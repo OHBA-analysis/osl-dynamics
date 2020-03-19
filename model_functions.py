@@ -5,6 +5,7 @@ from tensorflow.python.framework import ops
 import importlib
 
 import taser_functions
+
 taser_functions = importlib.reload(taser_functions)
 
 
@@ -21,29 +22,25 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
         ops.reset_default_graph()
         inputs_layer = layers.Input(shape=(mini_batch_length, nchans), name='MEG_input')
         dropout_layer = layers.Dropout(0.5)(inputs_layer)
-        if GPU == 1:
-            if bi_di_inf == 1:
-                print("using bi-directional RNNs")
-                inf_output_fw = tf.compat.v1.keras.layers.CuDNNGRU(int(nunits / 1),  # number of units
-                                                                   return_sequences=True,
-                                                                   name='uni_INF_GRU_FW')
-                inf_output_bw = tf.compat.v1.keras.layers.CuDNNGRU(int(nunits / 1),  # number of units
-                                                                   return_sequences=True,
-                                                                   name='uni_INF_GRU_BW',
-                                                                   go_backwards=True)
 
-                output = tf.keras.layers.Bidirectional(inf_output_fw,
-                                                       backward_layer=inf_output_bw,
-                                                       merge_mode='concat')(dropout_layer)
-            else:
+        if bi_di_inf == 1:
+            print("using bi-directional RNNs")
+            inf_output_fw = tf.keras.layers.GRU(int(nunits / 1),  # number of units
+                                                return_sequences=True,
+                                                name='uni_INF_GRU_FW')
+            inf_output_bw = tf.keras.layers.GRU(int(nunits / 1),  # number of units
+                                                return_sequences=True,
+                                                name='uni_INF_GRU_BW',
+                                                go_backwards=True)
 
-                output = tf.compat.v1.keras.layers.CuDNNGRU(int(nunits / 1),  # number of units
-                                                            return_sequences=True,
-                                                            name='uni_INF_GRU')(dropout_layer)
+            output = tf.keras.layers.Bidirectional(inf_output_fw,
+                                                   backward_layer=inf_output_bw,
+                                                   merge_mode='concat')(dropout_layer)
         else:
-            output = tf.compat.v1.keras.layers.GRU(12,
-                                                   return_sequences=True,
-                                                   name='uni_INF_GRU')(inputs_layer)
+
+            output = tf.keras.layers.GRU(int(nunits / 1),  # number of units
+                                         return_sequences=True,
+                                         name='uni_INF_GRU')(dropout_layer)
 
         # Affine transformations from output of RNN to mu and sigma for each alpha:
         dense_layer_mu = tf.keras.layers.Dense(npriors, activation='linear')(output)
@@ -93,15 +90,15 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
 
         # Construct your custom loss by feeding in the tensors which we made in the model.
         loss = taser_functions.my_beautiful_custom_loss(alpha_ast,
-                                        inputs_layer,
-                                        npriors,
-                                        nchans,
-                                        SL_tmp_cov_mat,
-                                        dense_layer_mu,
-                                        dense_layer_sigma,
-                                        model_dense_layer_mu,
-                                        model_dense_layer_sigma,
-                                        weight, mini_batch_length)
+                                                        inputs_layer,
+                                                        npriors,
+                                                        nchans,
+                                                        SL_tmp_cov_mat,
+                                                        dense_layer_mu,
+                                                        dense_layer_sigma,
+                                                        model_dense_layer_mu,
+                                                        model_dense_layer_sigma,
+                                                        weight, mini_batch_length)
 
         # Add loss to model
         model.add_loss(loss)
