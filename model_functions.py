@@ -50,28 +50,22 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
         alpha_ast = layers.Lambda(taser_functions.sampling,
                                   name='alpha_ast')([dense_layer_mu, dense_layer_sigma])
 
-        if GPU == 1:
-            if bi_di_model == 1:
-                model_output_fw = tf.compat.v1.keras.layers.CuDNNGRU(int(nunits / 1),  # number of units
-                                                                     return_sequences=True,
-                                                                     name='uni_model_mu_GRU_FW')
-                model_output_bw = tf.compat.v1.keras.layers.CuDNNGRU(int(nunits / 1),  # number of units
-                                                                     return_sequences=True,
-                                                                     name='uni_model_mu_GRU_BW',
-                                                                     go_backwards=True)
+        if bi_di_model == 1:
+            model_output_fw = tf.keras.layers.GRU(int(nunits / 1),  # number of units
+                                                  return_sequences=True,
+                                                  name='uni_model_mu_GRU_FW')
+            model_output_bw = tf.keras.layers.GRU(int(nunits / 1),  # number of units
+                                                  return_sequences=True,
+                                                  name='uni_model_mu_GRU_BW',
+                                                  go_backwards=True)
 
-                model_output = tf.keras.layers.Bidirectional(model_output_fw,
-                                                             backward_layer=model_output_bw,
-                                                             merge_mode='concat')(alpha_ast)
-            else:
-                model_output = tf.compat.v1.keras.layers.CuDNNGRU(int(nunits / 1),  # number of units
-                                                                  return_sequences=True,
-                                                                  name='uni_model_mu_GRU')(alpha_ast)
-
+            model_output = tf.keras.layers.Bidirectional(model_output_fw,
+                                                         backward_layer=model_output_bw,
+                                                         merge_mode='concat')(alpha_ast)
         else:
-            model_output = tf.compat.v1.keras.layers.GRU(10,  # number of units
-                                                         return_sequences=True,
-                                                         name='uni_model_mu_GRU')(alpha_ast)
+            model_output = tf.keras.layers.GRU(int(nunits / 1),  # number of units
+                                               return_sequences=True,
+                                               name='uni_model_mu_GRU')(alpha_ast)
 
         model_dense_layer_mu = tf.keras.layers.Dense(npriors, activation='linear', name='model_mu')(model_output)
         model_dense_layer_sigma = tf.keras.layers.Dense(npriors, activation='linear', name='model_sigma')(model_output)
