@@ -3,11 +3,15 @@ import scipy.io as spio
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import ops
+import matplotlib.pyplot as plt
 
 import importlib
 
 import model_functions
+import plotting_functions
+
 model_functions = importlib.reload(model_functions)
+plotting_functions = importlib.reload(plotting_functions)
 
 tf.random.set_seed(42)
 np.random.seed(154)
@@ -88,7 +92,7 @@ save_model = tf.keras.callbacks.ModelCheckpoint(filepath,
                                                 monitor='loss',
                                                 verbose=1,
                                                 save_best_only=True,
-                                                period=10)
+                                                save_freq=10)
 
 # NaN stopper
 NaNstop = tf.keras.callbacks.TerminateOnNaN()
@@ -99,6 +103,44 @@ history = model.fit(Y_portioned,  # Input or "Y_true"
                     verbose=1,
                     callbacks=[earlystopping_callback, callback_reduce_lr],
                     shuffle=True,
-                    epochs=30,
-                    batch_size=10,  # Scream if you want to go faster
+                    epochs=200,
+                    batch_size=4,  # Scream if you want to go faster
                     )
+
+mu_store = np.zeros((nbatches, mini_batch_length, npriors))
+for i in range(nbatches):
+    mu, sigma, ast, mod_mu, mod_sigma = model.predict(Y_portioned[i:i + 1, :, :])
+    mu_store[i, :, :] = mu
+
+print(mu_store.shape)
+mu_rs = tf.math.softplus(np.reshape(mu_store, (nbatches * mini_batch_length, npriors)))
+mu_rs = np.array(mu_rs)
+
+loss = np.array(history.history['loss'])
+
+plotting = True
+if plotting:
+    print("Plotting results")
+    fig, axes = plt.subplots(3, 3, figsize=(20, 20))
+    axis_generator = (axis for axis in axes.flatten())
+
+    plotting_functions.plot(np.log(loss - loss.min() + 1e-6), title="adjusted log loss", axis=next(axis_generator))
+
+    plotting_functions.imshow(trial_times[1:1000, :].T, title="trial_times", axis=next(axis_generator))
+    plotting_functions.imshow(mu_rs[1:1000, 88:100].T, title="Recon alphas", axis=next(axis_generator))
+    plotting_functions.imshow(mu_rs[1:1000, :].T, title="Recon alphas", axis=next(axis_generator))
+
+    plotting_functions.plot_alpha_channel(mu_rs, channel=88, axis=next(axis_generator))
+    plotting_functions.plot_alpha_channel(mu_rs, channel=89, axis=next(axis_generator))
+    plotting_functions.plot_alpha_channel(mu_rs, channel=98, axis=next(axis_generator))
+
+    plotting_functions.plot_multiple_channels(mu_rs, channels=[89, 98], axis=next(axis_generator))
+
+    plotting_functions.plot_reg(mu_rs, npriors=npriors, axis=next(axis_generator))
+
+    plt.tight_layout()
+
+    plt.show()
+
+np.save(base_dir + 'alphas.npy', mu_rs)
+np.save(base_dir + 'loss.npy', loss)
