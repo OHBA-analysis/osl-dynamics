@@ -9,9 +9,15 @@ import importlib
 
 import model_functions
 import plotting_functions
+import misc
 
 model_functions = importlib.reload(model_functions)
 plotting_functions = importlib.reload(plotting_functions)
+misc = importlib.reload(misc)
+
+log_print = misc.log_print
+
+log_print("Imports completed", "blue")
 
 tf.random.set_seed(42)
 np.random.seed(154)
@@ -23,26 +29,34 @@ ops.reset_default_graph()
 base_dir = '/well/woolrich/users/ozn760/TASER/bSNR_1_iteration_1/'
 
 # Load in PCA'd lead field, the GT X and simulated data, Y
+log_print(f"Loading PCA'd lead field from {base_dir + 'burst_SIMULATION_LF_PCA.mat'}", 'green')
 H_PCA = spio.loadmat(base_dir + 'burst_SIMULATION_LF_PCA.mat')
 H_PCA = np.transpose(H_PCA['c_ROI_LF_PCA'])  # Must be channels or PCs by sources
 
+log_print(f"Loading PCA'd Y from {base_dir + 'burst_SIMULATION_Y_PCA.mat'}", 'green')
 Y_sim = spio.loadmat(base_dir + 'burst_SIMULATION_Y_PCA.mat')
 Y_sim = Y_sim['data_for_MF_SR']  # needs to be channels or PCs by time
 Y_sim = Y_sim[:, :]
-print("Simulated data are of dimension:", Y_sim.shape)
+log_print(f"Simulated data are of dimension: {Y_sim.shape}", "magenta")
 
 H2 = H_PCA
 
+log_print(f"Loading trial times from {base_dir + 'trial_times.mat'}", 'green')
 trial_times = spio.loadmat(base_dir + 'trial_times.mat')
 trial_times = trial_times['trial_times']
 
 # Finally, load in the ROB prior:
+log_print(f"Loading 'rest of brain' prior from {base_dir + 'ROB_prior.mat'}", 'green')
 ROB = spio.loadmat(base_dir + 'ROB_prior.mat')
 ROB = ROB['ROB_prior']
 
-# Spit out simulation info
-with open(base_dir + 'exp.txt', 'r') as f:
-    print(f.read())
+log_print("Files loaded", 'blue')
+
+print_simulation_info = False
+if print_simulation_info:
+    # Spit out simulation info
+    with open(base_dir + 'exp.txt', 'r') as f:
+        print(f.read())
 
 nbatches = 198  # how many examples of data we have
 mini_batch_length = 100  # how long each feature/segment/example is
@@ -72,8 +86,6 @@ Y_portioned = np.reshape(Y_sim[:, 0:nbatches * mini_batch_length].transpose(),
                          [nbatches, mini_batch_length, nchans])
 print(Y_portioned.shape)
 
-model = model_functions.create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat)
-
 # Early stopping:
 earlystopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss',
                                                           patience=10000,
@@ -97,15 +109,21 @@ save_model = tf.keras.callbacks.ModelCheckpoint(filepath,
 # NaN stopper
 NaNstop = tf.keras.callbacks.TerminateOnNaN()
 
-# Y_portioned is of shape ((nbatches,mini_batch_length,nchans))
-ops.reset_default_graph()
-history = model.fit(Y_portioned,  # Input or "Y_true"
-                    verbose=1,
-                    callbacks=[earlystopping_callback, callback_reduce_lr],
-                    shuffle=True,
-                    epochs=200,
-                    batch_size=4,  # Scream if you want to go faster
-                    )
+strategy = tf.distribute.MirroredStrategy()
+with strategy.scope():
+    model = model_functions.create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat)
+
+    # Y_portioned is of shape ((nbatches,mini_batch_length,nchans))
+    ops.reset_default_graph()
+
+    print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}")
+    history = model.fit(Y_portioned,  # Input or "Y_true"
+                        verbose=1,
+                        callbacks=[earlystopping_callback, callback_reduce_lr],
+                        shuffle=True,
+                        epochs=1,
+                        batch_size=10,  # Scream if you want to go faster
+                        )
 
 mu_store = np.zeros((nbatches, mini_batch_length, npriors))
 for i in range(nbatches):

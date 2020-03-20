@@ -10,8 +10,8 @@ taser_functions = importlib.reload(taser_functions)
 
 
 def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
-    strategy = tf.distribute.MirroredStrategy()
-    # with strategy.scope():
+    print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}")
+
     if True:
         GPU = 1
         RNN = 1
