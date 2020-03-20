@@ -10,10 +10,12 @@ import importlib
 import model_functions
 import plotting_functions
 import misc
+import taser_functions
 
 model_functions = importlib.reload(model_functions)
 plotting_functions = importlib.reload(plotting_functions)
 misc = importlib.reload(misc)
+taser_functions = importlib.reload(taser_functions)
 
 log_print = misc.log_print
 
@@ -86,44 +88,23 @@ Y_portioned = np.reshape(Y_sim[:, 0:nbatches * mini_batch_length].transpose(),
                          [nbatches, mini_batch_length, nchans])
 print(Y_portioned.shape)
 
-# Early stopping:
-earlystopping_callback = tf.keras.callbacks.EarlyStopping(monitor='loss',
-                                                          patience=10000,
-                                                          restore_best_weights=True)
-
-# Decrease learning rate if we need to:
-callback_reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss',
-                                                          factor=0.5,
-                                                          min_lr=1e-6,
-                                                          patience=40,
-                                                          verbose=1)
-
-# Save the model as we train
-filepath = "model.h5"
-save_model = tf.keras.callbacks.ModelCheckpoint(filepath,
-                                                monitor='loss',
-                                                verbose=1,
-                                                save_best_only=True,
-                                                save_freq=10)
-
-# NaN stopper
-NaNstop = tf.keras.callbacks.TerminateOnNaN()
-
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
     model = model_functions.create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat)
 
     # Y_portioned is of shape ((nbatches,mini_batch_length,nchans))
-    ops.reset_default_graph()
+    # ops.reset_default_graph()
 
-    print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}")
+    log_print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}", "red")
     history = model.fit(Y_portioned,  # Input or "Y_true"
                         verbose=1,
-                        callbacks=[earlystopping_callback, callback_reduce_lr],
+                        callbacks=taser_functions.get_callbacks(["early_stopping", "reduce_lr"]),
                         shuffle=True,
                         epochs=1,
                         batch_size=10,  # Scream if you want to go faster
                         )
+
+log_print("Training complete", "green")
 
 mu_store = np.zeros((nbatches, mini_batch_length, npriors))
 for i in range(nbatches):

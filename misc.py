@@ -24,6 +24,7 @@ def log_print(text, log_type='none'):
         fail='\033[91m',
         bold='\033[1m',
         underline='\033[4m',
+        red='\033[31m',
         none=''
     )
     end_character = '' if log_type == 'none' else '\033[0m'

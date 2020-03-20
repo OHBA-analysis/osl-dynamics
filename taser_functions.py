@@ -105,3 +105,37 @@ def my_beautiful_custom_loss(alpha_ast,
     loss = tf.reduce_mean(-LL) + (weight * KL)
 
     return loss
+
+
+def get_callbacks(callbacks):
+
+    if isinstance(callbacks, str):
+        callbacks = [callbacks]
+
+    filepath = "model.h5"
+
+    callback_dict = dict(
+        # Early stopping:
+        early_stopping=tf.keras.callbacks.EarlyStopping(monitor='loss',
+                                                        patience=10000,
+                                                        restore_best_weights=True),
+
+        # Decrease learning rate if we need to:
+        reduce_lr=tf.keras.callbacks.ReduceLROnPlateau(monitor='loss',
+                                                       factor=0.5,
+                                                       min_lr=1e-6,
+                                                       patience=40,
+                                                       verbose=1),
+
+        # Save the model as we train
+        save_model=tf.keras.callbacks.ModelCheckpoint(filepath,
+                                                      monitor='loss',
+                                                      verbose=1,
+                                                      save_best_only=True,
+                                                      save_freq=10),
+
+        # NaN stopper
+        nan_stop=tf.keras.callbacks.TerminateOnNaN()
+    )
+
+    return [callback_dict[callback] for callback in callbacks]

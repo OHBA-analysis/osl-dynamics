@@ -5,12 +5,16 @@ from tensorflow.python.framework import ops
 import importlib
 
 import taser_functions
+import misc
 
 taser_functions = importlib.reload(taser_functions)
+misc = importlib.reload(misc)
+
+log_print = misc.log_print
 
 
 def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
-    print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}")
+    log_print(f"LOG: scope in function is {ops.get_default_graph()._distribution_strategy_stack}", "red")
 
     if True:
         GPU = 1
