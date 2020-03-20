@@ -30,27 +30,28 @@ ops.reset_default_graph()
 
 base_dir = '/well/woolrich/users/ozn760/TASER/bSNR_1_iteration_1/'
 
+file_names = dict(
+    H_PCA=base_dir + 'burst_SIMULATION_LF_PCA.npy',
+    Y_sim=base_dir + 'burst_SIMULATION_Y_PCA.npy',
+    trial_times=base_dir + 'trial_times.npy',
+    ROB_prior=base_dir + 'ROB_prior.npy'
+)
+
 # Load in PCA'd lead field, the GT X and simulated data, Y
-log_print(f"Loading PCA'd lead field from {base_dir + 'burst_SIMULATION_LF_PCA.mat'}", 'green')
-H_PCA = spio.loadmat(base_dir + 'burst_SIMULATION_LF_PCA.mat')
-H_PCA = np.transpose(H_PCA['c_ROI_LF_PCA'])  # Must be channels or PCs by sources
-
-log_print(f"Loading PCA'd Y from {base_dir + 'burst_SIMULATION_Y_PCA.mat'}", 'green')
-Y_sim = spio.loadmat(base_dir + 'burst_SIMULATION_Y_PCA.mat')
-Y_sim = Y_sim['data_for_MF_SR']  # needs to be channels or PCs by time
-Y_sim = Y_sim[:, :]
-log_print(f"Simulated data are of dimension: {Y_sim.shape}", "magenta")
-
+log_print(f"Loading PCA'd lead field from {file_names['H_PCA']}", 'green')
+H_PCA = np.load(file_names['H_PCA']).T
 H2 = H_PCA
 
-log_print(f"Loading trial times from {base_dir + 'trial_times.mat'}", 'green')
-trial_times = spio.loadmat(base_dir + 'trial_times.mat')
-trial_times = trial_times['trial_times']
+log_print(f"Loading PCA'd Y from {file_names['Y_sim']}", 'green')
+Y_sim = np.load(file_names['Y_sim'])
+log_print(f"Simulated data are of dimension: {Y_sim.shape}", "")
+
+log_print(f"Loading trial times from {file_names['trial_times']}", 'green')
+trial_times = np.load(file_names['trial_times'])
 
 # Finally, load in the ROB prior:
-log_print(f"Loading 'rest of brain' prior from {base_dir + 'ROB_prior.mat'}", 'green')
-ROB = spio.loadmat(base_dir + 'ROB_prior.mat')
-ROB = ROB['ROB_prior']
+log_print(f"Loading 'rest of brain' prior from {file_names['ROB_prior']}", 'green')
+ROB = np.load(file_names['ROB_prior'])
 
 log_print("Files loaded", 'blue')
 
