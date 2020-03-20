@@ -23,7 +23,7 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
         bi_di_model = 0
         nunits = 50
         # Build the network!
-        ops.reset_default_graph()
+        # ops.reset_default_graph()
         inputs_layer = layers.Input(shape=(mini_batch_length, nchans), name='MEG_input')
         dropout_layer = layers.Dropout(0.5)(inputs_layer)
 

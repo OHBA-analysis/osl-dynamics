@@ -25,7 +25,7 @@ tf.random.set_seed(42)
 np.random.seed(154)
 
 tfd = tfp.distributions
-tf.config.experimental_run_functions_eagerly(True)
+tf.config.experimental_run_functions_eagerly(False)
 ops.reset_default_graph()
 
 base_dir = '/well/woolrich/users/ozn760/TASER/bSNR_1_iteration_1/'
@@ -96,13 +96,15 @@ with strategy.scope():
     # ops.reset_default_graph()
 
     log_print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}", "red")
-    history = model.fit(Y_portioned,  # Input or "Y_true"
-                        verbose=1,
-                        callbacks=taser_functions.get_callbacks(["early_stopping", "reduce_lr"]),
-                        shuffle=True,
-                        epochs=1,
-                        batch_size=10,  # Scream if you want to go faster
-                        )
+
+
+history = model.fit(Y_portioned,  # Input or "Y_true"
+                    verbose=1,
+                    callbacks=taser_functions.get_callbacks(["early_stopping", "reduce_lr"]),
+                    shuffle=True,
+                    epochs=200,
+                    batch_size=10,  # Scream if you want to go faster
+                    )
 
 log_print("Training complete", "green")
 
