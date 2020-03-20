@@ -76,3 +76,27 @@ def plot_reg(data, npriors, axis=None):
         plt.show()
     else:
         return plot_axis
+
+
+def plot_all(loss, trial_times, mu_rs, n_priors):
+    print("Plotting results")
+    fig, axes = plt.subplots(3, 3, figsize=(20, 20))
+    axis_generator = (axis for axis in axes.flatten())
+
+    plot(np.log(loss - loss.min() + 1e-6), title="adjusted log loss", axis=next(axis_generator))
+
+    imshow(trial_times[1:1000, :].T, title="trial_times", axis=next(axis_generator))
+    imshow(mu_rs[1:1000, 88:100].T, title="Recon alphas", axis=next(axis_generator))
+    imshow(mu_rs[1:1000, :].T, title="Recon alphas", axis=next(axis_generator))
+
+    plot_alpha_channel(mu_rs, channel=88, axis=next(axis_generator))
+    plot_alpha_channel(mu_rs, channel=89, axis=next(axis_generator))
+    plot_alpha_channel(mu_rs, channel=98, axis=next(axis_generator))
+
+    plot_multiple_channels(mu_rs, channels=[89, 98], axis=next(axis_generator))
+
+    plot_reg(mu_rs, npriors=n_priors, axis=next(axis_generator))
+
+    plt.tight_layout()
+
+    plt.show()

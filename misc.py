@@ -12,6 +12,8 @@ def convert_mat_to_npy():
     for mat_file in tqdm(file_names):
         for val in spio.loadmat(mat_file).values():
             if isinstance(val, np.ndarray):
+                if 'LF' in mat_file:
+                    val = val.T
                 np.save(mat_file[:-4], val)
 
 

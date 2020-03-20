@@ -14,16 +14,13 @@ log_print = misc.log_print
 
 
 def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
-    log_print(f"LOG: scope in function is {ops.get_default_graph()._distribution_strategy_stack}", "red")
+    # log_print(f"LOG: scope in function is {ops.get_default_graph()._distribution_strategy_stack}", "red")
 
     if True:
-        GPU = 1
-        RNN = 1
         bi_di_inf = 1
         bi_di_model = 0
         nunits = 50
         # Build the network!
-        # ops.reset_default_graph()
         inputs_layer = layers.Input(shape=(mini_batch_length, nchans), name='MEG_input')
         dropout_layer = layers.Dropout(0.5)(inputs_layer)
 

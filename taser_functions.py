@@ -34,25 +34,25 @@ def my_beautiful_custom_loss(alpha_ast,
                              model_mu,
                              model_sigma,
                              weight, mini_batch_length):
-    # SL_tmp_cov_mat <- The basis set at the sensor level after projection through H
+    # sl_tmp_cov_mat <- The basis set at the sensor level after projection through H
 
     # Input dimensions:
-    # cov_arg inv: [batches, mini_batch_length,nchans,nchans]
-    # Y_portioned: [batches, mini_batch_length,nchans]
+    # cov_arg inv: [batches, mini_batch_length,n_channels,n_channels]
+    # Y_portioned: [batches, mini_batch_length,n_channels]
     # weight: scalar, KL annealing term
 
     covariance_matrix = SL_tmp_cov_mat.astype('float32')
 
-    # Alphas need to end up being of dimension (?,mini_batch_length,npriors,1,1),
+    # Alphas need to end up being of dimension (?,mini_batch_length,n_priors,1,1),
     # and need to undergo softplus transformation:
     alpha_ext = tf.keras.backend.expand_dims(tf.keras.backend.expand_dims(
         tf.keras.activations.softplus(alpha_ast),
         axis=-1), axis=-1)
 
-    # Covariance basis functions need to be of dimension [1,1, npriors, sensors, sensors]
+    # Covariance basis functions need to be of dimension [1,1, n_priors, sensors, sensors]
     covariance_ext = tf.reshape(covariance_matrix, (1, 1, npriors, nchans, nchans))
 
-    # Do the multiplicative sum over the npriors dimension:
+    # Do the multiplicative sum over the n_priors dimension:
     cov_arg = tf.reduce_sum(tf.multiply(alpha_ext, covariance_ext), 2)
 
     # Add a tiny bit of diagonal to the covariance to ensure invertability
@@ -72,8 +72,8 @@ def my_beautiful_custom_loss(alpha_ast,
     inv_cov_arg = tf.linalg.inv(cov_arg)
     log_det = -0.5 * m * tf.linalg.logdet(cov_arg)
 
-    # Y_portioned is [batches, mini_batch_length,nchans], but we need it to be
-    # [batches, mini_batch_length,1,nchans]. This is an easy fix - just add an extra dimension
+    # Y_portioned is [batches, mini_batch_length,n_channels], but we need it to be
+    # [batches, mini_batch_length,1,n_channels]. This is an easy fix - just add an extra dimension
 
     Y_exp_dims = tf.expand_dims(Y_portioned, axis=2)
 
