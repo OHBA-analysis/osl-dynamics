@@ -82,7 +82,7 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
         with open('model.json', "w") as json_file:
             json_file.write(model_as_json)
 
-        weight = 0.0
+        weight = 1.0
 
         # Construct your custom loss by feeding in the tensors which we made in the model.
         loss = taser_functions.my_beautiful_custom_loss(alpha_ast,

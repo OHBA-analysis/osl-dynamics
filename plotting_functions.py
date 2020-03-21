@@ -31,12 +31,12 @@ def imshow(data, title='', axis=None):
         return plot_axis
 
 
-def plot_alpha_channel(data, channel, axis=None):
+def plot_alpha_channel(data, channel, axis=None, lw=1):
     if axis is None:
         fig, plot_axis = plt.subplots(1)
     else:
         plot_axis = axis
-    plot_axis.plot((data[:, channel]))
+    plot_axis.plot((data[:, channel]), lw=lw)
     plot_axis.set_xlim([0, 500])
     plot_axis.set_title(f'Source {channel}')
 
@@ -46,13 +46,13 @@ def plot_alpha_channel(data, channel, axis=None):
         return plot_axis
 
 
-def plot_multiple_channels(data, channels, axis=None):
+def plot_multiple_channels(data, channels, axis=None, lw=1):
     if axis is None:
         fig, plot_axis = plt.subplots(1)
     else:
         plot_axis = axis
     for channel in channels:
-        plot_axis.plot((data[:, channel]), label=channel)
+        plot_axis.plot((data[:, channel]), label=channel, lw=lw)
     plot_axis.set_xlim([0, 500])
     plot_axis.set_title(f'Sources {", ".join(map(str, channels))}')
     plot_axis.legend()

@@ -19,9 +19,9 @@ def convert_mat_to_npy():
 
 def log_print(text, log_type='none'):
     colors = dict(
-        magenta='\033[95m',
-        blue='\033[94m',
-        green='\033[92m',
+        magenta='\033[95mLOG: ',
+        blue='\033[94mSUCCESS: ',
+        green='\033[92mINFO: ',
         yellow='\033[93m',
         fail='\033[91m',
         bold='\033[1m',
