@@ -1,11 +1,44 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
+from time import time
+import datetime
 
 tfd = tfp.distributions
 
 
-def sampling(args):
+class TimeRemainingCallback(tf.keras.callbacks.Callback):
+    def __init__(self, n_epochs=None, use_gpu=True):
+        super(TimeRemainingCallback, self).__init__()
+        self.n_epochs = n_epochs
+        self.current_epoch = 0
+        self.times = []
+        self.start_time = None
+        if use_gpu:
+            import nvidia_smi
+            nvidia_smi.nvmlInit()
+
+    def on_epoch_begin(self, epoch, logs=None):
+        if self.current_epoch:
+            print(f"Estimated time remaining: {self.str_time_remaining[:-7]}")
+        self.start_time = time()
+        self.current_epoch += 1
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.times.append(time() - self.start_time)
+        # clear_output()
+        if len(self.times) > 5:
+            mean_times = np.mean(self.times[-5:])
+        else:
+            mean_times = np.mean(self.times)
+        # print("\nAverage time per epoch (last ten): {:.5f} seconds".format(mean_times))
+        self.str_time_remaining = str(datetime.timedelta(seconds=mean_times * (self.n_epochs - self.current_epoch)))
+        # print(f"Estimated time remaining: {str_time_remaining[:-7]}")
+
+        # check_gpu_utilization()
+
+
+def sampling(z_mean, z_log_var):
     """Reparameterization trick: draw random variable from normal distribution (mu=0,sigma=1)
 
     # Arguments
@@ -14,7 +47,7 @@ def sampling(args):
     # Returns
         z* = a sample from the variational dist.
     """
-    z_mean, z_log_var = args
+    # z_mean, z_log_var = args
     batch = tf.shape(z_mean)[0]
     dim = tf.keras.backend.int_shape(z_mean)[1]
     chans = tf.keras.backend.int_shape(z_mean)[2]
@@ -22,6 +55,20 @@ def sampling(args):
     # by default, random_normal has mean = 0 and std = 1.0
     epsilon = tf.keras.backend.random_normal(shape=(batch, dim, chans))
     return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+
+
+class SamplingLayer(tf.keras.layers.Layer):
+    def __init__(self):
+        super(SamplingLayer, self).__init__()
+
+    def call(self, inputs, **kwargs):
+        # Shape of z_mean is batch, dim, chans
+        z_mean, z_log_var = inputs
+
+        # by default, random_normal has mean = 0 and std = 1.0
+        # epsilon = tf.keras.backend.random_normal(shape=(batch, dim, chans))
+        epsilon = tf.keras.backend.random_normal(shape=tf.shape(z_mean))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
 
 def my_beautiful_custom_loss(alpha_ast,
@@ -41,7 +88,7 @@ def my_beautiful_custom_loss(alpha_ast,
     # Y_portioned: [batches, mini_batch_length,n_channels]
     # weight: scalar, KL annealing term
 
-    covariance_matrix = SL_tmp_cov_mat.astype('float32')
+    covariance_matrix = SL_tmp_cov_mat  # .astype('float32')
 
     # Alphas need to end up being of dimension (?,mini_batch_length,n_priors,1,1),
     # and need to undergo softplus transformation:
@@ -56,7 +103,7 @@ def my_beautiful_custom_loss(alpha_ast,
     cov_arg = tf.reduce_sum(tf.multiply(alpha_ext, covariance_ext), 2)
 
     # Add a tiny bit of diagonal to the covariance to ensure invertability
-    safety_add = (1e-8) * np.eye(nchans, nchans)
+    safety_add = 1e-8 * np.eye(nchans, nchans)
     # cov_arg = (cov_arg + tf.transpose(cov_arg,perm=[0,1,3,2]))*0.5
     cov_arg = cov_arg + safety_add
 
@@ -70,7 +117,7 @@ def my_beautiful_custom_loss(alpha_ast,
     #   m is the number of observations = channels
     m = nchans
     inv_cov_arg = tf.linalg.inv(cov_arg)
-    log_det = -0.5 * m * tf.linalg.logdet(cov_arg)
+    log_det = -0.5 * tf.cast(m, tf.float32) * tf.linalg.logdet(cov_arg)
 
     # Y_portioned is [batches, mini_batch_length,n_channels], but we need it to be
     # [batches, mini_batch_length,1,n_channels]. This is an easy fix - just add an extra dimension
@@ -93,8 +140,9 @@ def my_beautiful_custom_loss(alpha_ast,
 
     # For the model sigma term, we take the mean over batches and MBL, then tile into the shape that
     # we need
-    test = tf.tile(tf.math.reduce_mean(tf.math.reduce_mean(inference_sigma, axis=0), axis=0, keepdims=True),
-                   [mini_batch_length, 1])
+    test = tf.tile(
+        tf.math.reduce_mean(tf.math.reduce_mean(inference_sigma, axis=0), axis=0, keepdims=True),
+        [mini_batch_length, 1])
 
     q = tfd.Normal(loc=inference_mu,
                    scale=tf.exp(test))
@@ -107,8 +155,7 @@ def my_beautiful_custom_loss(alpha_ast,
     return loss
 
 
-def get_callbacks(callbacks):
-
+def get_callbacks(callbacks, n_epochs=None):
     if isinstance(callbacks, str):
         callbacks = [callbacks]
 
@@ -135,7 +182,9 @@ def get_callbacks(callbacks):
                                                       save_freq=10),
 
         # NaN stopper
-        nan_stop=tf.keras.callbacks.TerminateOnNaN()
+        nan_stop=tf.keras.callbacks.TerminateOnNaN(),
+
+        time_remaining=TimeRemainingCallback(n_epochs=n_epochs)
     )
 
     return [callback_dict[callback] for callback in callbacks]

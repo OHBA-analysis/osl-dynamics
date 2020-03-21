@@ -97,6 +97,6 @@ def plot_all(loss, trial_times, mu_rs, n_priors):
 
     plot_reg(mu_rs, npriors=n_priors, axis=next(axis_generator))
 
-    plt.tight_layout()
+    plt.tight_layout(pad=5)
 
     plt.show()

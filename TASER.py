@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.python.framework import ops
-import matplotlib.pyplot as plt
-
+from time import time
+import datetime
 import importlib
 
 import model_functions
@@ -19,9 +19,6 @@ taser_functions = importlib.reload(taser_functions)
 log_print = misc.log_print
 
 log_print("Imports completed", "blue")
-
-tf.random.set_seed(42)
-np.random.seed(154)
 
 tfd = tfp.distributions
 tf.config.experimental_run_functions_eagerly(False)
@@ -69,7 +66,7 @@ n_priors = n_sources + 2  # number of priors in our inference
 tf.keras.backend.clear_session()
 
 # Simulate data - not optimised!
-time = np.arange(0, n_batches * mini_batch_length, 1);
+time_series = np.arange(0, n_batches * mini_batch_length, 1)
 
 # First, build the prior basis set.
 tmp_cov_mat = np.zeros((n_priors, n_sources, n_sources))  # source level covariance
@@ -84,9 +81,15 @@ for i in range(n_priors - 2):
 sl_tmp_cov_mat[n_priors - 2, :, :] = np.eye(n_channels)  # REGULARISATION TERM!
 sl_tmp_cov_mat[n_priors - 1, :, :] = ROB
 
+sl_tmp_cov_mat = tf.convert_to_tensor(sl_tmp_cov_mat, dtype=tf.float32)
+
 Y_portioned = np.reshape(Y_sim[:, 0:n_batches * mini_batch_length].transpose(),
                          [n_batches, mini_batch_length, n_channels])
 print(Y_portioned.shape)
+
+Y_portioned = tf.convert_to_tensor(Y_portioned, dtype=tf.float32)
+
+Y_portioned_dataset = tf.data.Dataset.from_tensor_slices(Y_portioned).batch(20)
 
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
@@ -97,21 +100,31 @@ with strategy.scope():
 
     # log_print(f"LOG: scope is {ops.get_default_graph()._distribution_strategy_stack}", "red")
 
-
-history = model.fit(Y_portioned,  # Input or "Y_true"
+n_epochs = 200
+fit_start_time = time()
+history = model.fit(Y_portioned_dataset,  # Input or "Y_true"
                     verbose=1,
-                    callbacks=taser_functions.get_callbacks(["early_stopping", "reduce_lr"]),
+                    callbacks=taser_functions.get_callbacks(
+                        ["early_stopping", "reduce_lr", "time_remaining"],
+                        n_epochs=n_epochs),
                     shuffle=True,
-                    epochs=4,
-                    batch_size=10,  # Scream if you want to go faster
+                    epochs=n_epochs,
+                    # batch_size=20,  # Scream if you want to go faster
                     )
-
+fit_end_time = time()
+fit_time_string = str(datetime.timedelta(seconds=fit_end_time - fit_start_time))[:-7]
 log_print("Training complete", "green")
+log_print(f"Total training time was {fit_time_string}", "magenta")
 
-mu_store = np.zeros((n_batches, mini_batch_length, n_priors))
-for i in range(n_batches):
-    mu, sigma, ast, mod_mu, mod_sigma = model.predict(Y_portioned[i:i + 1, :, :])
-    mu_store[i, :, :] = mu
+# mu_store = np.zeros((n_batches, mini_batch_length, n_priors))
+# for i in range(n_batches):
+#     mu, sigma, ast, mod_mu, mod_sigma = model.predict(Y_portioned[i:i + 1, :, :])
+#     mu_store[i, :, :] = mu
+
+mu, sigma, ast, mod_mu, mod_sigma = model.predict(Y_portioned)
+mu_store = mu
+
+log_print("Prediction complete", "green")
 
 print(mu_store.shape)
 mu_rs = tf.math.softplus(np.reshape(mu_store, (n_batches * mini_batch_length, n_priors)))

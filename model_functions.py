@@ -48,8 +48,9 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
         dense_layer_sigma = tf.keras.layers.Dense(npriors, activation='linear')(output)
 
         # Generate a sample via the RT.
-        alpha_ast = layers.Lambda(taser_functions.sampling,
-                                  name='alpha_ast')([dense_layer_mu, dense_layer_sigma])
+        # alpha_ast = layers.Lambda(taser_functions.sampling,
+        #                           name='alpha_ast')(z_mean=dense_layer_mu, z_log_var=dense_layer_sigma)
+        alpha_ast = taser_functions.SamplingLayer()([dense_layer_mu, dense_layer_sigma])
 
         if bi_di_model == 1:
             model_output_fw = tf.keras.layers.GRU(int(nunits / 1),  # number of units
@@ -81,19 +82,19 @@ def create_model(mini_batch_length, nchans, npriors, SL_tmp_cov_mat):
         with open('model.json', "w") as json_file:
             json_file.write(model_as_json)
 
-        weight = 1.0
+        weight = 0.0
 
         # Construct your custom loss by feeding in the tensors which we made in the model.
         loss = taser_functions.my_beautiful_custom_loss(alpha_ast,
                                                         inputs_layer,
-                                                        npriors,
-                                                        nchans,
+                                                        tf.constant(npriors),
+                                                        tf.constant(nchans),
                                                         SL_tmp_cov_mat,
                                                         dense_layer_mu,
                                                         dense_layer_sigma,
                                                         model_dense_layer_mu,
                                                         model_dense_layer_sigma,
-                                                        weight, mini_batch_length)
+                                                        tf.constant(weight), tf.constant(mini_batch_length))
 
         # Add loss to model
         model.add_loss(loss)
