@@ -24,7 +24,7 @@ tfd = tfp.distributions
 tf.config.experimental_run_functions_eagerly(False)
 ops.reset_default_graph()
 
-base_dir = '/well/woolrich/users/ozn760/TASER/bSNR_1_iteration_1/'
+base_dir = '/well/woolrich/shared/bSNR_1_iteration_1/'
 
 file_names = dict(
     H_PCA=base_dir + 'burst_SIMULATION_LF_PCA.npy',
@@ -75,7 +75,7 @@ debug_cov = 0
 
 for i in range(n_priors - 2):
     tmp_cov_mat[i, i, i] = 1
-    sl_tmp_cov_mat[i, :, :] = (1e-4 * np.eye(n_channels)) + np.matmul(np.matmul(H2, tmp_cov_mat[i, :, :]),
+    sl_tmp_cov_mat[i, :, :] = (1e-8 * np.eye(n_channels)) + np.matmul(np.matmul(H2, tmp_cov_mat[i, :, :]),
                                                                       np.transpose(H2))  # C_Yi = H C_Xi H'
 
 sl_tmp_cov_mat[n_priors - 2, :, :] = np.eye(n_channels)  # REGULARISATION TERM!
@@ -89,7 +89,7 @@ print(Y_portioned.shape)
 
 Y_portioned = tf.convert_to_tensor(Y_portioned, dtype=tf.float32)
 
-Y_portioned_dataset = tf.data.Dataset.from_tensor_slices(Y_portioned).batch(20)
+Y_portioned_dataset = tf.data.Dataset.from_tensor_slices(Y_portioned).batch(4)
 
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():

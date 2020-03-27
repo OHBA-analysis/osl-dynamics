@@ -36,8 +36,8 @@ def plot_alpha_channel(data, channel, axis=None, lw=1):
         fig, plot_axis = plt.subplots(1)
     else:
         plot_axis = axis
-    plot_axis.plot((data[:, channel]), lw=lw)
-    plot_axis.set_xlim([0, 500])
+    plot_axis.plot((data[:500, channel]), lw=lw)
+    # plot_axis.set_xlim([0, 500])
     plot_axis.set_title(f'Source {channel}')
 
     if axis is None:
@@ -52,8 +52,8 @@ def plot_multiple_channels(data, channels, axis=None, lw=1):
     else:
         plot_axis = axis
     for channel in channels:
-        plot_axis.plot((data[:, channel]), label=channel, lw=lw)
-    plot_axis.set_xlim([0, 500])
+        plot_axis.plot((data[:500, channel]), label=channel, lw=lw)
+    # plot_axis.set_xlim([0, 500])
     plot_axis.set_title(f'Sources {", ".join(map(str, channels))}')
     plot_axis.legend()
 
@@ -68,8 +68,8 @@ def plot_reg(data, npriors, axis=None):
         fig, plot_axis = plt.subplots(1)
     else:
         plot_axis = axis
-    plot_axis.plot((data[:, npriors - 1]))
-    plot_axis.set_xlim([0, 500])
+    plot_axis.plot((data[:500, npriors - 1]))
+    # plot_axis.set_xlim([0, 500])
     plot_axis.set_title('reg')
 
     if axis is None:
