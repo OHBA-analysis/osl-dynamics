@@ -1,3 +1,9 @@
+"""Initializers for TensorFlow layers
+
+A series of classes which inherit from `tensorflow.keras.initializers.Initializer`.
+They are used to initialize weights in custom layers.
+
+"""
 import tensorflow as tf
 from tensorflow.keras.initializers import Initializer
 
@@ -65,6 +71,7 @@ class UnchangedInitializer(Initializer):
     """Initializer which returns unchanged values when called.
 
     """
+
     def __init__(self, initial_values):
         self.initial_values = initial_values
 

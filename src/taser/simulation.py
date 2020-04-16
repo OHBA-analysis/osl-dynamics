@@ -1,26 +1,41 @@
+"""Simulations for MEG data
+
+This module allows the user to conveniently simulate MEG data. Instantiating the
+`Simulation` class automatically takes the user's input parameters and produces data
+which can be analysed.
+
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-def get_one_hot(values, n_states):
-    """
-
-    Parameters
-    ----------
-    values
-    n_states
-
-    Returns
-    -------
-
-    """
-    res = np.eye(n_states)[np.array(values).reshape(-1)]
-    return res.reshape(list(values.shape) + [n_states])
+from src.taser.helpers.numpy import get_one_hot
 
 
 class Simulation:
-    """
+    """Class for making the simulation of MEG data easy!
 
+    Parameters
+    ----------
+    sim_type : str
+        Type of HMM to use (["sequence_hmm", "uni_hmm", "hmm", "random"])
+    n_samples : int
+        Number of time points to generate
+    n_channels : int
+        Number of channels to create
+    n_states : int
+        Number of states to simulate
+    sim_varying_means : bool
+        If False, means will be set to zero.
+    markov_lag : int
+        How many time steps to look back for the current hidden state.
+    stay_prob : float
+        The probability that a state will remain selected in the next iteration.
+    random_covariance_weights : bool
+        Should the simulation use random covariance weights? False gives structured
+        covariances.
+    e_std : float
+        The standard deviation of noise added to the signal from a normal distribution.
     """
 
     simulation_options = ["sequence_hmm", "uni_hmm", "hmm", "random"]
@@ -65,10 +80,12 @@ class Simulation:
         self.data_sim = self.simulate_data()
 
     def hmm(self) -> np.ndarray:
-        """
+        """Standard sequential HMM
 
         Returns
         -------
+        alpha_sim : np.array
+            State time course
 
         """
         alpha_sim = np.zeros((self.n_samples, self.n_states))
@@ -94,11 +111,12 @@ class Simulation:
         return alpha_sim
 
     def random_hmm(self) -> np.ndarray:
-        """
+        """Totally random state selection HMM
 
         Returns
         -------
-
+        alpha_sim : np.array
+            State time course
         """
         # TODO: Ask Mark what FOS is short for (frequency of state?)
         z = np.random.choice(self.n_states, size=self.n_samples)
@@ -106,11 +124,12 @@ class Simulation:
         return alpha_sim
 
     def uni_hmm(self) -> np.ndarray:
-        """
+        """An HMM with equal transfer probabilities for all non-active states.
 
         Returns
         -------
-
+        alpha_sim : np.array
+            State time course
         """
         hmm_trans_prob = np.ones([2, 2]) * (1 - self.stay_prob)
         hmm_trans_prob[np.diag_indices(2)] = self.stay_prob
@@ -133,11 +152,12 @@ class Simulation:
         return alpha_sim
 
     def plot_alphas(self, n_points: int = 1000):
-        """
+        """Method for plotting the state time course of a simulation.
 
         Parameters
         ----------
-        n_points
+        n_points : int
+            Number of time points to plot.
 
         Returns
         -------
@@ -146,17 +166,20 @@ class Simulation:
         plt.figure()
         plt.plot(self.alpha_sim[0:n_points])
         plt.show()
-        return
 
     def create_djs(self, identity_factor: float = 0.0001) -> np.ndarray:
-        """
+        """Create the covariance matrices for the simulation
 
         Parameters
         ----------
-        identity_factor
+        identity_factor : float
+            Factor by which to scale the identity matrix which is added to the
+            covariance.
 
         Returns
         -------
+        djs_sim : np.array
+            The covariance matrices of the simulation
 
         """
         if self.random_covariance_weights:
@@ -184,10 +207,12 @@ class Simulation:
         return djs_sim
 
     def simulate_data(self) -> np.ndarray:
-        """
+        """Simulate a time course of MEG data.
 
         Returns
         -------
+        data_sim : np.array
+            A float32 array containing a simulated time course of simulated data.
 
         """
         if self.sim_varying_means:
@@ -210,11 +235,12 @@ class Simulation:
         return data_sim.astype(np.float32)
 
     def plot_data(self, n_points: int = 1000):
-        """
+        """Method for plotting simulated data.
 
         Parameters
         ----------
-        n_points
+        n_points : int
+            Number of time points to plot.
         """
         n_points = min(n_points, self.n_samples)
         fig, y_axes = plt.subplots(

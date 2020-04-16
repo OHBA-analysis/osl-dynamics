@@ -5,11 +5,11 @@ from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
 from taser.inference.layers import (
+    MVNLayer,
     ReparameterizationLayer,
     TrainableVariablesLayer,
-    MVNLayer,
 )
-from taser.losses.layers import LogLikelihoodLayer, KLDivergenceLayer
+from taser.losses.layers import KLDivergenceLayer, LogLikelihoodLayer
 
 
 class InferenceRNN(Model):

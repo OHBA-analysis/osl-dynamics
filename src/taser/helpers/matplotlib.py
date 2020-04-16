@@ -1,5 +1,10 @@
+"""Helper functions for plotting using matplotlib
+
+"""
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def plot_two_data_scales(
@@ -39,7 +44,7 @@ def plot_two_data_scales(
         clipping.
     dataset_1_cap : float
         All values above `dataset_1_cap` in `dataset_1` will be clipped. Default is no
-         clipping.
+        clipping.
     dataset_2_cap : float
         All values above `dataset_2_cap` in `dataset_2` will be clipped. Default is no
         clipping.
@@ -86,4 +91,25 @@ def plot_two_data_scales(
     for axis in axes[n_channels:]:
         axis.set_ylim(y_min, y_max)
 
+    plt.show()
+
+
+def plot_covariances(cholesky_djs: np.ndarray, fig_kwargs=None):
+    """Function for plotting multiple matrices in a row.
+
+    Parameters
+    ----------
+    cholesky_djs : numpy.array
+        Cholesky decomposition of state covariances [n_states x n_channels x n_channels]
+    fig_kwargs
+    """
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    c_i = cholesky_djs @ cholesky_djs.transpose((0, 2, 1))
+    fig, axes = plt.subplots(ncols=len(c_i), **fig_kwargs)
+    for covariance, axis in zip(c_i, axes):
+        pl = axis.matshow(covariance)
+        divider = make_axes_locatable(axis)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(pl, cax=cax)
     plt.show()

@@ -1,3 +1,6 @@
+"""Helper functions for TensorFlow
+
+"""
 import tensorflow as tf
 
 

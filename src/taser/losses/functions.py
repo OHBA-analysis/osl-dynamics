@@ -1,3 +1,6 @@
+"""Functions for calculating losses
+
+"""
 import tensorflow as tf
 
 
@@ -26,7 +29,8 @@ def normal_kl_divergence(
 
     Notes
     -----
-    ..math \text{KL} = \log \frac{\sigma_2}{\sigma_1} + \frac{\sigma_1^2 + (\mu_1 - \mu_2)^2}{2 \sigma_2^2} - \frac{1}{2}
+    .. math::
+        \text{KL} = \log \frac{\sigma_2}{\sigma_1} + \frac{\sigma_1^2 + (\mu_1 - \mu_2)^2}{2 \sigma_2^2} - \frac{1}{2}
 
     Examples
     --------

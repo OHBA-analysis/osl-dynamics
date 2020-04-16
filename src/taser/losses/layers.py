@@ -1,3 +1,8 @@
+"""TensorFlow layers for calculating losses.
+
+"""
+from typing import List
+
 import tensorflow as tf
 from tensorflow.keras.activations import linear, softmax, softplus
 from tensorflow.keras.layers import Layer
@@ -6,6 +11,19 @@ from taser.losses.functions import normal_kl_divergence
 
 
 class LogLikelihoodLayer(Layer):
+    """Layer for calculating the log likelihood loss.
+
+    Parameters
+    ----------
+    n_states : int
+    n_channels : int
+    alpha_xform : str
+        The function to apply to the resampled normal distribution `theta_ast`.
+        Options are ["softplus", "softmax", "none", "linear" (default)]. "none" and
+        "linear" leave their inputs unchanged.
+    kwargs
+    """
+
     alpha_xforms = {
         "softplus": softplus,
         "softmax": softmax,
@@ -16,6 +34,7 @@ class LogLikelihoodLayer(Layer):
     def __init__(
         self, n_states: int, n_channels: int, alpha_xform: str = "linear", **kwargs
     ):
+
         super().__init__(**kwargs)
 
         self.n_states = n_states
@@ -31,19 +50,37 @@ class LogLikelihoodLayer(Layer):
             raise
 
     def compute_output_shape(self, input_shape):
-        return tf.zeros(1).shape
-
-    def call(self, inputs, **kwargs):
-        """
+        """Compute output shape
 
         Parameters
         ----------
-        inputs
+        input_shape : tf.TensorShape
+            Not used internally.
+
+        Returns
+        -------
+        output_shape : tf.TensorShape
+            Always returns a shape of 1.
+        """
+        return tf.TensorShape([1])
+
+    def call(self, inputs: List[tf.Tensor], **kwargs):
+        """Calculate the log likelihood loss of a set of inputs.
+
+        Parameters
+        ----------
+        inputs : List[tf.Tensor]
+            List of Tensors formed of:
+                - data batch
+                - resampled distribution
+                - matrix of means
+                - matrix of covariances
         kwargs
 
         Returns
         -------
-
+        log_likelihood_loss : tf.Tensor
+            Scalar tensor containing the log_likelihood_loss of the model and dataset.
         """
         y_portioned, theta_ast, mean_matrix, covariance_matrix = inputs
 
@@ -77,13 +114,44 @@ class LogLikelihoodLayer(Layer):
 
 
 class KLDivergenceLayer(Layer):
-    def __init__(self, n_states, n_channels, **kwargs):
+    """Layer for calculating the KL divergence loss.
+
+    Parameters
+    ----------
+    n_states : int
+    n_channels : int
+    kwargs
+
+    """
+
+    def __init__(self, n_states: int, n_channels: int, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
         self.run_eagerly = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs):
+        """Calculate the KL divergence loss.
+
+        Given a the means and standard deviations of two univariate normal
+        distributions, calculate their KL divergence.
+
+        Parameters
+        ----------
+        inputs : List[tf.Tensor]
+            List of Tensors formed of:
+                - Inference mean
+                - Inference standard deviation
+                - Model mean
+                - Model standard deviation
+        kwargs
+
+        Returns
+        -------
+        kl_divergence_loss : tf.Tensor
+            Scalar Tensor containing the KL divergence loss of the two input
+            distributions.
+        """
         inference_mu, inference_sigma, model_mu, log_sigma_theta_j = inputs
 
         shifted_model_mu = tf.roll(model_mu, shift=1, axis=1)
@@ -98,5 +166,17 @@ class KLDivergenceLayer(Layer):
 
         return kl_divergence
 
-    def compute_output_shape(self, input_shape):
-        return tf.zeros(1).shape
+    def compute_output_shape(self, input_shape: tf.TensorShape):
+        """Compute output shape
+
+        Parameters
+        ----------
+        input_shape : tf.TensorShape
+            Not used internally.
+
+        Returns
+        -------
+        output_shape : tf.TensorShape
+            Always returns a scalar tensor (tf.TensorShape([1]))
+        """
+        return tf.TensorShape([1])

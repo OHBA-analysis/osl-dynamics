@@ -2,4 +2,4 @@
 Contributors
 ============
 
-* evanroberts <trumpeter5>
+* Evan Roberts <evan.roberts@kellogg.ox.ac.uk>

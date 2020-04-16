@@ -1,6 +1,8 @@
 from unittest import TestCase
-from taser.simulation import Simulation
+
 import numpy as np
+
+from taser.simulation import Simulation
 
 
 class SimulationTest(TestCase):

@@ -1,27 +1,41 @@
+"""Model data using a `BayesianGaussianMixture` model from scikit-learn
+
+"""
 from typing import Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.mixture import BayesianGaussianMixture
 
 
 def learn_mu_sigma(
     data: np.ndarray, n_states: int, n_channels: int, learn_means: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
+    """Find a mixture of Gaussian distributions which characterises a dataset.
+
+    Using scikit-learn's `BayesianGaussianMixture` class, find a set of Gaussian
+    distributions which when linearly combined can explain a dataset.
 
     Parameters
     ----------
-    data
-    n_states
-    n_channels
-    learn_means
+    data : numpy.ndarray
+        Input data of dimensions [n_channels x n_time_points]
+    n_states : int
+        Number of states (Gaussian distributions) to try to find.
+    n_channels : int
+        The number of channels in the dataset.
+    learn_means : bool
+        If False (default), means will be assumed to be zero and given a strong
+        weight as a prior.
 
     Returns
     -------
-
+    covariances : numpy.ndarray
+        Covariances of the states (Gaussian distributions) found with dimensions
+        [n_states x n_channels x n_channels]
+    means : numpy.ndarray
+        Means of the states (Gaussian distributions) found with dimensions [n_states x
+        n_channels]
     """
     if learn_means:
         # use sklearn learn to do GMM
@@ -40,20 +54,27 @@ def learn_mu_sigma(
 
 
 def process_covariance(
-    covariances: np.ndarray, means: np.ndarray, n_states: int, learn_means: bool
+    covariances: np.ndarray, means: np.ndarray, learn_means: bool
 ) -> np.ndarray:
-    """
+    """Calculate normalised full covariance.
+
+    Given a set of covariances and means, calculate the full covariance matrices and
+    normalise them by their traces.
 
     Parameters
     ----------
-    covariances
-    means
-    n_states
-    learn_means
+    covariances : numpy.ndarray
+        Matrix of covariances of dimensions [n_states x n_channels x n_channels].
+    means : numpy.ndarray
+        Matrix of means of dimensions [n_states x n_channels].
+    learn_means : bool
+        If True, include means in calculation (i.e. calculate full covariance).
 
     Returns
     -------
-
+    full_covariance : numpy.ndarray
+        Normalised full covariance matrices of dimensions [n_states x n_channels
+        x n_channels].
     """
     if learn_means:
         full_covariances = covariances
@@ -68,15 +89,24 @@ def process_covariance(
 
 
 def matrix_sqrt_3d(matrix):
-    """
+    """A wrapper function for `scipy.linalg.sqrtm`.
+
+    SciPy's matrix square root function only works on [N x N] 2D matrices. This
+    function provides a simple solution for performing this operation on a stack of
+    [N x N] 2D arrays.
+
+    TensorFlow has a function to do this (`tensorflow.linalg.sqrtm`) but I won't
+    move to that until the whole of gmm.py has moved to TensorFlow code.
 
     Parameters
     ----------
-    matrix
+    matrix : numpy.ndarray
+        [M x N x N] matrix.
 
     Returns
     -------
-
+    matrix_sqrt : numpy.ndarray
+        A stack of matrix square roots of the same dimensions as `matrix` ([M x N x N])
     """
     if matrix.ndim != 3 or matrix.shape[1] != matrix.shape[2]:
         raise ValueError("Only accepts matrices with dimensions M x N x N")
@@ -89,43 +119,37 @@ def matrix_sqrt_3d(matrix):
 def find_cholesky_decompositions(
     covariances: np.ndarray, means: np.ndarray, learn_means: bool,
 ):
-    """
+    """Calculate the Cholesky decomposition of the full covariance of a distribution.
+
+    Given a set of covariances [n_states x n_channels x n_channels] and means
+    [n_states x n_channels], calculate the full covariance (i.e. with means included).
+    We then take the matrix square root (sqrtm(M) * sqrtm(M) = M) and project it onto
+    a set of principle components W. For now, this is implemented only as the identity
+    matrix. A Cholesky decomposition is then performed on the result.
 
     Parameters
     ----------
-    covariances
-    means
-    learn_means
+    covariances : numpy.ndarray
+        Covariance matrices for states [n_states x n_channels x n_channels]
+    means : numpy.ndarray
+        Means for states [n_states x n_channels]
+    learn_means : bool
+        If True, means will be incorporated to form full covariance matrices.
 
     Returns
     -------
-
+    cholesky_decompositions : numpy.array
+        [n_states x n_channels x n_channels] array containing the Cholesky
+        decompositions of full covariance matrices.
     """
     n_states, n_channels = covariances.shape[:2]
     w = np.identity(n_channels)
-    full_cov = process_covariance(covariances, means, n_states, learn_means)
+    if learn_means:
+        full_cov = process_covariance(covariances, means, n_states, learn_means)
+    else:
+        full_cov = covariances
     b_k = np.linalg.pinv(w) @ full_cov
     matrix_sqrt = matrix_sqrt_3d(b_k @ b_k.transpose(0, 2, 1))
     cholesky_djs = np.linalg.cholesky(matrix_sqrt)
 
     return cholesky_djs
-
-
-def plot_covariances(cholesky_djs: np.ndarray, fig_kwargs=None):
-    """
-
-    Parameters
-    ----------
-    fig_kwargs
-    cholesky_djs
-    """
-    if fig_kwargs is None:
-        fig_kwargs = {}
-    c_i = cholesky_djs @ cholesky_djs.transpose((0, 2, 1))
-    fig, axes = plt.subplots(ncols=len(c_i), **fig_kwargs)
-    for covariance, axis in zip(c_i, axes):
-        pl = axis.matshow(covariance)
-        divider = make_axes_locatable(axis)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(pl, cax=cax)
-    plt.show()

@@ -1,16 +1,13 @@
-from typing import Union, List
+from typing import List, Union
 
 import tensorflow as tf
 from tensorflow.keras.layers import Layer
 
-from taser.inference.functions import (
-    _normalise_covariance,
-    _pseudo_sigma_to_sigma,
-)
+from taser.inference.functions import normalise_covariance, pseudo_sigma_to_sigma
 from taser.inference.initializers import (
     Identity3D,
-    PseudoSigmaInitializer,
     MeansInitializer,
+    PseudoSigmaInitializer,
     UnchangedInitializer,
 )
 
@@ -161,7 +158,7 @@ class MVNLayer(Layer):
             Standard deviations of a multivariate normal distribution
 
         """
-        self.sigmas = _normalise_covariance(_pseudo_sigma_to_sigma(self.pseudo_sigmas))
+        self.sigmas = normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas))
         return self.means, self.sigmas
 
 

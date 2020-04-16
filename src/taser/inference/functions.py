@@ -1,8 +1,11 @@
-import tensorflow as tf
+"""A series of inference-specific functions which are too broad to include in a model.
+
+"""
 import numpy as np
+import tensorflow as tf
 
 
-def _pseudo_sigma_to_sigma(pseudo_sigma):
+def pseudo_sigma_to_sigma(pseudo_sigma):
     """Ensure covariance matrices are positive semi-definite.
 
     Parameters
@@ -21,7 +24,7 @@ def _pseudo_sigma_to_sigma(pseudo_sigma):
     return sigma
 
 
-def _normalise_covariance(covariance):
+def normalise_covariance(covariance):
     """Normalise covariance matrix based on its trace.
 
     The trace of `covariance` is taken. All values are then divided by it.
