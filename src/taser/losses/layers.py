@@ -9,6 +9,8 @@ from tensorflow.keras.layers import Layer
 
 from taser.losses.functions import normal_kl_divergence
 
+import functools
+
 
 class LogLikelihoodLayer(Layer):
     """Layer for calculating the log likelihood loss.
@@ -26,7 +28,7 @@ class LogLikelihoodLayer(Layer):
 
     alpha_xforms = {
         "softplus": softplus,
-        "softmax": softmax,
+        "softmax": functools.partial(softmax, axis=2),
         "none": linear,
         "linear": linear,
     }
@@ -84,7 +86,6 @@ class LogLikelihoodLayer(Layer):
         """
         y_portioned, theta_ast, mean_matrix, covariance_matrix = inputs
 
-        # TODO: If self.alpha_xform is "softmax", it requires axis=2
         alpha_ext = self.alpha_xform(theta_ast)[..., tf.newaxis]
         mean_ext = mean_matrix[tf.newaxis, tf.newaxis, ...]
 

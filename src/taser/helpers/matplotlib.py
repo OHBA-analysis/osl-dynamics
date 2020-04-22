@@ -113,3 +113,26 @@ def plot_covariances(cholesky_djs: np.ndarray, fig_kwargs=None):
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(pl, cax=cax)
     plt.show()
+
+
+def time_course_plot_axis(one_hot_time_course, axis, n_plot_points, title=None):
+    for state in one_hot_time_course:
+        axis.fill_between(
+            np.arange(n_plot_points), state[:n_plot_points], alpha=0.5, lw=10
+        )
+        axis.plot(np.arange(n_plot_points), state[:n_plot_points], lw=4, c="k")
+    if title is not None:
+        axis.set_title(title)
+    axis.autoscale(tight=True)
+
+
+def time_course_plot(one_hot_time_courses, n_plot_points, titles=None, figsize=(15, 6)):
+    fig, axes = plt.subplots(nrows=len(one_hot_time_courses), figsize=figsize)
+
+    if titles is None or (len(titles) != len(one_hot_time_courses)):
+        titles = ["" for i in one_hot_time_courses]
+
+    for one_hot_time_course, axis, title in zip(one_hot_time_courses, axes, titles):
+        time_course_plot_axis(one_hot_time_course, axis, n_plot_points, title)
+    plt.tight_layout()
+    plt.show()

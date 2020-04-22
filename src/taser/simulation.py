@@ -5,14 +5,15 @@ This module allows the user to conveniently simulate MEG data. Instantiating the
 which can be analysed.
 
 """
+from abc import ABC, abstractmethod
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.taser.helpers.numpy import get_one_hot
+from taser.helpers.numpy import get_one_hot
 
 
-class Simulation:
+class Simulation(ABC):
     """Class for making the simulation of MEG data easy!
 
     Parameters
@@ -42,114 +43,31 @@ class Simulation:
 
     def __init__(
         self,
-        sim_type: str = "sequence_hmm",
         n_samples: int = 20000,
         n_channels: int = 7,
         n_states: int = 4,
         sim_varying_means: bool = False,
-        markov_lag: int = 1,
-        stay_prob: float = 0.95,
         random_covariance_weights: bool = False,
         e_std: float = 0.2,
     ):
 
-        simulation_options = {
-            "sequence_hmm": self.hmm,
-            "uni_hmm": self.uni_hmm,
-            "hmm": self.hmm,
-            "random": self.random_hmm,
-        }
-
-        if sim_type not in simulation_options.keys():
-            raise ValueError(
-                f"The simulation types available are {', '.join(simulation_options.keys())}"
-            )
-
-        self.sim_type = sim_type
         self.n_samples = n_samples
         self.n_channels = n_channels
         self.n_states = n_states
         self.sim_varying_means = sim_varying_means
-        self.markov_lag = markov_lag
-        self.stay_prob = stay_prob
         self.random_covariance_weights = random_covariance_weights
         self.e_std = e_std
 
-        self.alpha_sim = simulation_options[self.sim_type]()
+        self.alpha_sim = self.generate_states()
         self.djs = self.create_djs()
         self.data_sim = self.simulate_data()
 
-    def hmm(self) -> np.ndarray:
-        """Standard sequential HMM
-
-        Returns
-        -------
-        alpha_sim : np.array
-            State time course
+    @abstractmethod
+    def generate_states(self) -> np.ndarray:
+        """State generation must be implemented by subclasses.
 
         """
-        alpha_sim = np.zeros((self.n_samples, self.n_states))
-        z = np.zeros([self.n_samples + 1], dtype=int)
-
-        single_trans_prob = (1 - self.stay_prob) / self.n_states
-        hmm_trans_prob = np.ones((self.n_states, self.n_states)) * single_trans_prob
-        hmm_trans_prob[np.diag_indices(self.n_states)] = self.stay_prob
-
-        hmm_cumsum_trans_prob = np.cumsum(hmm_trans_prob, axis=1)
-
-        rands = np.random.rand(self.n_samples)
-
-        for tt in range(self.markov_lag - 1, self.n_samples):
-            tmp = rands[tt]
-            for kk in range(hmm_cumsum_trans_prob.shape[1]):
-
-                if tmp < hmm_cumsum_trans_prob[z[tt - self.markov_lag], kk]:
-                    z[tt] = kk
-                    break
-            alpha_sim[tt, z[tt]] = 1
-
-        return alpha_sim
-
-    def random_hmm(self) -> np.ndarray:
-        """Totally random state selection HMM
-
-        Returns
-        -------
-        alpha_sim : np.array
-            State time course
-        """
-        # TODO: Ask Mark what FOS is short for (frequency of state?)
-        z = np.random.choice(self.n_states, size=self.n_samples)
-        alpha_sim = get_one_hot(z, self.n_states)
-        return alpha_sim
-
-    def uni_hmm(self) -> np.ndarray:
-        """An HMM with equal transfer probabilities for all non-active states.
-
-        Returns
-        -------
-        alpha_sim : np.array
-            State time course
-        """
-        hmm_trans_prob = np.ones([2, 2]) * (1 - self.stay_prob)
-        hmm_trans_prob[np.diag_indices(2)] = self.stay_prob
-        hmm_cumsum_trans_prob = np.cumsum(hmm_trans_prob, axis=1)
-
-        z = np.zeros([self.n_samples, self.n_states], int)
-        alpha_sim = np.zeros((self.n_samples, self.n_states))
-        rands = np.random.rand(self.n_samples, self.n_states)
-
-        for tt in range(self.markov_lag - 1, self.n_samples):
-            for kk in range(self.n_states):
-
-                tmp = rands[tt, kk]
-                for jj in range(hmm_cumsum_trans_prob.shape[1]):
-                    if tmp < hmm_cumsum_trans_prob[z[tt - self.markov_lag, kk], jj]:
-                        z[tt, kk] = jj
-                        break
-                alpha_sim[tt, kk] = z[tt, kk]
-
-        return alpha_sim
+        pass
 
     def plot_alphas(self, n_points: int = 1000):
         """Method for plotting the state time course of a simulation.
@@ -253,3 +171,287 @@ class Simulation:
             alpha_axis.plot(np.arange(n_points), alpha_channel[:n_points])
         plt.tight_layout()
         plt.show()
+
+
+class HMMSimulation(Simulation):
+    def __init__(
+        self,
+        n_samples: int = 20000,
+        n_channels: int = 7,
+        n_states: int = 4,
+        sim_varying_means: bool = False,
+        random_covariance_weights: bool = False,
+        e_std: float = 0.2,
+        markov_lag: int = 1,
+    ):
+        self.markov_lag = markov_lag
+
+        self.trans_prob = None
+        self.cumsum_trans_prob = None
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            sim_varying_means=sim_varying_means,
+            random_covariance_weights=random_covariance_weights,
+            e_std=e_std,
+        )
+
+    @abstractmethod
+    def construct_trans_prob_matrix(self):
+        pass
+
+    def generate_states(self) -> np.ndarray:
+        self.construct_trans_prob_matrix()
+
+        self.cumsum_trans_prob = np.cumsum(self.trans_prob, axis=1)
+        alpha_sim = np.zeros((self.n_samples, self.n_states))
+        z = np.zeros([self.n_samples + 1], dtype=int)
+        rands = np.random.rand(self.n_samples)
+
+        for tt in range(self.markov_lag - 1, self.n_samples):
+            tmp = rands[tt]
+            for kk in range(self.cumsum_trans_prob.shape[1]):
+                if tmp < self.cumsum_trans_prob[z[tt - self.markov_lag], kk]:
+                    z[tt] = kk
+                    break
+            alpha_sim[tt, z[tt]] = 1
+        return alpha_sim
+
+
+class SequenceHMMSimulation(HMMSimulation):
+    def __init__(
+        self,
+        n_samples: int = 20000,
+        n_channels: int = 7,
+        n_states: int = 4,
+        sim_varying_means: bool = False,
+        markov_lag: int = 1,
+        stay_prob: float = 0.95,
+        random_covariance_weights: bool = False,
+        e_std: float = 0.2,
+    ):
+
+        self.stay_prob = stay_prob
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            sim_varying_means=sim_varying_means,
+            random_covariance_weights=random_covariance_weights,
+            e_std=e_std,
+            markov_lag=markov_lag,
+        )
+
+    def construct_trans_prob_matrix(self):
+
+        self.trans_prob = np.zeros([self.n_states, self.n_states])
+        np.fill_diagonal(self.trans_prob, 0.95)
+        np.fill_diagonal(self.trans_prob[:, 1:], 1 - self.stay_prob)
+        self.trans_prob[-1, 0] = 1 - self.stay_prob
+
+
+class BasicHMMSimulation(HMMSimulation):
+    def __init__(
+        self,
+        n_samples: int = 20000,
+        n_channels: int = 7,
+        n_states: int = 4,
+        sim_varying_means: bool = False,
+        markov_lag: int = 1,
+        stay_prob: float = 0.95,
+        random_covariance_weights: bool = False,
+        e_std: float = 0.2,
+    ):
+
+        self.markov_lag = markov_lag
+        self.stay_prob = stay_prob
+
+        self.trans_prob = None
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            sim_varying_means=sim_varying_means,
+            random_covariance_weights=random_covariance_weights,
+            e_std=e_std,
+        )
+
+    def construct_trans_prob_matrix(self):
+        """Standard sequential HMM
+
+        Returns
+        -------
+        alpha_sim : np.array
+            State time course
+
+        """
+        single_trans_prob = (1 - self.stay_prob) / self.n_states
+        self.trans_prob = np.ones((self.n_states, self.n_states)) * single_trans_prob
+        self.trans_prob[np.diag_indices(self.n_states)] = self.stay_prob
+
+
+class UniHMMSimulation(HMMSimulation):
+    def __init__(
+        self,
+        n_samples: int = 20000,
+        n_channels: int = 7,
+        n_states: int = 4,
+        sim_varying_means: bool = False,
+        markov_lag: int = 1,
+        stay_prob: float = 0.95,
+        random_covariance_weights: bool = False,
+        e_std: float = 0.2,
+    ):
+
+        self.markov_lag = markov_lag
+        self.stay_prob = stay_prob
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            sim_varying_means=sim_varying_means,
+            random_covariance_weights=random_covariance_weights,
+            e_std=e_std,
+        )
+
+    def construct_trans_prob_matrix(self):
+        """An HMM with equal transfer probabilities for all non-active states.
+
+        Returns
+        -------
+        alpha_sim : np.array
+            State time course
+        """
+        self.trans_prob = np.ones([2, 2]) * (1 - self.stay_prob)
+        self.trans_prob[np.diag_indices(2)] = self.stay_prob
+
+
+class RandomHMMSimulation(HMMSimulation):
+    def __init__(
+        self,
+        n_samples: int = 20000,
+        n_channels: int = 7,
+        n_states: int = 4,
+        sim_varying_means: bool = False,
+        random_covariance_weights: bool = False,
+        e_std: float = 0.2,
+    ):
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            sim_varying_means=sim_varying_means,
+            random_covariance_weights=random_covariance_weights,
+            e_std=e_std,
+        )
+
+    def construct_trans_prob_matrix(self):
+        pass
+
+    def generate_states(self) -> np.ndarray:
+        """Totally random state selection HMM
+
+        Returns
+        -------
+        alpha_sim : np.array
+            State time course
+        """
+        # TODO: Ask Mark what FOS is short for (frequency of state?)
+        z = np.random.choice(self.n_states, size=self.n_samples)
+        alpha_sim = get_one_hot(z, self.n_states)
+        return alpha_sim
+
+
+class HiddenSemiMarkovSimulation(Simulation):
+    def __init__(
+        self,
+        n_samples: int = 20000,
+        n_channels: int = 7,
+        n_states: int = 4,
+        sim_varying_means: bool = False,
+        random_covariance_weights: bool = False,
+        e_std: float = 0.2,
+        off_diagonal_trans_prob: np.ndarray = None,
+        full_trans_prob: np.ndarray = None,
+        stay_prob: float = 0.95,
+        gamma_shape: float = 5,
+        gamma_scale: float = 10,
+    ):
+        self.off_diagonal_trans_prob = off_diagonal_trans_prob
+        self.full_trans_prob = full_trans_prob
+        self.cumsum_off_diagonal_trans_prob = None
+        self.stay_prob = stay_prob
+
+        self.gamma_shape = gamma_shape
+        self.gamma_scale = gamma_scale
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            sim_varying_means=sim_varying_means,
+            random_covariance_weights=random_covariance_weights,
+            e_std=e_std,
+        )
+
+    def construct_off_diagonal_trans_prob(self):
+        if self.off_diagonal_trans_prob is not None and (
+            self.full_trans_prob is not None
+        ):
+            raise ValueError(
+                "Exactly one of off_diagonal_trans_prob and full_trans_prob must be "
+                "specified. "
+            )
+
+        if (self.off_diagonal_trans_prob is None) and (self.full_trans_prob is None):
+            self.off_diagonal_trans_prob = np.zeros([self.n_states, self.n_states])
+
+            np.fill_diagonal(self.off_diagonal_trans_prob[:, 1:], 1 - self.stay_prob)
+            self.off_diagonal_trans_prob[-1, 0] = 1 - self.stay_prob
+            self.off_diagonal_trans_prob = (
+                self.off_diagonal_trans_prob
+                / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
+            )
+
+        if self.off_diagonal_trans_prob is not None:
+            self.off_diagonal_trans_prob = self.off_diagonal_trans_prob
+
+        if self.full_trans_prob is not None:
+            self.off_diagonal_trans_prob = (
+                self.full_trans_prob / self.full_trans_prob.sum(axis=1)[:, None]
+            )
+
+    def generate_states(self):
+        self.construct_off_diagonal_trans_prob()
+        self.cumsum_off_diagonal_trans_prob = np.cumsum(
+            self.off_diagonal_trans_prob, axis=1
+        )
+        alpha_sim = np.zeros(self.n_samples, dtype=np.int)
+
+        gamma_sample = np.random.default_rng().gamma
+        current_state = 0
+        current_position = 0
+
+        while current_position < len(alpha_sim):
+            state_lifetime = np.round(
+                gamma_sample(shape=self.gamma_shape, scale=self.gamma_scale)
+            ).astype(np.int)
+            alpha_sim[
+                current_position : current_position + state_lifetime
+            ] = current_state
+
+            for kk in range(self.cumsum_off_diagonal_trans_prob.shape[1]):
+                tmp = np.random.default_rng().uniform()
+                if tmp < self.cumsum_off_diagonal_trans_prob[current_state, kk]:
+                    break
+
+            current_position += state_lifetime
+            current_state = kk
+
+        return get_one_hot(alpha_sim)

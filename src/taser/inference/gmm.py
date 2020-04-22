@@ -1,4 +1,4 @@
-"""Model data using a `BayesianGaussianMixture` model from scikit-learn
+"""Model data using a `BayesianGaussianMixture` model from Scikit-Learn
 
 """
 from typing import Tuple
@@ -9,7 +9,12 @@ from sklearn.mixture import BayesianGaussianMixture
 
 
 def learn_mu_sigma(
-    data: np.ndarray, n_states: int, n_channels: int, learn_means: bool = False,
+    data: np.ndarray,
+    n_states: int,
+    n_channels: int,
+    learn_means: bool = False,
+    retry_attempts: int = 5,
+    gmm_kwargs=None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Find a mixture of Gaussian distributions which characterises a dataset.
 
@@ -27,6 +32,10 @@ def learn_mu_sigma(
     learn_means : bool
         If False (default), means will be assumed to be zero and given a strong
         weight as a prior.
+    retry_attempts : int
+        Number of times to retry fitting if `.fit()` doesn't converge.
+    gmm_kwargs : dict
+        Keyword arguments for the `BayesianGaussianMixture`
 
     Returns
     -------
@@ -37,11 +46,15 @@ def learn_mu_sigma(
         Means of the states (Gaussian distributions) found with dimensions [n_states x
         n_channels]
     """
+    if retry_attempts < 1:
+        raise ValueError("retry_attempts cannot be less than 1")
+    if gmm_kwargs is None:
+        gmm_kwargs = {}
     if learn_means:
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
-            n_components=n_states, covariance_type="full"
-        ).fit(data)
+            n_components=n_states, covariance_type="full", **gmm_kwargs,
+        )
     else:
         # make sure we force means to be zero:
         gmm = BayesianGaussianMixture(
@@ -49,7 +62,14 @@ def learn_mu_sigma(
             covariance_type="full",
             mean_prior=np.zeros(n_channels),
             mean_precision_prior=1e12,
-        ).fit(data)
+            **gmm_kwargs,
+        )
+    for attempt in range(retry_attempts):
+        gmm.fit(data)
+        if gmm.converged_:
+            print(f"Converged on iteration {attempt}")
+            break
+        print(f"Failed to converge on iteration {attempt}")
     return gmm.covariances_, gmm.means_
 
 
@@ -145,7 +165,7 @@ def find_cholesky_decompositions(
     n_states, n_channels = covariances.shape[:2]
     w = np.identity(n_channels)
     if learn_means:
-        full_cov = process_covariance(covariances, means, n_states, learn_means)
+        full_cov = process_covariance(covariances, means, learn_means)
     else:
         full_cov = covariances
     b_k = np.linalg.pinv(w) @ full_cov
