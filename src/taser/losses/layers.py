@@ -1,6 +1,7 @@
 """TensorFlow layers for calculating losses.
 
 """
+import functools
 from typing import List
 
 import tensorflow as tf
@@ -8,8 +9,6 @@ from tensorflow.keras.activations import linear, softmax, softplus
 from tensorflow.keras.layers import Layer
 
 from taser.losses.functions import normal_kl_divergence
-
-import functools
 
 
 class LogLikelihoodLayer(Layer):

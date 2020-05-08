@@ -1,9 +1,11 @@
 from typing import List
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
+from taser.helpers.array_ops import get_one_hot
 from taser.inference.layers import (
     MVNLayer,
     ReparameterizationLayer,
@@ -49,8 +51,8 @@ class InferenceRNN(Model):
         n_units_model: int,
         n_states: int,
         n_channels: int,
-        mus_initial: tf.Tensor,
-        cholesky_djs_initial: tf.Tensor,
+        mus_initial: tf.Tensor = None,
+        cholesky_djs_initial: tf.Tensor = None,
         learn_means: bool = False,
         learn_covariances: bool = True,
         alpha_xform: str = "softmax",
@@ -100,7 +102,7 @@ class InferenceRNN(Model):
         self.kl_loss = KLDivergenceLayer(n_states, n_channels)
 
     def call(
-        self, inputs: List[tf.Tensor], training: bool = None, **kwargs
+        self, inputs: List[tf.Tensor], training: bool = True, **kwargs
     ) -> List[tf.Tensor]:
         """Pass inputs to the model to get outputs.
 
@@ -125,18 +127,18 @@ class InferenceRNN(Model):
 
 
         """
-        dropout_0 = self.dropout_layer_0(inputs)
+        dropout_0 = self.dropout_layer_0(inputs, training=training)
         inference_rnn = self.inference_rnn(dropout_0)
-        dropout_1 = self.dropout_layer_1(inference_rnn)
+        dropout_1 = self.dropout_layer_1(inference_rnn, training=training)
 
         inference_mu = self.inference_dense_layer_mu(dropout_1)
         inference_sigma = self.inference_dense_layer_sigma(inference_rnn)
 
         theta_ast = self.theta_ast([inference_mu, inference_sigma])
 
-        dropout_2 = self.dropout_layer_2(theta_ast)
+        dropout_2 = self.dropout_layer_2(theta_ast, training=training)
         model_rnn = self.model_rnn(dropout_2)
-        dropout_3 = self.dropout_layer_3(model_rnn)
+        dropout_3 = self.dropout_layer_3(model_rnn, training=training)
 
         model_mu = self.model_dense_layer_mu(dropout_3)
         log_sigma_theta_j = self.log_sigma_theta_j(inputs)
@@ -158,3 +160,64 @@ class InferenceRNN(Model):
             mus,
             djs,
         ]
+
+    @staticmethod
+    def result_combination(results: List) -> List:
+
+        results = np.array(results)
+
+        operations = {
+            "log_likelihood_loss": lambda x: np.array(x),
+            "kl_loss": lambda x: np.array(x),
+            "theta_ast": lambda x: np.array(
+                tf.math.softplus(
+                    tf.reshape(
+                        tf.concat(x.squeeze().tolist(), axis=0), [-1, x[0, 0].shape[-1]]
+                    )
+                )
+            ),
+            "inference_mu": lambda x: np.array(
+                tf.reshape(
+                    tf.math.softplus(tf.concat(x.squeeze().tolist(), axis=0)),
+                    (-1, x[0, 0].shape[-1]),
+                )
+            ),
+            "inference_sigma": lambda x: np.array(
+                tf.reshape(
+                    tf.concat(x.squeeze().tolist(), axis=0), [-1, x[0, 0].shape[-1]]
+                )
+            ),
+            "model_mu": lambda x: tf.concat(x.squeeze().tolist(), axis=0),
+            "mus": lambda x: x[0, 0],
+            "djs": lambda x: x[0, 0],
+        }
+
+        combined_results = [
+            operations["log_likelihood_loss"](results[:, 0::8]),
+            operations["kl_loss"](results[:, 1::8]),
+            operations["theta_ast"](results[:, 2::8]),
+            operations["inference_mu"](results[:, 3::8]),
+            operations["inference_sigma"](results[:, 4::8]),
+            operations["model_mu"](results[:, 5::8]),
+            operations["mus"](results[:, 6::8]),
+            operations["djs"](results[:, 7::8]),
+        ]
+
+        return combined_results
+
+    def latent_variable(self, results_list: List, one_hot: bool = True):
+        inference_mu = results_list[3]
+        if one_hot:
+            return get_one_hot(inference_mu.argmax(axis=1))
+        return inference_mu
+
+
+def get_default_config(n_states, n_channels):
+    return {
+        "dropout_rate": 0.3,
+        "n_units_inference": 5 * n_states,
+        "n_units_model": 5 * n_states,
+        "n_states": n_states,
+        "n_channels": n_channels,
+        "learn_means": True,
+    }

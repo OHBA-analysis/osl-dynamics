@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pytest
+
 from taser.skeleton import fib
 
 __author__ = "evanroberts"

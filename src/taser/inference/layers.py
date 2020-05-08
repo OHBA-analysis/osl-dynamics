@@ -1,9 +1,13 @@
+import logging
 from typing import List, Union
 
 import tensorflow as tf
 from tensorflow.keras.layers import Layer
 
-from taser.inference.functions import normalise_covariance, pseudo_sigma_to_sigma
+from taser.inference.inference_functions import (
+    normalise_covariance,
+    pseudo_sigma_to_sigma,
+)
 from taser.inference.initializers import (
     Identity3D,
     MeansInitializer,

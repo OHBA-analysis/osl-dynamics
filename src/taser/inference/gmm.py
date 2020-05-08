@@ -14,7 +14,8 @@ def learn_mu_sigma(
     n_channels: int,
     learn_means: bool = False,
     retry_attempts: int = 5,
-    gmm_kwargs=None,
+    gmm_kwargs: dict = None,
+    normalize_covariance: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Find a mixture of Gaussian distributions which characterises a dataset.
 

@@ -1,13 +1,18 @@
 """Classes and methods for abstracting the training loop.
 
 """
+import logging
+import warnings
+from abc import ABC, abstractmethod
 from typing import List
 
+import matplotlib.pyplot as plt
 import tensorflow as tf
+from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 from tqdm.notebook import tnrange, tqdm_notebook
 
-from abc import ABC, abstractmethod
+from taser.helpers.decorators import timing
 
 
 class Trainer(ABC):
@@ -34,9 +39,9 @@ class Trainer(ABC):
 
     """
 
-    def __init__(self, model, optimizer):
+    def __init__(self, model, optimizer=None):
         self.model = model
-        self.optimizer = optimizer
+        self.optimizer = Adam(lr=0.02, clipnorm=0.1) if optimizer is None else optimizer
         self.epoch = None
         self.n_epochs = None
 
@@ -49,6 +54,7 @@ class Trainer(ABC):
 
         self.check_tqdm()
 
+    @timing
     def train(self, dataset: tf.data.Dataset, n_epochs: int):
         """Vanilla custom training loop. No bells or whistles.
 
@@ -117,18 +123,54 @@ class Trainer(ABC):
         """
         pass
 
+    @timing
+    def predict(self, dataset: tf.data.Dataset) -> List:
+        results = []
+        for y in dataset:
+            results.append(self.model(y, training=False))
+
+        if callable(getattr(self.model, "result_combination", None)):
+            results = self.model.result_combination(results)
+
+        return results
+
+    def predict_latent_variable(self, dataset: tf.data.Dataset, **kwargs):
+        if callable(getattr(self.model, "latent_variable", None)):
+            results = self.predict(dataset=dataset)
+            latent_variable = self.model.latent_variable(results_list=results, **kwargs)
+            return latent_variable
+        else:
+            logging.warning(
+                f"This instance of {self.__class__.__name__} does not have a "
+                f"latent_variable method defined. "
+            )
+
+    def plot_loss(self):
+        plt.plot(self.loss_history[1:])
+        plt.show()
+
     def check_tqdm(self):
         """Check if tqdm_notebook throws an error and use CLI version if it does.
 
         """
-        try:
-            for i in self.trange(1, leave=False):
-                pass
-            print("tqdm notebook seems to be working.")
-        except ImportError:
-            print("Fallback to commandline version of tqdm.\nWarning can be ignored.")
-            self.tqdm = tqdm
-            self.trange = range
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                for i in self.trange(1, leave=False):
+                    pass
+                print("tqdm notebook seems to be working.")
+            except ImportError:
+                try:
+                    from IPython.display import clear_output
+
+                    clear_output()
+                except ImportError:
+                    pass
+                print(
+                    "Fallback to commandline version of tqdm.\nWarning can be ignored."
+                )
+                self.tqdm = tqdm
+                self.trange = range
 
 
 class AnnealingTrainer(Trainer):
@@ -146,11 +188,14 @@ class AnnealingTrainer(Trainer):
     def __init__(
         self,
         model: tf.keras.Model,
-        optimizer: tf.keras.optimizers.Optimizer,
         annealing_sharpness: float,
+        update_frequency: int = 10,
+        optimizer: tf.keras.optimizers.Optimizer = None,
     ):
         super().__init__(model, optimizer)
         self.annealing_sharpness = annealing_sharpness
+        self.update_frequency = update_frequency
+
         self.annealing_factor = None
 
     def calculate_annealing_factor(self):
@@ -159,16 +204,15 @@ class AnnealingTrainer(Trainer):
         Calculate the weight of the KL loss in the total loss of the model by
         evaluating a tanh function at different epochs.
         """
+        epoch = self.epoch
+        n_epochs = self.n_epochs
+        sharpness = self.annealing_sharpness
+
         self.annealing_factor = (
-            0.5
-            * tf.math.tanh(
-                self.annealing_sharpness
-                * (self.epoch - self.n_epochs / 2.0)
-                / self.n_epochs
-            )
-            + 0.5
+            0.5 * tf.math.tanh(sharpness * (epoch - n_epochs / 2.0) / n_epochs) + 0.5
         )
 
+    @timing
     def train(self, dataset: tf.data.Dataset, n_epochs: int):
         """Train the model.
 
@@ -183,7 +227,7 @@ class AnnealingTrainer(Trainer):
         """
         self.n_epochs = n_epochs
         for self.epoch in self.trange(n_epochs):
-            if self.epoch % 10 == 0:
+            if self.epoch % self.update_frequency == 0:
                 self.calculate_annealing_factor()
             self.train_epoch(dataset=dataset)
 
@@ -211,3 +255,36 @@ class AnnealingTrainer(Trainer):
         loss_value = log_likelihood_loss + self.annealing_factor * kl_loss
 
         return loss_value
+
+
+class RepeatedAnnealer(AnnealingTrainer):
+    def __init__(
+        self,
+        model: tf.keras.Model,
+        annealing_sharpness: float,
+        reset: int = None,
+        update_frequency: int = None,
+    ):
+        super().__init__(model, annealing_sharpness, update_frequency)
+        self.reset = reset
+
+    def calculate_annealing_factor(self):
+        """Calculate the weighting of the KL loss
+
+        Calculate the weight of the KL loss in the total loss of the model by
+        evaluating a tanh function at different epochs.
+        """
+        epoch = self.epoch
+        n_epochs = self.n_epochs
+        sharpness = self.annealing_sharpness
+        reset = self.reset
+
+        self.annealing_factor = (
+            0.5
+            * tf.math.tanh(
+                sharpness
+                * (epoch % reset - min(n_epochs, reset) / 2.0)
+                / min(n_epochs, reset)
+            )
+            + 0.5
+        )

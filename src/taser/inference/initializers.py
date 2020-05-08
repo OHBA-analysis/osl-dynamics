@@ -4,6 +4,8 @@ A series of classes which inherit from `tensorflow.keras.initializers.Initialize
 They are used to initialize weights in custom layers.
 
 """
+import logging
+
 import tensorflow as tf
 from tensorflow.keras.initializers import Initializer
 
@@ -56,6 +58,10 @@ class MeansInitializer(Initializer):
 
     def __init__(self, initial_means):
         self.initial_means = initial_means
+        logging.info(
+            f"Creating MeansInitializer with "
+            f"initial_means.shape = {initial_means.shape}"
+        )
 
     def __call__(self, shape, dtype=None):
         if not (len(shape) == 2 and shape == self.initial_means.shape):

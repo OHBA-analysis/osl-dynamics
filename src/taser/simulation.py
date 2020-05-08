@@ -5,12 +5,13 @@ This module allows the user to conveniently simulate MEG data. Instantiating the
 which can be analysed.
 
 """
+import logging
 from abc import ABC, abstractmethod
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from taser.helpers.numpy import get_one_hot
+from taser.helpers.array_ops import get_one_hot
 
 
 class Simulation(ABC):
@@ -149,6 +150,9 @@ class Simulation(ABC):
             loc=0, scale=self.e_std, size=(self.n_channels, self.n_samples)
         )
         data_sim = signal + noise
+
+        if data_sim.shape[1] > data_sim.shape[0]:
+            data_sim = data_sim.T
 
         return data_sim.astype(np.float32)
 
@@ -410,10 +414,9 @@ class HiddenSemiMarkovSimulation(Simulation):
             )
 
         if (self.off_diagonal_trans_prob is None) and (self.full_trans_prob is None):
-            self.off_diagonal_trans_prob = np.zeros([self.n_states, self.n_states])
+            self.off_diagonal_trans_prob = np.ones([self.n_states, self.n_states])
+            np.fill_diagonal(self.off_diagonal_trans_prob, 0)
 
-            np.fill_diagonal(self.off_diagonal_trans_prob[:, 1:], 1 - self.stay_prob)
-            self.off_diagonal_trans_prob[-1, 0] = 1 - self.stay_prob
             self.off_diagonal_trans_prob = (
                 self.off_diagonal_trans_prob
                 / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
@@ -427,6 +430,11 @@ class HiddenSemiMarkovSimulation(Simulation):
                 self.full_trans_prob / self.full_trans_prob.sum(axis=1)[:, None]
             )
 
+        with np.printoptions(linewidth=np.nan):
+            logging.info(
+                f"off_diagonal_trans_prob is:\n{str(self.off_diagonal_trans_prob)}"
+            )
+
     def generate_states(self):
         self.construct_off_diagonal_trans_prob()
         self.cumsum_off_diagonal_trans_prob = np.cumsum(
@@ -435,7 +443,8 @@ class HiddenSemiMarkovSimulation(Simulation):
         alpha_sim = np.zeros(self.n_samples, dtype=np.int)
 
         gamma_sample = np.random.default_rng().gamma
-        current_state = 0
+        random_sample = np.random.default_rng().uniform
+        current_state = np.random.default_rng().integers(0, self.n_states)
         current_position = 0
 
         while current_position < len(alpha_sim):
@@ -446,12 +455,18 @@ class HiddenSemiMarkovSimulation(Simulation):
                 current_position : current_position + state_lifetime
             ] = current_state
 
+            tmp = random_sample()
             for kk in range(self.cumsum_off_diagonal_trans_prob.shape[1]):
-                tmp = np.random.default_rng().uniform()
                 if tmp < self.cumsum_off_diagonal_trans_prob[current_state, kk]:
                     break
 
             current_position += state_lifetime
             current_state = kk
 
-        return get_one_hot(alpha_sim)
+        logging.debug(f"n_states present in alpha sim = {len(np.unique(alpha_sim))}")
+
+        one_hot_alpha_sim = get_one_hot(alpha_sim, n_states=self.n_states)
+
+        logging.debug(f"one_hot_alpha_sim.shape = {one_hot_alpha_sim.shape}")
+
+        return one_hot_alpha_sim
