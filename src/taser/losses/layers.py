@@ -34,13 +34,19 @@ class LogLikelihoodLayer(Layer):
     }
 
     def __init__(
-        self, n_states: int, n_channels: int, alpha_xform: str = "linear", **kwargs
+        self,
+        n_states: int,
+        n_channels: int,
+        alpha_xform: str = "linear",
+        diagonal_constant: float = 1e-8,
+        **kwargs,
     ):
-
         super().__init__(**kwargs)
 
         self.n_states = n_states
         self.n_channels = n_channels
+        self.diagonal_constant = diagonal_constant
+
         self.run_eagerly = True
 
         self.regularizer = l2()
@@ -100,7 +106,7 @@ class LogLikelihoodLayer(Layer):
 
         regularized_cov_arg = self.regularizer(cov_arg)
 
-        safety_add = 1e-8 * tf.eye(self.n_channels)
+        safety_add = self.diagonal_constant * tf.eye(self.n_channels)
         regularized_cov_arg += safety_add
 
         inv_cov_arg = tf.linalg.inv(regularized_cov_arg)

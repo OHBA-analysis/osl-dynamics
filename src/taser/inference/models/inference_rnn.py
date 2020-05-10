@@ -56,6 +56,7 @@ class InferenceRNN(Model):
         learn_means: bool = False,
         learn_covariances: bool = True,
         alpha_xform: str = "softmax",
+        log_likelihood_diagonal_constant: float = 1e-8,
     ):
         super().__init__()
 
@@ -97,7 +98,10 @@ class InferenceRNN(Model):
         )
 
         self.log_likelihood_loss = LogLikelihoodLayer(
-            n_states, n_channels, alpha_xform=alpha_xform
+            n_states,
+            n_channels,
+            alpha_xform=alpha_xform,
+            diagonal_constant=log_likelihood_diagonal_constant,
         )
         self.kl_loss = KLDivergenceLayer(n_states, n_channels)
 
