@@ -7,6 +7,7 @@ from typing import List
 import tensorflow as tf
 from tensorflow.keras.activations import linear, softmax, softplus
 from tensorflow.keras.layers import Layer
+from tensorflow.keras.regularizers import l2
 
 from taser.losses.functions import normal_kl_divergence
 
@@ -41,6 +42,8 @@ class LogLikelihoodLayer(Layer):
         self.n_states = n_states
         self.n_channels = n_channels
         self.run_eagerly = True
+
+        self.regularizer = l2()
 
         try:
             self.alpha_xform = self.alpha_xforms[alpha_xform]
@@ -95,11 +98,13 @@ class LogLikelihoodLayer(Layer):
 
         cov_arg = tf.reduce_sum(alpha_ext * covariance_ext, axis=2)
 
-        safety_add = 1e-8 * tf.eye(self.n_channels)
-        cov_arg += safety_add
+        regularized_cov_arg = self.regularizer(cov_arg)
 
-        inv_cov_arg = tf.linalg.inv(cov_arg)
-        log_det = -0.5 * tf.linalg.logdet(cov_arg)
+        safety_add = 1e-8 * tf.eye(self.n_channels)
+        regularized_cov_arg += safety_add
+
+        inv_cov_arg = tf.linalg.inv(regularized_cov_arg)
+        log_det = -0.5 * tf.linalg.logdet(regularized_cov_arg)
 
         y_exp = y_portioned[:, :, tf.newaxis, ...]
         mn_exp = mn_arg[:, :, tf.newaxis, ...]

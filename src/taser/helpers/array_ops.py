@@ -2,6 +2,7 @@
 
 """
 import logging
+from itertools import permutations
 from typing import List, Tuple
 
 import numpy as np
@@ -143,6 +144,77 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     if len(sequence_2.shape) == 2:
         sequence_2 = sequence_2.argmax(axis=1)
     return dice_coefficient_1d(sequence_1, sequence_2)
+
+
+@transpose(0, "sequence_1", 1, "sequence_2")
+def align_arrays(
+    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "left"
+) -> Tuple[np.ndarray, np.ndarray]:
+    min_length = min(len(sequence_1), len(sequence_2))
+
+    if alignment == "left":
+        sequence_1 = sequence_1[:min_length]
+        sequence_2 = sequence_2[:min_length]
+
+    elif alignment == "right":
+        sequence_1 = sequence_1[-min_length:]
+        sequence_2 = sequence_2[-min_length:]
+
+    elif alignment == "center":
+        half_length = int(min_length / 2)
+        mid_1 = int(len(sequence_1) / 2)
+        mid_2 = int(len(sequence_2) / 2)
+
+        sequence_1 = sequence_1[mid_1 - half_length : mid_1 + half_length]
+        sequence_2 = sequence_2[mid_2 - half_length : mid_2 + half_length]
+
+    else:
+        raise ValueError(f"Alignment must be left, right or center.")
+
+    return sequence_1, sequence_2
+
+
+@transpose(0, "sequence_1", 1, "sequence_2")
+def dice_from_permutations(
+    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "all"
+) -> List[List[Tuple[float, List[int], str]]]:
+    if alignment == "all":
+        dice_list = []
+        for a in ["left", "right", "center"]:
+            aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=a)
+            for order in permutations(range(aligned_1.shape[1])):
+                dice_list.append(
+                    [dice_coefficient(aligned_1[:, order], aligned_2), order, a]
+                )
+
+        dice_list.sort(key=lambda x: x[0], reverse=True)
+
+        return dice_list
+
+    aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=alignment)
+
+    dice_list = []
+    for order in permutations(range(aligned_1.shape[1])):
+        dice_list.append(
+            [dice_coefficient(aligned_1[:, order], aligned_2), order, alignment]
+        )
+
+    dice_list.sort(key=lambda x: x[0], reverse=True)
+
+    return dice_list
+
+
+@transpose(0, "sequence_1", 1, "sequence_2")
+def get_maximum_dice_arrays(
+    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "all"
+):
+    ordered_dice = dice_from_permutations(sequence_1, sequence_2, alignment=alignment)
+    dice, order, alignment = ordered_dice[0]
+    print(
+        f"maximum dice coefficent is {dice} from order {order} "
+        f"with alignment {alignment}"
+    )
+    return sequence_1, sequence_2[:, order]
 
 
 @transpose(0, "state_time_course")
