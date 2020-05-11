@@ -299,24 +299,6 @@ def from_cholesky(cholesky_matrix: np.ndarray):
     return cholesky_matrix @ cholesky_matrix.transpose((0, 2, 1))
 
 
-def trials_to_continuous(trials_time_course: np.ndarray):
-    if trials_time_course.ndim == 2:
-        logging.warning(
-            "A 2D time series was passed. Assuming it doesn't need to"
-            "be concatenated."
-        )
-        if trials_time_course.shape[1] > trials_time_course.shape[0]:
-            trials_time_course = trials_time_course.T
-        return trials_time_course
-
-    if trials_time_course.ndim != 3:
-        raise ValueError(
-            f"trials_time_course has {trials_time_course.ndim}"
-            f" dimensions. It should have 3."
-        )
-    return np.concatenate(np.transpose(trials_time_course, axes=[2, 0, 1]), axis=1)
-
-
 @transpose(0, "state_time_course")
 def calculate_trans_prob_matrix(
     state_time_course: np.ndarray,
