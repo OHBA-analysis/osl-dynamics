@@ -4,7 +4,6 @@ from typing import Union
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from taser.helpers import array_ops
 from taser.helpers.decorators import transpose
 
 
