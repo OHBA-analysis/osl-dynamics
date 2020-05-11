@@ -115,3 +115,7 @@ def scale(time_series: np.ndarray) -> np.ndarray:
 
 def scale_pca(time_series: np.ndarray, n_components: Union[int, float]):
     return scale(pca(time_series=time_series, n_components=n_components))
+
+
+def scale_pca_scale(time_series: np.ndarray, n_components: Union[int, float]):
+    return scale(pca(scale(time_series), n_components=n_components))

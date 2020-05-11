@@ -104,13 +104,11 @@ class LogLikelihoodLayer(Layer):
 
         cov_arg = tf.reduce_sum(alpha_ext * covariance_ext, axis=2)
 
-        regularized_cov_arg = self.regularizer(cov_arg)
-
         safety_add = self.diagonal_constant * tf.eye(self.n_channels)
-        regularized_cov_arg += safety_add
+        cov_arg += safety_add
 
-        inv_cov_arg = tf.linalg.inv(regularized_cov_arg)
-        log_det = -0.5 * tf.linalg.logdet(regularized_cov_arg)
+        inv_cov_arg = tf.linalg.inv(cov_arg)
+        log_det = -0.5 * tf.linalg.logdet(cov_arg)
 
         y_exp = y_portioned[:, :, tf.newaxis, ...]
         mn_exp = mn_arg[:, :, tf.newaxis, ...]

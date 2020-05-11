@@ -187,19 +187,16 @@ def dice_from_permutations(
                     [dice_coefficient(aligned_1[:, order], aligned_2), order, a]
                 )
 
-        dice_list.sort(key=lambda x: x[0], reverse=True)
+    else:
+        aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=alignment)
 
-        return dice_list
+        dice_list = []
+        for order in permutations(range(aligned_1.shape[1])):
+            dice_list.append(
+                [dice_coefficient(aligned_1[:, order], aligned_2), order, alignment]
+            )
 
-    aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=alignment)
-
-    dice_list = []
-    for order in permutations(range(aligned_1.shape[1])):
-        dice_list.append(
-            [dice_coefficient(aligned_1[:, order], aligned_2), order, alignment]
-        )
-
-    dice_list.sort(key=lambda x: x[0], reverse=True)
+    dice_list = sorted(dice_list, reverse=True)
 
     return dice_list
 
@@ -214,7 +211,7 @@ def get_maximum_dice_arrays(
         f"maximum dice coefficent is {dice} from order {order} "
         f"with alignment {alignment}"
     )
-    return sequence_1, sequence_2[:, order]
+    return sequence_1[:, order], sequence_2
 
 
 @transpose(0, "state_time_course")
