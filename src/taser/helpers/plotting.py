@@ -28,6 +28,12 @@ def value_separation(
     return time_series + gap * separation
 
 
+def get_colors(n_states: int, colormap: str = "gist_rainbow"):
+    colormap = plt.get_cmap(colormap)
+    colors = [colormap(1 * i / n_states) for i in range(n_states)]
+    return colors
+
+
 @transpose(0, 1, 2, "time_series_0", "time_series_1", "time_series_2")
 def plot_two_data_scales(
     time_series_0: np.ndarray,
@@ -199,8 +205,7 @@ def highlight_states(
     n_states = reduced_state_time_course.shape[1]
     ons, offs = state_activation(reduced_state_time_course)
 
-    colormap = plt.get_cmap(colormap)
-    colors = [colormap(1 * i / n_states) for i in range(n_states)]
+    colors = get_colors(n_states, colormap)
 
     for state_number, (state_ons, state_offs, color) in enumerate(
         zip(ons, offs, colors)
@@ -324,25 +329,43 @@ def add_axis_colorbar(axis: plt.Axes):
 
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
-    state_time_course: np.ndarray, figsize=(5, 5), bins: int = 20, density: bool = False
+    state_time_course: np.ndarray,
+    figsize=(5, 5),
+    bins: int = 20,
+    density: bool = False,
+    hist_kwargs: dict = None,
 ):
     if state_time_course.ndim == 1:
         state_time_course = get_one_hot(state_time_course)
     if state_time_course.ndim != 2:
         raise ValueError("state_timecourse must be a 2D array")
 
+    default_hist_kwargs = {"alpha": 0.5}
+    hist_kwargs = override_dict_defaults(default_hist_kwargs, hist_kwargs)
+
     state_time_course = reduce_state_time_course(state_time_course)
     channel_lifetimes = state_lifetimes(state_time_course)
     n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
 
+    colors = get_colors(n_plots)
+
     fig, axes = plt.subplots(short, long, figsize=figsize)
-    for channel, axis in zip_longest(channel_lifetimes, axes.ravel()):
+    for channel, axis, color in zip_longest(channel_lifetimes, axes.ravel(), colors):
         if channel is None:
             axis.remove()
             continue
-        axis.hist(channel, density=density, bins=bins)
-
+        axis.hist(channel, density=density, bins=bins, color=color, **hist_kwargs)
+        t = axis.text(
+            0.95,
+            0.95,
+            f"{np.sum(channel) / len(state_time_course) * 100:.2f}%",
+            fontsize=10,
+            horizontalalignment="right",
+            verticalalignment="top",
+            transform=axis.transAxes,
+        )
+        t.set_bbox({"facecolor": "white", "alpha": 0.7, "boxstyle": "round"})
     plt.tight_layout()
 
     plt.show()

@@ -1,10 +1,11 @@
 import logging
-from typing import Union
+from typing import Union, List, Tuple
 
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from taser.helpers.decorators import transpose
+from tqdm import tqdm
 
 
 def get_alpha_order(real_alpha, est_alpha):
@@ -35,16 +36,11 @@ def get_alpha_order(real_alpha, est_alpha):
     return alpha_res_order
 
 
+@transpose
 def pca(time_series: np.ndarray, n_components: Union[int, float] = None,) -> np.ndarray:
 
-    if time_series.ndim == 3:
-        logging.warning("Assuming 3D array is [channels x time x trials]")
-        time_series = trials_to_continuous(time_series)
     if time_series.ndim != 2:
         raise ValueError("time_series must be a 2D array")
-    if time_series.shape[0] < time_series.shape[1]:
-        logging.warning("Assuming longer axis to be time and transposing.")
-        time_series = time_series.T
 
     standard_scaler = StandardScaler()
     data_std = standard_scaler.fit_transform(time_series)
@@ -70,35 +66,100 @@ def scale_pca(time_series: np.ndarray, n_components: Union[int, float]):
     return scale(pca(time_series=time_series, n_components=n_components))
 
 
-def scale_pca_scale(time_series: np.ndarray, n_components: Union[int, float]):
-    return scale(pca(scale(time_series), n_components=n_components))
+def standardize(
+    time_series: np.ndarray,
+    n_components: Union[int, float] = 0.9,
+    pre_scale: bool = True,
+    do_pca: bool = True,
+    post_scale: bool = True,
+):
+
+    if pre_scale:
+        time_series = scale(time_series)
+    if do_pca:
+        time_series = pca(time_series, n_components)
+    if post_scale:
+        time_series = scale(time_series)
+
+    return time_series
 
 
-def process_data(dataset_parameters):
-    raw_data = np.load(dataset_parameters["input_data"]).astype(np.float32)
-
-    retrialed_data = raw_data[
-        :, : dataset_parameters["trial_cutoff"], :: dataset_parameters["trial_skip"]
+def load_file_list(file_list: List[str]) -> List[np.ndarray]:
+    if isinstance(file_list, str):
+        file_list = [file_list]
+    return [
+        np.load(file).astype(np.float32)
+        for file in tqdm(file_list, desc="Loading files")
     ]
-    concatenated_data = trials_to_continuous(retrialed_data)
 
-    events = concatenated_data[dataset_parameters["event_channel"]]
-    input_data = concatenated_data[dataset_parameters["data_start"] :]
 
-    if dataset_parameters["standardize"]:
-        input_data = scale(input_data)
-    if dataset_parameters["pca"]:
-        input_data = pca(input_data, n_components=dataset_parameters["n_pcs"])
-    if dataset_parameters["standardize_pcs"]:
-        input_data = scale(input_data)
+def trim_trial_list(
+    trials_time_course_list: List[np.ndarray], trial_cutoff: int, trial_skip: int
+):
+    if isinstance(trials_time_course_list, np.ndarray):
+        trials_time_course_list = [trials_time_course_list]
 
-    return input_data, events
+    if trial_cutoff is None:
+        trial_cutoff = trials_time_course_list[0].shape[1]
+    return [
+        trials_time_course[:, :trial_cutoff, ::trial_skip]
+        for trials_time_course in trials_time_course_list
+    ]
+
+
+def subjects_to_time_course(
+    file_list: List[str],
+    trial_cutoff: int = None,
+    trial_skip: int = 1,
+    event_channel: int = None,
+    data_start: int = 0,
+    **kwargs: dict,
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    raw_data_list = load_file_list(file_list)
+
+    trimmed_trial_list = trim_trial_list(raw_data_list, trial_cutoff, trial_skip)
+
+    concatenated_data_list = [
+        trials_to_continuous(trimmed) for trimmed in trimmed_trial_list
+    ]
+
+    input_data_list = [
+        concatenated_data[data_start:] for concatenated_data in concatenated_data_list
+    ]
+
+    scaled_data_list = [scale(input_data) for input_data in input_data_list]
+
+    data_shapes = [arr.shape[1] for arr in scaled_data_list]
+    max_data_shape = max(data_shapes)
+    shape_difference = np.array([max_data_shape - shape for shape in data_shapes])
+    needs_padding = np.argwhere(shape_difference != 0)
+    if needs_padding.size > 0:
+        logging.warning(
+            f"Padding required for inputs:\n"
+            f"\t   file: {', '.join([str(i[0]) for i in needs_padding])}\n"
+            f"\tpadding: {', '.join(str(i[0]) for i in shape_difference[needs_padding])}"
+        )
+
+    padded_data_list = [
+        np.pad(arr, [[0, 0], [0, diff]])
+        for arr, diff in zip(scaled_data_list, shape_difference)
+    ]
+
+    all_concatenated = np.concatenate(padded_data_list, axis=0)
+
+    if event_channel is None:
+        return all_concatenated
+    else:
+        events = np.concatenate(
+            [data[event_channel] for data in concatenated_data_list]
+        )
+        return all_concatenated, events
 
 
 def trials_to_continuous(trials_time_course: np.ndarray):
     if trials_time_course.ndim == 2:
         logging.warning(
-            "A 2D time series was passed. Assuming it doesn't need to"
+            "A 2D time series was passed. Assuming it doesn't need to "
             "be concatenated."
         )
         if trials_time_course.shape[1] > trials_time_course.shape[0]:
