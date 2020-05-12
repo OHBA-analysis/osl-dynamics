@@ -107,6 +107,12 @@ def trim_trial_list(
     ]
 
 
+def count_trials(trials_time_course: List[np.ndarray]):
+    if isinstance(trials_time_course, np.ndarray):
+        trials_time_course = [trials_time_course]
+    return np.sum([time_course.shape[2] for time_course in trials_time_course])
+
+
 def subjects_to_time_course(
     file_list: List[str],
     trial_cutoff: int = None,
