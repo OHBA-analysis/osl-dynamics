@@ -248,14 +248,17 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
     for i, diff in enumerate(diffs.T):
         on = (diff == 1).nonzero()[0]
         off = (diff == -1).nonzero()[0]
-        if on[-1] > off[-1]:
-            off = np.append(off, len(diff))
+        try:
+            if on[-1] > off[-1]:
+                off = np.append(off, len(diff))
 
-        if off[0] < on[0]:
-            on = np.insert(on, 0, -1)
+            if off[0] < on[0]:
+                on = np.insert(on, 0, -1)
 
-        channel_on.append(on)
-        channel_off.append(off)
+            channel_on.append(on)
+            channel_off.append(off)
+        except IndexError:
+            logging.info(f"No activation in state {i}.")
 
     channel_on = np.array(channel_on)
     channel_off = np.array(channel_off)

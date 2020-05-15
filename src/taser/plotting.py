@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from taser.helpers.array_ops import (
+from taser.array_ops import (
     from_cholesky,
     get_one_hot,
     reduce_state_time_course,

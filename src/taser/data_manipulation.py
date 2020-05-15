@@ -1,11 +1,12 @@
 import logging
-from typing import Union, List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from taser.helpers.decorators import transpose
 from tqdm import tqdm
+
+from taser.helpers.decorators import transpose
 
 
 def get_alpha_order(real_alpha, est_alpha):
@@ -113,45 +114,94 @@ def count_trials(trials_time_course: List[np.ndarray]):
     return np.sum([time_course.shape[2] for time_course in trials_time_course])
 
 
+def randomly_sample_trials(
+    trials_time_course: List[np.ndarray],
+    approx_n_trials: int = None,
+    probability: float = None,
+) -> List[np.ndarray]:
+    if isinstance(trials_time_course, np.ndarray):
+        trials_time_course = [trials_time_course]
+
+    if not ((approx_n_trials is None) != (probability is None)):
+        raise ValueError("Specify one of approx_n_trials and percent_trials.")
+
+    if approx_n_trials is not None:
+        total_trials = count_trials(trials_time_course)
+        probability = approx_n_trials / total_trials
+        if probability > 1:
+            logging.warning(
+                f"approx_n_trials ({approx_n_trials}) > total trials ({total_trials}). "
+                f"Setting probability to 1."
+            )
+            probability = 1
+
+    if not (0 < probability <= 1):
+        raise ValueError("Probability must be between 0 and 1")
+
+    resampled_trials = []
+    for time_course in trials_time_course:
+        rands = np.random.rand(time_course.shape[2])
+        resampled_trials.append(time_course[:, :, rands < probability])
+
+    return resampled_trials
+
+
 def subjects_to_time_course(
     file_list: List[str],
+    n_pcs: Union[int, float],
     trial_cutoff: int = None,
     trial_skip: int = 1,
     event_channel: int = None,
     data_start: int = 0,
+    approx_n_trials: int = None,
+    keep_probability: int = None,
     **kwargs: dict,
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+
     raw_data_list = load_file_list(file_list)
 
     trimmed_trial_list = trim_trial_list(raw_data_list, trial_cutoff, trial_skip)
 
+    if (approx_n_trials is None) and (keep_probability is None):
+        keep_probability = 1
+
+    resampled_trials = randomly_sample_trials(
+        trimmed_trial_list,
+        approx_n_trials=approx_n_trials,
+        probability=keep_probability,
+    )
+
     concatenated_data_list = [
-        trials_to_continuous(trimmed) for trimmed in trimmed_trial_list
+        trials_to_continuous(trimmed) for trimmed in resampled_trials
     ]
 
     input_data_list = [
         concatenated_data[data_start:] for concatenated_data in concatenated_data_list
     ]
 
-    scaled_data_list = [scale(input_data) for input_data in input_data_list]
+    # scaled_data_list = [scale(input_data) for input_data in input_data_list]
 
-    data_shapes = [arr.shape[1] for arr in scaled_data_list]
-    max_data_shape = max(data_shapes)
-    shape_difference = np.array([max_data_shape - shape for shape in data_shapes])
-    needs_padding = np.argwhere(shape_difference != 0)
-    if needs_padding.size > 0:
-        logging.warning(
-            f"Padding required for inputs:\n"
-            f"\t   file: {', '.join([str(i[0]) for i in needs_padding])}\n"
-            f"\tpadding: {', '.join(str(i[0]) for i in shape_difference[needs_padding])}"
-        )
+    # data_shapes = [arr.shape[1] for arr in scaled_data_list]
+    # max_data_shape = max(data_shapes)
+    # shape_difference = np.array([max_data_shape - shape for shape in data_shapes])
+    # needs_padding = np.argwhere(shape_difference != 0)
+    # if needs_padding.size > 0:
+    #     logging.warning(
+    #         f"Padding required for inputs:\n"
+    #         f"\t   file: {', '.join([str(i[0]) for i in needs_padding])}\n"
+    #         f"\tpadding: {', '.join(str(i[0]) for i in shape_difference[needs_padding])}"
+    #     )
+    #
+    # padded_data_list = [
+    #     np.pad(arr, [[0, 0], [0, diff]])
+    #     for arr, diff in zip(scaled_data_list, shape_difference)
+    # ]
 
-    padded_data_list = [
-        np.pad(arr, [[0, 0], [0, diff]])
-        for arr, diff in zip(scaled_data_list, shape_difference)
+    rescaled = [
+        standardize(padded_data, n_components=n_pcs) for padded_data in input_data_list
     ]
 
-    all_concatenated = np.concatenate(padded_data_list, axis=0)
+    all_concatenated = np.concatenate(rescaled, axis=0)
 
     if event_channel is None:
         return all_concatenated

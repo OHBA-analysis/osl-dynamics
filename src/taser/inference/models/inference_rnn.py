@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
-from taser.helpers.array_ops import get_one_hot
+from taser.array_ops import get_one_hot
 from taser.inference.layers import (
     MVNLayer,
     ReparameterizationLayer,

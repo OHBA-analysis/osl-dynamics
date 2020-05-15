@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
 
-from taser.helpers.array_ops import get_one_hot
+from taser.array_ops import get_one_hot
 
 
 class Simulation(ABC):
