@@ -330,7 +330,7 @@ def add_axis_colorbar(axis: plt.Axes):
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
     state_time_course: np.ndarray,
-    figsize=(5, 5),
+    figsize=None,
     bins: int = 20,
     density: bool = False,
     hist_kwargs: dict = None,
@@ -349,6 +349,9 @@ def plot_state_lifetimes(
     short, long, empty = rough_square_axes(n_plots)
 
     colors = get_colors(n_plots)
+
+    if figsize is None:
+        figsize = (long * 2.5, short * 2.5)
 
     fig, axes = plt.subplots(short, long, figsize=figsize)
     for channel, axis, color in zip_longest(channel_lifetimes, axes.ravel(), colors):

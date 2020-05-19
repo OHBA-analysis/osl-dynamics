@@ -1,12 +1,81 @@
 import logging
-from typing import List, Tuple, Union
+from typing import List, Union
 
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
+import scipy.io
+import mat73
 
 from taser.helpers.decorators import transpose
+from taser import plotting
+
+
+class MEGData:
+    def __init__(
+        self, time_series: Union[np.ndarray, str], sampling_frequency: float = 1
+    ):
+        if isinstance(time_series, str):
+            if time_series[-4:] == ".npy":
+                time_series = np.load(time_series)
+            elif time_series[-4:] == ".mat":
+                try:
+                    mat = scipy.io.loadmat(time_series)
+                except NotImplementedError:
+                    logging.warning(
+                        f"{time_series} is a MAT v7.3 file so importing will"
+                        f" be handled by `mat73`."
+                    )
+                    mat = mat73.loadmat(time_series)
+                finally:
+                    for key in mat:
+                        if key not in ["__globals__", "__header__", "__version__"]:
+                            time_series = mat[key]
+
+        self.raw_data = time_series
+        self.time_series = time_series.copy()
+
+        self.sampling_frequency = sampling_frequency
+        self.t = None
+
+    def __getitem__(self, val):
+        return self.time_series[val]
+
+    def trim_trials(self, trial_start=None, trial_cutoff=None, trial_skip=None):
+        try:
+            self.time_series = trim_trial_list(
+                self.time_series,
+                trial_start=trial_start,
+                trial_cutoff=trial_cutoff,
+                trial_skip=trial_skip,
+            )
+        except ValueError:
+            logging.warning(
+                "self.time_series is not a 3D array. "
+                "Has it already been made continuous?"
+            )
+
+    def make_continuous(self):
+        self.time_series = trials_to_continuous(self.time_series)
+        self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
+
+    def standardize(
+        self, n_components=0.9, pre_scale=True, do_pca=True, post_scale=True
+    ):
+        self.time_series = standardize(
+            self.time_series,
+            n_components=n_components,
+            pre_scale=pre_scale,
+            do_pca=do_pca,
+            post_scale=post_scale,
+        )
+
+    def plot(self, n_time_points=10000):
+        plotting.plot_time_series(self.time_series, n_time_points=n_time_points)
+
+    def mean(self, axis=None, **kwargs):
+        return np.mean(self.time_series, axis=axis, **kwargs)
 
 
 def get_alpha_order(real_alpha, est_alpha):
@@ -95,17 +164,14 @@ def load_file_list(file_list: List[str]) -> List[np.ndarray]:
 
 
 def trim_trial_list(
-    trials_time_course_list: List[np.ndarray], trial_cutoff: int, trial_skip: int
+    trials_time_course: np.ndarray,
+    trial_start: int = None,
+    trial_cutoff: int = None,
+    trial_skip: int = None,
 ):
-    if isinstance(trials_time_course_list, np.ndarray):
-        trials_time_course_list = [trials_time_course_list]
-
-    if trial_cutoff is None:
-        trial_cutoff = trials_time_course_list[0].shape[1]
-    return [
-        trials_time_course[:, :trial_cutoff, ::trial_skip]
-        for trials_time_course in trials_time_course_list
-    ]
+    if trials_time_course.ndim != 3:
+        raise ValueError("trials_time_course should be a 3D array.")
+    return trials_time_course[:, trial_start:trial_cutoff, ::trial_skip]
 
 
 def count_trials(trials_time_course: List[np.ndarray]):
@@ -114,105 +180,7 @@ def count_trials(trials_time_course: List[np.ndarray]):
     return np.sum([time_course.shape[2] for time_course in trials_time_course])
 
 
-def randomly_sample_trials(
-    trials_time_course: List[np.ndarray],
-    approx_n_trials: int = None,
-    probability: float = None,
-) -> List[np.ndarray]:
-    if isinstance(trials_time_course, np.ndarray):
-        trials_time_course = [trials_time_course]
-
-    if not ((approx_n_trials is None) != (probability is None)):
-        raise ValueError("Specify one of approx_n_trials and percent_trials.")
-
-    if approx_n_trials is not None:
-        total_trials = count_trials(trials_time_course)
-        probability = approx_n_trials / total_trials
-        if probability > 1:
-            logging.warning(
-                f"approx_n_trials ({approx_n_trials}) > total trials ({total_trials}). "
-                f"Setting probability to 1."
-            )
-            probability = 1
-
-    if not (0 < probability <= 1):
-        raise ValueError("Probability must be between 0 and 1")
-
-    resampled_trials = []
-    for time_course in trials_time_course:
-        rands = np.random.rand(time_course.shape[2])
-        resampled_trials.append(time_course[:, :, rands < probability])
-
-    return resampled_trials
-
-
-def subjects_to_time_course(
-    file_list: List[str],
-    n_pcs: Union[int, float],
-    trial_cutoff: int = None,
-    trial_skip: int = 1,
-    event_channel: int = None,
-    data_start: int = 0,
-    approx_n_trials: int = None,
-    keep_probability: int = None,
-    **kwargs: dict,
-) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-
-    raw_data_list = load_file_list(file_list)
-
-    trimmed_trial_list = trim_trial_list(raw_data_list, trial_cutoff, trial_skip)
-
-    if (approx_n_trials is None) and (keep_probability is None):
-        keep_probability = 1
-
-    resampled_trials = randomly_sample_trials(
-        trimmed_trial_list,
-        approx_n_trials=approx_n_trials,
-        probability=keep_probability,
-    )
-
-    concatenated_data_list = [
-        trials_to_continuous(trimmed) for trimmed in resampled_trials
-    ]
-
-    input_data_list = [
-        concatenated_data[data_start:] for concatenated_data in concatenated_data_list
-    ]
-
-    # scaled_data_list = [scale(input_data) for input_data in input_data_list]
-
-    # data_shapes = [arr.shape[1] for arr in scaled_data_list]
-    # max_data_shape = max(data_shapes)
-    # shape_difference = np.array([max_data_shape - shape for shape in data_shapes])
-    # needs_padding = np.argwhere(shape_difference != 0)
-    # if needs_padding.size > 0:
-    #     logging.warning(
-    #         f"Padding required for inputs:\n"
-    #         f"\t   file: {', '.join([str(i[0]) for i in needs_padding])}\n"
-    #         f"\tpadding: {', '.join(str(i[0]) for i in shape_difference[needs_padding])}"
-    #     )
-    #
-    # padded_data_list = [
-    #     np.pad(arr, [[0, 0], [0, diff]])
-    #     for arr, diff in zip(scaled_data_list, shape_difference)
-    # ]
-
-    rescaled = [
-        standardize(padded_data, n_components=n_pcs) for padded_data in input_data_list
-    ]
-
-    all_concatenated = np.concatenate(rescaled, axis=0)
-
-    if event_channel is None:
-        return all_concatenated
-    else:
-        events = np.concatenate(
-            [data[event_channel] for data in concatenated_data_list]
-        )
-        return all_concatenated, events
-
-
-def trials_to_continuous(trials_time_course: np.ndarray):
+def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
     if trials_time_course.ndim == 2:
         logging.warning(
             "A 2D time series was passed. Assuming it doesn't need to "
@@ -227,4 +195,14 @@ def trials_to_continuous(trials_time_course: np.ndarray):
             f"trials_time_course has {trials_time_course.ndim}"
             f" dimensions. It should have 3."
         )
-    return np.concatenate(np.transpose(trials_time_course, axes=[2, 0, 1]), axis=1)
+    concatenated = np.concatenate(
+        np.transpose(trials_time_course, axes=[2, 0, 1]), axis=1
+    )
+    if concatenated.shape[1] > concatenated.shape[0]:
+        concatenated = concatenated.T
+        logging.warning(
+            f"Assuming longer axis to be time and transposing. Check your inputs to be "
+            f"sure."
+        )
+
+    return concatenated

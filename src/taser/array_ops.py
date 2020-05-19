@@ -191,7 +191,8 @@ def dice_from_permutations(
         aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=alignment)
 
         dice_list = []
-        for order in permutations(range(aligned_1.shape[1])):
+        perms = permutations(range(aligned_1.shape[1]))
+        for order in perms:
             dice_list.append(
                 [dice_coefficient(aligned_1[:, order], aligned_2), order, alignment]
             )
