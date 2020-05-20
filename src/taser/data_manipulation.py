@@ -43,7 +43,7 @@ class MEGData:
         self.n_min, self.n_max = None, None
 
     def __getitem__(self, val):
-        return self.time_series[self.n_min:self.n_max][val]
+        return self.time_series[self.n_min : self.n_max][val]
 
     def data_limits(self, n_min=None, n_max=None):
         self.n_min = n_min

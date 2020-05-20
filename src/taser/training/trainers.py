@@ -81,9 +81,7 @@ class Trainer(ABC):
         dataset : tf.Dataset
         """
         epoch_iterator = self.tqdm(
-            dataset,
-            leave=False,
-            postfix={"loss": self.loss_history[-1]},
+            dataset, leave=False, postfix={"loss": self.loss_history[-1]},
         )
 
         for y in epoch_iterator:
