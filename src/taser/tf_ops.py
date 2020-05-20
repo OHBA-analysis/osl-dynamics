@@ -2,10 +2,12 @@
 
 """
 import logging
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import tensorflow as tf
+
+from taser.data_manipulation import MEGData
 
 
 def gpu_growth():
@@ -28,11 +30,14 @@ def gpu_growth():
 
 
 def train_predict_dataset(
-    time_series: np.ndarray,
+    time_series: Union[np.ndarray, MEGData],
     mini_batch_length: int,
     batch_size: int,
     buffer_size: int = 10000,
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
+    if isinstance(time_series, MEGData):
+        time_series = time_series[:]
+    time_series = time_series.astype(np.float32)
     if time_series.shape[0] < time_series.shape[1]:
         logging.warning("Assuming longer axis to be time and transposing.")
         time_series = time_series.T

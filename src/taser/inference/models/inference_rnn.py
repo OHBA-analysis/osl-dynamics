@@ -60,6 +60,9 @@ class InferenceRNN(Model):
     ):
         super().__init__()
 
+        if n_channels is None:
+            raise ValueError("n_channels must be specified.")
+
         self.dropout_layer_0 = Dropout(dropout_rate)
 
         self.inference_rnn = Bidirectional(

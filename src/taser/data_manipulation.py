@@ -23,7 +23,7 @@ class MEGData:
                 try:
                     mat = scipy.io.loadmat(time_series)
                 except NotImplementedError:
-                    logging.warning(
+                    logging.info(
                         f"{time_series} is a MAT v7.3 file so importing will"
                         f" be handled by `mat73`."
                     )
@@ -35,12 +35,19 @@ class MEGData:
 
         self.raw_data = time_series
         self.time_series = time_series.copy()
+        self.pca_applied = False
 
         self.sampling_frequency = sampling_frequency
         self.t = None
 
+        self.n_min, self.n_max = None, None
+
     def __getitem__(self, val):
-        return self.time_series[val]
+        return self.time_series[self.n_min:self.n_max][val]
+
+    def data_limits(self, n_min=None, n_max=None):
+        self.n_min = n_min
+        self.n_max = n_max
 
     def trim_trials(self, trial_start=None, trial_cutoff=None, trial_skip=None):
         try:
@@ -63,6 +70,9 @@ class MEGData:
     def standardize(
         self, n_components=0.9, pre_scale=True, do_pca=True, post_scale=True
     ):
+        if do_pca and self.pca_applied:
+            logging.warning("PCA already performed. Skipping.")
+            return
         self.time_series = standardize(
             self.time_series,
             n_components=n_components,
@@ -70,6 +80,7 @@ class MEGData:
             do_pca=do_pca,
             post_scale=post_scale,
         )
+        self.pca_applied = True
 
     def plot(self, n_time_points=10000):
         plotting.plot_time_series(self.time_series, n_time_points=n_time_points)
