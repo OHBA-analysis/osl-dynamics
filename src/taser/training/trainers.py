@@ -80,11 +80,14 @@ class Trainer(ABC):
         ----------
         dataset : tf.Dataset
         """
-        for y in self.tqdm(
+        epoch_iterator = self.tqdm(
             dataset,
             leave=False,
-            postfix={"epoch": self.epoch, "loss": self.loss_history[-1]},
-        ):
+            postfix={"loss": self.loss_history[-1]},
+        )
+
+        for y in epoch_iterator:
+            epoch_iterator.set_description_str(f"epoch={self.epoch}")
             loss_value, grads = self.grad(y)
             self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
             self.batch_mean(loss_value)
