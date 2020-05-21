@@ -185,11 +185,18 @@ def highlight_states(
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
     n_time_points: int = 5000,
+    sample_frequency: float = None,
     highlight_kwargs: dict = None,
     legend: bool = True,
     fig_kwargs: dict = None,
 ):
     n_time_points = min(n_time_points, state_time_course.shape[0])
+
+    time_array = np.array([0, n_time_points])
+
+    if sample_frequency is not None:
+        time_array = np.arange(n_time_points) / sample_frequency
+
     axis_given = axis is not None
     if not axis_given:
         fig_defaults = {
@@ -221,8 +228,8 @@ def highlight_states(
             else:
                 label = ""
             axis.axvspan(
-                on,
-                min(off, n_time_points),
+                on / sample_frequency,
+                min(off, n_time_points) / sample_frequency,
                 color=color,
                 **highlight_kwargs,
                 label=label,
@@ -230,18 +237,22 @@ def highlight_states(
 
     if legend:
         axis.legend(
-            loc=(0.0, -0.2), mode="expand", borderaxespad=0, ncol=n_states,
+            loc=(0.0, -0.3), mode="expand", borderaxespad=0, ncol=n_states,
         )
+
+    plt.plot(time_array, np.zeros_like(time_array), alpha=1)
+
+    plt.setp(axis.spines.values(), visible=False)
 
     axis.set_yticks([])
 
     axis.autoscale(tight=True)
-    axis.set_xlim(0, n_time_points)
+    # axis.set_xlim(0, n_time_points)
 
     plt.tight_layout()
 
     if not axis_given:
-        axis.axis("off")
+        # axis.axis("off")
         plt.show()
 
 
@@ -405,3 +416,30 @@ def axis_highlights(ons, offs, n_points, axis, i: int = 0, label: str = ""):
     for on, off in zip(ons, offs):
         if on < n_points or off < n_points:
             axis.axvspan(on, min(n_points - 1, off), alpha=0.1, color="r")
+
+
+def compare_state_data(
+    *state_time_courses, n_time_points=None, sample_frequency: float = 1,
+):
+    fig, axes = plt.subplots(
+        nrows=len(state_time_courses),
+        figsize=(20, 2.5 * len(state_time_courses)),
+        sharex="all",
+    )
+
+    for state_time_course, axis in zip(state_time_courses[:-1], axes[:-1]):
+        highlight_states(
+            state_time_course,
+            axis=axis,
+            n_time_points=n_time_points,
+            legend=False,
+            sample_frequency=sample_frequency,
+        )
+
+    highlight_states(
+        state_time_courses[-1],
+        axis=axes[-1],
+        n_time_points=n_time_points,
+        legend=True,
+        sample_frequency=sample_frequency,
+    )

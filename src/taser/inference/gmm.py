@@ -67,7 +67,7 @@ def learn_mu_sigma(
             **gmm_kwargs,
         )
     for attempt in range(retry_attempts):
-        warnings.filterwarnings('ignore')
+        warnings.filterwarnings("ignore")
         gmm.fit(data)
         if gmm.converged_:
             print(f"Converged on iteration {attempt}")

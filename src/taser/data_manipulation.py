@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import List, Union
 
 import numpy as np
@@ -13,6 +14,15 @@ from taser import plotting
 
 
 class MEGData:
+
+    ignored_keys = [
+        "__globals__",
+        "__header__",
+        "__version__",
+        "save_time",
+        "pca_applied",
+    ]
+
     def __init__(
         self, time_series: Union[np.ndarray, str], sampling_frequency: float = 1
     ):
@@ -30,7 +40,7 @@ class MEGData:
                     mat = mat73.loadmat(time_series)
                 finally:
                     for key in mat:
-                        if key not in ["__globals__", "__header__", "__version__"]:
+                        if key not in MEGData.ignored_keys:
                             time_series = mat[key]
 
         self.raw_data = time_series
@@ -39,6 +49,8 @@ class MEGData:
 
         self.sampling_frequency = sampling_frequency
         self.t = None
+        if time_series.ndim == 2:
+            self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
 
         self.n_min, self.n_max = None, None
 
@@ -87,6 +99,19 @@ class MEGData:
 
     def mean(self, axis=None, **kwargs):
         return np.mean(self.time_series, axis=axis, **kwargs)
+
+    def savemat(self, filename: str, field_name: str = "x"):
+        scipy.io.savemat(
+            filename,
+            {
+                field_name: self[:],
+                "save_time": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "pca_applied": self.pca_applied,
+            },
+        )
+
+    def save(self, filename: str):
+        np.save(filename, self[:])
 
 
 def get_alpha_order(real_alpha, est_alpha):
