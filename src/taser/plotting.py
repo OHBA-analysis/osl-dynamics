@@ -240,8 +240,6 @@ def highlight_states(
             loc=(0.0, -0.3), mode="expand", borderaxespad=0, ncol=n_states,
         )
 
-    plt.plot(time_array, np.zeros_like(time_array), alpha=1)
-
     plt.setp(axis.spines.values(), visible=False)
 
     axis.set_yticks([])
