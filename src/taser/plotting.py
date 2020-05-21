@@ -245,7 +245,11 @@ def highlight_states(
     axis.set_yticks([])
 
     axis.autoscale(tight=True)
-    # axis.set_xlim(0, n_time_points)
+
+    if sample_frequency is None:
+        axis.set_xlim(0, n_time_points)
+    else:
+        axis.set_xlim(0, n_time_points / sample_frequency)
 
     plt.tight_layout()
 
