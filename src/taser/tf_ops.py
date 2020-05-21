@@ -35,9 +35,10 @@ def train_predict_dataset(
     batch_size: int,
     buffer_size: int = 10000,
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
-    if isinstance(time_series, MEGData):
-        time_series = time_series[:]
+
+    time_series = time_series[:]
     time_series = time_series.astype(np.float32)
+
     if time_series.shape[0] < time_series.shape[1]:
         logging.warning("Assuming longer axis to be time and transposing.")
         time_series = time_series.T

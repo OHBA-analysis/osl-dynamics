@@ -8,11 +8,13 @@ import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
 import warnings
 
+from taser.helpers.decorators import transpose
 
+
+@transpose("data", 0)
 def learn_mu_sigma(
     data: np.ndarray,
     n_states: int,
-    n_channels: int,
     learn_means: bool = False,
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
@@ -52,6 +54,9 @@ def learn_mu_sigma(
         raise ValueError("retry_attempts cannot be less than 1")
     if gmm_kwargs is None:
         gmm_kwargs = {}
+
+    n_channels = data.shape[1]
+
     if learn_means:
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
