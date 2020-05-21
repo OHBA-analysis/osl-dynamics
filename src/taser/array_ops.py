@@ -6,8 +6,21 @@ from itertools import permutations
 from typing import List, Tuple
 
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 
 from taser.helpers.decorators import transpose
+
+
+@transpose
+def match_states(
+    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    correlation = np.zeros((state_time_course_1.shape[1], state_time_course_2.shape[1]))
+    for i, state1 in enumerate(state_time_course_1.T):
+        for j, state2 in enumerate(state_time_course_2.T):
+            correlation[i, j] = np.corrcoef(state1, state2)[0, 1]
+    matches = linear_sum_assignment(-correlation)
+    return state_time_course_1, state_time_course_2[:, matches[1]]
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):

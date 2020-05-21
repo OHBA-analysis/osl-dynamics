@@ -2,17 +2,46 @@
 
 """
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from typing import List
 
+import numpy as np
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from taser.helpers.misc import listify
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
-from tqdm.notebook import tnrange, tqdm_notebook
 
 from taser.helpers.decorators import timing
+
+
+class Callback(ABC):
+    def __init__(self):
+        pass
+
+    def epoch_end(self, *args, **kwargs):
+        pass
+
+
+class SaveCallback(Callback):
+    def __init__(self, trainer, basename, predict_dataset, frequency: int = 1):
+        super().__init__()
+        self.trainer = trainer
+        self.basename = basename
+        self.dataset = predict_dataset
+        self.frequency = frequency
+
+        Path(basename).mkdir(parents=True, exist_ok=True)
+
+    def epoch_end(self):
+        if self.trainer.epoch % self.frequency == 0:
+            fn_length = len(str(self.trainer.n_epochs))
+            np.save(
+                f"{self.basename}/{str(self.trainer.epoch).zfill(fn_length)}",
+                self.trainer.predict_latent_variable(self.dataset),
+            )
 
 
 class Trainer(ABC):
@@ -45,17 +74,14 @@ class Trainer(ABC):
         self.epoch = None
         self.n_epochs = None
 
-        self.tqdm = tqdm_notebook
-        self.trange = tnrange
-
         self.loss_value = tf.zeros(1)
         self.loss_history = [0.0]
         self.batch_mean = tf.keras.metrics.Mean()
 
-        self.check_tqdm()
-
     @timing
-    def train(self, dataset: tf.data.Dataset, n_epochs: int):
+    def train(
+        self, dataset: tf.data.Dataset, n_epochs: int, callbacks: List[Callback] = None
+    ):
         """Vanilla custom training loop. No bells or whistles.
 
         A method to train a model. It contains the training loop for the optimization
@@ -68,9 +94,14 @@ class Trainer(ABC):
         n_epochs : int
             The number of epochs to train for.
         """
+        callbacks = listify(callbacks)
+
         self.n_epochs = n_epochs
-        for self.epoch in self.trange(n_epochs):
+        for self.epoch in range(n_epochs):
             self.train_epoch(dataset=dataset)
+            for callback in callbacks:
+                callback.epoch_end()
+
         del self.loss_history[0]
 
     def train_epoch(self, dataset: tf.data.Dataset):
@@ -80,7 +111,7 @@ class Trainer(ABC):
         ----------
         dataset : tf.Dataset
         """
-        epoch_iterator = self.tqdm(
+        epoch_iterator = tqdm(
             dataset, leave=False, postfix={"loss": self.loss_history[-1]},
         )
 
@@ -124,7 +155,7 @@ class Trainer(ABC):
         """
         pass
 
-    @timing
+    # @timing
     def predict(self, dataset: tf.data.Dataset) -> List:
         results = []
         for y in dataset:
@@ -149,29 +180,6 @@ class Trainer(ABC):
     def plot_loss(self):
         plt.plot(self.loss_history[1:])
         plt.show()
-
-    def check_tqdm(self):
-        """Check if tqdm_notebook throws an error and use CLI version if it does.
-
-        """
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            try:
-                for i in self.trange(1, leave=False):
-                    pass
-                print("tqdm notebook seems to be working.")
-            except ImportError:
-                try:
-                    from IPython.display import clear_output
-
-                    clear_output()
-                except ImportError:
-                    pass
-                print(
-                    "Fallback to commandline version of tqdm.\nWarning can be ignored."
-                )
-                self.tqdm = tqdm
-                self.trange = range
 
 
 class AnnealingTrainer(Trainer):
@@ -214,7 +222,9 @@ class AnnealingTrainer(Trainer):
         )
 
     @timing
-    def train(self, dataset: tf.data.Dataset, n_epochs: int):
+    def train(
+        self, dataset: tf.data.Dataset, n_epochs: int, callbacks: List[Callback] = None
+    ):
         """Train the model.
 
         Override of `Trainer` method. Includes KL annealing step.
@@ -226,11 +236,15 @@ class AnnealingTrainer(Trainer):
         n_epochs : int
             The number of epochs to train for.
         """
+        callbacks = listify(callbacks)
+
         self.n_epochs = n_epochs
-        for self.epoch in self.trange(n_epochs):
+        for self.epoch in range(n_epochs):
             if self.epoch % self.update_frequency == 0:
                 self.calculate_annealing_factor()
             self.train_epoch(dataset=dataset)
+            for callback in callbacks:
+                callback.epoch_end()
 
     def loss(self, inputs: List[tf.Tensor], training: bool = True):
         """Calculate the loss of the model from the log likelihood loss and KL loss.

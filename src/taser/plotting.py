@@ -216,14 +216,16 @@ def highlight_states(
             if (on > n_time_points) and (off > n_time_points):
                 break
             handles, labels = axis.get_legend_handles_labels()
+            if (str(state_number) not in labels) and legend:
+                label = str(state_number)
+            else:
+                label = ""
             axis.axvspan(
                 on,
                 min(off, n_time_points),
                 color=color,
                 **highlight_kwargs,
-                label=str(state_number)
-                if (str(state_number) not in labels) and legend
-                else "",
+                label=label,
             )
 
     if legend:
@@ -376,7 +378,7 @@ def plot_state_lifetimes(
 
 @transpose(0, 1, "time_series", "state_time_course")
 def plot_highlighted_states(
-    time_series, state_time_course, n_time_points, state_order, fig_kwargs=None
+    time_series, state_time_course, n_time_points, fig_kwargs=None
 ):
     if fig_kwargs is None:
         fig_kwargs = {}
@@ -385,10 +387,10 @@ def plot_highlighted_states(
 
     ons, offs = state_activation(state_time_course)
 
-    for i, (channel_ons, channel_offs, ss, axis) in enumerate(
-        zip(ons, offs, state_order, axes.ravel())
+    for i, (channel_ons, channel_offs, axis, channel_time_series) in enumerate(
+        zip(ons, offs, axes.ravel(), time_series[:n_time_points].T)
     ):
-        axis.plot(time_series[0:n_time_points, ss])
+        axis.plot(channel_time_series)
         axis.set_yticks([0.5])
         axis.set_yticklabels([i])
         axis.set_ylim(-0.1, 1.1)
