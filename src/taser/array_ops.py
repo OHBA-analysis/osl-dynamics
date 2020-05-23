@@ -12,13 +12,22 @@ from taser.helpers.decorators import transpose
 
 
 @transpose
-def match_states(
+def correlate_states(
     state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> np.ndarray:
     correlation = np.zeros((state_time_course_1.shape[1], state_time_course_2.shape[1]))
     for i, state1 in enumerate(state_time_course_1.T):
         for j, state2 in enumerate(state_time_course_2.T):
             correlation[i, j] = np.corrcoef(state1, state2)[0, 1]
+    return correlation
+
+
+@transpose
+def match_states(
+    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    correlation = correlate_states(state_time_course_1, state_time_course_2)
+    correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
     matches = linear_sum_assignment(-correlation)
     return state_time_course_1, state_time_course_2[:, matches[1]]
 
@@ -273,6 +282,8 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             channel_off.append(off)
         except IndexError:
             logging.info(f"No activation in state {i}.")
+            channel_on.append(np.array([]))
+            channel_off.append(np.array([]))
 
     channel_on = np.array(channel_on)
     channel_off = np.array(channel_off)
@@ -358,3 +369,12 @@ def trace_normalize(matrix: np.ndarray):
         raise ValueError("Matrix should be 2D or 3D.")
 
     return matrix / matrix.trace(axis1=1, axis2=2)[:, None, None]
+
+
+def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
+    transposed = False
+    if input_array.shape[1] > input_array.shape[0]:
+        input_array = input_array.T
+        transposed = True
+    return input_array, transposed
+

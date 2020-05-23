@@ -36,6 +36,7 @@ def train_predict_dataset(
     buffer_size: int = 10000,
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
 
+    # If data is in a MEGData class, get the time_series first
     time_series = time_series[:]
     time_series = time_series.astype(np.float32)
 

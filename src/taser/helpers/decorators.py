@@ -1,6 +1,16 @@
 import logging
 from functools import wraps
 from time import time
+import numpy as np
+from typing import Tuple
+
+
+def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
+    transposed = False
+    if input_array.shape[1] > input_array.shape[0]:
+        input_array = input_array.T
+        transposed = True
+    return input_array, transposed
 
 
 def timing(f):
@@ -50,8 +60,8 @@ def transpose(f, *arguments):
         args = [*args]
         for i in positional_arguments:
             try:
-                if args[i].shape[1] > args[i].shape[0]:
-                    args[i] = args[i].T
+                args[i], transposed = time_axis_first(args[i])
+                if transposed:
                     logging.warning(
                         f"Argument {i}: assuming longer axis to be time and transposing."
                     )
@@ -59,8 +69,11 @@ def transpose(f, *arguments):
                 logging.debug(f"Positional argument {i} not in args.")
         for k in keyword_arguments:
             try:
-                if kwargs[k].shape[1] > kwargs[k].shape[0]:
-                    kwargs[k] = kwargs[k].T
+                kwargs[k], transposed = time_axis_first(kwargs[k])
+                if transposed:
+                    logging.warning(
+                        f"Argument {k}: assuming longer axis to be time and transposing."
+                    )
             except KeyError:
                 logging.debug(f"Argument {k} not found in kwargs.")
 

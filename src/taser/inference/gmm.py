@@ -1,19 +1,20 @@
 """Model data using a `BayesianGaussianMixture` model from Scikit-Learn
 
 """
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
 import warnings
 
+from taser.array_ops import time_axis_first
+from taser.data_manipulation import MEGData
 from taser.helpers.decorators import transpose
 
 
-@transpose("data", 0)
 def learn_mu_sigma(
-    data: np.ndarray,
+    data: Union[np.ndarray, MEGData],
     n_states: int,
     learn_means: bool = False,
     retry_attempts: int = 5,
@@ -54,6 +55,8 @@ def learn_mu_sigma(
         raise ValueError("retry_attempts cannot be less than 1")
     if gmm_kwargs is None:
         gmm_kwargs = {}
+
+    data, transposed = time_axis_first(data[:])
 
     n_channels = data.shape[1]
 

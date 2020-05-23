@@ -185,17 +185,14 @@ def highlight_states(
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
     n_time_points: int = 5000,
-    sample_frequency: float = None,
+    sample_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
     fig_kwargs: dict = None,
 ):
+    if n_time_points is None:
+        n_time_points = state_time_course.shape[0]
     n_time_points = min(n_time_points, state_time_course.shape[0])
-
-    time_array = np.array([0, n_time_points])
-
-    if sample_frequency is not None:
-        time_array = np.arange(n_time_points) / sample_frequency
 
     axis_given = axis is not None
     if not axis_given:
@@ -208,7 +205,8 @@ def highlight_states(
     highlight_defaults = {"alpha": 0.2, "lw": 0}
     highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
 
-    reduced_state_time_course = reduce_state_time_course(state_time_course)
+    # reduced_state_time_course = reduce_state_time_course(state_time_course)
+    reduced_state_time_course = state_time_course.copy()
     n_states = reduced_state_time_course.shape[1]
     ons, offs = state_activation(reduced_state_time_course)
 
@@ -246,10 +244,7 @@ def highlight_states(
 
     axis.autoscale(tight=True)
 
-    if sample_frequency is None:
-        axis.set_xlim(0, n_time_points)
-    else:
-        axis.set_xlim(0, n_time_points / sample_frequency)
+    axis.set_xlim(0, n_time_points / sample_frequency)
 
     plt.tight_layout()
 
@@ -421,7 +416,7 @@ def axis_highlights(ons, offs, n_points, axis, i: int = 0, label: str = ""):
 
 
 def compare_state_data(
-    *state_time_courses, n_time_points=None, sample_frequency: float = 1,
+    *state_time_courses, n_time_points=20000, sample_frequency: float = 1,
 ):
     fig, axes = plt.subplots(
         nrows=len(state_time_courses),

@@ -1,4 +1,5 @@
 import logging
+from copy import copy
 from datetime import datetime
 from typing import List, Union
 
@@ -57,9 +58,37 @@ class MEGData:
     def __getitem__(self, val):
         return self.time_series[self.n_min : self.n_max][val]
 
-    def data_limits(self, n_min=None, n_max=None):
-        self.n_min = n_min
-        self.n_max = n_max
+    @property
+    def data_limits(self):
+        return self.n_min, self.n_max
+
+    @data_limits.setter
+    def data_limits(self, limits):
+        try:
+            self.n_min, self.n_max = limits
+        except TypeError:
+            self.n_max = limits
+
+    @property
+    def shape(self):
+        return self[:].shape
+
+    @property
+    def data_shape(self):
+        return self.time_series.shape
+
+    @property
+    def ndim(self):
+        return self.time_series.ndim
+
+    @property
+    def T(self):
+        if any(limit is not None for limit in self.data_limits):
+            logging.warning("Transposing, but data limits are in place. "
+                            "Make sure they still make sense.")
+        duplicate = copy(self)
+        duplicate.time_series = duplicate.time_series.T
+        return duplicate
 
     def trim_trials(self, trial_start=None, trial_cutoff=None, trial_skip=None):
         try:
@@ -148,11 +177,8 @@ def pca(time_series: np.ndarray, n_components: Union[int, float] = None,) -> np.
     if time_series.ndim != 2:
         raise ValueError("time_series must be a 2D array")
 
-    standard_scaler = StandardScaler()
-    data_std = standard_scaler.fit_transform(time_series)
-
     pca_from_variance = PCA(n_components=n_components)
-    data_pca = pca_from_variance.fit_transform(data_std)
+    data_pca = pca_from_variance.fit_transform(time_series)
     if 0 < n_components < 1:
         print(
             f"{pca_from_variance.n_components_} components are required to "
