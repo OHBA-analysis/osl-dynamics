@@ -274,7 +274,9 @@ def plot_matrix_max_min_mean(
     )
 
 
-def plot_matrices(matrix, group_color_scale: bool = True, titles: list = None):
+def plot_matrices(
+    matrix, group_color_scale: bool = True, titles: list = None, cmap="viridis"
+):
     matrix = np.array(matrix)
     if matrix.ndim == 2:
         matrix = matrix[None, :]
@@ -298,9 +300,9 @@ def plot_matrices(matrix, group_color_scale: bool = True, titles: list = None):
             axis.remove()
             continue
         if group_color_scale:
-            im = axis.matshow(grid, vmin=v_min, vmax=v_max)
+            im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
         else:
-            im = axis.matshow(grid)
+            im = axis.matshow(grid, cmap=cmap)
         axis.set_title(title)
 
     if group_color_scale:

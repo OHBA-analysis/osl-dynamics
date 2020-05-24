@@ -1,16 +1,8 @@
 import logging
 from functools import wraps
 from time import time
-import numpy as np
-from typing import Tuple
 
-
-def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
-    transposed = False
-    if input_array.shape[1] > input_array.shape[0]:
-        input_array = input_array.T
-        transposed = True
-    return input_array, transposed
+from taser.helpers.misc import time_axis_first
 
 
 def timing(f):

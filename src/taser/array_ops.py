@@ -377,4 +377,3 @@ def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
         input_array = input_array.T
         transposed = True
     return input_array, transposed
-

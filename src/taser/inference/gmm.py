@@ -20,6 +20,7 @@ def learn_mu_sigma(
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
     normalize_covariance: bool = False,
+    take_random_sample: int = 0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Find a mixture of Gaussian distributions which characterises a dataset.
 
@@ -32,8 +33,6 @@ def learn_mu_sigma(
         Input data of dimensions [n_channels x n_time_points]
     n_states : int
         Number of states (Gaussian distributions) to try to find.
-    n_channels : int
-        The number of channels in the dataset.
     learn_means : bool
         If False (default), means will be assumed to be zero and given a strong
         weight as a prior.
@@ -56,7 +55,10 @@ def learn_mu_sigma(
     if gmm_kwargs is None:
         gmm_kwargs = {}
 
-    data, transposed = time_axis_first(data[:])
+    data, transposed = time_axis_first(data)
+
+    if take_random_sample:
+        data = np.random.permutation(data)[:take_random_sample]
 
     n_channels = data.shape[1]
 

@@ -178,7 +178,19 @@ class Trainer(ABC):
             )
 
     def plot_loss(self):
-        plt.plot(self.loss_history[1:])
+        fig, axis = plt.subplots(1)
+        axis.plot(self.loss_history[1:], color="k", lw=1)
+
+        axis.set_title("Trainer loss")
+        axis.set_xlabel("Epoch")
+        axis.set_ylabel("Loss")
+
+        plt.setp([axis.spines["right"], axis.spines["top"]], visible=False)
+
+        axis.ticklabel_format(
+            axis="y", style="scientific", scilimits=(0, 0), useMathText=True
+        )
+
         plt.show()
 
 
