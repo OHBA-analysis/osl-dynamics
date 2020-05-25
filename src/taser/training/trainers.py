@@ -211,12 +211,14 @@ class AnnealingTrainer(Trainer):
     def __init__(
         self,
         model: tf.keras.Model,
-        annealing_sharpness: float,
+        annealing_sharpness: float = 20,
         update_frequency: int = 10,
         optimizer: tf.keras.optimizers.Optimizer = None,
+        annealing_scale: float = 1,
     ):
         super().__init__(model, optimizer)
         self.annealing_sharpness = annealing_sharpness
+        self.annealing_scale = annealing_scale
         self.update_frequency = update_frequency
 
         self.annealing_factor = None
@@ -234,6 +236,8 @@ class AnnealingTrainer(Trainer):
         self.annealing_factor = (
             0.5 * tf.math.tanh(sharpness * (epoch - n_epochs / 2.0) / n_epochs) + 0.5
         )
+
+        self.annealing_factor *= self.annealing_scale
 
     @timing
     def train(
