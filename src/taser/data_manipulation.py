@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import numpy as np
 from sklearn.decomposition import PCA
@@ -37,15 +37,20 @@ class MEGData:
                     )
                     mat = mat73.loadmat(time_series)
                 finally:
-                    for key in mat:
-                        if key not in MEGData.ignored_keys:
-                            time_series = mat[key]
+                    if 'D' in mat:
+                        logging.info("Assuming that key 'D' corresponds to an "
+                                     "SPM MEEG object.")
+                        time_series, sampling_frequency = load_spm(time_series)
+                    else:
+                        for key in mat:
+                            if key not in MEGData.ignored_keys:
+                                time_series = mat[key]
 
+        self.sampling_frequency = sampling_frequency
         self.raw_data = time_series
         self.time_series = time_series.copy()
         self.pca_applied = False
 
-        self.sampling_frequency = sampling_frequency
         self.t = None
         if time_series.ndim == 2:
             self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
@@ -78,7 +83,8 @@ class MEGData:
 
     def time_axis_first(self):
         self.time_series, transposed = time_axis_first(self.time_series)
-        logging.warning("Assuming time to be the longer axis and transposing.")
+        if transposed:
+            logging.warning("Assuming time to be the longer axis and transposing.")
 
     def trim_trials(self, trial_start=None, trial_cutoff=None, trial_skip=None):
         if self.ndim == 3:
@@ -124,7 +130,7 @@ class MEGData:
             raise ValueError("time_series must be a 2D array")
 
         if n_components == 1:
-            logging.warning("n_components of 1 was passed. Skipping PCA.")
+            logging.info("n_components of 1 was passed. Skipping PCA.")
 
         else:
             pca_from_variance = PCA(n_components=n_components)
@@ -207,3 +213,20 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
         )
 
     return concatenated
+
+
+def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
+    spm = scipy.io.loadmat(file_name)
+    data_file = spm["D"][0][0][6][0][0][0][0]
+    n_channels = spm["D"][0][0][6][0][0][1][0][0]
+    n_time_points = spm["D"][0][0][6][0][0][1][0][1]
+    sampling_frequency = spm["D"][0][0][2][0][0]
+    try:
+        data = np.fromfile(data_file, dtype=np.float64).reshape(
+            n_time_points, n_channels
+        )
+    except ValueError:
+        data = np.fromfile(data_file, dtype=np.float32).reshape(
+            n_time_points, n_channels
+        )
+    return data, sampling_frequency

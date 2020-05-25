@@ -78,6 +78,8 @@ class Trainer(ABC):
         self.loss_history = [0.0]
         self.batch_mean = tf.keras.metrics.Mean()
 
+        self.prediction_dataset = None
+
     @timing
     def train(
         self, dataset: tf.data.Dataset, n_epochs: int, callbacks: List[Callback] = None
@@ -155,7 +157,6 @@ class Trainer(ABC):
         """
         pass
 
-    # @timing
     def predict(self, dataset: tf.data.Dataset) -> List:
         results = []
         for y in dataset:
@@ -167,6 +168,7 @@ class Trainer(ABC):
         return results
 
     def predict_latent_variable(self, dataset: tf.data.Dataset, **kwargs):
+        self.prediction_dataset = dataset
         if callable(getattr(self.model, "latent_variable", None)):
             results = self.predict(dataset=dataset)
             latent_variable = self.model.latent_variable(results_list=results, **kwargs)
