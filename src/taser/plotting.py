@@ -342,35 +342,57 @@ def add_axis_colorbar(axis: plt.Axes):
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
     state_time_course: np.ndarray,
-    figsize=None,
     bins: int = 20,
     density: bool = False,
+    match_scale_x=True,
+    match_scale_y=True,
     hist_kwargs: dict = None,
+    fig_kwargs: dict = None,
 ):
     if state_time_course.ndim == 1:
         state_time_course = get_one_hot(state_time_course)
     if state_time_course.ndim != 2:
         raise ValueError("state_timecourse must be a 2D array")
 
-    default_hist_kwargs = {"alpha": 0.5}
-    hist_kwargs = override_dict_defaults(default_hist_kwargs, hist_kwargs)
-
-    state_time_course = reduce_state_time_course(state_time_course)
+    # state_time_course = reduce_state_time_course(state_time_course)
     channel_lifetimes = state_lifetimes(state_time_course)
     n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
 
     colors = get_colors(n_plots)
 
-    if figsize is None:
-        figsize = (long * 2.5, short * 2.5)
+    default_hist_kwargs = {"alpha": 0.5}
+    hist_kwargs = override_dict_defaults(default_hist_kwargs, hist_kwargs)
 
-    fig, axes = plt.subplots(short, long, figsize=figsize)
+    default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    fig, axes = plt.subplots(short, long, **fig_kwargs)
+    largest_bar = 0
+    furthest_value = 0
     for channel, axis, color in zip_longest(channel_lifetimes, axes.ravel(), colors):
         if channel is None:
             axis.remove()
             continue
-        axis.hist(channel, density=density, bins=bins, color=color, **hist_kwargs)
+        if not len(channel):
+            # axis.hist([])
+            axis.text(
+                0.5,
+                0.5,
+                "No\nactivation",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=axis.transAxes,
+                fontsize=20,
+            )
+            axis.set_xticks([])
+            axis.set_yticks([])
+            continue
+        hist = axis.hist(
+            channel, density=density, bins=bins, color=color, **hist_kwargs
+        )
+        largest_bar = max(hist[0].max(), largest_bar)
+        furthest_value = max(hist[1].max(), furthest_value)
         t = axis.text(
             0.95,
             0.95,
@@ -380,7 +402,13 @@ def plot_state_lifetimes(
             verticalalignment="top",
             transform=axis.transAxes,
         )
+        axis.xaxis.set_tick_params(labelbottom=True, labelleft=True)
         t.set_bbox({"facecolor": "white", "alpha": 0.7, "boxstyle": "round"})
+    for axis in axes.ravel():
+        if match_scale_x:
+            axis.set_xlim(0, furthest_value * 1.1)
+        if match_scale_y:
+            axis.set_ylim(0, largest_bar * 1.1)
     plt.tight_layout()
 
     plt.show()

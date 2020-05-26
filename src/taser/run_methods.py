@@ -29,16 +29,16 @@ def run_from_dict(settings: Union[dict, str]):
         meg_data, **dataset_settings
     )
 
-    print("Fit GMM")
-    gmm = mixture.GaussianMixture(n_components=model_settings["n_states"])
-    gmm.fit(meg_data)
-    means = gmm.means_
-    covariances = gmm.covariances_
-
-    cholesky = find_cholesky_decompositions(covariances, means, learn_means=False)
-
-    model_settings["mus_initial"] = means
-    model_settings["cholesky_djs_initial"] = cholesky
+    # print("Fit GMM")
+    # gmm = mixture.GaussianMixture(n_components=model_settings["n_states"])
+    # gmm.fit(meg_data)
+    # means = gmm.means_
+    # covariances = gmm.covariances_
+    #
+    # cholesky = find_cholesky_decompositions(covariances, means, learn_means=False)
+    #
+    # model_settings["mus_initial"] = means
+    # model_settings["cholesky_djs_initial"] = cholesky
 
     print("Creating model.")
     model_settings["n_channels"] = meg_data.shape[1]

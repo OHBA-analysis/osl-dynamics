@@ -169,9 +169,20 @@ class InferenceRNN(Model):
         ]
 
     @staticmethod
-    def result_combination(results: List) -> List:
+    def result_combination(results: List) -> dict:
 
         results = np.array(results)
+
+        names = [
+            "log_likelihood_loss",
+            "kl_loss",
+            "theta_ast",
+            "inference_mu",
+            "inference_sigma",
+            "model_mu",
+            "mus",
+            "djs",
+        ]
 
         operations = {
             "log_likelihood_loss": lambda x: np.array(x),
@@ -210,10 +221,10 @@ class InferenceRNN(Model):
             operations["djs"](results[:, 7::8]),
         ]
 
-        return combined_results
+        return dict(zip(names, combined_results))
 
-    def latent_variable(self, results_list: List, one_hot: bool = True):
-        inference_mu = results_list[3]
+    def latent_variable(self, results_list: dict, one_hot: bool = True):
+        inference_mu = results_list["inference_mu"]
         if one_hot:
             return get_one_hot(inference_mu.argmax(axis=1))
         return inference_mu

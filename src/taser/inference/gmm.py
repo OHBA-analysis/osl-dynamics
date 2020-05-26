@@ -11,6 +11,7 @@ import warnings
 from taser.array_ops import time_axis_first
 from taser.data_manipulation import MEGData
 from taser.helpers.decorators import transpose
+from taser.helpers.misc import override_dict_defaults
 
 
 def learn_mu_sigma(
@@ -52,8 +53,9 @@ def learn_mu_sigma(
     """
     if retry_attempts < 1:
         raise ValueError("retry_attempts cannot be less than 1")
-    if gmm_kwargs is None:
-        gmm_kwargs = {}
+
+    default_gmm_kwargs = {"verbose": 2, "n_init": 5}
+    gmm_kwargs = override_dict_defaults(default_gmm_kwargs, gmm_kwargs)
 
     data, transposed = time_axis_first(data)
 

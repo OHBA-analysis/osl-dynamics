@@ -196,47 +196,6 @@ def align_arrays(
     return sequence_1, sequence_2
 
 
-@transpose(0, "sequence_1", 1, "sequence_2")
-def dice_from_permutations(
-    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "all"
-) -> List[List[Tuple[float, List[int], str]]]:
-    if alignment == "all":
-        dice_list = []
-        for a in ["left", "right", "center"]:
-            aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=a)
-            for order in permutations(range(aligned_1.shape[1])):
-                dice_list.append(
-                    [dice_coefficient(aligned_1[:, order], aligned_2), order, a]
-                )
-
-    else:
-        aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=alignment)
-
-        dice_list = []
-        perms = permutations(range(aligned_1.shape[1]))
-        for order in perms:
-            dice_list.append(
-                [dice_coefficient(aligned_1[:, order], aligned_2), order, alignment]
-            )
-
-    dice_list = sorted(dice_list, reverse=True)
-
-    return dice_list
-
-
-@transpose(0, "sequence_1", 1, "sequence_2")
-def get_maximum_dice_arrays(
-    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "all"
-):
-    ordered_dice = dice_from_permutations(sequence_1, sequence_2, alignment=alignment)
-    dice, order, alignment = ordered_dice[0]
-    print(
-        f"maximum dice coefficent is {dice} from order {order} "
-        f"with alignment {alignment}"
-    )
-    return sequence_1[:, order], sequence_2
-
-
 @transpose(0, "state_time_course")
 def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate state activations for a state time course.
