@@ -37,9 +37,11 @@ class MEGData:
                     )
                     mat = mat73.loadmat(time_series)
                 finally:
-                    if 'D' in mat:
-                        logging.info("Assuming that key 'D' corresponds to an "
-                                     "SPM MEEG object.")
+                    if "D" in mat:
+                        logging.info(
+                            "Assuming that key 'D' corresponds to an "
+                            "SPM MEEG object."
+                        )
                         time_series, sampling_frequency = load_spm(time_series)
                     else:
                         for key in mat:
