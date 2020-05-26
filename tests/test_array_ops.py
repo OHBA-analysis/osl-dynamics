@@ -115,3 +115,29 @@ class TestAlignArrays(TestCase):
         self.assertTrue(np.all(np.equal(*left_aligned, self.left)))
         self.assertTrue(np.all(np.equal(*right_aligned, self.right)))
         self.assertTrue(np.all(np.equal(*center_aligned, self.center)))
+
+
+class TestStateActivation(TestCase):
+    def setUp(self) -> None:
+        r2 = np.random.randint(5, size=1000)
+        to_delete = []
+        for idx, (i, j) in enumerate(zip(r2, r2[1:])):
+            if i == j:
+                to_delete.append(idx + 1)
+
+        self.r2 = np.delete(r2, to_delete)
+
+        self.r = np.random.randint(5, 10, size=self.r2.size)
+
+        activation = []
+        for i, j in zip(self.r, self.r2):
+            activation.extend([j] * i)
+        activation = np.array(activation)
+
+        self.one_hot = array_ops.get_one_hot(activation)
+
+    def test_state_activation(self):
+        ons, offs = array_ops.state_activation(self.one_hot)
+        for idx, (on, off) in enumerate(zip(ons, offs)):
+            self.assertTrue(np.all((off - on) == self.r[self.r2 == idx]))
+

@@ -207,9 +207,6 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
     ----------
     state_time_course : numpy.ndarray
         State time course (strictly binary).
-    time_axis : int
-        Specify the axis which denotes time. If 0, `state_time_course` should have
-        dimensions [time points x channels].
 
     Returns
     -------
