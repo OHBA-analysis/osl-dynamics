@@ -141,3 +141,12 @@ class TestStateActivation(TestCase):
         for idx, (on, off) in enumerate(zip(ons, offs)):
             self.assertTrue(np.all((off - on) == self.r[self.r2 == idx]))
 
+
+class TestReduceStateTimeCourse(TestCase):
+    def setUp(self) -> None:
+        self.a = array_ops.get_one_hot(np.random.randint(5, size=1000))
+        self.b = np.zeros((self.a.shape[0], self.a.shape[1] + 1))
+        self.b[:, :-1] = self.a
+
+    def test_reduce_state_time_course(self):
+        self.assertTrue(np.all(array_ops.reduce_state_time_course(self.b) == self.a))
