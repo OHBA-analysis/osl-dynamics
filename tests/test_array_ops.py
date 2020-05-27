@@ -141,6 +141,16 @@ class TestStateActivation(TestCase):
         for idx, (on, off) in enumerate(zip(ons, offs)):
             self.assertTrue(np.all((off - on) == self.r[self.r2 == idx]))
 
+    def test_state_lifetimes(self):
+        self.assertTrue(
+            np.concatenate(
+                [
+                    i == self.r[self.r2 == j]
+                    for i, j in zip(array_ops.state_lifetimes(self.one_hot), range(5))
+                ]
+            ).all()
+        )
+
 
 class TestReduceStateTimeCourse(TestCase):
     def setUp(self) -> None:
@@ -150,3 +160,40 @@ class TestReduceStateTimeCourse(TestCase):
 
     def test_reduce_state_time_course(self):
         self.assertTrue(np.all(array_ops.reduce_state_time_course(self.b) == self.a))
+
+
+class TestFromCholesky(TestCase):
+    def setUp(self) -> None:
+        r = np.random.rand(10, 10)
+        self.psd = r @ r.T
+        self.chol = np.linalg.cholesky(self.psd)
+
+    def test_from_cholesky(self):
+        reconstructed = array_ops.from_cholesky(self.chol)
+        self.assertTrue(np.allclose(reconstructed, self.psd))
+
+        reconstructed = array_ops.from_cholesky(self.chol[None])
+        self.assertTrue(np.allclose(reconstructed, self.psd[None]))
+
+
+class TestCalculateTransProbMatrix(TestCase):
+    def setUp(self) -> None:
+        rand = np.random.rand(5, 5)
+        rand_norm = rand / rand.sum(axis=1)[:, None]
+        trans_prob = rand_norm.cumsum(axis=1)
+
+        state = [0]
+        for i in range(1, 5000):
+            r = np.random.rand()
+            state.append(np.argmax(trans_prob[state[-1]] > r))
+
+        self.state = np.array(state)
+        z = np.zeros((5, 5))
+        for i, j in zip(state, state[1:]):
+            z[i, j] += 1
+
+        self.z = z / z.sum(axis=1)[:, None]
+
+    def test_calculate_trans_prob_matrix(self):
+        inf_tb = array_ops.calculate_trans_prob_matrix(self.state)
+        self.assertTrue(np.allclose(inf_tb, self.z))

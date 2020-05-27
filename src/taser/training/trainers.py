@@ -68,9 +68,9 @@ class Trainer(ABC):
 
     """
 
-    def __init__(self, model, optimizer=None):
+    def __init__(self, model, optimizer=None, lr=0.02):
         self.model = model
-        self.optimizer = Adam(lr=0.02, clipnorm=0.1) if optimizer is None else optimizer
+        self.optimizer = Adam(lr=lr, clipnorm=0.1) if optimizer is None else optimizer
         self.epoch = None
         self.n_epochs = None
 
@@ -214,9 +214,10 @@ class AnnealingTrainer(Trainer):
         annealing_sharpness: float = 20,
         update_frequency: int = 10,
         optimizer: tf.keras.optimizers.Optimizer = None,
+        lr: float = None,
         annealing_scale: float = 1,
     ):
-        super().__init__(model, optimizer)
+        super().__init__(model, optimizer, lr=lr)
         self.annealing_sharpness = annealing_sharpness
         self.annealing_scale = annealing_scale
         self.update_frequency = update_frequency
@@ -297,8 +298,9 @@ class RepeatedAnnealer(AnnealingTrainer):
         annealing_sharpness: float,
         reset: int = None,
         update_frequency: int = None,
+        lr: float = None,
     ):
-        super().__init__(model, annealing_sharpness, update_frequency)
+        super().__init__(model, annealing_sharpness, update_frequency, lr=lr)
         self.reset = reset
 
     def calculate_annealing_factor(self):

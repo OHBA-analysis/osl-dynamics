@@ -280,6 +280,8 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
 
 
 def from_cholesky(cholesky_matrix: np.ndarray):
+    if cholesky_matrix.ndim == 2:
+        return cholesky_matrix @ cholesky_matrix.transpose()
     return cholesky_matrix @ cholesky_matrix.transpose((0, 2, 1))
 
 
@@ -310,7 +312,7 @@ def calculate_trans_prob_matrix(
     trans_prob[vals[:, 0], vals[:, 1]] = counts
 
     if normalize:
-        trans_prob = trans_prob / trans_prob.sum(axis=1)
+        trans_prob = trans_prob / trans_prob.sum(axis=1)[:, None]
 
     if zero_diagonal:
         np.fill_diagonal(trans_prob, 0)
