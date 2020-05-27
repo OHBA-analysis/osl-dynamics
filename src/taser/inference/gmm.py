@@ -8,10 +8,8 @@ import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
 import warnings
 
-from taser.array_ops import time_axis_first
 from taser.data_manipulation import MEGData
-from taser.helpers.decorators import transpose
-from taser.helpers.misc import override_dict_defaults
+from taser.helpers.misc import override_dict_defaults, time_axis_first
 
 
 def learn_mu_sigma(

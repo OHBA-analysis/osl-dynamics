@@ -23,7 +23,8 @@ class TestCorrelateStates(TestCase):
 
 class TestGetOneHot(TestCase):
     def setUp(self) -> None:
-        self.state_time_course = np.random.randint(5, size=100)
+        self.state_time_course_2d = np.random.rand(100, 5)
+        self.state_time_course = self.state_time_course_2d.argmax(axis=1)
 
     def test_get_one_hot(self):
         one_hot = array_ops.get_one_hot(self.state_time_course)
@@ -32,6 +33,14 @@ class TestGetOneHot(TestCase):
             np.all(one_hot.argmax(axis=1) == self.state_time_course),
             msg="One hot did not reproduce the categorical sequence when inverted.",
         )
+
+    def test_get_one_hot_2D(self):
+        one_hot_1d = array_ops.get_one_hot(self.state_time_course)
+        one_hot_2d = array_ops.get_one_hot(self.state_time_course_2d)
+        one_hot_2d_states = array_ops.get_one_hot(self.state_time_course_2d, n_states=7)
+
+        self.assertTrue(np.all(one_hot_1d == one_hot_2d))
+        self.assertTrue(np.all(one_hot_1d == one_hot_2d_states[:, :5]))
 
 
 class TestMatchStates(TestCase):
@@ -197,3 +206,20 @@ class TestCalculateTransProbMatrix(TestCase):
     def test_calculate_trans_prob_matrix(self):
         inf_tb = array_ops.calculate_trans_prob_matrix(self.state)
         self.assertTrue(np.allclose(inf_tb, self.z))
+
+
+class TestTraceNormalize(TestCase):
+    def setUp(self) -> None:
+        self.rand2d = np.random.rand(10, 10)
+        self.normed2d = self.rand2d / self.rand2d.trace()
+
+        self.rand3d = np.random.rand(10, 10, 4)
+        self.normed3d = self.rand3d / self.rand3d.trace(axis1=1, axis2=2)[:, None, None]
+
+    def test_trace_normalize(self):
+        self.assertTrue(
+            np.allclose(self.normed2d, array_ops.trace_normalize(self.rand2d))
+        )
+        self.assertTrue(
+            np.allclose(self.normed3d, array_ops.trace_normalize(self.rand3d))
+        )

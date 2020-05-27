@@ -78,7 +78,7 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
     """
     if values.ndim == 2:
         logging.warning("argmax being taken on shorter axis.")
-        values = values.argmax(axis=min(values.shape))
+        values = values.argmax(axis=1)
     if n_states is None:
         n_states = values.max() + 1
     res = np.eye(n_states)[np.array(values).reshape(-1)]
@@ -112,18 +112,12 @@ def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float
         If either sequence is not one dimensional.
 
     """
-    if len(sequence_1.shape) != 1:
+    if (sequence_1.ndim, sequence_2.ndim) != (1, 1):
         raise ValueError(
-            f"sequence_1 must be a 1D array. Dimensions are {sequence_1.shape}."
+            f"sequences must be 1D: {(sequence_1.ndim, sequence_2.ndim)} != (1, 1)."
         )
-    if len(sequence_2.shape) != 1:
-        raise ValueError(
-            f"sequence_2 must be a 1D array. Dimensions are {sequence_2.shape}."
-        )
-    if sequence_1.dtype != np.int:
-        raise TypeError("sequence_1 must by an array of integers.")
-    if sequence_1.dtype != np.int:
-        raise TypeError("sequence_2 must by an array of integers.")
+    if (sequence_1.dtype, sequence_2.dtype) != (int, int):
+        raise TypeError("Both sequences must be integer (categorical).")
 
     return 2 * ((sequence_1 == sequence_2).sum()) / (len(sequence_1) + len(sequence_2))
 
@@ -322,16 +316,8 @@ def calculate_trans_prob_matrix(
 def trace_normalize(matrix: np.ndarray):
     matrix = np.array(matrix)
     if matrix.ndim == 2:
-        matrix = matrix[None, ...]
+        return matrix / matrix.trace()
     if matrix.ndim != 3:
         raise ValueError("Matrix should be 2D or 3D.")
 
     return matrix / matrix.trace(axis1=1, axis2=2)[:, None, None]
-
-
-def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
-    transposed = False
-    if input_array.shape[1] > input_array.shape[0]:
-        input_array = input_array.T
-        transposed = True
-    return input_array, transposed
