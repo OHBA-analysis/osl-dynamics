@@ -19,6 +19,7 @@ class MEGData:
         "__version__",
         "save_time",
         "pca_applied",
+        "T",
     ]
 
     def __init__(
