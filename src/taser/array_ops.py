@@ -281,9 +281,7 @@ def from_cholesky(cholesky_matrix: np.ndarray):
 
 @transpose(0, "state_time_course")
 def calculate_trans_prob_matrix(
-    state_time_course: np.ndarray,
-    zero_diagonal: bool = False,
-    n_states: int = None,
+    state_time_course: np.ndarray, zero_diagonal: bool = False, n_states: int = None,
 ) -> np.ndarray:
     if state_time_course.ndim == 2:
         state_time_course = state_time_course.argmax(axis=1)
