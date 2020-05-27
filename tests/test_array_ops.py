@@ -86,14 +86,25 @@ class TestDiceCoefficient1D(TestCase):
             "have a dice coefficient of around 1/n states.",
         )
 
+        one_hot = array_ops.get_one_hot(self.sequence_1)
+
+        with self.assertRaises(ValueError):
+            array_ops.dice_coefficient_1d(self.sequence_1, one_hot)
+
+        with self.assertRaises(TypeError):
+            array_ops.dice_coefficient_1d(
+                self.sequence_1, self.sequence_2.astype(np.float)
+            ),
+
 
 class TestDiceCoefficient(TestCase):
     def setUp(self) -> None:
-        self.sequence_1 = array_ops.get_one_hot(np.random.randint(5, size=1000))
+        self.base = np.random.randint(5, size=1000)
+        self.sequence_1 = array_ops.get_one_hot(self.base)
         self.sequence_2 = self.sequence_1.copy()
         self.sequence_3 = np.random.permutation(self.sequence_1)
 
-    def test_dice_coefficient_1d(self):
+    def test_dice_coefficient_2d(self):
         dice_1 = array_ops.dice_coefficient(self.sequence_1, self.sequence_2)
         dice_2 = array_ops.dice_coefficient(self.sequence_1, self.sequence_3)
 
@@ -103,6 +114,14 @@ class TestDiceCoefficient(TestCase):
             msg="A randomly shuffled array should "
             "have a dice coefficient of around 1/n states.",
         )
+
+        with self.assertRaises(ValueError):
+            array_ops.dice_coefficient(np.random.rand(3, 4, 5), np.random.rand(5, 6, 7))
+
+        self.assertTrue(array_ops.dice_coefficient(self.base, self.base.copy()) == 1)
+
+        self.assertTrue(array_ops.dice_coefficient(self.base, self.sequence_1) == 1)
+        self.assertTrue(array_ops.dice_coefficient(self.sequence_1, self.base) == 1)
 
 
 class TestAlignArrays(TestCase):
@@ -125,6 +144,9 @@ class TestAlignArrays(TestCase):
         self.assertTrue(np.all(np.equal(*right_aligned, self.right)))
         self.assertTrue(np.all(np.equal(*center_aligned, self.center)))
 
+        with self.assertRaises(ValueError):
+            array_ops.align_arrays(self.sequence, self.left, alignment="problem")
+
 
 class TestStateActivation(TestCase):
     def setUp(self) -> None:
@@ -143,7 +165,7 @@ class TestStateActivation(TestCase):
             activation.extend([j] * i)
         activation = np.array(activation)
 
-        self.one_hot = array_ops.get_one_hot(activation)
+        self.one_hot = array_ops.get_one_hot(activation, n_states=7)
 
     def test_state_activation(self):
         ons, offs = array_ops.state_activation(self.one_hot)
@@ -207,6 +229,31 @@ class TestCalculateTransProbMatrix(TestCase):
         inf_tb = array_ops.calculate_trans_prob_matrix(self.state)
         self.assertTrue(np.allclose(inf_tb, self.z))
 
+        inf_tb_from_2d = array_ops.calculate_trans_prob_matrix(
+            array_ops.get_one_hot(self.state)
+        )
+
+        self.assertTrue(np.allclose(inf_tb_from_2d, self.z))
+
+        with self.assertRaises(ValueError):
+            array_ops.calculate_trans_prob_matrix(np.random.rand(3, 6, 8))
+
+        self.assertTrue(
+            np.allclose(
+                array_ops.calculate_trans_prob_matrix(self.state, n_states=10)[:5, :5],
+                self.z,
+            )
+        )
+
+        z2 = self.z.copy()
+        np.fill_diagonal(z2, 0)
+        self.assertTrue(
+            np.allclose(
+                array_ops.calculate_trans_prob_matrix(self.state, zero_diagonal=True),
+                z2,
+            )
+        )
+
 
 class TestTraceNormalize(TestCase):
     def setUp(self) -> None:
@@ -223,3 +270,6 @@ class TestTraceNormalize(TestCase):
         self.assertTrue(
             np.allclose(self.normed3d, array_ops.trace_normalize(self.rand3d))
         )
+
+        with self.assertRaises(ValueError):
+            array_ops.trace_normalize(np.random.rand(3, 4, 5, 6))

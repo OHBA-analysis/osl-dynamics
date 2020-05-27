@@ -284,7 +284,6 @@ def calculate_trans_prob_matrix(
     state_time_course: np.ndarray,
     zero_diagonal: bool = False,
     n_states: int = None,
-    normalize: bool = True,
 ) -> np.ndarray:
     if state_time_course.ndim == 2:
         state_time_course = state_time_course.argmax(axis=1)
@@ -305,8 +304,9 @@ def calculate_trans_prob_matrix(
     trans_prob = np.zeros((n_states, n_states))
     trans_prob[vals[:, 0], vals[:, 1]] = counts
 
-    if normalize:
+    with np.errstate(divide="ignore", invalid="ignore"):
         trans_prob = trans_prob / trans_prob.sum(axis=1)[:, None]
+    trans_prob = np.nan_to_num(trans_prob)
 
     if zero_diagonal:
         np.fill_diagonal(trans_prob, 0)
