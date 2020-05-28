@@ -11,7 +11,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from taser.array_ops import (
     from_cholesky,
     get_one_hot,
-    reduce_state_time_course,
     state_activation,
     state_lifetimes,
 )
