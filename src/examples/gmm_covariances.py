@@ -3,7 +3,7 @@ from taser.inference import gmm
 from taser.simulation import Simulation
 
 simulation = Simulation()
-data = simulation.data_sim.T
+data = simulation.time_series.T
 simulation.plot_data()
 
 covariances, means = gmm.learn_mu_sigma(

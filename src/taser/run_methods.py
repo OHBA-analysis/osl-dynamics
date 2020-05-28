@@ -1,10 +1,7 @@
 from typing import Union
 import yaml
-from sklearn import mixture
-from taser import data_manipulation, tf_ops, plotting
-from taser.inference.gmm import find_cholesky_decompositions
+from taser import data_manipulation, tf_ops, plotting, trainers
 from taser.inference.models import inference_rnn
-from taser.training import trainers
 
 
 def run_from_dict(settings: Union[dict, str]):

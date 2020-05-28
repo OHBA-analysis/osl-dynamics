@@ -59,9 +59,9 @@ class Simulation(ABC):
         self.random_covariance_weights = random_covariance_weights
         self.e_std = e_std
 
-        self.alpha_sim = self.generate_states()
+        self.state_time_course = self.generate_states()
         self.djs = self.create_djs()
-        self.data_sim = self.simulate_data()
+        self.time_series = self.simulate_data()
 
     @abstractmethod
     def generate_states(self) -> np.ndarray:
@@ -83,7 +83,7 @@ class Simulation(ABC):
 
         """
         plt.figure()
-        plt.plot(self.alpha_sim[0:n_points])
+        plt.plot(self.state_time_course[0:n_points])
         plt.show()
 
     def create_djs(self, identity_factor: float = 0.0001) -> np.ndarray:
@@ -139,8 +139,12 @@ class Simulation(ABC):
         else:
             mus_sim = np.zeros((self.n_states, self.n_channels))
 
-        mus = np.sum(self.alpha_sim.reshape((-1, self.n_states, 1)) * mus_sim, axis=1)
-        cs = np.sum(self.alpha_sim[:, :, np.newaxis, np.newaxis] * self.djs, axis=1)
+        mus = np.sum(
+            self.state_time_course.reshape((-1, self.n_states, 1)) * mus_sim, axis=1
+        )
+        cs = np.sum(
+            self.state_time_course[:, :, np.newaxis, np.newaxis] * self.djs, axis=1
+        )
 
         signal = np.zeros((self.n_channels, self.n_samples))
         for tt in range(self.n_samples):
@@ -168,10 +172,10 @@ class Simulation(ABC):
         fig, y_axes = plt.subplots(
             1, min(self.n_channels, 10), figsize=(20, 3), sharey="row"
         )
-        for y_axis, y_channel in zip(y_axes, self.data_sim):
+        for y_axis, y_channel in zip(y_axes, self.time_series):
             y_axis.plot(np.arange(n_points), y_channel[:n_points])
         fig, alpha_axes = plt.subplots(1, min(self.n_states, 10), figsize=(15, 3))
-        for alpha_axis, alpha_channel in zip(alpha_axes, self.alpha_sim.T):
+        for alpha_axis, alpha_channel in zip(alpha_axes, self.state_time_course.T):
             alpha_axis.plot(np.arange(n_points), alpha_channel[:n_points])
         plt.tight_layout()
         plt.show()
