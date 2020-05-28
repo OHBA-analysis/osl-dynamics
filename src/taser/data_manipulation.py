@@ -23,7 +23,10 @@ class MEGData:
     ]
 
     def __init__(
-        self, time_series: Union[np.ndarray, str], sampling_frequency: float = 1
+        self,
+        time_series: Union[np.ndarray, str],
+        sampling_frequency: float = 1,
+        multi_sequence: Union[str, int] = "all",
     ):
         if isinstance(time_series, str):
             if time_series[-4:] == ".npy":
@@ -48,6 +51,20 @@ class MEGData:
                         for key in mat:
                             if key not in MEGData.ignored_keys:
                                 time_series = mat[key]
+
+        if isinstance(time_series, list):
+            if multi_sequence == "all":
+                logging.warning(
+                    f"{len(time_series)} sequences detected. "
+                    f"Concatenating along first axis."
+                )
+                time_series = np.concatenate(time_series)
+            if isinstance(multi_sequence, int):
+                logging.warning(
+                    f"{len(time_series)} sequences detected. "
+                    f"Using sequence with index {multi_sequence}."
+                )
+                time_series = time_series[multi_sequence]
 
         self.sampling_frequency = sampling_frequency
         self.raw_data = time_series

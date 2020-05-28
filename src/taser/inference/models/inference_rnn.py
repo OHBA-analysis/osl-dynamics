@@ -63,6 +63,8 @@ class InferenceRNN(Model):
         if n_channels is None:
             raise ValueError("n_channels must be specified.")
 
+        self.n_states = n_states
+
         self.dropout_layer_0 = Dropout(dropout_rate)
 
         self.inference_rnn = Bidirectional(
@@ -226,7 +228,7 @@ class InferenceRNN(Model):
     def latent_variable(self, results_list: dict, one_hot: bool = True):
         inference_mu = results_list["inference_mu"]
         if one_hot:
-            return get_one_hot(inference_mu.argmax(axis=1))
+            return get_one_hot(inference_mu.argmax(axis=1), n_states=self.n_states)
         return inference_mu
 
 

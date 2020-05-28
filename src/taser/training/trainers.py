@@ -14,7 +14,7 @@ from taser.helpers.misc import listify
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
-from taser.helpers.decorators import timing
+from taser.decorators import timing
 
 
 class Callback(ABC):

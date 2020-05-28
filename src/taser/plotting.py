@@ -14,7 +14,7 @@ from taser.array_ops import (
     state_activation,
     state_lifetimes,
 )
-from taser.helpers.decorators import transpose
+from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults
 
 

@@ -2,13 +2,12 @@
 
 """
 import logging
-from itertools import permutations
 from typing import List, Tuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from taser.helpers.decorators import transpose
+from taser.decorators import transpose
 
 
 @transpose
