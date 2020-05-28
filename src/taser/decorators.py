@@ -1,3 +1,4 @@
+import inspect
 import logging
 from functools import wraps
 from time import time
@@ -72,3 +73,46 @@ def transpose(f, *arguments):
         return f(*args, **kwargs)
 
     return wrap
+
+
+def auto_repr(func):
+    @wraps(func)
+    def wrapper_function(me, *args, **kwargs):
+        arg_dict = {}
+        params = inspect.signature(me.__class__).parameters
+
+        sig_dict = params.items()
+        for i, (key, val) in enumerate(params.items()):
+            if i < len(args):
+                arg_dict[key] = args[i]
+            if i >= len(args):
+                if key in kwargs:
+                    arg_dict[key] = kwargs[key]
+                elif key in params:
+                    arg_dict[key] = params[key].default
+
+        me.__arg_dict = arg_dict
+
+        def __repr__(self):
+            return (
+                self.__class__.__name__
+                + "("
+                + ", ".join(
+                    "=".join(
+                        [
+                            item[0],
+                            str(item[1])
+                            if not isinstance(item[1], str)
+                            else "'" + item[1] + "'",
+                        ]
+                    )
+                    for item in self.__arg_dict.items()
+                )
+                + ")"
+            )
+
+        setattr(me.__class__, "__repr__", __repr__)
+
+        func(me, *args, **kwargs)
+
+    return wrapper_function
