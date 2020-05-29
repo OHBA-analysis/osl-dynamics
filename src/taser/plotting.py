@@ -3,7 +3,9 @@
 """
 import logging
 from itertools import zip_longest
+from typing import List
 
+import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -16,6 +18,77 @@ from taser.array_ops import (
 )
 from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults
+
+
+def plot_state_sums(state_time_course: np.ndarray, color="tab:gray"):
+    fig, axis = plt.subplots(1)
+    counts = state_time_course.sum(axis=0).astype(int)
+    bars = axis.bar(range(len(counts)), counts, color=color)
+    axis.set_xticks(range(len(counts)))
+    text = []
+    for i, val in enumerate(counts):
+        text.append(
+            axis.text(
+                i,
+                val * 0.98,
+                val,
+                horizontalalignment="center",
+                verticalalignment="top",
+                color="white",
+                fontsize=13,
+            )
+        )
+    plt.setp(axis.spines.values(), visible=False)
+    plt.setp(axis.get_xticklines(), visible=False)
+    axis.set_yticks([])
+
+    adjust_text(text, bars, fig, axis)
+
+    plt.show()
+
+
+# noinspection PyUnresolvedReferences
+def adjust_text(
+    text_objects: List[matplotlib.text.Text],
+    plot_objects: List[matplotlib.patches.Patch],
+    fig=None,
+    axis=None,
+    color="black",
+):
+    fig = plt.gcf() if fig is None else fig
+    axis = plt.gca() if axis is None else axis
+
+    fig.canvas.draw()
+
+    plot_bbs = [plot_object.get_bbox() for plot_object in plot_objects]
+    text_bbs = [
+        text_object.get_window_extent().inverse_transformed(axis.transData)
+        for text_object in text_objects
+    ]
+
+    while not all(
+        [
+            plot_bb.containsx(text_bb.x0) and plot_bb.containsx(text_bb.x1)
+            for plot_bb, text_bb in zip(plot_bbs, text_bbs)
+        ]
+    ):
+        plot_bbs = [plot_object.get_bbox() for plot_object in plot_objects]
+        text_bbs = [
+            text_object.get_window_extent().inverse_transformed(axis.transData)
+            for text_object in text_objects
+        ]
+        for plot_bb, text_bb, text_object in zip(plot_bbs, text_bbs, text_objects):
+            if not (plot_bb.containsx(text_bb.x0) and plot_bb.containsx(text_bb.x1)):
+                text_object.set_size(text_object.get_size() - 1)
+        fig.canvas.draw()
+
+    for plot_bb, text_bb, text_object in zip(plot_bbs, text_bbs, text_objects):
+        if not (plot_bb.containsy(text_bb.y0) and plot_bb.containsy(text_bb.y1)):
+            text_object.set_verticalalignment("bottom")
+            text_object.set_y(plot_bb.y1)
+            text_object.set_color(color)
+
+    fig.canvas.draw()
 
 
 @transpose(0, "time_series")

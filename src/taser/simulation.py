@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from taser.array_ops import get_one_hot
+from taser.decorators import auto_repr
 
 
 class Simulation(ABC):
@@ -62,6 +63,14 @@ class Simulation(ABC):
         self.state_time_course = self.generate_states()
         self.djs = self.create_djs()
         self.time_series = self.simulate_data()
+
+    def __array__(self):
+        return self.time_series
+
+    def __getattr__(self, attr):
+        if attr[:2] == "__":
+            raise AttributeError(f"No attribute called {attr}.")
+        return getattr(self.time_series, attr)
 
     @abstractmethod
     def generate_states(self) -> np.ndarray:
@@ -377,6 +386,7 @@ class RandomHMMSimulation(HMMSimulation):
 
 
 class HiddenSemiMarkovSimulation(Simulation):
+    @auto_repr
     def __init__(
         self,
         n_samples: int = 20000,

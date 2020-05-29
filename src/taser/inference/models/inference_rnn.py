@@ -2,6 +2,7 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
+from taser.decorators import auto_repr
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
@@ -44,6 +45,7 @@ class InferenceRNN(Model):
 
     """
 
+    @auto_repr
     def __init__(
         self,
         dropout_rate: float,

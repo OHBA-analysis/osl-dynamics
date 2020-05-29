@@ -67,8 +67,8 @@ class MEGData:
                 time_series = time_series[multi_sequence]
 
         self.sampling_frequency = sampling_frequency
-        self.raw_data = time_series
-        self.time_series = time_series.copy()
+        self.raw_data = np.array(time_series)
+        self.time_series = self.raw_data.copy()
         self.pca_applied = False
 
         self.t = None
