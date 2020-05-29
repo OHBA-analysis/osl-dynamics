@@ -14,10 +14,18 @@ from taser.array_ops import (
     from_cholesky,
     get_one_hot,
     state_activation,
-    state_lifetimes,
+    state_lifetimes, match_states, correlate_states, mean_diagonal,
 )
 from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults
+
+
+def plot_correlation(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+    matched_stc_1, matched_stc_2 = match_states(state_time_course_1, state_time_course_2)
+    correlation = correlate_states(matched_stc_1, matched_stc_2)
+    correlation_off_diagonal = mean_diagonal(correlation)
+
+    plot_matrices([correlation, correlation_off_diagonal], group_color_scale=False)
 
 
 def plot_state_sums(state_time_course: np.ndarray, color="tab:gray"):

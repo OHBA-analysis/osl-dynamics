@@ -318,3 +318,10 @@ def trace_normalize(matrix: np.ndarray):
         raise ValueError("Matrix should be 2D or 3D.")
 
     return matrix / matrix.trace(axis1=1, axis2=2)[:, None, None]
+
+
+def mean_diagonal(array: np.ndarray):
+    off_diagonals = ~np.eye(array.shape[0], dtype=bool)
+    new_array = array.copy()
+    np.fill_diagonal(new_array, array[off_diagonals].mean())
+    return new_array
