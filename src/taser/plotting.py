@@ -401,8 +401,8 @@ def plot_matrices(
 
 
 def rough_square_axes(n_plots):
-    short = np.floor(n_plots ** 0.5).astype(int)
-    long = np.ceil(n_plots ** 0.5).astype(int)
+    long = np.floor(n_plots ** 0.5).astype(int)
+    short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
