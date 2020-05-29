@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 import scipy.io
 import mat73
+from taser.decorators import auto_repr
 
 from taser.helpers.misc import time_axis_first
 from taser import plotting
@@ -22,12 +23,15 @@ class MEGData:
         "T",
     ]
 
+    @auto_repr
     def __init__(
         self,
         time_series: Union[np.ndarray, str],
         sampling_frequency: float = 1,
         multi_sequence: Union[str, int] = "all",
     ):
+        self.from_file = time_series if isinstance(time_series, str) else False
+
         if isinstance(time_series, str):
             if time_series[-4:] == ".npy":
                 time_series = np.load(time_series)
@@ -77,6 +81,19 @@ class MEGData:
             self.time_axis_first()
 
         self.n_min, self.n_max = None, None
+
+    def __str__(self):
+        return_string = [
+            f"{self.__class__.__name__}:",
+            f"from_file: {self.from_file}",
+            f"n_channels: {self.time_series.shape[1]}",
+            f"n_time_points: {self.time_series.shape[0]}",
+            f"pca_applied: {self.pca_applied}",
+            f"data_limits: {self.n_min}, {self.n_max}",
+            f"original_shape: {self.raw_data.shape}",
+            f"current_shape: {self[:].shape}",
+        ]
+        return "\n  ".join(return_string)
 
     def __getitem__(self, val):
         return self.time_series[self.n_min : self.n_max][val]

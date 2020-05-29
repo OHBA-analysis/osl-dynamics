@@ -75,43 +75,62 @@ def transpose(f, *arguments):
     return wrap
 
 
+def get_params(me, args, kwargs):
+    arg_dict = {}
+
+    params = inspect.signature(me.__class__).parameters
+
+    for i, (key, val) in enumerate(params.items()):
+        if i < len(args):
+            arg_dict[key] = args[i]
+        if i >= len(args):
+            if key in kwargs:
+                arg_dict[key] = kwargs[key]
+            elif key in params:
+                arg_dict[key] = params[key].default
+    return arg_dict
+
+
 def auto_repr(func):
     @wraps(func)
     def wrapper_function(me, *args, **kwargs):
-        arg_dict = {}
-        params = inspect.signature(me.__class__).parameters
-
-        sig_dict = params.items()
-        for i, (key, val) in enumerate(params.items()):
-            if i < len(args):
-                arg_dict[key] = args[i]
-            if i >= len(args):
-                if key in kwargs:
-                    arg_dict[key] = kwargs[key]
-                elif key in params:
-                    arg_dict[key] = params[key].default
-
-        me.__arg_dict = arg_dict
+        me.__arg_dict = get_params(me, args, kwargs)
 
         def __repr__(self):
-            return (
-                self.__class__.__name__
-                + "("
-                + ", ".join(
-                    "=".join(
-                        [
-                            item[0],
-                            str(item[1])
-                            if not isinstance(item[1], str)
-                            else "'" + item[1] + "'",
-                        ]
-                    )
-                    for item in self.__arg_dict.items()
-                )
-                + ")"
-            )
+            return_string = [self.__class__.__name__, "("]
+            var_string = []
+            for item in me.__arg_dict.items():
+                if isinstance(item[1], str):
+                    var_string.append(f"{item[0]}='{item[1]}'")
+                else:
+                    var_string.append(f"{item[0]}={item[1]}")
+            return_string.append(", ".join(var_string))
+            return_string.append(")")
+            return "".join(return_string)
 
         setattr(me.__class__, "__repr__", __repr__)
+
+        func(me, *args, **kwargs)
+
+    return wrapper_function
+
+
+def auto_str(func):
+    @wraps(func)
+    def wrapper_function(me, *args, **kwargs):
+        me.__arg_dict = get_params(me, args, kwargs)
+
+        def __str__(self):
+            str_output = [f"{self.__class__.__name__}:"]
+            for item in self.__arg_dict.items():
+                if isinstance(item[1], str):
+                    str_output.append(f"{item[0]} = '{item[1]}'")
+                else:
+                    str_output.append(f"{item[0]} = {item[1]}")
+
+            return "\n  ".join(str_output)
+
+        setattr(me.__class__, "__str__", __str__)
 
         func(me, *args, **kwargs)
 
