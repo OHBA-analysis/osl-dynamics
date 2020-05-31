@@ -155,7 +155,7 @@ class MVNLayer(Layer):
             tf.TensorShape([self.num_gaussians, self.dim, self.dim]),
         ]
 
-    def call(self, inputs, burn_in=True, **kwargs):
+    def call(self, inputs, burn_in=False, **kwargs):
         """
 
         Parameters
