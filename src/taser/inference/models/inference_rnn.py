@@ -103,7 +103,7 @@ class InferenceRNN(Model):
             learn_covariances=learn_covariances,
             initial_means=mus_initial,
             initial_pseudo_sigmas=cholesky_djs_initial,
-            initial_sigmas=covariance_initial
+            initial_sigmas=covariance_initial,
         )
 
         self.log_likelihood_loss = LogLikelihoodLayer(

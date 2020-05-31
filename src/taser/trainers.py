@@ -118,10 +118,7 @@ class Trainer(ABC):
         self.epoch_iterator = tqdm(
             dataset,
             leave=False,
-            postfix={
-                "loss": self.loss_history[-1],
-                "dice": self.dice
-            },
+            postfix={"loss": self.loss_history[-1], "dice": self.dice},
         )
 
         for y in self.epoch_iterator:
