@@ -81,8 +81,16 @@ class MVNLayer(Layer):
         learn_covariances: bool = True,
         initial_means: tf.Tensor = None,
         initial_pseudo_sigmas: tf.Tensor = None,
+        initial_sigmas: tf.Tensor = None,
         **kwargs,
     ):
+
+        if not ((initial_pseudo_sigmas is None) != (initial_sigmas is None)):
+            raise ValueError(
+                "Exactly one of initial_pseudo_sigmas "
+                "and initial_sigmas may be specified."
+            )
+
         super().__init__(**kwargs)
         self.num_gaussians = num_gaussians
         self.dim = dim
@@ -90,18 +98,19 @@ class MVNLayer(Layer):
         self.learn_covariances = learn_covariances
         self.initial_means = initial_means
         self.initial_pseudo_sigmas = initial_pseudo_sigmas
+        self.initial_true_sigmas = initial_sigmas
 
         if self.initial_means is None:
             self.means_initializer = tf.keras.initializers.Zeros
         else:
             self.means_initializer = MeansInitializer(self.initial_means)
 
-        if self.initial_pseudo_sigmas is None:
-            self.pseudo_sigmas_initializer = Identity3D
+        if self.initial_pseudo_sigmas is not None:
+            self.sigmas_initializer = PseudoSigmaInitializer(self.initial_pseudo_sigmas)
+        if self.initial_true_sigmas is not None:
+            self.sigmas_initializer = UnchangedInitializer(self.initial_true_sigmas)
         else:
-            self.pseudo_sigmas_initializer = PseudoSigmaInitializer(
-                self.initial_pseudo_sigmas
-            )
+            self.sigmas_initializer = Identity3D
 
         self.means = None
         self.pseudo_sigmas = None
@@ -123,7 +132,7 @@ class MVNLayer(Layer):
         self.pseudo_sigmas = self.add_weight(
             "pseudo_sigmas",
             shape=(self.num_gaussians, self.dim, self.dim),
-            initializer=self.pseudo_sigmas_initializer,
+            initializer=self.sigmas_initializer,
             trainable=self.learn_covariances,
         )
         super().build(input_shape)

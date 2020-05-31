@@ -11,12 +11,9 @@ class TestCorrelateStates(TestCase):
         self.state_time_course_2 = self.state_time_course_1.copy()
 
     def test_correlate_states(self):
-
         correlation = array_ops.correlate_states(
             self.state_time_course_1, self.state_time_course_2
         )
-
-        print(correlation)
 
         self.assertTrue(np.allclose(np.diagonal(correlation), 1))
 
@@ -273,3 +270,17 @@ class TestTraceNormalize(TestCase):
 
         with self.assertRaises(ValueError):
             array_ops.trace_normalize(np.random.rand(3, 4, 5, 6))
+
+
+class Test(TestCase):
+    def test_mean_diagonal(self):
+        rand = np.random.rand(5, 5)
+        result = array_ops.mean_diagonal(rand)
+        self.assertTrue(
+            np.allclose(result[~np.eye(5, dtype=bool)], rand[~np.eye(5, dtype=bool)])
+        )
+        self.assertTrue(
+            np.allclose(
+                result[np.eye(5, dtype=bool)], rand[~np.eye(5, dtype=bool)].mean()
+            )
+        )

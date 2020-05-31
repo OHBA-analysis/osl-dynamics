@@ -79,6 +79,8 @@ class Trainer(ABC):
         self.batch_mean = tf.keras.metrics.Mean()
 
         self.prediction_dataset = None
+        self.epoch_iterator = None
+        self.dice = None
 
     @timing
     def train(
@@ -113,12 +115,17 @@ class Trainer(ABC):
         ----------
         dataset : tf.Dataset
         """
-        epoch_iterator = tqdm(
-            dataset, leave=False, postfix={"loss": self.loss_history[-1]},
+        self.epoch_iterator = tqdm(
+            dataset,
+            leave=False,
+            postfix={
+                "loss": self.loss_history[-1],
+                "dice": self.dice
+            },
         )
 
-        for y in epoch_iterator:
-            epoch_iterator.set_description_str(f"epoch={self.epoch}")
+        for y in self.epoch_iterator:
+            self.epoch_iterator.set_description_str(f"epoch={self.epoch}")
             loss_value, grads = self.grad(y)
             self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
             self.batch_mean(loss_value)

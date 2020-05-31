@@ -55,6 +55,7 @@ class InferenceRNN(Model):
         n_channels: int,
         mus_initial: tf.Tensor = None,
         cholesky_djs_initial: tf.Tensor = None,
+        covariance_initial: tf.Tensor = None,
         learn_means: bool = False,
         learn_covariances: bool = True,
         alpha_xform: str = "softmax",
@@ -96,12 +97,13 @@ class InferenceRNN(Model):
         )
 
         self.mvn_layer = MVNLayer(
-            n_states,
-            n_channels,
-            learn_means,
-            learn_covariances,
-            mus_initial,
-            cholesky_djs_initial,
+            num_gaussians=n_states,
+            dim=n_channels,
+            learn_means=learn_means,
+            learn_covariances=learn_covariances,
+            initial_means=mus_initial,
+            initial_pseudo_sigmas=cholesky_djs_initial,
+            initial_sigmas=covariance_initial
         )
 
         self.log_likelihood_loss = LogLikelihoodLayer(
