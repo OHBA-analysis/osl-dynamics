@@ -14,6 +14,7 @@ from taser.inference.initializers import (
     PseudoSigmaInitializer,
     UnchangedInitializer,
 )
+from tensorflow_core.python.keras.utils import tf_utils
 
 
 class ReparameterizationLayer(Layer):
@@ -154,7 +155,7 @@ class MVNLayer(Layer):
             tf.TensorShape([self.num_gaussians, self.dim, self.dim]),
         ]
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, burn_in=True, **kwargs):
         """
 
         Parameters
@@ -171,7 +172,14 @@ class MVNLayer(Layer):
             Standard deviations of a multivariate normal distribution
 
         """
-        self.sigmas = normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas))
+        self.sigmas = tf_utils.smart_cond(
+            burn_in,
+            lambda: tf.stop_gradient(normalise_covariance(self.pseudo_sigmas)),
+            lambda: normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas)),
+        )
+
+        # self.sigmas = normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas))
+        # self.sigmas = tf.stop_gradient(normalise_covariance(self.pseudo_sigmas))
         return self.means, self.sigmas
 
 
