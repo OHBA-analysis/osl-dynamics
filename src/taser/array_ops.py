@@ -2,12 +2,33 @@
 
 """
 import logging
-from itertools import permutations
 from typing import List, Tuple
 
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 
-from taser.helpers.decorators import transpose
+from taser.decorators import transpose
+
+
+@transpose
+def correlate_states(
+    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+) -> np.ndarray:
+    correlation = np.zeros((state_time_course_1.shape[1], state_time_course_2.shape[1]))
+    for i, state1 in enumerate(state_time_course_1.T):
+        for j, state2 in enumerate(state_time_course_2.T):
+            correlation[i, j] = np.corrcoef(state1, state2)[0, 1]
+    return correlation
+
+
+@transpose
+def match_states(
+    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    correlation = correlate_states(state_time_course_1, state_time_course_2)
+    correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
+    matches = linear_sum_assignment(-correlation)
+    return state_time_course_1, state_time_course_2[:, matches[1]]
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):
@@ -55,8 +76,8 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
 
     """
     if values.ndim == 2:
-        logging.warning("argmax being taken on shorter axis.")
-        values = values.argmax(axis=min(values.shape))
+        logging.info("argmax being taken on shorter axis.")
+        values = values.argmax(axis=1)
     if n_states is None:
         n_states = values.max() + 1
     res = np.eye(n_states)[np.array(values).reshape(-1)]
@@ -90,18 +111,12 @@ def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float
         If either sequence is not one dimensional.
 
     """
-    if len(sequence_1.shape) != 1:
+    if (sequence_1.ndim, sequence_2.ndim) != (1, 1):
         raise ValueError(
-            f"sequence_1 must be a 1D array. Dimensions are {sequence_1.shape}."
+            f"sequences must be 1D: {(sequence_1.ndim, sequence_2.ndim)} != (1, 1)."
         )
-    if len(sequence_2.shape) != 1:
-        raise ValueError(
-            f"sequence_2 must be a 1D array. Dimensions are {sequence_2.shape}."
-        )
-    if sequence_1.dtype != np.int:
-        raise TypeError("sequence_1 must by an array of integers.")
-    if sequence_1.dtype != np.int:
-        raise TypeError("sequence_2 must by an array of integers.")
+    if (sequence_1.dtype, sequence_2.dtype) != (int, int):
+        raise TypeError("Both sequences must be integer (categorical).")
 
     return 2 * ((sequence_1 == sequence_2).sum()) / (len(sequence_1) + len(sequence_2))
 
@@ -174,49 +189,6 @@ def align_arrays(
     return sequence_1, sequence_2
 
 
-@transpose(0, "sequence_1", 1, "sequence_2")
-def dice_from_permutations(
-    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "all"
-) -> List[List[Tuple[float, List[int], str]]]:
-    if alignment == "all":
-        dice_list = []
-        for a in ["left", "right", "center"]:
-            aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=a)
-            for order in permutations(range(aligned_1.shape[1])):
-                dice_list.append(
-                    [dice_coefficient(aligned_1[:, order], aligned_2), order, a]
-                )
-
-        dice_list.sort(key=lambda x: x[0], reverse=True)
-
-        return dice_list
-
-    aligned_1, aligned_2 = align_arrays(sequence_1, sequence_2, alignment=alignment)
-
-    dice_list = []
-    for order in permutations(range(aligned_1.shape[1])):
-        dice_list.append(
-            [dice_coefficient(aligned_1[:, order], aligned_2), order, alignment]
-        )
-
-    dice_list.sort(key=lambda x: x[0], reverse=True)
-
-    return dice_list
-
-
-@transpose(0, "sequence_1", 1, "sequence_2")
-def get_maximum_dice_arrays(
-    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "all"
-):
-    ordered_dice = dice_from_permutations(sequence_1, sequence_2, alignment=alignment)
-    dice, order, alignment = ordered_dice[0]
-    print(
-        f"maximum dice coefficent is {dice} from order {order} "
-        f"with alignment {alignment}"
-    )
-    return sequence_1, sequence_2[:, order]
-
-
 @transpose(0, "state_time_course")
 def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate state activations for a state time course.
@@ -228,9 +200,6 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
     ----------
     state_time_course : numpy.ndarray
         State time course (strictly binary).
-    time_axis : int
-        Specify the axis which denotes time. If 0, `state_time_course` should have
-        dimensions [time points x channels].
 
     Returns
     -------
@@ -251,14 +220,19 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
     for i, diff in enumerate(diffs.T):
         on = (diff == 1).nonzero()[0]
         off = (diff == -1).nonzero()[0]
-        if on[-1] > off[-1]:
-            off = np.append(off, len(diff))
+        try:
+            if on[-1] > off[-1]:
+                off = np.append(off, len(diff))
 
-        if off[0] < on[0]:
-            on = np.insert(on, 0, -1)
+            if off[0] < on[0]:
+                on = np.insert(on, 0, -1)
 
-        channel_on.append(on)
-        channel_off.append(off)
+            channel_on.append(on)
+            channel_off.append(off)
+        except IndexError:
+            logging.info(f"No activation in state {i}.")
+            channel_on.append(np.array([]))
+            channel_off.append(np.array([]))
 
     channel_on = np.array(channel_on)
     channel_off = np.array(channel_off)
@@ -299,33 +273,14 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
 
 
 def from_cholesky(cholesky_matrix: np.ndarray):
+    if cholesky_matrix.ndim == 2:
+        return cholesky_matrix @ cholesky_matrix.transpose()
     return cholesky_matrix @ cholesky_matrix.transpose((0, 2, 1))
-
-
-def trials_to_continuous(trials_time_course: np.ndarray):
-    if trials_time_course.ndim == 2:
-        logging.warning(
-            "A 2D time series was passed. Assuming it doesn't need to"
-            "be concatenated."
-        )
-        if trials_time_course.shape[1] > trials_time_course.shape[0]:
-            trials_time_course = trials_time_course.T
-        return trials_time_course
-
-    if trials_time_course.ndim != 3:
-        raise ValueError(
-            f"trials_time_course has {trials_time_course.ndim}"
-            f" dimensions. It should have 3."
-        )
-    return np.concatenate(np.transpose(trials_time_course, axes=[2, 0, 1]), axis=1)
 
 
 @transpose(0, "state_time_course")
 def calculate_trans_prob_matrix(
-    state_time_course: np.ndarray,
-    zero_diagonal: bool = False,
-    n_states: int = None,
-    normalize: bool = True,
+    state_time_course: np.ndarray, zero_diagonal: bool = False, n_states: int = None,
 ) -> np.ndarray:
     if state_time_course.ndim == 2:
         state_time_course = state_time_course.argmax(axis=1)
@@ -346,8 +301,9 @@ def calculate_trans_prob_matrix(
     trans_prob = np.zeros((n_states, n_states))
     trans_prob[vals[:, 0], vals[:, 1]] = counts
 
-    if normalize:
-        trans_prob = trans_prob / trans_prob.sum(axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        trans_prob = trans_prob / trans_prob.sum(axis=1)[:, None]
+    trans_prob = np.nan_to_num(trans_prob)
 
     if zero_diagonal:
         np.fill_diagonal(trans_prob, 0)
@@ -357,8 +313,15 @@ def calculate_trans_prob_matrix(
 def trace_normalize(matrix: np.ndarray):
     matrix = np.array(matrix)
     if matrix.ndim == 2:
-        matrix = matrix[None, ...]
+        return matrix / matrix.trace()
     if matrix.ndim != 3:
         raise ValueError("Matrix should be 2D or 3D.")
 
     return matrix / matrix.trace(axis1=1, axis2=2)[:, None, None]
+
+
+def mean_diagonal(array: np.ndarray):
+    off_diagonals = ~np.eye(array.shape[0], dtype=bool)
+    new_array = array.copy()
+    np.fill_diagonal(new_array, array[off_diagonals].mean())
+    return new_array

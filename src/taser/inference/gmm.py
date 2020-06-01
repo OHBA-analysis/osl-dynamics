@@ -1,21 +1,25 @@
 """Model data using a `BayesianGaussianMixture` model from Scikit-Learn
 
 """
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
+import warnings
+
+from taser.data_manipulation import MEGData
+from taser.helpers.misc import override_dict_defaults, time_axis_first
 
 
 def learn_mu_sigma(
-    data: np.ndarray,
+    data: Union[np.ndarray, MEGData],
     n_states: int,
-    n_channels: int,
     learn_means: bool = False,
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
     normalize_covariance: bool = False,
+    take_random_sample: int = 0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Find a mixture of Gaussian distributions which characterises a dataset.
 
@@ -28,8 +32,6 @@ def learn_mu_sigma(
         Input data of dimensions [n_channels x n_time_points]
     n_states : int
         Number of states (Gaussian distributions) to try to find.
-    n_channels : int
-        The number of channels in the dataset.
     learn_means : bool
         If False (default), means will be assumed to be zero and given a strong
         weight as a prior.
@@ -49,8 +51,17 @@ def learn_mu_sigma(
     """
     if retry_attempts < 1:
         raise ValueError("retry_attempts cannot be less than 1")
-    if gmm_kwargs is None:
-        gmm_kwargs = {}
+
+    default_gmm_kwargs = {"verbose": 2, "n_init": 5}
+    gmm_kwargs = override_dict_defaults(default_gmm_kwargs, gmm_kwargs)
+
+    data, transposed = time_axis_first(data)
+
+    if take_random_sample:
+        data = np.random.permutation(data)[:take_random_sample]
+
+    n_channels = data.shape[1]
+
     if learn_means:
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
@@ -66,6 +77,7 @@ def learn_mu_sigma(
             **gmm_kwargs,
         )
     for attempt in range(retry_attempts):
+        warnings.filterwarnings("ignore")
         gmm.fit(data)
         if gmm.converged_:
             print(f"Converged on iteration {attempt}")

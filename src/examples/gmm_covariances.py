@@ -1,9 +1,9 @@
-import src.taser.helpers.plotting
+import taser.plotting
 from taser.inference import gmm
 from taser.simulation import Simulation
 
 simulation = Simulation()
-data = simulation.data_sim.T
+data = simulation.time_series.T
 simulation.plot_data()
 
 covariances, means = gmm.learn_mu_sigma(
@@ -14,6 +14,4 @@ covariances, means = gmm.learn_mu_sigma(
 )
 cholesky_djs = gmm.find_cholesky_decompositions(covariances, means, learn_means=True)
 
-src.taser.helpers.plotting.plot_covariances(
-    cholesky_djs, fig_kwargs={"figsize": (20, 10)}
-)
+taser.plotting.plot_covariances(cholesky_djs, fig_kwargs={"figsize": (20, 10)})

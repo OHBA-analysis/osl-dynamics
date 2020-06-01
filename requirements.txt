@@ -33,3 +33,6 @@ pexpect~=4.7.0
 setuptools~=42.0.2
 zlib~=1.2.11
 toml~=0.10.0
+mat73~=0.40
+yaml~=0.1.7
+pyyaml~=5.3.1

@@ -3,20 +3,105 @@
 """
 import logging
 from itertools import zip_longest
+from typing import List
 
+import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from taser.helpers.array_ops import (
+from taser.array_ops import (
     from_cholesky,
     get_one_hot,
-    reduce_state_time_course,
     state_activation,
     state_lifetimes,
+    match_states,
+    correlate_states,
+    mean_diagonal,
 )
-from taser.helpers.decorators import transpose
+from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults
+
+
+def plot_correlation(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+    matched_stc_1, matched_stc_2 = match_states(
+        state_time_course_1, state_time_course_2
+    )
+    correlation = correlate_states(matched_stc_1, matched_stc_2)
+    correlation_off_diagonal = mean_diagonal(correlation)
+
+    plot_matrices([correlation, correlation_off_diagonal], group_color_scale=False)
+
+
+def plot_state_sums(state_time_course: np.ndarray, color="tab:gray"):
+    fig, axis = plt.subplots(1)
+    counts = state_time_course.sum(axis=0).astype(int)
+    bars = axis.bar(range(len(counts)), counts, color=color)
+    axis.set_xticks(range(len(counts)))
+    text = []
+    for i, val in enumerate(counts):
+        text.append(
+            axis.text(
+                i,
+                val * 0.98,
+                val,
+                horizontalalignment="center",
+                verticalalignment="top",
+                color="white",
+                fontsize=13,
+            )
+        )
+    plt.setp(axis.spines.values(), visible=False)
+    plt.setp(axis.get_xticklines(), visible=False)
+    axis.set_yticks([])
+
+    adjust_text(text, bars, fig, axis)
+
+    plt.show()
+
+
+# noinspection PyUnresolvedReferences
+def adjust_text(
+    text_objects: List[matplotlib.text.Text],
+    plot_objects: List[matplotlib.patches.Patch],
+    fig=None,
+    axis=None,
+    color="black",
+):
+    fig = plt.gcf() if fig is None else fig
+    axis = plt.gca() if axis is None else axis
+
+    fig.canvas.draw()
+
+    plot_bbs = [plot_object.get_bbox() for plot_object in plot_objects]
+    text_bbs = [
+        text_object.get_window_extent().inverse_transformed(axis.transData)
+        for text_object in text_objects
+    ]
+
+    while not all(
+        [
+            plot_bb.containsx(text_bb.x0) and plot_bb.containsx(text_bb.x1)
+            for plot_bb, text_bb in zip(plot_bbs, text_bbs)
+        ]
+    ):
+        plot_bbs = [plot_object.get_bbox() for plot_object in plot_objects]
+        text_bbs = [
+            text_object.get_window_extent().inverse_transformed(axis.transData)
+            for text_object in text_objects
+        ]
+        for plot_bb, text_bb, text_object in zip(plot_bbs, text_bbs, text_objects):
+            if not (plot_bb.containsx(text_bb.x0) and plot_bb.containsx(text_bb.x1)):
+                text_object.set_size(text_object.get_size() - 1)
+        fig.canvas.draw()
+
+    for plot_bb, text_bb, text_object in zip(plot_bbs, text_bbs, text_objects):
+        if not (plot_bb.containsy(text_bb.y0) and plot_bb.containsy(text_bb.y1)):
+            text_object.set_verticalalignment("bottom")
+            text_object.set_y(plot_bb.y1)
+            text_object.set_color(color)
+
+    fig.canvas.draw()
 
 
 @transpose(0, "time_series")
@@ -26,6 +111,12 @@ def value_separation(
     gap = separation_factor * np.abs([time_series.min(), time_series.max()]).max()
     separation = np.arange(time_series.shape[1])[None, ::-1]
     return time_series + gap * separation
+
+
+def get_colors(n_states: int, colormap: str = "gist_rainbow"):
+    colormap = plt.get_cmap(colormap)
+    colors = [colormap(1 * i / n_states) for i in range(n_states)]
+    return colors
 
 
 @transpose(0, 1, 2, "time_series_0", "time_series_1", "time_series_2")
@@ -179,11 +270,15 @@ def highlight_states(
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
     n_time_points: int = 5000,
+    sample_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
     fig_kwargs: dict = None,
 ):
+    if n_time_points is None:
+        n_time_points = state_time_course.shape[0]
     n_time_points = min(n_time_points, state_time_course.shape[0])
+
     axis_given = axis is not None
     if not axis_given:
         fig_defaults = {
@@ -195,12 +290,12 @@ def highlight_states(
     highlight_defaults = {"alpha": 0.2, "lw": 0}
     highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
 
-    reduced_state_time_course = reduce_state_time_course(state_time_course)
+    # reduced_state_time_course = reduce_state_time_course(state_time_course)
+    reduced_state_time_course = state_time_course.copy()
     n_states = reduced_state_time_course.shape[1]
     ons, offs = state_activation(reduced_state_time_course)
 
-    colormap = plt.get_cmap(colormap)
-    colors = [colormap(1 * i / n_states) for i in range(n_states)]
+    colors = get_colors(n_states, colormap)
 
     for state_number, (state_ons, state_offs, color) in enumerate(
         zip(ons, offs, colors)
@@ -211,30 +306,35 @@ def highlight_states(
             if (on > n_time_points) and (off > n_time_points):
                 break
             handles, labels = axis.get_legend_handles_labels()
+            if (str(state_number) not in labels) and legend:
+                label = str(state_number)
+            else:
+                label = ""
             axis.axvspan(
-                on,
-                min(off, n_time_points),
+                on / sample_frequency,
+                min(off, n_time_points) / sample_frequency,
                 color=color,
                 **highlight_kwargs,
-                label=str(state_number)
-                if (str(state_number) not in labels) and legend
-                else "",
+                label=label,
             )
 
     if legend:
         axis.legend(
-            loc=(0.0, -0.2), mode="expand", borderaxespad=0, ncol=n_states,
+            loc=(0.0, -0.3), mode="expand", borderaxespad=0, ncol=n_states,
         )
+
+    plt.setp(axis.spines.values(), visible=False)
 
     axis.set_yticks([])
 
     axis.autoscale(tight=True)
-    axis.set_xlim(0, n_time_points)
+
+    axis.set_xlim(0, n_time_points / sample_frequency)
 
     plt.tight_layout()
 
     if not axis_given:
-        axis.axis("off")
+        # axis.axis("off")
         plt.show()
 
 
@@ -259,7 +359,9 @@ def plot_matrix_max_min_mean(
     )
 
 
-def plot_matrices(matrix, group_color_scale: bool = True, titles: list = None):
+def plot_matrices(
+    matrix, group_color_scale: bool = True, titles: list = None, cmap="viridis"
+):
     matrix = np.array(matrix)
     if matrix.ndim == 2:
         matrix = matrix[None, :]
@@ -283,9 +385,9 @@ def plot_matrices(matrix, group_color_scale: bool = True, titles: list = None):
             axis.remove()
             continue
         if group_color_scale:
-            im = axis.matshow(grid, vmin=v_min, vmax=v_max)
+            im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
         else:
-            im = axis.matshow(grid)
+            im = axis.matshow(grid, cmap=cmap)
         axis.set_title(title)
 
     if group_color_scale:
@@ -304,8 +406,8 @@ def plot_matrices(matrix, group_color_scale: bool = True, titles: list = None):
 
 
 def rough_square_axes(n_plots):
-    short = np.floor(n_plots ** 0.5).astype(int)
-    long = np.ceil(n_plots ** 0.5).astype(int)
+    long = np.floor(n_plots ** 0.5).astype(int)
+    short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -324,25 +426,74 @@ def add_axis_colorbar(axis: plt.Axes):
 
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
-    state_time_course: np.ndarray, figsize=(5, 5), bins: int = 20, density: bool = False
+    state_time_course: np.ndarray,
+    bins: int = 20,
+    density: bool = False,
+    match_scale_x=True,
+    match_scale_y=True,
+    hist_kwargs: dict = None,
+    fig_kwargs: dict = None,
 ):
     if state_time_course.ndim == 1:
         state_time_course = get_one_hot(state_time_course)
     if state_time_course.ndim != 2:
         raise ValueError("state_timecourse must be a 2D array")
 
-    state_time_course = reduce_state_time_course(state_time_course)
+    # state_time_course = reduce_state_time_course(state_time_course)
     channel_lifetimes = state_lifetimes(state_time_course)
     n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
 
-    fig, axes = plt.subplots(short, long, figsize=figsize)
-    for channel, axis in zip_longest(channel_lifetimes, axes.ravel()):
+    colors = get_colors(n_plots)
+
+    default_hist_kwargs = {"alpha": 0.5}
+    hist_kwargs = override_dict_defaults(default_hist_kwargs, hist_kwargs)
+
+    default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    fig, axes = plt.subplots(short, long, **fig_kwargs)
+    largest_bar = 0
+    furthest_value = 0
+    for channel, axis, color in zip_longest(channel_lifetimes, axes.ravel(), colors):
         if channel is None:
             axis.remove()
             continue
-        axis.hist(channel, density=density, bins=bins)
-
+        if not len(channel):
+            # axis.hist([])
+            axis.text(
+                0.5,
+                0.5,
+                "No\nactivation",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=axis.transAxes,
+                fontsize=20,
+            )
+            axis.set_xticks([])
+            axis.set_yticks([])
+            continue
+        hist = axis.hist(
+            channel, density=density, bins=bins, color=color, **hist_kwargs
+        )
+        largest_bar = max(hist[0].max(), largest_bar)
+        furthest_value = max(hist[1].max(), furthest_value)
+        t = axis.text(
+            0.95,
+            0.95,
+            f"{np.sum(channel) / len(state_time_course) * 100:.2f}%",
+            fontsize=10,
+            horizontalalignment="right",
+            verticalalignment="top",
+            transform=axis.transAxes,
+        )
+        axis.xaxis.set_tick_params(labelbottom=True, labelleft=True)
+        t.set_bbox({"facecolor": "white", "alpha": 0.7, "boxstyle": "round"})
+    for axis in axes.ravel():
+        if match_scale_x:
+            axis.set_xlim(0, furthest_value * 1.1)
+        if match_scale_y:
+            axis.set_ylim(0, largest_bar * 1.1)
     plt.tight_layout()
 
     plt.show()
@@ -350,7 +501,7 @@ def plot_state_lifetimes(
 
 @transpose(0, 1, "time_series", "state_time_course")
 def plot_highlighted_states(
-    time_series, state_time_course, n_time_points, state_order, fig_kwargs=None
+    time_series, state_time_course, n_time_points, fig_kwargs=None
 ):
     if fig_kwargs is None:
         fig_kwargs = {}
@@ -359,10 +510,10 @@ def plot_highlighted_states(
 
     ons, offs = state_activation(state_time_course)
 
-    for i, (channel_ons, channel_offs, ss, axis) in enumerate(
-        zip(ons, offs, state_order, axes.ravel())
+    for i, (channel_ons, channel_offs, axis, channel_time_series) in enumerate(
+        zip(ons, offs, axes.ravel(), time_series[:n_time_points].T)
     ):
-        axis.plot(time_series[0:n_time_points, ss])
+        axis.plot(channel_time_series)
         axis.set_yticks([0.5])
         axis.set_yticklabels([i])
         axis.set_ylim(-0.1, 1.1)
@@ -377,3 +528,30 @@ def axis_highlights(ons, offs, n_points, axis, i: int = 0, label: str = ""):
     for on, off in zip(ons, offs):
         if on < n_points or off < n_points:
             axis.axvspan(on, min(n_points - 1, off), alpha=0.1, color="r")
+
+
+def compare_state_data(
+    *state_time_courses, n_time_points=20000, sample_frequency: float = 1,
+):
+    fig, axes = plt.subplots(
+        nrows=len(state_time_courses),
+        figsize=(20, 2.5 * len(state_time_courses)),
+        sharex="all",
+    )
+
+    for state_time_course, axis in zip(state_time_courses[:-1], axes[:-1]):
+        highlight_states(
+            state_time_course,
+            axis=axis,
+            n_time_points=n_time_points,
+            legend=False,
+            sample_frequency=sample_frequency,
+        )
+
+    highlight_states(
+        state_time_courses[-1],
+        axis=axes[-1],
+        n_time_points=n_time_points,
+        legend=True,
+        sample_frequency=sample_frequency,
+    )

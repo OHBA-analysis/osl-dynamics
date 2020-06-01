@@ -2,10 +2,11 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
+from taser.decorators import auto_repr
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
-from taser.helpers.array_ops import get_one_hot
+from taser.array_ops import get_one_hot
 from taser.inference.layers import (
     MVNLayer,
     ReparameterizationLayer,
@@ -44,6 +45,7 @@ class InferenceRNN(Model):
 
     """
 
+    @auto_repr
     def __init__(
         self,
         dropout_rate: float,
@@ -53,11 +55,18 @@ class InferenceRNN(Model):
         n_channels: int,
         mus_initial: tf.Tensor = None,
         cholesky_djs_initial: tf.Tensor = None,
+        covariance_initial: tf.Tensor = None,
         learn_means: bool = False,
         learn_covariances: bool = True,
         alpha_xform: str = "softmax",
+        log_likelihood_diagonal_constant: float = 1e-8,
     ):
         super().__init__()
+
+        if n_channels is None:
+            raise ValueError("n_channels must be specified.")
+
+        self.n_states = n_states
 
         self.dropout_layer_0 = Dropout(dropout_rate)
 
@@ -88,21 +97,29 @@ class InferenceRNN(Model):
         )
 
         self.mvn_layer = MVNLayer(
-            n_states,
-            n_channels,
-            learn_means,
-            learn_covariances,
-            mus_initial,
-            cholesky_djs_initial,
+            num_gaussians=n_states,
+            dim=n_channels,
+            learn_means=learn_means,
+            learn_covariances=learn_covariances,
+            initial_means=mus_initial,
+            initial_pseudo_sigmas=cholesky_djs_initial,
+            initial_sigmas=covariance_initial,
         )
 
         self.log_likelihood_loss = LogLikelihoodLayer(
-            n_states, n_channels, alpha_xform=alpha_xform
+            n_states,
+            n_channels,
+            alpha_xform=alpha_xform,
+            diagonal_constant=log_likelihood_diagonal_constant,
         )
         self.kl_loss = KLDivergenceLayer(n_states, n_channels)
 
     def call(
-        self, inputs: List[tf.Tensor], training: bool = True, **kwargs
+        self,
+        inputs: List[tf.Tensor],
+        training: bool = True,
+        burn_in: bool = False,
+        **kwargs
     ) -> List[tf.Tensor]:
         """Pass inputs to the model to get outputs.
 
@@ -143,7 +160,7 @@ class InferenceRNN(Model):
         model_mu = self.model_dense_layer_mu(dropout_3)
         log_sigma_theta_j = self.log_sigma_theta_j(inputs)
 
-        mus, djs = self.mvn_layer(inputs)
+        mus, djs = self.mvn_layer(inputs, burn_in=burn_in)
 
         log_likelihood_loss = self.log_likelihood_loss([inputs, theta_ast, mus, djs])
         kl_loss = self.kl_loss(
@@ -162,9 +179,20 @@ class InferenceRNN(Model):
         ]
 
     @staticmethod
-    def result_combination(results: List) -> List:
+    def result_combination(results: List) -> dict:
 
         results = np.array(results)
+
+        names = [
+            "log_likelihood_loss",
+            "kl_loss",
+            "theta_ast",
+            "inference_mu",
+            "inference_sigma",
+            "model_mu",
+            "mus",
+            "djs",
+        ]
 
         operations = {
             "log_likelihood_loss": lambda x: np.array(x),
@@ -203,12 +231,12 @@ class InferenceRNN(Model):
             operations["djs"](results[:, 7::8]),
         ]
 
-        return combined_results
+        return dict(zip(names, combined_results))
 
-    def latent_variable(self, results_list: List, one_hot: bool = True):
-        inference_mu = results_list[3]
+    def latent_variable(self, results_list: dict, one_hot: bool = True):
+        inference_mu = results_list["inference_mu"]
         if one_hot:
-            return get_one_hot(inference_mu.argmax(axis=1))
+            return get_one_hot(inference_mu.argmax(axis=1), n_states=self.n_states)
         return inference_mu
 
 
