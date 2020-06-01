@@ -115,7 +115,11 @@ class InferenceRNN(Model):
         self.kl_loss = KLDivergenceLayer(n_states, n_channels)
 
     def call(
-        self, inputs: List[tf.Tensor], training: bool = True, **kwargs
+        self,
+        inputs: List[tf.Tensor],
+        training: bool = True,
+        burn_in: bool = False,
+        **kwargs
     ) -> List[tf.Tensor]:
         """Pass inputs to the model to get outputs.
 
@@ -156,7 +160,7 @@ class InferenceRNN(Model):
         model_mu = self.model_dense_layer_mu(dropout_3)
         log_sigma_theta_j = self.log_sigma_theta_j(inputs)
 
-        mus, djs = self.mvn_layer(inputs)
+        mus, djs = self.mvn_layer(inputs, burn_in=burn_in)
 
         log_likelihood_loss = self.log_likelihood_loss([inputs, theta_ast, mus, djs])
         kl_loss = self.kl_loss(

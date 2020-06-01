@@ -5,43 +5,14 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 
-import numpy as np
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from taser.callbacks import Callback
 from taser.helpers.misc import listify
 from tensorflow.keras.optimizers import Adam
 from tqdm import tqdm
 
 from taser.decorators import timing
-
-
-class Callback(ABC):
-    def __init__(self):
-        pass
-
-    def epoch_end(self, *args, **kwargs):
-        pass
-
-
-class SaveCallback(Callback):
-    def __init__(self, trainer, basename, predict_dataset, frequency: int = 1):
-        super().__init__()
-        self.trainer = trainer
-        self.basename = basename
-        self.dataset = predict_dataset
-        self.frequency = frequency
-
-        Path(basename).mkdir(parents=True, exist_ok=True)
-
-    def epoch_end(self):
-        if self.trainer.epoch % self.frequency == 0:
-            fn_length = len(str(self.trainer.n_epochs))
-            np.save(
-                f"{self.basename}/{str(self.trainer.epoch).zfill(fn_length)}",
-                self.trainer.predict_latent_variable(self.dataset),
-            )
 
 
 class Trainer(ABC):
@@ -220,6 +191,7 @@ class AnnealingTrainer(Trainer):
         optimizer: tf.keras.optimizers.Optimizer = None,
         lr: float = None,
         annealing_scale: float = 1,
+        burn_in: int = 0,
     ):
         super().__init__(model, optimizer, lr=lr)
         self.annealing_sharpness = annealing_sharpness
@@ -227,6 +199,10 @@ class AnnealingTrainer(Trainer):
         self.update_frequency = update_frequency
 
         self.annealing_factor = None
+        self.burn_in = burn_in
+
+    def check_burn_in(self):
+        return self.epoch < self.burn_in
 
     def calculate_annealing_factor(self):
         """Calculate the weighting of the KL loss
@@ -260,7 +236,8 @@ class AnnealingTrainer(Trainer):
             The number of epochs to train for.
         """
         callbacks = listify(callbacks)
-
+        if self.burn_in > 0:
+            logging.getLogger("tensorflow").setLevel(logging.ERROR)
         self.n_epochs = n_epochs
         for self.epoch in range(n_epochs):
             if self.epoch % self.update_frequency == 0:
@@ -288,7 +265,9 @@ class AnnealingTrainer(Trainer):
             divergence losses.
 
         """
-        log_likelihood_loss, kl_loss = self.model(inputs, training=training)[:2]
+        log_likelihood_loss, kl_loss = self.model(
+            inputs, training=training, burn_in=self.check_burn_in()
+        )[:2]
 
         loss_value = log_likelihood_loss + self.annealing_factor * kl_loss
 

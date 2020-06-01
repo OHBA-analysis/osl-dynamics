@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import List, Union
 
 import tensorflow as tf
@@ -172,9 +173,14 @@ class MVNLayer(Layer):
             Standard deviations of a multivariate normal distribution
 
         """
+
+        def no_grad():
+            result = tf.stop_gradient(normalise_covariance(self.pseudo_sigmas))
+            return result
+
         self.sigmas = tf_utils.smart_cond(
             burn_in,
-            lambda: tf.stop_gradient(normalise_covariance(self.pseudo_sigmas)),
+            no_grad,
             lambda: normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas)),
         )
 
