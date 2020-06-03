@@ -5,7 +5,7 @@
       <paths name="gpu">
         <serverdata>
           <mappings>
-            <mapping deploy="TASER2" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="TASER" local="$PROJECT_DIR$" web="/" />
           </mappings>
           <excludedPaths>
             <excludedPath local="true" path="$PROJECT_DIR$/.eggs" />

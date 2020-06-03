@@ -6,8 +6,23 @@ from typing import List, Tuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from sklearn import metrics
 
 from taser.decorators import transpose
+
+
+@transpose("state_time_course_1", 0, "state_time_course_2", 1)
+def confusion_matrix(
+    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+) -> np.ndarray:
+    if state_time_course_1.ndim == 2:
+        state_time_course_1 = state_time_course_1.argmax(axis=1)
+    if state_time_course_2.ndim == 2:
+        state_time_course_2 = state_time_course_2.argmax(axis=1)
+    if not ((state_time_course_1.ndim == 1) and (state_time_course_2.ndim == 1)):
+        raise ValueError("Both state time courses must be either 1D or 2D.")
+
+    return metrics.confusion_matrix(state_time_course_1, state_time_course_2)
 
 
 @transpose

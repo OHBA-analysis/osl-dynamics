@@ -9,6 +9,7 @@ import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from taser import array_ops
 
 from taser.array_ops import (
     from_cholesky,
@@ -555,3 +556,10 @@ def compare_state_data(
         legend=True,
         sample_frequency=sample_frequency,
     )
+
+
+@transpose("state_time_course_1", 0, "state_time_course_2", 1)
+def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+    confusion = array_ops.confusion_matrix(state_time_course_1, state_time_course_2)
+    correlation_off_diagonal = mean_diagonal(confusion)
+    plot_matrices([confusion, correlation_off_diagonal], group_color_scale=False)

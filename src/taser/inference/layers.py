@@ -15,7 +15,7 @@ from taser.inference.initializers import (
     PseudoSigmaInitializer,
     UnchangedInitializer,
 )
-from tensorflow_core.python.keras.utils import tf_utils
+from tensorflow.python.keras.utils import tf_utils
 
 
 class ReparameterizationLayer(Layer):
