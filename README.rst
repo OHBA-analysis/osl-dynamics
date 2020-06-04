@@ -13,6 +13,23 @@ Install in editable mode
     cd TASER
     pip install -e .
 
+
+Build documentation
+===================
+.. code-block:: shell
+
+    cd TASER
+    python setup.py docs
+
+
+Run tests
+========================
+.. code-block:: shell
+
+    cd TASER
+    python setup.py test
+
+
 Usage
 =====
 You can import things from TASER like any other package.
