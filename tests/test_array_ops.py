@@ -284,3 +284,11 @@ class Test(TestCase):
                 result[np.eye(5, dtype=bool)], rand[~np.eye(5, dtype=bool)].mean()
             )
         )
+
+
+class TestConfusionMatrix(TestCase):
+    def test_confusion_matrix(self):
+        a = np.array([1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3])
+        b = np.array([1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3])
+        exp_result = np.array([[2, 1, 1], [1, 2, 1], [1, 1, 2]])
+        self.assertTrue(np.all(exp_result == array_ops.confusion_matrix(a, b)))
