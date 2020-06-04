@@ -40,21 +40,34 @@ class ComparisonCallback(Callback):
         self.comparison_array = comparison_array
         self.predict_dataset = predict_dataset
         self.dice_history = []
+        self.max_dice = 0
+        self.max_dice_stc = None
 
     def plot_loss_dice(self):
         fig, axis = plt.subplots(1)
-        axis.plot(self.trainer.loss_history[1:], c='k', label="loss")
+        axis.plot(self.trainer.loss_history[1:], c="k", label="loss")
         axis_2 = axis.twinx()
-        axis_2.plot(self.dice_history, c='tab:red', label="dice")
+        axis_2.plot(self.dice_history, c="tab:red", label="dice")
         plt.legend()
         plt.show()
 
     def epoch_end(self):
         pred_stc = self.trainer.predict_latent_variable(self.predict_dataset)
         aligned_comp_array, aligned_pred_stc = array_ops.align_arrays(
-            self.comparison_array, pred_stc)
-        matched_comp_array, matched_pred_stc = array_ops.match_states(
-            aligned_comp_array, aligned_pred_stc)
-        self.trainer.dice = array_ops.dice_coefficient(matched_comp_array,
-                                                       matched_pred_stc)
+            self.comparison_array, pred_stc
+        )
+        try:
+            matched_comp_array, matched_pred_stc = array_ops.match_states(
+                aligned_comp_array, aligned_pred_stc
+            )
+            self.trainer.dice = array_ops.dice_coefficient(
+                matched_comp_array, matched_pred_stc
+            )
+        except ValueError:
+            self.trainer.dice = np.nan
+
+        if len(self.dice_history) > 0:
+            if self.trainer.dice > max(self.dice_history):
+                self.max_dice_stc = matched_pred_stc.copy()
+
         self.dice_history.append(self.trainer.dice)
