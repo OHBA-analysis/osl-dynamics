@@ -45,10 +45,13 @@ class ComparisonCallback(Callback):
 
     def plot_loss_dice(self):
         fig, axis = plt.subplots(1)
-        axis.plot(self.trainer.loss_history[1:], c="k", label="loss")
+        loss_line, = axis.plot(self.trainer.loss_history[1:], c="k")
+        axis.set_xlabel("Epoch")
+        axis.set_ylabel("Loss")
         axis_2 = axis.twinx()
-        axis_2.plot(self.dice_history, c="tab:red", label="dice")
-        plt.legend()
+        dice_line = axis_2.plot(self.dice_history, c="tab:red")
+        axis_2.set_ylabel("Dice coefficient")
+        plt.legend([loss_line, dice_line], ["loss", "dice"])
         plt.show()
 
     def epoch_end(self):
