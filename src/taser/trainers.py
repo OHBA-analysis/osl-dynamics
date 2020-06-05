@@ -3,7 +3,7 @@
 """
 import logging
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Union
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -222,7 +222,10 @@ class AnnealingTrainer(Trainer):
 
     @timing
     def train(
-        self, dataset: tf.data.Dataset, n_epochs: int, callbacks: List[Callback] = None
+        self,
+        dataset: tf.data.Dataset,
+        n_epochs: int,
+        callbacks: Union[List[Callback], Callback] = None,
     ):
         """Train the model.
 
