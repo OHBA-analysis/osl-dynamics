@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from taser.array_ops import get_one_hot
-from taser.decorators import auto_repr
+from taser.decorators import auto_repr, auto_yaml
 
 
 class Simulation(ABC):
@@ -386,6 +386,7 @@ class RandomHMMSimulation(HMMSimulation):
 
 
 class HiddenSemiMarkovSimulation(Simulation):
+    @auto_yaml
     @auto_repr
     def __init__(
         self,
