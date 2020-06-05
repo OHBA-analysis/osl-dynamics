@@ -3,7 +3,7 @@
 """
 import logging
 from itertools import zip_longest
-from typing import List
+from typing import List, Union, Any
 
 import matplotlib
 import numpy as np
@@ -164,7 +164,7 @@ def plot_two_data_scales(
 
 @transpose(0, 1, "time_series", "state_time_course")
 def plot_state_highlighted_data(
-    time_series: np.ndarray,
+    time_series: Union[np.ndarray, Any],
     state_time_course: np.ndarray,
     events: np.ndarray = None,
     n_time_points: int = 5000,

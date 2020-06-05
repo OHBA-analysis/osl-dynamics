@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Any
 
 import numpy as np
 from sklearn.decomposition import PCA
@@ -26,7 +26,7 @@ class MEGData:
     @auto_repr
     def __init__(
         self,
-        time_series: Union[np.ndarray, str],
+        time_series: Union[np.ndarray, str, Any],
         sampling_frequency: float = 1,
         multi_sequence: Union[str, int] = "all",
     ):

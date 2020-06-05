@@ -3,6 +3,7 @@ import logging
 from functools import wraps
 from time import time
 
+import yaml
 from taser.helpers.misc import time_axis_first
 
 
@@ -124,11 +125,26 @@ def auto_str(func):
             str_output = [f"{self.__class__.__name__}:"]
             for item in self.__arg_dict.items():
                 if isinstance(item[1], str):
-                    str_output.append(f"{item[0]} = '{item[1]}'")
+                    str_output.append(f"{item[0]}: '{item[1]}'")
                 else:
-                    str_output.append(f"{item[0]} = {item[1]}")
+                    str_output.append(f"{item[0]}: {item[1]}")
 
             return "\n  ".join(str_output)
+
+        setattr(me.__class__, "__str__", __str__)
+
+        func(me, *args, **kwargs)
+
+    return wrapper_function
+
+
+def auto_yaml(func):
+    @wraps(func)
+    def wrapper_function(me, *args, **kwargs):
+        me.__arg_dict = get_params(me, args, kwargs)
+
+        def __str__(self):
+            return yaml.dump({self.__class__.__name__: self.__arg_dict})
 
         setattr(me.__class__, "__str__", __str__)
 

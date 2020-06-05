@@ -2,7 +2,7 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
-from taser.decorators import auto_repr
+from taser.decorators import auto_repr, auto_yaml
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
@@ -45,7 +45,6 @@ class InferenceRNN(Model):
 
     """
 
-    @auto_repr
     def __init__(
         self,
         dropout_rate: float,
@@ -53,9 +52,9 @@ class InferenceRNN(Model):
         n_units_model: int,
         n_states: int,
         n_channels: int,
-        mus_initial: tf.Tensor = None,
-        cholesky_djs_initial: tf.Tensor = None,
-        covariance_initial: tf.Tensor = None,
+        mus_initial: np.ndarray = None,
+        cholesky_djs_initial: np.ndarray = None,
+        covariance_initial: np.ndarray = None,
         learn_means: bool = False,
         learn_covariances: bool = True,
         alpha_xform: str = "softmax",
