@@ -3,22 +3,22 @@
 """
 import logging
 from itertools import zip_longest
-from typing import List, Union, Any
+from typing import Any, List, Union
 
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from taser import array_ops
 
+from taser import array_ops
 from taser.array_ops import (
+    correlate_states,
     from_cholesky,
     get_one_hot,
+    match_states,
+    mean_diagonal,
     state_activation,
     state_lifetimes,
-    match_states,
-    correlate_states,
-    mean_diagonal,
 )
 from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults

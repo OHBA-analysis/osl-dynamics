@@ -1,15 +1,15 @@
 import logging
 from datetime import datetime
-from typing import List, Union, Tuple, Any
+from typing import Any, Tuple, Union
 
-import numpy as np
-from sklearn.decomposition import PCA
-import scipy.io
 import mat73
-from taser.decorators import auto_repr
+import numpy as np
+import scipy.io
+from sklearn.decomposition import PCA
 
-from taser.helpers.misc import time_axis_first
 from taser import plotting
+from taser.decorators import auto_repr
+from taser.helpers.misc import time_axis_first
 
 
 class MEGData:
@@ -245,8 +245,8 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
     if concatenated.shape[1] > concatenated.shape[0]:
         concatenated = concatenated.T
         logging.warning(
-            f"Assuming longer axis to be time and transposing. Check your inputs to be "
-            f"sure."
+            "Assuming longer axis to be time and transposing. Check your inputs to be "
+            "sure."
         )
 
     return concatenated

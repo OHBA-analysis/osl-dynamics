@@ -1,9 +1,8 @@
-import logging
-import warnings
 from typing import List, Union
 
 import tensorflow as tf
 from tensorflow.keras.layers import Layer
+from tensorflow.python.keras.utils import tf_utils
 
 from taser.inference.inference_functions import (
     normalise_covariance,
@@ -15,7 +14,6 @@ from taser.inference.initializers import (
     PseudoSigmaInitializer,
     UnchangedInitializer,
 )
-from tensorflow.python.keras.utils import tf_utils
 
 
 class ReparameterizationLayer(Layer):

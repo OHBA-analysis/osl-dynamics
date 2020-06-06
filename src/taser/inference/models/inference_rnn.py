@@ -2,7 +2,6 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
-from taser.decorators import auto_repr, auto_yaml
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 

@@ -4,6 +4,7 @@ from functools import wraps
 from time import time
 
 import yaml
+
 from taser.helpers.misc import time_axis_first
 
 
