@@ -38,12 +38,14 @@ def correlate_states(
 
 @transpose
 def match_states(
-    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+    reference_state_time_course: np.ndarray, modified_state_time_course: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
-    correlation = correlate_states(state_time_course_1, state_time_course_2)
+    correlation = correlate_states(
+        reference_state_time_course, modified_state_time_course
+    )
     correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
     matches = linear_sum_assignment(-correlation)
-    return state_time_course_1, state_time_course_2[:, matches[1]]
+    return reference_state_time_course, modified_state_time_course[:, matches[1]]
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):
