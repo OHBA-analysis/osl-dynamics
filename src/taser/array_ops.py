@@ -199,7 +199,7 @@ def align_arrays(
         sequence_2 = sequence_2[mid_2 - half_length : mid_2 + half_length]
 
     else:
-        raise ValueError(f"Alignment must be left, right or center.")
+        raise ValueError("Alignment must be left, right or center.")
 
     return sequence_1, sequence_2
 

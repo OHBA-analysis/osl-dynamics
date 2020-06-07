@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from matplotlib import pyplot as plt
+
 from taser import array_ops
 
 
@@ -45,7 +46,7 @@ class ComparisonCallback(Callback):
 
     def plot_loss_dice(self):
         fig, axis = plt.subplots(1)
-        loss_line, = axis.plot(self.trainer.loss_history[1:], c="k")
+        (loss_line,) = axis.plot(self.trainer.loss_history[1:], c="k")
         axis.set_xlabel("Epoch")
         axis.set_ylabel("Loss")
         axis_2 = axis.twinx()

@@ -1,12 +1,12 @@
 """Model data using a `BayesianGaussianMixture` model from Scikit-Learn
 
 """
+import warnings
 from typing import Tuple, Union
 
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
-import warnings
 
 from taser.data_manipulation import MEGData
 from taser.helpers.misc import override_dict_defaults, time_axis_first

@@ -1,14 +1,16 @@
+import logging
+import pathlib
+
+import yaml
+
 from taser import array_ops, plotting
 from taser.callbacks import ComparisonCallback
 from taser.data_manipulation import MEGData
 from taser.inference.gmm import learn_mu_sigma
 from taser.inference.models.inference_rnn import InferenceRNN
 from taser.simulation import HiddenSemiMarkovSimulation
-import yaml
-from taser.tf_ops import train_predict_dataset, gpu_growth
-import logging
+from taser.tf_ops import gpu_growth, train_predict_dataset
 from taser.trainers import AnnealingTrainer
-import pathlib
 
 # Restrict GPU memory usage
 gpu_growth()
