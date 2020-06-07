@@ -4,16 +4,5 @@ scipy
 scikit-learn
 matplotlib
 tqdm
-yaml
 pyyaml
 mat73
-sphinx
-attrs
-typing_extensions
-packaging
-gettext
-importlib_metadata
-pexpect
-setuptools
-zlib
-toml
