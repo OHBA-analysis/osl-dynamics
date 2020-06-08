@@ -38,14 +38,18 @@ def correlate_states(
 
 @transpose
 def match_states(
-    reference_state_time_course: np.ndarray, modified_state_time_course: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
-    correlation = correlate_states(
-        reference_state_time_course, modified_state_time_course
-    )
-    correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
-    matches = linear_sum_assignment(-correlation)
-    return reference_state_time_course, modified_state_time_course[:, matches[1]]
+    *state_time_courses: np.ndarray
+) -> List[np.ndarray]:
+    matched_state_time_courses = [state_time_courses[0]]
+    for state_time_course in state_time_courses[1:]:
+
+        correlation = correlate_states(
+            state_time_courses[0], state_time_course
+        )
+        correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
+        matches = linear_sum_assignment(-correlation)
+        matched_state_time_courses.append(state_time_course[:, matches[1]])
+    return matched_state_time_courses
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):
@@ -180,30 +184,23 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
 
 @transpose(0, "sequence_1", 1, "sequence_2")
 def align_arrays(
-    sequence_1: np.ndarray, sequence_2: np.ndarray, alignment: str = "left"
-) -> Tuple[np.ndarray, np.ndarray]:
-    min_length = min(len(sequence_1), len(sequence_2))
+    *sequences, alignment: str = "left"
+) -> List[np.ndarray]:
+    min_length = min(len(sequence) for sequence in sequences)
 
     if alignment == "left":
-        sequence_1 = sequence_1[:min_length]
-        sequence_2 = sequence_2[:min_length]
+        return [sequence[:min_length] for sequence in sequences]
 
     elif alignment == "right":
-        sequence_1 = sequence_1[-min_length:]
-        sequence_2 = sequence_2[-min_length:]
-
+        return [sequence[-min_length:] for sequence in sequences]
     elif alignment == "center":
         half_length = int(min_length / 2)
-        mid_1 = int(len(sequence_1) / 2)
-        mid_2 = int(len(sequence_2) / 2)
+        mids = [int(len(sequence) / 2) for sequence in sequences]
 
-        sequence_1 = sequence_1[mid_1 - half_length : mid_1 + half_length]
-        sequence_2 = sequence_2[mid_2 - half_length : mid_2 + half_length]
+        return [sequence[mid - half_length : mid + half_length] for sequence, mid in zip(sequences, mids)]
 
     else:
         raise ValueError("Alignment must be left, right or center.")
-
-    return sequence_1, sequence_2
 
 
 @transpose(0, "state_time_course")
