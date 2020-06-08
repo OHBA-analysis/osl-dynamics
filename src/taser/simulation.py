@@ -13,6 +13,7 @@ import numpy as np
 
 from taser.array_ops import get_one_hot
 from taser.decorators import auto_repr, auto_yaml
+from tqdm import trange
 
 
 class Simulation(ABC):
@@ -20,8 +21,6 @@ class Simulation(ABC):
 
     Parameters
     ----------
-    sim_type : str
-        Type of HMM to use (["sequence_hmm", "uni_hmm", "hmm", "random"])
     n_samples : int
         Number of time points to generate
     n_channels : int
@@ -30,18 +29,12 @@ class Simulation(ABC):
         Number of states to simulate
     sim_varying_means : bool
         If False, means will be set to zero.
-    markov_lag : int
-        How many time steps to look back for the current hidden state.
-    stay_prob : float
-        The probability that a state will remain selected in the next iteration.
     random_covariance_weights : bool
         Should the simulation use random covariance weights? False gives structured
         covariances.
     e_std : float
         The standard deviation of noise added to the signal from a normal distribution.
     """
-
-    simulation_options = ["sequence_hmm", "uni_hmm", "hmm", "random"]
 
     def __init__(
         self,
@@ -51,6 +44,8 @@ class Simulation(ABC):
         sim_varying_means: bool = False,
         random_covariance_weights: bool = False,
         e_std: float = 0.2,
+        djs: np.ndarray = None,
+        simulate: bool = True,
     ):
 
         self.n_samples = n_samples
@@ -60,14 +55,23 @@ class Simulation(ABC):
         self.random_covariance_weights = random_covariance_weights
         self.e_std = e_std
 
+        self.state_time_course = None
+        self.djs = self.create_djs() if djs is None else djs
+        self.time_series = None
+
+        if simulate:
+            self.simulate()
+
+    def simulate(self):
         self.state_time_course = self.generate_states()
-        self.djs = self.create_djs()
         self.time_series = self.simulate_data()
 
     def __array__(self):
         return self.time_series
 
     def __getattr__(self, attr):
+        if attr == "time_series":
+            raise NameError("time_series has not yet been created.")
         if attr[:2] == "__":
             raise AttributeError(f"No attribute called {attr}.")
         return getattr(self.time_series, attr)
@@ -156,7 +160,7 @@ class Simulation(ABC):
         )
 
         signal = np.zeros((self.n_channels, self.n_samples))
-        for tt in range(self.n_samples):
+        for tt in trange(self.n_samples, desc="Simulating"):
             signal[:, tt] = np.random.multivariate_normal(mus[tt, :], cs[tt, :, :])
 
         noise = np.random.normal(
@@ -191,36 +195,37 @@ class Simulation(ABC):
 
 
 class HMMSimulation(Simulation):
+    @auto_yaml
+    @auto_repr
     def __init__(
         self,
+        trans_prob: np.ndarray,
         n_samples: int = 20000,
         n_channels: int = 7,
-        n_states: int = 4,
         sim_varying_means: bool = False,
         random_covariance_weights: bool = False,
         e_std: float = 0.2,
         markov_lag: int = 1,
+        djs: np.ndarray = None,
     ):
-        self.markov_lag = markov_lag
+        if djs is not None:
+            n_channels = djs.shape[1]
 
-        self.trans_prob = None
+        self.markov_lag = markov_lag
+        self.trans_prob = trans_prob
         self.cumsum_trans_prob = None
 
         super().__init__(
             n_samples=n_samples,
             n_channels=n_channels,
-            n_states=n_states,
+            n_states=trans_prob.shape[0],
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
+            djs=djs,
         )
 
-    @abstractmethod
-    def construct_trans_prob_matrix(self):
-        pass
-
     def generate_states(self) -> np.ndarray:
-        self.construct_trans_prob_matrix()
 
         self.cumsum_trans_prob = np.cumsum(self.trans_prob, axis=1)
         alpha_sim = np.zeros((self.n_samples, self.n_states))
@@ -250,8 +255,6 @@ class SequenceHMMSimulation(HMMSimulation):
         e_std: float = 0.2,
     ):
 
-        self.stay_prob = stay_prob
-
         super().__init__(
             n_samples=n_samples,
             n_channels=n_channels,
@@ -260,17 +263,24 @@ class SequenceHMMSimulation(HMMSimulation):
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
             markov_lag=markov_lag,
+            trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
         )
 
-    def construct_trans_prob_matrix(self):
+    @staticmethod
+    def construct_trans_prob_matrix(
+            n_states: int, stay_prob: float
+    ) -> np.ndarray:
 
-        self.trans_prob = np.zeros([self.n_states, self.n_states])
-        np.fill_diagonal(self.trans_prob, 0.95)
-        np.fill_diagonal(self.trans_prob[:, 1:], 1 - self.stay_prob)
-        self.trans_prob[-1, 0] = 1 - self.stay_prob
+        trans_prob = np.zeros([n_states, n_states])
+        np.fill_diagonal(trans_prob, 0.95)
+        np.fill_diagonal(trans_prob[:, 1:], 1 - stay_prob)
+        trans_prob[-1, 0] = 1 - stay_prob
+        return trans_prob
 
 
 class BasicHMMSimulation(HMMSimulation):
+    @auto_yaml
+    @auto_repr
     def __init__(
         self,
         n_samples: int = 20000,
@@ -295,9 +305,11 @@ class BasicHMMSimulation(HMMSimulation):
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
+            trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
         )
 
-    def construct_trans_prob_matrix(self):
+    @staticmethod
+    def construct_trans_prob_matrix(n_states: int, stay_prob: float):
         """Standard sequential HMM
 
         Returns
@@ -306,9 +318,10 @@ class BasicHMMSimulation(HMMSimulation):
             State time course
 
         """
-        single_trans_prob = (1 - self.stay_prob) / self.n_states
-        self.trans_prob = np.ones((self.n_states, self.n_states)) * single_trans_prob
-        self.trans_prob[np.diag_indices(self.n_states)] = self.stay_prob
+        single_trans_prob = (1 - stay_prob) / n_states
+        trans_prob = np.ones((n_states, n_states)) * single_trans_prob
+        trans_prob[np.diag_indices(n_states)] = stay_prob
+        return trans_prob
 
 
 class UniHMMSimulation(HMMSimulation):
@@ -334,9 +347,11 @@ class UniHMMSimulation(HMMSimulation):
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
+            trans_prob=self.construct_trans_prob_matrix(stay_prob)
         )
 
-    def construct_trans_prob_matrix(self):
+    @staticmethod
+    def construct_trans_prob_matrix(stay_prob: float) -> np.ndarray:
         """An HMM with equal transfer probabilities for all non-active states.
 
         Returns
@@ -344,8 +359,9 @@ class UniHMMSimulation(HMMSimulation):
         alpha_sim : np.array
             State time course
         """
-        self.trans_prob = np.ones([2, 2]) * (1 - self.stay_prob)
-        self.trans_prob[np.diag_indices(2)] = self.stay_prob
+        trans_prob = np.ones([2, 2]) * (1 - stay_prob)
+        trans_prob.trans_prob[np.diag_indices(2)] = stay_prob
+        return trans_prob
 
 
 class RandomHMMSimulation(HMMSimulation):
@@ -366,10 +382,12 @@ class RandomHMMSimulation(HMMSimulation):
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
+            trans_prob=self.construct_trans_prob_matrix(n_states)
         )
 
-    def construct_trans_prob_matrix(self):
-        pass
+    @staticmethod
+    def construct_trans_prob_matrix(n_states: int):
+        return np.ones((n_states, n_states)) * 1 / n_states
 
     def generate_states(self) -> np.ndarray:
         """Totally random state selection HMM
