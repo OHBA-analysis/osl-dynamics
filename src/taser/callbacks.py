@@ -50,7 +50,7 @@ class ComparisonCallback(Callback):
         axis.set_xlabel("Epoch")
         axis.set_ylabel("Loss")
         axis_2 = axis.twinx()
-        dice_line = axis_2.plot(self.dice_history, c="tab:red")
+        (dice_line,) = axis_2.plot(self.dice_history, c="tab:red")
         axis_2.set_ylabel("Dice coefficient")
         plt.legend([loss_line, dice_line], ["loss", "dice"])
         plt.show()
