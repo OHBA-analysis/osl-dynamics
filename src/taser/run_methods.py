@@ -1,7 +1,6 @@
 from typing import Union
 
 import yaml
-
 from taser import data_manipulation, plotting, tf_ops, trainers
 from taser.inference.models import inference_rnn
 

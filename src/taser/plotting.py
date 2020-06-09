@@ -3,13 +3,12 @@
 """
 import logging
 from itertools import zip_longest
-from typing import Any, List, Union
+from typing import Any, List, Tuple, Union
 
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 from taser import array_ops
 from taser.array_ops import (
     correlate_states,
@@ -24,17 +23,52 @@ from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults
 
 
-def plot_correlation(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+def plot_correlation(
+    state_time_course_1: np.ndarray,
+    state_time_course_2: np.ndarray,
+    show_diagonal: bool = True,
+):
+    """Plot a correlation matrix between two state time courses.
+
+    Given two state time courses, find the correlation between the states and
+    show both the full correlation matrix, and the correlation matrix with diagonals
+    removed. This behaviour can be modified using the show_diagonal parameter.
+
+    Parameters
+    ----------
+    state_time_course_1 : numpy.ndarray
+        First state time course (one-hot).
+    state_time_course_2 : numpy.ndarray
+        Second state time course (one-hot).
+    show_diagonal : bool
+        If True (default), the correlation matrix with the diagonal removed will also
+        be shown.
+    """
     matched_stc_1, matched_stc_2 = match_states(
         state_time_course_1, state_time_course_2
     )
     correlation = correlate_states(matched_stc_1, matched_stc_2)
     correlation_off_diagonal = mean_diagonal(correlation)
 
-    plot_matrices([correlation, correlation_off_diagonal], group_color_scale=False)
+    if show_diagonal:
+        plot_matrices([correlation, correlation_off_diagonal], group_color_scale=False)
+    else:
+        plot_matrices([correlation], group_color_scale=False)
 
 
-def plot_state_sums(state_time_course: np.ndarray, color="tab:gray"):
+def plot_state_sums(state_time_course: np.ndarray, color: str = "tab:gray"):
+    """Bar chart of total state durations.
+
+    Creates a bar chart of the total activation duration for each state in
+    state_time_course. The value of each bar is displayed at the top of each bar.
+
+    Parameters
+    ----------
+    state_time_course : numpy.ndarray
+        The state time course to be plotted (one-hot).
+    color : str
+        A matplotlib compatible color given as a string. Default is "tab:gray".
+    """
     fig, axis = plt.subplots(1)
     counts = state_time_course.sum(axis=0).astype(int)
     bars = axis.bar(range(len(counts)), counts, color=color)
@@ -65,10 +99,29 @@ def plot_state_sums(state_time_course: np.ndarray, color="tab:gray"):
 def adjust_text(
     text_objects: List[matplotlib.text.Text],
     plot_objects: List[matplotlib.patches.Patch],
-    fig=None,
-    axis=None,
-    color="black",
+    fig: matplotlib.figure.Figure = None,
+    axis: matplotlib.axes.Axes = None,
+    color: str = "black",
 ):
+    """Make text fit in bar charts.
+
+    Given a list of bars and a list of text objects to fit into them, find the largest
+    text size which fits within the each bar. If the text is too tall to fit within the
+    bar, it will be placed directly above the bar.
+
+    Parameters
+    ----------
+    text_objects : list of matplotlib.text.Text
+        The text to be placed within the bars.
+    plot_objects : list of matplotlib.patches.Patch
+        The bars to place the text within.
+    fig : matplotlib.figure.Figure
+        Figure to work on. Default is to get the current active figure.
+    axis : matplotlib.axes.Axes
+        Axis to work on. Default is to get the current active axis.
+    color: str
+        Color for the text as a matplotlib compatible string. Default black.
+    """
     fig = plt.gcf() if fig is None else fig
     axis = plt.gca() if axis is None else axis
 
@@ -109,12 +162,53 @@ def adjust_text(
 def value_separation(
     time_series: np.ndarray, separation_factor: float = 1.2
 ) -> np.ndarray:
+    """Separate sequences for plotting.
+
+    Convenience method to add a constant to each channel of time_series. This allows
+    easy plotting of multiple channels on the same axes with separation between them.
+    The separation is determined by finding the largest and smallest value in any
+    sequence and multiplying it by separation_factor.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        The time series to be modified.
+    separation_factor : float
+        The factor by which to multiply the separation distance.
+
+    Returns
+    -------
+    separated_time_series: numpy.ndarray
+        The time series with separation added.
+
+    """
     gap = separation_factor * np.abs([time_series.min(), time_series.max()]).max()
     separation = np.arange(time_series.shape[1])[None, ::-1]
     return time_series + gap * separation
 
 
-def get_colors(n_states: int, colormap: str = "gist_rainbow"):
+def get_colors(
+    n_states: int, colormap: str = "gist_rainbow"
+) -> List[Tuple[float, float, float, float]]:
+    """Produce equidistant colors from a matplotlib colormap.
+
+    Given a matplotlib colormap, produce a series of RGBA colors which are equally
+    spaced by value. There is no guarantee that these colors will be perceptually
+    uniformly distributed and with many colors will likely be extremely close. Alpha is
+    1.0 for all colors.
+
+    Parameters
+    ----------
+    n_states : int
+        The number of colors to return.
+    colormap : str
+        The name of a matplotlib colormap.
+
+    Returns
+    -------
+    colors: list of tuple of float
+        A list of colors in RGBA format. A = 1.0 in all cases.
+    """
     colormap = plt.get_cmap(colormap)
     colors = [colormap(1 * i / n_states) for i in range(n_states)]
     return colors

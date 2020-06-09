@@ -6,7 +6,6 @@ import mat73
 import numpy as np
 import scipy.io
 from sklearn.decomposition import PCA
-
 from taser import plotting
 from taser.decorators import auto_repr
 from taser.helpers.misc import time_axis_first

@@ -10,10 +10,8 @@ from abc import ABC, abstractmethod
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 from taser.array_ops import get_one_hot
 from taser.decorators import auto_repr, auto_yaml
-from tqdm import trange
 
 
 class Simulation(ABC):

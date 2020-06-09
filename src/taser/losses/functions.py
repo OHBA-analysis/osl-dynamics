@@ -25,12 +25,14 @@ def normal_kl_divergence(
     Returns
     -------
     kl_divergence : tf.Tensor
-        KL divergence of univariate normals parameterised by their means and standard deviations
+        KL divergence of univariate normals parameterised by their means
+        and standard deviations
 
     Notes
     -----
     .. math::
-        \text{KL} = \log \frac{\sigma_2}{\sigma_1} + \frac{\sigma_1^2 + (\mu_1 - \mu_2)^2}{2 \sigma_2^2} - \frac{1}{2}
+        \text{KL} = \log \frac{\sigma_2}{\sigma_1} + \frac{\sigma_1^2 +\
+         (\mu_1 - \mu_2)^2}{2 \sigma_2^2} - \frac{1}{2}
 
     Examples
     --------

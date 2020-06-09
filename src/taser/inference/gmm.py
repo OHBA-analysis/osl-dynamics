@@ -7,7 +7,6 @@ from typing import Tuple, Union
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
-
 from taser.data_manipulation import MEGData
 from taser.helpers.misc import override_dict_defaults, time_axis_first
 

@@ -2,9 +2,6 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import Model
-from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
-
 from taser.array_ops import get_one_hot
 from taser.inference.layers import (
     MVNLayer,
@@ -12,6 +9,8 @@ from taser.inference.layers import (
     TrainableVariablesLayer,
 )
 from taser.losses.layers import KLDivergenceLayer, LogLikelihoodLayer
+from tensorflow.keras import Model
+from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
 
 class InferenceRNN(Model):

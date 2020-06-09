@@ -7,12 +7,11 @@ from typing import List, Union
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
-from tqdm import tqdm
-
 from taser.callbacks import Callback
 from taser.decorators import timing
 from taser.helpers.misc import listify
+from tensorflow.keras.optimizers import Adam
+from tqdm import tqdm
 
 
 class Trainer(ABC):

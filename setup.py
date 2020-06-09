@@ -13,6 +13,13 @@ from pkg_resources import VersionConflict, require
 from setuptools import setup
 
 try:
+    import tensorflow
+except ModuleNotFoundError:
+    raise ModuleNotFoundError(
+        "You must install tensorflow or tensorflow-gpu before TASER."
+    )
+
+try:
     require("setuptools>=38.3")
 except VersionConflict:
     print("Error: version of setuptools is too old (<38.3)!")

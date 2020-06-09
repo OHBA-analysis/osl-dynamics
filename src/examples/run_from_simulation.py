@@ -2,7 +2,6 @@ import logging
 import pathlib
 
 import yaml
-
 from taser import array_ops, plotting
 from taser.callbacks import ComparisonCallback
 from taser.data_manipulation import MEGData
