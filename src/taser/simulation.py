@@ -152,24 +152,15 @@ class Simulation(ABC):
         else:
             mus_sim = np.zeros((self.n_states, self.n_channels))
 
-        mus = np.sum(
-            self.state_time_course.reshape((-1, self.n_states, 1)) * mus_sim, axis=1
-        )
-        cs = np.sum(
-            self.state_time_course[:, :, np.newaxis, np.newaxis] * self.djs, axis=1
-        )
-
-        signal = np.zeros((self.n_channels, self.n_samples))
-        for tt in trange(self.n_samples, desc="Simulating"):
-            signal[:, tt] = np.random.multivariate_normal(mus[tt, :], cs[tt, :, :])
-
-        noise = np.random.normal(
-            loc=0, scale=self.e_std, size=(self.n_channels, self.n_samples)
-        )
-        data_sim = signal + noise
-
-        if data_sim.shape[1] > data_sim.shape[0]:
-            data_sim = data_sim.T
+        data_sim = np.zeros((self.n_samples, self.n_channels))
+        for i in range(self.n_states):
+            data_sim[
+                self.state_time_course.argmax(axis=1) == i
+            ] = np.random.default_rng().multivariate_normal(
+                mus_sim[i],
+                self.djs[i],
+                size=np.count_nonzero(self.state_time_course.argmax(axis=1) == i),
+            )
 
         return data_sim.astype(np.float32)
 
@@ -267,9 +258,7 @@ class SequenceHMMSimulation(HMMSimulation):
         )
 
     @staticmethod
-    def construct_trans_prob_matrix(
-            n_states: int, stay_prob: float
-    ) -> np.ndarray:
+    def construct_trans_prob_matrix(n_states: int, stay_prob: float) -> np.ndarray:
 
         trans_prob = np.zeros([n_states, n_states])
         np.fill_diagonal(trans_prob, 0.95)
@@ -347,7 +336,7 @@ class UniHMMSimulation(HMMSimulation):
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
-            trans_prob=self.construct_trans_prob_matrix(stay_prob)
+            trans_prob=self.construct_trans_prob_matrix(stay_prob),
         )
 
     @staticmethod
@@ -382,7 +371,7 @@ class RandomHMMSimulation(HMMSimulation):
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
-            trans_prob=self.construct_trans_prob_matrix(n_states)
+            trans_prob=self.construct_trans_prob_matrix(n_states),
         )
 
     @staticmethod
