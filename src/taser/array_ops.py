@@ -7,7 +7,6 @@ from typing import List, Tuple
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from sklearn import metrics
-
 from taser.decorators import transpose
 
 

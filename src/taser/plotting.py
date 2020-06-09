@@ -9,7 +9,6 @@ import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 from taser import array_ops
 from taser.array_ops import (
     correlate_states,
@@ -24,14 +23,37 @@ from taser.decorators import transpose
 from taser.helpers.misc import override_dict_defaults
 
 
-def plot_correlation(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+def plot_correlation(
+    state_time_course_1: np.ndarray,
+    state_time_course_2: np.ndarray,
+    show_diagonal: bool = True,
+):
+    """Plot a correlation matrix between two state time courses.
+
+    Given two state time courses, find the correlation between the states and
+    show both the full correlation matrix, and the correlation matrix with diagonals
+    removed. This behaviour can be modified using the show_diagonal parameter.
+
+    Parameters
+    ----------
+    state_time_course_1 : np.ndarray
+        First state time course (one-hot).
+    state_time_course_2 : np.ndarray
+        Second state time course (one-hot).
+    show_diagonal : bool
+        If True (default), the correlation matrix with the diagonal removed will also
+        be shown.
+    """
     matched_stc_1, matched_stc_2 = match_states(
         state_time_course_1, state_time_course_2
     )
     correlation = correlate_states(matched_stc_1, matched_stc_2)
     correlation_off_diagonal = mean_diagonal(correlation)
 
-    plot_matrices([correlation, correlation_off_diagonal], group_color_scale=False)
+    if show_diagonal:
+        plot_matrices([correlation, correlation_off_diagonal], group_color_scale=False)
+    else:
+        plot_matrices([correlation], group_color_scale=False)
 
 
 def plot_state_sums(state_time_course: np.ndarray, color="tab:gray"):

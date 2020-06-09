@@ -2,10 +2,9 @@ import inspect
 import logging
 from functools import wraps
 from time import time
+
 import numpy as np
-
 import yaml
-
 from taser.helpers.misc import time_axis_first
 
 
@@ -59,7 +58,8 @@ def transpose(f, *arguments):
                 args[i], transposed = time_axis_first(args[i])
                 if transposed:
                     logging.warning(
-                        f"Argument {i}: assuming longer axis to be time and transposing."
+                        f"Argument {i}: assuming longer axis to be "
+                        f"time and transposing."
                     )
             except IndexError:
                 logging.debug(f"Positional argument {i} not in args.")
@@ -68,7 +68,8 @@ def transpose(f, *arguments):
                 kwargs[k], transposed = time_axis_first(kwargs[k])
                 if transposed:
                     logging.warning(
-                        f"Argument {k}: assuming longer axis to be time and transposing."
+                        f"Argument {k}: assuming longer axis to be "
+                        f"time and transposing."
                     )
             except KeyError:
                 logging.debug(f"Argument {k} not found in kwargs.")

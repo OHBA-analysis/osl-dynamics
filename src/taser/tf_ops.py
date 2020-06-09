@@ -6,7 +6,6 @@ from typing import Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-
 from taser.data_manipulation import MEGData
 
 
