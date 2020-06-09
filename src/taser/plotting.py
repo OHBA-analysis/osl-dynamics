@@ -538,7 +538,10 @@ def axis_highlights(ons, offs, n_points, axis, i: int = 0, label: str = ""):
 
 
 def compare_state_data(
-    *state_time_courses, n_time_points=20000, sample_frequency: float = 1,
+    *state_time_courses,
+    n_time_points=20000,
+    sample_frequency: float = 1,
+    titles: list = None,
 ):
     fig, axes = plt.subplots(
         nrows=len(state_time_courses),
@@ -546,7 +549,12 @@ def compare_state_data(
         sharex="all",
     )
 
-    for state_time_course, axis in zip(state_time_courses[:-1], axes[:-1]):
+    if titles is None:
+        titles = [""] * len(state_time_courses)
+
+    for state_time_course, axis, title in zip(
+        state_time_courses[:-1], axes[:-1], titles
+    ):
         highlight_states(
             state_time_course,
             axis=axis,
@@ -554,6 +562,7 @@ def compare_state_data(
             legend=False,
             sample_frequency=sample_frequency,
         )
+        axis.set_title(title)
 
     highlight_states(
         state_time_courses[-1],
@@ -562,6 +571,7 @@ def compare_state_data(
         legend=True,
         sample_frequency=sample_frequency,
     )
+    axes[-1].set_title(titles[-1])
 
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
