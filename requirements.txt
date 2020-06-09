@@ -1,8 +1,0 @@
-# tensorflow
-numpy
-scipy
-scikit-learn
-matplotlib
-tqdm
-pyyaml
-mat73
