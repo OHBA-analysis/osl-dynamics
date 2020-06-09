@@ -37,15 +37,11 @@ def correlate_states(
 
 
 @transpose
-def match_states(
-    *state_time_courses: np.ndarray
-) -> List[np.ndarray]:
+def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
     matched_state_time_courses = [state_time_courses[0]]
     for state_time_course in state_time_courses[1:]:
 
-        correlation = correlate_states(
-            state_time_courses[0], state_time_course
-        )
+        correlation = correlate_states(state_time_courses[0], state_time_course)
         correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
         matches = linear_sum_assignment(-correlation)
         matched_state_time_courses.append(state_time_course[:, matches[1]])
@@ -183,9 +179,7 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
 
 
 @transpose(0, "sequence_1", 1, "sequence_2")
-def align_arrays(
-    *sequences, alignment: str = "left"
-) -> List[np.ndarray]:
+def align_arrays(*sequences, alignment: str = "left") -> List[np.ndarray]:
     min_length = min(len(sequence) for sequence in sequences)
 
     if alignment == "left":
@@ -197,7 +191,10 @@ def align_arrays(
         half_length = int(min_length / 2)
         mids = [int(len(sequence) / 2) for sequence in sequences]
 
-        return [sequence[mid - half_length : mid + half_length] for sequence, mid in zip(sequences, mids)]
+        return [
+            sequence[mid - half_length : mid + half_length]
+            for sequence, mid in zip(sequences, mids)
+        ]
 
     else:
         raise ValueError("Alignment must be left, right or center.")
