@@ -2,6 +2,7 @@ import inspect
 import logging
 from functools import wraps
 from time import time
+import numpy as np
 
 import yaml
 
@@ -145,7 +146,13 @@ def auto_yaml(func):
         me.__arg_dict = get_params(me, args, kwargs)
 
         def __str__(self):
-            return yaml.dump({self.__class__.__name__: self.__arg_dict})
+            yaml_safe_arg_dict = self.__arg_dict.copy()
+            for key in yaml_safe_arg_dict:
+                if isinstance(yaml_safe_arg_dict[key], np.ndarray):
+                    yaml_safe_arg_dict[
+                        key
+                    ] = f"numpy array with shape {yaml_safe_arg_dict[key].shape}"
+            return yaml.dump({self.__class__.__name__: yaml_safe_arg_dict})
 
         setattr(me.__class__, "__str__", __str__)
 
