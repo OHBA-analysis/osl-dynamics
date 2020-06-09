@@ -269,6 +269,38 @@ def plot_state_highlighted_data(
     event_kwargs: dict = None,
     file_name: str = None,
 ):
+    """Plot time series data highlighted by state.
+
+    Plot a time series and highlight it by the active state defined
+    by state_time_course. When working with task data, the events can be plotted above
+    using the events option.
+
+    Parameters
+    ----------
+    time_series: numpy.ndarray
+        The data to be plotted.
+    state_time_course: numpy.ndarray
+        The states to highlight the data with.
+    events: numpy.ndarray
+        Optional. Events as a time series.
+    n_time_points: int
+        Number of time points to be plotted.
+    colormap: str
+        A matplotlib compatible colormap given as a string. This is for the highlights.
+    fig_kwargs: dict
+        A dictionary of kwargs to be passed to matplotlib.pyplot.subplots
+    highlight_kwargs: dict
+        A dictionary of kwargs for the highlights to be
+        passed to matplotlib.pyplot.axvline.
+    plot_kwargs: dict
+        A dictionary of kwargs for the plotted data to be
+        passed to matplotlib.pyplot.plot.
+    event_kwargs: dict
+        A dictionary of kwargs for the plotted event data to be
+        passed to matplotlib.pyplot.plot
+    file_name: str
+        A file to which to save the figure.
+    """
     fig_defaults = {
         "figsize": (20, 10),
         "gridspec_kw": {"height_ratios": [1] if events is None else [1, 5]},
@@ -317,6 +349,28 @@ def plot_time_series(
     fig_kwargs: dict = None,
     y_tick_values: list = None,
 ):
+    """Plot a time series with channel separation.
+
+    Plot time_series with channel separation calculated by
+    taser.plotting.value_separation. This allows each channel to be plotted on the
+    same axis but with a separation from the other channels defined by their extreme
+    values.
+
+    Parameters
+    ----------
+    time_series: numpy.ndarray
+        The time series to be plotted.
+    axis: matplotlib.axes.Axes
+        The axis on which to plot the data. If not given, a new axis is created.
+    n_time_points: int
+        The number of time points to be plotted.
+    plot_kwargs: dict
+        Keyword arguments to be passed on to matplotlib.pyplot.plot.
+    fig_kwargs: dict
+        Keyword arguments to be passed on to matplotlib.pyplot.subplots.
+    y_tick_values:
+        Labels for the channels to be placed on the y-axis.
+    """
     n_time_points = min(n_time_points, time_series.shape[0])
     axis_given = axis is not None
     if not axis_given:
