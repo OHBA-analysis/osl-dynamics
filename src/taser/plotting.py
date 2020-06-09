@@ -3,7 +3,7 @@
 """
 import logging
 from itertools import zip_longest
-from typing import Any, List, Tuple, Union
+from typing import Any, Iterable, List, Tuple, Union
 
 import matplotlib
 import numpy as np
@@ -424,6 +424,32 @@ def highlight_states(
     legend: bool = True,
     fig_kwargs: dict = None,
 ):
+    """Plot vertical bars corresponding to state activation.
+
+    For a state time course, each state has its activation starts and stops calculated
+    using taser.array_ops.state_activation. Each state is represented by a color chosen
+    at uniform separations from the colormap given. If a sample frequency is provided,
+    the x axis will be marked with time stamps rather than sample numbers.
+
+    Parameters
+    ----------
+    state_time_course: numpy.ndarray
+        The state time course to be displayed as vertical highlights.
+    axis: matplotlib.axes.Axes
+        Axis to plot on. Default is to create a new figure.
+    colormap: str
+        A matplotlib colormap from which to draw the highlight colors.
+    n_time_points: int
+        Number of time points to plot.
+    sample_frequency: float
+        The sampling frequency of the data. Default is to use sample number (i.e. 1Hz)
+    highlight_kwargs: dict
+        Keyword arguments to be passed to matplotlib.pyplot.axvspan.
+    legend: bool
+        If True a legend is added to the plot.
+    fig_kwargs: dict
+        Keyword arguments for matplotlib.pyplot.subplots.
+    """
     if n_time_points is None:
         n_time_points = state_time_course.shape[0]
     n_time_points = min(n_time_points, state_time_course.shape[0])
@@ -439,10 +465,8 @@ def highlight_states(
     highlight_defaults = {"alpha": 0.2, "lw": 0}
     highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
 
-    # reduced_state_time_course = reduce_state_time_course(state_time_course)
-    reduced_state_time_course = state_time_course.copy()
-    n_states = reduced_state_time_course.shape[1]
-    ons, offs = state_activation(reduced_state_time_course)
+    n_states = state_time_course.shape[1]
+    ons, offs = state_activation(state_time_course)
 
     colors = get_colors(n_states, colormap)
 
@@ -488,6 +512,17 @@ def highlight_states(
 
 
 def plot_cholesky(matrix, group_color_scale: bool = True):
+    """Plot a matrix from its Cholesky decomposition.
+
+    Given a Cholesky matrix, plot M @ M^T.
+
+    Parameters
+    ----------
+    matrix: np.ndarray
+        The matrix to plot.
+    group_color_scale: bool
+        If True, the colormap will be consistent across all matrices plotted.
+    """
     matrix = np.array(matrix)
     c_i = from_cholesky(matrix)
     plot_matrices(c_i, group_color_scale=group_color_scale)
@@ -496,6 +531,17 @@ def plot_cholesky(matrix, group_color_scale: bool = True):
 def plot_matrix_max_min_mean(
     matrix, group_color_scale: bool = True, cholesky: bool = False
 ):
+    """Plot the elementwise minima, maxima and means of a matrix.
+
+    Parameters
+    ----------
+    matrix: np.ndarray
+        The matrix to plot.
+    group_color_scale: bool
+        If True, all matrices will have the same colormap scale.
+    cholesky: bool
+        If True, the matrix will be treated as a Cholesky decomposition.
+    """
     if cholesky:
         matrix = from_cholesky(matrix)
     element_max = matrix.max(axis=0)
@@ -508,22 +554,37 @@ def plot_matrix_max_min_mean(
     )
 
 
+# noinspection PyUnresolvedReferences
 def plot_matrices(
-    matrix,
+    matrix: Iterable[np.ndarray],
     group_color_scale: bool = True,
     titles: list = None,
     cmap="viridis",
     nan_color="white",
 ):
+    """Plot a collection of matrices.
+
+    Given an iterable of matrices, plot each matrix in its own axis.
+
+    Parameters
+    ----------
+    matrix: list of np.ndarrays
+        The matrices to plot.
+    group_color_scale: bool
+        If True, all matrices will have the same colormap scale.
+    titles: list of str
+        Titles to give to each matrix axis.
+    cmap: str
+        Matplotlib colormap.
+    nan_color: str
+        Matplotlib color to use for NaN values. Default is white.
+    """
     matrix = np.array(matrix)
     if matrix.ndim == 2:
         matrix = matrix[None, :]
     if matrix.ndim != 3:
         raise ValueError("Must be a 3D array.")
     short, long, empty = rough_square_axes(len(matrix))
-    if group_color_scale:
-        v_min = matrix.min()
-        v_max = matrix.max()
     f_width = 2.5 * short
     f_height = 2.5 * long
     fig, axes = plt.subplots(
@@ -540,6 +601,8 @@ def plot_matrices(
             axis.remove()
             continue
         if group_color_scale:
+            v_min = matrix.min()
+            v_max = matrix.max()
             im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
         else:
             im = axis.matshow(grid, cmap=cmap)
@@ -561,6 +624,25 @@ def plot_matrices(
 
 
 def rough_square_axes(n_plots):
+    """Get the most square axis layout for n_plots.
+
+    Given n_plots, find the side lengths of the rectangle which gives the closest
+    layout to a square grid of axes.
+
+    Parameters
+    ----------
+    n_plots: int
+        Number of plots to arrange.
+
+    Returns
+    -------
+    short: int
+        Number of axes on the short side.
+    long: int
+        Number of axes on the long side.
+    empty: int
+        Number of axes left blank from the rectangle.
+    """
     long = np.floor(n_plots ** 0.5).astype(int)
     short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
@@ -570,6 +652,12 @@ def rough_square_axes(n_plots):
 
 
 def add_axis_colorbar(axis: plt.Axes):
+    """Add a colorbar to an axis by compressing the axis.
+
+    Parameters
+    ----------
+    axis: matplotlib.axes.Axes
+    """
     try:
         pl = axis.get_images()[0]
         divider = make_axes_locatable(axis)
@@ -589,6 +677,29 @@ def plot_state_lifetimes(
     hist_kwargs: dict = None,
     fig_kwargs: dict = None,
 ):
+    """Create a histogram of state lifetimes.
+
+    For a state time course, create a histogram for each state with the distribution
+    of the lengths of time for which it is active.
+
+    Parameters
+    ----------
+    state_time_course: numpy.ndarray
+        State time course to analyse.
+    bins: int
+        Number of bins for the histograms.
+    density: bool
+        If True, plot the probability density of the state activation lengths.
+        If False, raw number.
+    match_scale_x: bool
+        If True, all histograms will share the same x-axis scale.
+    match_scale_y: bool
+        If True, all histograms will share the same y-axis scale.
+    hist_kwargs: dict
+        Keyword arguments to pass to matplotlib.pyplot.hist.
+    fig_kwargs: dict
+        Keyword arguments to pass to matplotlib.pyplot.subplots.
+    """
     if state_time_course.ndim == 1:
         state_time_course = get_one_hot(state_time_course)
     if state_time_course.ndim != 2:
@@ -654,43 +765,28 @@ def plot_state_lifetimes(
     plt.show()
 
 
-@transpose(0, 1, "time_series", "state_time_course")
-def plot_highlighted_states(
-    time_series, state_time_course, n_time_points, fig_kwargs=None
-):
-    if fig_kwargs is None:
-        fig_kwargs = {}
-
-    fig, axes = plt.subplots(state_time_course.shape[1], **fig_kwargs)
-
-    ons, offs = state_activation(state_time_course)
-
-    for i, (channel_ons, channel_offs, axis, channel_time_series) in enumerate(
-        zip(ons, offs, axes.ravel(), time_series[:n_time_points].T)
-    ):
-        axis.plot(channel_time_series)
-        axis.set_yticks([0.5])
-        axis.set_yticklabels([i])
-        axis.set_ylim(-0.1, 1.1)
-
-        axis_highlights(channel_ons, channel_offs, n_time_points, axis)
-        axis.autoscale(axis="x", tight=True)
-
-    plt.show()
-
-
-def axis_highlights(ons, offs, n_points, axis, i: int = 0, label: str = ""):
-    for on, off in zip(ons, offs):
-        if on < n_points or off < n_points:
-            axis.axvspan(on, min(n_points - 1, off), alpha=0.1, color="r")
-
-
 def compare_state_data(
-    *state_time_courses,
+    *state_time_courses: List[np.ndarray],
     n_time_points=20000,
     sample_frequency: float = 1,
     titles: list = None,
 ):
+    """Plot multiple states time courses.
+
+    For a list of state time courses, plot the state diagrams produced by
+    taser.plotting.highlight_states.
+
+    Parameters
+    ----------
+    state_time_courses: list of numpy.ndarray
+        List of state time courses to plot.
+    n_time_points: int
+        Number of time courses to plot.
+    sample_frequency: float
+        If given the y-axis will contain timestamps rather than sample numbers.
+    titles: list of str
+        Titles to give to each axis.
+    """
     fig, axes = plt.subplots(
         nrows=len(state_time_courses),
         figsize=(20, 2.5 * len(state_time_courses)),
@@ -717,6 +813,19 @@ def compare_state_data(
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
 def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+    """Plot a confusion matrix.
+
+    For two state time courses, plot the confusion matrix between each pair of states.
+    The confusion matrix with the diagonal removed will also be plotted.
+
+
+    Parameters
+    ----------
+    state_time_course_1: numpy.ndarray
+        The first state time course.
+    state_time_course_2: numpy.ndarray
+        The second state time course.
+    """
     confusion = array_ops.confusion_matrix(state_time_course_1, state_time_course_2)
     nan_diagonal = confusion.copy().astype(float)
     nan_diagonal[np.diag_indices_from(nan_diagonal)] = np.nan
