@@ -552,26 +552,19 @@ def compare_state_data(
     if titles is None:
         titles = [""] * len(state_time_courses)
 
-    for state_time_course, axis, title in zip(
-        state_time_courses[:-1], axes[:-1], titles
+    legends = [False] * (len(state_time_courses) - 1) + [True]
+
+    for state_time_course, axis, title, legend in zip(
+        state_time_courses, axes, titles, legends
     ):
         highlight_states(
             state_time_course,
             axis=axis,
             n_time_points=n_time_points,
-            legend=False,
+            legend=legend,
             sample_frequency=sample_frequency,
         )
         axis.set_title(title)
-
-    highlight_states(
-        state_time_courses[-1],
-        axis=axes[-1],
-        n_time_points=n_time_points,
-        legend=True,
-        sample_frequency=sample_frequency,
-    )
-    axes[-1].set_title(titles[-1])
 
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
