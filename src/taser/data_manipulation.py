@@ -12,6 +12,55 @@ from taser.helpers.misc import time_axis_first
 
 
 class MEGData:
+    """An object for storing time series data with various methods to act on it.
+
+    MEGData is designed to standardize the workflow required to work with inputs with
+    the format numpy.ndarray, numpy files, MAT (MATLAB) files, MATv7.3 files and
+    SPM MEEG objects (also from MATLAB).
+
+    If the input provided is a numpy.ndarray, it is taken as is. If the input is a
+    string, TASER will check the file extension to see if it is .npy (read by
+    numpy.load) or .mat. If a .mat file is found, it is first opened using
+    scipy.io.loadmat and if that fails, mat73.loadmat. Any input other than these is
+    considered valid if it can be converted to a numpy array using numpy.array.
+
+    When importing from MAT files, the values in the class variable ignored_keys are
+    ignored if found in the dictionary created by loadmat. If the key 'D' is found, the
+    file will be treated as an SPM MEEG object and the data extracted from the .dat
+    file defined within the dictionary.
+
+    If multiple time series are found in the file, the user can specify multi_sequence.
+    With its default value 'all', the time series will be concatenated along the time
+    axis. Otherwise and integer specifies which time series to read.
+
+    Once instantiated, any property or function which has not been specified for
+    MEGData is provided by the internal numpy.ndarray, time_series. The array can be
+    accessed using slice notation on the MEGData object (e.g. meg_data[:1000, 2:5]
+    would return the first 1000 samples and channels 2, 3 and 4. The time axis of the
+    array can also be reduced using the data_limits method. This creates an pair of
+    internal variables which reduce the length of the data which can be extracted from
+    the object without modifying the underlying array.
+
+    A variety of methods are provided for preparing data for analysis. These are
+    detailed below.
+
+    Parameters
+    ----------
+    time_series: numpy.ndarray or str or array-like
+        Either an array, array-like object or a string specifying the location of a
+        NumPy or MATLAB file.
+    sampling_frequency: float
+        The sampling frequency of the time_series. The default of 1 means that each
+        sample is considered to be a time point (i.e. 1Hz).
+    multi_sequence: str or int
+        If the time_series provided contains multiple time series, "all" will
+        concatenate them while providing an int will specify the corresponding array.
+
+    Methods
+    -------
+
+
+    """
 
     ignored_keys = [
         "__globals__",
@@ -106,18 +155,56 @@ class MEGData:
         return np.asarray(self[:], *args, **kwargs)
 
     def data_limits(self, n_min: int = None, n_max: int = None):
+        """Set the maximum and minimum sample numbers for the object.
+
+        For a time_series of length 1000, meg_data.data_limits(5, 100) would mean that
+        calls using numpy.array(meg_data) or meg_data[:] would only be viewing
+        only the 5th to the 100th sample. Any new indexing is performed relative to
+        the values n_min and n_max. The underlying time_series remains unchanged.
+
+        Parameters
+        ----------
+        n_min: int
+            The index of the first sample to be in the view.
+        n_max: int
+            The index of the final sample to be in the view.
+        """
         self.n_min = n_min
         self.n_max = n_max
 
     @property
     def shape(self):
+        """Get the shape of time_series with any modifications from data_limits.
+
+        Returns
+        -------
+        shape: tuple of int
+            The shape of the view of time_series provided by the object.
+
+        """
         return self[:].shape
 
     @property
     def data_shape(self):
+        """Get the shape of time_series without any modifications from data_limits.
+
+        Returns
+        -------
+        shape: tuple of int
+            The shape of time_series, unmodified by data_limits.
+
+        """
         return self.time_series.shape
 
     def time_axis_first(self):
+        """Forces the longer axis of the data to be the first indexed axis.
+
+        If time_series is provided with dimensions (channel x time) where time is
+        assumed to be the longer of the two axes, time_series will be transposed. This
+        affects the internal variable but does not cause any change to raw_data which
+        is reserved to be a copy of the data provided.
+
+        """
         self.time_series, transposed = time_axis_first(self.time_series)
         if transposed:
             logging.warning("Assuming time to be the longer axis and transposing.")
