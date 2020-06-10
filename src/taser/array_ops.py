@@ -5,8 +5,8 @@ import logging
 from typing import List, Tuple
 
 import numpy as np
+import sklearn
 from scipy.optimize import linear_sum_assignment
-from sklearn import metrics
 from taser.decorators import transpose
 
 
@@ -21,7 +21,7 @@ def confusion_matrix(
     if not ((state_time_course_1.ndim == 1) and (state_time_course_2.ndim == 1)):
         raise ValueError("Both state time courses must be either 1D or 2D.")
 
-    return metrics.confusion_matrix(state_time_course_1, state_time_course_2)
+    return sklearn.metrics.confusion_matrix(state_time_course_1, state_time_course_2)
 
 
 @transpose
