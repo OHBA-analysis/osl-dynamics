@@ -119,6 +119,7 @@ class MEGData:
                 time_series = time_series[multi_sequence]
 
         self.sampling_frequency = sampling_frequency
+        # TODO: Make raw_data read only using @property and self._raw_data
         self.raw_data = np.array(time_series)
         self.time_series = self.raw_data.copy()
         self.pca_applied = False
@@ -209,7 +210,24 @@ class MEGData:
         if transposed:
             logging.warning("Assuming time to be the longer axis and transposing.")
 
-    def trim_trials(self, trial_start=None, trial_cutoff=None, trial_skip=None):
+    def trim_trials(
+        self, trial_start: int = None, trial_cutoff: int = None, trial_skip: int = None
+    ):
+        """Remove trials from input data.
+
+        If given as a three dimensional input with axes (channels x trials x time),
+        remove trials by slicing and stepping.
+
+        Parameters
+        ----------
+        trial_start: int
+            The first trial to keep.
+        trial_cutoff: int
+            The last trial to keep.
+        trial_skip: int
+            How many steps to take between selected trials.
+
+        """
         if self.ndim == 3:
             self.time_series = self.time_series[
                 :, trial_start:trial_cutoff, ::trial_skip
@@ -218,6 +236,12 @@ class MEGData:
             logging.warning(f"Array is not 3D (ndim = {self.ndim}). Can't trim trials.")
 
     def make_continuous(self):
+        """Given trial data, return a continuous time series.
+
+        With data input in the form (channels x trials x time), reshape the array to
+        create a (time x channels) array. Wraps trials_to_continuous.
+
+        """
         self.time_series = trials_to_continuous(self.time_series)
         self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
 
@@ -228,6 +252,26 @@ class MEGData:
         do_pca: Union[bool, str] = True,
         post_scale: bool = True,
     ):
+        """Function for scaling and performing PCA on time_series.
+
+        Wraps MEGData.scale and MEGData.pca.
+
+        Parameters
+        ----------
+        n_components: int or float
+            If >1, number of components to be kept in PCA. If <1, the amount of
+            variance to be explained by PCA. Passed to MEGData.pca.
+        pre_scale: bool
+            If True (default) scale data to have mean of zero and standard
+            deviation of one before PCA is applied.
+        do_pca: bool or str
+            If True perform PCA on time_series. n_components = 1 is equivalent to
+            False. If PCA has already been performed on time_series, set to "force".
+            This is a safety check to make sure PCA isn't accidentally run twice.
+        post_scale: bool
+            If True (default) scale data to have mean of zero and standard
+            deviation of one after PCA is applied.
+        """
         force_pca = False
         if self.pca_applied and do_pca == "force":
             force_pca = True
@@ -239,12 +283,30 @@ class MEGData:
             self.scale()
 
     def scale(self):
+        """Scale time_series to have mean zero and standard deviation 1.
+
+        """
         self.time_series = (
             self.time_series - self.time_series.mean(axis=0)
         ) / self.time_series.std(axis=0)
 
     def pca(self, n_components: Union[int, float] = 1, force=False):
+        """Perform PCA on time_series.
 
+        Wrapper for sklearn.decomposition.PCA.
+
+        Parameters
+        ----------
+        n_components: float or int
+            If >1, number of components to be kept in PCA. If <1, the amount of
+            variance to be explained by PCA. If equal to 1, no PCA applied.
+        force: bool
+            If True, apply PCA even if it has already been applied.
+
+        Returns
+        -------
+
+        """
         if self.pca_applied and not force:
             logging.warning("PCA already performed. Skipping.")
             return
@@ -265,10 +327,34 @@ class MEGData:
                 )
         self.pca_applied = True
 
-    def plot(self, n_time_points=10000):
+    def plot(self, n_time_points: int = 10000):
+        """Plot time_series.
+
+        Plot n_time_points samples of time_series. Limits set in data_limits are
+        ignored.
+
+        Parameters
+        ----------
+        n_time_points: int
+            Number of time points (samples) to plot.
+        """
         plotting.plot_time_series(self.time_series, n_time_points=n_time_points)
 
     def savemat(self, filename: str, field_name: str = "x"):
+        """Save time_series to a .mat file.
+
+        Save time_series to a MATLAB .mat file. A time stamp and whether PCA has been
+        applied to the data are included in the dictionary of values.
+
+        If data limits have been set, they will be observed.
+
+        Parameters
+        ----------
+        filename: str
+            The file to save to (with or without .mat extension).
+        field_name: str
+            The dictionary key (MATLAB object field) which references the data.
+        """
         scipy.io.savemat(
             filename,
             {
@@ -279,6 +365,15 @@ class MEGData:
         )
 
     def save(self, filename: str):
+        """Save time_series to a numpy (.npy) file.
+
+        If data limits have been set, they will be observed.
+
+        Parameters
+        ----------
+        filename: str
+            The file to save to (with or without .npy extension).
+        """
         np.save(filename, self[:])
 
 
@@ -311,6 +406,22 @@ def get_alpha_order(real_alpha, est_alpha):
 
 
 def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
+    """Given trial data, return a continuous time series.
+
+    With data input in the form (channels x trials x time), reshape the array to
+    create a (time x channels) array.
+
+    Parameters
+    ----------
+    trials_time_course: numpy.ndarray
+        A (channels x trials x time) time course.
+
+    Returns
+    -------
+    concatenated: numpy.ndarray
+        The (time x channels) array created by concatenating trial data.
+
+    """
     if trials_time_course.ndim == 2:
         logging.warning(
             "A 2D time series was passed. Assuming it doesn't need to "
@@ -339,6 +450,23 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
+    """Load an SPM MEEG object.
+
+    Highly untested function for reading SPM MEEG objects from MATLAB.
+
+    Parameters
+    ----------
+    file_name: str
+        Filename of an SPM MEEG object.
+
+    Returns
+    -------
+    data: numpy.ndarray
+        The time series referenced in the SPM MEEG object.
+    sampling_frequency: float
+        The sampling frequency listed in the SPM MEEG object.
+
+    """
     spm = scipy.io.loadmat(file_name)
     data_file = spm["D"][0][0][6][0][0][0][0]
     n_channels = spm["D"][0][0][6][0][0][1][0][0]
