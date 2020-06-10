@@ -6,8 +6,8 @@ import mat73
 import numpy as np
 import scipy.io
 from sklearn.decomposition import PCA
-from taser import plotting
-from taser.decorators import auto_repr
+from taser import array_ops, plotting
+from taser.decorators import auto_repr, deprecated
 from taser.helpers.misc import time_axis_first
 
 
@@ -377,32 +377,12 @@ class MEGData:
         np.save(filename, self[:])
 
 
+@deprecated
 def get_alpha_order(real_alpha, est_alpha):
-    """Correlate covariance matrices to match known and inferred states.
-
-    Parameters
-    ----------
-    real_alpha : array-like
-    est_alpha : array-like
-
-    Returns
-    -------
-    alpha_res_order : numpy.array
-        The order of inferred states as determined by known states.
+    """Deprecated. Use array_ops.match_states.
 
     """
-    # establish ordering of factors so that they match real alphas
-    ccs = np.zeros((real_alpha.shape[1], real_alpha.shape[1]))
-    alpha_res_order = np.ones((real_alpha.shape[1]), int)
-
-    for kk in range(real_alpha.shape[1]):
-        for jj in range(real_alpha.shape[1]):
-            if jj is not kk:
-                cc = np.corrcoef(real_alpha[:, kk], est_alpha[:, jj])
-                ccs[kk, jj] = cc[0, 1]
-        alpha_res_order[kk] = int(np.argmax(ccs[kk, :]))
-
-    return alpha_res_order
+    return array_ops.match_states(real_alpha, est_alpha)
 
 
 def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
