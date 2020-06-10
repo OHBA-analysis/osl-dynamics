@@ -84,9 +84,9 @@ class MVNLayer(Layer):
         **kwargs,
     ):
 
-        if not ((initial_pseudo_sigmas is None) != (initial_sigmas is None)):
+        if (initial_pseudo_sigmas is not None) and (initial_sigmas is not None):
             raise ValueError(
-                "Exactly one of initial_pseudo_sigmas "
+                "At most one of initial_pseudo_sigmas "
                 "and initial_sigmas may be specified."
             )
 
