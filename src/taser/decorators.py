@@ -160,3 +160,12 @@ def auto_yaml(func):
         func(me, *args, **kwargs)
 
     return wrapper_function
+
+
+def deprecated(f):
+    @wraps(f)
+    def wrapper_function(*args, **kwargs):
+        logging.warning(f"The '{f.__name__}' function is deprecated.")
+        f(*args, **kwargs)
+
+    return wrapper_function
