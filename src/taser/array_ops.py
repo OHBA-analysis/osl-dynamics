@@ -14,6 +14,25 @@ from taser.decorators import transpose
 def confusion_matrix(
     state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
 ) -> np.ndarray:
+    """Calculate the confusion matrix of two state time courses.
+
+    For two state-time-courses, calculate the confusion matrix (i.e. the
+    disagreement between the state selection for each sample). If either sequence is
+    two dimensional, it will first have argmax(axis=1) applied to it. The produces the
+    expected result for a one-hot encoded sequence but other inputs are not guaranteed
+    to behave.
+
+    This function is a wrapper for sklearn.metrics.confusion_matrix.
+
+    Parameters
+    ----------
+    state_time_course_1: numpy.ndarray
+    state_time_course_2: numpy.ndarray
+
+    Returns
+    -------
+    confusion_matrix: numpy.ndarray
+    """
     if state_time_course_1.ndim == 2:
         state_time_course_1 = state_time_course_1.argmax(axis=1)
     if state_time_course_2.ndim == 2:
@@ -28,6 +47,21 @@ def confusion_matrix(
 def correlate_states(
     state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
 ) -> np.ndarray:
+    """Calculate the correlation matrix between states in two state-time-courses.
+
+    Given two state time courses, calculate the correlation between each pair of states
+    in the state time courses. The output for each value in the matrix is the value
+    numpy.corrcoef(state_time_course_1, state_time_course_2)[0, 1].
+
+    Parameters
+    ----------
+    state_time_course_1: numpy.ndarray
+    state_time_course_2: numpy.ndarray
+
+    Returns
+    -------
+    correlation_matrix: numpy.ndarray
+    """
     correlation = np.zeros((state_time_course_1.shape[1], state_time_course_2.shape[1]))
     for i, state1 in enumerate(state_time_course_1.T):
         for j, state2 in enumerate(state_time_course_2.T):
@@ -37,6 +71,24 @@ def correlate_states(
 
 @transpose
 def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
+    """Find correlated states between state time courses.
+
+    Given N state time courses and using the first given state time course as a basis,
+    find the best matches for states between all of the state time courses. Once found,
+    the state time courses are returned with the states reordered so that the states
+    match.
+
+    Given two arrays with columns ABCD and CBAD, both will be returned with states in
+    the order ABCD.
+
+    Parameters
+    ----------
+    state_time_courses: list of numpy.ndarray
+
+    Returns
+    -------
+    matched_state_time_courses: list of numpy.ndarray
+    """
     matched_state_time_courses = [state_time_courses[0]]
     for state_time_course in state_time_courses[1:]:
 
@@ -179,6 +231,29 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
 
 @transpose(0, "sequence_1", 1, "sequence_2")
 def align_arrays(*sequences, alignment: str = "left") -> List[np.ndarray]:
+    """Given a list of sequences, return the sequences trimmed to equal length.
+
+    Given a list of sequences of unequal length, remove either the start, end or a
+    portion of both the start and end of the arrays such that their lengths are equal
+    to the length of the shortest array.
+
+    If alignment is "left", values will be trimmed from the ends of the arrays
+    (i.e. the starts of the arrays will be aligned). If "right", values will be trimmed
+    from the starts of the arrays (i.e. the ends will be aligned). If "center", an
+    equal amount will be trimmed from the start and end of the array (i.e. the arrays
+    are aligned by their middle values.
+
+
+    Parameters
+    ----------
+    sequences: list of numpy.ndarray
+        Time courses with differing lengths.
+    alignment: str
+        One of "left", "center" and "right".
+    Returns
+    -------
+    aligned_arrays: list of numpy.ndarray
+    """
     min_length = min(len(sequence) for sequence in sequences)
 
     if alignment == "left":
@@ -252,6 +327,21 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
 
 @transpose(0, "state_time_course")
 def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
+    """Remove empty states from a state time course.
+
+    If a state has no activation in the state time course, remove the column
+    corresponding to that state.
+
+    Parameters
+    ----------
+    state_time_course: numpy.ndarray
+
+    Returns
+    -------
+    reduced_state_time_course: numpy.ndarray
+        A state time course with no states with no activation.
+
+    """
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
 
 
@@ -276,6 +366,7 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
         List containing an array of lifetimes in the order they occur for each channel.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
+
     """
     ons, offs = state_activation(state_time_course)
     channel_lifetimes = offs - ons
@@ -283,6 +374,21 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
 
 
 def from_cholesky(cholesky_matrix: np.ndarray):
+    """Given a Cholesky matrix return the recomposed matrix.
+
+    Operates on the assumption that cholesky_matrix is a valid Cholesky decomposition
+    A = LL* and performs LL^T to recover A.
+
+    Parameters
+    ----------
+    cholesky_matrix: numpy.ndarray
+        A valid Cholesky decomposition.
+
+    Returns
+    -------
+    full_matrix: numpy.ndarray
+        A = LL^T where L is the Cholesky decomposition of A.
+    """
     if cholesky_matrix.ndim == 2:
         return cholesky_matrix @ cholesky_matrix.transpose()
     return cholesky_matrix @ cholesky_matrix.transpose((0, 2, 1))
@@ -292,7 +398,26 @@ def from_cholesky(cholesky_matrix: np.ndarray):
 def calculate_trans_prob_matrix(
     state_time_course: np.ndarray, zero_diagonal: bool = False, n_states: int = None,
 ) -> np.ndarray:
+    """For a given state time course, calculate the transition probability matrix.
+
+    If a 2D array is given, argmax(axis=1) will be performed upon it before proceeding.
+
+    Parameters
+    ----------
+    state_time_course: numpy.ndarray
+    zero_diagonal: bool
+        If True, return the array with diagonals set to zero.
+    n_states: int
+        The number of states in the state time course. Default is to take the highest
+        state number present in a 1D time course or the number of columns in a 2D
+        (one-hot encoded) time course.
+
+    Returns
+    -------
+
+    """
     if state_time_course.ndim == 2:
+        n_states = state_time_course.shape[1]
         state_time_course = state_time_course.argmax(axis=1)
     if state_time_course.ndim != 1:
         raise ValueError("state_time_course should either be 1D or 2D.")
@@ -321,6 +446,18 @@ def calculate_trans_prob_matrix(
 
 
 def trace_normalize(matrix: np.ndarray):
+    """Given a matrix, divide all of its values by the sum of its diagonal.
+
+    Parameters
+    ----------
+    matrix: numpy.ndarray
+
+    Returns
+    -------
+    normalized_matrix: numpy.ndarray
+        trace(M) = 1
+
+    """
     matrix = np.array(matrix)
     if matrix.ndim == 2:
         return matrix / matrix.trace()
@@ -331,6 +468,21 @@ def trace_normalize(matrix: np.ndarray):
 
 
 def mean_diagonal(array: np.ndarray):
+    """Set the diagonal of a matrix to the mean of all non-diagonal elements.
+
+    This is primarily useful for plotting without being concerned about the magnitude
+    of diagonal values compressing the color scale.
+
+    Parameters
+    ----------
+    array: numpy.ndarray
+
+    Returns
+    -------
+    mean_diagonal_array: numpy.ndarray
+        Array with diagonal set to mean of non-diagonal elements.
+
+    """
     off_diagonals = ~np.eye(array.shape[0], dtype=bool)
     new_array = array.copy()
     np.fill_diagonal(new_array, array[off_diagonals].mean())
