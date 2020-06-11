@@ -162,10 +162,14 @@ def auto_yaml(func):
     return wrapper_function
 
 
-def deprecated(f):
+@doublewrap
+def deprecated(f, *, replaced_by=None):
     @wraps(f)
     def wrapper_function(*args, **kwargs):
-        logging.warning(f"The '{f.__name__}' function is deprecated.")
-        f(*args, **kwargs)
+        message = f"The '{f.__name__}' function is deprecated."
+        if replaced_by is not None:
+            message += f" Replace it with '{replaced_by}'."
+        logging.warning(message)
+        return f(*args, **kwargs)
 
     return wrapper_function

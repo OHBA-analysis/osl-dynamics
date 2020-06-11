@@ -377,7 +377,7 @@ class MEGData:
         np.save(filename, self[:])
 
 
-@deprecated
+@deprecated(replaced_by="array_ops.match_states")
 def get_alpha_order(real_alpha, est_alpha):
     """Deprecated. Use array_ops.match_states.
 
