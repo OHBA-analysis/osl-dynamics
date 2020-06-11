@@ -184,7 +184,23 @@ class InferenceRNN(Model):
 
     @staticmethod
     def result_combination(results: List) -> dict:
+        """Apply transforms to results.
 
+        When predicting, apply transforms to results such that they are easier to work
+        with without needing to remember the necessary modifications. Unmodified
+        results can still be accessed by calling the function over a dataset.
+
+        Parameters
+        ----------
+        results : list
+            The outputs from the model when run over a dataset.
+
+        Returns
+        -------
+        formatted_results : dict
+            A dictionary of results with transforms applied.
+
+        """
         results = np.array(results)
 
         names = [
