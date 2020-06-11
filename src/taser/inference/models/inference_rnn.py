@@ -254,6 +254,23 @@ class InferenceRNN(Model):
         return dict(zip(names, combined_results))
 
     def latent_variable(self, results_list: dict, one_hot: bool = True):
+        """Get the variable of most interest.
+
+        For each model defined, the trainer object can call predict_latent_variable.
+        This will return the variable deemed the most important. There is no reason
+        that this cannot be a dict/list etc.
+
+        Parameters
+        ----------
+        results_list : dict
+            The list of predicted results from the result_combination method.
+        one_hot : bool
+            Return the variable after one-hot encoding.
+
+        Returns
+        -------
+
+        """
         inference_mu = results_list["inference_mu"]
         if one_hot:
             return get_one_hot(inference_mu.argmax(axis=1), n_states=self.n_states)
