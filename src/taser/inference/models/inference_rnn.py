@@ -124,7 +124,12 @@ class InferenceRNN(Model):
         ----------
         **kwargs
         inputs : tf.Tensor
+            The data to which to apply the model.
         training : bool
+            If True, the model runs in training mode. Important for Dropout layers.
+        burn_in : bool
+            If True, the gradient will not be calculated for covariances in the MVN
+            layer.
 
         Returns
         -------
@@ -133,7 +138,9 @@ class InferenceRNN(Model):
         theta_ast : tf.Tensor
             Re-sampled distribution derived from the inference RNN.
         inference_mu : tf.Tensor
+            Means from the inference RNN.
         model_mu : tf.Tensor
+            Means from the model RNN.
         mus : tf.Tensor
             Means from the multivariate normal layer (`MVNLayer`)
         djs : tf.Tensor
