@@ -160,6 +160,10 @@ class Simulation(ABC):
                 size=np.count_nonzero(self.state_time_course.argmax(axis=1) == i),
             )
 
+        data_sim += np.random.default_rng().normal(
+            scale=self.e_std, size=data_sim.shape
+        )
+
         return data_sim.astype(np.float32)
 
     def plot_data(self, n_points: int = 1000):
