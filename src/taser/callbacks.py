@@ -13,6 +13,9 @@ class Callback(ABC):
     def epoch_end(self, *args, **kwargs):
         pass
 
+    def tqdm_update(self, *args, **kwargs):
+        pass
+
 
 class SaveCallback(Callback):
     def __init__(self, trainer, basename, predict_dataset, frequency: int = 1):
@@ -74,3 +77,7 @@ class ComparisonCallback(Callback):
                 self.max_dice_stc = matched_pred_stc.copy()
 
         self.dice_history.append(self.trainer.dice)
+
+    def tqdm_update(self, *args, **kwargs):
+        if len(self.dice_history) > 0:
+            self.trainer.post_fix.update({"dice": self.dice_history[-1]})
