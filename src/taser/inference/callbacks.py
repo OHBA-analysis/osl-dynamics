@@ -2,6 +2,7 @@ from abc import ABC
 from pathlib import Path
 
 import numpy as np
+import taser.inference.metrics
 from matplotlib import pyplot as plt
 from taser import array_ops
 
@@ -66,7 +67,7 @@ class ComparisonCallback(Callback):
             matched_comp_array, matched_pred_stc = array_ops.match_states(
                 aligned_comp_array, aligned_pred_stc
             )
-            self.trainer.dice = array_ops.dice_coefficient(
+            self.trainer.dice = taser.inference.metrics.dice_coefficient(
                 matched_comp_array, matched_pred_stc
             )
         except ValueError:

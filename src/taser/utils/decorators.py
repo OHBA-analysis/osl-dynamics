@@ -5,7 +5,7 @@ from time import time
 
 import numpy as np
 import yaml
-from taser.helpers.misc import time_axis_first
+from taser.utils.misc import time_axis_first
 
 
 def timing(f):

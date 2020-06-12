@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import numpy as np
+import taser.inference.metrics
 from taser import array_ops
 
 
@@ -74,8 +75,12 @@ class TestDiceCoefficient1D(TestCase):
         self.sequence_3 = np.random.permutation(self.sequence_1)
 
     def test_dice_coefficient_1d(self):
-        dice_1 = array_ops.dice_coefficient_1d(self.sequence_1, self.sequence_2)
-        dice_2 = array_ops.dice_coefficient_1d(self.sequence_1, self.sequence_3)
+        dice_1 = taser.inference.metrics.dice_coefficient_1d(
+            self.sequence_1, self.sequence_2
+        )
+        dice_2 = taser.inference.metrics.dice_coefficient_1d(
+            self.sequence_1, self.sequence_3
+        )
 
         self.assertTrue(dice_1 == 1, msg="dice(a, a) == 1.")
         self.assertTrue(
@@ -87,10 +92,10 @@ class TestDiceCoefficient1D(TestCase):
         one_hot = array_ops.get_one_hot(self.sequence_1)
 
         with self.assertRaises(ValueError):
-            array_ops.dice_coefficient_1d(self.sequence_1, one_hot)
+            taser.inference.metrics.dice_coefficient_1d(self.sequence_1, one_hot)
 
         with self.assertRaises(TypeError):
-            array_ops.dice_coefficient_1d(
+            taser.inference.metrics.dice_coefficient_1d(
                 self.sequence_1, self.sequence_2.astype(np.float)
             ),
 
@@ -103,8 +108,12 @@ class TestDiceCoefficient(TestCase):
         self.sequence_3 = np.random.permutation(self.sequence_1)
 
     def test_dice_coefficient_2d(self):
-        dice_1 = array_ops.dice_coefficient(self.sequence_1, self.sequence_2)
-        dice_2 = array_ops.dice_coefficient(self.sequence_1, self.sequence_3)
+        dice_1 = taser.inference.metrics.dice_coefficient(
+            self.sequence_1, self.sequence_2
+        )
+        dice_2 = taser.inference.metrics.dice_coefficient(
+            self.sequence_1, self.sequence_3
+        )
 
         self.assertTrue(dice_1 == 1, msg="dice(a, a) == 1.")
         self.assertTrue(
@@ -114,12 +123,20 @@ class TestDiceCoefficient(TestCase):
         )
 
         with self.assertRaises(ValueError):
-            array_ops.dice_coefficient(np.random.rand(3, 4, 5), np.random.rand(5, 6, 7))
+            taser.inference.metrics.dice_coefficient(
+                np.random.rand(3, 4, 5), np.random.rand(5, 6, 7)
+            )
 
-        self.assertTrue(array_ops.dice_coefficient(self.base, self.base.copy()) == 1)
+        self.assertTrue(
+            taser.inference.metrics.dice_coefficient(self.base, self.base.copy()) == 1
+        )
 
-        self.assertTrue(array_ops.dice_coefficient(self.base, self.sequence_1) == 1)
-        self.assertTrue(array_ops.dice_coefficient(self.sequence_1, self.base) == 1)
+        self.assertTrue(
+            taser.inference.metrics.dice_coefficient(self.base, self.sequence_1) == 1
+        )
+        self.assertTrue(
+            taser.inference.metrics.dice_coefficient(self.sequence_1, self.base) == 1
+        )
 
 
 class TestAlignArrays(TestCase):
@@ -292,4 +309,6 @@ class TestConfusionMatrix(TestCase):
         a = np.array([1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3])
         b = np.array([1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3])
         exp_result = np.array([[2, 1, 1], [1, 2, 1], [1, 1, 2]])
-        self.assertTrue(np.all(exp_result == array_ops.confusion_matrix(a, b)))
+        self.assertTrue(
+            np.all(exp_result == taser.inference.metrics.confusion_matrix(a, b))
+        )

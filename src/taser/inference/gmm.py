@@ -7,17 +7,16 @@ from typing import Tuple, Union
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
-from taser.data_manipulation import MEGData
-from taser.helpers.misc import override_dict_defaults, time_axis_first
+from taser.data import Data
+from taser.utils.misc import override_dict_defaults, time_axis_first
 
 
 def learn_mu_sigma(
-    data: Union[np.ndarray, MEGData],
+    data: Union[np.ndarray, Data],
     n_states: int,
     learn_means: bool = False,
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
-    normalize_covariance: bool = False,
     take_random_sample: int = 0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Find a mixture of Gaussian distributions which characterises a dataset.
@@ -38,6 +37,9 @@ def learn_mu_sigma(
         Number of times to retry fitting if `.fit()` doesn't converge.
     gmm_kwargs : dict
         Keyword arguments for the `BayesianGaussianMixture`
+    take_random_sample : int
+        Number of time points to sample.
+
 
     Returns
     -------
@@ -126,9 +128,6 @@ def matrix_sqrt_3d(matrix):
     SciPy's matrix square root function only works on [N x N] 2D matrices. This
     function provides a simple solution for performing this operation on a stack of
     [N x N] 2D arrays.
-
-    TensorFlow has a function to do this (`tensorflow.linalg.sqrtm`) but I won't
-    move to that until the whole of gmm.py has moved to TensorFlow code.
 
     Parameters
     ----------
