@@ -67,7 +67,7 @@ def standardize(
     if pre_scale:
         time_series = scale(time_series=time_series)
     if do_pca:
-        time_series = pca(n_components)
+        time_series = pca(time_series=time_series, n_components=n_components)
     if post_scale:
         time_series = scale(time_series=time_series)
     return time_series
