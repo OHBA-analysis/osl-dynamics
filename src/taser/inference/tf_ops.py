@@ -6,7 +6,7 @@ from typing import Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from taser.data_manipulation import MEGData
+from taser.data import Data
 
 
 def gpu_growth():
@@ -29,13 +29,13 @@ def gpu_growth():
 
 
 def train_predict_dataset(
-    time_series: Union[np.ndarray, MEGData],
+    time_series: Union[np.ndarray, Data],
     mini_batch_length: int,
     batch_size: int,
     buffer_size: int = 10000,
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
 
-    # If data is in a MEGData class, get the time_series first
+    # If data is in a Data class, get the time_series first
     time_series = time_series[:]
     time_series = time_series.astype(np.float32)
 

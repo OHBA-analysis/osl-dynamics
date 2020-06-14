@@ -8,7 +8,7 @@ from taser.inference.layers import (
     ReparameterizationLayer,
     TrainableVariablesLayer,
 )
-from taser.losses.layers import KLDivergenceLayer, LogLikelihoodLayer
+from taser.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
@@ -275,14 +275,3 @@ class InferenceRNN(Model):
         if one_hot:
             return get_one_hot(inference_mu.argmax(axis=1), n_states=self.n_states)
         return inference_mu
-
-
-def get_default_config(n_states, n_channels):
-    return {
-        "dropout_rate": 0.3,
-        "n_units_inference": 5 * n_states,
-        "n_units_model": 5 * n_states,
-        "n_states": n_states,
-        "n_channels": n_channels,
-        "learn_means": True,
-    }
