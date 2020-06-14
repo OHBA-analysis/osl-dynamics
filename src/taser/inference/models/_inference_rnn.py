@@ -10,7 +10,13 @@ from taser.inference.layers import (
 )
 from taser.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
 from tensorflow.keras import Model
-from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
+from tensorflow.keras.layers import (
+    GRU,
+    Bidirectional,
+    Dense,
+    Dropout,
+    LayerNormalization,
+)
 
 
 class InferenceRNN(Model):
@@ -64,6 +70,9 @@ class InferenceRNN(Model):
             raise ValueError("n_channels must be specified.")
 
         self.n_states = n_states
+
+        self.normalization_0 = LayerNormalization()
+        self.normalization_1 = LayerNormalization()
 
         self.dropout_layer_0 = Dropout(dropout_rate)
 
@@ -148,9 +157,11 @@ class InferenceRNN(Model):
 
 
         """
-        dropout_0 = self.dropout_layer_0(inputs, training=training)
+        normalization_0 = self.normalization_0(inputs)
+        dropout_0 = self.dropout_layer_0(normalization_0, training=training)
         inference_rnn = self.inference_rnn(dropout_0)
-        dropout_1 = self.dropout_layer_1(inference_rnn, training=training)
+        normalization_1 = self.normalization_1(inference_rnn)
+        dropout_1 = self.dropout_layer_1(normalization_1, training=training)
 
         inference_mu = self.inference_dense_layer_mu(dropout_1)
         inference_sigma = self.inference_dense_layer_sigma(inference_rnn)
