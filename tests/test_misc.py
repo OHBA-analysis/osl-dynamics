@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from taser.helpers import misc
+from taser.utils import misc
 
 
 class TestListify(TestCase):

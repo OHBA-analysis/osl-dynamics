@@ -2,6 +2,7 @@ from abc import ABC
 from pathlib import Path
 
 import numpy as np
+import taser.inference.metrics
 from matplotlib import pyplot as plt
 from taser import array_ops
 
@@ -11,6 +12,9 @@ class Callback(ABC):
         pass
 
     def epoch_end(self, *args, **kwargs):
+        pass
+
+    def tqdm_update(self, *args, **kwargs):
         pass
 
 
@@ -63,7 +67,7 @@ class ComparisonCallback(Callback):
             matched_comp_array, matched_pred_stc = array_ops.match_states(
                 aligned_comp_array, aligned_pred_stc
             )
-            self.trainer.dice = array_ops.dice_coefficient(
+            self.trainer.dice = taser.inference.metrics.dice_coefficient(
                 matched_comp_array, matched_pred_stc
             )
         except ValueError:
@@ -74,3 +78,7 @@ class ComparisonCallback(Callback):
                 self.max_dice_stc = matched_pred_stc.copy()
 
         self.dice_history.append(self.trainer.dice)
+
+    def tqdm_update(self, *args, **kwargs):
+        if len(self.dice_history) > 0:
+            self.trainer.post_fix.update({"dice": self.dice_history[-1]})

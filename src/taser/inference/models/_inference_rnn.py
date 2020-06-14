@@ -8,7 +8,7 @@ from taser.inference.layers import (
     ReparameterizationLayer,
     TrainableVariablesLayer,
 )
-from taser.losses.layers import KLDivergenceLayer, LogLikelihoodLayer
+from taser.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
 from tensorflow.keras import Model
 from tensorflow.keras.layers import GRU, Bidirectional, Dense, Dropout
 
@@ -124,7 +124,12 @@ class InferenceRNN(Model):
         ----------
         **kwargs
         inputs : tf.Tensor
+            The data to which to apply the model.
         training : bool
+            If True, the model runs in training mode. Important for Dropout layers.
+        burn_in : bool
+            If True, the gradient will not be calculated for covariances in the MVN
+            layer.
 
         Returns
         -------
@@ -133,7 +138,9 @@ class InferenceRNN(Model):
         theta_ast : tf.Tensor
             Re-sampled distribution derived from the inference RNN.
         inference_mu : tf.Tensor
+            Means from the inference RNN.
         model_mu : tf.Tensor
+            Means from the model RNN.
         mus : tf.Tensor
             Means from the multivariate normal layer (`MVNLayer`)
         djs : tf.Tensor
@@ -177,7 +184,23 @@ class InferenceRNN(Model):
 
     @staticmethod
     def result_combination(results: List) -> dict:
+        """Apply transforms to results.
 
+        When predicting, apply transforms to results such that they are easier to work
+        with without needing to remember the necessary modifications. Unmodified
+        results can still be accessed by calling the function over a dataset.
+
+        Parameters
+        ----------
+        results : list
+            The outputs from the model when run over a dataset.
+
+        Returns
+        -------
+        formatted_results : dict
+            A dictionary of results with transforms applied.
+
+        """
         results = np.array(results)
 
         names = [
@@ -231,18 +254,24 @@ class InferenceRNN(Model):
         return dict(zip(names, combined_results))
 
     def latent_variable(self, results_list: dict, one_hot: bool = True):
+        """Get the variable of most interest.
+
+        For each model defined, the trainer object can call predict_latent_variable.
+        This will return the variable deemed the most important. There is no reason
+        that this cannot be a dict/list etc.
+
+        Parameters
+        ----------
+        results_list : dict
+            The list of predicted results from the result_combination method.
+        one_hot : bool
+            Return the variable after one-hot encoding.
+
+        Returns
+        -------
+
+        """
         inference_mu = results_list["inference_mu"]
         if one_hot:
             return get_one_hot(inference_mu.argmax(axis=1), n_states=self.n_states)
         return inference_mu
-
-
-def get_default_config(n_states, n_channels):
-    return {
-        "dropout_rate": 0.3,
-        "n_units_inference": 5 * n_states,
-        "n_units_model": 5 * n_states,
-        "n_states": n_states,
-        "n_channels": n_channels,
-        "learn_means": True,
-    }

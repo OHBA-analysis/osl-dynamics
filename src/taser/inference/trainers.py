@@ -7,11 +7,11 @@ from typing import List, Union
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from taser.callbacks import Callback
-from taser.decorators import timing
-from taser.helpers.misc import listify
+from taser.inference.callbacks import Callback
+from taser.utils.decorators import timing
+from taser.utils.misc import listify
 from tensorflow.keras.optimizers import Adam
-from tqdm import tqdm
+from tqdm import trange
 
 
 class Trainer(ABC):
@@ -51,6 +51,8 @@ class Trainer(ABC):
         self.prediction_dataset = None
         self.epoch_iterator = None
         self.dice = None
+        self.callbacks = None
+        self.post_fix = {}
 
     @timing
     def train(
@@ -68,12 +70,15 @@ class Trainer(ABC):
         n_epochs : int
             The number of epochs to train for.
         """
-        callbacks = listify(callbacks)
+        self.callbacks = listify(callbacks)
 
         self.n_epochs = n_epochs
-        for self.epoch in range(n_epochs):
+
+        self.epoch_iterator = trange(n_epochs)
+
+        for self.epoch in self.epoch_iterator:
             self.train_epoch(dataset=dataset)
-            for callback in callbacks:
+            for callback in self.callbacks:
                 callback.epoch_end()
 
         del self.loss_history[0]
@@ -85,17 +90,15 @@ class Trainer(ABC):
         ----------
         dataset : tf.Dataset
         """
-        self.epoch_iterator = tqdm(
-            dataset,
-            leave=False,
-            postfix={"loss": self.loss_history[-1], "dice": self.dice},
-        )
 
-        for y in self.epoch_iterator:
-            self.epoch_iterator.set_description_str(f"epoch={self.epoch}")
+        for i, y in enumerate(dataset):
             loss_value, grads = self.grad(y)
             self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
             self.batch_mean(loss_value)
+            self.post_fix = {"it": i, "loss": self.loss_history[-1]}
+            for callback in self.callbacks:
+                callback.tqdm_update()
+            self.epoch_iterator.set_postfix(self.post_fix)
         self.loss_history.append(self.batch_mean.result().numpy())
         self.batch_mean.reset_states()
 
@@ -237,15 +240,16 @@ class AnnealingTrainer(Trainer):
         n_epochs : int
             The number of epochs to train for.
         """
-        callbacks = listify(callbacks)
+        self.callbacks = listify(callbacks)
         if self.burn_in > 0:
             logging.getLogger("tensorflow").setLevel(logging.ERROR)
         self.n_epochs = n_epochs
-        for self.epoch in range(n_epochs):
+        self.epoch_iterator = trange(n_epochs)
+        for self.epoch in self.epoch_iterator:
             if self.epoch % self.update_frequency == 0:
                 self.calculate_annealing_factor()
             self.train_epoch(dataset=dataset)
-            for callback in callbacks:
+            for callback in self.callbacks:
                 callback.epoch_end()
 
     def loss(self, inputs: List[tf.Tensor], training: bool = True):

@@ -1,15 +1,17 @@
 import logging
 import pathlib
 
+import taser.inference.metrics
 import yaml
-from taser import array_ops, plotting
-from taser.callbacks import ComparisonCallback
-from taser.data_manipulation import MEGData
+from taser import array_ops
+from taser.data._base import Data
+from taser.inference.callbacks import ComparisonCallback
 from taser.inference.gmm import learn_mu_sigma
-from taser.inference.models.inference_rnn import InferenceRNN
+from taser.inference.models._inference_rnn import InferenceRNN
+from taser.inference.tf_ops import gpu_growth, train_predict_dataset
+from taser.inference.trainers import AnnealingTrainer
 from taser.simulation import HiddenSemiMarkovSimulation
-from taser.tf_ops import gpu_growth, train_predict_dataset
-from taser.trainers import AnnealingTrainer
+from taser.utils import plotting
 
 # Restrict GPU memory usage
 gpu_growth()
@@ -24,10 +26,10 @@ logger.info("Reading configuration from 'run_from_simulation.yml'")
 with open(script_dir + "/run_from_simulation.yml", "r") as f:
     config = yaml.load(f, Loader=yaml.Loader)
 
-# Simulate data and store in a MEGData object
+# Simulate data and store in a Data object
 logger.info("Simulating data")
 sim = HiddenSemiMarkovSimulation(**config["HiddenSemiMarkovSimulation"])
-meg_data = MEGData(sim)
+meg_data = Data(sim)
 state_time_course = sim.state_time_course
 n_states = sim.n_states
 
@@ -84,7 +86,9 @@ matched_stc, matched_inf_stc = array_ops.match_states(aligned_stc, aligned_inf_s
 
 dice_callback.plot_loss_dice()
 
-print(f"Dice coefficient is {array_ops.dice_coefficient(matched_stc, matched_inf_stc)}")
+print(
+    f"Dice coefficient is {taser.inference.metrics.dice_coefficient(matched_stc, matched_inf_stc)}"
+)
 
 plotting.compare_state_data(matched_inf_stc, matched_stc)
 

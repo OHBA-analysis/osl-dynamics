@@ -1,3 +1,0 @@
-"""Loss calculation.
-
-"""

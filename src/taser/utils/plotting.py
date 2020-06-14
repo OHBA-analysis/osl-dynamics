@@ -7,9 +7,9 @@ from typing import Any, Iterable, List, Tuple, Union
 
 import matplotlib
 import numpy as np
+import taser.inference.metrics
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from taser import array_ops
 from taser.array_ops import (
     correlate_states,
     from_cholesky,
@@ -19,8 +19,8 @@ from taser.array_ops import (
     state_activation,
     state_lifetimes,
 )
-from taser.decorators import transpose
-from taser.helpers.misc import override_dict_defaults
+from taser.utils.decorators import transpose
+from taser.utils.misc import override_dict_defaults
 
 
 def plot_correlation(
@@ -826,7 +826,9 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     state_time_course_2: numpy.ndarray
         The second state time course.
     """
-    confusion = array_ops.confusion_matrix(state_time_course_1, state_time_course_2)
+    confusion = taser.inference.metrics.confusion_matrix(
+        state_time_course_1, state_time_course_2
+    )
     nan_diagonal = confusion.copy().astype(float)
     nan_diagonal[np.diag_indices_from(nan_diagonal)] = np.nan
     plot_matrices([confusion, nan_diagonal], group_color_scale=False)
