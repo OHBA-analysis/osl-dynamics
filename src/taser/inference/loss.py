@@ -2,9 +2,8 @@ import functools
 from typing import List
 
 import tensorflow as tf
-from tensorflow.keras.activations import softplus, softmax, linear
-from tensorflow.keras.layers import Layer
-from tensorflow.keras.regularizers import l2
+import tensorflow_probability as tfp
+from tensorflow.keras import backend as K
 
 
 def normal_kl_divergence(
@@ -58,180 +57,151 @@ def normal_kl_divergence(
     return kl_divergence
 
 
-class LogLikelihoodLayer(Layer):
-    """Layer for calculating the log likelihood loss.
+class LogLikelihoodLayer(tf.keras.layers.Layer):
+    """Computes log likelihood."""
 
-    Parameters
-    ----------
-    n_states : int
-    n_channels : int
-    alpha_xform : str
-        The function to apply to the resampled normal distribution `theta_ast`.
-        Options are ["softplus", "softmax", "none", "linear" (default)]. "none" and
-        "linear" leave their inputs unchanged.
-    kwargs
-    """
-
-    alpha_xforms = {
-        "softplus": softplus,
-        "softmax": functools.partial(softmax, axis=2),
-        "none": linear,
-        "linear": linear,
-    }
-
-    def __init__(
-        self,
-        n_states: int,
-        n_channels: int,
-        alpha_xform: str = "linear",
-        diagonal_constant: float = 1e-8,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-
+    def __init__(self, n_states, n_channels, alpha_xform, **kwargs):
+        super(LogLikelihoodLayer, self).__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
-        self.diagonal_constant = diagonal_constant
+        self.alpha_xform = alpha_xform
 
-        self.run_eagerly = True
+    def build(self, input_shape):
+        # only learn alpha_scaling if softmax is being used
+        learn = self.alpha_xform == "softmax"
+        self.alpha_scaling = self.add_weight(
+            "alpha_scaling",
+            shape=self.n_states,
+            dtype=K.floatx(),
+            initializer=tf.keras.initializers.Ones(),
+            trainable=learn,
+        )
+        self.built = True
 
-        self.regularizer = l2()
+    def call(self, inputs, **kwargs):
+        """
+        The Log-Likelihood is given by:
+        c − (0.5*m)*log|Σ| − 0.5*∑(x - mu)^T sigma^-1 (x - mu)
+        where:
+        - c is some constant
+        - Σ is the covariance matrix
+        - mu is the mean (in this case, zero),
+        - x are the observations, i.e. Y_portioned here.
+        - m is the number of observations = channels
 
-        try:
-            self.alpha_xform = self.alpha_xforms[alpha_xform]
-        except KeyError:
-            print(
-                f"available options for alpha_xform are: {', '.join(self.alpha_xforms)}"
+        Dimensions:
+        - cov_arg_inv: [batches, mini_batch_length, n_channels, n_channels]
+        - Y_portioned: [batches, mini_batch_length, n_channels]
+        - alpha: [batch_size, mini_batch_length, n_states, 1, 1]
+        - mean basis functions: [1, 1, n_states, n_channels]
+        - covariance basis functions: [1,1, n_states, n_channels, n_channels]
+        """
+        n_states = self.n_states
+        n_channels = self.n_channels
+        Y_portioned, theta_ast, mean_matrix, covariance_matrix = inputs
+
+        if self.alpha_xform == "softplus":
+            alpha_ext = K.expand_dims(tf.keras.activations.softplus(theta_ast), axis=-1)
+        elif self.alpha_xform == "softmax":
+            alpha_ext = K.expand_dims(
+                tf.keras.activations.softmax(theta_ast, axis=2), axis=-1
             )
-            raise
 
-    def compute_output_shape(self, input_shape):
-        """Compute output shape
+        mean_ext = tf.reshape(mean_matrix, (1, 1, n_states, n_channels))
 
-        Parameters
-        ----------
-        input_shape : tf.TensorShape
-            Not used internally.
+        # Do the multiplicative sum over the n_states dimension:
+        mn_arg = tf.reduce_sum(tf.multiply(alpha_ext, mean_ext), 2)
 
-        Returns
-        -------
-        output_shape : tf.TensorShape
-            Always returns a shape of 1.
-        """
-        return tf.TensorShape([1])
+        if self.alpha_xform == "softplus":
+            alpha_ext = K.expand_dims(
+                K.expand_dims(tf.keras.activations.softplus(theta_ast), axis=-1),
+                axis=-1,
+            )
+        elif self.alpha_xform == "softmax":
+            alpha_ext = tf.keras.activations.softmax(theta_ast, axis=2)
+            alpha_ext = tf.multiply(
+                alpha_ext, tf.keras.activations.softplus(self.alpha_scaling)
+            )
+            alpha_ext = K.expand_dims(K.expand_dims(alpha_ext, axis=-1), axis=-1)
 
-    def call(self, inputs: List[tf.Tensor], **kwargs):
-        """Calculate the log likelihood loss of a set of inputs.
+        covariance_ext = tf.reshape(
+            covariance_matrix, (1, 1, n_states, n_channels, n_channels)
+        )
 
-        Parameters
-        ----------
-        inputs : List[tf.Tensor]
-            List of Tensors formed of:
-                - data batch
-                - resampled distribution
-                - matrix of means
-                - matrix of covariances
-        kwargs
+        # Do the multiplicative sum over the n_states dimension:
+        cov_arg = tf.reduce_sum(tf.multiply(alpha_ext, covariance_ext), 2)
 
-        Returns
-        -------
-        log_likelihood_loss : tf.Tensor
-            Scalar tensor containing the log_likelihood_loss of the model and dataset.
-        """
-        y_portioned, theta_ast, mean_matrix, covariance_matrix = inputs
-
-        alpha_ext = self.alpha_xform(theta_ast)[..., tf.newaxis]
-        mean_ext = mean_matrix[tf.newaxis, tf.newaxis, ...]
-
-        mn_arg = tf.reduce_sum(alpha_ext * mean_ext, axis=2)
-
-        alpha_ext = self.alpha_xform(theta_ast)[..., tf.newaxis, tf.newaxis]
-        covariance_ext = covariance_matrix[tf.newaxis, tf.newaxis, ...]
-
-        cov_arg = tf.reduce_sum(alpha_ext * covariance_ext, axis=2)
-
-        safety_add = self.diagonal_constant * tf.eye(self.n_channels)
-        cov_arg += safety_add
+        # Add a tiny bit of diagonal to the covariance to ensure invertability
+        cov_arg += 1e-8 * tf.eye(n_channels, n_channels)
 
         inv_cov_arg = tf.linalg.inv(cov_arg)
         log_det = -0.5 * tf.linalg.logdet(cov_arg)
 
-        y_exp = y_portioned[:, :, tf.newaxis, ...]
-        mn_exp = mn_arg[:, :, tf.newaxis, ...]
+        # Y_portioned is [batches, mini_batch_length,n_channels],
+        # but we need it to be [batches, mini_batch_length,1,n_channels],
+        # so that it can muliply the [n_channels x n_channels] covariance
+        # as a [1 x n_channels] vector (at each tpt)
+        Y_exp_dims = tf.expand_dims(Y_portioned, axis=2)
+        mn_exp_dims = tf.expand_dims(mn_arg, axis=2)
 
-        tmp = y_exp - mn_exp
+        tmp = tf.subtract(Y_exp_dims, mn_exp_dims)
+        attempt = -0.5 * tf.matmul(
+            tf.matmul(tmp, inv_cov_arg), tf.transpose(tmp, perm=[0, 1, 3, 2])
+        )
+        LL = log_det + tf.squeeze(tf.squeeze(attempt, axis=3), axis=2)
+        LL = -tf.reduce_sum(LL)
 
-        attempt = -0.5 * (tmp @ inv_cov_arg) @ tf.transpose(tmp, perm=[0, 1, 3, 2])
+        return LL
 
-        log_likelihood = -tf.reduce_sum(log_det + tf.squeeze(attempt))
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([1])
 
-        return log_likelihood
+    def get_config(self):
+        config = super(LogLikelihoodLayer, self).get_config()
+        config.update(
+            {
+                "n_states": self.n_states,
+                "n_channels": self.n_channels,
+                "alpha_xform": self.alpha_xform,
+            }
+        )
+        return config
 
 
-class KLDivergenceLayer(Layer):
-    """Layer for calculating the KL divergence loss.
+class KLDivergenceLayer(tf.keras.layers.Layer):
+    """Computes KL Divergence."""
 
-    Parameters
-    ----------
-    n_states : int
-    n_channels : int
-    kwargs
-
-    """
-
-    def __init__(self, n_states: int, n_channels: int, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, n_states, n_channels, **kwargs):
+        super(KLDivergenceLayer, self).__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
-        self.run_eagerly = True
 
-    def call(self, inputs: List[tf.Tensor], **kwargs):
-        """Calculate the KL divergence loss.
+    def build(self, input_shape):
+        self.built = True
 
-        Given a the means and standard deviations of two univariate normal
-        distributions, calculate their KL divergence.
-
-        Parameters
-        ----------
-        inputs : List[tf.Tensor]
-            List of Tensors formed of:
-                - Inference mean
-                - Inference standard deviation
-                - Model mean
-                - Model standard deviation
-        kwargs
-
-        Returns
-        -------
-        kl_divergence_loss : tf.Tensor
-            Scalar Tensor containing the KL divergence loss of the two input
-            distributions.
-        """
+    def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, log_sigma_theta_j = inputs
 
+        # model_mu needs shifting forward by one tpt
         shifted_model_mu = tf.roll(model_mu, shift=1, axis=1)
 
-        log_sigma_theta_j_ext = log_sigma_theta_j[tf.newaxis, tf.newaxis, ...]
-
-        kl_divergence = tf.reduce_sum(
-            normal_kl_divergence(
-                inference_mu, inference_sigma, shifted_model_mu, log_sigma_theta_j_ext
-            )
+        prior = tfp.distributions.Normal(
+            loc=shifted_model_mu, scale=tf.exp(log_sigma_theta_j)
+        )
+        posterior = tfp.distributions.Normal(
+            loc=inference_mu, scale=tf.exp(inference_sigma)
         )
 
-        return kl_divergence
+        kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
-    def compute_output_shape(self, input_shape: tf.TensorShape):
-        """Compute output shape
+        return kl_loss
 
-        Parameters
-        ----------
-        input_shape : tf.TensorShape
-            Not used internally.
-
-        Returns
-        -------
-        output_shape : tf.TensorShape
-            Always returns a scalar tensor (tf.TensorShape([1]))
-        """
+    def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
+
+    def get_config(self):
+        config = super(KLDivergenceLayer, self).get_config()
+        config.update(
+            {"n_states": self.n_states, "n_channels": self.n_channels,}
+        )
+        return config

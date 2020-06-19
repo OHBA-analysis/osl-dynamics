@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from taser.array_ops import get_one_hot
 from taser.simulation import Simulation
-from taser.utils.decorators import auto_yaml, auto_repr
+from taser.utils.decorators import auto_repr, auto_yaml
 
 
 class HiddenSemiMarkovSimulation(Simulation):
