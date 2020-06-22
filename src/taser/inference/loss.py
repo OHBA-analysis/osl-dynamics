@@ -4,6 +4,7 @@ from typing import List
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer
 
 
 def normal_kl_divergence(
@@ -57,7 +58,7 @@ def normal_kl_divergence(
     return kl_divergence
 
 
-class LogLikelihoodLayer(tf.keras.layers.Layer):
+class LogLikelihoodLayer(Layer):
     """Computes log likelihood."""
 
     def __init__(self, n_states, n_channels, alpha_xform, **kwargs):
@@ -168,7 +169,7 @@ class LogLikelihoodLayer(tf.keras.layers.Layer):
         return config
 
 
-class KLDivergenceLayer(tf.keras.layers.Layer):
+class KLDivergenceLayer(Layer):
     """Computes KL Divergence."""
 
     def __init__(self, n_states, n_channels, **kwargs):

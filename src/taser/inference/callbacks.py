@@ -5,6 +5,38 @@ import numpy as np
 import taser.inference.metrics
 from matplotlib import pyplot as plt
 from taser import array_ops
+from tensorflow.python import tanh
+from tensorflow.python.keras import callbacks
+
+
+class AnnealingCallback(callbacks.Callback):
+    """Used to update the annealing factor during training."""
+
+    def __init__(self, annealing_factor, annealing_sharpness, n_epochs_annealing):
+        super().__init__()
+        self.annealing_factor = annealing_factor
+        self.annealing_sharpness = annealing_sharpness
+        self.n_epochs_annealing = n_epochs_annealing
+
+    def on_epoch_end(self, epoch, logs=None):
+        if logs is None:
+            logs = {}
+        new_value = (
+            0.5
+            * tanh(
+                self.annealing_sharpness
+                * (epoch - 0.5 * self.n_epochs_annealing)
+                / self.n_epochs_annealing
+            )
+            + 0.5
+        )
+        self.annealing_factor.assign(new_value)
+
+
+class BurninCallback(callbacks.Callback):
+    def __init__(self, epochs):
+        super().__init__()
+        self.epochs = epochs
 
 
 class Callback(ABC):

@@ -60,7 +60,7 @@ class ReparameterizationLayer(Layer):
         return new_distribution
 
 
-class MVNLayer(tf.keras.layers.Layer):
+class MVNLayer(Layer):
     """Parameterises multiple multivariate Gaussians and in terms of their means
        and covariances. Means and covariances are outputted.
     """
@@ -158,7 +158,7 @@ class MVNLayer(tf.keras.layers.Layer):
         return config
 
 
-class TrainableVariablesLayer(tf.keras.layers.Layer):
+class TrainableVariablesLayer(Layer):
     """Generic trainable variables layer.
 
        Sets up trainable parameters/weights tensor of a certain shape.
