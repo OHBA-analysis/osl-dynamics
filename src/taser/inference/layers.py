@@ -81,6 +81,7 @@ class MVNLayer(Layer):
         self.learn_means = learn_means
         self.learn_covs = learn_covs
         self.initial_means = initial_means
+        self.burnin = tf.Variable(False)
 
         # Only keep the lower triangle of pseudo sigma (also flattens the tensors)
         self.initial_pseudo_sigmas = tfp.math.fill_triangular_inverse(
@@ -131,9 +132,23 @@ class MVNLayer(Layer):
             trainable=self.learn_covs,
         )
 
+        self.untrainable_sigmas = self.add_weight(
+            "pseudo_sigmas",
+            shape=self.initial_pseudo_sigmas.shape,
+            dtype=tf.float32,
+            initializer=self.pseudo_sigmas_initializer,
+            trainable=False,
+        )
+
         self.built = True
 
     def call(self, inputs, **kwargs):
+
+        self.sigmas = tf.cond(
+            self.burnin,
+            lambda: pseudo_sigma_to_sigma(self.untrainable_sigmas),
+            lambda: pseudo_sigma_to_sigma(self.pseudo_sigmas),
+        )
         self.sigmas = pseudo_sigma_to_sigma(self.pseudo_sigmas)
         return self.means, self.sigmas
 

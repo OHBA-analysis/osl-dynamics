@@ -1,5 +1,5 @@
 import numpy as np
-from taser.inference.callbacks import AnnealingCallback
+from taser.inference.callbacks import AnnealingCallback, BurninCallback
 from taser.inference.layers import MVNLayer, TrainableVariablesLayer, sampling
 from taser.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
 from taser.utils.misc import listify
@@ -24,6 +24,7 @@ def create_model(
     n_epochs_annealing: int,
     learning_rate: float,
     activation_function: str,
+    burnin_epochs: int,
 ):
     model = _model_structure(
         sequence_length=sequence_length,
@@ -48,6 +49,8 @@ def create_model(
         loss=[_ll_loss, _kl_loss(annealing_factor=annealing_factor)],
     )
 
+    burnin_callback = BurninCallback(epochs=burnin_epochs)
+
     annealing_callback = AnnealingCallback(
         annealing_factor=annealing_factor,
         annealing_sharpness=annealing_sharpness,
@@ -59,9 +62,12 @@ def create_model(
     def anneal_fit(*args, **kwargs):
         args = list(args)
         if len(args) > 5:
-            args[5] = listify(args[5]) + [annealing_callback]
+            args[5] = listify(args[5]) + [annealing_callback, burnin_callback]
         if "callbacks" in kwargs:
-            kwargs["callbacks"] = listify(kwargs["callbacks"]) + [annealing_callback]
+            kwargs["callbacks"] = listify(kwargs["callbacks"]) + [
+                annealing_callback,
+                burnin_callback,
+            ]
 
         return model.original_fit_method(*args, **kwargs)
 

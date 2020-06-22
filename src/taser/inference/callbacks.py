@@ -5,6 +5,7 @@ import numpy as np
 import taser.inference.metrics
 from matplotlib import pyplot as plt
 from taser import array_ops
+from taser.inference.layers import MVNLayer
 from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
 
@@ -37,6 +38,15 @@ class BurninCallback(callbacks.Callback):
     def __init__(self, epochs):
         super().__init__()
         self.epochs = epochs
+        self.mvn = None
+
+    def on_train_begin(self, logs=None):
+        self.mvn = self.model.layers[
+            [isinstance(layer, MVNLayer) for layer in self.model.layers].index(True)
+        ]
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.mvn.burnin.assign(epoch < self.epochs)
 
 
 class Callback(ABC):
