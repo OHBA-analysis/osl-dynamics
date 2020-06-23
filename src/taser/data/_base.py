@@ -67,15 +67,6 @@ class Data:
 
     """
 
-    ignored_keys = [
-        "__globals__",
-        "__header__",
-        "__version__",
-        "save_time",
-        "pca_applied",
-        "T",
-    ]
-
     @auto_repr
     def __init__(
         self,
@@ -92,12 +83,12 @@ class Data:
         )
 
         # TODO: Make raw_data read only using @property and self._raw_data
-        self.raw_data = np.array(time_series)
+        self.raw_data = np.array(self.time_series)
         self.time_series = self.raw_data.copy()
         self.pca_applied = False
 
         self.t = None
-        if time_series.ndim == 2:
+        if self.time_series.ndim == 2:
             self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
             self.time_axis_first()
 

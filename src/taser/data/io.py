@@ -4,6 +4,20 @@ from typing import Tuple, Union
 import mat73
 import numpy as np
 import scipy.io
+from taser.utils.misc import listify
+
+
+def get_ignored_keys(new_keys):
+    new_keys = listify(new_keys)
+    ignored_matlab_keys = [
+        "__globals__",
+        "__header__",
+        "__version__",
+        "save_time",
+        "pca_applied",
+        "T",
+    ] + new_keys
+    return ignored_matlab_keys
 
 
 def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
@@ -43,8 +57,7 @@ def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
 def load_matlab(
     file_name: str, sampling_frequency: float = 1, ignored_keys=None
 ) -> Tuple[np.ndarray, float]:
-    if ignored_keys is None:
-        ignored_keys = {}
+    ignored_keys = get_ignored_keys(ignored_keys)
     try:
         mat = scipy.io.loadmat(file_name)
     except NotImplementedError:
