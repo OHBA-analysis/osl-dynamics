@@ -6,6 +6,6 @@ which can be analysed.
 
 """
 
-from taser.simulation._base import *
-from taser.simulation._hmm import *
-from taser.simulation._other import *
+from vrad.simulation._base import *
+from vrad.simulation._hmm import *
+from vrad.simulation._other import *

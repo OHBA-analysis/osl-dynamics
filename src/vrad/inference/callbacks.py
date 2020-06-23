@@ -2,10 +2,10 @@ from abc import ABC
 from pathlib import Path
 
 import numpy as np
-import taser.inference.metrics
+import vrad.inference.metrics
 from matplotlib import pyplot as plt
-from taser import array_ops
-from taser.inference.layers import MVNLayer
+from vrad import array_ops
+from vrad.inference.layers import MVNLayer
 from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
 
@@ -109,7 +109,7 @@ class ComparisonCallback(Callback):
             matched_comp_array, matched_pred_stc = array_ops.match_states(
                 aligned_comp_array, aligned_pred_stc
             )
-            self.trainer.dice = taser.inference.metrics.dice_coefficient(
+            self.trainer.dice = vrad.inference.metrics.dice_coefficient(
                 matched_comp_array, matched_pred_stc
             )
         except ValueError:

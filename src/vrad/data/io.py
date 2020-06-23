@@ -4,7 +4,7 @@ from typing import Tuple, Union
 import mat73
 import numpy as np
 import scipy.io
-from taser.utils.misc import listify
+from vrad.utils.misc import listify
 
 
 def get_ignored_keys(new_keys):

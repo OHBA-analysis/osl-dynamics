@@ -3,17 +3,17 @@ from typing import Any, Union
 
 import numpy as np
 import scipy.io
-from taser.data.io import load_data
-from taser.data.manipulation import (
+from vrad.data.io import load_data
+from vrad.data.manipulation import (
     pca,
     scale,
     standardize,
     trials_to_continuous,
     trim_trials,
 )
-from taser.utils import plotting
-from taser.utils.decorators import auto_repr
-from taser.utils.misc import time_axis_first
+from vrad.utils import plotting
+from vrad.utils.decorators import auto_repr
+from vrad.utils.misc import time_axis_first
 
 
 class Data:
@@ -24,7 +24,7 @@ class Data:
     SPM MEEG objects (also from MATLAB).
 
     If the input provided is a numpy.ndarray, it is taken as is. If the input is a
-    string, TASER will check the file extension to see if it is .npy (read by
+    string, VRAD will check the file extension to see if it is .npy (read by
     numpy.load) or .mat. If a .mat file is found, it is first opened using
     scipy.io.loadmat and if that fails, mat73.loadmat. Any input other than these is
     considered valid if it can be converted to a numpy array using numpy.array.

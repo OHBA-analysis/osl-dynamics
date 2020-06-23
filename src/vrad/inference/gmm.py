@@ -7,8 +7,8 @@ from typing import Tuple, Union
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
-from taser.data import Data
-from taser.utils.misc import override_dict_defaults, time_axis_first
+from vrad.data import Data
+from vrad.utils.misc import override_dict_defaults, time_axis_first
 
 
 def learn_mu_sigma(

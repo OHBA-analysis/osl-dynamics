@@ -3,7 +3,7 @@ from typing import Union
 
 import numpy as np
 from sklearn.decomposition import PCA
-from taser.utils.decorators import transpose
+from vrad.utils.decorators import transpose
 
 
 def trim_trials(

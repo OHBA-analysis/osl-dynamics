@@ -2,7 +2,7 @@
 #
 # import pytest
 #
-# from taser.skeleton import fib
+# from vrad.skeleton import fib
 #
 # __author__ = "evanroberts"
 # __copyright__ = "evanroberts"

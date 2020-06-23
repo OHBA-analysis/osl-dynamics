@@ -1,9 +1,9 @@
 import logging
 
 import numpy as np
-from taser.array_ops import get_one_hot
-from taser.simulation import Simulation
-from taser.utils.decorators import auto_repr, auto_yaml
+from vrad.array_ops import get_one_hot
+from vrad.simulation import Simulation
+from vrad.utils.decorators import auto_repr, auto_yaml
 
 
 class HiddenSemiMarkovSimulation(Simulation):

@@ -6,7 +6,7 @@ from typing import Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from taser.data import Data
+from vrad.data import Data
 
 
 def gpu_growth():

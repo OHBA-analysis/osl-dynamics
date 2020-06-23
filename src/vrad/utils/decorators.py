@@ -5,7 +5,7 @@ from time import time
 
 import numpy as np
 import yaml
-from taser.utils.misc import time_axis_first
+from vrad.utils.misc import time_axis_first
 
 
 def timing(f):

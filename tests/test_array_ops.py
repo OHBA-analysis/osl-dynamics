@@ -1,8 +1,8 @@
 from unittest import TestCase
 
 import numpy as np
-import taser.inference.metrics
-from taser import array_ops
+import vrad.inference.metrics
+from vrad import array_ops
 
 
 class TestCorrelateStates(TestCase):
@@ -75,10 +75,10 @@ class TestDiceCoefficient1D(TestCase):
         self.sequence_3 = np.random.permutation(self.sequence_1)
 
     def test_dice_coefficient_1d(self):
-        dice_1 = taser.inference.metrics.dice_coefficient_1d(
+        dice_1 = vrad.inference.metrics.dice_coefficient_1d(
             self.sequence_1, self.sequence_2
         )
-        dice_2 = taser.inference.metrics.dice_coefficient_1d(
+        dice_2 = vrad.inference.metrics.dice_coefficient_1d(
             self.sequence_1, self.sequence_3
         )
 
@@ -92,10 +92,10 @@ class TestDiceCoefficient1D(TestCase):
         one_hot = array_ops.get_one_hot(self.sequence_1)
 
         with self.assertRaises(ValueError):
-            taser.inference.metrics.dice_coefficient_1d(self.sequence_1, one_hot)
+            vrad.inference.metrics.dice_coefficient_1d(self.sequence_1, one_hot)
 
         with self.assertRaises(TypeError):
-            taser.inference.metrics.dice_coefficient_1d(
+            vrad.inference.metrics.dice_coefficient_1d(
                 self.sequence_1, self.sequence_2.astype(np.float)
             ),
 
@@ -108,10 +108,10 @@ class TestDiceCoefficient(TestCase):
         self.sequence_3 = np.random.permutation(self.sequence_1)
 
     def test_dice_coefficient_2d(self):
-        dice_1 = taser.inference.metrics.dice_coefficient(
+        dice_1 = vrad.inference.metrics.dice_coefficient(
             self.sequence_1, self.sequence_2
         )
-        dice_2 = taser.inference.metrics.dice_coefficient(
+        dice_2 = vrad.inference.metrics.dice_coefficient(
             self.sequence_1, self.sequence_3
         )
 
@@ -123,19 +123,19 @@ class TestDiceCoefficient(TestCase):
         )
 
         with self.assertRaises(ValueError):
-            taser.inference.metrics.dice_coefficient(
+            vrad.inference.metrics.dice_coefficient(
                 np.random.rand(3, 4, 5), np.random.rand(5, 6, 7)
             )
 
         self.assertTrue(
-            taser.inference.metrics.dice_coefficient(self.base, self.base.copy()) == 1
+            vrad.inference.metrics.dice_coefficient(self.base, self.base.copy()) == 1
         )
 
         self.assertTrue(
-            taser.inference.metrics.dice_coefficient(self.base, self.sequence_1) == 1
+            vrad.inference.metrics.dice_coefficient(self.base, self.sequence_1) == 1
         )
         self.assertTrue(
-            taser.inference.metrics.dice_coefficient(self.sequence_1, self.base) == 1
+            vrad.inference.metrics.dice_coefficient(self.sequence_1, self.base) == 1
         )
 
 
@@ -310,5 +310,5 @@ class TestConfusionMatrix(TestCase):
         b = np.array([1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3])
         exp_result = np.array([[2, 1, 1], [1, 2, 1], [1, 1, 2]])
         self.assertTrue(
-            np.all(exp_result == taser.inference.metrics.confusion_matrix(a, b))
+            np.all(exp_result == vrad.inference.metrics.confusion_matrix(a, b))
         )

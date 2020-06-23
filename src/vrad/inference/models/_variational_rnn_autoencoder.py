@@ -1,8 +1,8 @@
 import numpy as np
-from taser.inference.callbacks import AnnealingCallback, BurninCallback
-from taser.inference.layers import MVNLayer, TrainableVariablesLayer, sampling
-from taser.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
-from taser.utils.misc import listify
+from vrad.inference.callbacks import AnnealingCallback, BurninCallback
+from vrad.inference.layers import MVNLayer, TrainableVariablesLayer, sampling
+from vrad.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
+from vrad.utils.misc import listify
 from tensorflow.keras import Model, layers, optimizers
 from tensorflow.python import Variable, zeros
 

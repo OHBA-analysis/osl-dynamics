@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.metrics import confusion_matrix as sklearn_confusion
-from taser.utils.decorators import transpose
+from vrad.utils.decorators import transpose
 
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)

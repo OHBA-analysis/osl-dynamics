@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from taser.utils.decorators import transpose
+from vrad.utils.decorators import transpose
 
 
 @transpose

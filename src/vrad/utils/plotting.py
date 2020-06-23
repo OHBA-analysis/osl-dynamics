@@ -7,10 +7,10 @@ from typing import Any, Iterable, List, Tuple, Union
 
 import matplotlib
 import numpy as np
-import taser.inference.metrics
+import vrad.inference.metrics
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from taser.array_ops import (
+from vrad.array_ops import (
     correlate_states,
     from_cholesky,
     get_one_hot,
@@ -19,8 +19,8 @@ from taser.array_ops import (
     state_activation,
     state_lifetimes,
 )
-from taser.utils.decorators import transpose
-from taser.utils.misc import override_dict_defaults
+from vrad.utils.decorators import transpose
+from vrad.utils.misc import override_dict_defaults
 
 
 def plot_correlation(
@@ -352,7 +352,7 @@ def plot_time_series(
     """Plot a time series with channel separation.
 
     Plot time_series with channel separation calculated by
-    taser.plotting.value_separation. This allows each channel to be plotted on the
+    vrad.plotting.value_separation. This allows each channel to be plotted on the
     same axis but with a separation from the other channels defined by their extreme
     values.
 
@@ -427,7 +427,7 @@ def highlight_states(
     """Plot vertical bars corresponding to state activation.
 
     For a state time course, each state has its activation starts and stops calculated
-    using taser.array_ops.state_activation. Each state is represented by a color chosen
+    using vrad.array_ops.state_activation. Each state is represented by a color chosen
     at uniform separations from the colormap given. If a sample frequency is provided,
     the x axis will be marked with time stamps rather than sample numbers.
 
@@ -774,7 +774,7 @@ def compare_state_data(
     """Plot multiple states time courses.
 
     For a list of state time courses, plot the state diagrams produced by
-    taser.plotting.highlight_states.
+    vrad.plotting.highlight_states.
 
     Parameters
     ----------
@@ -826,7 +826,7 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     state_time_course_2: numpy.ndarray
         The second state time course.
     """
-    confusion = taser.inference.metrics.confusion_matrix(
+    confusion = vrad.inference.metrics.confusion_matrix(
         state_time_course_1, state_time_course_2
     )
     nan_diagonal = confusion.copy().astype(float)

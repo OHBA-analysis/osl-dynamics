@@ -1,16 +1,16 @@
 =====
-TASER
+VRAD
 =====
 
 
-TASER can learn your alphas!!
+VRAD can learn your alphas!!
 
 
 Install in editable mode
 ========================
 .. code-block:: shell
 
-    cd TASER
+    cd VRAD
     pip install -e .
 
 
@@ -18,7 +18,7 @@ Build documentation
 ===================
 .. code-block:: shell
 
-    cd TASER
+    cd VRAD
     python setup.py docs
 
 
@@ -26,17 +26,17 @@ Run tests
 ========================
 .. code-block:: shell
 
-    cd TASER
+    cd VRAD
     python setup.py test
 
 
 Usage
 =====
-You can import things from TASER like any other package.
+You can import things from VRAD like any other package.
 
 .. code-block:: python
 
-    from taser.inference.models import InferenceRNN
+    from vrad.inference.models import InferenceRNN
 
 .. Description
     ===========

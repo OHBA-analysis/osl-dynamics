@@ -7,9 +7,9 @@ from typing import List, Union
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from taser.inference.callbacks import Callback
-from taser.utils.decorators import timing
-from taser.utils.misc import listify
+from vrad.inference.callbacks import Callback
+from vrad.utils.decorators import timing
+from vrad.utils.misc import listify
 from tensorflow.keras.optimizers import Adam
 from tqdm import trange
 

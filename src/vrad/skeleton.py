@@ -5,7 +5,7 @@ console script. To run this script uncomment the following lines in the
 [options.entry_points] section in setup.cfg:
 
     console_scripts =
-         fibonacci = taser.skeleton:run
+         fibonacci = vrad.skeleton:run
 
 Then run `python setup.py install` which will install the command `fibonacci`
 inside your current environment.
@@ -19,7 +19,7 @@ import argparse
 import logging
 import sys
 
-from taser import __version__
+from vrad import __version__
 
 __author__ = "evanroberts"
 __copyright__ = "evanroberts"
@@ -55,7 +55,7 @@ def parse_args(args):
     """
     parser = argparse.ArgumentParser(description="Just a Fibonacci demonstration")
     parser.add_argument(
-        "--version", action="version", version="TASER {ver}".format(ver=__version__)
+        "--version", action="version", version="VRAD {ver}".format(ver=__version__)
     )
     parser.add_argument(dest="n", help="n-th Fibonacci number", type=int, metavar="INT")
     parser.add_argument(

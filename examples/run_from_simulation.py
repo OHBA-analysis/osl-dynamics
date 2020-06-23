@@ -2,23 +2,23 @@ import logging
 import pathlib
 
 import numpy as np
-import taser.inference.metrics
+import vrad.inference.metrics
 import yaml
-from taser import array_ops
-from taser.data import Data
-from taser.inference import metrics
-from taser.inference.gmm import find_cholesky_decompositions, learn_mu_sigma
-from taser.inference.models import create_model
-from taser.inference.tf_ops import gpu_growth, train_predict_dataset
-from taser.simulation import HiddenSemiMarkovSimulation
-from taser.utils import plotting
+from vrad import array_ops
+from vrad.data import Data
+from vrad.inference import metrics
+from vrad.inference.gmm import find_cholesky_decompositions, learn_mu_sigma
+from vrad.inference.models import create_model
+from vrad.inference.tf_ops import gpu_growth, train_predict_dataset
+from vrad.simulation import HiddenSemiMarkovSimulation
+from vrad.utils import plotting
 
 # Restrict GPU memory usage
 gpu_growth()
 
 script_dir = str(pathlib.Path(__file__).parent.absolute())
 
-logger = logging.getLogger("TASER")
+logger = logging.getLogger("VRAD")
 logger.setLevel(logging.INFO)
 
 # Get all configuration options from a YAML file
