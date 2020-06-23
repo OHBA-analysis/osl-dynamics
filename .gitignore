@@ -14,7 +14,7 @@ __pycache__/*
 .*.swp
 */.ipynb_checkpoints/*
 .DS_Store
-Icon[\r]
+Icon[^M]
 
 # Project files
 .ropeproject
