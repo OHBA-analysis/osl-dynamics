@@ -81,7 +81,7 @@ class MVNLayer(Layer):
         self.learn_means = learn_means
         self.learn_covs = learn_covs
         self.initial_means = initial_means
-        self.burnin = tf.Variable(False)
+        self.burnin = tf.Variable(False, trainable=False)
 
         # Only keep the lower triangle of pseudo sigma (also flattens the tensors)
         self.initial_pseudo_sigmas = tfp.math.fill_triangular_inverse(
