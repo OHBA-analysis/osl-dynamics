@@ -1,15 +1,15 @@
 import logging
-from typing import Union, Any
+from typing import Any, Union
 
 import numpy as np
 import scipy.io
 from taser.data.io import load_data
 from taser.data.manipulation import (
-    trim_trials,
-    standardize,
     pca,
-    trials_to_continuous,
     scale,
+    standardize,
+    trials_to_continuous,
+    trim_trials,
 )
 from taser.utils import plotting
 from taser.utils.decorators import auto_repr

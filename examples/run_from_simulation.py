@@ -1,15 +1,15 @@
 import logging
 import pathlib
 
+import numpy as np
 import taser.inference.metrics
 import yaml
 from taser import array_ops
-from taser.data._base import Data
-from taser.inference.callbacks import ComparisonCallback
-from taser.inference.gmm import learn_mu_sigma
-from taser.inference.models._inference_rnn import InferenceRNN
+from taser.data import Data
+from taser.inference import metrics
+from taser.inference.gmm import find_cholesky_decompositions, learn_mu_sigma
+from taser.inference.models import create_model
 from taser.inference.tf_ops import gpu_growth, train_predict_dataset
-from taser.inference.trainers import AnnealingTrainer
 from taser.simulation import HiddenSemiMarkovSimulation
 from taser.utils import plotting
 
@@ -59,36 +59,34 @@ covariance, means = learn_mu_sigma(
     },
 )
 
+cholesky_covs = find_cholesky_decompositions(covariance, means, True)
+
 # Create model
 logger.info("Creating InferenceRNN")
 config["model"]["n_channels"] = meg_data.shape[1]
-model = InferenceRNN(
-    **config["model"], mus_initial=means, covariance_initial=covariance
+model = create_model(
+    **config["model"], initial_mean=means, initial_pseudo_cov=cholesky_covs
 )
 
 # Create trainer and callback for checking dice coefficient
 logger.info("Creating trainer")
-trainer = AnnealingTrainer(model=model, **config["trainer"])
-dice_callback = ComparisonCallback(trainer, state_time_course, prediction_dataset)
 
 # Train
 n_epochs = 100
 logger.info(f"Training for {n_epochs} epochs")
-trainer.train(training_dataset, n_epochs=n_epochs, callbacks=dice_callback)
+model.fit(training_dataset, epochs=n_epochs)
 logger.info("Training complete")
 
 # Analysis
 
-inf_stc = trainer.predict_latent_variable(prediction_dataset)
+inf_stc = array_ops.get_one_hot(
+    np.concatenate(model.predict(prediction_dataset)[3]).argmax(axis=1)
+)
 
 aligned_stc, aligned_inf_stc = array_ops.align_arrays(state_time_course, inf_stc)
 matched_stc, matched_inf_stc = array_ops.match_states(aligned_stc, aligned_inf_stc)
 
-dice_callback.plot_loss_dice()
-
-print(
-    f"Dice coefficient is {taser.inference.metrics.dice_coefficient(matched_stc, matched_inf_stc)}"
-)
+print(f"Dice coefficient is {metrics.dice_coefficient(matched_stc, matched_inf_stc)}")
 
 plotting.compare_state_data(matched_inf_stc, matched_stc)
 

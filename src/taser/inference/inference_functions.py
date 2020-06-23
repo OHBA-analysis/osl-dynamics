@@ -3,24 +3,22 @@
 """
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 
+@tf.function
 def pseudo_sigma_to_sigma(pseudo_sigma):
-    """Ensure covariance matrices are positive semi-definite.
-
-    Parameters
-    ----------
-    pseudo_sigma : tf.Tensor
-        An arbitrary [M x N x N] matrix.
-
-    Returns
-    -------
-    sigma : tf.Tensor
-        A positive semi-definite matrix
-    """
-    upper_triangle = tf.linalg.band_part(pseudo_sigma, 0, -1)
-    positive_definite = upper_triangle @ tf.transpose(upper_triangle, perm=[0, 2, 1])
-    sigma = positive_definite + tf.eye(positive_definite.shape[1]) * 1e-6
+    """Returns a legal non-singular covariance matrix from a 'pseudo_sigma' tensor."""
+    # Convert flattened tensors into matrices
+    pseudo_sigma = tfp.math.fill_triangular(pseudo_sigma)
+    sigma = tf.matmul(pseudo_sigma, tf.transpose(pseudo_sigma, (0, 2, 1)))
+    sigma = tf.add(
+        sigma,
+        1e-6
+        * tf.eye(
+            sigma.shape[1], batch_shape=[pseudo_sigma.shape[0]], dtype=sigma.dtype
+        ),
+    )
     return sigma
 
 

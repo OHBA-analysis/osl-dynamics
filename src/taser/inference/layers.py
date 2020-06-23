@@ -1,18 +1,30 @@
-from typing import List, Union
+from typing import Union
 
 import tensorflow as tf
-from taser.inference.inference_functions import (
-    normalise_covariance,
-    pseudo_sigma_to_sigma,
-)
-from taser.inference.initializers import (
-    Identity3D,
-    MeansInitializer,
-    PseudoSigmaInitializer,
-    UnchangedInitializer,
-)
+import tensorflow_probability as tfp
+from taser.inference.inference_functions import pseudo_sigma_to_sigma
+from taser.inference.initializers import Identity3D
+from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
-from tensorflow.python.keras.utils import tf_utils
+
+
+def sampling(args):
+    """Reparameterization trick:
+     draw random variable from normal distribution (mu=0, sigma=1)
+
+     Arguments:
+     - z_mu, z_log_sigma = paramters of variational distribution, Q(Z)
+
+     Returns:
+     - z* = a sample from the variational distribution.
+    """
+    z_mean, z_log_var = args
+    batch = tf.shape(z_mean)[0]
+    dim = K.int_shape(z_mean)[1]
+    chans = K.int_shape(z_mean)[2]
+    epsilon = K.random_normal(shape=(batch, dim, chans))
+    # default mean=0, std=1
+    return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
 
 class ReparameterizationLayer(Layer):
@@ -49,214 +61,165 @@ class ReparameterizationLayer(Layer):
 
 
 class MVNLayer(Layer):
-    """`Layer` for storing a means and standard deviations of a multivariate normal.
-
-    This layer doesn't act on input tensors. It only returns its internal state,
-    allowing means and standard deviations to be used to parameterize a
-    multivariate normal distribution.
-
-    Parameters
-    ----------
-    num_gaussians : int
-        The number of independent gaussian distributions.
-    dim : int
-        The dimensions of the space containing the gaussians.
-    learn_means : bool
-        If True, means are trainable.
-    learn_covariances : bool
-        If True, covariances are trainable.
-    initial_means : tf.Tensor
-        Starting values (priors) for the means. Default is all zero.
-    initial_pseudo_sigmas : tf.Tensor
-        Starting values (priors) for the covariances.
-        Default is num_gaussians x Identity(dim x dim).
+    """Parameterises multiple multivariate Gaussians and in terms of their means
+       and covariances. Means and covariances are outputted.
     """
 
     def __init__(
         self,
-        num_gaussians: int,
-        dim: int,
-        learn_means: bool = True,
-        learn_covariances: bool = True,
-        initial_means: tf.Tensor = None,
-        initial_pseudo_sigmas: tf.Tensor = None,
-        initial_sigmas: tf.Tensor = None,
-        **kwargs,
+        n_gaussians,
+        dim,
+        learn_means=True,
+        learn_covs=True,
+        initial_means=None,
+        initial_pseudo_sigmas=None,
+        **kwargs
     ):
-
-        if (initial_pseudo_sigmas is not None) and (initial_sigmas is not None):
-            raise ValueError(
-                "At most one of initial_pseudo_sigmas "
-                "and initial_sigmas may be specified."
-            )
-
-        super().__init__(**kwargs)
-        self.num_gaussians = num_gaussians
+        super(MVNLayer, self).__init__(**kwargs)
+        self.n_gaussians = n_gaussians
         self.dim = dim
         self.learn_means = learn_means
-        self.learn_covariances = learn_covariances
+        self.learn_covs = learn_covs
         self.initial_means = initial_means
-        self.initial_pseudo_sigmas = initial_pseudo_sigmas
-        self.initial_true_sigmas = initial_sigmas
+        self.burnin = tf.Variable(False)
 
+        # Only keep the lower triangle of pseudo sigma (also flattens the tensors)
+        self.initial_pseudo_sigmas = tfp.math.fill_triangular_inverse(
+            initial_pseudo_sigmas
+        ).numpy()
+
+    def _means_initializer(self, shape, dtype=tf.float32):
+        mats = self.initial_means
+        assert (
+            len(shape) == 2 and shape[0] == mats.shape[0] and shape[1] == mats.shape[1]
+        ), "shape must be (N, D)"
+        return mats
+
+    def _pseudo_sigmas_initializer(self, shape, dtype=tf.float32):
+        """Initialize a stacked tensor of using self.initial_pseudo_sigmas."""
+        return self.initial_pseudo_sigmas
+
+    def build(self, input_shape):
+        # Initialiser for means
         if self.initial_means is None:
             self.means_initializer = tf.keras.initializers.Zeros
         else:
-            self.means_initializer = MeansInitializer(self.initial_means)
+            self.means_initializer = self._means_initializer
 
-        if self.initial_pseudo_sigmas is not None:
-            self.sigmas_initializer = PseudoSigmaInitializer(self.initial_pseudo_sigmas)
-        if self.initial_true_sigmas is not None:
-            self.sigmas_initializer = UnchangedInitializer(self.initial_true_sigmas)
-        else:
-            self.sigmas_initializer = Identity3D
-
-        self.means = None
-        self.pseudo_sigmas = None
-        self.sigmas = None
-
-    def build(self, input_shape):
-        """Add weights to layer using initializers
-
-        Parameters
-        ----------
-        input_shape
-        """
         self.means = self.add_weight(
             "means",
-            shape=(self.num_gaussians, self.dim),
+            shape=(self.n_gaussians, self.dim),
+            dtype=tf.float32,
             initializer=self.means_initializer,
             trainable=self.learn_means,
         )
+
+        # Initialiser for covs
+        if self.initial_pseudo_sigmas is None:
+            # CHANGED THE IMPLEMENTATION SUCH THAT PSEUDO SIGMAS ARE FLATTENED
+            # SO THIS WONT WORK ANYMORE
+            print("NEED TO CODE: see MVNLayer")
+            exit()
+            self.pseudo_sigmas_initializer = Identity3D
+        else:
+            self.pseudo_sigmas_initializer = self._pseudo_sigmas_initializer
+
         self.pseudo_sigmas = self.add_weight(
             "pseudo_sigmas",
-            shape=(self.num_gaussians, self.dim, self.dim),
-            initializer=self.sigmas_initializer,
-            trainable=self.learn_covariances,
+            shape=self.initial_pseudo_sigmas.shape,
+            dtype=tf.float32,
+            initializer=self.pseudo_sigmas_initializer,
+            trainable=self.learn_covs,
         )
-        super().build(input_shape)
 
-    def compute_output_shape(self, input_shape) -> List[tf.TensorShape]:
-        """Compute output shape
+        self.untrainable_sigmas = self.add_weight(
+            "pseudo_sigmas",
+            shape=self.initial_pseudo_sigmas.shape,
+            dtype=tf.float32,
+            initializer=self.pseudo_sigmas_initializer,
+            trainable=False,
+        )
 
-        Parameters
-        ----------
-        input_shape
-            Not used internally.
+        self.built = True
 
-        Returns
-        -------
-        output_shape : List[tf.TensorShape]
-        """
+    def call(self, inputs, **kwargs):
+
+        self.sigmas = tf.cond(
+            self.burnin,
+            lambda: pseudo_sigma_to_sigma(self.untrainable_sigmas),
+            lambda: pseudo_sigma_to_sigma(self.pseudo_sigmas),
+        )
+        self.sigmas = pseudo_sigma_to_sigma(self.pseudo_sigmas)
+        return self.means, self.sigmas
+
+    def compute_output_shape(self, input_shape):
         return [
-            tf.TensorShape([self.num_gaussians, self.dim]),
-            tf.TensorShape([self.num_gaussians, self.dim, self.dim]),
+            tf.TensorShape([self.n_gaussians, self.dim]),
+            tf.TensorShape([self.n_gaussians, self.dim, self.dim]),
         ]
 
-    def call(self, inputs, burn_in=False, **kwargs):
-        """
-
-        Parameters
-        ----------
-        inputs
-            Not used, but required to allow eager execution
-        kwargs
-
-        Returns
-        -------
-        means : tf.Tensor
-            Means of a multivariate normal distribution
-        sigmas : tf.Tensor
-            Standard deviations of a multivariate normal distribution
-
-        """
-
-        def no_grad():
-            result = tf.stop_gradient(normalise_covariance(self.pseudo_sigmas))
-            return result
-
-        self.sigmas = tf_utils.smart_cond(
-            burn_in,
-            no_grad,
-            lambda: normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas)),
+    def get_config(self):
+        config = super(MVNLayer, self).get_config()
+        config.update(
+            {
+                "n_gaussian": self.n_gaussians,
+                "dim": self.dim,
+                "learn_means": self.learn_means,
+                "learn_covs": self.learn_covs,
+                "initial_means": self.initial_means,
+                "initial_pseudo_sigmas": self.initial_pseudo_sigmas,
+            }
         )
-
-        # self.sigmas = normalise_covariance(pseudo_sigma_to_sigma(self.pseudo_sigmas))
-        # self.sigmas = tf.stop_gradient(normalise_covariance(self.pseudo_sigmas))
-        return self.means, self.sigmas
+        return config
 
 
 class TrainableVariablesLayer(Layer):
-    """More abstract `Layer` allowing for calls which don't act on inputs.
+    """Generic trainable variables layer.
 
-    This layer holds its own values and provides then to a model when called. It
-    doesn't process any inputs provided to it - merely returns its internal state.
-
-    Parameters
-    ----------
-    shape : List[int]
-    initial_values : tf.Tensor
-    trainable : bool
-    kwargs
-
+       Sets up trainable parameters/weights tensor of a certain shape.
+       Parameters/weights are outputted.
     """
 
     def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
-
-        super().__init__(**kwargs)
+        super(TrainableVariablesLayer, self).__init__(**kwargs)
         self.shape = shape
         self.initial_values = initial_values
         self.trainable = trainable
 
-        self.values = None
+    def _variables_initializer(self, shape, dtype=tf.float32):
+        values = self.initial_values
+        return values
 
+    def build(self, input_shape):
+        # Set initialiser for means
         if self.initial_values is None:
             self.values_initializer = tf.keras.initializers.Zeros
         else:
-            self.values_initializer = UnchangedInitializer(self.initial_values)
+            self.values_initializer = self._variables_initializer
 
-    def build(self, input_shape):
-        """Add weights to layer.
-
-        Parameters
-        ----------
-        input_shape
-        """
         self.values = self.add_weight(
             "values",
             shape=self.shape,
+            dtype=K.floatx(),
             initializer=self.values_initializer,
             trainable=self.trainable,
         )
-        super().build(self.shape)
 
-    def compute_output_shape(self, input_shape):
-        """Provide the output shape of the layer.
-
-        Parameters
-        ----------
-        input_shape : tf.TensorShape
-            Not used internally.
-
-        Returns
-        -------
-        output_shape : tf.TensorShape
-            The shape specified during layer creation.
-
-        """
-        return tf.zeros(self.shape).shape
+        self.built = True
 
     def call(self, inputs, **kwargs):
-        """Return internal values.
-
-        Parameters
-        ----------
-        inputs : tf.Tensor
-            Not used.
-        kwargs
-
-        Returns
-        -------
-        internal_values : tf.Tensor
-        """
         return self.values
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(self.shape)
+
+    def get_config(self):
+        config = super(TrainableVariablesLayer, self).get_config()
+        config.update(
+            {
+                "shape": self.shape,
+                "initial_values": self.initial_values,
+                "trainable": self.trainable,
+            }
+        )
+        return config

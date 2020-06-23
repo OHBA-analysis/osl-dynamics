@@ -12,22 +12,23 @@ HiddenSemiMarkovSimulation:
   stay_prob: 0.95
 
 dataset:
-  mini_batch_length: 500
+  sequence_length: 100
   batch_size: 32
+  window_shift: 100
 
 model:
-  dropout_rate: 0.4
-  n_units_inference: 50
-  n_units_model: 50
+  sequence_length: 100
+  n_channels: 7
+  inference_dropout_rate: 0.3
+  n_units_lstm_inference: 15
   n_states: 4
-  n_channels: null
-  learn_means: false
-  learn_covariances: true
-  alpha_xform: "softmax"
-  log_likelihood_diagonal_constant: 1.0e-8
-
-trainer:
-  lr: 0.01
-  annealing_scale: 0.0001
-  annealing_sharpness: 20
-  burn_in: 20
+  model_dropout_rate: 0.3
+  n_units_lstm_model: 15
+  learn_means: False
+  learn_covs: True
+  do_annealing: True
+  annealing_sharpness: 5
+  n_epochs_annealing: 100
+  learning_rate: 0.01
+  activation_function: "softmax"
+  burnin_epochs: 30
