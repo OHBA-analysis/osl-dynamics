@@ -56,7 +56,9 @@ def plot_correlation(
         plot_matrices([correlation], group_color_scale=False)
 
 
-def plot_state_sums(state_time_course: np.ndarray, color: str = "tab:gray"):
+def plot_state_sums(
+    state_time_course: np.ndarray, color: str = "tab:gray", filename: str = None,
+):
     """Bar chart of total state durations.
 
     Creates a bar chart of the total activation duration for each state in
@@ -68,6 +70,8 @@ def plot_state_sums(state_time_course: np.ndarray, color: str = "tab:gray"):
         The state time course to be plotted (one-hot).
     color : str
         A matplotlib compatible color given as a string. Default is "tab:gray".
+    filename: str
+        A file to which to save the figure.
     """
     fig, axis = plt.subplots(1)
     counts = state_time_course.sum(axis=0).astype(int)
@@ -92,7 +96,7 @@ def plot_state_sums(state_time_course: np.ndarray, color: str = "tab:gray"):
 
     adjust_text(text, bars, fig, axis)
 
-    plt.show()
+    show_or_save(filename)
 
 
 # noinspection PyUnresolvedReferences
@@ -224,6 +228,7 @@ def plot_two_data_scales(
     plot_0_kwargs: dict = None,
     plot_1_kwargs: dict = None,
     plot_2_kwargs: dict = None,
+    filename: str = None,
 ):
     n_time_points = min(n_time_points, time_series_0.shape[0], time_series_1.shape[0],)
 
@@ -253,7 +258,7 @@ def plot_two_data_scales(
 
     plt.tight_layout()
 
-    plt.show()
+    show_or_save(filename)
 
 
 @transpose(0, 1, "time_series", "state_time_course")
@@ -267,7 +272,7 @@ def plot_state_highlighted_data(
     highlight_kwargs: dict = None,
     plot_kwargs: dict = None,
     event_kwargs: dict = None,
-    file_name: str = None,
+    filename: str = None,
 ):
     """Plot time series data highlighted by state.
 
@@ -298,7 +303,7 @@ def plot_state_highlighted_data(
     event_kwargs: dict
         A dictionary of kwargs for the plotted event data to be
         passed to matplotlib.pyplot.plot
-    file_name: str
+    filename: str
         A file to which to save the figure.
     """
     fig_defaults = {
@@ -333,11 +338,8 @@ def plot_state_highlighted_data(
         axis.axis("off")
 
     plt.tight_layout()
-    if file_name is None:
-        plt.show()
-    else:
-        plt.savefig(file_name, dpi=350)
-        plt.close("all")
+
+    show_or_save(filename)
 
 
 @transpose("time_series", 0)
@@ -348,6 +350,7 @@ def plot_time_series(
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     y_tick_values: list = None,
+    filename: str = None,
 ):
     """Plot a time series with channel separation.
 
@@ -370,6 +373,8 @@ def plot_time_series(
         Keyword arguments to be passed on to matplotlib.pyplot.subplots.
     y_tick_values:
         Labels for the channels to be placed on the y-axis.
+    filename: str
+        A file to which to save the figure.
     """
     n_time_points = min(n_time_points, time_series.shape[0])
     axis_given = axis is not None
@@ -410,7 +415,7 @@ def plot_time_series(
 
     if not axis_given:
         plt.tight_layout()
-        plt.show()
+        show_or_save(filename)
 
 
 @transpose(0, "state_time_course")
@@ -423,6 +428,7 @@ def highlight_states(
     highlight_kwargs: dict = None,
     legend: bool = True,
     fig_kwargs: dict = None,
+    filename: str = None,
 ):
     """Plot vertical bars corresponding to state activation.
 
@@ -449,6 +455,8 @@ def highlight_states(
         If True a legend is added to the plot.
     fig_kwargs: dict
         Keyword arguments for matplotlib.pyplot.subplots.
+    filename: str
+        A file to which to save the figure.
     """
     if n_time_points is None:
         n_time_points = state_time_course.shape[0]
@@ -508,7 +516,7 @@ def highlight_states(
 
     if not axis_given:
         # axis.axis("off")
-        plt.show()
+        show_or_save(filename)
 
 
 def plot_cholesky(matrix, group_color_scale: bool = True):
@@ -561,6 +569,7 @@ def plot_matrices(
     titles: list = None,
     cmap="viridis",
     nan_color="white",
+    filename: str = None,
 ):
     """Plot a collection of matrices.
 
@@ -578,6 +587,8 @@ def plot_matrices(
         Matplotlib colormap.
     nan_color: str
         Matplotlib color to use for NaN values. Default is white.
+    filename: str
+        A file to which to save the figure.
     """
     matrix = np.array(matrix)
     if matrix.ndim == 2:
@@ -620,7 +631,7 @@ def plot_matrices(
             plt.colorbar(pl, cax=cax)
         plt.tight_layout()
 
-    plt.show()
+    show_or_save(filename)
 
 
 def rough_square_axes(n_plots):
@@ -676,6 +687,7 @@ def plot_state_lifetimes(
     match_scale_y=True,
     hist_kwargs: dict = None,
     fig_kwargs: dict = None,
+    filename: str = None,
 ):
     """Create a histogram of state lifetimes.
 
@@ -699,6 +711,8 @@ def plot_state_lifetimes(
         Keyword arguments to pass to matplotlib.pyplot.hist.
     fig_kwargs: dict
         Keyword arguments to pass to matplotlib.pyplot.subplots.
+    filename: str
+        A file to which to save the figure.
     """
     if state_time_course.ndim == 1:
         state_time_course = get_one_hot(state_time_course)
@@ -762,7 +776,7 @@ def plot_state_lifetimes(
             axis.set_ylim(0, largest_bar * 1.1)
     plt.tight_layout()
 
-    plt.show()
+    show_or_save(filename)
 
 
 def compare_state_data(
@@ -770,6 +784,7 @@ def compare_state_data(
     n_time_points=20000,
     sample_frequency: float = 1,
     titles: list = None,
+    filename: str = None,
 ):
     """Plot multiple states time courses.
 
@@ -810,6 +825,8 @@ def compare_state_data(
         )
         axis.set_title(title)
 
+    show_or_save(filename)
+
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
 def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
@@ -832,3 +849,12 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     nan_diagonal = confusion.copy().astype(float)
     nan_diagonal[np.diag_indices_from(nan_diagonal)] = np.nan
     plot_matrices([confusion, nan_diagonal], group_color_scale=False)
+
+
+def show_or_save(filename: str = None):
+    if filename is None:
+        plt.show()
+    else:
+        print(f"Saving {filename}")
+        plt.savefig(filename, dpi=350)
+        plt.close("all")
