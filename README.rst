@@ -36,7 +36,7 @@ You can import things from VRAD like any other package.
 
 .. code-block:: python
 
-    from vrad.inference.models import InferenceRNN
+    from vrad.inference.models import create_model
 
 .. Description
     ===========
