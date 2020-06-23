@@ -4,10 +4,10 @@ from pathlib import Path
 import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
-from vrad import array_ops
-from vrad.inference.layers import MVNLayer
 from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
+from vrad import array_ops
+from vrad.inference.layers import MVNLayer
 
 
 class AnnealingCallback(callbacks.Callback):
