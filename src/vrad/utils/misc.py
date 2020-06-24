@@ -29,3 +29,28 @@ def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
         input_array = input_array.T
         transposed = True
     return input_array, transposed
+
+
+class LoggingContext:
+    def __init__(self, logger, suppress_level="warning", handler=None, close=True):
+        self.logger = logging.getLogger(logger)
+        if isinstance(suppress_level, str):
+            suppress_level = logging.getLevelName(suppress_level.upper())
+        self.level = suppress_level + 10
+        self.handler = handler
+        self.close = close
+
+    def __enter__(self):
+        if self.level is not None:
+            self.old_level = self.logger.level
+            self.logger.setLevel(self.level)
+        if self.handler:
+            self.logger.addHandler(self.handler)
+
+    def __exit__(self, et, ev, tb):
+        if self.level is not None:
+            self.logger.setLevel(self.old_level)
+        if self.handler:
+            self.logger.removeHandler(self.handler)
+        if self.handler and self.close:
+            self.handler.close()

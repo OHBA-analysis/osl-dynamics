@@ -1,12 +1,8 @@
 """Helper functions for TensorFlow
 
 """
-import logging
-from typing import Tuple, Union
 
-import numpy as np
 import tensorflow as tf
-from vrad.data import Data
 
 
 def gpu_growth():
@@ -49,36 +45,3 @@ def train_predict_dataset(time_series, sequence_length, batch_size, window_shift
     prediction_dataset = prediction_dataset.batch(sequence_length).batch(batch_size)
 
     return training_dataset, prediction_dataset
-
-
-# def train_predict_dataset(
-#     time_series: Union[np.ndarray, Data],
-#     mini_batch_length: int,
-#     batch_size: int,
-#     buffer_size: int = 10000,
-# ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
-#
-#     # If data is in a Data class, get the time_series first
-#     time_series = time_series[:]
-#     time_series = time_series.astype(np.float32)
-#
-#     if time_series.shape[0] < time_series.shape[1]:
-#         logging.warning("Assuming longer axis to be time and transposing.")
-#         time_series = time_series.T
-#     dataset = tf.data.Dataset.from_tensor_slices(time_series)
-#
-#     train_dataset = (
-#         dataset.batch(mini_batch_length, drop_remainder=True)
-#         .shuffle(buffer_size)
-#         .batch(batch_size)
-#         .prefetch(tf.data.experimental.AUTOTUNE)
-#         .cache()
-#     )
-#     predict_dataset = (
-#         dataset.batch(mini_batch_length, drop_remainder=True)
-#         .batch(batch_size)
-#         .prefetch(tf.data.experimental.AUTOTUNE)
-#         .cache()
-#     )
-#
-#     return train_dataset, predict_dataset
