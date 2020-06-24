@@ -3,8 +3,8 @@ from typing import Union
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
-from tensorflow.python.keras.backend import expand_dims
 from tensorflow.keras.layers import Layer
+from tensorflow.python.keras.backend import expand_dims
 from vrad.inference.functions import pseudo_sigma_to_sigma
 from vrad.inference.initializers import Identity3D
 

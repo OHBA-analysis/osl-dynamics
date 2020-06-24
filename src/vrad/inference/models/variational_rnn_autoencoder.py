@@ -5,11 +5,11 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import (
-    MVNLayer,
-    TrainableVariablesLayer,
-    ReparameterizationLayer,
     KLDivergenceLayer,
     LogLikelihoodLayer,
+    MVNLayer,
+    ReparameterizationLayer,
+    TrainableVariablesLayer,
 )
 from vrad.utils.misc import listify
 
