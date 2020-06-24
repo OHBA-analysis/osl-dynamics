@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/TASER.iml" filepath="$PROJECT_DIR$/.idea/TASER.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/VRAD.iml" filepath="$PROJECT_DIR$/.idea/VRAD.iml" />
     </modules>
   </component>
 </project>

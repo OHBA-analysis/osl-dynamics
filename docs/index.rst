@@ -1,8 +1,8 @@
 =====
-TASER
+VRAD
 =====
 
-This is the documentation of **TASER**.
+This is the documentation of **VRAD**.
 
 .. note::
 

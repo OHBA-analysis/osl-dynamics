@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    Setup file for taser.
+    Setup file for vrad.
     Use setup.cfg to configure your project.
 
     This file was generated with PyScaffold 3.2.3.
@@ -16,7 +16,7 @@ try:
     import tensorflow
 except ModuleNotFoundError:
     raise ModuleNotFoundError(
-        "You must install tensorflow or tensorflow-gpu before TASER."
+        "You must install tensorflow or tensorflow-gpu before VRAD."
     )
 
 try:

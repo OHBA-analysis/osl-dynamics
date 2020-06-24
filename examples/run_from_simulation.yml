@@ -1,0 +1,34 @@
+HiddenSemiMarkovSimulation:
+  e_std: 0.2
+  full_trans_prob: null
+  gamma_scale: 10
+  gamma_shape: 5
+  n_channels: 7
+  n_samples: 50000
+  n_states: 4
+  off_diagonal_trans_prob: null
+  random_covariance_weights: false
+  sim_varying_means: false
+  stay_prob: 0.95
+
+dataset:
+  sequence_length: 100
+  batch_size: 32
+  window_shift: 100
+
+model:
+  sequence_length: 100
+  n_channels: 7
+  inference_dropout_rate: 0.3
+  n_units_lstm_inference: 15
+  n_states: 4
+  model_dropout_rate: 0.3
+  n_units_lstm_model: 15
+  learn_means: False
+  learn_covs: True
+  do_annealing: True
+  annealing_sharpness: 5
+  n_epochs_annealing: 100
+  learning_rate: 0.01
+  activation_function: "softmax"
+  burnin_epochs: 30
