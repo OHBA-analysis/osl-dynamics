@@ -1,6 +1,9 @@
 import numpy as np
 from tensorflow.keras import Model, layers, optimizers
 from tensorflow.python import Variable, zeros
+from tensorflow.python.distribute.distribution_strategy_context import get_strategy
+from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
+from tensorflow.python.keras.backend import expand_dims
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import MVNLayer, TrainableVariablesLayer, sampling
 from vrad.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
@@ -25,21 +28,28 @@ def create_model(
     learning_rate: float,
     activation_function: str,
     burnin_epochs: int,
+    multi_gpu: bool = False,
 ):
-    model = _model_structure(
-        sequence_length=sequence_length,
-        n_channels=n_channels,
-        inference_dropout_rate=inference_dropout_rate,
-        n_units_lstm_inference=n_units_lstm_inference,
-        n_states=n_states,
-        model_dropout_rate=model_dropout_rate,
-        n_units_lstm_model=n_units_lstm_model,
-        learn_means=learn_means,
-        learn_covs=learn_covs,
-        initial_mean=initial_mean,
-        initial_pseudo_cov=initial_pseudo_cov,
-        activation_function=activation_function,
-    )
+    if multi_gpu:
+        strategy = MirroredStrategy()
+    else:
+        strategy = get_strategy()
+
+    with strategy.scope():
+        model = _model_structure(
+            sequence_length=sequence_length,
+            n_channels=n_channels,
+            inference_dropout_rate=inference_dropout_rate,
+            n_units_lstm_inference=n_units_lstm_inference,
+            n_states=n_states,
+            model_dropout_rate=model_dropout_rate,
+            n_units_lstm_model=n_units_lstm_model,
+            learn_means=learn_means,
+            learn_covs=learn_covs,
+            initial_mean=initial_mean,
+            initial_pseudo_cov=initial_pseudo_cov,
+            activation_function=activation_function,
+        )
 
     optimizer = optimizers.Adam(learning_rate=learning_rate)
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
@@ -182,8 +192,8 @@ def _model_structure(
     kl_loss = kl_loss_layer([m_theta_t, s2_theta_t, mu_theta_jt, sigma2_theta_j])
 
     outputs = [
-        ll_loss,
-        kl_loss,
+        expand_dims(ll_loss, axis=0),
+        expand_dims(kl_loss, axis=0),
         theta_t,
         m_theta_t,
         s2_theta_t,
