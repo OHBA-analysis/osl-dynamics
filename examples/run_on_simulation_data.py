@@ -68,9 +68,7 @@ covariances = gmm.find_cholesky_decompositions(covariances, means, False)
 
 # Prepare dataset
 training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
-    time_series=meg_data,
-    sequence_length=sequence_length,
-    batch_size=batch_size,
+    time_series=meg_data, sequence_length=sequence_length, batch_size=batch_size,
 )
 
 # Build autoecoder model

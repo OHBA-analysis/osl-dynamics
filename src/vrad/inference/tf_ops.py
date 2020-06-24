@@ -24,7 +24,9 @@ def gpu_growth():
             print(e)
 
 
-def train_predict_dataset(time_series, sequence_length, batch_size=32, window_shift=None):
+def train_predict_dataset(
+    time_series, sequence_length, batch_size=32, window_shift=None
+):
     window_shift = window_shift or sequence_length
     dataset = tf.data.Dataset.from_tensor_slices(time_series)
     training_dataset = dataset.window(
