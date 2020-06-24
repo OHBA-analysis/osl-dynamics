@@ -116,11 +116,10 @@ class MVNLayer(Layer):
 
         # Initialiser for covs
         if self.initial_pseudo_sigmas is None:
-            # CHANGED THE IMPLEMENTATION SUCH THAT PSEUDO SIGMAS ARE FLATTENED
-            # SO THIS WONT WORK ANYMORE
-            print("NEED TO CODE: see MVNLayer")
-            exit()
-            self.pseudo_sigmas_initializer = Identity3D
+            # Only keep the lower triangle of pseudo sigma (also flattens the tensors)
+            self.pseudo_sigmas_initializer = tfp.math.fill_triangular_inverse(
+                Identity3D
+            ).numpy()
         else:
             self.pseudo_sigmas_initializer = self._pseudo_sigmas_initializer
 
