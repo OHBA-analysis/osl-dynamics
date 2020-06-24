@@ -17,11 +17,11 @@ from vrad.utils.misc import listify
 def create_model(
     n_states: int,
     n_channels: int,
+    sequence_length: int,
     learn_means: bool,
     learn_covs: bool,
     initial_mean: np.ndarray,
     initial_cholesky_cov: np.ndarray,
-    sequence_length: int = 125,
     n_units_encoder: int = 64,
     n_units_decoder: int = 64,
     dropout_rate_encoder: float = 0.3,
