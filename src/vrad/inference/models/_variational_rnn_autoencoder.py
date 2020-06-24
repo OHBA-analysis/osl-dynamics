@@ -3,6 +3,7 @@ from tensorflow.keras import Model, layers, optimizers
 from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
+from tensorflow.python.keras.backend import expand_dims
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import MVNLayer, TrainableVariablesLayer, sampling
 from vrad.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
@@ -191,8 +192,8 @@ def _model_structure(
     kl_loss = kl_loss_layer([m_theta_t, s2_theta_t, mu_theta_jt, sigma2_theta_j])
 
     outputs = [
-        ll_loss,
-        kl_loss,
+        expand_dims(ll_loss, axis=0),
+        expand_dims(kl_loss, axis=0),
         theta_t,
         m_theta_t,
         s2_theta_t,
