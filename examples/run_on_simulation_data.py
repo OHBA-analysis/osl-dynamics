@@ -82,6 +82,15 @@ rnn_vae = create_model(
     learn_covs=True,
     initial_mean=means,
     initial_cholesky_cov=covariances,
+    n_units_encoder=n_units_encoder,
+    n_units_decoder=n_units_decoder,
+    dropout_rate_encoder=dropout_rate_encoder,
+    dropout_rate_decoder=dropout_rate_decoder,
+    activation_function=activation_function,
+    do_annealing=do_annealing,
+    annealing_sharpness=annealing_sharpness,
+    n_epochs_annealing=n_epochs_annealing,
+    n_epochs_burnin=n_epochs_burnin,
 )
 
 rnn_vae.summary()
