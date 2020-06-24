@@ -5,7 +5,7 @@ import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
 from tensorflow.python.keras.backend import expand_dims
 from tensorflow.keras.layers import Layer
-from vrad.inference.inference_functions import pseudo_sigma_to_sigma
+from vrad.inference.functions import pseudo_sigma_to_sigma
 from vrad.inference.initializers import Identity3D
 
 
