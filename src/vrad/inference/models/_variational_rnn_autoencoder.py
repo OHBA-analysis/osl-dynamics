@@ -10,23 +10,24 @@ from vrad.utils.misc import listify
 
 
 def create_model(
-    sequence_length: int,
-    n_channels: int,
-    inference_dropout_rate: float,
-    n_units_lstm_inference: int,
     n_states: int,
-    model_dropout_rate: float,
-    n_units_lstm_model: int,
-    learn_means: bool,
-    learn_covs: bool,
-    initial_mean: np.ndarray,
-    initial_pseudo_cov: np.ndarray,
-    do_annealing: bool,
-    annealing_sharpness: float,
-    n_epochs_annealing: int,
-    learning_rate: float,
-    activation_function: str,
-    burnin_epochs: int,
+    n_channels: int,
+    sequence_length: int = 125,
+    n_units_inference: int = 64,
+    n_units_model: int = 64,
+    inference_dropout_rate: float = 0.3,
+    model_dropout_rate: float = 0.3,
+    activation_function: str = "softmax",
+    learn_means: bool = True,
+    learn_covs: bool = True,
+    initial_mean: np.ndarray = None,
+    initial_pseudo_cov: np.ndarray = None,
+    do_annealing: bool = True,
+    annealing_sharpness: float = 5.0,
+    n_epochs_annealing: int = 80,
+    burnin_epochs: int = 10,
+    learning_rate: float = 0.01,
+    clip_normalization: float = None,
     multi_gpu: bool = False,
 ):
     if multi_gpu:
@@ -39,10 +40,10 @@ def create_model(
             sequence_length=sequence_length,
             n_channels=n_channels,
             inference_dropout_rate=inference_dropout_rate,
-            n_units_lstm_inference=n_units_lstm_inference,
+            n_units_inference=n_units_inference,
             n_states=n_states,
             model_dropout_rate=model_dropout_rate,
-            n_units_lstm_model=n_units_lstm_model,
+            n_units_model=n_units_model,
             learn_means=learn_means,
             learn_covs=learn_covs,
             initial_mean=initial_mean,
@@ -50,7 +51,9 @@ def create_model(
             activation_function=activation_function,
         )
 
-    optimizer = optimizers.Adam(learning_rate=learning_rate)
+    optimizer = optimizers.Adam(
+        learning_rate=learning_rate, clipnorm=clip_normalization,
+    )
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
     model.compile(
@@ -103,10 +106,10 @@ def _model_structure(
     sequence_length: int,
     n_channels: int,
     inference_dropout_rate: float,
-    n_units_lstm_inference: int,
+    n_units_inference: int,
     n_states: int,
     model_dropout_rate: float,
-    n_units_lstm_model: int,
+    n_units_model: int,
     learn_means: bool,
     learn_covs: bool,
     initial_mean: np.ndarray,
@@ -125,7 +128,7 @@ def _model_structure(
     input_normalisation_layer = layers.LayerNormalization()
     inference_input_dropout_layer = layers.Dropout(inference_dropout_rate)
     inference_output_layer = layers.Bidirectional(
-        layer=layers.LSTM(n_units_lstm_inference, return_sequences=True, stateful=False)
+        layer=layers.LSTM(n_units_inference, return_sequences=True, stateful=False)
     )
     inference_normalisation_layer = layers.LayerNormalization()
     inference_output_dropout_layer = layers.Dropout(inference_dropout_rate)
@@ -154,7 +157,7 @@ def _model_structure(
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(model_dropout_rate)
     model_output_layer = layers.LSTM(
-        n_units_lstm_model, return_sequences=True, stateful=False
+        n_units_model, return_sequences=True, stateful=False
     )
     model_normalisation_layer = layers.LayerNormalization()
     model_output_dropout_layer = layers.Dropout(model_dropout_rate)
