@@ -5,6 +5,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
+from tensorflow.python.keras.backend import expand_dims
 
 
 def normal_kl_divergence(
@@ -152,7 +153,7 @@ class LogLikelihoodLayer(Layer):
         LL = log_det + tf.squeeze(tf.squeeze(attempt, axis=3), axis=2)
         LL = -tf.reduce_sum(LL)
 
-        return LL
+        return expand_dims(LL)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
@@ -195,7 +196,7 @@ class KLDivergenceLayer(Layer):
 
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
-        return kl_loss
+        return expand_dims(kl_loss)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
