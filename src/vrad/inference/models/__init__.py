@@ -2,4 +2,4 @@
 
 """
 
-from vrad.inference.models._variational_rnn_autoencoder import create_model
+from vrad.inference.models.variational_rnn_autoencoder import create_model

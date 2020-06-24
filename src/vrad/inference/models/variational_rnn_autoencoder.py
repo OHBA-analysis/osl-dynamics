@@ -4,64 +4,74 @@ from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
-from vrad.inference.layers import MVNLayer, TrainableVariablesLayer, sampling
-from vrad.inference.loss import KLDivergenceLayer, LogLikelihoodLayer
+from vrad.inference.layers import (
+    MVNLayer,
+    TrainableVariablesLayer,
+    ReparameterizationLayer,
+    KLDivergenceLayer,
+    LogLikelihoodLayer,
+)
 from vrad.utils.misc import listify
 
 
 def create_model(
     n_states: int,
     n_channels: int,
-    sequence_length: int = 125,
-    n_units_inference: int = 64,
-    n_units_model: int = 64,
-    inference_dropout_rate: float = 0.3,
-    model_dropout_rate: float = 0.3,
+    sequence_length: int,
+    learn_means: bool,
+    learn_covs: bool,
+    initial_mean: np.ndarray,
+    initial_cholesky_cov: np.ndarray,
+    n_units_encoder: int = 64,
+    n_units_decoder: int = 64,
+    dropout_rate_encoder: float = 0.3,
+    dropout_rate_decoder: float = 0.3,
     activation_function: str = "softmax",
-    learn_means: bool = True,
-    learn_covs: bool = True,
-    initial_mean: np.ndarray = None,
-    initial_pseudo_cov: np.ndarray = None,
     do_annealing: bool = True,
     annealing_sharpness: float = 5.0,
     n_epochs_annealing: int = 80,
-    burnin_epochs: int = 10,
+    n_epochs_burnin: int = 10,
     learning_rate: float = 0.01,
     clip_normalization: float = None,
     multi_gpu: bool = False,
 ):
+    annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
+
+    # Setup optimizer
+    optimizer = optimizers.Adam(
+        learning_rate=learning_rate, clipnorm=clip_normalization,
+    )
+
+    # Stretegy for distributed learning
     if multi_gpu:
         strategy = MirroredStrategy()
     else:
         strategy = get_strategy()
 
+    # Compile the model
     with strategy.scope():
         model = _model_structure(
-            sequence_length=sequence_length,
-            n_channels=n_channels,
-            inference_dropout_rate=inference_dropout_rate,
-            n_units_inference=n_units_inference,
             n_states=n_states,
-            model_dropout_rate=model_dropout_rate,
-            n_units_model=n_units_model,
+            n_channels=n_channels,
+            sequence_length=sequence_length,
+            n_units_encoder=n_units_encoder,
+            n_units_decoder=n_units_decoder,
+            dropout_rate_encoder=dropout_rate_encoder,
+            dropout_rate_decoder=dropout_rate_decoder,
             learn_means=learn_means,
             learn_covs=learn_covs,
             initial_mean=initial_mean,
-            initial_pseudo_cov=initial_pseudo_cov,
+            initial_cholesky_cov=initial_cholesky_cov,
             activation_function=activation_function,
         )
 
-    optimizer = optimizers.Adam(
-        learning_rate=learning_rate, clipnorm=clip_normalization,
-    )
-    annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
+        model.compile(
+            optimizer=optimizer,
+            loss=[_ll_loss, _kl_loss(annealing_factor=annealing_factor)],
+        )
 
-    model.compile(
-        optimizer=optimizer,
-        loss=[_ll_loss, _kl_loss(annealing_factor=annealing_factor)],
-    )
-
-    burnin_callback = BurninCallback(epochs=burnin_epochs)
+    # Callbacks
+    burnin_callback = BurninCallback(epochs=n_epochs_burnin)
 
     annealing_callback = AnnealingCallback(
         annealing_factor=annealing_factor,
@@ -84,6 +94,7 @@ def create_model(
         return model.original_fit_method(*args, **kwargs)
 
     model.fit = anneal_fit
+
     return model
 
 
@@ -103,17 +114,17 @@ def _kl_loss(annealing_factor):
 
 
 def _model_structure(
-    sequence_length: int,
-    n_channels: int,
-    inference_dropout_rate: float,
-    n_units_inference: int,
     n_states: int,
-    model_dropout_rate: float,
-    n_units_model: int,
+    n_channels: int,
+    sequence_length: int,
+    n_units_encoder: int,
+    n_units_decoder: int,
+    dropout_rate_encoder: float,
+    dropout_rate_decoder: float,
     learn_means: bool,
     learn_covs: bool,
     initial_mean: np.ndarray,
-    initial_pseudo_cov: np.ndarray,
+    initial_cholesky_cov: np.ndarray,
     activation_function: str = "softmax",
 ):
     # Layer for input
@@ -126,18 +137,18 @@ def _model_structure(
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
-    inference_input_dropout_layer = layers.Dropout(inference_dropout_rate)
+    inference_input_dropout_layer = layers.Dropout(dropout_rate_encoder)
     inference_output_layer = layers.Bidirectional(
-        layer=layers.LSTM(n_units_inference, return_sequences=True, stateful=False)
+        layer=layers.LSTM(n_units_encoder, return_sequences=True, stateful=False)
     )
     inference_normalisation_layer = layers.LayerNormalization()
-    inference_output_dropout_layer = layers.Dropout(inference_dropout_rate)
+    inference_output_dropout_layer = layers.Dropout(dropout_rate_encoder)
     m_theta_t_layer = layers.Dense(n_states, activation="linear")
     s2_theta_t_layer = layers.Dense(n_states, activation="softplus")
 
     # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, s2_theta_t) via the
     # reparameterisation trick
-    theta_t_layer = layers.Lambda(sampling)
+    theta_t_layer = ReparameterizationLayer()
 
     # Inference RNN data flow
     inputs_norm = input_normalisation_layer(inputs)
@@ -155,12 +166,12 @@ def _model_structure(
     # - sigma2_theta_j      = trainable constant
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(model_dropout_rate)
+    model_input_dropout_layer = layers.Dropout(dropout_rate_decoder)
     model_output_layer = layers.LSTM(
-        n_units_model, return_sequences=True, stateful=False
+        n_units_decoder, return_sequences=True, stateful=False
     )
     model_normalisation_layer = layers.LayerNormalization()
-    model_output_dropout_layer = layers.Dropout(model_dropout_rate)
+    model_output_dropout_layer = layers.Dropout(dropout_rate_decoder)
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear")
     sigma2_theta_j_layer = TrainableVariablesLayer(
         [n_states], initial_values=zeros(n_states), trainable=True
@@ -173,7 +184,7 @@ def _model_structure(
         learn_means=learn_means,
         learn_covs=learn_covs,
         initial_means=initial_mean,
-        initial_pseudo_sigmas=initial_pseudo_cov,
+        initial_pseudo_sigmas=initial_cholesky_cov,
     )
 
     # Layers to calculate loss as the free energy = LL + KL
@@ -206,6 +217,5 @@ def _model_structure(
     ]
 
     model = Model(inputs=inputs, outputs=outputs,)
-    # model.add_loss([ll_loss, kl_loss])
 
     return model
