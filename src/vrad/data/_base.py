@@ -8,6 +8,7 @@ from vrad.data.manipulation import (
     pca,
     scale,
     standardize,
+    time_embed,
     trials_to_continuous,
     trim_trials,
 )
@@ -192,6 +193,11 @@ class Data:
                 self.time_series = pca(
                     time_series=self.time_series, n_components=n_components
                 )
+
+    def time_embed(self, backward, forward):
+        self.time_series = time_embed(
+            self.time_series, backward=backward, forward=forward
+        )
 
     def plot(self, n_time_points: int = 10000):
         """Plot time_series.

@@ -18,7 +18,8 @@ def learn_mu_sigma(
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
     take_random_sample: int = 0,
-) -> Tuple[np.ndarray, np.ndarray]:
+    return_gmm: bool = False,
+):
     """Find a mixture of Gaussian distributions which characterises a dataset.
 
     Using scikit-learn's `BayesianGaussianMixture` class, find a set of Gaussian
@@ -84,6 +85,9 @@ def learn_mu_sigma(
             print(f"Converged on iteration {attempt}")
             break
         print(f"Failed to converge on iteration {attempt}")
+
+    if return_gmm:
+        return gmm.covariances_, gmm.means_, gmm
     return gmm.covariances_, gmm.means_
 
 

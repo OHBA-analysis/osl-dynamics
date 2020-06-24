@@ -156,3 +156,11 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
         )
 
     return concatenated
+
+
+@transpose
+def time_embed(time_series, backward, forward):
+    n_samples = time_series.shape[0]
+    trimmed_indices = np.arange(backward, n_samples - forward)
+    indices = trimmed_indices + np.arange(-backward, forward + 1)[:, None]
+    return time_series[indices].sum(axis=0)
