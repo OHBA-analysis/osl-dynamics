@@ -12,5 +12,5 @@ except DistributionNotFound:
 finally:
     del get_distribution, DistributionNotFound
 
-logging.basicConfig(level=logging.DEBUG, format=logging.BASIC_FORMAT)
+logging.basicConfig(level=logging.WARNING, format=logging.BASIC_FORMAT)
 _logger = logging.getLogger("VRAD")
