@@ -3,6 +3,8 @@ from typing import Tuple
 
 import numpy as np
 
+_logger = logging.getLogger("VRAD")
+
 
 def override_dict_defaults(default_dict: dict, override_dict: dict = None) -> dict:
     if override_dict is None:
@@ -22,7 +24,7 @@ def listify(obj: object):
 
 def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
     if input_array.ndim != 2:
-        logging.info("Non-2D array not transposed.")
+        logger.info("Non-2D array not transposed.")
         return input_array, False
     transposed = False
     if input_array.shape[1] > input_array.shape[0]:

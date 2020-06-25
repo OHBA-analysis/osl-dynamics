@@ -22,6 +22,8 @@ from vrad.array_ops import (
 from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
 
+_logger = logging.getLogger("VRAD")
+
 
 def plot_correlation(
     state_time_course_1: np.ndarray,
@@ -679,7 +681,7 @@ def add_axis_colorbar(axis: plt.Axes):
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(pl, cax=cax)
     except IndexError:
-        logging.warning("No mappable image found on axis.")
+        _logger.warning("No mappable image found on axis.")
 
 
 @transpose(0, "state_time_course")

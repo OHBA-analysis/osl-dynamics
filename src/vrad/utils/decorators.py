@@ -7,6 +7,8 @@ import numpy as np
 import yaml
 from vrad.utils.misc import time_axis_first
 
+_logger = logging.getLogger("VRAD")
+
 
 def timing(f):
     @wraps(f)
@@ -57,22 +59,22 @@ def transpose(f, *arguments):
             try:
                 args[i], transposed = time_axis_first(args[i])
                 if transposed:
-                    logging.warning(
+                    _logger.warning(
                         f"Argument {i}: assuming longer axis to be "
                         f"time and transposing."
                     )
             except IndexError:
-                logging.debug(f"Positional argument {i} not in args.")
+                _logger.debug(f"Positional argument {i} not in args.")
         for k in keyword_arguments:
             try:
                 kwargs[k], transposed = time_axis_first(kwargs[k])
                 if transposed:
-                    logging.warning(
+                    _logger.warning(
                         f"Argument {k}: assuming longer axis to be "
                         f"time and transposing."
                     )
             except KeyError:
-                logging.debug(f"Argument {k} not found in kwargs.")
+                _logger.debug(f"Argument {k} not found in kwargs.")
 
         return f(*args, **kwargs)
 
@@ -172,7 +174,7 @@ def deprecated(f, *, replaced_by: str = None, reason: str = None):
         if reason is not None:
             message.append(reason)
         message = " ".join(message)
-        logging.warning(message)
+        _logger.warning(message)
         return f(*args, **kwargs)
 
     return wrapper_function

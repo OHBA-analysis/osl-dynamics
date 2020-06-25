@@ -8,6 +8,8 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from vrad.utils.decorators import transpose
 
+_logger = logging.getLogger("VRAD")
+
 
 @transpose
 def correlate_states(
@@ -110,7 +112,7 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
 
     """
     if values.ndim == 2:
-        logging.info("argmax being taken on shorter axis.")
+        _logger.info("argmax being taken on shorter axis.")
         values = values.argmax(axis=1)
     if n_states is None:
         n_states = values.max() + 1
@@ -204,7 +206,7 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             channel_on.append(on)
             channel_off.append(off)
         except IndexError:
-            logging.info(f"No activation in state {i}.")
+            _logger.info(f"No activation in state {i}.")
             channel_on.append(np.array([]))
             channel_off.append(np.array([]))
 
