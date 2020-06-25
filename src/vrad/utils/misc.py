@@ -24,7 +24,7 @@ def listify(obj: object):
 
 def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
     if input_array.ndim != 2:
-        logger.info("Non-2D array not transposed.")
+        _logger.info("Non-2D array not transposed.")
         return input_array, False
     transposed = False
     if input_array.shape[1] > input_array.shape[0]:
