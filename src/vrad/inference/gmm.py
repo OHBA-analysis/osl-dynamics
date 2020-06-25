@@ -17,7 +17,7 @@ def learn_mu_sigma(
     learn_means: bool = False,
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
-    take_random_sample: int = 0,
+    take_random_sample: int = None,
     return_gmm: bool = False,
 ):
     """Find a mixture of Gaussian distributions which characterises a dataset.
@@ -54,7 +54,7 @@ def learn_mu_sigma(
     if retry_attempts < 1:
         raise ValueError("retry_attempts cannot be less than 1")
 
-    default_gmm_kwargs = {"verbose": 2, "n_init": 5}
+    default_gmm_kwargs = {"verbose": 2, "n_init": 1}
     gmm_kwargs = override_dict_defaults(default_gmm_kwargs, gmm_kwargs)
 
     data, transposed = time_axis_first(data)
