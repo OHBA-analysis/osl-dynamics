@@ -223,14 +223,16 @@ def plot_two_data_scales(
     time_series_0: np.ndarray,
     time_series_1: np.ndarray,
     time_series_2: np.ndarray = None,
-    n_time_points: int = np.inf,
+    n_time_points: int = None,
     fig_kwargs: dict = None,
     plot_0_kwargs: dict = None,
     plot_1_kwargs: dict = None,
     plot_2_kwargs: dict = None,
     filename: str = None,
 ):
-    n_time_points = min(n_time_points, time_series_0.shape[0], time_series_1.shape[0],)
+    n_time_points = min(
+        n_time_points or np.inf, time_series_0.shape[0], time_series_1.shape[0],
+    )
 
     if plot_2_kwargs is not None:
         n_time_points = min(n_time_points, time_series_2.shape[0])
@@ -266,7 +268,7 @@ def plot_state_highlighted_data(
     time_series: Union[np.ndarray, Any],
     state_time_course: np.ndarray,
     events: np.ndarray = None,
-    n_time_points: int = 5000,
+    n_time_points: int = None,
     colormap: str = "gist_rainbow",
     fig_kwargs: dict = None,
     highlight_kwargs: dict = None,
@@ -315,6 +317,10 @@ def plot_state_highlighted_data(
     fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
     event_kwargs = override_dict_defaults(event_defaults, event_kwargs)
 
+    n_time_points = min(
+        n_time_points or np.inf, len(state_time_course), len(time_series)
+    )
+
     fig, axes = plt.subplots(1 if events is None else 2, **fig_kwargs, squeeze=False)
 
     axes = axes.ravel()
@@ -346,7 +352,7 @@ def plot_state_highlighted_data(
 def plot_time_series(
     time_series: np.ndarray,
     axis: plt.Axes = None,
-    n_time_points: int = 5000,
+    n_time_points: int = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     y_tick_values: list = None,
@@ -376,7 +382,7 @@ def plot_time_series(
     filename: str
         A file to which to save the figure.
     """
-    n_time_points = min(n_time_points, time_series.shape[0])
+    n_time_points = min(n_time_points or np.inf, time_series.shape[0])
     axis_given = axis is not None
     if not axis_given:
         fig_defaults = {
@@ -423,7 +429,7 @@ def highlight_states(
     state_time_course: np.ndarray,
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
-    n_time_points: int = 5000,
+    n_time_points: int = None,
     sample_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
@@ -458,9 +464,7 @@ def highlight_states(
     filename: str
         A file to which to save the figure.
     """
-    if n_time_points is None:
-        n_time_points = state_time_course.shape[0]
-    n_time_points = min(n_time_points, state_time_course.shape[0])
+    n_time_points = min(n_time_points or np.inf, state_time_course.shape[0])
 
     axis_given = axis is not None
     if not axis_given:
@@ -781,7 +785,7 @@ def plot_state_lifetimes(
 
 def compare_state_data(
     *state_time_courses: List[np.ndarray],
-    n_time_points=20000,
+    n_time_points=None,
     sample_frequency: float = 1,
     titles: list = None,
     filename: str = None,
@@ -802,6 +806,10 @@ def compare_state_data(
     titles: list of str
         Titles to give to each axis.
     """
+    n_time_points = min(
+        n_time_points or np.inf, *[len(stc) for stc in state_time_courses]
+    )
+
     fig, axes = plt.subplots(
         nrows=len(state_time_courses),
         figsize=(20, 2.5 * len(state_time_courses)),
