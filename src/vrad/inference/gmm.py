@@ -1,14 +1,17 @@
 """Model data using a `BayesianGaussianMixture` model from Scikit-Learn
 
 """
+import logging
 import warnings
-from typing import Tuple, Union
+from typing import Union
 
 import numpy as np
 import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
 from vrad.data import Data
 from vrad.utils.misc import override_dict_defaults, time_axis_first
+
+_logger = logging.getLogger("VRAD")
 
 
 def learn_mu_sigma(

@@ -9,6 +9,8 @@ import logging
 import tensorflow as tf
 from tensorflow.keras.initializers import Initializer
 
+_logger = logging.getLogger("VRAD")
+
 
 class Identity3D(Initializer):
     """Initializer to create stacked identity matrices.
@@ -58,7 +60,7 @@ class MeansInitializer(Initializer):
 
     def __init__(self, initial_means):
         self.initial_means = initial_means
-        logging.info(
+        logger.info(
             f"Creating MeansInitializer with "
             f"initial_means.shape = {initial_means.shape}"
         )

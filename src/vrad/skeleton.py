@@ -25,7 +25,7 @@ __author__ = "evanroberts"
 __copyright__ = "evanroberts"
 __license__ = "mit"
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("VRAD")
 
 
 def fib(n):

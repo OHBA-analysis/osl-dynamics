@@ -16,6 +16,8 @@ from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
 from vrad.utils.misc import time_axis_first
 
+_logger = logging.getLogger("VRAD")
+
 
 class Data:
     """An object for storing time series data with various methods to act on it.
@@ -147,7 +149,7 @@ class Data:
         """
         self.time_series, transposed = time_axis_first(self.time_series)
         if transposed:
-            logging.warning("Assuming time to be the longer axis and transposing.")
+            _logger.warning("Assuming time to be the longer axis and transposing.")
 
     def trim_trials(
         self, trial_start: int = None, trial_cutoff: int = None, trial_skip: int = None,

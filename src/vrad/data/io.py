@@ -6,6 +6,8 @@ import numpy as np
 import scipy.io
 from vrad.utils.misc import listify
 
+_logger = logging.getLogger("VRAD")
+
 
 def get_ignored_keys(new_keys):
     new_keys = listify(new_keys)
@@ -64,7 +66,7 @@ def load_matlab(
         mat = mat73.loadmat(file_name)
 
     if "D" in mat:
-        logging.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
+        _logger.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
         time_series, sampling_frequency = load_spm(file_name=file_name)
     else:
         for key in mat:
@@ -94,13 +96,13 @@ def load_data(
             )
     if isinstance(time_series, list):
         if multi_sequence == "all":
-            logging.warning(
+            _logger.warning(
                 f"{len(time_series)} sequences detected. "
                 f"Concatenating along first axis."
             )
             time_series = np.concatenate(time_series)
         if isinstance(multi_sequence, int):
-            logging.warning(
+            _logger.warning(
                 f"{len(time_series)} sequences detected. "
                 f"Using sequence with index {multi_sequence}."
             )
