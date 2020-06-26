@@ -1,12 +1,12 @@
 from typing import Union
 
 import tensorflow as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.math import fill_triangluar_inverse
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
 from tensorflow.python.keras.backend import expand_dims, stop_gradient
-from vrad.inference.functions import pseudo_sigma_to_sigma
-from vrad.inference.initializers import Identity3D
+from vrad.inference.functions import cholesky_sigma_to_sigma
+from vrad.inference.gmm import find_cholesky_decompositions
 
 
 class ReparameterizationLayer(Layer):
@@ -42,34 +42,57 @@ class MVNLayer(Layer):
         n_gaussians,
         dim,
         learn_means=True,
-        learn_covs=True,
+        learn_covariances=True,
         initial_means=None,
-        initial_pseudo_sigmas=None,
+        initial_covariances=None,
         **kwargs
     ):
         super(MVNLayer, self).__init__(**kwargs)
         self.n_gaussians = n_gaussians
         self.dim = dim
         self.learn_means = learn_means
-        self.learn_covs = learn_covs
+        self.learn_covariances = learn_covariances
         self.initial_means = initial_means
         self.burnin = tf.Variable(False, trainable=False)
 
-        # Only keep the lower triangle of pseudo sigma (also flattens the tensors)
-        self.initial_pseudo_sigmas = tfp.math.fill_triangular_inverse(
-            initial_pseudo_sigmas
-        ).numpy()
+        if initial_covariances is not None:
+            # Check if the full covariance matrix or the cholesky decomposition
+            # has been passed
+
+            # Get upper triangle of the covariance matrix
+            upper_triangle = tf.linalg.band_part(
+                initial_covariances, 0, -1
+            ) - tf.linalg.band_part(initial_covariances, 0, 0)
+
+            # Flatten the matrix into a 1D array
+            upper_triangle = fill_triangular_inverse(upper_triangle, upper=True)
+
+            # See if there's any non-zero elements
+            if tf.reduce_any(upper_triangle != 0):
+
+                # Calculate the cholesky decomposition of the covariance matrix
+                self.initial_cholesky_covariances = find_cholesky_decompositions(
+                    initial_covariances, None, False,
+                )
+
+            else:
+                # The cholesky decomposition has been passed
+                self.initial_cholesky_covariances = initial_covariances
+
+            # Only the lower triangle is non-zero
+            # Flatten into a 1D array
+            self.initial_cholesky_covariances = fill_triangular_inverse(
+                self.initial_cholesky_covariances
+            ).numpy()
+
+        else:
+            self.initial_cholesky_covariances = None
 
     def _means_initializer(self, shape, dtype=tf.float32):
-        mats = self.initial_means
-        assert (
-            len(shape) == 2 and shape[0] == mats.shape[0] and shape[1] == mats.shape[1]
-        ), "shape must be (N, D)"
-        return mats
+        return self.initial_means
 
-    def _pseudo_sigmas_initializer(self, shape, dtype=tf.float32):
-        """Initialize a stacked tensor of using self.initial_pseudo_sigmas."""
-        return self.initial_pseudo_sigmas
+    def _cholesky_covariances_initializer(self, shape, dtype=tf.float32):
+        return self.initial_cholesky_covariances
 
     def build(self, input_shape):
         # Initialiser for means
@@ -78,6 +101,7 @@ class MVNLayer(Layer):
         else:
             self.means_initializer = self._means_initializer
 
+        # Create weights the means
         self.means = self.add_weight(
             "means",
             shape=(self.n_gaussians, self.dim),
@@ -86,35 +110,35 @@ class MVNLayer(Layer):
             trainable=self.learn_means,
         )
 
-        # Initialiser for covs
-        if self.initial_pseudo_sigmas is None:
-            # Only keep the lower triangle of pseudo sigma (also flattens the tensors)
-            self.pseudo_sigmas_initializer = tfp.math.fill_triangular_inverse(
-                Identity3D
-            ).numpy()
+        # Initialiser for covariances
+        if self.initial_cholesky_covariances is None:
+            self.cholesky_covariances_initializer = tf.keras.initializers.Zeros
         else:
-            self.pseudo_sigmas_initializer = self._pseudo_sigmas_initializer
+            self.cholesky_covariances_initializer = (
+                self._cholesky_covariances_initializer
+            )
 
-        self.pseudo_sigmas = self.add_weight(
-            "pseudo_sigmas",
-            shape=self.initial_pseudo_sigmas.shape,
+        # Create weights for the cholesky decomposition of the covariances
+        self.cholesky_covariances = self.add_weight(
+            "cholesky_covariances",
+            shape=(self.n_gaussians, self.dim * (self.dim + 1) // 2),
             dtype=tf.float32,
-            initializer=self.pseudo_sigmas_initializer,
-            trainable=self.learn_covs,
+            initializer=self.cholesky_covariances_initializer,
+            trainable=self.learn_covariances,
         )
 
         self.built = True
 
     def call(self, inputs, **kwargs):
         def no_grad():
-            return stop_gradient(pseudo_sigma_to_sigma(self.pseudo_sigmas))
+            return stop_gradient(cholesky_sigma_to_sigma(self.cholesky_covariances))
 
         def with_grad():
-            return pseudo_sigma_to_sigma(self.pseudo_sigmas)
+            return cholesky_sigma_to_sigma(self.cholesky_covariances)
 
-        self.sigmas = tf.cond(self.burnin, no_grad, with_grad,)
-        # self.sigmas = pseudo_sigma_to_sigma(self.pseudo_sigmas)
-        return self.means, self.sigmas
+        self.covariances = tf.cond(self.burnin, no_grad, with_grad,)
+
+        return self.means, self.covariances
 
     def compute_output_shape(self, input_shape):
         return [
@@ -129,9 +153,9 @@ class MVNLayer(Layer):
                 "n_gaussian": self.n_gaussians,
                 "dim": self.dim,
                 "learn_means": self.learn_means,
-                "learn_covs": self.learn_covs,
+                "learn_covariances": self.learn_covariances,
                 "initial_means": self.initial_means,
-                "initial_pseudo_sigmas": self.initial_pseudo_sigmas,
+                "initial_cholesky_covariances": self.initial_cholesky_covariances,
             }
         )
         return config

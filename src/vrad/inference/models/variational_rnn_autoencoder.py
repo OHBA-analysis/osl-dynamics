@@ -19,9 +19,9 @@ def create_model(
     n_channels: int,
     sequence_length: int,
     learn_means: bool,
-    learn_covs: bool,
-    initial_mean: np.ndarray,
-    initial_cholesky_cov: np.ndarray,
+    learn_covariances: bool,
+    initial_mean: np.ndarray = None,
+    initial_covariances: np.ndarray = None,
     n_units_inference: int = 64,
     n_units_model: int = 64,
     dropout_rate_inference: float = 0.3,
@@ -59,9 +59,9 @@ def create_model(
             dropout_rate_inference=dropout_rate_inference,
             dropout_rate_model=dropout_rate_model,
             learn_means=learn_means,
-            learn_covs=learn_covs,
+            learn_covariances=learn_covariances,
             initial_mean=initial_mean,
-            initial_cholesky_cov=initial_cholesky_cov,
+            initial_covariances=initial_covariances,
             activation_function=activation_function,
         )
 
@@ -122,9 +122,9 @@ def _model_structure(
     dropout_rate_inference: float,
     dropout_rate_model: float,
     learn_means: bool,
-    learn_covs: bool,
+    learn_covariances: bool,
     initial_mean: np.ndarray,
-    initial_cholesky_cov: np.ndarray,
+    initial_covariances: np.ndarray,
     activation_function: str = "softmax",
 ):
     # Layer for input
@@ -182,9 +182,9 @@ def _model_structure(
         n_states,
         n_channels,
         learn_means=learn_means,
-        learn_covs=learn_covs,
+        learn_covariances=learn_covariances,
         initial_means=initial_mean,
-        initial_pseudo_sigmas=initial_cholesky_cov,
+        initial_covariances=initial_covariances,
     )
 
     # Layers to calculate loss as the free energy = LL + KL

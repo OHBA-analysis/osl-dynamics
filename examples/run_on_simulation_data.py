@@ -32,7 +32,7 @@ n_units_inference = 64
 n_units_model = 64
 
 learn_means = False
-learn_covs = True
+learn_covariances = True
 
 activation_function = "softmax"
 
@@ -77,9 +77,9 @@ rnn_vae = create_model(
     n_states=n_states,
     sequence_length=sequence_length,
     learn_means=False,
-    learn_covs=True,
+    learn_covariances=True,
     initial_mean=means,
-    initial_cholesky_cov=covariances,
+    initial_covariances=covariances,
     n_units_inference=n_units_inference,
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
