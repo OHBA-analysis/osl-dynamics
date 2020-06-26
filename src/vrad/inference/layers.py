@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
-from tensorflow.python.keras.backend import expand_dims
+from tensorflow.python.keras.backend import expand_dims, stop_gradient
 from vrad.inference.functions import pseudo_sigma_to_sigma
 from vrad.inference.initializers import Identity3D
 
@@ -103,24 +103,17 @@ class MVNLayer(Layer):
             trainable=self.learn_covs,
         )
 
-        self.untrainable_sigmas = self.add_weight(
-            "pseudo_sigmas",
-            shape=self.initial_pseudo_sigmas.shape,
-            dtype=tf.float32,
-            initializer=self.pseudo_sigmas_initializer,
-            trainable=False,
-        )
-
         self.built = True
 
     def call(self, inputs, **kwargs):
+        def no_grad():
+            return stop_gradient(pseudo_sigma_to_sigma(self.pseudo_sigmas))
 
-        self.sigmas = tf.cond(
-            self.burnin,
-            lambda: pseudo_sigma_to_sigma(self.untrainable_sigmas),
-            lambda: pseudo_sigma_to_sigma(self.pseudo_sigmas),
-        )
-        self.sigmas = pseudo_sigma_to_sigma(self.pseudo_sigmas)
+        def with_grad():
+            return pseudo_sigma_to_sigma(self.pseudo_sigmas)
+
+        self.sigmas = tf.cond(self.burnin, no_grad, with_grad,)
+        # self.sigmas = pseudo_sigma_to_sigma(self.pseudo_sigmas)
         return self.means, self.sigmas
 
     def compute_output_shape(self, input_shape):
