@@ -44,6 +44,8 @@ def train_predict_dataset(
     )  # dataset must return input and target
 
     prediction_dataset = tf.data.Dataset.from_tensor_slices(time_series)
-    prediction_dataset = prediction_dataset.batch(sequence_length).batch(batch_size)
+    prediction_dataset = prediction_dataset.batch(
+        sequence_length, drop_remainder=True
+    ).batch(batch_size, drop_remainder=True)
 
     return training_dataset, prediction_dataset
