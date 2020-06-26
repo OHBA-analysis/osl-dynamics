@@ -25,11 +25,11 @@ n_epochs_annealing = 80
 n_epochs = 100
 n_epochs_burnin = 10
 
-dropout_rate_encoder = 0.4
-dropout_rate_decoder = 0.4
+dropout_rate_inference = 0.4
+dropout_rate_model = 0.4
 
-n_units_encoder = 64
-n_units_decoder = 64
+n_units_inference = 64
+n_units_model = 64
 
 learn_means = False
 learn_covs = True
@@ -80,10 +80,10 @@ rnn_vae = create_model(
     learn_covs=True,
     initial_mean=means,
     initial_cholesky_cov=covariances,
-    n_units_encoder=n_units_encoder,
-    n_units_decoder=n_units_decoder,
-    dropout_rate_encoder=dropout_rate_encoder,
-    dropout_rate_decoder=dropout_rate_decoder,
+    n_units_inference=n_units_inference,
+    n_units_model=n_units_model,
+    dropout_rate_inference=dropout_rate_inference,
+    dropout_rate_model=dropout_rate_model,
     activation_function=activation_function,
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,

@@ -22,10 +22,10 @@ def create_model(
     learn_covs: bool,
     initial_mean: np.ndarray,
     initial_cholesky_cov: np.ndarray,
-    n_units_encoder: int = 64,
-    n_units_decoder: int = 64,
-    dropout_rate_encoder: float = 0.3,
-    dropout_rate_decoder: float = 0.3,
+    n_units_inference: int = 64,
+    n_units_model: int = 64,
+    dropout_rate_inference: float = 0.3,
+    dropout_rate_model: float = 0.3,
     activation_function: str = "softmax",
     do_annealing: bool = True,
     annealing_sharpness: float = 5.0,
@@ -54,10 +54,10 @@ def create_model(
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            n_units_encoder=n_units_encoder,
-            n_units_decoder=n_units_decoder,
-            dropout_rate_encoder=dropout_rate_encoder,
-            dropout_rate_decoder=dropout_rate_decoder,
+            n_units_inference=n_units_inference,
+            n_units_model=n_units_model,
+            dropout_rate_inference=dropout_rate_inference,
+            dropout_rate_model=dropout_rate_model,
             learn_means=learn_means,
             learn_covs=learn_covs,
             initial_mean=initial_mean,
@@ -117,10 +117,10 @@ def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
-    n_units_encoder: int,
-    n_units_decoder: int,
-    dropout_rate_encoder: float,
-    dropout_rate_decoder: float,
+    n_units_inference: int,
+    n_units_model: int,
+    dropout_rate_inference: float,
+    dropout_rate_model: float,
     learn_means: bool,
     learn_covs: bool,
     initial_mean: np.ndarray,
@@ -130,19 +130,19 @@ def _model_structure(
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels))
 
-    # Inference RNN (encoder):
+    # Inference RNN
     # - q(theta_t) ~ N(m_theta_t, s2_theta_t)
     # - m_theta_t  ~ affine(RNN(Y_<=t))
     # - s2_theta_t ~ softplus(RNN(Y_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
-    inference_input_dropout_layer = layers.Dropout(dropout_rate_encoder)
+    inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
     inference_output_layer = layers.Bidirectional(
-        layer=layers.LSTM(n_units_encoder, return_sequences=True, stateful=False)
+        layer=layers.LSTM(n_units_inference, return_sequences=True, stateful=False)
     )
     inference_normalisation_layer = layers.LayerNormalization()
-    inference_output_dropout_layer = layers.Dropout(dropout_rate_encoder)
+    inference_output_dropout_layer = layers.Dropout(dropout_rate_inference)
     m_theta_t_layer = layers.Dense(n_states, activation="linear")
     s2_theta_t_layer = layers.Dense(n_states, activation="softplus")
 
@@ -160,18 +160,18 @@ def _model_structure(
     s2_theta_t = s2_theta_t_layer(inference_output_dropout)
     theta_t = theta_t_layer([m_theta_t, s2_theta_t])
 
-    # Model RNN (decoder):
+    # Model RNN
     # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
     # - mu_theta_jt         ~ affine(RNN(theta_<t))
     # - sigma2_theta_j      = trainable constant
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(dropout_rate_decoder)
+    model_input_dropout_layer = layers.Dropout(dropout_rate_model)
     model_output_layer = layers.LSTM(
-        n_units_decoder, return_sequences=True, stateful=False
+        n_units_model, return_sequences=True, stateful=False
     )
     model_normalisation_layer = layers.LayerNormalization()
-    model_output_dropout_layer = layers.Dropout(dropout_rate_decoder)
+    model_output_dropout_layer = layers.Dropout(dropout_rate_model)
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear")
     sigma2_theta_j_layer = TrainableVariablesLayer(
         [n_states], initial_values=zeros(n_states), trainable=True
