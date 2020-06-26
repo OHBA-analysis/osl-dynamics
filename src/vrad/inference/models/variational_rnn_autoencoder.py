@@ -67,7 +67,7 @@ def create_model(
 
         model.compile(
             optimizer=optimizer,
-            loss=[_ll_loss, _kl_loss(annealing_factor=annealing_factor)],
+            loss=[_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)],
         )
 
     # Callbacks
@@ -98,19 +98,19 @@ def create_model(
     return model
 
 
-def _ll_loss(y_true, ll_loss):
+def _ll_loss_fn(y_true, ll_loss):
     """The first output of the model is the negative log likelihood
        so we just need to return it."""
     return ll_loss
 
 
-def _kl_loss(annealing_factor):
-    def kl_loss_fn(y_true, kl_loss):
+def _create_kl_loss_fn(annealing_factor):
+    def _kl_loss_fn(y_true, kl_loss):
         """Second output of the model is the KL divergence loss.
         We multiply with an annealing factor."""
         return annealing_factor * kl_loss
 
-    return kl_loss_fn
+    return _kl_loss_fn
 
 
 def _model_structure(

@@ -180,11 +180,7 @@ class TrainableVariablesLayer(Layer):
     def get_config(self):
         config = super(TrainableVariablesLayer, self).get_config()
         config.update(
-            {
-                "shape": self.shape,
-                "initial_values": self.initial_values,
-                "trainable": self.trainable,
-            }
+            {"shape": self.shape, "trainable": self.trainable,}
         )
         return config
 

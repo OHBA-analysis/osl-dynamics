@@ -3,6 +3,11 @@
 """
 
 import tensorflow as tf
+import tensorflow.keras.models as models
+from vrad.inference.models.variational_rnn_autoencoder import (
+    _ll_loss_fn,
+    _create_kl_loss_fn,
+)
 
 
 def gpu_growth():
@@ -49,3 +54,16 @@ def train_predict_dataset(
     ).batch(batch_size, drop_remainder=True)
 
     return training_dataset, prediction_dataset
+
+
+def load_model(filename):
+    """Loads a model saved with its .save(filename) method.
+    """
+    model = models.load_model(
+        filename,
+        custom_objects={
+            "_ll_loss_fn": _ll_loss_fn,
+            "_kl_loss_fn": _create_kl_loss_fn(1.0),
+        },
+    )
+    return model
