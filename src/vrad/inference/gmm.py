@@ -14,6 +14,13 @@ from vrad.utils.misc import override_dict_defaults, time_axis_first
 _logger = logging.getLogger("VRAD")
 
 
+def wishart_random_sigmas(data, n_states):
+    mix = BayesianGaussianMixture(n_components=n_states, max_iter=1)
+    warnings.filterwarnings("ignore")
+    mix.fit(data)
+    return mix.covariances_
+
+
 def learn_mu_sigma(
     data: Union[np.ndarray, Data],
     n_states: int,
