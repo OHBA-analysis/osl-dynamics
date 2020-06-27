@@ -32,7 +32,7 @@ class ReparameterizationLayer(Layer):
         return input_shape
 
 
-class MVNLayer(Layer):
+class MultivariateNormalLayer(Layer):
     """Parameterises multiple multivariate Gaussians and in terms of their means
        and covariances. Means and covariances are outputted.
     """
@@ -47,7 +47,7 @@ class MVNLayer(Layer):
         initial_covariances=None,
         **kwargs
     ):
-        super(MVNLayer, self).__init__(**kwargs)
+        super(MultivariateNormalLayer, self).__init__(**kwargs)
         self.n_gaussians = n_gaussians
         self.dim = dim
         self.learn_means = learn_means
@@ -147,7 +147,7 @@ class MVNLayer(Layer):
         ]
 
     def get_config(self):
-        config = super(MVNLayer, self).get_config()
+        config = super(MultivariateNormalLayer, self).get_config()
         config.update(
             {
                 "n_gaussian": self.n_gaussians,

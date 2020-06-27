@@ -7,7 +7,7 @@ from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import (
     KLDivergenceLayer,
     LogLikelihoodLayer,
-    MVNLayer,
+    MultivariateNormalLayer,
     ReparameterizationLayer,
     TrainableVariablesLayer,
 )
@@ -178,7 +178,7 @@ def _model_structure(
     )
 
     # Layers for the means and covariances for observation model of each state
-    observation_means_covs_layer = MVNLayer(
+    observation_means_covs_layer = MultivariateNormalLayer(
         n_states,
         n_channels,
         learn_means=learn_means,
