@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-import scipy.linalg
+import scipy
 import tensorflow as tf
 
 
@@ -35,11 +35,9 @@ def cholesky_factor_to_full_matrix(cholesky_factor):
 
 def cholesky_factor(full_matrix):
     """Calculate the cholesky decomposition of a matrix"""
-    n_states, n_channels = full_matrix.shape[:2]
-    w = np.identity(n_channels)
-    b_k = np.linalg.pinv(w) @ full_matrix
-    matrix_sqrt = matrix_sqrt_3d(b_k @ b_k.transpose(0, 2, 1))
-    cholesky_factor = np.linalg.cholesky(matrix_sqrt)
+    cholesky_factor = np.empty(full_matrix.shape)
+    for i in range(full_matrix.shape[0]):
+        cholesky_factor[i] = np.linalg.cholesky(full_matrix[i])
     return cholesky_factor
 
 
