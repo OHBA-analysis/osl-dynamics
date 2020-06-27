@@ -6,9 +6,9 @@ import warnings
 from typing import Union
 
 import numpy as np
-import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
 from vrad.data import Data
+from vrad.inference.functions import cholesky_factor
 from vrad.utils.misc import override_dict_defaults, time_axis_first
 
 _logger = logging.getLogger("VRAD")
@@ -129,31 +129,6 @@ def process_covariance(
     return full_covariances
 
 
-def matrix_sqrt_3d(matrix):
-    """A wrapper function for `scipy.linalg.sqrtm`.
-
-    SciPy's matrix square root function only works on [N x N] 2D matrices. This
-    function provides a simple solution for performing this operation on a stack of
-    [N x N] 2D arrays.
-
-    Parameters
-    ----------
-    matrix : numpy.ndarray
-        [M x N x N] matrix.
-
-    Returns
-    -------
-    matrix_sqrt : numpy.ndarray
-        A stack of matrix square roots of the same dimensions as `matrix` ([M x N x N])
-    """
-    if matrix.ndim != 3 or matrix.shape[1] != matrix.shape[2]:
-        raise ValueError("Only accepts matrices with dimensions M x N x N")
-    return_matrix = np.empty_like(matrix)
-    for index, layer in enumerate(matrix):
-        return_matrix[index] = scipy.linalg.sqrtm(layer)
-    return return_matrix
-
-
 def find_cholesky_decompositions(
     covariances: np.ndarray, means: np.ndarray, learn_means: bool,
 ):
@@ -180,14 +155,8 @@ def find_cholesky_decompositions(
         [n_states x n_channels x n_channels] array containing the Cholesky
         decompositions of full covariance matrices.
     """
-    n_states, n_channels = covariances.shape[:2]
-    w = np.identity(n_channels)
     if learn_means:
-        full_cov = process_covariance(covariances, means, learn_means)
+        full_covariances = process_covariance(covariances, means, learn_means)
     else:
-        full_cov = covariances
-    b_k = np.linalg.pinv(w) @ full_cov
-    matrix_sqrt = matrix_sqrt_3d(b_k @ b_k.transpose(0, 2, 1))
-    cholesky_djs = np.linalg.cholesky(matrix_sqrt)
-
-    return cholesky_djs
+        full_covariances = covariances
+    return cholesky_factor(full_covariances)

@@ -35,22 +35,22 @@ class Identity3D(Initializer):
         return tf.eye(shape[1], shape[2], [shape[0]])
 
 
-class PseudoSigmaInitializer(Initializer):
+class CholeskyCovariancesInitializer(Initializer):
     """Initialize weights with provided variable, assuming dimensions are accepted.
 
     """
 
-    def __init__(self, initial_pseudo_sigmas):
-        self.initial_pseudo_sigmas = initial_pseudo_sigmas
+    def __init__(self, initial_cholesky_covariances):
+        self.initial_cholesky_covariances = initial_cholesky_covariances
 
     def __call__(self, shape, dtype=None):
-        if not (len(shape) == 3 and shape == self.initial_pseudo_sigmas.shape):
+        if not (len(shape) == 3 and shape == self.initial_cholesky_covariances.shape):
             raise ValueError(
-                f"shape must be 3D and be equal to initial_pseudo_sigmas.shape. "
+                f"shape must be 3D and be equal to initial_cholesky_covariances.shape. "
                 f"shape == {[*shape]}, "
-                f"initial_means.shape = {[*self.initial_pseudo_sigmas.shape]} "
+                f"initial_means.shape = {[*self.initial_cholesky_covariances.shape]} "
             )
-        return self.initial_pseudo_sigmas
+        return self.initial_cholesky_covariances
 
 
 class MeansInitializer(Initializer):
@@ -60,7 +60,7 @@ class MeansInitializer(Initializer):
 
     def __init__(self, initial_means):
         self.initial_means = initial_means
-        logger.info(
+        _logger.info(
             f"Creating MeansInitializer with "
             f"initial_means.shape = {initial_means.shape}"
         )

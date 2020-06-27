@@ -1,12 +1,20 @@
 from typing import Union
 
 import tensorflow as tf
-from tensorflow_probability.math import fill_triangluar_inverse
+import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
 from tensorflow.python.keras.backend import expand_dims, stop_gradient
-from vrad.inference.functions import cholesky_sigma_to_sigma
-from vrad.inference.gmm import find_cholesky_decompositions
+from vrad.inference.functions import (
+    is_symmetric,
+    cholesky_factor,
+    cholesky_factor_to_full_matrix,
+)
+from vrad.inference.initializers import (
+    Identity3D,
+    MeansInitializer,
+    CholeskyCovariancesInitializer,
+)
 
 
 class ReparameterizationLayer(Layer):
@@ -56,50 +64,24 @@ class MultivariateNormalLayer(Layer):
         self.burnin = tf.Variable(False, trainable=False)
 
         if initial_covariances is not None:
-            # Check if the full covariance matrix or the cholesky decomposition
-            # has been passed
+            # If the matrix is symmetric we assume it's the full covariance matrix
+            # WARNING: diagonal matrices are assumed to be the full covariance matrix
+            if is_symmetric(initial_covariances):
+                self.initial_cholesky_covariances = cholesky_factor(initial_covariances)
 
-            # Get upper triangle of the covariance matrix
-            upper_triangle = tf.linalg.band_part(
-                initial_covariances, 0, -1
-            ) - tf.linalg.band_part(initial_covariances, 0, 0)
-
-            # Flatten the matrix into a 1D array
-            upper_triangle = fill_triangular_inverse(upper_triangle, upper=True)
-
-            # See if there's any non-zero elements
-            if tf.reduce_any(upper_triangle != 0):
-
-                # Calculate the cholesky decomposition of the covariance matrix
-                self.initial_cholesky_covariances = find_cholesky_decompositions(
-                    initial_covariances, None, False,
-                )
-
+            # Otherwise, we assume the cholesky factor has already been calculated
             else:
-                # The cholesky decomposition has been passed
                 self.initial_cholesky_covariances = initial_covariances
-
-            # Only the lower triangle is non-zero
-            # Flatten into a 1D array
-            self.initial_cholesky_covariances = fill_triangular_inverse(
-                self.initial_cholesky_covariances
-            ).numpy()
 
         else:
             self.initial_cholesky_covariances = None
 
-    def _means_initializer(self, shape, dtype=tf.float32):
-        return self.initial_means
-
-    def _cholesky_covariances_initializer(self, shape, dtype=tf.float32):
-        return self.initial_cholesky_covariances
-
     def build(self, input_shape):
-        # Initialiser for means
+        # Initializer for means
         if self.initial_means is None:
             self.means_initializer = tf.keras.initializers.Zeros
         else:
-            self.means_initializer = self._means_initializer
+            self.means_initializer = MeansInitializer(self.initial_means)
 
         # Create weights the means
         self.means = self.add_weight(
@@ -110,18 +92,18 @@ class MultivariateNormalLayer(Layer):
             trainable=self.learn_means,
         )
 
-        # Initialiser for covariances
+        # Initializer for covariances
         if self.initial_cholesky_covariances is None:
-            self.cholesky_covariances_initializer = tf.keras.initializers.Zeros
+            self.cholesky_covariances_initializer = Identity3D
         else:
-            self.cholesky_covariances_initializer = (
-                self._cholesky_covariances_initializer
+            self.cholesky_covariances_initializer = CholeskyCovariancesInitializer(
+                self.initial_cholesky_covariances
             )
 
         # Create weights for the cholesky decomposition of the covariances
         self.cholesky_covariances = self.add_weight(
             "cholesky_covariances",
-            shape=(self.n_gaussians, self.dim * (self.dim + 1) // 2),
+            shape=(self.n_gaussians, self.dim, self.dim),
             dtype=tf.float32,
             initializer=self.cholesky_covariances_initializer,
             trainable=self.learn_covariances,
@@ -131,14 +113,33 @@ class MultivariateNormalLayer(Layer):
 
     def call(self, inputs, **kwargs):
         def no_grad():
-            return stop_gradient(cholesky_sigma_to_sigma(self.cholesky_covariances))
+            return stop_gradient(
+                cholesky_factor_to_full_matrix(self.cholesky_covariances)
+            )
 
         def with_grad():
-            return cholesky_sigma_to_sigma(self.cholesky_covariances)
+            return cholesky_factor_to_full_matrix(self.cholesky_covariances)
 
+        # If we are in the burn-in phase call no_grad, otherwise call with_grad
         self.covariances = tf.cond(self.burnin, no_grad, with_grad,)
 
         return self.means, self.covariances
+
+    def set_means(self, means):
+        """Overrides the means weights"""
+        weights = self.get_weights()
+        weights[0] = means
+        self.set_weight(weights)
+
+    def set_covariances(self, covariances):
+        """Overrides the covariances weights"""
+        # Calculate the cholesky factor
+        cholesky_covariances = cholesky_factor(covariances)
+
+        # Set layer weights
+        weights = self.get_weights()
+        weights[1] = cholesky_covariances
+        self.set_weights(weights)
 
     def compute_output_shape(self, input_shape):
         return [
