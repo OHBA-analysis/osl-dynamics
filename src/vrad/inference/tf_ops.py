@@ -5,8 +5,8 @@
 import tensorflow as tf
 import tensorflow.keras.models as models
 from vrad.inference.models.variational_rnn_autoencoder import (
-    _ll_loss_fn,
     _create_kl_loss_fn,
+    _ll_loss_fn,
 )
 
 
@@ -52,6 +52,13 @@ def train_predict_dataset(
     prediction_dataset = prediction_dataset.batch(
         sequence_length, drop_remainder=True
     ).batch(batch_size, drop_remainder=True)
+
+    if not len(list(training_dataset)) or not len(list(prediction_dataset)):
+        max_batch_size = int(time_series.shape[0] / sequence_length)
+        raise ValueError(
+            f"For a non-windowed time series, the maximum batch size is "
+            f"int(time_series.shape[0] / sequence_length) = {max_batch_size}"
+        )
 
     return training_dataset, prediction_dataset
 
