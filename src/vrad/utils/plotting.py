@@ -320,7 +320,7 @@ def plot_state_highlighted_data(
     event_kwargs = override_dict_defaults(event_defaults, event_kwargs)
 
     n_time_points = min(
-        n_time_points or np.inf, len(state_time_course), len(time_series)
+        n_time_points or np.inf, state_time_course.shape[0], time_series.shape[0]
     )
 
     fig, axes = plt.subplots(1 if events is None else 2, **fig_kwargs, squeeze=False)
