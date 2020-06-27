@@ -1,10 +1,14 @@
+.. include:: <isonum.txt>
+
 =========
 Changelog
 =========
 
-Version 0.1
-===========
+Version 1.1.0
+=============
 
-- Feature A added
-- FIX: nasty bug #1729 fixed
-- add your changes here!
+- API Changes
+    - variational_rnn_autoencoder
+        - burnin_epochs |rarr| n_epochs_burnin
+        - initial_pseudo_cov |rarr| initial_covariances (can accept non-cholesky matrices)
+        - learn_covs |rarr| learn_covariances
