@@ -42,7 +42,7 @@ def train_predict_dataset(
     )
 
     training_dataset = training_dataset.shuffle(time_series.shape[0])
-    training_dataset = training_dataset.batch(batch_size)
+    training_dataset = training_dataset.batch(batch_size, drop_remainder=True)
     training_dataset = training_dataset.prefetch(tf.data.experimental.AUTOTUNE)
     training_dataset = tf.data.Dataset.zip(
         (training_dataset, training_dataset)
