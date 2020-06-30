@@ -104,14 +104,13 @@ class Data:
             f"n_channels: {self.time_series.shape[1]}",
             f"n_time_points: {self.time_series.shape[0]}",
             f"pca_applied: {self.pca_applied}",
-            f"data_limits: {self.n_min}, {self.n_max}",
             f"original_shape: {self.raw_data.shape}",
             f"current_shape: {self.time_series.shape}",
         ]
         return "\n  ".join(return_string)
 
     def __getitem__(self, val):
-        return self.time_series[self.n_min : self.n_max][val]
+        return self.time_series[val]
 
     def __getattr__(self, attr):
         if attr[:2] == "__":
