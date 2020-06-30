@@ -97,8 +97,6 @@ class Data:
             self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
             self.time_axis_first()
 
-        self.n_min, self.n_max = None, None
-
     def __str__(self):
         return_string = [
             f"{self.__class__.__name__}:",
@@ -108,7 +106,7 @@ class Data:
             f"pca_applied: {self.pca_applied}",
             f"data_limits: {self.n_min}, {self.n_max}",
             f"original_shape: {self.raw_data.shape}",
-            f"current_shape: {self[:].shape}",
+            f"current_shape: {self.time_series.shape}",
         ]
         return "\n  ".join(return_string)
 
@@ -118,32 +116,10 @@ class Data:
     def __getattr__(self, attr):
         if attr[:2] == "__":
             raise AttributeError(f"No attribute called {attr}.")
-        return getattr(self[:], attr)
+        return getattr(self.time_series, attr)
 
     def __array__(self, *args, **kwargs):
-        return np.asarray(self[:], *args, **kwargs)
-
-    def data_limits(self, t_min: int = None, t_max: int = None):
-        """Set the maximum and minimum sample numbers for the object.
-
-        The underlying time_series remains unchanged.
-
-        Parameters
-        ----------
-        t_min: int
-        t_max: int
-
-        """
-        self.n_min = t_min
-        self.n_max = t_max
-
-    @property
-    def shape(self):
-        return self[:].shape
-
-    @property
-    def original_shape(self):
-        return self.time_series.shape
+        return np.asarray(self.time_series, *args, **kwargs)
 
     def time_axis_first(self):
         """Forces the longer axis of the data to be the first indexed axis.
@@ -219,7 +195,7 @@ class Data:
         field_name: str
             The dictionary key (MATLAB object field) which references the data.
         """
-        scipy.io.savemat(filename, {field_name: self[:]})
+        scipy.io.savemat(filename, {field_name: self.time_series})
 
     def save(self, filename: str):
         """Save time_series to a numpy (.npy) file.
@@ -229,7 +205,7 @@ class Data:
         filename: str
             The file to save to (with or without .npy extension).
         """
-        np.save(filename, self[:])
+        np.save(filename, self.time_series)
 
 
 # noinspection PyPep8Naming
