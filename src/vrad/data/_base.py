@@ -1,8 +1,10 @@
 import logging
 from typing import Any, Union
 
+import mat73
 import numpy as np
 import scipy.io
+from vrad import array_ops
 from vrad.data.io import load_data
 from vrad.data.manipulation import (
     pca,
@@ -228,3 +230,51 @@ class Data:
             The file to save to (with or without .npy extension).
         """
         np.save(filename, self[:])
+
+
+# noinspection PyPep8Naming
+class OSL_HMM:
+    """Import and encapsulate OSL HMMs"""
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.hmm = mat73.loadmat(filename)["hmm"]
+
+        self.state = self.hmm.state
+        self.k = self.hmm.K
+        self.p = self.hmm.P
+        self.dir_2d_alpha = self.hmm.Dir2d_alpha
+        self.pi = self.hmm.Pi
+        self.dir_alpha = self.hmm.Dir_alpha
+        self.prior = self.hmm.prior
+        self.train = self.hmm.train
+
+        self.data_files = self.hmm.data_files
+        self.epoched_state_path_sub = self.hmm.epoched_statepath_sub
+        self.filenames = self.hmm.filenames
+        self.f_sample = self.hmm.fsample
+        self.gamma = self.hmm.gamma
+        self.is_epoched = self.hmm.is_epoched
+        self.options = self.hmm.options
+        self.state_map_parcel_vectors = self.hmm.statemap_parcel_vectors
+        self.subject_state_map_parcel_vectors = self.hmm.statemap_parcel_vectors_persubj
+        self.state_maps = self.hmm.statemaps
+        self.state_path = self.hmm.statepath.astype(np.int)
+        self.subject_indices = self.hmm.subj_inds
+
+        # Aliases
+        self.covariances = np.array([state["Gam_rate"] for state in self.state.Omega])
+        self.state_time_course = self.gamma
+        self.viterbi_path = array_ops.get_one_hot(self.state_path)
+
+    def plot_covariances(self, *args, **kwargs):
+        """Wraps plotting.plot_matrices for self.covariances."""
+        plotting.plot_matrices(self.covariances, *args, **kwargs)
+
+    def plot_states(self, *args, **kwargs):
+        """Wraps plotting.highlight_states for self.viterbi_path."""
+
+        plotting.highlight_states(self.viterbi_path, *args, **kwargs)
+
+    def __str__(self):
+        return f"OSL HMM object from file {self.filename}"

@@ -1,3 +1,3 @@
-from vrad.data._base import Data
+from vrad.data._base import OSL_HMM, Data
 
-__all__ = ["Data"]
+__all__ = ["Data", "OSL_HMM"]
