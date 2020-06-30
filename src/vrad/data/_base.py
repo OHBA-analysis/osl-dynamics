@@ -188,11 +188,13 @@ class Data:
             )
             self.time_embedding_applied = True
 
-    def plot(self, n_time_points: int = 10000):
+    def plot(self, n_time_points: int = 10000, filename: str = None):
         """Plot time_series.
 
         """
-        plotting.plot_time_series(self.time_series, n_time_points=n_time_points)
+        plotting.plot_time_series(
+            self.time_series, n_time_points=n_time_points, filename=filename
+        )
 
     def savemat(self, filename: str, field_name: str = "x"):
         """Save time_series to a .mat file.
