@@ -86,16 +86,22 @@ class Data:
             multi_sequence=multi_sequence,
             sampling_frequency=sampling_frequency,
         )
+        self._original_shape = self.time_series.shape
 
-        # TODO: Make raw_data read only using @property and self._raw_data
-        self.raw_data = np.array(self.time_series)
-        self.time_series = self.raw_data.copy()
         self.pca_applied = False
 
         self.t = None
         if self.time_series.ndim == 2:
             self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
             self.time_axis_first()
+
+    @property
+    def original_shape(self):
+        return self._original_shape
+
+    @original_shape.setter
+    def original_shape(self, value):
+        self._original_shape = value
 
     def __str__(self):
         return_string = [
@@ -104,7 +110,7 @@ class Data:
             f"n_channels: {self.time_series.shape[1]}",
             f"n_time_points: {self.time_series.shape[0]}",
             f"pca_applied: {self.pca_applied}",
-            f"original_shape: {self.raw_data.shape}",
+            f"original_shape: {self.original_shape}",
             f"current_shape: {self.time_series.shape}",
         ]
         return "\n  ".join(return_string)
