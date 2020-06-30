@@ -79,7 +79,7 @@ class Data:
         sampling_frequency: float = 1,
         multi_sequence: Union[str, int] = "all",
     ):
-        self.from_file = time_series if isinstance(time_series, str) else False
+        self._from_file = time_series if isinstance(time_series, str) else False
 
         self.time_series, self.sampling_frequency = load_data(
             time_series=time_series,
@@ -95,6 +95,14 @@ class Data:
         if self.time_series.ndim == 2:
             self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
             self.time_axis_first()
+
+    @property
+    def from_file(self):
+        return self._from_file
+
+    @from_file.setter
+    def from_file(self, value):
+        self._from_file = value
 
     @property
     def original_shape(self):
