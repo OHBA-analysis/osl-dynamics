@@ -89,6 +89,7 @@ class Data:
         self._original_shape = self.time_series.shape
 
         self.pca_applied = False
+        self.time_embedding_applied = False
 
         self.t = None
         if self.time_series.ndim == 2:
@@ -110,6 +111,7 @@ class Data:
             f"n_channels: {self.time_series.shape[1]}",
             f"n_time_points: {self.time_series.shape[0]}",
             f"pca_applied: {self.pca_applied}",
+            f"time_embedding_applied: {self.time_embedding_applied}",
             f"original_shape: {self.original_shape}",
             f"current_shape: {self.time_series.shape}",
         ]
@@ -172,17 +174,19 @@ class Data:
     def scale(self):
         self.time_series = scale(self.time_series)
 
-    def pca(self, n_components: Union[int, float] = 1, force=False):
-        if self.pca_applied:
-            if not force:
-                self.time_series = pca(
-                    time_series=self.time_series, n_components=n_components
-                )
+    def pca(self, n_components: Union[int, float] = 1):
+        if not self.pca_applied:
+            self.time_series = pca(
+                time_series=self.time_series, n_components=n_components
+            )
+            self.pca_applied = True
 
     def time_embed(self, backward, forward):
-        self.time_series = time_embed(
-            self.time_series, backward=backward, forward=forward
-        )
+        if not self.time_embedding_applied:
+            self.time_series = time_embed(
+                self.time_series, backward=backward, forward=forward
+            )
+            self.time_embedding_applied = True
 
     def plot(self, n_time_points: int = 10000):
         """Plot time_series.
