@@ -159,8 +159,42 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose
-def time_embed(time_series, backward, forward):
-    n_samples = time_series.shape[0]
-    trimmed_indices = np.arange(backward, n_samples - forward)
-    indices = trimmed_indices + np.arange(-backward, forward + 1)[:, None]
-    return time_series[indices].sum(axis=0)
+def time_embed(time_series, n_embeddings, zero_padding=False):
+    """Performs a time embedding.
+
+    time_embeded_series = [
+        channel 1,   lag 1
+        channel 1,   lag 2
+        channel 1,   lag ...
+        channel 1,   lag N
+        channel 2,   lag 1
+        channel 2,   lag 2
+        channel 2,   lag ...
+        channel 2,   lag N
+        ....................
+        ....................
+        ....................
+        ....................
+        channel M,   lag 1
+        channel M,   lag 2
+        channel M,   lag ...
+        channel M,   lag N
+    ]
+    """
+    n_samples, n_channels = time_series.shape
+    if zero_padding:
+        time_embedded_series = np.zeros([n_samples, n_channels * n_embeddings])
+        for i in range(n_channels):
+            for j in range(n_embeddings):
+                time_embedded_series[
+                    : n_samples - j, i * n_embeddings + j
+                ] = time_series[j:, i]
+    else:
+        n_embedded_samples = n_samples - n_embeddings
+        time_embedded_series = np.empty([n_embedded_samples, n_channels * n_embeddings])
+        for i in range(n_channels):
+            for j in range(n_embeddings):
+                time_embedded_series[:, i * n_embeddings + j] = time_series[
+                    j : n_embedded_samples + j, i
+                ]
+    return time_embedded_series

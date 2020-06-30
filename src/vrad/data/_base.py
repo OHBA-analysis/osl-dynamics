@@ -79,15 +79,18 @@ class Data:
         sampling_frequency: float = 1,
         multi_sequence: Union[str, int] = "all",
     ):
-        self._from_file = time_series if isinstance(time_series, str) else False
-
+        # Raw data
         self.time_series, self.sampling_frequency = load_data(
             time_series=time_series,
             multi_sequence=multi_sequence,
             sampling_frequency=sampling_frequency,
         )
+
+        # Properties
+        self._from_file = time_series if isinstance(time_series, str) else False
         self._original_shape = self.time_series.shape
 
+        # Flags for data manipulation
         self.pca_applied = False
         self.time_embedding_applied = False
 
@@ -184,16 +187,12 @@ class Data:
 
     def pca(self, n_components: Union[int, float] = 1):
         if not self.pca_applied:
-            self.time_series = pca(
-                time_series=self.time_series, n_components=n_components
-            )
+            self.time_series = pca(self.time_series, n_components)
             self.pca_applied = True
 
-    def time_embed(self, backward, forward):
+    def time_embed(self, n_embeddings, zero_padding=True):
         if not self.time_embedding_applied:
-            self.time_series = time_embed(
-                self.time_series, backward=backward, forward=forward
-            )
+            self.time_series = time_embed(self.time_series, n_embeddings, zero_padding)
             self.time_embedding_applied = True
 
     def plot(self, n_time_points: int = 10000, filename: str = None):
