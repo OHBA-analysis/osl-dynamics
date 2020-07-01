@@ -24,12 +24,9 @@ class SavePredictionCallback(callbacks.Callback):
 
         except FileExistsError:
             pass
-        finally:
-            if dir_name[-1] != "/":
-                dir_name = dir_name + "/"
 
-        self.pattern = (
-            dir_name + time.strftime("%Y%m%d_%H%M%S_") + "predict_epoch_{:03d}"
+        self.pattern = os.path.join(
+            dir_name, time.strftime("%Y%m%d_%H%M%S_") + "predict_epoch_{:03d}"
         )
 
     def on_epoch_end(self, epoch, logs=None):
