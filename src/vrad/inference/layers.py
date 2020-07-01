@@ -6,14 +6,14 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
 from tensorflow.python.keras.backend import expand_dims, stop_gradient
 from vrad.inference.functions import (
-    is_symmetric,
     cholesky_factor,
     cholesky_factor_to_full_matrix,
+    is_symmetric,
 )
 from vrad.inference.initializers import (
+    CholeskyCovariancesInitializer,
     Identity3D,
     MeansInitializer,
-    CholeskyCovariancesInitializer,
 )
 
 

@@ -1,3 +1,5 @@
+import os
+import time
 from abc import ABC
 from pathlib import Path
 
@@ -8,6 +10,34 @@ from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
 from vrad.inference.layers import MultivariateNormalLayer
+
+
+class SavePredictionCallback(callbacks.Callback):
+    def __init__(self, prediction_dataset, dir_name, save_frequency=1):
+        super().__init__()
+
+        self.prediction_dataset = prediction_dataset
+        self.save_frequency = save_frequency
+
+        try:
+            os.mkdir(dir_name)
+
+        except FileExistsError:
+            pass
+        finally:
+            if dir_name[-1] != "/":
+                dir_name = dir_name + "/"
+
+        self.pattern = (
+            dir_name + time.strftime("%Y%m%d_%H%M%S_") + "predict_epoch_{:03d}"
+        )
+
+    def on_epoch_end(self, epoch, logs=None):
+        if epoch % self.save_frequency == 0:
+            np.save(
+                self.pattern.format(epoch),
+                self.model.predict(self.prediction_dataset)["m_theta_t"],
+            )
 
 
 class AnnealingCallback(callbacks.Callback):
