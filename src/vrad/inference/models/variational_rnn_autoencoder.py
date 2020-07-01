@@ -79,6 +79,8 @@ def create_model(
         n_epochs_annealing=n_epochs_annealing,
     )
 
+    # Convenience functions
+    # Add annealing to fit callbacks
     model.original_fit_method = model.fit
 
     def anneal_fit(*args, **kwargs):
@@ -90,10 +92,34 @@ def create_model(
                 annealing_callback,
                 burnin_callback,
             ]
-
         return model.original_fit_method(*args, **kwargs)
 
     model.fit = anneal_fit
+
+    # Return predictions as a dictionary with names
+    model.original_predict_function = model.predict
+
+    def named_predict(*args, **kwargs):
+        prediction = model.original_predict_function(*args, **kwargs)
+        return_names = [
+            "ll_loss",
+            "kl_loss",
+            "theta_t",
+            "m_theta_t",
+            "s2_theta_t",
+            "mu_theta_jt",
+            "sigma2_theta_j",
+            "mu_j",
+            "D_j",
+        ]
+        return dict(zip(return_names, prediction))
+
+    model.predict = named_predict
+
+    def predict_states(*args, **kwargs):
+        return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
+
+    model.predict_states = predict_states
 
     return model
 
