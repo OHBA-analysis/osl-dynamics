@@ -6,6 +6,11 @@ from sklearn.decomposition import PCA
 from vrad.utils.decorators import transpose
 
 
+def concatenate(time_series: np.ndarray) -> np.ndarray:
+    """Concatenates data into a single time series"""
+    return time_series.reshape(-1, time_series.shape[-1])
+
+
 def trim_trials(
     epoched_time_series: np.ndarray,
     trial_start: int = None,
@@ -82,7 +87,7 @@ def scale(time_series: np.ndarray):
 
 
 @transpose
-def pca(time_series, n_components: Union[int, float] = 1):
+def pca(time_series, n_components: Union[int, float] = 1, random_state: int = None):
     """Perform PCA on time_series.
 
     Wrapper for sklearn.decomposition.PCA.
@@ -104,7 +109,7 @@ def pca(time_series, n_components: Union[int, float] = 1):
         logging.info("n_components of 1 was passed. Skipping PCA.")
 
     else:
-        pca_from_variance = PCA(n_components=n_components)
+        pca_from_variance = PCA(n_components=n_components, random_state=random_state)
         time_series = pca_from_variance.fit_transform(time_series)
         if 0 < n_components < 1:
             print(
@@ -159,8 +164,51 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose
-def time_embed(time_series, backward, forward):
-    n_samples = time_series.shape[0]
-    trimmed_indices = np.arange(backward, n_samples - forward)
-    indices = trimmed_indices + np.arange(-backward, forward + 1)[:, None]
-    return time_series[indices].sum(axis=0)
+def time_embed(time_series, n_embeddings: int, rng_seed: int = None):
+    """Performs time embedding. This function reproduces the OSL function embedx.
+
+    time_embeded_series = [
+        channel 1,   lag 1
+        channel 1,   lag 2
+        channel 1,   lag ...
+        channel 1,   lag N
+        channel 2,   lag 1
+        channel 2,   lag 2
+        channel 2,   lag ...
+        channel 2,   lag N
+        ....................
+        ....................
+        ....................
+        ....................
+        channel M,   lag 1
+        channel M,   lag 2
+        channel M,   lag ...
+        channel M,   lag N
+    ]
+    """
+    n_samples, n_channels = time_series.shape
+    n_embedded_samples = n_samples - n_embeddings
+    lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
+
+    # Generate time embedded data
+    time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
+    for i in range(n_channels):
+        for j in range(len(lags)):
+            time_embedded_series[:, i * n_embeddings + j] = np.roll(
+                time_series[:, i], lags[j]
+            )
+
+    # Calculate a standard deviation of the first 500 time points (over all channels)
+    sigma = np.std(time_embedded_series[:500])
+
+    # We fill the values we don't have all the time lags for with Gaussian
+    # random numbers
+    rng = np.random.default_rng(rng_seed)
+    time_embedded_series[: lags[-1]] = rng.normal(
+        0, sigma, time_embedded_series[: lags[-1]].shape
+    )
+    time_embedded_series[lags[0] :] = rng.normal(
+        0, sigma, time_embedded_series[lags[0] :].shape
+    )
+
+    return time_embedded_series
