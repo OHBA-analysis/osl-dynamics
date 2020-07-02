@@ -7,12 +7,11 @@ import scipy.io
 from vrad import array_ops
 from vrad.data.io import load_data
 from vrad.data.manipulation import (
-    pca,
-    scale,
+    concatenate,
     standardize,
+    scale,
+    pca,
     time_embed,
-    trials_to_continuous,
-    trim_trials,
 )
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
@@ -91,8 +90,11 @@ class Data:
         self._original_shape = self.time_series.shape
 
         # Flags for data manipulation
+        self.concatenated = False
+        self.scaling_applied = False
         self.pca_applied = False
         self.time_embedding_applied = False
+        self.prepared = False
 
         self.t = None
         if self.time_series.ndim == 2:
@@ -103,28 +105,17 @@ class Data:
     def from_file(self):
         return self._from_file
 
-    @from_file.setter
-    def from_file(self, value):
-        self._from_file = value
-
     @property
     def original_shape(self):
         return self._original_shape
-
-    @original_shape.setter
-    def original_shape(self, value):
-        self._original_shape = value
 
     def __str__(self):
         return_string = [
             f"{self.__class__.__name__}:",
             f"from_file: {self.from_file}",
-            f"n_channels: {self.time_series.shape[1]}",
-            f"n_time_points: {self.time_series.shape[0]}",
-            f"pca_applied: {self.pca_applied}",
-            f"time_embedding_applied: {self.time_embedding_applied}",
             f"original_shape: {self.original_shape}",
             f"current_shape: {self.time_series.shape}",
+            f"prepared: {self.prepared}",
         ]
         return "\n  ".join(return_string)
 
@@ -147,25 +138,9 @@ class Data:
         if transposed:
             _logger.warning("Assuming time to be the longer axis and transposing.")
 
-    def trim_trials(
-        self, trial_start: int = None, trial_cutoff: int = None, trial_skip: int = None,
-    ):
-        self.time_series = trim_trials(
-            epoched_time_series=self.time_series,
-            trial_start=trial_start,
-            trial_cutoff=trial_cutoff,
-            trial_skip=trial_skip,
-        )
-
-    def make_continuous(self):
-        """Given trial data, return a continuous time series.
-
-        With data input in the form (channels x trials x time), reshape the array to
-        create a (time x channels) array. Wraps trials_to_continuous.
-
-        """
-        self.time_series = trials_to_continuous(self.time_series)
-        self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
+    def concatenate(self):
+        self.time_series = concatenate(self.time_series)
+        self.concatenated = True
 
     def standardize(
         self,
@@ -184,26 +159,44 @@ class Data:
 
     def scale(self):
         self.time_series = scale(self.time_series)
+        self.scaling_applied = True
 
-    def pca(self, n_components: Union[int, float] = 1):
-        if not self.pca_applied:
-            self.time_series = pca(self.time_series, n_components)
-            self.pca_applied = True
+    def pca(self, n_components: Union[int, float] = 1, random_state: int = None):
+        logging.info(f"Applying PCA with n_components={n_components}")
+        self.time_series = pca(self.time_series, n_components)
+        self.pca_applied = True
 
-    def time_embed(self, n_embeddings):
-        if not self.time_embedding_applied:
-            self.time_series = time_embed(self.time_series, n_embeddings)
-            self.time_embedding_applied = True
+    def time_embed(self, n_embeddings: int, rng_seed: int = None):
+        logging.info(f"Applying time embedding with n_embeddings={n_embeddings}")
+        self.time_series = time_embed(self.time_series, n_embeddings, rng_seed)
+        self.time_embedding_applied = True
 
-    def plot(self, n_time_points: int = 10000, filename: str = None):
+    def prepare(
+        self,
+        n_embeddings: int,
+        n_pca_components: Union[int, float],
+        time_embed_rng_seed: int = None,
+        pca_rng_seed: int = None,
+    ):
+        if not self.prepared:
+            self.concatenate()
+            self.time_embed(n_embeddings, time_embed_rng_seed)
+            self.scale()
+            self.pca(n_pca_components, pca_rng_seed)
+            self.scale()
+            self.prepared = True
+        else:
+            logging.warning("Data has already been prepared")
+
+    def plot(self, n_samples: int = 10000, filename: str = None):
         """Plot time_series.
 
         """
         plotting.plot_time_series(
-            self.time_series, n_time_points=n_time_points, filename=filename
+            self.time_series, n_samples=n_samples, filename=filename
         )
 
-    def savemat(self, filename: str, field_name: str = "x"):
+    def savemat(self, filename: str, field_name: str = "X"):
         """Save time_series to a .mat file.
 
         Parameters

@@ -6,6 +6,11 @@ from sklearn.decomposition import PCA
 from vrad.utils.decorators import transpose
 
 
+def concatenate(time_series: np.ndarray) -> np.ndarray:
+    """Concatenates data into a single time series"""
+    return time_series.reshape(-1, time_series.shape[-1])
+
+
 def trim_trials(
     epoched_time_series: np.ndarray,
     trial_start: int = None,
@@ -82,7 +87,7 @@ def scale(time_series: np.ndarray):
 
 
 @transpose
-def pca(time_series, n_components: Union[int, float] = 1):
+def pca(time_series, n_components: Union[int, float] = 1, random_state: int = None):
     """Perform PCA on time_series.
 
     Wrapper for sklearn.decomposition.PCA.
@@ -104,7 +109,7 @@ def pca(time_series, n_components: Union[int, float] = 1):
         logging.info("n_components of 1 was passed. Skipping PCA.")
 
     else:
-        pca_from_variance = PCA(n_components=n_components)
+        pca_from_variance = PCA(n_components=n_components, random_state=random_state)
         time_series = pca_from_variance.fit_transform(time_series)
         if 0 < n_components < 1:
             print(
@@ -159,9 +164,8 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose
-def time_embed(time_series, n_embeddings, rng_seed=None):
+def time_embed(time_series, n_embeddings: int, rng_seed: int = None):
     """Performs time embedding. This function reproduces the OSL function embedx.
-       This function should be applied to each data file separately.
 
     time_embeded_series = [
         channel 1,   lag 1
