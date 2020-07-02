@@ -190,9 +190,9 @@ class Data:
             self.time_series = pca(self.time_series, n_components)
             self.pca_applied = True
 
-    def time_embed(self, n_embeddings, zero_padding=True):
+    def time_embed(self, n_embeddings):
         if not self.time_embedding_applied:
-            self.time_series = time_embed(self.time_series, n_embeddings, zero_padding)
+            self.time_series = time_embed(self.time_series, n_embeddings)
             self.time_embedding_applied = True
 
     def plot(self, n_time_points: int = 10000, filename: str = None):

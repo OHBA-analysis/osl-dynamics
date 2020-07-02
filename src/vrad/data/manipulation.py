@@ -159,8 +159,9 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose
-def time_embed(time_series, n_embeddings, zero_padding=False):
-    """Performs a time embedding.
+def time_embed(time_series, n_embeddings, rng_seed=None):
+    """Performs time embedding. This function reproduces the OSL function embedx.
+       This function should be applied to each data file separately.
 
     time_embeded_series = [
         channel 1,   lag 1
@@ -182,19 +183,28 @@ def time_embed(time_series, n_embeddings, zero_padding=False):
     ]
     """
     n_samples, n_channels = time_series.shape
-    if zero_padding:
-        time_embedded_series = np.zeros([n_samples, n_channels * n_embeddings])
-        for i in range(n_channels):
-            for j in range(n_embeddings):
-                time_embedded_series[
-                    : n_samples - j, i * n_embeddings + j
-                ] = time_series[j:, i]
-    else:
-        n_embedded_samples = n_samples - n_embeddings
-        time_embedded_series = np.empty([n_embedded_samples, n_channels * n_embeddings])
-        for i in range(n_channels):
-            for j in range(n_embeddings):
-                time_embedded_series[:, i * n_embeddings + j] = time_series[
-                    j : n_embedded_samples + j, i
-                ]
+    n_embedded_samples = n_samples - n_embeddings
+    lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
+
+    # Generate time embedded data
+    time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
+    for i in range(n_channels):
+        for j in range(len(lags)):
+            time_embedded_series[:, i * n_embeddings + j] = np.roll(
+                time_series[:, i], lags[j]
+            )
+
+    # Calculate a standard deviation of the first 500 time points (over all channels)
+    sigma = np.std(time_embedded_series[:500])
+
+    # We fill the values we don't have all the time lags for with Gaussian
+    # random numbers
+    rng = np.random.default_rng(rng_seed)
+    time_embedded_series[: lags[-1]] = rng.normal(
+        0, sigma, time_embedded_series[: lags[-1]].shape
+    )
+    time_embedded_series[lags[0] :] = rng.normal(
+        0, sigma, time_embedded_series[lags[0] :].shape
+    )
+
     return time_embedded_series
