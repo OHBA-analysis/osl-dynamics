@@ -171,7 +171,7 @@ def _model_structure(
     inference_normalisation_layer = layers.LayerNormalization()
     inference_output_dropout_layer = layers.Dropout(dropout_rate_inference)
     m_theta_t_layer = layers.Dense(n_states, activation="linear")
-    s2_theta_t_layer = layers.Dense(n_states, activation="softplus")
+    s2_theta_t_layer = layers.Dense(n_states, activation="linear")
 
     # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, s2_theta_t) via the
     # reparameterisation trick
