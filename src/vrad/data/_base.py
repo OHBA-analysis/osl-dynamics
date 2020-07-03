@@ -225,7 +225,7 @@ class Data:
             self.scale()
 
             # Use an eigen decomposition for dimensionality reduction
-            self.eigen_decomposition_dimensionality_reduction(n_pca_components)
+            self.eigen_decomposition_dimensionality_reduction(n_pca_components, whiten)
 
             # Concatenate the data
             self.concatenate()

@@ -7,6 +7,7 @@ from vrad.utils.decorators import transpose
 
 _logger = logging.getLogger("VRAD")
 
+
 def concatenate(time_series: np.ndarray) -> np.ndarray:
     """Concatenates data into a single time series"""
     return time_series.reshape(-1, time_series.shape[-1])
@@ -235,11 +236,11 @@ def eigen_decomposition(
     # Sort the eigenvalues into desending order
     order = np.argsort(eigenvalues)[::-1]
     eigenvalues = eigenvalues[order]
-    eigenvectors = eigenvectors[:,order]
+    eigenvectors = eigenvectors[:, order]
 
     # Only keep the first n_components
     eigenvalues = eigenvalues[:n_components]
-    eigenvectors = eigenvectors[:,:n_components]
+    eigenvectors = eigenvectors[:, :n_components]
 
     return eigenvalues, eigenvectors
 
@@ -248,7 +249,7 @@ def whiten_eigenvectors(
     eigenvalues: np.ndarray, eigenvectors: np.ndarray
 ) -> np.ndarray:
     for i in range(eigenvalues.shape[0]):
-        eigenvectors[:,i] /= np.sqrt(eigenvalues[i])
+        eigenvectors[:, i] /= np.sqrt(eigenvalues[i])
     return eigenvectors
 
 
