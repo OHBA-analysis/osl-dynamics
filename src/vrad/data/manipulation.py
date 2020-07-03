@@ -87,7 +87,12 @@ def scale(time_series: np.ndarray):
 
 
 @transpose
-def pca(time_series, n_components: Union[int, float] = 1, random_state: int = None):
+def pca(
+    time_series,
+    n_components: Union[int, float] = 1,
+    whiten: bool = True,
+    random_state: int = None,
+):
     """Perform PCA on time_series.
 
     Wrapper for sklearn.decomposition.PCA.
@@ -109,7 +114,9 @@ def pca(time_series, n_components: Union[int, float] = 1, random_state: int = No
         logging.info("n_components of 1 was passed. Skipping PCA.")
 
     else:
-        pca_from_variance = PCA(n_components=n_components, random_state=random_state)
+        pca_from_variance = PCA(
+            n_components=n_components, whiten=whiten, random_state=random_state
+        )
         time_series = pca_from_variance.fit_transform(time_series)
         if 0 < n_components < 1:
             print(

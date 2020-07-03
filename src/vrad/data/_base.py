@@ -161,9 +161,14 @@ class Data:
         self.time_series = scale(self.time_series)
         self.scaling_applied = True
 
-    def pca(self, n_components: Union[int, float] = 1, random_state: int = None):
+    def pca(
+        self,
+        n_components: Union[int, float] = 1,
+        whiten: bool = True,
+        random_state: int = None,
+    ):
         logging.info(f"Applying PCA with n_components={n_components}")
-        self.time_series = pca(self.time_series, n_components)
+        self.time_series = pca(self.time_series, n_components, whiten, random_state)
         self.pca_applied = True
 
     def time_embed(self, n_embeddings: int, rng_seed: int = None):
