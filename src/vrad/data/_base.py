@@ -6,13 +6,7 @@ import numpy as np
 import scipy.io
 from vrad import array_ops
 from vrad.data.io import load_data
-from vrad.data.manipulation import (
-    concatenate,
-    standardize,
-    scale,
-    pca,
-    time_embed,
-)
+from vrad.data.manipulation import concatenate, pca, scale, standardize, time_embed
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
 from vrad.utils.misc import time_axis_first
@@ -233,7 +227,7 @@ class OSL_HMM:
         self.hmm = mat73.loadmat(filename)["hmm"]
 
         self.state = self.hmm.state
-        self.k = self.hmm.K
+        self.k = int(self.hmm.K)
         self.p = self.hmm.P
         self.dir_2d_alpha = self.hmm.Dir2d_alpha
         self.pi = self.hmm.Pi
