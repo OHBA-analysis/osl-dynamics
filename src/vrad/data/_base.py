@@ -7,7 +7,6 @@ import scipy.io
 from vrad import array_ops
 from vrad.data.io import load_data
 from vrad.data.manipulation import (
-    concatenate,
     pca,
     scale,
     standardize,
@@ -89,11 +88,6 @@ class Data:
             sampling_frequency=sampling_frequency,
         )
 
-        # Ensure time_series is 3D: [n_sessions x n_samples x n_channels]
-        self.time_series = self.time_series.reshape(
-            -1, self.time_series.shape[-2], self.time_series.shape[-1]
-        )
-
         # Properties
         self._from_file = time_series if isinstance(time_series, str) else False
         self._n_total_samples = len(
@@ -101,7 +95,6 @@ class Data:
         )
 
         # Flags for data manipulation
-        self.concatenated = False
         self.prepared = False
 
         self.t = None
@@ -123,7 +116,6 @@ class Data:
             f"from_file: {self.from_file}",
             f"current_shape: {self.time_series.shape}",
             f"prepared: {self.prepared}",
-            f"concatenated: {self.concatenated}",
         ]
         return "\n  ".join(return_string)
 
@@ -145,10 +137,6 @@ class Data:
         self.time_series, transposed = time_axis_first(self.time_series)
         if transposed:
             _logger.warning("Assuming time to be the longer axis and transposing.")
-
-    def concatenate(self):
-        self.time_series = concatenate(self.time_series)
-        self.concatenated = True
 
     def standardize(
         self,
@@ -191,14 +179,16 @@ class Data:
         )
 
         # Calculate the weighted covariance matrix for each session and average
-        sigma = covariances(self.time_series, weighted=True)
-        total_weighted_covariance = np.sum(sigma, axis=0) / (self.n_total_samples - 1)
+        #sigma = covariances(self.time_series, weighted=True)
+        #total_weighted_covariance = np.sum(sigma, axis=0) / (self.n_total_samples - 1)
+        sigma = covariances(self.time_series)
 
         # Calculate the eigen decomposition for each session and keep the top
         # n_components
-        eigenvalues, eigenvectors = eigen_decomposition(
-            total_weighted_covariance, n_components
-        )
+        #eigenvalues, eigenvectors = eigen_decomposition(
+        #    total_weighted_covariance, n_components
+        #)
+        eigenvalues, eigenvectors = eigen_decomposition(sigma, n_components)
 
         # Whiten the eigenvectors
         if whiten:
@@ -226,9 +216,6 @@ class Data:
 
             # Use an eigen decomposition for dimensionality reduction
             self.eigen_decomposition_dimensionality_reduction(n_pca_components, whiten)
-
-            # Concatenate the data
-            self.concatenate()
 
             self.prepared = True
 
