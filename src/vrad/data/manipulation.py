@@ -286,4 +286,5 @@ def multiply_by_eigenvectors(
     n_pca_components = eigenvectors.shape[1]
     pca_time_series = np.empty([n_samples, n_pca_components])
     pca_time_series = time_series @ eigenvectors
-    return pca_time_series
+    # eigen decomposition returns complex numbers so we covert to real numbers
+    return np.real_if_close(pca_time_series)
