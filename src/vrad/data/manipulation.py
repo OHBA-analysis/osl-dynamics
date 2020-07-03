@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from vrad.utils.decorators import transpose
 
+_logger = logging.getLogger("VRAD")
 
 def concatenate(time_series: np.ndarray) -> np.ndarray:
     """Concatenates data into a single time series"""
@@ -37,7 +38,7 @@ def trim_trials(
     if epoched_time_series.ndim == 3:
         return epoched_time_series[:, trial_start:trial_cutoff, ::trial_skip]
     else:
-        logging.warning(
+        _logger.warning(
             f"Array is not 3D (ndim = {epoched_time_series.ndim}). Can't trim trials."
         )
 
@@ -79,16 +80,21 @@ def standardize(
 
 
 @transpose
-def scale(time_series: np.ndarray):
+def scale(time_series: np.ndarray) -> np.ndarray:
     """Scale time_series to have mean zero and standard deviation 1.
 
     """
-    return (time_series - time_series.mean(axis=0)) / time_series.std(axis=0)
+    # Loop over sessions
+    for n in range(time_series.shape[0]):
+        # Normalise over the time dimension
+        time_series[n] -= time_series[n].mean(axis=0)
+        time_series[n] /= time_series[n].std(axis=0)
+    return time_series
 
 
 @transpose
 def pca(
-    time_series,
+    time_series: np.ndarray,
     n_components: Union[int, float] = 1,
     whiten: bool = True,
     random_state: int = None,
@@ -111,7 +117,7 @@ def pca(
         raise ValueError("time_series must be a 2D array")
 
     if n_components == 1:
-        logging.info("n_components of 1 was passed. Skipping PCA.")
+        _logger.info("n_components of 1 was passed. Skipping PCA.")
 
     else:
         pca_from_variance = PCA(
@@ -144,7 +150,7 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
     """
     if trials_time_course.ndim == 2:
-        logging.warning(
+        _logger.warning(
             "A 2D time series was passed. Assuming it doesn't need to "
             "be concatenated."
         )
@@ -162,7 +168,7 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
     )
     if concatenated.shape[1] > concatenated.shape[0]:
         concatenated = concatenated.T
-        logging.warning(
+        _logger.warning(
             "Assuming longer axis to be time and transposing. Check your inputs to be "
             "sure."
         )
@@ -171,51 +177,87 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose
-def time_embed(time_series, n_embeddings: int, rng_seed: int = None):
+def time_embed(time_series: np.ndarray, n_embeddings: int, random_seed: int = None):
     """Performs time embedding. This function reproduces the OSL function embedx.
-
-    time_embeded_series = [
-        channel 1,   lag 1
-        channel 1,   lag 2
-        channel 1,   lag ...
-        channel 1,   lag N
-        channel 2,   lag 1
-        channel 2,   lag 2
-        channel 2,   lag ...
-        channel 2,   lag N
-        ....................
-        ....................
-        ....................
-        ....................
-        channel M,   lag 1
-        channel M,   lag 2
-        channel M,   lag ...
-        channel M,   lag N
-    ]
     """
-    n_samples, n_channels = time_series.shape
+    n_sessions, n_samples, n_channels = time_series.shape
     n_embedded_samples = n_samples - n_embeddings
     lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
 
+    # Setup random number generator
+    rng = np.random.default_rng(random_seed)
+
     # Generate time embedded data
-    time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
-    for i in range(n_channels):
-        for j in range(len(lags)):
-            time_embedded_series[:, i * n_embeddings + j] = np.roll(
-                time_series[:, i], lags[j]
-            )
+    time_embedded_series = np.empty([n_sessions, n_samples, n_channels * len(lags)])
+    for n in range(n_sessions):
+        for i in range(n_channels):
+            for j in range(len(lags)):
+                time_embedded_series[n, :, i * n_embeddings + j] = np.roll(
+                    time_series[n, :, i], lags[j]
+                )
 
-    # Calculate a standard deviation of the first 500 time points (over all channels)
-    sigma = np.std(time_embedded_series[:500])
+        # Calculate a standard deviation of the first 500 time points
+        # (over all channels)
+        sigma = np.std(time_embedded_series[n, :500])
 
-    # We fill the values we don't have all the time lags for with Gaussian
-    # random numbers
-    rng = np.random.default_rng(rng_seed)
-    time_embedded_series[: lags[-1]] = rng.normal(
-        0, sigma, time_embedded_series[: lags[-1]].shape
-    )
-    time_embedded_series[lags[0] :] = rng.normal(
-        0, sigma, time_embedded_series[lags[0] :].shape
-    )
+        # We fill the values we don't have all the time lags for with Gaussian
+        # random numbers
+        time_embedded_series[n, : lags[-1]] = rng.normal(
+            0, sigma, time_embedded_series[n, : lags[-1]].shape
+        )
+        time_embedded_series[n, lags[0] :] = rng.normal(
+            0, sigma, time_embedded_series[n, lags[0] :].shape
+        )
 
     return time_embedded_series
+
+
+def covariances(time_series: np.ndarray, weighted: bool = False) -> np.ndarray:
+    n_sessions, n_samples, n_channels = time_series.shape
+    covariances = np.empty([n_sessions, n_channels, n_channels])
+    for n in range(n_sessions):
+        if weighted:
+            covariances[n] = (time_series.shape[1] - 1) * np.cov(time_series[n].T)
+        else:
+            covariances[n] = np.cov(time_series[n])
+    return covariances
+
+
+def eigen_decomposition(
+    covariance: np.ndarray, n_components: int
+) -> (np.ndarray, np.ndarray):
+    # Calculate eigen decomposition
+    if n_components / covariance.shape[0] > 0.04:
+        eigenvalues, eigenvectors = np.linalg.eig(covariance)
+    else:
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+
+    # Sort the eigenvalues into desending order
+    order = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[order]
+    eigenvectors = eigenvectors[:,order]
+
+    # Only keep the first n_components
+    eigenvalues = eigenvalues[:n_components]
+    eigenvectors = eigenvectors[:,:n_components]
+
+    return eigenvalues, eigenvectors
+
+
+def whiten_eigenvectors(
+    eigenvalues: np.ndarray, eigenvectors: np.ndarray
+) -> np.ndarray:
+    for i in range(eigenvalues.shape[0]):
+        eigenvectors[:,i] /= np.sqrt(eigenvalues[i])
+    return eigenvectors
+
+
+def multiply_by_eigenvectors(
+    time_series: np.ndarray, eigenvectors: np.ndarray
+) -> np.ndarray:
+    n_sessions, n_samples, n_channels = time_series.shape
+    n_pca_components = eigenvectors.shape[1]
+    pca_time_series = np.empty([n_sessions, n_samples, n_pca_components])
+    for n in range(n_sessions):
+        pca_time_series[n] = time_series[n] @ eigenvectors
+    return pca_time_series

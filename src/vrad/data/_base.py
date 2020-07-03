@@ -6,7 +6,17 @@ import numpy as np
 import scipy.io
 from vrad import array_ops
 from vrad.data.io import load_data
-from vrad.data.manipulation import concatenate, pca, scale, standardize, time_embed
+from vrad.data.manipulation import (
+    concatenate,
+    pca,
+    scale,
+    standardize,
+    time_embed,
+    covariances,
+    eigen_decomposition,
+    whiten_eigenvectors,
+    multiply_by_eigenvectors,
+)
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
 from vrad.utils.misc import time_axis_first
@@ -79,15 +89,19 @@ class Data:
             sampling_frequency=sampling_frequency,
         )
 
+        # Ensure time_series is 3D: [n_sessions x n_samples x n_channels]
+        self.time_series = self.time_series.reshape(
+            -1, self.time_series.shape[-2], self.time_series.shape[-1]
+        )
+
         # Properties
         self._from_file = time_series if isinstance(time_series, str) else False
-        self._original_shape = self.time_series.shape
+        self._n_total_samples = len(
+            self.time_series.reshape(-1, self.time_series.shape[-1])
+        )
 
         # Flags for data manipulation
         self.concatenated = False
-        self.scaling_applied = False
-        self.pca_applied = False
-        self.time_embedding_applied = False
         self.prepared = False
 
         self.t = None
@@ -100,16 +114,16 @@ class Data:
         return self._from_file
 
     @property
-    def original_shape(self):
-        return self._original_shape
+    def n_total_samples(self):
+        return self._n_total_samples
 
     def __str__(self):
         return_string = [
             f"{self.__class__.__name__}:",
             f"from_file: {self.from_file}",
-            f"original_shape: {self.original_shape}",
             f"current_shape: {self.time_series.shape}",
             f"prepared: {self.prepared}",
+            f"concatenated: {self.concatenated}",
         ]
         return "\n  ".join(return_string)
 
@@ -153,7 +167,6 @@ class Data:
 
     def scale(self):
         self.time_series = scale(self.time_series)
-        self.scaling_applied = True
 
     def pca(
         self,
@@ -163,29 +176,64 @@ class Data:
     ):
         logging.info(f"Applying PCA with n_components={n_components}")
         self.time_series = pca(self.time_series, n_components, whiten, random_state)
-        self.pca_applied = True
 
-    def time_embed(self, n_embeddings: int, rng_seed: int = None):
+    def time_embed(self, n_embeddings: int, random_seed: int = None):
         logging.info(f"Applying time embedding with n_embeddings={n_embeddings}")
-        self.time_series = time_embed(self.time_series, n_embeddings, rng_seed)
-        self.time_embedding_applied = True
+        self.time_series = time_embed(
+            self.time_series, n_embeddings, random_seed=random_seed
+        )
+
+    def eigen_decomposition_dimensionality_reduction(
+        self, n_components: int, whiten: bool = True
+    ):
+        logging.info(
+            f"Calculating eigen decomposition and keeping {n_components} components"
+        )
+
+        # Calculate the weighted covariance matrix for each session and average
+        sigma = covariances(self.time_series, weighted=True)
+        total_weighted_covariance = np.sum(sigma, axis=0) / (self.n_total_samples - 1)
+
+        # Calculate the eigen decomposition for each session and keep the top
+        # n_components
+        eigenvalues, eigenvectors = eigen_decomposition(
+            total_weighted_covariance, n_components
+        )
+
+        # Whiten the eigenvectors
+        if whiten:
+            eigenvectors = whiten_eigenvectors(eigenvalues, eigenvectors)
+
+        # Apply dimensionality reduction
+        self.time_series = multiply_by_eigenvectors(self.time_series, eigenvectors)
 
     def prepare(
         self,
         n_embeddings: int,
         n_pca_components: Union[int, float],
-        time_embed_rng_seed: int = None,
-        pca_rng_seed: int = None,
+        whiten: bool,
+        random_seed: int = None,
     ):
+        """This method reproduces the data preparation performed in
+           teh_groupinference_parcels.m
+        """
         if not self.prepared:
+            # Apply time embedding to each session
+            self.time_embed(n_embeddings, random_seed=random_seed)
+
+            # Standardise the data in each session
+            self.scale()
+
+            # Use an eigen decomposition for dimensionality reduction
+            self.eigen_decomposition_dimensionality_reduction(n_pca_components)
+
+            # Concatenate the data
             self.concatenate()
-            self.time_embed(n_embeddings, time_embed_rng_seed)
-            self.scale()
-            self.pca(n_pca_components, pca_rng_seed)
-            self.scale()
+
             self.prepared = True
+
         else:
-            logging.warning("Data has already been prepared")
+            logging.warning("Data has already been prepared. No changes made.")
 
     def plot(self, n_samples: int = 10000, filename: str = None):
         """Plot time_series.
