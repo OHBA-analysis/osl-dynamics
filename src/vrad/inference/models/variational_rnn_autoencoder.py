@@ -34,6 +34,7 @@ def create_model(
     learning_rate: float = 0.01,
     clip_normalization: float = None,
     multi_gpu: bool = False,
+    strategy=None,
 ):
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
@@ -45,7 +46,7 @@ def create_model(
     # Stretegy for distributed learning
     if multi_gpu:
         strategy = MirroredStrategy()
-    else:
+    elif strategy is None:
         strategy = get_strategy()
 
     # Compile the model
