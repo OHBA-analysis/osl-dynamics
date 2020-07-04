@@ -1,5 +1,12 @@
+"""Example script for running inference on simulated HMM data.
+
+- Takes approximately 2 minutes to train (on compG017).
+- Achieves a dice coefficient of ~0.9.
+- Line 133 can be uncommented to produce a plot of the simulated and inferred
+  time courses for comparison.
+"""
+
 print("Importing packages")
-import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
@@ -7,22 +14,30 @@ from vrad import array_ops, data
 from vrad.inference import gmm, metrics, tf_ops
 from vrad.inference.models.variational_rnn_autoencoder import create_model
 from vrad.simulation import HMMSimulation
-from vrad.utils import misc, plotting
+from vrad.utils import plotting
 
 # Limit GPU RAM use
 tf_ops.gpu_growth()
 
-# Parameters
+multi_gpu = False
+strategy = None
+
+# Settings
+n_samples = 50000
+observation_error = 0.2
+
 n_states = 5
 sequence_length = 100
 batch_size = 32
+
 learning_rate = 0.01
+clip_normalization = None
 
 do_annealing = True
 annealing_sharpness = 5
-n_epochs_annealing = 80
 
 n_epochs = 100
+n_epochs_annealing = 80
 n_epochs_burnin = 10
 
 dropout_rate_inference = 0.4
@@ -43,7 +58,10 @@ init_djs = np.load("data/state_000.npy")
 # Simulate data
 print("Simulating data")
 sim = HMMSimulation(
-    trans_prob=init_trans_prob, djs=init_djs, n_samples=50000, e_std=0.2
+    trans_prob=init_trans_prob,
+    djs=init_djs,
+    n_samples=n_samples,
+    e_std=observation_error,
 )
 meg_data = data.Data(sim)
 n_channels = meg_data.shape[1]
@@ -64,8 +82,6 @@ covariances, means = gmm.learn_mu_sigma(
     learn_means=False,
 )
 
-covariances = gmm.find_cholesky_decompositions(covariances, means, False)
-
 # Prepare dataset
 training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
     time_series=meg_data, sequence_length=sequence_length, batch_size=batch_size,
@@ -76,8 +92,8 @@ rnn_vae = create_model(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
-    learn_means=False,
-    learn_covariances=True,
+    learn_means=learn_means,
+    learn_covariances=learn_covariances,
     initial_mean=means,
     initial_covariances=covariances,
     n_units_inference=n_units_inference,
@@ -89,6 +105,10 @@ rnn_vae = create_model(
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
     n_epochs_burnin=n_epochs_burnin,
+    learning_rate=learning_rate,
+    clip_normalization=clip_normalization,
+    multi_gpu=multi_gpu,
+    strategy=strategy,
 )
 
 rnn_vae.summary()
@@ -102,13 +122,15 @@ history = rnn_vae.fit(
     verbose=0,
 )
 
-# Evaluate performance
+# Inferred state time course
 inf_stc = array_ops.get_one_hot(
-    np.concatenate(rnn_vae.predict(prediction_dataset)[3]).argmax(axis=1)
+    np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"]).argmax(axis=1)
 )
 
+# Find correspondance to ground truth state time courses
 matched_stc, matched_inf_stc = array_ops.match_states(sim.state_time_course, inf_stc)
 
-plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# Compare state time courses
+#plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
