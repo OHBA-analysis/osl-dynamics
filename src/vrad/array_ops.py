@@ -57,13 +57,19 @@ def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
     -------
     matched_state_time_courses: list of numpy.ndarray
     """
-    matched_state_time_courses = [state_time_courses[0]]
-    for state_time_course in state_time_courses[1:]:
+    # If the state time courses have different length we only use the first n_samples
+    n_samples = min([stc.shape[0] for stc in state_time_courses])
 
-        correlation = correlate_states(state_time_courses[0], state_time_course)
+    # Match time courses based on correlation
+    matched_state_time_courses = [state_time_courses[0][:n_samples]]
+    for state_time_course in state_time_courses[1:]:
+        correlation = correlate_states(
+            state_time_courses[0][:n_samples], state_time_course[:n_samples]
+        )
         correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
         matches = linear_sum_assignment(-correlation)
-        matched_state_time_courses.append(state_time_course[:, matches[1]])
+        matched_state_time_courses.append(state_time_course[:n_samples, matches[1]])
+
     return matched_state_time_courses
 
 
