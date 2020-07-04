@@ -50,13 +50,13 @@ learn_covariances = True
 activation_function = "softmax"
 
 # Read MEG data
-print('Reading MEG data')
-meg_data = data.Data('/well/woolrich/shared/vrad/prepared_data/one_subject.mat')
+print("Reading MEG data")
+meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
 n_channels = meg_data.shape[1]
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
-covariances = mat73.loadmat('/well/woolrich/shared/vrad/hmm_fits/one_subject/Covs.mat')
-covariances = covariances['Covs'].astype(np.float32)
+covariances = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/Covs.mat")
+covariances = covariances["Covs"].astype(np.float32)
 means = np.zeros([n_states, n_channels], dtype=np.float32)
 
 # Prepare dataset
@@ -103,8 +103,8 @@ history = rnn_vae.fit(
 inf_stc = np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"])
 
 # Read file containing state probabilities inferred by OSL
-hmm_stc = mat73.loadmat('/well/woolrich/shared/vrad/hmm_fits/one_subject/gamma.mat')
-hmm_stc = hmm_stc['gamma']
+hmm_stc = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/gamma.mat")
+hmm_stc = hmm_stc["gamma"]
 
 # Hard classify
 inf_stc = inf_stc.argmax(axis=1)
@@ -118,6 +118,6 @@ hmm_stc = array_ops.get_one_hot(hmm_stc)
 matched_stc, matched_inf_stc = array_ops.match_states(hmm_stc, inf_stc)
 
 # Compare state time courses
-#plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))

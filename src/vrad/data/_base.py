@@ -3,7 +3,6 @@ from typing import Any, Union
 
 import mat73
 import numpy as np
-import scipy.io
 from vrad import array_ops
 from vrad.data.io import load_data
 from vrad.data.manipulation import (
@@ -11,7 +10,7 @@ from vrad.data.manipulation import (
     scale,
     standardize,
     time_embed,
-    covariances,
+    covariance,
     eigen_decomposition,
     whiten_eigenvectors,
     multiply_by_eigenvectors,
@@ -33,7 +32,7 @@ class Data:
     If the input provided is a numpy.ndarray, it is taken as is. If the input is a
     string, VRAD will check the file extension to see if it is .npy (read by
     numpy.load) or .mat. If a .mat file is found, it is first opened using
-    scipy.io.loadmat and if that fails, mat73.loadmat. Any input other than these is
+    mat73.loadmat and if that fails, mat73.loadmat. Any input other than these is
     considered valid if it can be converted to a numpy array using numpy.array.
 
     When importing from MAT files, the values in the class variable ignored_keys are
@@ -179,15 +178,10 @@ class Data:
         )
 
         # Calculate the weighted covariance matrix for each session and average
-        #sigma = covariances(self.time_series, weighted=True)
-        #total_weighted_covariance = np.sum(sigma, axis=0) / (self.n_total_samples - 1)
-        sigma = covariances(self.time_series)
+        sigma = covariance(self.time_series)
 
         # Calculate the eigen decomposition for each session and keep the top
         # n_components
-        #eigenvalues, eigenvectors = eigen_decomposition(
-        #    total_weighted_covariance, n_components
-        #)
         eigenvalues, eigenvectors = eigen_decomposition(sigma, n_components)
 
         # Whiten the eigenvectors
@@ -208,15 +202,10 @@ class Data:
            teh_groupinference_parcels.m
         """
         if not self.prepared:
-            # Apply time embedding to each session
             self.time_embed(n_embeddings, random_seed=random_seed)
-
-            # Standardise the data in each session
             self.scale()
-
-            # Use an eigen decomposition for dimensionality reduction
             self.eigen_decomposition_dimensionality_reduction(n_pca_components, whiten)
-
+            self.scale()
             self.prepared = True
 
         else:
@@ -240,7 +229,7 @@ class Data:
         field_name: str
             The dictionary key (MATLAB object field) which references the data.
         """
-        scipy.io.savemat(filename, {field_name: self.time_series})
+        mat73.savemat(filename, {field_name: self.time_series})
 
     def save(self, filename: str):
         """Save time_series to a numpy (.npy) file.

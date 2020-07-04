@@ -85,11 +85,8 @@ def scale(time_series: np.ndarray) -> np.ndarray:
     """Scale time_series to have mean zero and standard deviation 1.
 
     """
-    # Loop over sessions
-    for n in range(time_series.shape[0]):
-        # Normalise over the time dimension
-        time_series[n] -= time_series[n].mean(axis=0)
-        time_series[n] /= time_series[n].std(axis=0)
+    time_series -= time_series.mean(axis=0)
+    time_series /= time_series.std(axis=0)
     return time_series
 
 
@@ -181,67 +178,38 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 def time_embed(time_series: np.ndarray, n_embeddings: int, random_seed: int = None):
     """Performs time embedding. This function reproduces the OSL function embedx.
     """
-    # n_sessions, n_samples, n_channels = time_series.shape
     n_samples, n_channels = time_series.shape
     n_embedded_samples = n_samples - n_embeddings
     lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
 
-    # Setup random number generator
-    rng = np.random.default_rng(random_seed)
-
-    # Generate time embedded data
-    # time_embedded_series = np.empty([n_sessions, n_samples, n_channels * len(lags)])
-    # for n in range(n_sessions):
-    #    for i in range(n_channels):
-    #        for j in range(len(lags)):
-    #            time_embedded_series[n, :, i * n_embeddings + j] = np.roll(
-    #                time_series[n, :, i], lags[j]
-    #            )
-
-    # Calculate a standard deviation of the first 500 time points
-    # (over all channels)
-    #    sigma = np.std(time_embedded_series[n, :500])
-
-    # We fill the values we don't have all the time lags for with Gaussian
-    # random numbers
-    #    time_embedded_series[n, : lags[-1]] = rng.normal(
-    #        0, sigma, time_embedded_series[n, : lags[-1]].shape
-    #    )
-    #    time_embedded_series[n, lags[0] :] = rng.normal(
-    #        0, sigma, time_embedded_series[n, lags[0] :].shape
-    #    )
-
+    # Generate time embedded dataset
     time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
     for i in range(n_channels):
         for j in range(len(lags)):
-            time_embedded_series[:, i * n_embeddings + j] = np.roll(
+            time_embedded_series[:, i * (n_embeddings + 1) + j] = np.roll(
                 time_series[:, i], lags[j]
             )
 
     # Calculate a standard deviation of the first 500 time points
-    # (over all channels)
-    sigma = np.std(time_embedded_series[:500])
+    sigma = np.std(time_embedded_series[:500], axis=0)
+
+    # Setup random number generator
+    rng = np.random.default_rng(random_seed)
 
     # We fill the values we don't have all the time lags for with Gaussian
     # random numbers
-    time_embedded_series[: lags[-1]] = rng.normal(
-        0, sigma, time_embedded_series[: lags[-1]].shape
-    )
-    time_embedded_series[lags[0] :] = rng.normal(
-        0, sigma, time_embedded_series[lags[0] :].shape
-    )
+    for i in range(n_channels):
+        time_embedded_series[: lags[-1], i] = rng.normal(
+            0, sigma[i], time_embedded_series[: lags[-1], i].shape
+        )
+        time_embedded_series[lags[0] :, i] = rng.normal(
+            0, sigma[i], time_embedded_series[lags[0] :, i].shape
+        )
 
     return time_embedded_series
 
 
-def covariances(time_series: np.ndarray, weighted: bool = False) -> np.ndarray:
-    # n_sessions, n_samples, n_channels = time_series.shape
-    # covariances = np.empty([n_sessions, n_channels, n_channels])
-    # for n in range(n_sessions):
-    #    if weighted:
-    #        covariances[n] = (time_series.shape[1] - 1) * np.cov(time_series[n].T)
-    #    else:
-    #        covariances[n] = np.cov(time_series[n])
+def covariance(time_series: np.ndarray) -> np.ndarray:
     return np.cov(time_series.T)
 
 
@@ -277,14 +245,11 @@ def whiten_eigenvectors(
 def multiply_by_eigenvectors(
     time_series: np.ndarray, eigenvectors: np.ndarray
 ) -> np.ndarray:
-    # n_sessions, n_samples, n_channels = time_series.shape
-    # n_pca_components = eigenvectors.shape[1]
-    # pca_time_series = np.empty([n_sessions, n_samples, n_pca_components])
-    # for n in range(n_sessions):
-    #    pca_time_series[n] = time_series[n] @ eigenvectors
     n_samples, n_channels = time_series.shape
     n_pca_components = eigenvectors.shape[1]
+
     pca_time_series = np.empty([n_samples, n_pca_components])
     pca_time_series = time_series @ eigenvectors
+
     # eigen decomposition returns complex numbers so we covert to real numbers
     return np.real_if_close(pca_time_series)

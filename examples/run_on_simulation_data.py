@@ -131,6 +131,6 @@ inf_stc = array_ops.get_one_hot(
 matched_stc, matched_inf_stc = array_ops.match_states(sim.state_time_course, inf_stc)
 
 # Compare state time courses
-#plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
