@@ -1,8 +1,9 @@
-"""Example script for running inference on simulated HMM data.
+"""Example script for running inference on real MEG data.
 
-- Takes approximately 2 minutes to train (on compG017).
-- Achieves a dice coefficient of ~0.9.
-- Line 133 can be uncommented to produce a plot of the simulated and inferred
+- The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- Takes approximately 4 minutes to train (on compG017).
+- Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
+- Line 121 can be uncommented to produce a plot of the simulated and inferred
   state time courses for comparison.
 """
 
@@ -11,10 +12,10 @@ import numpy as np
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
-from vrad.inference import gmm, metrics, tf_ops
+from vrad.inference import metrics, tf_ops
 from vrad.inference.models.variational_rnn_autoencoder import create_model
-from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
+import mat73
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -23,11 +24,8 @@ multi_gpu = False
 strategy = None
 
 # Settings
-n_samples = 50000
-observation_error = 0.2
-
-n_states = 5
-sequence_length = 100
+n_states = 6
+sequence_length = 400
 batch_size = 32
 
 learning_rate = 0.01
@@ -36,9 +34,9 @@ clip_normalization = None
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 100
-n_epochs_annealing = 80
-n_epochs_burnin = 10
+n_epochs = 200
+n_epochs_annealing = 150
+n_epochs_burnin = 30
 
 dropout_rate_inference = 0.4
 dropout_rate_model = 0.4
@@ -51,36 +49,15 @@ learn_covariances = True
 
 activation_function = "softmax"
 
-# Load state transition probability matrix and covariances of each state
-init_trans_prob = np.load("data/prob_000.npy")
-init_djs = np.load("data/state_000.npy")
-
-# Simulate data
-print("Simulating data")
-sim = HMMSimulation(
-    trans_prob=init_trans_prob,
-    djs=init_djs,
-    n_samples=n_samples,
-    e_std=observation_error,
-)
-meg_data = data.Data(sim)
+# Read MEG data
+print('Reading MEG data')
+meg_data = data.Data('/well/woolrich/shared/vrad/prepared_data/one_subject.mat')
 n_channels = meg_data.shape[1]
 
-# Priors
-covariances, means = gmm.learn_mu_sigma(
-    meg_data,
-    n_states,
-    take_random_sample=50000,
-    gmm_kwargs={
-        "n_init": 1,
-        "verbose": 2,
-        "verbose_interval": 50,
-        "max_iter": 10000,
-        "tol": 1e-6,
-    },
-    retry_attempts=5,
-    learn_means=False,
-)
+# Priors: we use the covariance matrices inferred by fitting an HMM with OSL
+covariances = mat73.loadmat('/well/woolrich/shared/vrad/hmm_fits/one_subject/Covs.mat')
+covariances = covariances['Covs'].astype(np.float32)
+means = np.zeros([n_states, n_channels], dtype=np.float32)
 
 # Prepare dataset
 training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
@@ -122,13 +99,23 @@ history = rnn_vae.fit(
     verbose=0,
 )
 
-# Inferred state time course
-inf_stc = array_ops.get_one_hot(
-    np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"]).argmax(axis=1)
-)
+# Inferred state probabilities
+inf_stc = np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"])
 
-# Find correspondance to ground truth state time courses
-matched_stc, matched_inf_stc = array_ops.match_states(sim.state_time_course, inf_stc)
+# Read file containing state probabilities inferred by OSL
+hmm_stc = mat73.loadmat('/well/woolrich/shared/vrad/hmm_fits/one_subject/gamma.mat')
+hmm_stc = hmm_stc['gamma']
+
+# Hard classify
+inf_stc = inf_stc.argmax(axis=1)
+hmm_stc = hmm_stc.argmax(axis=1)
+
+# One hot encode
+inf_stc = array_ops.get_one_hot(inf_stc)
+hmm_stc = array_ops.get_one_hot(hmm_stc)
+
+# Find correspondance between state time courses
+matched_stc, matched_inf_stc = array_ops.match_states(hmm_stc, inf_stc)
 
 # Compare state time courses
 #plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
