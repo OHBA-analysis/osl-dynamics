@@ -213,18 +213,12 @@ def eigen_decomposition(
     covariance: np.ndarray, n_components: int
 ) -> (np.ndarray, np.ndarray):
     # Calculate the eigen decomposition
-    if n_components / covariance.shape[0] > 0.04:
-        eigenvalues, eigenvectors = np.linalg.eig(covariance)
-    else:
-        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
 
     # Sort the eigenvalues into desending order
-    #
-    # N.b. there is a factor -1 difference between Numpy's linalg.eig and
-    # MATLAB's eig function so we also flip the sign of eigenvectors
     order = np.argsort(eigenvalues)[::-1]
     eigenvalues = eigenvalues[order]
-    eigenvectors = -eigenvectors[:, order]
+    eigenvectors = eigenvectors[:, order]
 
     # Only keep the first n_components
     eigenvalues = eigenvalues[:n_components]
