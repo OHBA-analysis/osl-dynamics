@@ -101,18 +101,10 @@ class Data:
             self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
             self.time_axis_first()
 
-    @property
-    def from_file(self):
-        return self._from_file
-
-    @property
-    def n_total_samples(self):
-        return self._n_total_samples
-
     def __str__(self):
         return_string = [
             f"{self.__class__.__name__}:",
-            f"from_file: {self.from_file}",
+            f"from_file: {self._from_file}",
             f"current_shape: {self.time_series.shape}",
             f"prepared: {self.prepared}",
         ]
@@ -205,7 +197,6 @@ class Data:
             self.time_embed(n_embeddings, random_seed=random_seed)
             self.scale()
             self.eigen_decomposition_dimensionality_reduction(n_pca_components, whiten)
-            self.scale()
             self.prepared = True
 
         else:

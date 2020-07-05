@@ -237,19 +237,12 @@ def eigen_decomposition(
 def whiten_eigenvectors(
     eigenvalues: np.ndarray, eigenvectors: np.ndarray
 ) -> np.ndarray:
-    for i in range(eigenvalues.shape[0]):
-        eigenvectors[:, i] /= np.sqrt(eigenvalues[i])
-    return eigenvectors
+    return eigenvectors @ np.diag(1.0 / np.sqrt(eigenvalues))
 
 
 def multiply_by_eigenvectors(
     time_series: np.ndarray, eigenvectors: np.ndarray
 ) -> np.ndarray:
-    n_samples, n_channels = time_series.shape
-    n_pca_components = eigenvectors.shape[1]
-
-    pca_time_series = np.empty([n_samples, n_pca_components])
     pca_time_series = time_series @ eigenvectors
-
     # eigen decomposition returns complex numbers so we covert to real numbers
     return np.real_if_close(pca_time_series)
