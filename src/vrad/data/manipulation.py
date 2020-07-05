@@ -198,13 +198,9 @@ def time_embed(time_series: np.ndarray, n_embeddings: int, random_seed: int = No
 
     # We fill the values we don't have all the time lags for with Gaussian
     # random numbers
-    for i in range(n_channels):
-        time_embedded_series[: lags[-1], i] = rng.normal(
-            0, sigma[i], time_embedded_series[: lags[-1], i].shape
-        )
-        time_embedded_series[lags[0] :, i] = rng.normal(
-            0, sigma[i], time_embedded_series[lags[0] :, i].shape
-        )
+    for i in range(n_channels * len(lags)):
+        time_embedded_series[: lags[-1], i] = rng.normal(0, sigma[i], lags[-1])
+        time_embedded_series[lags[0] :, i] = rng.normal(0, sigma[i], abs(lags[0]))
 
     return time_embedded_series
 
