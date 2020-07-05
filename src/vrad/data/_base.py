@@ -196,7 +196,9 @@ class Data:
         if not self.prepared:
             self.time_embed(n_embeddings, random_seed=random_seed)
             self.scale()
-            self.eigen_decomposition_dimensionality_reduction(n_pca_components, whiten)
+            self.eigen_decomposition_dimensionality_reduction(
+                n_pca_components, whiten=whiten
+            )
             self.prepared = True
 
         else:
