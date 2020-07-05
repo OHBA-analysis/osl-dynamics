@@ -212,16 +212,19 @@ def covariance(time_series: np.ndarray) -> np.ndarray:
 def eigen_decomposition(
     covariance: np.ndarray, n_components: int
 ) -> (np.ndarray, np.ndarray):
-    # Calculate eigen decomposition
+    # Calculate the eigen decomposition
     if n_components / covariance.shape[0] > 0.04:
         eigenvalues, eigenvectors = np.linalg.eig(covariance)
     else:
         eigenvalues, eigenvectors = np.linalg.eigh(covariance)
 
     # Sort the eigenvalues into desending order
+    #
+    # N.b. there is a factor -1 difference between Numpy's linalg.eig and
+    # MATLAB's eig function so we also flip the sign of eigenvectors
     order = np.argsort(eigenvalues)[::-1]
     eigenvalues = eigenvalues[order]
-    eigenvectors = eigenvectors[:, order]
+    eigenvectors = -eigenvectors[:, order]
 
     # Only keep the first n_components
     eigenvalues = eigenvalues[:n_components]
@@ -239,6 +242,4 @@ def whiten_eigenvectors(
 def multiply_by_eigenvectors(
     time_series: np.ndarray, eigenvectors: np.ndarray
 ) -> np.ndarray:
-    pca_time_series = time_series @ eigenvectors
-    # eigen decomposition returns complex numbers so we covert to real numbers
-    return np.real_if_close(pca_time_series)
+    return time_series @ eigenvectors
