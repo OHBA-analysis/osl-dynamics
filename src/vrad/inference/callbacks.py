@@ -19,15 +19,10 @@ class SavePredictionCallback(callbacks.Callback):
         self.prediction_dataset = prediction_dataset
         self.save_frequency = save_frequency
 
-        try:
-            os.mkdir(dir_name)
+        path = Path(dir_name, time.strftime("%Y%m%d_%H%M%S"))
+        path.mkdir(parents=True, exist_ok=True)
 
-        except FileExistsError:
-            pass
-
-        self.pattern = os.path.join(
-            dir_name, time.strftime("%Y%m%d_%H%M%S_") + "predict_epoch_{:03d}"
-        )
+        self.pattern = str(path / "predict_epoch_{:03d}")
 
     def on_epoch_end(self, epoch, logs=None):
         if epoch % self.save_frequency == 0:
