@@ -179,7 +179,6 @@ def time_embed(time_series: np.ndarray, n_embeddings: int, random_seed: int = No
     """Performs time embedding. This function reproduces the OSL function embedx.
     """
     n_samples, n_channels = time_series.shape
-    n_embedded_samples = n_samples - n_embeddings
     lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
 
     # Generate time embedded dataset
