@@ -6,14 +6,14 @@ import numpy as np
 from vrad import array_ops
 from vrad.data.io import load_data
 from vrad.data.manipulation import (
+    covariance,
+    eigen_decomposition,
+    multiply_by_eigenvectors,
     pca,
     scale,
     standardize,
     time_embed,
-    covariance,
-    eigen_decomposition,
     whiten_eigenvectors,
-    multiply_by_eigenvectors,
 )
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
