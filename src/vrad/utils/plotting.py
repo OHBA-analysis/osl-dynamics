@@ -19,7 +19,7 @@ from vrad.array_ops import (
     state_activation,
     state_lifetimes,
 )
-from vrad.utils.decorators import transpose
+from vrad.utils.decorators import deprecated, transpose
 from vrad.utils.misc import override_dict_defaults
 
 _logger = logging.getLogger("VRAD")
@@ -426,6 +426,65 @@ def plot_time_series(
         show_or_save(filename)
 
 
+@transpose("state_time_course", 0)
+def state_barcode(
+    state_time_course: np.ndarray,
+    axis: plt.Axes = None,
+    colormap: str = "gist_rainbow",
+    n_time_points: int = None,
+    sample_frequency: float = 1,
+    highlight_kwargs: dict = None,
+    legend: bool = True,
+    fig_kwargs: dict = None,
+    filename: str = None,
+):
+    state_time_course = np.asarray(state_time_course)
+    if state_time_course.ndim == 2:
+        state_time_course = state_time_course.argmax(axis=1)
+    if state_time_course.ndim != 1:
+        raise ValueError("state_time_course must be 1D or 2D.")
+
+    n_time_points = min(n_time_points or np.inf, len(state_time_course))
+    state_time_course = state_time_course[:n_time_points]
+
+    axis_given = axis is not None
+    if not axis_given:
+        fig_defaults = {
+            "figsize": (24, 2.5),
+        }
+        fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
+        fig, axis = plt.subplots(1, **fig_kwargs)
+
+    highlight_defaults = {"alpha": 0.2}
+    highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
+
+    n_states = np.max(np.unique(state_time_course)) + 1
+
+    cmap = plt.cm.get_cmap(colormap, lut=n_states)
+
+    axis.imshow(
+        state_time_course[None],
+        aspect="auto",
+        cmap=cmap,
+        vmin=-0.5,
+        vmax=np.max(n_states) - 0.5,
+        interpolation="none",
+        extent=[0, n_time_points / sample_frequency, 0, 1],
+        **highlight_kwargs,
+    )
+
+    plt.setp(axis.spines.values(), visible=False)
+
+    if legend:
+        add_axis_colorbar(axis)
+
+    axis.set_yticks([])
+
+    if not axis_given:
+        show_or_save(filename)
+
+
+@deprecated(replaced_by="state_barcode", reason="state_barcode is more efficient.")
 @transpose(0, "state_time_course")
 def highlight_states(
     state_time_course: np.ndarray,
@@ -684,6 +743,12 @@ def add_axis_colorbar(axis: plt.Axes):
         _logger.warning("No mappable image found on axis.")
 
 
+def add_figure_colorbar(fig: plt.Figure, mappable):
+    fig.subplots_adjust(right=0.94)
+    color_bar_axis = fig.add_axes([0.95, 0.15, 0.025, 0.7])
+    fig.colorbar(mappable, cax=color_bar_axis)
+
+
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
     state_time_course: np.ndarray,
@@ -821,19 +886,17 @@ def compare_state_data(
     if titles is None:
         titles = [""] * len(state_time_courses)
 
-    legends = [False] * (len(state_time_courses) - 1) + [True]
-
-    for state_time_course, axis, title, legend in zip(
-        state_time_courses, axes, titles, legends
-    ):
-        highlight_states(
+    for state_time_course, axis, title in zip(state_time_courses, axes, titles):
+        state_barcode(
             state_time_course,
             axis=axis,
             n_time_points=n_time_points,
-            legend=legend,
+            legend=False,
             sample_frequency=sample_frequency,
         )
         axis.set_title(title)
+
+    add_figure_colorbar(fig=fig, mappable=fig.axes[0].get_images()[0])
 
     show_or_save(filename)
 
