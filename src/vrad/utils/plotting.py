@@ -330,13 +330,6 @@ def plot_state_highlighted_data(
     plot_time_series(
         time_series, axes[-1], n_time_points=n_time_points, plot_kwargs=plot_kwargs
     )
-    highlight_states(
-        state_time_course,
-        axes[-1],
-        n_time_points=n_time_points,
-        colormap=colormap,
-        highlight_kwargs=highlight_kwargs,
-    )
 
     if events is not None:
         axes[0].plot(events[:n_time_points], **event_kwargs)
@@ -344,6 +337,15 @@ def plot_state_highlighted_data(
     for axis in axes:
         axis.autoscale(tight=True)
         axis.axis("off")
+
+    state_barcode(
+        state_time_course,
+        axes[-1],
+        n_time_points=n_time_points,
+        colormap=colormap,
+        highlight_kwargs=highlight_kwargs,
+        extent=[*axes[-1].get_xlim(), *axes[-1].get_ylim()],
+    )
 
     plt.tight_layout()
 
@@ -437,6 +439,7 @@ def state_barcode(
     legend: bool = True,
     fig_kwargs: dict = None,
     filename: str = None,
+    extent: List[float] = None,
 ):
     state_time_course = np.asarray(state_time_course)
     if state_time_course.ndim == 2:
@@ -462,6 +465,8 @@ def state_barcode(
 
     cmap = plt.cm.get_cmap(colormap, lut=n_states)
 
+    extent = extent or [0, n_time_points / sample_frequency, 0, 1]
+
     axis.imshow(
         state_time_course[None],
         aspect="auto",
@@ -469,7 +474,7 @@ def state_barcode(
         vmin=-0.5,
         vmax=np.max(n_states) - 0.5,
         interpolation="none",
-        extent=[0, n_time_points / sample_frequency, 0, 1],
+        extent=extent,
         **highlight_kwargs,
     )
 
