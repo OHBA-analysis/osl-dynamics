@@ -107,6 +107,6 @@ def load_data(
         )
 
     # Check time is the first axis, channels are the second axis
-    time_series, transposed = time_axis_first(time_series)
+    time_series = time_axis_first(time_series)
 
     return time_series, sampling_frequency

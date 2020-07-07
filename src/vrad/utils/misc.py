@@ -1,5 +1,4 @@
 import logging
-from typing import Tuple
 
 import numpy as np
 
@@ -22,18 +21,16 @@ def listify(obj: object):
         return [obj]
 
 
-def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
+def time_axis_first(input_array: np.ndarray) -> np.ndarray:
     if input_array.ndim != 2:
         _logger.info("Non-2D array not transposed.")
-        return input_array, False
-    transposed = False
+        return input_array
     if input_array.shape[1] > input_array.shape[0]:
-        input_array = input_array.T
+        input_array = np.transpose(input_array)
         _logger.warning(
             "More channels than time points detected. Time series has been tranposed."
         )
-        transposed = True
-    return input_array, transposed
+    return input_array
 
 
 class LoggingContext:

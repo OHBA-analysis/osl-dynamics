@@ -8,11 +8,6 @@ from vrad.utils.decorators import transpose
 _logger = logging.getLogger("VRAD")
 
 
-def concatenate(time_series: np.ndarray) -> np.ndarray:
-    """Concatenates data into a single time series"""
-    return time_series.reshape(-1, time_series.shape[-1])
-
-
 def trim_trials(
     epoched_time_series: np.ndarray,
     trial_start: int = None,
@@ -204,8 +199,12 @@ def time_embed(time_series: np.ndarray, n_embeddings: int, random_seed: int = No
     return time_embedded_series
 
 
-def covariance(time_series: np.ndarray) -> np.ndarray:
-    return np.cov(time_series, rowvar=False)
+def covariance(time_series: np.ndarray, weighted: bool = False) -> np.ndarray:
+    if weighted:
+        weight = time_series.shape[0] - 1
+    else:
+        weight = 1.0
+    return weight * np.cov(time_series, rowvar=False)
 
 
 def eigen_decomposition(
@@ -226,13 +225,54 @@ def eigen_decomposition(
     return eigenvalues, eigenvectors
 
 
-def whiten_eigenvectors(
-    eigenvalues: np.ndarray, eigenvectors: np.ndarray
-) -> np.ndarray:
-    return eigenvectors @ np.diag(1.0 / np.sqrt(eigenvalues))
+def prepare(
+    subjects,
+    ids: list,
+    n_embeddings: int,
+    n_pca_components: int,
+    whiten: bool,
+    random_seed: int = None,
+) -> list:
+    """Prepares subject data by time embeddings and performing PCA.
 
+    Following the data preparation done in the OSL script teh_groupinference_parcels.m
+    """
 
-def multiply_by_eigenvectors(
-    time_series: np.ndarray, eigenvectors: np.ndarray
-) -> np.ndarray:
-    return time_series @ eigenvectors
+    # Convert IDs to indices
+    indices = [i - 1 for i in ids]
+
+    # Total number of time points to prepare
+    n_total_samples = np.sum([subjects[i].time_series.shape[0] for i in indices])
+
+    # List to hold the weighted covariance matrix of each subjects time series
+    covariances = []
+
+    for i in indices:
+        # Perform time embedding
+        subjects[i].time_embed(n_embeddings, random_seed=random_seed)
+
+        # Rescale (z-transform) the time series
+        subjects[i].scale()
+
+        # Calculate weighted covariances
+        covariances.append(covariance(subjects[i].time_series, weighted=True))
+
+    # Sum and normalise the covariance matrices
+    covariances = np.sum(covariances, axis=0)
+    covariances /= n_total_samples - 1
+
+    # Calculate the eigen decomposition and keep the top n_pca_components
+    eigenvalues, eigenvectors = eigen_decomposition(covariances, n_pca_components)
+
+    # Whiten the eigenvectors
+    if whiten:
+        eigenvectors = eigenvectors @ np.diag(1.0 / np.sqrt(eigenvalues))
+
+    # Apply dimensionality reduction
+    for i in indices:
+        subjects[i].time_series = subjects[i].time_series @ eigenvectors
+
+        # Update flag to indicate data has been prepared
+        subjects[i].prepared = True
+
+    return subjects
