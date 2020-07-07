@@ -434,7 +434,7 @@ def state_barcode(
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
     n_time_points: int = None,
-    sample_frequency: float = 1,
+    sampling_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
     fig_kwargs: dict = None,
@@ -496,7 +496,7 @@ def highlight_states(
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
     n_time_points: int = None,
-    sample_frequency: float = 1,
+    sampling_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
     fig_kwargs: dict = None,
@@ -519,7 +519,7 @@ def highlight_states(
         A matplotlib colormap from which to draw the highlight colors.
     n_time_points: int
         Number of time points to plot.
-    sample_frequency: float
+    sampling_frequency: float
         The sampling frequency of the data. Default is to use sample number (i.e. 1Hz)
     highlight_kwargs: dict
         Keyword arguments to be passed to matplotlib.pyplot.axvspan.
@@ -562,8 +562,8 @@ def highlight_states(
             else:
                 label = ""
             axis.axvspan(
-                on / sample_frequency,
-                min(off, n_time_points) / sample_frequency,
+                on / sampling_frequency,
+                min(off, n_time_points) / sampling_frequency,
                 color=color,
                 **highlight_kwargs,
                 label=label,
@@ -580,7 +580,7 @@ def highlight_states(
 
     axis.autoscale(tight=True)
 
-    axis.set_xlim(0, n_time_points / sample_frequency)
+    axis.set_xlim(0, n_time_points / sampling_frequency)
 
     plt.tight_layout()
 
@@ -589,7 +589,7 @@ def highlight_states(
         show_or_save(filename)
 
 
-def plot_cholesky(matrix, group_color_scale: bool = True):
+def plot_covariance_from_cholesky(matrix, group_color_scale: bool = True):
     """Plot a matrix from its Cholesky decomposition.
 
     Given a Cholesky matrix, plot M @ M^T.
@@ -855,10 +855,38 @@ def plot_state_lifetimes(
     show_or_save(filename)
 
 
+def state_time_courses(
+    *state_time_courses: List[np.ndarray],
+    n_time_points: int = None,
+    sampling_frequency: float = 1.0,
+    title: str = None,
+    filename: str = None,
+):
+    """Plots separated state time courses."""
+
+    # Number of time points to point
+    n_time_points = min(
+        n_time_points or np.inf, *[len(stc) for stc in state_time_courses]
+    )
+
+    # Number of states
+    n_states = max([stc.shape[1] for stc in state_time_courses])
+
+    # Plot state time courses
+    fig, ax = plt.subplots(n_states, figsize=(20, n_states), sharex="all")
+    for stc in state_time_courses:
+        for j in range(n_states):
+            ax[j].plot(stc[:n_time_points, j])
+    plt.tight_layout()
+
+    # Show the plot or save to a file
+    show_or_save(filename)
+
+
 def compare_state_data(
     *state_time_courses: List[np.ndarray],
-    n_time_points=None,
-    sample_frequency: float = 1,
+    n_time_points: int = None,
+    sampling_frequency: float = 1.0,
     titles: list = None,
     filename: str = None,
 ):
@@ -873,7 +901,7 @@ def compare_state_data(
         List of state time courses to plot.
     n_time_points: int
         Number of time courses to plot.
-    sample_frequency: float
+    sampling_frequency: float
         If given the y-axis will contain timestamps rather than sample numbers.
     titles: list of str
         Titles to give to each axis.
@@ -897,9 +925,11 @@ def compare_state_data(
             axis=axis,
             n_time_points=n_time_points,
             legend=False,
-            sample_frequency=sample_frequency,
+            sampling_frequency=sampling_frequency,
         )
         axis.set_title(title)
+
+    plt.tight_layout()
 
     add_figure_colorbar(fig=fig, mappable=fig.axes[0].get_images()[0])
 

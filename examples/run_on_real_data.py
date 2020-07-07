@@ -3,8 +3,8 @@
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Takes approximately 4 minutes to train (on compG017).
 - Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
-- Line 121 can be uncommented to produce a plot of the simulated and inferred
-  state time courses for comparison.
+- Line 106 and 127 can be uncommented to produce a plot of the inferred
+  covariances and state time courses.
 """
 
 print("Importing packages")
@@ -51,7 +51,7 @@ activation_function = "softmax"
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
+meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/subject1.mat")
 n_channels = meg_data.shape[1]
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
@@ -65,7 +65,7 @@ training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
 )
 
 # Build autoecoder model
-rnn_vae = create_model(
+model = create_model(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -88,19 +88,25 @@ rnn_vae = create_model(
     strategy=strategy,
 )
 
-rnn_vae.summary()
+model.summary()
 
 # Train the model
 print("Training model")
-history = rnn_vae.fit(
+history = model.fit(
     training_dataset,
     callbacks=[TqdmCallback(tqdm_class=tqdm, verbose=0)],
     epochs=n_epochs,
     verbose=0,
 )
 
+# Inferred covariance matrices
+inf_cov = model.predict(prediction_dataset)["D_j"]
+
+# Plot covariance matrices
+# plotting.plot_matrices(inf_cov, filename="plots/covariances.png")
+
 # Inferred state probabilities
-inf_stc = np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"])
+inf_stc = np.concatenate(model.predict(prediction_dataset)["m_theta_t"])
 
 # Read file containing state probabilities inferred by OSL
 hmm_stc = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/gamma.mat")

@@ -2,8 +2,8 @@
 
 - Takes approximately 2 minutes to train (on compG017).
 - Achieves a dice coefficient of ~0.9.
-- Line 133 can be uncommented to produce a plot of the simulated and inferred
-  state time courses for comparison.
+- Lines 129 and 142 can be uncommented to produce a plots of the inferred
+  covariances and state time courses.
 """
 
 print("Importing packages")
@@ -87,8 +87,8 @@ training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
     time_series=meg_data, sequence_length=sequence_length, batch_size=batch_size,
 )
 
-# Build autoecoder model
-rnn_vae = create_model(
+# Build model
+model = create_model(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -111,26 +111,34 @@ rnn_vae = create_model(
     strategy=strategy,
 )
 
-rnn_vae.summary()
+model.summary()
 
 # Train the model
 print("Training model")
-history = rnn_vae.fit(
+history = model.fit(
     training_dataset,
     callbacks=[TqdmCallback(tqdm_class=tqdm, verbose=0)],
     epochs=n_epochs,
     verbose=0,
 )
 
+# Inferred covariances
+inf_cov = model.predict(prediction_dataset)["D_j"]
+
+# Plot covariance matrices
+# plotting.plot_matrices(inf_cov, filename="plots/covariances.png")
+
 # Inferred state time course
-inf_stc = array_ops.get_one_hot(
-    np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"]).argmax(axis=1)
-)
+inf_stc = model.predict(prediction_dataset)["m_theta_t"]
+inf_stc = np.concatenate(inf_stc).argmax(axis=1)
+
+# One hot encode the inferred state time courses
+inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance to ground truth state time courses
 matched_stc, matched_inf_stc = array_ops.match_states(sim.state_time_course, inf_stc)
 
-# Compare state time courses
-# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# Plot state time courses
+# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="plots/compare.png")
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
