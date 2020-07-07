@@ -16,7 +16,7 @@ class HiddenSemiMarkovSimulation(Simulation):
         n_states: int = 4,
         sim_varying_means: bool = False,
         random_covariance_weights: bool = False,
-        e_std: float = 0.2,
+        observation_error: float = 0.2,
         off_diagonal_trans_prob: np.ndarray = None,
         full_trans_prob: np.ndarray = None,
         stay_prob: float = 0.95,
@@ -37,7 +37,7 @@ class HiddenSemiMarkovSimulation(Simulation):
             n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
-            e_std=e_std,
+            observation_error=observation_error,
         )
 
     def construct_off_diagonal_trans_prob(self):
