@@ -40,10 +40,6 @@ class Data:
     file will be treated as an SPM MEEG object and the data extracted from the .dat
     file defined within the dictionary.
 
-    If multiple time series are found in the file, the user can specify multi_sequence.
-    With its default value 'all', the time series will be concatenated along the time
-    axis. Otherwise and integer specifies which time series to read.
-
     Once instantiated, any property or function which has not been specified for
     Data is provided by the internal numpy.ndarray, time_series. The array can be
     accessed using slice notation on the Data object (e.g. meg_data[:1000, 2:5]
@@ -63,9 +59,6 @@ class Data:
     sampling_frequency: float
         The sampling frequency of the time_series. The default of 1 means that each
         sample is considered to be a time point (i.e. 1Hz).
-    multi_sequence: str or int
-        If the time_series provided contains multiple time series, "all" will
-        concatenate them while providing an int will specify the corresponding array.
 
     Methods
     -------
@@ -75,16 +68,11 @@ class Data:
 
     @auto_repr
     def __init__(
-        self,
-        time_series: Union[np.ndarray, str, Any],
-        sampling_frequency: float = 1,
-        multi_sequence: Union[str, int] = "all",
+        self, time_series: Union[np.ndarray, str, Any], sampling_frequency: float = 1,
     ):
         # Raw data
         self.time_series, self.sampling_frequency = load_data(
-            time_series=time_series,
-            multi_sequence=multi_sequence,
-            sampling_frequency=sampling_frequency,
+            time_series=time_series, sampling_frequency=sampling_frequency,
         )
 
         # Properties

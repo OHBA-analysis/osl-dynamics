@@ -29,6 +29,9 @@ def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
     transposed = False
     if input_array.shape[1] > input_array.shape[0]:
         input_array = input_array.T
+        _logger.warning(
+            "More channels than time points detected. Time series has been tranposed."
+        )
         transposed = True
     return input_array, transposed
 
