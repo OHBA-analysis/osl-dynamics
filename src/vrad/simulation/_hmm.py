@@ -12,6 +12,7 @@ class HMMSimulation(Simulation):
         trans_prob: np.ndarray,
         n_samples: int = 20000,
         n_channels: int = 7,
+        n_states: int = 4,
         sim_varying_means: bool = False,
         random_covariance_weights: bool = False,
         e_std: float = 0.2,
@@ -21,6 +22,12 @@ class HMMSimulation(Simulation):
         if djs is not None:
             n_channels = djs.shape[1]
 
+        if n_states != trans_prob.shape[0]:
+            raise ValueError(
+                f"Number of states ({n_states}) and shape of transition " + \
+                f"probability matrix {trans_prob.shape} incomptible."
+            )
+
         self.markov_lag = markov_lag
         self.trans_prob = trans_prob
         self.cumsum_trans_prob = None
@@ -28,7 +35,7 @@ class HMMSimulation(Simulation):
         super().__init__(
             n_samples=n_samples,
             n_channels=n_channels,
-            n_states=trans_prob.shape[0],
+            n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
             e_std=e_std,
