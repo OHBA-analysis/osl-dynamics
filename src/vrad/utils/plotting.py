@@ -225,19 +225,19 @@ def plot_two_data_scales(
     time_series_0: np.ndarray,
     time_series_1: np.ndarray,
     time_series_2: np.ndarray = None,
-    n_time_points: int = None,
+    n_samples: int = None,
     fig_kwargs: dict = None,
     plot_0_kwargs: dict = None,
     plot_1_kwargs: dict = None,
     plot_2_kwargs: dict = None,
     filename: str = None,
 ):
-    n_time_points = min(
-        n_time_points or np.inf, time_series_0.shape[0], time_series_1.shape[0],
+    n_samples = min(
+        n_samples or np.inf, time_series_0.shape[0], time_series_1.shape[0],
     )
 
     if plot_2_kwargs is not None:
-        n_time_points = min(n_time_points, time_series_2.shape[0])
+        n_samples = min(n_samples, time_series_2.shape[0])
 
     fig_defaults = {"figsize": (20, 10), "sharex": "all"}
     fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
@@ -245,16 +245,16 @@ def plot_two_data_scales(
 
     plot_0_defaults = {"lw": 0.6, "color": "tab:blue"}
     plot_0_kwargs = override_dict_defaults(plot_0_defaults, plot_0_kwargs)
-    axes[0].plot(value_separation(time_series_0[:n_time_points]), **plot_0_kwargs)
+    axes[0].plot(value_separation(time_series_0[:n_samples]), **plot_0_kwargs)
 
     plot_1_defaults = {"lw": 0.6, "color": "tab:blue"}
     plot_1_kwargs = override_dict_defaults(plot_1_defaults, plot_1_kwargs)
-    axes[1].plot(value_separation(time_series_1[:n_time_points]), **plot_1_kwargs)
+    axes[1].plot(value_separation(time_series_1[:n_samples]), **plot_1_kwargs)
 
     if time_series_2 is not None:
         plot_2_defaults = {"lw": 0.4, "color": "tab:orange"}
         plot_2_kwargs = override_dict_defaults(plot_2_defaults, plot_2_kwargs)
-        axes[1].plot(value_separation(time_series_1[:n_time_points]), **plot_2_kwargs)
+        axes[1].plot(value_separation(time_series_1[:n_samples]), **plot_2_kwargs)
 
     for axis in axes:
         axis.autoscale(axis="x", tight=True)
@@ -270,7 +270,7 @@ def plot_state_highlighted_data(
     time_series: Union[np.ndarray, Any],
     state_time_course: np.ndarray,
     events: np.ndarray = None,
-    n_time_points: int = None,
+    n_samples: int = None,
     colormap: str = "gist_rainbow",
     fig_kwargs: dict = None,
     highlight_kwargs: dict = None,
@@ -292,7 +292,7 @@ def plot_state_highlighted_data(
         The states to highlight the data with.
     events: numpy.ndarray
         Optional. Events as a time series.
-    n_time_points: int
+    n_samples: int
         Number of time points to be plotted.
     colormap: str
         A matplotlib compatible colormap given as a string. This is for the highlights.
@@ -319,8 +319,8 @@ def plot_state_highlighted_data(
     fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
     event_kwargs = override_dict_defaults(event_defaults, event_kwargs)
 
-    n_time_points = min(
-        n_time_points or np.inf, state_time_course.shape[0], time_series.shape[0]
+    n_samples = min(
+        n_samples or np.inf, state_time_course.shape[0], time_series.shape[0]
     )
 
     fig, axes = plt.subplots(1 if events is None else 2, **fig_kwargs, squeeze=False)
@@ -328,11 +328,11 @@ def plot_state_highlighted_data(
     axes = axes.ravel()
 
     plot_time_series(
-        time_series, axes[-1], n_time_points=n_time_points, plot_kwargs=plot_kwargs
+        time_series, axes[-1], n_samples=n_samples, plot_kwargs=plot_kwargs
     )
 
     if events is not None:
-        axes[0].plot(events[:n_time_points], **event_kwargs)
+        axes[0].plot(events[:n_samples], **event_kwargs)
 
     for axis in axes:
         axis.autoscale(tight=True)
@@ -341,7 +341,7 @@ def plot_state_highlighted_data(
     state_barcode(
         state_time_course,
         axes[-1],
-        n_time_points=n_time_points,
+        n_samples=n_samples,
         colormap=colormap,
         highlight_kwargs=highlight_kwargs,
         extent=[*axes[-1].get_xlim(), *axes[-1].get_ylim()],
@@ -356,7 +356,7 @@ def plot_state_highlighted_data(
 def plot_time_series(
     time_series: np.ndarray,
     axis: plt.Axes = None,
-    n_time_points: int = None,
+    n_samples: int = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     y_tick_values: list = None,
@@ -375,7 +375,7 @@ def plot_time_series(
         The time series to be plotted.
     axis: matplotlib.axes.Axes
         The axis on which to plot the data. If not given, a new axis is created.
-    n_time_points: int
+    n_samples: int
         The number of time points to be plotted.
     plot_kwargs: dict
         Keyword arguments to be passed on to matplotlib.pyplot.plot.
@@ -386,7 +386,7 @@ def plot_time_series(
     filename: str
         A file to which to save the figure.
     """
-    n_time_points = min(n_time_points or np.inf, time_series.shape[0])
+    n_samples = min(n_samples or np.inf, time_series.shape[0])
     axis_given = axis is not None
     if not axis_given:
         fig_defaults = {
@@ -404,12 +404,12 @@ def plot_time_series(
     n_channels = time_series.shape[1]
 
     separation = (
-        np.maximum(time_series[:n_time_points].max(), time_series[:n_time_points].min())
+        np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min())
         * 1.2
     )
     gaps = np.arange(n_channels)[::-1] * separation
 
-    axis.plot(time_series[:n_time_points] + gaps[None, :], **plot_kwargs)
+    axis.plot(time_series[:n_samples] + gaps[None, :], **plot_kwargs)
 
     axis.autoscale(tight=True)
     for spine in axis.spines.values():
@@ -433,7 +433,7 @@ def state_barcode(
     state_time_course: np.ndarray,
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
-    n_time_points: int = None,
+    n_samples: int = None,
     sampling_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
@@ -447,8 +447,8 @@ def state_barcode(
     if state_time_course.ndim != 1:
         raise ValueError("state_time_course must be 1D or 2D.")
 
-    n_time_points = min(n_time_points or np.inf, len(state_time_course))
-    state_time_course = state_time_course[:n_time_points]
+    n_samples = min(n_samples or np.inf, len(state_time_course))
+    state_time_course = state_time_course[:n_samples]
 
     axis_given = axis is not None
     if not axis_given:
@@ -465,7 +465,7 @@ def state_barcode(
 
     cmap = plt.cm.get_cmap(colormap, lut=n_states)
 
-    extent = extent or [0, n_time_points / sample_frequency, 0, 1]
+    extent = extent or [0, n_samples / sample_frequency, 0, 1]
 
     axis.imshow(
         state_time_course[None],
@@ -495,7 +495,7 @@ def highlight_states(
     state_time_course: np.ndarray,
     axis: plt.Axes = None,
     colormap: str = "gist_rainbow",
-    n_time_points: int = None,
+    n_samples: int = None,
     sampling_frequency: float = 1,
     highlight_kwargs: dict = None,
     legend: bool = True,
@@ -517,7 +517,7 @@ def highlight_states(
         Axis to plot on. Default is to create a new figure.
     colormap: str
         A matplotlib colormap from which to draw the highlight colors.
-    n_time_points: int
+    n_samples: int
         Number of time points to plot.
     sampling_frequency: float
         The sampling frequency of the data. Default is to use sample number (i.e. 1Hz)
@@ -530,7 +530,7 @@ def highlight_states(
     filename: str
         A file to which to save the figure.
     """
-    n_time_points = min(n_time_points or np.inf, state_time_course.shape[0])
+    n_samples = min(n_samples or np.inf, state_time_course.shape[0])
 
     axis_given = axis is not None
     if not axis_given:
@@ -552,9 +552,9 @@ def highlight_states(
         zip(ons, offs, colors)
     ):
         for highlight_number, (on, off) in enumerate(
-            zip(state_ons[:n_time_points], state_offs[:n_time_points])
+            zip(state_ons[:n_samples], state_offs[:n_samples])
         ):
-            if (on > n_time_points) and (off > n_time_points):
+            if (on > n_samples) and (off > n_samples):
                 break
             handles, labels = axis.get_legend_handles_labels()
             if (str(state_number) not in labels) and legend:
@@ -563,7 +563,7 @@ def highlight_states(
                 label = ""
             axis.axvspan(
                 on / sampling_frequency,
-                min(off, n_time_points) / sampling_frequency,
+                min(off, n_samples) / sampling_frequency,
                 color=color,
                 **highlight_kwargs,
                 label=label,
@@ -580,7 +580,7 @@ def highlight_states(
 
     axis.autoscale(tight=True)
 
-    axis.set_xlim(0, n_time_points / sampling_frequency)
+    axis.set_xlim(0, n_samples / sampling_frequency)
 
     plt.tight_layout()
 
@@ -855,9 +855,9 @@ def plot_state_lifetimes(
     show_or_save(filename)
 
 
-def state_time_courses(
+def plot_state_time_courses(
     *state_time_courses: List[np.ndarray],
-    n_time_points: int = None,
+    n_samples: int = None,
     sampling_frequency: float = 1.0,
     title: str = None,
     filename: str = None,
@@ -865,8 +865,8 @@ def state_time_courses(
     """Plots separated state time courses."""
 
     # Number of time points to point
-    n_time_points = min(
-        n_time_points or np.inf, *[len(stc) for stc in state_time_courses]
+    n_samples = min(
+        n_samples or np.inf, *[len(stc) for stc in state_time_courses]
     )
 
     # Number of states
@@ -876,7 +876,7 @@ def state_time_courses(
     fig, ax = plt.subplots(n_states, figsize=(20, n_states), sharex="all")
     for stc in state_time_courses:
         for j in range(n_states):
-            ax[j].plot(stc[:n_time_points, j])
+            ax[j].plot(stc[:n_samples, j])
     plt.tight_layout()
 
     # Show the plot or save to a file
@@ -885,7 +885,7 @@ def state_time_courses(
 
 def compare_state_data(
     *state_time_courses: List[np.ndarray],
-    n_time_points: int = None,
+    n_samples: int = None,
     sampling_frequency: float = 1.0,
     titles: list = None,
     filename: str = None,
@@ -899,15 +899,15 @@ def compare_state_data(
     ----------
     state_time_courses: list of numpy.ndarray
         List of state time courses to plot.
-    n_time_points: int
+    n_samples: int
         Number of time courses to plot.
     sampling_frequency: float
         If given the y-axis will contain timestamps rather than sample numbers.
     titles: list of str
         Titles to give to each axis.
     """
-    n_time_points = min(
-        n_time_points or np.inf, *[len(stc) for stc in state_time_courses]
+    n_samples = min(
+        n_samples or np.inf, *[len(stc) for stc in state_time_courses]
     )
 
     fig, axes = plt.subplots(
@@ -923,7 +923,7 @@ def compare_state_data(
         state_barcode(
             state_time_course,
             axis=axis,
-            n_time_points=n_time_points,
+            n_samples=n_samples,
             legend=False,
             sampling_frequency=sampling_frequency,
         )

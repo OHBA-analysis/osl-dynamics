@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 from matplotlib import pyplot as plt
 
+from vrad.utils import plotting
+
 
 class Simulation(ABC):
     """Class for making the simulation of MEG data easy!
@@ -44,7 +46,9 @@ class Simulation(ABC):
         self.observation_error = observation_error
 
         self.state_time_course = None
-        self.covariances = self.create_covariances() if covariances is None else covariances
+        self.covariances = (
+            self.create_covariances() if covariances is None else covariances
+        )
         self.time_series = None
 
         if simulate:
@@ -71,7 +75,7 @@ class Simulation(ABC):
         """
         pass
 
-    def plot_alphas(self, n_points: int = 1000):
+    def plot_alphas(self, n_points: int = 1000, filename: str = None):
         """Method for plotting the state time course of a simulation.
 
         Parameters
@@ -83,9 +87,9 @@ class Simulation(ABC):
         -------
 
         """
-        plt.figure()
-        plt.plot(self.state_time_course[0:n_points])
-        plt.show()
+        plotting.plot_state_time_courses(
+            self.state_time_course, n_samples=n_points, filename=filename
+        )
 
     def create_covariances(self, identity_factor: float = 0.0001) -> np.ndarray:
         """Create the covariance matrices for the simulation
@@ -156,7 +160,7 @@ class Simulation(ABC):
 
         return data_sim.astype(np.float32)
 
-    def plot_data(self, n_points: int = 1000):
+    def plot_data(self, n_points: int = 1000, filename: str = None):
         """Method for plotting simulated data.
 
         Parameters
@@ -165,13 +169,6 @@ class Simulation(ABC):
             Number of time points to plot.
         """
         n_points = min(n_points, self.n_samples)
-        fig, y_axes = plt.subplots(
-            1, min(self.n_channels, 10), figsize=(20, 3), sharey="row"
+        plotting.plot_time_series(
+            self.time_series, n_samples=n_points, filename=filename
         )
-        for y_axis, y_channel in zip(y_axes, self.time_series):
-            y_axis.plot(np.arange(n_points), y_channel[:n_points])
-        fig, alpha_axes = plt.subplots(1, min(self.n_states, 10), figsize=(15, 3))
-        for alpha_axis, alpha_channel in zip(alpha_axes, self.state_time_course.T):
-            alpha_axis.plot(np.arange(n_points), alpha_channel[:n_points])
-        plt.tight_layout()
-        plt.show()
