@@ -17,7 +17,6 @@ from vrad.data.manipulation import (
 )
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
-from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")
 
@@ -75,24 +74,23 @@ class Data:
             time_series=time_series, sampling_frequency=sampling_frequency,
         )
 
-        # Properties
         self._from_file = time_series if isinstance(time_series, str) else False
         self._n_total_samples = len(
             self.time_series.reshape(-1, self.time_series.shape[-1])
         )
+        self._original_shape = self.time_series.shape
 
         # Flags for data manipulation
         self.prepared = False
 
-        self.t = None
-        if self.time_series.ndim == 2:
-            self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
-            self.time_axis_first()
+        # Time axis
+        self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
 
     def __str__(self):
         return_string = [
             f"{self.__class__.__name__}:",
             f"from_file: {self._from_file}",
+            f"original_shape: {self._original_shape}",
             f"current_shape: {self.time_series.shape}",
             f"prepared: {self.prepared}",
         ]
@@ -108,14 +106,6 @@ class Data:
 
     def __array__(self, *args, **kwargs):
         return np.asarray(self.time_series, *args, **kwargs)
-
-    def time_axis_first(self):
-        """Forces the longer axis of the data to be the first indexed axis.
-
-        """
-        self.time_series, transposed = time_axis_first(self.time_series)
-        if transposed:
-            _logger.warning("Assuming time to be the longer axis and transposing.")
 
     def standardize(
         self,
