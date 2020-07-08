@@ -107,9 +107,9 @@ def create_model(
             "kl_loss",
             "theta_t",
             "m_theta_t",
-            "s2_theta_t",
+            "log_s2_theta_t",
             "mu_theta_jt",
-            "sigma2_theta_j",
+            "log_sigma2_theta_j",
             "mu_j",
             "D_j",
         ]
@@ -170,9 +170,9 @@ def _model_structure(
     inputs = layers.Input(shape=(sequence_length, n_channels))
 
     # Inference RNN
-    # - q(theta_t) ~ N(m_theta_t, s2_theta_t)
-    # - m_theta_t  ~ affine(RNN(Y_<=t))
-    # - s2_theta_t ~ affine(RNN(Y_<=t))
+    # - q(theta_t)     ~ N(m_theta_t, s2_theta_t)
+    # - m_theta_t      ~ affine(RNN(Y_<=t))
+    # - log_s2_theta_t ~ affine(RNN(Y_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
@@ -183,9 +183,9 @@ def _model_structure(
     inference_normalisation_layer = layers.LayerNormalization()
     inference_output_dropout_layer = layers.Dropout(dropout_rate_inference)
     m_theta_t_layer = layers.Dense(n_states, activation="linear")
-    s2_theta_t_layer = layers.Dense(n_states, activation="linear")
+    log_s2_theta_t_layer = layers.Dense(n_states, activation="linear")
 
-    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, s2_theta_t) via the
+    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
     # reparameterisation trick
     theta_t_layer = ReparameterizationLayer()
 
@@ -196,13 +196,13 @@ def _model_structure(
     inference_output_norm = inference_normalisation_layer(inference_output)
     inference_output_dropout = inference_output_dropout_layer(inference_output_norm)
     m_theta_t = m_theta_t_layer(inference_output_dropout)
-    s2_theta_t = s2_theta_t_layer(inference_output_dropout)
-    theta_t = theta_t_layer([m_theta_t, s2_theta_t])
+    log_s2_theta_t = log_s2_theta_t_layer(inference_output_dropout)
+    theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
 
     # Model RNN
     # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
     # - mu_theta_jt         ~ affine(RNN(theta_<t))
-    # - sigma2_theta_j      = trainable constant
+    # - log_sigma2_theta_j  = trainable constant
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model)
@@ -212,7 +212,7 @@ def _model_structure(
     model_normalisation_layer = layers.LayerNormalization()
     model_output_dropout_layer = layers.Dropout(dropout_rate_model)
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear")
-    sigma2_theta_j_layer = TrainableVariablesLayer(
+    log_sigma2_theta_j_layer = TrainableVariablesLayer(
         [n_states], initial_values=zeros(n_states), trainable=True
     )
 
@@ -239,19 +239,19 @@ def _model_structure(
     model_output_norm = model_normalisation_layer(model_output)
     model_output_dropout = model_output_dropout_layer(model_output_norm)
     mu_theta_jt = mu_theta_jt_layer(model_output_dropout)
-    sigma2_theta_j = sigma2_theta_j_layer(inputs)  # inputs not used
+    log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
     ll_loss = log_likelihood_layer([inputs, theta_t, mu_j, D_j])
-    kl_loss = kl_loss_layer([m_theta_t, s2_theta_t, mu_theta_jt, sigma2_theta_j])
+    kl_loss = kl_loss_layer([m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j])
 
     outputs = [
         ll_loss,
         kl_loss,
         theta_t,
         m_theta_t,
-        s2_theta_t,
+        log_s2_theta_t,
         mu_theta_jt,
-        sigma2_theta_j,
+        log_sigma2_theta_j,
         mu_j,
         D_j,
     ]
