@@ -231,7 +231,7 @@ def _model_structure(
     log_likelihood_layer = LogLikelihoodLayer(
         n_states, n_channels, alpha_xform=activation_function, name="ll"
     )
-    kl_loss_layer = KLDivergenceLayer(n_states, n_channels, name="kl")
+    kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
     model_input_dropout = model_input_dropout_layer(theta_t)

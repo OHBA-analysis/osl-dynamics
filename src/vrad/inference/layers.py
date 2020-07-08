@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Layer
-from tensorflow.python.keras.backend import expand_dims, stop_gradient
+from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
@@ -313,7 +313,7 @@ class LogLikelihoodLayer(Layer):
         LL = log_det + tf.squeeze(tf.squeeze(attempt, axis=3), axis=2)
         LL = -tf.reduce_sum(LL)
 
-        return expand_dims(LL)
+        return K.expand_dims(LL)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
@@ -333,37 +333,32 @@ class LogLikelihoodLayer(Layer):
 class KLDivergenceLayer(Layer):
     """Computes KL Divergence."""
 
-    def __init__(self, n_states, n_channels, **kwargs):
+    def __init__(self, **kwargs):
         super(KLDivergenceLayer, self).__init__(**kwargs)
-        self.n_states = n_states
-        self.n_channels = n_channels
 
     def build(self, input_shape):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        inference_mu, inference_sigma, model_mu, log_sigma_theta_j = inputs
+        inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
-        # model_mu needs shifting forward by one tpt
+        # model_mu needs shifting forward by one time point
         shifted_model_mu = tf.roll(model_mu, shift=1, axis=1)
 
         prior = tfp.distributions.Normal(
-            loc=shifted_model_mu, scale=tf.exp(log_sigma_theta_j)
+            loc=shifted_model_mu, scale=tf.exp(model_log_sigma)
         )
         posterior = tfp.distributions.Normal(
-            loc=inference_mu, scale=tf.exp(inference_sigma)
+            loc=inference_mu, scale=tf.exp(inference_log_sigma)
         )
 
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
-        return expand_dims(kl_loss)
+        return K.expand_dims(kl_loss)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
 
     def get_config(self):
         config = super(KLDivergenceLayer, self).get_config()
-        config.update(
-            {"n_states": self.n_states, "n_channels": self.n_channels,}
-        )
         return config
