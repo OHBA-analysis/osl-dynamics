@@ -404,8 +404,7 @@ def plot_time_series(
     n_channels = time_series.shape[1]
 
     separation = (
-        np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min())
-        * 1.2
+        np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min()) * 1.2
     )
     gaps = np.arange(n_channels)[::-1] * separation
 
@@ -865,9 +864,7 @@ def plot_state_time_courses(
     """Plots separated state time courses."""
 
     # Number of time points to point
-    n_samples = min(
-        n_samples or np.inf, *[len(stc) for stc in state_time_courses]
-    )
+    n_samples = min(n_samples or np.inf, *[len(stc) for stc in state_time_courses])
 
     # Number of states
     n_states = max([stc.shape[1] for stc in state_time_courses])
@@ -906,9 +903,7 @@ def compare_state_data(
     titles: list of str
         Titles to give to each axis.
     """
-    n_samples = min(
-        n_samples or np.inf, *[len(stc) for stc in state_time_courses]
-    )
+    n_samples = min(n_samples or np.inf, *[len(stc) for stc in state_time_courses])
 
     fig, axes = plt.subplots(
         nrows=len(state_time_courses),
