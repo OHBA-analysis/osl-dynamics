@@ -141,6 +141,15 @@ class MultivariateNormalLayer(Layer):
         weights[1] = cholesky_covariances
         self.set_weights(weights)
 
+    def get_means(self):
+        """Returns the means"""
+        return self.means
+
+    def get_covariances(self):
+        """Returns the covariances"""
+        covariances = cholesky_factor_to_full_matrix(self.cholesky_covariances)
+        return covariances
+
     def compute_output_shape(self, input_shape):
         return [
             tf.TensorShape([self.n_gaussians, self.dim]),
