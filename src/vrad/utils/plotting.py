@@ -855,29 +855,25 @@ def plot_state_lifetimes(
 
 
 def plot_state_time_courses(
-    *state_time_courses: List[np.ndarray],
+    state_time_course: np.ndarray,
+    axis: plt.Axes = None,
     n_samples: int = None,
-    sampling_frequency: float = 1.0,
-    title: str = None,
+    plot_kwargs: dict = None,
+    fig_kwargs: dict = None,
+    y_tick_values: list = None,
     filename: str = None,
 ):
-    """Plots separated state time courses."""
+    """Alias for plot_time_series."""
 
-    # Number of time points to point
-    n_samples = min(n_samples or np.inf, *[len(stc) for stc in state_time_courses])
-
-    # Number of states
-    n_states = max([stc.shape[1] for stc in state_time_courses])
-
-    # Plot state time courses
-    fig, ax = plt.subplots(n_states, figsize=(20, n_states), sharex="all")
-    for stc in state_time_courses:
-        for j in range(n_states):
-            ax[j].plot(stc[:n_samples, j])
-    plt.tight_layout()
-
-    # Show the plot or save to a file
-    show_or_save(filename)
+    plot_time_series(
+        time_series=state_time_course,
+        axis=axis,
+        n_samples=n_samples,
+        plot_kwargs=plot_kwargs,
+        fig_kwargs=fig_kwargs,
+        y_tick_values=y_tick_values,
+        filename=filename,
+    )
 
 
 def compare_state_data(
