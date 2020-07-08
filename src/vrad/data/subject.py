@@ -18,7 +18,7 @@ class Subject:
     def __init__(
         self,
         time_series: Union[str, np.ndarray, list],
-        _id: int,
+        _id: int = None,
         sampling_frequency: float = 1.0,
     ):
         # Raw data
