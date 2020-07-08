@@ -20,7 +20,7 @@ from vrad.utils import plotting
 # GPU settings
 tf_ops.gpu_growth()
 
-multi_gpu = False
+multi_gpu = True
 strategy = None
 
 # Settings
@@ -51,7 +51,7 @@ activation_function = "softmax"
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/subject1.mat")
+meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
 n_channels = meg_data.shape[1]
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
@@ -100,13 +100,13 @@ history = model.fit(
 )
 
 # Inferred covariance matrices
-inf_cov = model.predict(prediction_dataset)["D_j"]
+inf_cov = model.state_covariances(prediction_dataset)
 
 # Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="plots/covariances.png")
 
 # Inferred state probabilities
-inf_stc = np.concatenate(model.predict(prediction_dataset)["m_theta_t"])
+inf_stc = model.predict_states(prediction_dataset)
 
 # Read file containing state probabilities inferred by OSL
 hmm_stc = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/gamma.mat")

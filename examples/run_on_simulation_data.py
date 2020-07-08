@@ -2,7 +2,7 @@
 
 - Takes approximately 2 minutes to train (on compG017).
 - Achieves a dice coefficient of ~0.9.
-- Lines 129 and 142 can be uncommented to produce a plots of the inferred
+- Lines 130 and 143 can be uncommented to produce a plots of the inferred
   covariances and state time courses.
 """
 
@@ -53,15 +53,16 @@ activation_function = "softmax"
 
 # Load state transition probability matrix and covariances of each state
 init_trans_prob = np.load("data/prob_000.npy")
-init_djs = np.load("data/state_000.npy")
+init_cov = np.load("data/state_000.npy")
 
 # Simulate data
 print("Simulating data")
 sim = HMMSimulation(
+    n_states=n_states,
     trans_prob=init_trans_prob,
-    djs=init_djs,
+    covariances=init_cov,
     n_samples=n_samples,
-    e_std=observation_error,
+    observation_error=observation_error,
 )
 meg_data = data.Data(sim)
 n_channels = meg_data.shape[1]
@@ -123,14 +124,16 @@ history = model.fit(
 )
 
 # Inferred covariances
-inf_cov = model.predict(prediction_dataset)["D_j"]
+inf_cov = model.state_covariances(prediction_dataset)
 
 # Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="plots/covariances.png")
 
 # Inferred state time course
-inf_stc = model.predict(prediction_dataset)["m_theta_t"]
-inf_stc = np.concatenate(inf_stc).argmax(axis=1)
+inf_stc = model.predict_states(prediction_dataset)
+
+# Hard classify
+inf_stc = inf_stc.argmax(axis=1)
 
 # One hot encode the inferred state time courses
 inf_stc = array_ops.get_one_hot(inf_stc)
