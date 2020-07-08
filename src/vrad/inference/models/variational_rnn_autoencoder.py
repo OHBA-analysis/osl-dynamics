@@ -5,11 +5,12 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import (
-    KLDivergenceLayer,
-    LogLikelihoodLayer,
-    MultivariateNormalLayer,
     ReparameterizationLayer,
     TrainableVariablesLayer,
+    MultivariateNormalLayer,
+    # MixMeansCovsLayer,
+    LogLikelihoodLayer,
+    KLDivergenceLayer,
 )
 from vrad.utils.misc import listify
 
@@ -226,10 +227,11 @@ def _model_structure(
         initial_covariances=initial_covariances,
         name="mvn",
     )
+    # mix_means_covs_layer = MixMeansCovsLayer(n_states, n_channels, activation_function)
 
-    # Layers to calculate loss as the free energy = LL + KL
+    # Layers to calculate the negative of the log likelihood and KL divergence
     log_likelihood_layer = LogLikelihoodLayer(
-        n_states, n_channels, alpha_xform=activation_function, name="ll"
+        n_states, n_channels, activation_function, name="ll"
     )
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
@@ -241,8 +243,11 @@ def _model_structure(
     mu_theta_jt = mu_theta_jt_layer(model_output_dropout)
     log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
+    # m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
     ll_loss = log_likelihood_layer([inputs, theta_t, mu_j, D_j])
-    kl_loss = kl_loss_layer([m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j])
+    kl_loss = kl_loss_layer(
+        [m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j]
+    )
 
     outputs = [
         ll_loss,
@@ -256,6 +261,6 @@ def _model_structure(
         D_j,
     ]
 
-    model = Model(inputs=inputs, outputs=outputs,)
+    model = Model(inputs=inputs, outputs=outputs)
 
     return model
