@@ -113,7 +113,9 @@ def create_model(
             "mu_j",
             "D_j",
         ]
-        return dict(zip(return_names, prediction))
+        prediction_dict = dict(zip(return_names, prediction))
+        prediction_dict["D_j"] = model.state_covariances()
+        return prediction_dict
 
     model.predict = named_predict
 
@@ -121,6 +123,11 @@ def create_model(
         return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
 
     model.predict_states = predict_states
+
+    def state_covariances():
+        return model.get_layer("MultivariateNormalLayer").get_weights()[0]
+
+    model.state_covariances = state_covariances
 
     return model
 
@@ -212,6 +219,7 @@ def _model_structure(
         learn_covariances=learn_covariances,
         initial_means=initial_mean,
         initial_covariances=initial_covariances,
+        name="MultivariateNormalLayer",
     )
 
     # Layers to calculate loss as the free energy = LL + KL
