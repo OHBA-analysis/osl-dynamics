@@ -2,6 +2,7 @@
 
 """
 
+import os
 import tensorflow as tf
 import tensorflow.keras.models as models
 from vrad.inference.models.variational_rnn_autoencoder import (
@@ -27,6 +28,14 @@ def gpu_growth():
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
             print(e)
+
+
+def select_gpu(gpu_number):
+    """Allows the user to pick a GPU to use."""
+    if isinstance(gpu_number, int):
+        gpu_number = str(gpu_number)
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_number
+    print(f"Using GPU {gpu_number}")
 
 
 def train_predict_dataset(
