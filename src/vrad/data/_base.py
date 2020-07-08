@@ -61,6 +61,10 @@ class Data:
 
         return subjects
 
+    @property
+    def time_series(self):
+        return np.concatenate([subject for subject in self.subjects])
+
     def add(
         self,
         new_subjects: Union[str, list, np.ndarray],
