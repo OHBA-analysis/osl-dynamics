@@ -100,7 +100,7 @@ history = model.fit(
 )
 
 # Inferred covariance matrices
-inf_cov = model.state_covariances(prediction_dataset)
+inf_cov = model.state_covariances()
 
 # Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="plots/covariances.png")
