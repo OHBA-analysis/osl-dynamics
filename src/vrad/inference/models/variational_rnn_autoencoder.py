@@ -113,7 +113,11 @@ def create_model(
             "mu_j",
             "D_j",
         ]
-        return dict(zip(return_names, prediction))
+        prediction_dict = dict(zip(return_names, prediction))
+        mu_j, D_j = model.state_means_covariances()
+        prediction_dict["mu_j"] = mu_j
+        prediction_dict["D_j"] = D_j
+        return prediction_dict
 
     model.predict = named_predict
 
@@ -121,6 +125,14 @@ def create_model(
         return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
 
     model.predict_states = predict_states
+
+    def state_means_covariances():
+        mvn_layer = model.get_layer("mvn")
+        means = mvn_layer.get_means()
+        covariances = mvn_layer.get_covariances()
+        return means, covariances
+
+    model.state_means_covariances = state_means_covariances
 
     return model
 
@@ -160,7 +172,7 @@ def _model_structure(
     # Inference RNN
     # - q(theta_t) ~ N(m_theta_t, s2_theta_t)
     # - m_theta_t  ~ affine(RNN(Y_<=t))
-    # - s2_theta_t ~ softplus(RNN(Y_<=t))
+    # - s2_theta_t ~ affine(RNN(Y_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
@@ -212,6 +224,7 @@ def _model_structure(
         learn_covariances=learn_covariances,
         initial_means=initial_mean,
         initial_covariances=initial_covariances,
+        name="mvn",
     )
 
     # Layers to calculate loss as the free energy = LL + KL

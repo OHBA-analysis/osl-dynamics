@@ -28,7 +28,7 @@ class SavePredictionCallback(callbacks.Callback):
         if epoch % self.save_frequency == 0:
             np.save(
                 self.pattern.format(epoch),
-                self.model.predict(self.prediction_dataset)["m_theta_t"],
+                self.model.predict_states(self.prediction_dataset),
             )
 
 

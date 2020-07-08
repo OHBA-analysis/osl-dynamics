@@ -1,9 +1,9 @@
 """Example script for running inference on simulated HMM data.
 
-- Takes approximately 2 minutes to train (on compG017).
+- Takes approximately 1 minute to train (on compG017).
 - Achieves a dice coefficient of ~0.9.
-- Line 133 can be uncommented to produce a plot of the simulated and inferred
-  state time courses for comparison.
+- Lines 130, 146, 146 can be uncommented to produce a plots of the inferred
+  covariances and state time courses.
 """
 
 print("Importing packages")
@@ -23,7 +23,7 @@ multi_gpu = False
 strategy = None
 
 # Settings
-n_samples = 50000
+n_samples = 25000
 observation_error = 0.2
 
 n_states = 5
@@ -53,15 +53,16 @@ activation_function = "softmax"
 
 # Load state transition probability matrix and covariances of each state
 init_trans_prob = np.load("data/prob_000.npy")
-init_djs = np.load("data/state_000.npy")
+init_cov = np.load("data/state_000.npy")
 
 # Simulate data
 print("Simulating data")
 sim = HMMSimulation(
+    n_states=n_states,
     trans_prob=init_trans_prob,
-    djs=init_djs,
+    covariances=init_cov,
     n_samples=n_samples,
-    e_std=observation_error,
+    observation_error=observation_error,
 )
 meg_data = data.Data(sim)
 n_channels = meg_data.shape[1]
@@ -87,8 +88,8 @@ training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
     time_series=meg_data, sequence_length=sequence_length, batch_size=batch_size,
 )
 
-# Build autoecoder model
-rnn_vae = create_model(
+# Build model
+model = create_model(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -111,26 +112,37 @@ rnn_vae = create_model(
     strategy=strategy,
 )
 
-rnn_vae.summary()
+model.summary()
 
 # Train the model
 print("Training model")
-history = rnn_vae.fit(
+history = model.fit(
     training_dataset,
     callbacks=[TqdmCallback(tqdm_class=tqdm, verbose=0)],
     epochs=n_epochs,
     verbose=0,
 )
 
+# Inferred covariances
+inf_means, inf_cov = model.state_means_covariances()
+
+# Plot covariance matrices
+# plotting.plot_matrices(inf_cov, filename="covariances.png")
+
 # Inferred state time course
-inf_stc = array_ops.get_one_hot(
-    np.concatenate(rnn_vae.predict(prediction_dataset)["m_theta_t"]).argmax(axis=1)
-)
+inf_stc = model.predict_states(prediction_dataset)
+
+# Hard classify
+inf_stc = inf_stc.argmax(axis=1)
+
+# One hot encode the inferred state time courses
+inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance to ground truth state time courses
 matched_stc, matched_inf_stc = array_ops.match_states(sim.state_time_course, inf_stc)
 
-# Compare state time courses
+# Plot state time courses
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# plotting.plot_state_time_courses(matched_stc, matched_inf_stc, filename='stc.png')
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
