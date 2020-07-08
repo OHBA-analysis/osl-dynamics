@@ -69,7 +69,9 @@ class Subject:
         """Plot data.
 
         """
-        plotting.plot_data(self.time_series, n_samples=n_samples, filename=filename)
+        plotting.plot_time_series(
+            self.time_series, n_samples=n_samples, filename=filename
+        )
 
     def savemat(self, filename: str, field_name: str = "X"):
         """Save data to a .mat file.

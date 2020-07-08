@@ -4,8 +4,9 @@ from typing import Union
 import mat73
 import numpy as np
 from vrad import array_ops
-from vrad.data.subject import Subject
 from vrad.data.manipulation import prepare
+from vrad.data.subject import Subject
+from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
 
 _logger = logging.getLogger("VRAD")
@@ -55,18 +56,20 @@ class Data:
                     "A 2D (single subject) or 3D (multiple subject) array must "
                     + "be passed."
                 )
-            if subject.ndim == 2:
+            if subjects.ndim == 2:
                 subjects = subjects[np.newaxis, :, :]
 
         return subjects
 
     def add(
-        self, new_subject: Union[str, list, np.ndarray], sampling_frequency: float = 1.0
+        self,
+        new_subjects: Union[str, list, np.ndarray],
+        sampling_frequency: float = 1.0,
     ):
         """Adds one or more subjects to the data object."""
 
         # Check new subjects are been passed correctly
-        new_subjects = check(new_subjects)
+        new_subjects = self.check(new_subjects)
 
         # Add the number of new subjects to the total
         n_new_subjects = len(new_subjects)
@@ -91,7 +94,7 @@ class Data:
 
     def prepare(
         self,
-        ids: Union[int, list, np.ndarray, str] = 'all',
+        ids: Union[int, list, np.ndarray, str] = "all",
         n_embeddings: int = None,
         n_pca_components: int = None,
         whiten: bool = False,
@@ -108,7 +111,7 @@ class Data:
                 raise ValueError(f"ids={ids} unknown in data preparation.")
 
         # Check the time series has not already been prepared
-        if self.prepared == True:
+        if self.prepared:
             logging.warning("Data has already been prepared. No changes made.")
 
         else:
@@ -151,7 +154,7 @@ class OSL_HMM:
         # Aliases
         self.covariances = np.array([state["Gam_rate"] for state in self.state.Omega])
         self.state_time_course = self.gamma
-        self.viterbi_path = array_ops.get_one_hot(self.state_path)
+        self.viterbi_path = array_ops.get_one_hot(self.state_path - 1)
 
     def plot_covariances(self, *args, **kwargs):
         """Wraps plotting.plot_matrices for self.covariances."""
@@ -160,7 +163,7 @@ class OSL_HMM:
     def plot_states(self, *args, **kwargs):
         """Wraps plotting.highlight_states for self.viterbi_path."""
 
-        plotting.highlight_states(self.viterbi_path, *args, **kwargs)
+        plotting.state_barcode(self.viterbi_path, *args, **kwargs)
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"
