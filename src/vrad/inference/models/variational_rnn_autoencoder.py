@@ -114,7 +114,9 @@ def create_model(
             "D_j",
         ]
         prediction_dict = dict(zip(return_names, prediction))
-        prediction_dict["D_j"] = model.state_covariances()
+        mu_j, D_j = model.state_means_covariances()
+        prediction_dict["mu_j"] = mu_j
+        prediction_dict["D_j"] = D_j
         return prediction_dict
 
     model.predict = named_predict
@@ -125,7 +127,10 @@ def create_model(
     model.predict_states = predict_states
 
     def state_covariances():
-        return model.get_layer("MultivariateNormalLayer").get_weights()[0]
+        mvn_layer = model.get_layer("MultivariateNormalLayer")
+        means = mvn_layer.get_means()
+        covariances = mvn_layer.get_covariances()
+        return means, covariances
 
     model.state_covariances = state_covariances
 
@@ -167,7 +172,7 @@ def _model_structure(
     # Inference RNN
     # - q(theta_t) ~ N(m_theta_t, s2_theta_t)
     # - m_theta_t  ~ affine(RNN(Y_<=t))
-    # - s2_theta_t ~ softplus(RNN(Y_<=t))
+    # - s2_theta_t ~ affine(RNN(Y_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
