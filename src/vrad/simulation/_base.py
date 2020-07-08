@@ -35,6 +35,7 @@ class Simulation(ABC):
         observation_error: float = 0.2,
         covariances: np.ndarray = None,
         simulate: bool = True,
+        random_seed: int = None,
     ):
 
         self.n_samples = n_samples
@@ -49,6 +50,9 @@ class Simulation(ABC):
             self.create_covariances() if covariances is None else covariances
         )
         self.time_series = None
+
+        # Setup random number generator
+        self._rng = np.random.default_rng(random_seed)
 
         if simulate:
             self.simulate()
@@ -106,7 +110,7 @@ class Simulation(ABC):
 
         """
         if self.random_covariance_weights:
-            tilde_cov_weights = np.random.normal(
+            tilde_cov_weights = self._rng.normal(
                 size=(self.n_states, self.n_channels, self.n_channels)
             )
         else:
@@ -139,7 +143,7 @@ class Simulation(ABC):
 
         """
         if self.sim_varying_means:
-            mus_sim = np.random.normal((self.n_states, self.n_channels))
+            mus_sim = self._rng.normal((self.n_states, self.n_channels))
         else:
             mus_sim = np.zeros((self.n_states, self.n_channels))
 
@@ -147,15 +151,13 @@ class Simulation(ABC):
         for i in range(self.n_states):
             data_sim[
                 self.state_time_course.argmax(axis=1) == i
-            ] = np.random.default_rng().multivariate_normal(
+            ] = self._rng.multivariate_normal(
                 mus_sim[i],
                 self.covariances[i],
                 size=np.count_nonzero(self.state_time_course.argmax(axis=1) == i),
             )
 
-        data_sim += np.random.default_rng().normal(
-            scale=self.observation_error, size=data_sim.shape
-        )
+        data_sim += self._rng.normal(scale=self.observation_error, size=data_sim.shape)
 
         return data_sim.astype(np.float32)
 
