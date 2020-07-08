@@ -126,13 +126,13 @@ def create_model(
 
     model.predict_states = predict_states
 
-    def state_covariances():
-        mvn_layer = model.get_layer("MultivariateNormalLayer")
+    def state_means_covariances():
+        mvn_layer = model.get_layer("mvn")
         means = mvn_layer.get_means()
         covariances = mvn_layer.get_covariances()
         return means, covariances
 
-    model.state_covariances = state_covariances
+    model.state_means_covariances = state_means_covariances
 
     return model
 
@@ -224,7 +224,7 @@ def _model_structure(
         learn_covariances=learn_covariances,
         initial_means=initial_mean,
         initial_covariances=initial_covariances,
-        name="MultivariateNormalLayer",
+        name="mvn",
     )
 
     # Layers to calculate loss as the free energy = LL + KL
