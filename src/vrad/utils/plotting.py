@@ -465,7 +465,7 @@ def state_barcode(
 
     cmap = plt.cm.get_cmap(colormap, lut=n_states)
 
-    extent = extent or [0, n_samples / sample_frequency, 0, 1]
+    extent = extent or [0, n_samples / sampling_frequency, 0, 1]
 
     axis.imshow(
         state_time_course[None],
