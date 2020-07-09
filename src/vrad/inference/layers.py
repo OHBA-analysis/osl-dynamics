@@ -223,12 +223,11 @@ class TrainableVariablesLayer(Layer):
         )
         return config
 
-
-class LogLikelihoodLayer(Layer):
-    """Computes log likelihood."""
+class MixMeansCovsLayer(Layer):
+    """Computes a probabilistic mixture of means and covariances."""
 
     def __init__(self, n_states, n_channels, alpha_xform, **kwargs):
-        super(LogLikelihoodLayer, self).__init__(**kwargs)
+        super(MixMeansCovsLayer, self).__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
@@ -248,21 +247,17 @@ class LogLikelihoodLayer(Layer):
 
         self.built = True
 
+    def get_alpha_scaling(self):
+        """Returns the alpha_scaling weight"""
+        return self.alpha_scaling
+
     def call(self, inputs, **kwargs):
-        """Computes the log likelihood:
-           c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-           where:
-           - x are the observations
-           - mu is the mean
-           - sigma is the covariance matrix
-           - c is a constant
-           This function returns the negative of the log likelihood.
-        """
+        """Computes Sum_j alpha_jt mu_j and Sum_j alpha2_jt D_j."""
         # Unpack the inputs:
         # - theta_t.shape = (None, sequence_length, n_states)
         # - mu.shape      = (n_states, n_channels)
         # - D.shape       = (n_states, n_channels, n_channels)
-        x, theta_t, mu, D = inputs
+        theta_t, mu, D = inputs
 
         if self.alpha_xform == "softplus":
             alpha_t = softplus(theta_t)
@@ -273,7 +268,7 @@ class LogLikelihoodLayer(Layer):
 
         # Calculate the mean
         mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
-        mu = tf.reduce_sum(tf.multiply(alpha_t, mu), 2)
+        m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), 2)
 
         if self.alpha_xform == "softplus":
             alpha_t = softplus(theta_t)
@@ -286,7 +281,44 @@ class LogLikelihoodLayer(Layer):
 
         # Calculate the covariance
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
-        sigma = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
+        C_t = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
+
+        return m_t, C_t
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([1])
+
+    def get_config(self):
+        config = super(MixMeansCovsLayer, self).get_config()
+        config.update(
+            {
+                "n_states": self.n_states,
+                "n_channels": self.n_channels,
+                "alpha_xform": self.alpha_xform,
+            }
+        )
+
+
+class LogLikelihoodLayer(Layer):
+    """Computes log likelihood."""
+
+    def __init__(self, **kwargs):
+        super(LogLikelihoodLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        """Computes the log likelihood:
+           c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+           where:
+           - x are the observations
+           - mu is the mean
+           - sigma is the covariance matrix
+           - c is a constant
+           This function returns the negative of the log likelihood.
+        """
+        x, mu, sigma = inputs
 
         x = tf.expand_dims(x, axis=2)
         mu = tf.expand_dims(mu, axis=2)
@@ -317,13 +349,6 @@ class LogLikelihoodLayer(Layer):
 
     def get_config(self):
         config = super(LogLikelihoodLayer, self).get_config()
-        config.update(
-            {
-                "n_states": self.n_states,
-                "n_channels": self.n_channels,
-                "alpha_xform": self.alpha_xform,
-            }
-        )
         return config
 
 

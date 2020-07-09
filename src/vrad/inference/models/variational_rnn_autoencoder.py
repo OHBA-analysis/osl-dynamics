@@ -8,7 +8,7 @@ from vrad.inference.layers import (
     ReparameterizationLayer,
     TrainableVariablesLayer,
     MultivariateNormalLayer,
-    # MixMeansCovsLayer,
+    MixMeansCovsLayer,
     LogLikelihoodLayer,
     KLDivergenceLayer,
 )
@@ -227,12 +227,10 @@ def _model_structure(
         initial_covariances=initial_covariances,
         name="mvn",
     )
-    # mix_means_covs_layer = MixMeansCovsLayer(n_states, n_channels, activation_function)
+    mix_means_covs_layer = MixMeansCovsLayer(n_states, n_channels, activation_function)
 
     # Layers to calculate the negative of the log likelihood and KL divergence
-    log_likelihood_layer = LogLikelihoodLayer(
-        n_states, n_channels, activation_function, name="ll"
-    )
+    log_likelihood_layer = LogLikelihoodLayer(name="ll")
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
@@ -243,8 +241,8 @@ def _model_structure(
     mu_theta_jt = mu_theta_jt_layer(model_output_dropout)
     log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
-    # m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
-    ll_loss = log_likelihood_layer([inputs, theta_t, mu_j, D_j])
+    m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
+    ll_loss = log_likelihood_layer([inputs, m_t, C_t])
     kl_loss = kl_loss_layer(
         [m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j]
     )
