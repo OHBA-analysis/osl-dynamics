@@ -253,7 +253,7 @@ class MixMeansCovsLayer(Layer):
         return self.alpha_scaling
 
     def call(self, inputs, **kwargs):
-        """Computes Sum_j alpha_jt mu_j and Sum_j alpha2_jt D_j."""
+        """Computes Sum_j alpha_jt mu_j and Sum_j alpha_jt D_j."""
         # Unpack the inputs:
         # - theta_t.shape = (None, sequence_length, n_states)
         # - mu.shape      = (n_states, n_channels)
@@ -277,7 +277,7 @@ class MixMeansCovsLayer(Layer):
         alpha_t = K.expand_dims(alpha_t, axis=-1)
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
 
-        # Calculate the covariance: Sum_j alpha2_jt D_j
+        # Calculate the covariance: Sum_j alpha_jt D_j
         C_t = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
 
         return m_t, C_t
