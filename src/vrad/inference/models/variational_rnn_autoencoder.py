@@ -111,13 +111,8 @@ def create_model(
             "log_s2_theta_t",
             "mu_theta_jt",
             "log_sigma2_theta_j",
-            "mu_j",
-            "D_j",
         ]
         prediction_dict = dict(zip(return_names, prediction))
-        mu_j, D_j = model.state_means_covariances()
-        prediction_dict["mu_j"] = mu_j
-        prediction_dict["D_j"] = D_j
         return prediction_dict
 
     model.predict = named_predict
@@ -134,6 +129,13 @@ def create_model(
         return means, covariances
 
     model.state_means_covariances = state_means_covariances
+
+    def alpha_scaling():
+        mix_means_covs_layer = model.get_layer("mix_means_covs")
+        alpha_scaling = mix_means_covs_layer.get_alpha_scaling()
+        return alpha_scaling
+
+    model.alpha_scaling = alpha_scaling
 
     return model
 
@@ -227,7 +229,9 @@ def _model_structure(
         initial_covariances=initial_covariances,
         name="mvn",
     )
-    mix_means_covs_layer = MixMeansCovsLayer(n_states, n_channels, activation_function)
+    mix_means_covs_layer = MixMeansCovsLayer(
+        n_states, n_channels, activation_function, name="mix_means_covs"
+    )
 
     # Layers to calculate the negative of the log likelihood and KL divergence
     log_likelihood_layer = LogLikelihoodLayer(name="ll")
@@ -255,8 +259,6 @@ def _model_structure(
         log_s2_theta_t,
         mu_theta_jt,
         log_sigma2_theta_j,
-        mu_j,
-        D_j,
     ]
 
     model = Model(inputs=inputs, outputs=outputs)
