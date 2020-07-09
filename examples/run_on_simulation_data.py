@@ -1,9 +1,10 @@
 """Example script for running inference on simulated HMM data.
 
-- Takes approximately 1 minute to train (on compG017).
-- Achieves a dice coefficient of ~0.9.
-- Lines 130, 146, 146 can be uncommented to produce a plots of the inferred
+- This script sets a seed for the random number generators for reproducibility.
+- Should achieve a dice coefficient of ~0.94.
+- Lines 131, 146, 146 can be uncommented to produce a plots of the inferred
   covariances and state time courses.
+- Takes approximately 1 minute to train (on compG017).
 """
 
 print("Importing packages")
@@ -63,6 +64,7 @@ sim = HMMSimulation(
     covariances=init_cov,
     n_samples=n_samples,
     observation_error=observation_error,
+    random_seed=123,
 )
 meg_data = data.Data(sim)
 n_channels = meg_data.shape[1]
@@ -71,7 +73,6 @@ n_channels = meg_data.shape[1]
 covariances, means = gmm.learn_mu_sigma(
     meg_data,
     n_states,
-    take_random_sample=50000,
     gmm_kwargs={
         "n_init": 1,
         "verbose": 2,
@@ -79,8 +80,9 @@ covariances, means = gmm.learn_mu_sigma(
         "max_iter": 10000,
         "tol": 1e-6,
     },
-    retry_attempts=5,
+    retry_attempts=1,
     learn_means=False,
+    random_seed=124,
 )
 
 # Prepare dataset
