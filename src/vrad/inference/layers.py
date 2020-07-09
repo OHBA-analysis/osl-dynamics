@@ -297,15 +297,18 @@ class LogLikelihoodLayer(Layer):
         # Calculate third term: 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
         inv_sigma = tf.linalg.inv(sigma + 1e-8 * tf.eye(sigma.shape[-1]))
         mu_minus_sigma = tf.subtract(x, mu)
+        mu_minus_sigma_T = tf.transpose(mu_minus_sigma, perm=[0, 1, 3, 2])
         third_term = -0.5 * tf.matmul(
-            tf.matmul(mu_minus_sigma, inv_sigma),
-            tf.transpose(mu_minus_sigma, perm=[0, 1, 3, 2])
+            tf.matmul(mu_minus_sigma, inv_sigma), mu_minus_sigma_T
         )
         third_term = tf.squeeze(tf.squeeze(third_term, axis=3), axis=2)
 
-        # Calculate negative log likelihood loss
+        # Calculate the log likelihood
         # We ignore the first term which is a constant
-        nll_loss = -tf.reduce_sum(second_term + third_term)
+        ll_loss = tf.reduce_sum(second_term + third_term)
+
+        # We return the negative of the log likelihood
+        nll_loss = -ll_loss
 
         return K.expand_dims(nll_loss)
 
