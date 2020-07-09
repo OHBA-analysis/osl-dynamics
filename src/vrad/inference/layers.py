@@ -218,9 +218,7 @@ class TrainableVariablesLayer(Layer):
 
     def get_config(self):
         config = super(TrainableVariablesLayer, self).get_config()
-        config.update(
-            {"shape": self.shape, "trainable": self.trainable,}
-        )
+        config.update({"shape": self.shape, "trainable": self.trainable})
         return config
 
 
@@ -253,7 +251,7 @@ class MixMeansCovsLayer(Layer):
         return self.alpha_scaling
 
     def call(self, inputs, **kwargs):
-        """Computes Sum_j alpha_jt mu_j and Sum_j alpha_jt D_j."""
+        """Computes m_t = Sum_j alpha_jt mu_j and C_t = Sum_j alpha_jt D_j."""
         # Unpack the inputs:
         # - theta_t.shape = (None, sequence_length, n_states)
         # - mu.shape      = (n_states, n_channels)
@@ -270,14 +268,14 @@ class MixMeansCovsLayer(Layer):
         alpha_t = K.expand_dims(alpha_t, axis=-1)
         mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
 
-        # Calculate the mean: Sum_j alpha_jt mu_j
+        # Calculate the mean: m_t = Sum_j alpha_jt mu_j
         m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), 2)
 
         # Reshape alpha_t and D for multiplication
         alpha_t = K.expand_dims(alpha_t, axis=-1)
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
 
-        # Calculate the covariance: Sum_j alpha_jt D_j
+        # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         C_t = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
 
         return m_t, C_t
@@ -294,6 +292,7 @@ class MixMeansCovsLayer(Layer):
                 "alpha_xform": self.alpha_xform,
             }
         )
+        return config
 
 
 class LogLikelihoodLayer(Layer):
@@ -310,10 +309,10 @@ class LogLikelihoodLayer(Layer):
            c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
            where:
            - x are the observations
-           - mu is the mean
+           - mu is the mean vector
            - sigma is the covariance matrix
            - c is a constant
-           This function returns the negative of the log likelihood.
+           This method returns the negative of the log likelihood.
         """
         x, mu, sigma = inputs
 
@@ -323,7 +322,7 @@ class LogLikelihoodLayer(Layer):
         # Calculate second term: -0.5 * log(|sigma|)
         second_term = -0.5 * tf.linalg.logdet(sigma)
 
-        # Calculate third term: 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+        # Calculate third term: -0.5 * [(x - mu)^T sigma^-1 (x - mu)]
         inv_sigma = tf.linalg.inv(sigma + 1e-8 * tf.eye(sigma.shape[-1]))
         mu_minus_sigma = tf.subtract(x, mu)
         mu_minus_sigma_T = tf.transpose(mu_minus_sigma, perm=[0, 1, 3, 2])
