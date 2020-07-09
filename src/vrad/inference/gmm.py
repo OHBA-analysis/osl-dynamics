@@ -29,6 +29,7 @@ def learn_mu_sigma(
     gmm_kwargs: dict = None,
     take_random_sample: int = None,
     return_gmm: bool = False,
+    random_seed: int = None,
 ):
     """Find a mixture of Gaussian distributions which characterises a dataset.
 
@@ -77,7 +78,10 @@ def learn_mu_sigma(
     if learn_means:
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
-            n_components=n_states, covariance_type="full", **gmm_kwargs,
+            n_components=n_states,
+            covariance_type="full",
+            **gmm_kwargs,
+            random_state=random_seed,
         )
     else:
         # make sure we force means to be zero:
