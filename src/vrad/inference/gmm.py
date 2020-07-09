@@ -90,6 +90,7 @@ def learn_mu_sigma(
             covariance_type="full",
             mean_prior=np.zeros(n_channels),
             mean_precision_prior=1e12,
+            random_state=random_seed,
             **gmm_kwargs,
         )
     for attempt in range(retry_attempts):
