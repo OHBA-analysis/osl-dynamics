@@ -223,6 +223,7 @@ class TrainableVariablesLayer(Layer):
         )
         return config
 
+
 class MixMeansCovsLayer(Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
@@ -263,24 +264,20 @@ class MixMeansCovsLayer(Layer):
             alpha_t = softplus(theta_t)
         elif self.alpha_xform == "softmax":
             alpha_t = softmax(theta_t, axis=2)
-
-        alpha_t = K.expand_dims(alpha_t, axis=-1)
-
-        # Calculate the mean
-        mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
-        m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), 2)
-
-        if self.alpha_xform == "softplus":
-            alpha_t = softplus(theta_t)
-        elif self.alpha_xform == "softmax":
-            alpha_t = softmax(theta_t, axis=2)
             alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
 
+        # Reshape alpha_t and mu for multiplication
         alpha_t = K.expand_dims(alpha_t, axis=-1)
-        alpha_t = K.expand_dims(alpha_t, axis=-1)
+        mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
 
-        # Calculate the covariance
+        # Calculate the mean: Sum_j alpha_jt mu_j
+        m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), 2)
+
+        # Reshape alpha_t and D for multiplication
+        alpha_t = K.expand_dims(alpha_t, axis=-1)
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
+
+        # Calculate the covariance: Sum_j alpha2_jt D_j
         C_t = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
 
         return m_t, C_t
