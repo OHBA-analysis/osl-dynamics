@@ -52,7 +52,7 @@ alpha_xform = "softmax"
 # Read MEG data
 print("Reading MEG data")
 meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
-n_channels = meg_data.shape[1]
+n_channels = meg_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
 covariances = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/Covs.mat")
