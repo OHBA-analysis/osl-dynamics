@@ -70,7 +70,7 @@ sim = HMMSimulation(
     random_seed=123,
 )
 meg_data = data.Data(sim)
-n_channels = meg_data.shape[1]
+n_channels = meg_data.n_channels
 
 # Priors
 covariances, means = gmm.learn_mu_sigma(
