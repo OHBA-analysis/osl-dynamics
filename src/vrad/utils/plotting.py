@@ -386,6 +386,7 @@ def plot_time_series(
     filename: str
         A file to which to save the figure.
     """
+    time_series = np.asarray(time_series)
     n_samples = min(n_samples or np.inf, time_series.shape[0])
     axis_given = axis is not None
     if not axis_given:
