@@ -6,16 +6,17 @@
 - Line 106, 127, 128 can be uncommented to produce a plot of the inferred
   covariances and state time courses.
 """
-
-print("Importing packages")
 import mat73
 import numpy as np
+from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
 from vrad.inference.models.variational_rnn_autoencoder import create_model
 from vrad.utils import plotting
+
+print("Importing packages")
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -63,13 +64,16 @@ covariances = covariances["Covs"].astype(np.float32)
 means = np.zeros([n_states, n_channels], dtype=np.float32)
 
 # Prepare dataset
-training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
-    time_series=meg_data.time_series,
-    sequence_length=sequence_length,
-    batch_size=batch_size,
+training_dataset = (
+    meg_data.dataset(sequence_length).batch(32).cache().shuffle(10000).prefetch(-1)
+)
+prediction_dataset = (
+    Dataset.from_tensor_slices(meg_data.time_series)
+    .batch(sequence_length, drop_remainder=True)
+    .batch(batch_size, drop_remainder=True)
 )
 
-# Build autoecoder model
+# Build autoencoder model
 model = create_model(
     n_channels=n_channels,
     n_states=n_states,
