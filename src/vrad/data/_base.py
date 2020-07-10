@@ -62,7 +62,7 @@ class Data:
 
         # If the data array has been passed, check its shape
         if isinstance(subjects, np.ndarray):
-            if subjects.ndim != 2 or subjects.ndim != 3:
+            if (subjects.ndim != 2) and (subjects.ndim != 3):
                 raise ValueError(
                     "A 2D (single subject) or 3D (multiple subject) array must "
                     + "be passed."
