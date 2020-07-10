@@ -57,22 +57,12 @@ def transpose(f, *arguments):
         args = [*args]
         for i in positional_arguments:
             try:
-                args[i], transposed = time_axis_first(args[i])
-                if transposed:
-                    _logger.warning(
-                        f"Argument {i}: assuming longer axis to be "
-                        f"time and transposing."
-                    )
+                args[i] = time_axis_first(args[i])
             except IndexError:
                 _logger.debug(f"Positional argument {i} not in args.")
         for k in keyword_arguments:
             try:
-                kwargs[k], transposed = time_axis_first(kwargs[k])
-                if transposed:
-                    _logger.warning(
-                        f"Argument {k}: assuming longer axis to be "
-                        f"time and transposing."
-                    )
+                kwargs[k] = time_axis_first(kwargs[k])
             except KeyError:
                 _logger.debug(f"Argument {k} not found in kwargs.")
 
