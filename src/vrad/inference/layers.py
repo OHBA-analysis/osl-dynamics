@@ -390,7 +390,7 @@ class KLDivergenceLayer(layers.Layer):
 
 
 class InferenceRNNLayers(layers.Layer):
-    """RNN layer for the inference network."""
+    """RNN layers for the inference network."""
 
     def __init__(self, n_layers, n_units, dropout_rate, **kwargs):
         super().__init__(**kwargs)
@@ -411,7 +411,36 @@ class InferenceRNNLayers(layers.Layer):
         return inputs
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape(input_shape.as_list()[:-1] + [2*self.n_units])
+        # we multiply self.n_units by 2 because we're using a bidirectional RNN
+        return tf.TensorShape(input_shape.as_list()[:-1] + [2 * self.n_units])
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"n_units": self.n_units})
+        return config
+
+
+class ModelRNNLayers(layers.Layer):
+    """RNN layers for the generative model."""
+
+    def __init__(self, n_layers, n_units, dropout_rate, **kwargs):
+        super().__init__(**kwargs)
+        self.n_units = n_units
+        self.layers = []
+        for n in range(n_layers):
+            self.layers.append(
+                layers.LSTM(n_units, return_sequences=True, stateful=False)
+            )
+            self.layers.append(layers.LayerNormalization())
+            self.layers.append(layers.Dropout(dropout_rate))
+
+    def call(self, inputs):
+        for layer in self.layers:
+            inputs = layer(inputs)
+        return inputs
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(input_shape.as_list()[:-1] + [self.n_units])
 
     def get_config(self):
         config = super().get_config()

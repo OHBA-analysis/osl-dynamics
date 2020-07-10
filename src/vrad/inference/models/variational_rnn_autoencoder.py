@@ -10,6 +10,7 @@ from vrad.inference.layers import (
     TrainableVariablesLayer,
     MultivariateNormalLayer,
     MixMeansCovsLayer,
+    ModelRNNLayers,
     LogLikelihoodLayer,
     KLDivergenceLayer,
 )
@@ -187,7 +188,7 @@ def _model_structure(
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
     inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
-    inference_output_layer = InferenceRNNLayers(
+    inference_output_layers = InferenceRNNLayers(
         n_layers_inference, n_units_inference, dropout_rate_inference
     )
     m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
@@ -197,12 +198,12 @@ def _model_structure(
 
     # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
     # reparameterisation trick
-    theta_t_layer = ReparameterizationLayer(name='theta_t')
+    theta_t_layer = ReparameterizationLayer(name="theta_t")
 
     # Inference RNN data flow
     inputs_norm = input_normalisation_layer(inputs)
     inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
-    inference_output = inference_output_layer(inputs_norm_dropout)
+    inference_output = inference_output_layers(inputs_norm_dropout)
     m_theta_t = m_theta_t_layer(inference_output)
     log_s2_theta_t = log_s2_theta_t_layer(inference_output)
     theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
@@ -214,11 +215,9 @@ def _model_structure(
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model)
-    model_output_layer = layers.LSTM(
-        n_units_model, return_sequences=True, stateful=False
+    model_output_layers = ModelRNNLayers(
+        n_layers_model, n_units_model, dropout_rate_model
     )
-    model_normalisation_layer = layers.LayerNormalization()
-    model_output_dropout_layer = layers.Dropout(dropout_rate_model)
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
     log_sigma2_theta_j_layer = TrainableVariablesLayer(
         [n_states],
@@ -247,10 +246,8 @@ def _model_structure(
 
     # Model RNN data flow
     model_input_dropout = model_input_dropout_layer(theta_t)
-    model_output = model_output_layer(model_input_dropout)
-    model_output_norm = model_normalisation_layer(model_output)
-    model_output_dropout = model_output_dropout_layer(model_output_norm)
-    mu_theta_jt = mu_theta_jt_layer(model_output_dropout)
+    model_output = model_output_layers(model_input_dropout)
+    mu_theta_jt = mu_theta_jt_layer(model_output)
     log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
