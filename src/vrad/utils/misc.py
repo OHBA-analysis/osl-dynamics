@@ -21,6 +21,11 @@ def listify(obj: object):
         return [obj]
 
 
+def check_iterable_type(iterable, object_type: type):
+    """Check iterable is non-empty and contains only objects of specific type."""
+    return bool(iterable) and all(isinstance(elem, object_type) for elem in iterable)
+
+
 def time_axis_first(input_array: np.ndarray) -> np.ndarray:
     if input_array.ndim != 2:
         _logger.info("Non-2D array not transposed.")

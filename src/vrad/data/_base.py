@@ -9,6 +9,7 @@ from vrad.data.manipulation import prepare
 from vrad.data.subject import Subject
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
+from vrad.utils.misc import check_iterable_type
 
 _logger = logging.getLogger("VRAD")
 
@@ -66,9 +67,13 @@ class Data:
 
         # Check if only one filename has been pass
         if isinstance(subjects, str):
-            subjects = [subjects]
-        else:
-            subjects = np.asarray(subjects)
+            return [subjects]
+
+        if check_iterable_type(subjects, str):
+            return subjects
+
+        # Try to get a useable type
+        subjects = np.asarray(subjects)
 
         # If the data array has been passed, check its shape
         if isinstance(subjects, np.ndarray):
@@ -203,7 +208,12 @@ class OSL_HMM:
         self.subject_indices = self.hmm.subj_inds
 
         # Aliases
-        self.covariances = np.array([state["Gam_rate"] for state in self.state.Omega])
+        self.covariances = np.array(
+            [
+                state.Gam_rate / (state.Gam_shape - len(state.Gam_rate) - 1)
+                for state in self.state.Omega
+            ]
+        )
         self.state_time_course = self.gamma
         self.viterbi_path = array_ops.get_one_hot(self.state_path - 1)
 
