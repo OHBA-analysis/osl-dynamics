@@ -38,7 +38,8 @@ class ReparameterizationLayer(Layer):
         return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
     def compute_output_shape(self, input_shape):
-        return input_shape
+        z_mean_shape, z_log_var_shape = input_shape
+        return z_mean_shape
 
 
 class MultivariateNormalLayer(Layer):
@@ -124,7 +125,7 @@ class MultivariateNormalLayer(Layer):
         # If we are in the burn-in phase call no_grad, otherwise call with_grad
         self.covariances = tf.cond(self.burnin, no_grad, with_grad,)
 
-        return self.means, self.covariances
+        return [self.means, self.covariances]
 
     def set_means(self, means):
         """Overrides the means weights"""
@@ -278,10 +279,11 @@ class MixMeansCovsLayer(Layer):
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         C_t = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
 
-        return m_t, C_t
+        return [m_t, C_t]
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape([1])
+        theta_t_shape, mu_shape, D_shape = input_shape
+        return [mu_shape, D_shape]
 
     def get_config(self):
         config = super(MixMeansCovsLayer, self).get_config()
