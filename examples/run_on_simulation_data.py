@@ -44,6 +44,9 @@ n_epochs_burnin = 10
 dropout_rate_inference = 0.4
 dropout_rate_model = 0.4
 
+n_layers_inference = 1
+n_layers_model = 1
+
 n_units_inference = 64
 n_units_model = 64
 
@@ -99,6 +102,8 @@ model = create_model(
     learn_covariances=learn_covariances,
     initial_mean=means,
     initial_covariances=covariances,
+    n_layers_inference=n_layers_inference,
+    n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
