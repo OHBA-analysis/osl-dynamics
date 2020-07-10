@@ -3,7 +3,7 @@ from typing import Union
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
-from tensorflow.keras.layers import Layer
+import tensorflow.keras.layers as layers
 from tensorflow.keras.activations import softmax, softplus
 from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (
@@ -18,7 +18,7 @@ from vrad.inference.initializers import (
 )
 
 
-class ReparameterizationLayer(Layer):
+class ReparameterizationLayer(layers.Layer):
     """Resample a normal distribution.
 
     The reparameterization trick is used to provide a differentiable random sample.
@@ -41,8 +41,12 @@ class ReparameterizationLayer(Layer):
         z_mean_shape, z_log_var_shape = input_shape
         return z_mean_shape
 
+    def get_config(self):
+        config = super().get_config()
+        return config
 
-class MultivariateNormalLayer(Layer):
+
+class MultivariateNormalLayer(layers.Layer):
     """Parameterises multiple multivariate Gaussians and in terms of their means
        and covariances. Means and covariances are outputted.
     """
@@ -57,7 +61,7 @@ class MultivariateNormalLayer(Layer):
         initial_covariances=None,
         **kwargs
     ):
-        super(MultivariateNormalLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.n_gaussians = n_gaussians
         self.dim = dim
         self.learn_means = learn_means
@@ -159,7 +163,7 @@ class MultivariateNormalLayer(Layer):
         ]
 
     def get_config(self):
-        config = super(MultivariateNormalLayer, self).get_config()
+        config = super().get_config()
         config.update(
             {
                 "n_gaussian": self.n_gaussians,
@@ -173,7 +177,7 @@ class MultivariateNormalLayer(Layer):
         return config
 
 
-class TrainableVariablesLayer(Layer):
+class TrainableVariablesLayer(layers.Layer):
     """Generic trainable variables layer.
 
        Sets up trainable parameters/weights tensor of a certain shape.
@@ -181,7 +185,7 @@ class TrainableVariablesLayer(Layer):
     """
 
     def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
-        super(TrainableVariablesLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.shape = shape
         self.initial_values = initial_values
         self.trainable = trainable
@@ -218,16 +222,16 @@ class TrainableVariablesLayer(Layer):
         return tf.TensorShape(self.shape)
 
     def get_config(self):
-        config = super(TrainableVariablesLayer, self).get_config()
+        config = super().get_config()
         config.update({"shape": self.shape, "trainable": self.trainable})
         return config
 
 
-class MixMeansCovsLayer(Layer):
+class MixMeansCovsLayer(layers.Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
     def __init__(self, n_states, n_channels, alpha_xform, **kwargs):
-        super(MixMeansCovsLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
@@ -286,7 +290,7 @@ class MixMeansCovsLayer(Layer):
         return [mu_shape, D_shape]
 
     def get_config(self):
-        config = super(MixMeansCovsLayer, self).get_config()
+        config = super().get_config()
         config.update(
             {
                 "n_states": self.n_states,
@@ -297,16 +301,16 @@ class MixMeansCovsLayer(Layer):
         return config
 
 
-class LogLikelihoodLayer(Layer):
+class LogLikelihoodLayer(layers.Layer):
     """Computes log likelihood."""
 
     def __init__(self, **kwargs):
-        super(LogLikelihoodLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def build(self, input_shape):
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
         """Computes the log likelihood:
            c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
            where:
@@ -346,20 +350,20 @@ class LogLikelihoodLayer(Layer):
         return tf.TensorShape([1])
 
     def get_config(self):
-        config = super(LogLikelihoodLayer, self).get_config()
+        config = super().get_config()
         return config
 
 
-class KLDivergenceLayer(Layer):
+class KLDivergenceLayer(layers.Layer):
     """Computes KL Divergence."""
 
     def __init__(self, **kwargs):
-        super(KLDivergenceLayer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def build(self, input_shape):
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
         # model_mu needs shifting forward by one time point
@@ -381,5 +385,64 @@ class KLDivergenceLayer(Layer):
         return tf.TensorShape([1])
 
     def get_config(self):
-        config = super(KLDivergenceLayer, self).get_config()
+        config = super().get_config()
+        return config
+
+
+class InferenceRNNLayers(layers.Layer):
+    """RNN layers for the inference network."""
+
+    def __init__(self, n_layers, n_units, dropout_rate, **kwargs):
+        super().__init__(**kwargs)
+        self.n_units = n_units
+        self.layers = []
+        for n in range(n_layers):
+            self.layers.append(
+                layers.Bidirectional(
+                    layer=layers.LSTM(n_units, return_sequences=True, stateful=False)
+                )
+            )
+            self.layers.append(layers.LayerNormalization())
+            self.layers.append(layers.Dropout(dropout_rate))
+
+    def call(self, inputs):
+        for layer in self.layers:
+            inputs = layer(inputs)
+        return inputs
+
+    def compute_output_shape(self, input_shape):
+        # we multiply self.n_units by 2 because we're using a bidirectional RNN
+        return tf.TensorShape(input_shape.as_list()[:-1] + [2 * self.n_units])
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"n_units": self.n_units})
+        return config
+
+
+class ModelRNNLayers(layers.Layer):
+    """RNN layers for the generative model."""
+
+    def __init__(self, n_layers, n_units, dropout_rate, **kwargs):
+        super().__init__(**kwargs)
+        self.n_units = n_units
+        self.layers = []
+        for n in range(n_layers):
+            self.layers.append(
+                layers.LSTM(n_units, return_sequences=True, stateful=False)
+            )
+            self.layers.append(layers.LayerNormalization())
+            self.layers.append(layers.Dropout(dropout_rate))
+
+    def call(self, inputs):
+        for layer in self.layers:
+            inputs = layer(inputs)
+        return inputs
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(input_shape.as_list()[:-1] + [self.n_units])
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"n_units": self.n_units})
         return config

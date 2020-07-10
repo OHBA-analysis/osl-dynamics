@@ -5,10 +5,12 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import (
+    InferenceRNNLayers,
     ReparameterizationLayer,
     TrainableVariablesLayer,
     MultivariateNormalLayer,
     MixMeansCovsLayer,
+    ModelRNNLayers,
     LogLikelihoodLayer,
     KLDivergenceLayer,
 )
@@ -23,6 +25,8 @@ def create_model(
     learn_covariances: bool,
     initial_mean: np.ndarray = None,
     initial_covariances: np.ndarray = None,
+    n_layers_inference: int = 1,
+    n_layers_model: int = 1,
     n_units_inference: int = 64,
     n_units_model: int = 64,
     dropout_rate_inference: float = 0.3,
@@ -56,6 +60,8 @@ def create_model(
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
+            n_layers_inference=n_layers_inference,
+            n_layers_model=n_layers_model,
             n_units_inference=n_units_inference,
             n_units_model=n_units_model,
             dropout_rate_inference=dropout_rate_inference,
@@ -159,6 +165,8 @@ def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
+    n_layers_inference: int,
+    n_layers_model: int,
     n_units_inference: int,
     n_units_model: int,
     dropout_rate_inference: float,
@@ -180,26 +188,24 @@ def _model_structure(
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
     inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
-    inference_output_layer = layers.Bidirectional(
-        layer=layers.LSTM(n_units_inference, return_sequences=True, stateful=False)
+    inference_output_layers = InferenceRNNLayers(
+        n_layers_inference, n_units_inference, dropout_rate_inference
     )
-    inference_normalisation_layer = layers.LayerNormalization()
-    inference_output_dropout_layer = layers.Dropout(dropout_rate_inference)
-    m_theta_t_layer = layers.Dense(n_states, activation="linear")
-    log_s2_theta_t_layer = layers.Dense(n_states, activation="linear")
+    m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
+    log_s2_theta_t_layer = layers.Dense(
+        n_states, activation="linear", name="log_s2_theta_t"
+    )
 
     # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
     # reparameterisation trick
-    theta_t_layer = ReparameterizationLayer()
+    theta_t_layer = ReparameterizationLayer(name="theta_t")
 
     # Inference RNN data flow
     inputs_norm = input_normalisation_layer(inputs)
-    inputs_dropout = inference_input_dropout_layer(inputs_norm)
-    inference_output = inference_output_layer(inputs_dropout)
-    inference_output_norm = inference_normalisation_layer(inference_output)
-    inference_output_dropout = inference_output_dropout_layer(inference_output_norm)
-    m_theta_t = m_theta_t_layer(inference_output_dropout)
-    log_s2_theta_t = log_s2_theta_t_layer(inference_output_dropout)
+    inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
+    inference_output = inference_output_layers(inputs_norm_dropout)
+    m_theta_t = m_theta_t_layer(inference_output)
+    log_s2_theta_t = log_s2_theta_t_layer(inference_output)
     theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
 
     # Model RNN
@@ -209,14 +215,15 @@ def _model_structure(
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model)
-    model_output_layer = layers.LSTM(
-        n_units_model, return_sequences=True, stateful=False
+    model_output_layers = ModelRNNLayers(
+        n_layers_model, n_units_model, dropout_rate_model
     )
-    model_normalisation_layer = layers.LayerNormalization()
-    model_output_dropout_layer = layers.Dropout(dropout_rate_model)
-    mu_theta_jt_layer = layers.Dense(n_states, activation="linear")
+    mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
     log_sigma2_theta_j_layer = TrainableVariablesLayer(
-        [n_states], initial_values=zeros(n_states), trainable=True
+        [n_states],
+        initial_values=zeros(n_states),
+        trainable=True,
+        name="log_sigma2_theta_j",
     )
 
     # Layers for the means and covariances for observation model of each state
@@ -239,10 +246,8 @@ def _model_structure(
 
     # Model RNN data flow
     model_input_dropout = model_input_dropout_layer(theta_t)
-    model_output = model_output_layer(model_input_dropout)
-    model_output_norm = model_normalisation_layer(model_output)
-    model_output_dropout = model_output_dropout_layer(model_output_norm)
-    mu_theta_jt = mu_theta_jt_layer(model_output_dropout)
+    model_output = model_output_layers(model_input_dropout)
+    mu_theta_jt = mu_theta_jt_layer(model_output)
     log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
