@@ -3,6 +3,7 @@ from typing import Union
 
 import mat73
 import numpy as np
+from tensorflow.python.data import Dataset
 from vrad import array_ops
 from vrad.data.manipulation import prepare
 from vrad.data.subject import Subject
@@ -20,7 +21,7 @@ class Data:
         self, subjects: Union[str, list, np.ndarray], sampling_frequency: float = 1.0,
     ):
         # Validate the subjects
-        subjects = self.check(subjects)
+        subjects = self.validate_inputs(subjects)
 
         # Number of subjects
         self.n_subjects = len(subjects)
@@ -28,21 +29,31 @@ class Data:
         # Load subjects
         self.subjects = [
             Subject(
-                time_series=subjects[i],
-                _id=i + 1,
-                sampling_frequency=sampling_frequency,
+                time_series=subjects[i], _id=i, sampling_frequency=sampling_frequency,
             )
             for i in range(self.n_subjects)
         ]
 
+        self.validate_subjects()
+
         # Flag to indicate if the data has been prepared
         self.prepared = False
+
+    @property
+    def n_channels(self):
+        return self.subjects[0].shape[1]
 
     def __str__(self):
         return_string = [self.subjects[i].__str__() for i in range(self.n_subjects)]
         return "\n\n".join(return_string)
 
-    def check(self, subjects: Union[str, list, np.ndarray]):
+    def __iter__(self):
+        return iter(self.subjects)
+
+    def __getitem__(self, item):
+        return self.subjects[item]
+
+    def validate_inputs(self, subjects: Union[str, list, np.ndarray]):
         """Checks is the subjects argument has been passed correctly."""
 
         # Check if only one filename has been pass
@@ -61,6 +72,11 @@ class Data:
 
         return subjects
 
+    def validate_subjects(self):
+        n_channels = [subject.shape[1] for subject in self.subjects]
+        if not np.equal(n_channels, n_channels[0]).all():
+            raise ValueError("All subjects should have an the same number of channels.")
+
     @property
     def time_series(self):
         return np.concatenate([subject for subject in self.subjects])
@@ -73,7 +89,7 @@ class Data:
         """Adds one or more subjects to the data object."""
 
         # Check new subjects are been passed correctly
-        new_subjects = self.check(new_subjects)
+        new_subjects = self.validate_inputs(new_subjects)
 
         # Add the number of new subjects to the total
         n_new_subjects = len(new_subjects)
@@ -84,17 +100,19 @@ class Data:
             self.subjects.append(
                 Subject(
                     time_series=new_subjects[i],
-                    _ids=self.n_subjects + i + 1,
+                    _ids=self.n_subjects + i,
                     sampling_frequency=sampling_frequency,
                 )
             )
+
+        self.validate_subjects()
 
     def remove(self, ids: Union[int, list, np.ndarray]):
         """Removes the subject objects for the subjects specified through ids."""
         if isinstance(ids, int):
             ids = [ids]
         for i in ids:
-            del self.subjects[i - 1]
+            del self.subjects[i]
 
     def prepare(
         self,
@@ -110,7 +128,7 @@ class Data:
 
         if isinstance(ids, str):
             if ids == "all":
-                ids = range(1, self.n_subjects + 1)
+                ids = range(self.n_subjects)
             else:
                 raise ValueError(f"ids={ids} unknown in data preparation.")
 
@@ -123,6 +141,25 @@ class Data:
                 self.subjects, ids, n_embeddings, n_pca_components, whiten, random_seed,
             )
             self.prepared = True
+
+    def dataset(self, sequence_length: int, window_step: int = None):
+        empty_data = Dataset.from_tensor_slices(
+            np.zeros((0, sequence_length, self.n_channels), dtype=np.float32)
+        )
+        empty_tracker = Dataset.from_tensor_slices(np.zeros(0, dtype=np.float32))
+        dataset = Dataset.zip((empty_data, empty_tracker))
+
+        for subject in self.subjects:
+            subject_data = subject.dataset(sequence_length, window_step)
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(
+                    subject.num_batches(sequence_length, window_step), dtype=np.float32
+                )
+                + subject._id
+            )
+            dataset = dataset.concatenate(Dataset.zip((subject_data, subject_tracker)))
+
+        return dataset
 
 
 # noinspection PyPep8Naming

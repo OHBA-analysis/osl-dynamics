@@ -395,3 +395,16 @@ def mean_diagonal(array: np.ndarray):
     new_array = array.copy()
     np.fill_diagonal(new_array, array[off_diagonals].mean())
     return new_array
+
+
+@transpose
+def batch(
+    array: np.ndarray,
+    window_size: int,
+    step_size: int = None,
+    selection: np.ndarray = slice(None),
+):
+    step_size = step_size or window_size
+    final_slice_start = array.shape[0] - window_size + 1
+    index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(window_size)
+    return array[index[selection]]

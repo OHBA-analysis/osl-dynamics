@@ -95,7 +95,7 @@ def load_data(
                 sampling_frequency=sampling_frequency,
                 ignored_keys=ignored_keys,
             )
-    
+
     # If a python list has been passed, convert to a numpy array
     if isinstance(time_series, list):
         time_series = np.array(time_series)

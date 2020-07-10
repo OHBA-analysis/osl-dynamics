@@ -3,6 +3,8 @@ from typing import Union
 
 import mat73
 import numpy as np
+from tensorflow.python.data import Dataset
+from vrad.array_ops import batch
 from vrad.data.io import load_data
 from vrad.data.manipulation import scale, time_embed
 from vrad.utils import plotting
@@ -55,6 +57,38 @@ class Subject:
 
     def __array__(self, *args, **kwargs):
         return np.asarray(self.time_series, *args, **kwargs)
+
+    def num_batches(self, sequence_length: int, step_size: int = None):
+        step_size = step_size or sequence_length
+        final_slice_start = self.shape[0] - sequence_length + 1
+        index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
+            sequence_length
+        )
+        return len(index)
+
+    def batch(
+        self,
+        sequence_length: int,
+        step_size: int = None,
+        selection: np.ndarray = slice(None, None, None),
+    ):
+        return batch(
+            self.time_series,
+            window_size=sequence_length,
+            step_size=step_size,
+            selection=selection,
+        )
+
+    def dataset(self, sequence_length: int, window_shift=None):
+        window_shift = window_shift or sequence_length
+        dataset = Dataset.from_tensor_slices(self.time_series.astype(np.float32))
+        dataset = dataset.window(
+            size=sequence_length, shift=window_shift, drop_remainder=True
+        )
+        dataset = dataset.flat_map(
+            lambda chunk: chunk.batch(sequence_length, drop_remainder=True)
+        )
+        return dataset
 
     def scale(self):
         self.time_series = scale(self.time_series)
