@@ -68,7 +68,7 @@ def learn_mu_sigma(
     default_gmm_kwargs = {"verbose": 2, "n_init": 1}
     gmm_kwargs = override_dict_defaults(default_gmm_kwargs, gmm_kwargs)
 
-    data, transposed = time_axis_first(data)
+    data = time_axis_first(data)
 
     if take_random_sample:
         data = np.random.permutation(data)[:take_random_sample]

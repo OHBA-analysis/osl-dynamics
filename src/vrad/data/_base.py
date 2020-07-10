@@ -43,6 +43,14 @@ class Data:
     def n_channels(self):
         return self.subjects[0].shape[1]
 
+    def __getattr__(self, attr):
+        if attr[:2] == "__":
+            raise AttributeError(f"No attribute called {attr}.")
+        return getattr(self.time_series, attr)
+
+    def __array__(self, *args, **kwargs):
+        return np.asarray(self.time_series, *args, **kwargs)
+
     def __str__(self):
         return_string = [self.subjects[i].__str__() for i in range(self.n_subjects)]
         return "\n\n".join(return_string)
@@ -59,6 +67,8 @@ class Data:
         # Check if only one filename has been pass
         if isinstance(subjects, str):
             subjects = [subjects]
+        else:
+            subjects = np.asarray(subjects)
 
         # If the data array has been passed, check its shape
         if isinstance(subjects, np.ndarray):
