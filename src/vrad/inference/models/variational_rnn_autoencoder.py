@@ -190,12 +190,14 @@ def _model_structure(
     inference_output_layer = InferenceRNNLayers(
         n_layers_inference, n_units_inference, dropout_rate_inference
     )
-    m_theta_t_layer = layers.Dense(n_states, activation="linear")
-    log_s2_theta_t_layer = layers.Dense(n_states, activation="linear")
+    m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
+    log_s2_theta_t_layer = layers.Dense(
+        n_states, activation="linear", name="log_s2_theta_t"
+    )
 
     # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
     # reparameterisation trick
-    theta_t_layer = ReparameterizationLayer()
+    theta_t_layer = ReparameterizationLayer(name='theta_t')
 
     # Inference RNN data flow
     inputs_norm = input_normalisation_layer(inputs)
@@ -217,9 +219,12 @@ def _model_structure(
     )
     model_normalisation_layer = layers.LayerNormalization()
     model_output_dropout_layer = layers.Dropout(dropout_rate_model)
-    mu_theta_jt_layer = layers.Dense(n_states, activation="linear")
+    mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
     log_sigma2_theta_j_layer = TrainableVariablesLayer(
-        [n_states], initial_values=zeros(n_states), trainable=True
+        [n_states],
+        initial_values=zeros(n_states),
+        trainable=True,
+        name="log_sigma2_theta_j",
     )
 
     # Layers for the means and covariances for observation model of each state
