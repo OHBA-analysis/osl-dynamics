@@ -12,3 +12,4 @@ Version 1.1.0
         - burnin_epochs |rarr| n_epochs_burnin
         - initial_pseudo_cov |rarr| initial_covariances (can accept non-cholesky matrices)
         - learn_covs |rarr| learn_covariances
+        - activation_function |rarr| alpha_xform

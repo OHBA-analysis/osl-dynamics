@@ -27,7 +27,7 @@ def create_model(
     n_units_model: int = 64,
     dropout_rate_inference: float = 0.3,
     dropout_rate_model: float = 0.3,
-    activation_function: str = "softmax",
+    alpha_xform: str = "softmax",
     do_annealing: bool = True,
     annealing_sharpness: float = 5.0,
     n_epochs_annealing: int = 80,
@@ -64,7 +64,7 @@ def create_model(
             learn_covariances=learn_covariances,
             initial_mean=initial_mean,
             initial_covariances=initial_covariances,
-            activation_function=activation_function,
+            alpha_xform=alpha_xform,
         )
 
         model.compile(
@@ -167,7 +167,7 @@ def _model_structure(
     learn_covariances: bool,
     initial_mean: np.ndarray,
     initial_covariances: np.ndarray,
-    activation_function: str = "softmax",
+    alpha_xform: str = "softmax",
 ):
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels))
@@ -230,7 +230,7 @@ def _model_structure(
         name="mvn",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, activation_function, name="mix_means_covs"
+        n_states, n_channels, alpha_xform, name="mix_means_covs"
     )
 
     # Layers to calculate the negative of the log likelihood and KL divergence

@@ -50,7 +50,7 @@ n_units_model = 64
 learn_means = False
 learn_covariances = True
 
-activation_function = "softmax"
+alpha_xform = "softmax"
 
 # Load state transition probability matrix and covariances of each state
 init_trans_prob = np.load("data/prob_000.npy")
@@ -103,7 +103,7 @@ model = create_model(
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
-    activation_function=activation_function,
+    alpha_xform=alpha_xform,
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
