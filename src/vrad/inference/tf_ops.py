@@ -5,10 +5,7 @@
 import os
 import tensorflow as tf
 import tensorflow.keras.models as models
-from vrad.inference.models.variational_rnn_autoencoder import (
-    _create_kl_loss_fn,
-    _ll_loss_fn,
-)
+from vrad.inference.models import _create_kl_loss_fn, _ll_loss_fn
 
 
 def gpu_growth():
