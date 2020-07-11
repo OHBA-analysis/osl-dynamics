@@ -113,10 +113,6 @@ def create_model(
 
         model.summary = full_summary
 
-    # Override original fit method
-    model.original_fit_method = model.fit
-
-
     # Callbacks
     burnin_callback = BurninCallback(epochs=n_epochs_burnin)
 
@@ -127,6 +123,8 @@ def create_model(
     )
 
     # Override original fit method
+    model.original_fit_method = model.fit
+
     def anneal_burnin_fit(*args, **kwargs):
         args = list(args)
         if len(args) > 5:
@@ -161,10 +159,18 @@ def create_model(
 
     # Method to predict the inferred state time course
     if not generative_only:
+
         def predict_states(*args, **kwargs):
-            return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
+            m_theta_t = model.predict(*args, **kwargs)["m_theta_t"]
+            return np.concatenate(m_theta_t)
 
         model.predict_states = predict_states
+
+    # Method to calculate the free energy (log likelihood + KL divergence)
+    def free_energy(*args, **kwargs):
+        ll_loss = model.predict(*args, **kwargs)["ll_loss"]
+        kl_loss = model.predict(*args, **kwargs)["kl_loss"]
+        return np.mean(ll_loss + kl_loss)
 
     # Method to get the learned means and covariances for each state
     def state_means_covariances():
@@ -214,10 +220,8 @@ def _inference_model_structure(
        - m_theta_t      ~ affine(RNN(Y_<=t))
        - log_s2_theta_t ~ affine(RNN(Y_<=t))
     """
-    # Layer for inputs (i.e. the training data)
-    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
-
     # Definition of layers
+    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
     input_normalisation_layer = layers.LayerNormalization()
     input_dropout_layer = layers.Dropout(dropout_rate)
     output_layers = InferenceRNNLayers(n_layers, n_units, dropout_rate)
@@ -225,9 +229,6 @@ def _inference_model_structure(
     log_s2_theta_t_layer = layers.Dense(
         n_states, activation="linear", name="log_s2_theta_t"
     )
-
-    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
-    # reparameterisation trick
     theta_t_layer = ReparameterizationLayer(name="theta_t")
 
     # Inference RNN data flow
@@ -262,17 +263,14 @@ def _generative_model_structure(
        - mu_theta_jt         ~ affine(RNN(theta_<t))
        - log_sigma2_theta_j  = trainable constant
     """
-    # Layer for inputs (i.e. the training data)
+    # Definition of layers
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
-
-    # Layers for the inferred latent states as inputs
     theta_t = layers.Input(shape=(sequence_length, n_states), name="theta_t")
     m_theta_t = layers.Input(shape=(sequence_length, n_states), name="m_theta_t")
     log_s2_theta_t = layers.Input(
         shape=(sequence_length, n_states), name="log_s2_theta_t"
     )
 
-    # Definition of layers
     theta_t_dropout_layer = layers.Dropout(dropout_rate)
     output_layers = ModelRNNLayers(n_layers, n_units, dropout_rate)
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
@@ -283,7 +281,6 @@ def _generative_model_structure(
         name="log_sigma2_theta_j",
     )
 
-    # Layers for the means and covariances for observation model of each state
     observation_means_covs_layer = MultivariateNormalLayer(
         n_states,
         n_channels,
@@ -297,7 +294,6 @@ def _generative_model_structure(
         n_states, n_channels, alpha_xform, name="mix_means_covs"
     )
 
-    # Layers to calculate the negative of the log likelihood and KL divergence
     log_likelihood_layer = LogLikelihoodLayer(name="ll")
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
