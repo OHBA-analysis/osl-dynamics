@@ -39,7 +39,8 @@ def create_model(
     learning_rate: float = 0.01,
     clip_normalization: float = None,
     multi_gpu: bool = False,
-    strategy=None,
+    strategy: str = None,
+    generative_only: bool = False,
 ):
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
@@ -56,16 +57,6 @@ def create_model(
 
     with strategy.scope():
 
-        # Model to infer latent states
-        inference_model = _inference_model_structure(
-            n_states=n_states,
-            n_channels=n_channels,
-            sequence_length=sequence_length,
-            n_layers=n_layers_inference,
-            n_units=n_units_inference,
-            dropout_rate=dropout_rate_inference,
-        )
-
         # Model to generate observations from states
         generative_model = _generative_model_structure(
             n_states=n_states,
@@ -81,17 +72,50 @@ def create_model(
             alpha_xform=alpha_xform,
         )
 
-        # Build the full model: inference + generative model
-        inputs = inference_model.input
-        inference_output = inference_model(inputs)
-        outputs = generative_model(inference_output)
-        model = Model(inputs=inputs, outputs=outputs)
+        if not generative_only:
+            # Model to infer latent states
+            inference_model = _inference_model_structure(
+                n_states=n_states,
+                n_channels=n_channels,
+                sequence_length=sequence_length,
+                n_layers=n_layers_inference,
+                n_units=n_units_inference,
+                dropout_rate=dropout_rate_inference,
+            )
+
+            # Build the full model: inference + generative model
+            inputs = inference_model.input
+            inference_output = inference_model(inputs)
+            outputs = generative_model(inference_output)
+            model = Model(inputs=inputs, outputs=outputs)
+
+        else:
+            model = generative_model
 
         # Compile the model
         model.compile(
             optimizer=optimizer,
             loss=[_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)],
         )
+
+    # Override original summary method
+    if not generative_only:
+        model.original_summary = model.summary
+
+        def full_summary(*args, **kwargs):
+            # Display summary for the inference model
+            inference_model = model.get_layer("inference_model")
+            inference_model.summary(*args, **kwargs)
+
+            # Display summary for the generative model
+            generative_model = model.get_layer("generative_model")
+            generative_model.summary(*args, **kwargs)
+
+        model.summary = full_summary
+
+    # Override original fit method
+    model.original_fit_method = model.fit
+
 
     # Callbacks
     burnin_callback = BurninCallback(epochs=n_epochs_burnin)
@@ -102,23 +126,7 @@ def create_model(
         n_epochs_annealing=n_epochs_annealing,
     )
 
-    # Override original summary method
-    model.original_summary = model.summary
-
-    def full_summary(*args, **kwargs):
-        # Display summary for the inference model
-        inference_model = model.get_layer("inference_model")
-        inference_model.summary(*args, **kwargs)
-
-        # Display summary for the generative model
-        generative_model = model.get_layer("generative_model")
-        generative_model.summary(*args, **kwargs)
-
-    model.summary = full_summary
-
     # Override original fit method
-    model.original_fit_method = model.fit
-
     def anneal_burnin_fit(*args, **kwargs):
         args = list(args)
         if len(args) > 5:
@@ -151,11 +159,14 @@ def create_model(
 
     model.predict = named_predict
 
-    def predict_states(*args, **kwargs):
-        return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
+    # Method to predict the inferred state time course
+    if not generative_only:
+        def predict_states(*args, **kwargs):
+            return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
 
-    model.predict_states = predict_states
+        model.predict_states = predict_states
 
+    # Method to get the learned means and covariances for each state
     def state_means_covariances():
         mvn_layer = model.get_layer("mvn")
         means = mvn_layer.get_means()
@@ -164,6 +175,7 @@ def create_model(
 
     model.state_means_covariances = state_means_covariances
 
+    # Method to get the alpha scaling of each state
     def alpha_scaling():
         mix_means_covs_layer = model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.get_alpha_scaling()
@@ -226,6 +238,7 @@ def _inference_model_structure(
     log_s2_theta_t = log_s2_theta_t_layer(output)
     theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
 
+    # Inference model outputs
     outputs = [inputs, theta_t, m_theta_t, log_s2_theta_t]
 
     return Model(inputs=inputs, outputs=outputs, name="inference_model")
