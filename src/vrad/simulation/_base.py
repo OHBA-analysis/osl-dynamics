@@ -64,6 +64,9 @@ class Simulation(ABC):
     def __array__(self):
         return self.time_series
 
+    def __iter__(self):
+        return iter(self.time_series)
+
     def __getattr__(self, attr):
         if attr == "time_series":
             raise NameError("time_series has not yet been created.")

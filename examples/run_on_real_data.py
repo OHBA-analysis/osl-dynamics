@@ -59,19 +59,13 @@ meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
 n_channels = meg_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
-covariances = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/Covs.mat")
-covariances = covariances["Covs"].astype(np.float32)
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
+covariances = hmm.covariances
 means = np.zeros([n_states, n_channels], dtype=np.float32)
 
 # Prepare dataset
-training_dataset = (
-    meg_data.dataset(sequence_length).batch(32).cache().shuffle(10000).prefetch(-1)
-)
-prediction_dataset = (
-    Dataset.from_tensor_slices(meg_data.time_series)
-    .batch(sequence_length, drop_remainder=True)
-    .batch(batch_size, drop_remainder=True)
-)
+training_dataset = meg_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build autoencoder model
 model = create_model(
@@ -120,22 +114,19 @@ int_means, inf_cov = model.state_means_covariances()
 inf_stc = model.predict_states(prediction_dataset)
 
 # Read file containing state probabilities inferred by OSL
-hmm_stc = mat73.loadmat("/well/woolrich/shared/vrad/hmm_fits/one_subject/gamma.mat")
-hmm_stc = hmm_stc["gamma"]
+hmm_stc = hmm.viterbi_path
 
 # Hard classify
 inf_stc = inf_stc.argmax(axis=1)
-hmm_stc = hmm_stc.argmax(axis=1)
 
 # One hot encode
 inf_stc = array_ops.get_one_hot(inf_stc)
-hmm_stc = array_ops.get_one_hot(hmm_stc)
 
 # Find correspondance between state time courses
 matched_stc, matched_inf_stc = array_ops.match_states(hmm_stc, inf_stc)
 
 # Compare state time courses
-# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 plotting.plot_state_time_courses(matched_stc, filename="stc.png")
 plotting.plot_state_time_courses(matched_inf_stc, filename="inf_stc.png")
 

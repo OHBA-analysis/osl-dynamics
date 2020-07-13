@@ -23,6 +23,8 @@ def listify(obj: object):
 
 def check_iterable_type(iterable, object_type: type):
     """Check iterable is non-empty and contains only objects of specific type."""
+    if isinstance(iterable, np.ndarray):
+        return iterable.dtype == object_type
     return bool(iterable) and all(isinstance(elem, object_type) for elem in iterable)
 
 

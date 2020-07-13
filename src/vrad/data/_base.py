@@ -157,7 +157,9 @@ class Data:
             )
             self.prepared = True
 
-    def dataset(self, sequence_length: int, window_step: int = None):
+    def training_dataset(
+        self, sequence_length: int, batch_size: int = 32, window_step: int = None
+    ):
         empty_data = Dataset.from_tensor_slices(
             np.zeros((0, sequence_length, self.n_channels), dtype=np.float32)
         )
@@ -174,7 +176,14 @@ class Data:
             )
             dataset = dataset.concatenate(Dataset.zip((subject_data, subject_tracker)))
 
-        return dataset
+        return dataset.batch(batch_size).cache().shuffle(10000).prefetch(-1)
+
+    def prediction_dataset(self, sequence_length: int, batch_size: int = 32):
+        return (
+            Dataset.from_tensor_slices(self.time_series)
+            .batch(sequence_length, drop_remainder=True)
+            .batch(batch_size, drop_remainder=True)
+        )
 
 
 # noinspection PyPep8Naming
