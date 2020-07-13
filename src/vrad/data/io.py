@@ -4,7 +4,9 @@ from typing import Tuple, Union
 import mat73
 import numpy as np
 import scipy.io
-from vrad.utils.misc import listify
+from vrad.utils.misc import listify, time_axis_first
+
+_logger = logging.getLogger("VRAD")
 
 
 def get_ignored_keys(new_keys):
@@ -64,7 +66,7 @@ def load_matlab(
         mat = mat73.loadmat(file_name)
 
     if "D" in mat:
-        logging.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
+        _logger.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
         time_series, sampling_frequency = load_spm(file_name=file_name)
     else:
         for key in mat:
@@ -79,10 +81,11 @@ def load_matlab(
 
 def load_data(
     time_series: Union[str, np.ndarray],
-    multi_sequence="all",
     sampling_frequency: float = 1,
     ignored_keys=None,
 ) -> Tuple[np.ndarray, float]:
+
+    # Read time series from a file
     if isinstance(time_series, str):
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
@@ -92,18 +95,18 @@ def load_data(
                 sampling_frequency=sampling_frequency,
                 ignored_keys=ignored_keys,
             )
+
+    # If a python list has been passed, convert to a numpy array
     if isinstance(time_series, list):
-        if multi_sequence == "all":
-            logging.warning(
-                f"{len(time_series)} sequences detected. "
-                f"Concatenating along first axis."
-            )
-            time_series = np.concatenate(time_series)
-        if isinstance(multi_sequence, int):
-            logging.warning(
-                f"{len(time_series)} sequences detected. "
-                f"Using sequence with index {multi_sequence}."
-            )
-            time_series = time_series[multi_sequence]
+        time_series = np.array(time_series)
+
+    # Check the time series has the appropriate shape
+    if time_series.ndim != 2:
+        raise ValueError(
+            f"{time_series.shape} detected. Time series must be a 2D array."
+        )
+
+    # Check time is the first axis, channels are the second axis
+    time_series = time_axis_first(time_series)
 
     return time_series, sampling_frequency

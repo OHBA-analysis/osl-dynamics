@@ -5,8 +5,24 @@ import logging
 from typing import List, Tuple
 
 import numpy as np
+import scipy.special
 from scipy.optimize import linear_sum_assignment
 from vrad.utils.decorators import transpose
+
+_logger = logging.getLogger("VRAD")
+
+
+def softplus(time_course: np.ndarray):
+    """Calculate the softplus activation of a time series."""
+    time_course = np.asarray(time_course)
+    zero = np.asarray(0).astype(time_course.dtype)
+    return np.logaddexp(zero, time_course)
+
+
+def softmax(time_course: np.ndarray):
+    """Calculate the softmax activation of a time series over the last axis."""
+    time_course = np.asarray(time_course)
+    return scipy.special.softmax(time_course, axis=-1)
 
 
 @transpose
@@ -55,13 +71,19 @@ def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
     -------
     matched_state_time_courses: list of numpy.ndarray
     """
-    matched_state_time_courses = [state_time_courses[0]]
-    for state_time_course in state_time_courses[1:]:
+    # If the state time courses have different length we only use the first n_samples
+    n_samples = min([stc.shape[0] for stc in state_time_courses])
 
-        correlation = correlate_states(state_time_courses[0], state_time_course)
+    # Match time courses based on correlation
+    matched_state_time_courses = [state_time_courses[0][:n_samples]]
+    for state_time_course in state_time_courses[1:]:
+        correlation = correlate_states(
+            state_time_courses[0][:n_samples], state_time_course[:n_samples]
+        )
         correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
         matches = linear_sum_assignment(-correlation)
-        matched_state_time_courses.append(state_time_course[:, matches[1]])
+        matched_state_time_courses.append(state_time_course[:n_samples, matches[1]])
+
     return matched_state_time_courses
 
 
@@ -110,7 +132,7 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
 
     """
     if values.ndim == 2:
-        logging.info("argmax being taken on shorter axis.")
+        _logger.info("argmax being taken on shorter axis.")
         values = values.argmax(axis=1)
     if n_states is None:
         n_states = values.max() + 1
@@ -204,7 +226,7 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             channel_on.append(on)
             channel_off.append(off)
         except IndexError:
-            logging.info(f"No activation in state {i}.")
+            _logger.info(f"No activation in state {i}.")
             channel_on.append(np.array([]))
             channel_off.append(np.array([]))
 
@@ -373,3 +395,16 @@ def mean_diagonal(array: np.ndarray):
     new_array = array.copy()
     np.fill_diagonal(new_array, array[off_diagonals].mean())
     return new_array
+
+
+@transpose
+def batch(
+    array: np.ndarray,
+    window_size: int,
+    step_size: int = None,
+    selection: np.ndarray = slice(None),
+):
+    step_size = step_size or window_size
+    final_slice_start = array.shape[0] - window_size + 1
+    index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(window_size)
+    return array[index[selection]]

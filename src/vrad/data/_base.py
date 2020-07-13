@@ -1,228 +1,239 @@
 import logging
-from typing import Any, Union
+from typing import Union
 
+import mat73
 import numpy as np
-import scipy.io
-from vrad.data.io import load_data
-from vrad.data.manipulation import (
-    pca,
-    scale,
-    standardize,
-    time_embed,
-    trials_to_continuous,
-    trim_trials,
-)
+from tensorflow.python.data import Dataset
+from vrad import array_ops
+from vrad.data.manipulation import prepare
+from vrad.data.subject import Subject
 from vrad.utils import plotting
 from vrad.utils.decorators import auto_repr
-from vrad.utils.misc import time_axis_first
+from vrad.utils.misc import check_iterable_type
+
+_logger = logging.getLogger("VRAD")
 
 
 class Data:
-    """An object for storing time series data with various methods to act on it.
-
-    Data is designed to standardize the workflow required to work with inputs with
-    the format numpy.ndarray, numpy files, MAT (MATLAB) files, MATv7.3 files and
-    SPM MEEG objects (also from MATLAB).
-
-    If the input provided is a numpy.ndarray, it is taken as is. If the input is a
-    string, VRAD will check the file extension to see if it is .npy (read by
-    numpy.load) or .mat. If a .mat file is found, it is first opened using
-    scipy.io.loadmat and if that fails, mat73.loadmat. Any input other than these is
-    considered valid if it can be converted to a numpy array using numpy.array.
-
-    When importing from MAT files, the values in the class variable ignored_keys are
-    ignored if found in the dictionary created by loadmat. If the key 'D' is found, the
-    file will be treated as an SPM MEEG object and the data extracted from the .dat
-    file defined within the dictionary.
-
-    If multiple time series are found in the file, the user can specify multi_sequence.
-    With its default value 'all', the time series will be concatenated along the time
-    axis. Otherwise and integer specifies which time series to read.
-
-    Once instantiated, any property or function which has not been specified for
-    Data is provided by the internal numpy.ndarray, time_series. The array can be
-    accessed using slice notation on the Data object (e.g. meg_data[:1000, 2:5]
-    would return the first 1000 samples and channels 2, 3 and 4. The time axis of the
-    array can also be reduced using the data_limits method. This creates an pair of
-    internal variables which reduce the length of the data which can be extracted from
-    the object without modifying the underlying array.
-
-    A variety of methods are provided for preparing data for analysis. These are
-    detailed below.
-
-    Parameters
-    ----------
-    time_series: numpy.ndarray or str or array-like
-        Either an array, array-like object or a string specifying the location of a
-        NumPy or MATLAB file.
-    sampling_frequency: float
-        The sampling frequency of the time_series. The default of 1 means that each
-        sample is considered to be a time point (i.e. 1Hz).
-    multi_sequence: str or int
-        If the time_series provided contains multiple time series, "all" will
-        concatenate them while providing an int will specify the corresponding array.
-
-    Methods
-    -------
-
-
-    """
+    """A class for holding time series data for multiple subjects."""
 
     @auto_repr
     def __init__(
-        self,
-        time_series: Union[np.ndarray, str, Any],
-        sampling_frequency: float = 1,
-        multi_sequence: Union[str, int] = "all",
+        self, subjects: Union[str, list, np.ndarray], sampling_frequency: float = 1.0,
     ):
-        self.from_file = time_series if isinstance(time_series, str) else False
+        # Validate the subjects
+        subjects = self.validate_inputs(subjects)
 
-        self.time_series, self.sampling_frequency = load_data(
-            time_series=time_series,
-            multi_sequence=multi_sequence,
-            sampling_frequency=sampling_frequency,
-        )
+        # Number of subjects
+        self.n_subjects = len(subjects)
 
-        # TODO: Make raw_data read only using @property and self._raw_data
-        self.raw_data = np.array(self.time_series)
-        self.time_series = self.raw_data.copy()
-        self.pca_applied = False
-
-        self.t = None
-        if self.time_series.ndim == 2:
-            self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
-            self.time_axis_first()
-
-        self.n_min, self.n_max = None, None
-
-    def __str__(self):
-        return_string = [
-            f"{self.__class__.__name__}:",
-            f"from_file: {self.from_file}",
-            f"n_channels: {self.time_series.shape[1]}",
-            f"n_time_points: {self.time_series.shape[0]}",
-            f"pca_applied: {self.pca_applied}",
-            f"data_limits: {self.n_min}, {self.n_max}",
-            f"original_shape: {self.raw_data.shape}",
-            f"current_shape: {self[:].shape}",
+        # Load subjects
+        self.subjects = [
+            Subject(
+                time_series=subjects[i], _id=i, sampling_frequency=sampling_frequency,
+            )
+            for i in range(self.n_subjects)
         ]
-        return "\n  ".join(return_string)
 
-    def __getitem__(self, val):
-        return self.time_series[self.n_min : self.n_max][val]
+        self.validate_subjects()
+
+        # Flag to indicate if the data has been prepared
+        self.prepared = False
+
+    @property
+    def n_channels(self):
+        return self.subjects[0].shape[1]
 
     def __getattr__(self, attr):
         if attr[:2] == "__":
             raise AttributeError(f"No attribute called {attr}.")
-        return getattr(self[:], attr)
+        return getattr(self.time_series, attr)
 
     def __array__(self, *args, **kwargs):
-        return np.asarray(self[:], *args, **kwargs)
+        return np.asarray(self.time_series, *args, **kwargs)
 
-    def data_limits(self, t_min: int = None, t_max: int = None):
-        """Set the maximum and minimum sample numbers for the object.
+    def __str__(self):
+        return_string = [self.subjects[i].__str__() for i in range(self.n_subjects)]
+        return "\n\n".join(return_string)
 
-        The underlying time_series remains unchanged.
+    def __iter__(self):
+        return iter(self.subjects)
 
-        Parameters
-        ----------
-        t_min: int
-        t_max: int
+    def __getitem__(self, item):
+        return self.subjects[item]
 
-        """
-        self.n_min = t_min
-        self.n_max = t_max
+    def validate_inputs(self, subjects: Union[str, list, np.ndarray]):
+        """Checks is the subjects argument has been passed correctly."""
 
-    @property
-    def shape(self):
-        return self[:].shape
+        # Check if only one filename has been pass
+        if isinstance(subjects, str):
+            return [subjects]
 
-    @property
-    def original_shape(self):
-        return self.time_series.shape
+        if check_iterable_type(subjects, str):
+            return subjects
 
-    def time_axis_first(self):
-        """Forces the longer axis of the data to be the first indexed axis.
+        # Try to get a useable type
+        subjects = np.asarray(subjects)
 
-        """
-        self.time_series, transposed = time_axis_first(self.time_series)
-        if transposed:
-            logging.warning("Assuming time to be the longer axis and transposing.")
-
-    def trim_trials(
-        self, trial_start: int = None, trial_cutoff: int = None, trial_skip: int = None,
-    ):
-        self.time_series = trim_trials(
-            epoched_time_series=self.time_series,
-            trial_start=trial_start,
-            trial_cutoff=trial_cutoff,
-            trial_skip=trial_skip,
-        )
-
-    def make_continuous(self):
-        """Given trial data, return a continuous time series.
-
-        With data input in the form (channels x trials x time), reshape the array to
-        create a (time x channels) array. Wraps trials_to_continuous.
-
-        """
-        self.time_series = trials_to_continuous(self.time_series)
-        self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
-
-    def standardize(
-        self,
-        n_components: Union[float, int] = 0.9,
-        pre_scale: bool = True,
-        do_pca: Union[bool, str] = True,
-        post_scale: bool = True,
-    ):
-        self.time_series = standardize(
-            time_series=self.time_series,
-            n_components=n_components,
-            pre_scale=pre_scale,
-            do_pca=do_pca,
-            post_scale=post_scale,
-        )
-
-    def scale(self):
-        self.time_series = scale(self.time_series)
-
-    def pca(self, n_components: Union[int, float] = 1, force=False):
-        if self.pca_applied:
-            if not force:
-                self.time_series = pca(
-                    time_series=self.time_series, n_components=n_components
+        # If the data array has been passed, check its shape
+        if isinstance(subjects, np.ndarray):
+            if (subjects.ndim != 2) and (subjects.ndim != 3):
+                raise ValueError(
+                    "A 2D (single subject) or 3D (multiple subject) array must "
+                    + "be passed."
                 )
+            if subjects.ndim == 2:
+                subjects = subjects[np.newaxis, :, :]
 
-    def time_embed(self, backward, forward):
-        self.time_series = time_embed(
-            self.time_series, backward=backward, forward=forward
+        return subjects
+
+    def validate_subjects(self):
+        n_channels = [subject.shape[1] for subject in self.subjects]
+        if not np.equal(n_channels, n_channels[0]).all():
+            raise ValueError("All subjects should have an the same number of channels.")
+
+    @property
+    def time_series(self):
+        return np.concatenate([subject for subject in self.subjects])
+
+    def add(
+        self,
+        new_subjects: Union[str, list, np.ndarray],
+        sampling_frequency: float = 1.0,
+    ):
+        """Adds one or more subjects to the data object."""
+
+        # Check new subjects are been passed correctly
+        new_subjects = self.validate_inputs(new_subjects)
+
+        # Add the number of new subjects to the total
+        n_new_subjects = len(new_subjects)
+        self.n_subjects += n_new_subjects
+
+        # Create subject objects for the new subjects
+        for i in range(n_new_subjects):
+            self.subjects.append(
+                Subject(
+                    time_series=new_subjects[i],
+                    _ids=self.n_subjects + i,
+                    sampling_frequency=sampling_frequency,
+                )
+            )
+
+        self.validate_subjects()
+
+    def remove(self, ids: Union[int, list, np.ndarray]):
+        """Removes the subject objects for the subjects specified through ids."""
+        if isinstance(ids, int):
+            ids = [ids]
+        for i in ids:
+            del self.subjects[i]
+
+    def prepare(
+        self,
+        ids: Union[int, list, np.ndarray, str] = "all",
+        n_embeddings: int = None,
+        n_pca_components: int = None,
+        whiten: bool = False,
+        random_seed: int = None,
+    ):
+        """Prepares the subjects specified by ids."""
+        if isinstance(ids, int):
+            ids = [ids]
+
+        if isinstance(ids, str):
+            if ids == "all":
+                ids = range(self.n_subjects)
+            else:
+                raise ValueError(f"ids={ids} unknown in data preparation.")
+
+        # Check the time series has not already been prepared
+        if self.prepared:
+            logging.warning("Data has already been prepared. No changes made.")
+
+        else:
+            self.subjects = prepare(
+                self.subjects, ids, n_embeddings, n_pca_components, whiten, random_seed,
+            )
+            self.prepared = True
+
+    def training_dataset(
+        self, sequence_length: int, batch_size: int = 32, window_step: int = None
+    ):
+        empty_data = Dataset.from_tensor_slices(
+            np.zeros((0, sequence_length, self.n_channels), dtype=np.float32)
+        )
+        empty_tracker = Dataset.from_tensor_slices(np.zeros(0, dtype=np.float32))
+        dataset = Dataset.zip((empty_data, empty_tracker))
+
+        for subject in self.subjects:
+            subject_data = subject.dataset(sequence_length, window_step)
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(
+                    subject.num_batches(sequence_length, window_step), dtype=np.float32
+                )
+                + subject._id
+            )
+            dataset = dataset.concatenate(Dataset.zip((subject_data, subject_tracker)))
+
+        return dataset.batch(batch_size).cache().shuffle(10000).prefetch(-1)
+
+    def prediction_dataset(self, sequence_length: int, batch_size: int = 32):
+        return (
+            Dataset.from_tensor_slices(self.time_series)
+            .batch(sequence_length, drop_remainder=True)
+            .batch(batch_size, drop_remainder=True)
         )
 
-    def plot(self, n_time_points: int = 10000):
-        """Plot time_series.
 
-        """
-        plotting.plot_time_series(self.time_series, n_time_points=n_time_points)
+# noinspection PyPep8Naming
+class OSL_HMM:
+    """Import and encapsulate OSL HMMs"""
 
-    def savemat(self, filename: str, field_name: str = "x"):
-        """Save time_series to a .mat file.
+    def __init__(self, filename):
+        self.filename = filename
+        self.hmm = mat73.loadmat(filename)["hmm"]
 
-        Parameters
-        ----------
-        filename: str
-            The file to save to (with or without .mat extension).
-        field_name: str
-            The dictionary key (MATLAB object field) which references the data.
-        """
-        scipy.io.savemat(filename, {field_name: self[:]})
+        self.state = self.hmm.state
+        self.k = int(self.hmm.K)
+        self.p = self.hmm.P
+        self.dir_2d_alpha = self.hmm.Dir2d_alpha
+        self.pi = self.hmm.Pi
+        self.dir_alpha = self.hmm.Dir_alpha
+        self.prior = self.hmm.prior
+        self.train = self.hmm.train
 
-    def save(self, filename: str):
-        """Save time_series to a numpy (.npy) file.
+        self.data_files = self.hmm.data_files
+        self.epoched_state_path_sub = self.hmm.epoched_statepath_sub
+        self.filenames = self.hmm.filenames
+        self.f_sample = self.hmm.fsample
+        self.gamma = self.hmm.gamma
+        self.is_epoched = self.hmm.is_epoched
+        self.options = self.hmm.options
+        self.state_map_parcel_vectors = self.hmm.statemap_parcel_vectors
+        self.subject_state_map_parcel_vectors = self.hmm.statemap_parcel_vectors_persubj
+        self.state_maps = self.hmm.statemaps
+        self.state_path = self.hmm.statepath.astype(np.int)
+        self.subject_indices = self.hmm.subj_inds
 
-        Parameters
-        ----------
-        filename: str
-            The file to save to (with or without .npy extension).
-        """
-        np.save(filename, self[:])
+        # Aliases
+        self.covariances = np.array(
+            [
+                state.Gam_rate / (state.Gam_shape - len(state.Gam_rate) - 1)
+                for state in self.state.Omega
+            ]
+        )
+        self.state_time_course = self.gamma
+        self.viterbi_path = array_ops.get_one_hot(self.state_path - 1)
+
+    def plot_covariances(self, *args, **kwargs):
+        """Wraps plotting.plot_matrices for self.covariances."""
+        plotting.plot_matrices(self.covariances, *args, **kwargs)
+
+    def plot_states(self, *args, **kwargs):
+        """Wraps plotting.highlight_states for self.viterbi_path."""
+
+        plotting.state_barcode(self.viterbi_path, *args, **kwargs)
+
+    def __str__(self):
+        return f"OSL HMM object from file {self.filename}"

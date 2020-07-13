@@ -5,11 +5,14 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import (
-    MVNLayer,
-    TrainableVariablesLayer,
+    InferenceRNNLayers,
     ReparameterizationLayer,
-    KLDivergenceLayer,
+    TrainableVariablesLayer,
+    MultivariateNormalLayer,
+    MixMeansCovsLayer,
+    ModelRNNLayers,
     LogLikelihoodLayer,
+    KLDivergenceLayer,
 )
 from vrad.utils.misc import listify
 
@@ -19,14 +22,16 @@ def create_model(
     n_channels: int,
     sequence_length: int,
     learn_means: bool,
-    learn_covs: bool,
-    initial_mean: np.ndarray,
-    initial_cholesky_cov: np.ndarray,
-    n_units_encoder: int = 64,
-    n_units_decoder: int = 64,
-    dropout_rate_encoder: float = 0.3,
-    dropout_rate_decoder: float = 0.3,
-    activation_function: str = "softmax",
+    learn_covariances: bool,
+    initial_mean: np.ndarray = None,
+    initial_covariances: np.ndarray = None,
+    n_layers_inference: int = 1,
+    n_layers_model: int = 1,
+    n_units_inference: int = 64,
+    n_units_model: int = 64,
+    dropout_rate_inference: float = 0.3,
+    dropout_rate_model: float = 0.3,
+    alpha_xform: str = "softmax",
     do_annealing: bool = True,
     annealing_sharpness: float = 5.0,
     n_epochs_annealing: int = 80,
@@ -34,6 +39,7 @@ def create_model(
     learning_rate: float = 0.01,
     clip_normalization: float = None,
     multi_gpu: bool = False,
+    strategy=None,
 ):
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
@@ -45,7 +51,7 @@ def create_model(
     # Stretegy for distributed learning
     if multi_gpu:
         strategy = MirroredStrategy()
-    else:
+    elif strategy is None:
         strategy = get_strategy()
 
     # Compile the model
@@ -54,20 +60,22 @@ def create_model(
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            n_units_encoder=n_units_encoder,
-            n_units_decoder=n_units_decoder,
-            dropout_rate_encoder=dropout_rate_encoder,
-            dropout_rate_decoder=dropout_rate_decoder,
+            n_layers_inference=n_layers_inference,
+            n_layers_model=n_layers_model,
+            n_units_inference=n_units_inference,
+            n_units_model=n_units_model,
+            dropout_rate_inference=dropout_rate_inference,
+            dropout_rate_model=dropout_rate_model,
             learn_means=learn_means,
-            learn_covs=learn_covs,
+            learn_covariances=learn_covariances,
             initial_mean=initial_mean,
-            initial_cholesky_cov=initial_cholesky_cov,
-            activation_function=activation_function,
+            initial_covariances=initial_covariances,
+            alpha_xform=alpha_xform,
         )
 
         model.compile(
             optimizer=optimizer,
-            loss=[_ll_loss, _kl_loss(annealing_factor=annealing_factor)],
+            loss=[_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)],
         )
 
     # Callbacks
@@ -79,6 +87,8 @@ def create_model(
         n_epochs_annealing=n_epochs_annealing,
     )
 
+    # Convenience functions
+    # Add annealing to fit callbacks
     model.original_fit_method = model.fit
 
     def anneal_fit(*args, **kwargs):
@@ -90,132 +100,172 @@ def create_model(
                 annealing_callback,
                 burnin_callback,
             ]
-
         return model.original_fit_method(*args, **kwargs)
 
     model.fit = anneal_fit
 
+    # Return predictions as a dictionary with names
+    model.original_predict_function = model.predict
+
+    def named_predict(*args, **kwargs):
+        prediction = model.original_predict_function(*args, **kwargs)
+        return_names = [
+            "ll_loss",
+            "kl_loss",
+            "theta_t",
+            "m_theta_t",
+            "log_s2_theta_t",
+            "mu_theta_jt",
+            "log_sigma2_theta_j",
+        ]
+        prediction_dict = dict(zip(return_names, prediction))
+        return prediction_dict
+
+    model.predict = named_predict
+
+    def predict_states(*args, **kwargs):
+        return np.concatenate(model.predict(*args, **kwargs)["m_theta_t"])
+
+    model.predict_states = predict_states
+
+    def state_means_covariances():
+        mvn_layer = model.get_layer("mvn")
+        means = mvn_layer.get_means()
+        covariances = mvn_layer.get_covariances()
+        return means, covariances
+
+    model.state_means_covariances = state_means_covariances
+
+    def alpha_scaling():
+        mix_means_covs_layer = model.get_layer("mix_means_covs")
+        alpha_scaling = mix_means_covs_layer.get_alpha_scaling()
+        return alpha_scaling
+
+    model.alpha_scaling = alpha_scaling
+
     return model
 
 
-def _ll_loss(y_true, ll_loss):
+def _ll_loss_fn(y_true, ll_loss):
     """The first output of the model is the negative log likelihood
        so we just need to return it."""
     return ll_loss
 
 
-def _kl_loss(annealing_factor):
-    def kl_loss_fn(y_true, kl_loss):
+def _create_kl_loss_fn(annealing_factor):
+    def _kl_loss_fn(y_true, kl_loss):
         """Second output of the model is the KL divergence loss.
         We multiply with an annealing factor."""
         return annealing_factor * kl_loss
 
-    return kl_loss_fn
+    return _kl_loss_fn
 
 
 def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
-    n_units_encoder: int,
-    n_units_decoder: int,
-    dropout_rate_encoder: float,
-    dropout_rate_decoder: float,
+    n_layers_inference: int,
+    n_layers_model: int,
+    n_units_inference: int,
+    n_units_model: int,
+    dropout_rate_inference: float,
+    dropout_rate_model: float,
     learn_means: bool,
-    learn_covs: bool,
+    learn_covariances: bool,
     initial_mean: np.ndarray,
-    initial_cholesky_cov: np.ndarray,
-    activation_function: str = "softmax",
+    initial_covariances: np.ndarray,
+    alpha_xform: str = "softmax",
 ):
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels))
 
-    # Inference RNN (encoder):
-    # - q(theta_t) ~ N(m_theta_t, s2_theta_t)
-    # - m_theta_t  ~ affine(RNN(Y_<=t))
-    # - s2_theta_t ~ softplus(RNN(Y_<=t))
+    # Inference RNN
+    # - q(theta_t)     ~ N(m_theta_t, s2_theta_t)
+    # - m_theta_t      ~ affine(RNN(Y_<=t))
+    # - log_s2_theta_t ~ affine(RNN(Y_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
-    inference_input_dropout_layer = layers.Dropout(dropout_rate_encoder)
-    inference_output_layer = layers.Bidirectional(
-        layer=layers.LSTM(n_units_encoder, return_sequences=True, stateful=False)
+    inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
+    inference_output_layers = InferenceRNNLayers(
+        n_layers_inference, n_units_inference, dropout_rate_inference
     )
-    inference_normalisation_layer = layers.LayerNormalization()
-    inference_output_dropout_layer = layers.Dropout(dropout_rate_encoder)
-    m_theta_t_layer = layers.Dense(n_states, activation="linear")
-    s2_theta_t_layer = layers.Dense(n_states, activation="softplus")
+    m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
+    log_s2_theta_t_layer = layers.Dense(
+        n_states, activation="linear", name="log_s2_theta_t"
+    )
 
-    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, s2_theta_t) via the
+    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
     # reparameterisation trick
-    theta_t_layer = ReparameterizationLayer()
+    theta_t_layer = ReparameterizationLayer(name="theta_t")
 
     # Inference RNN data flow
     inputs_norm = input_normalisation_layer(inputs)
-    inputs_dropout = inference_input_dropout_layer(inputs_norm)
-    inference_output = inference_output_layer(inputs_dropout)
-    inference_output_norm = inference_normalisation_layer(inference_output)
-    inference_output_dropout = inference_output_dropout_layer(inference_output_norm)
-    m_theta_t = m_theta_t_layer(inference_output_dropout)
-    s2_theta_t = s2_theta_t_layer(inference_output_dropout)
-    theta_t = theta_t_layer([m_theta_t, s2_theta_t])
+    inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
+    inference_output = inference_output_layers(inputs_norm_dropout)
+    m_theta_t = m_theta_t_layer(inference_output)
+    log_s2_theta_t = log_s2_theta_t_layer(inference_output)
+    theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
 
-    # Model RNN (decoder):
+    # Model RNN
     # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
     # - mu_theta_jt         ~ affine(RNN(theta_<t))
-    # - sigma2_theta_j      = trainable constant
+    # - log_sigma2_theta_j  = trainable constant
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(dropout_rate_decoder)
-    model_output_layer = layers.LSTM(
-        n_units_decoder, return_sequences=True, stateful=False
+    model_input_dropout_layer = layers.Dropout(dropout_rate_model)
+    model_output_layers = ModelRNNLayers(
+        n_layers_model, n_units_model, dropout_rate_model
     )
-    model_normalisation_layer = layers.LayerNormalization()
-    model_output_dropout_layer = layers.Dropout(dropout_rate_decoder)
-    mu_theta_jt_layer = layers.Dense(n_states, activation="linear")
-    sigma2_theta_j_layer = TrainableVariablesLayer(
-        [n_states], initial_values=zeros(n_states), trainable=True
+    mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
+    log_sigma2_theta_j_layer = TrainableVariablesLayer(
+        [n_states],
+        initial_values=zeros(n_states),
+        trainable=True,
+        name="log_sigma2_theta_j",
     )
 
     # Layers for the means and covariances for observation model of each state
-    observation_means_covs_layer = MVNLayer(
+    observation_means_covs_layer = MultivariateNormalLayer(
         n_states,
         n_channels,
         learn_means=learn_means,
-        learn_covs=learn_covs,
+        learn_covariances=learn_covariances,
         initial_means=initial_mean,
-        initial_pseudo_sigmas=initial_cholesky_cov,
+        initial_covariances=initial_covariances,
+        name="mvn",
+    )
+    mix_means_covs_layer = MixMeansCovsLayer(
+        n_states, n_channels, alpha_xform, name="mix_means_covs"
     )
 
-    # Layers to calculate loss as the free energy = LL + KL
-    log_likelihood_layer = LogLikelihoodLayer(
-        n_states, n_channels, alpha_xform=activation_function, name="ll"
-    )
-    kl_loss_layer = KLDivergenceLayer(n_states, n_channels, name="kl")
+    # Layers to calculate the negative of the log likelihood and KL divergence
+    log_likelihood_layer = LogLikelihoodLayer(name="ll")
+    kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
     model_input_dropout = model_input_dropout_layer(theta_t)
-    model_output = model_output_layer(model_input_dropout)
-    model_output_norm = model_normalisation_layer(model_output)
-    model_output_dropout = model_output_dropout_layer(model_output_norm)
-    mu_theta_jt = mu_theta_jt_layer(model_output_dropout)
-    sigma2_theta_j = sigma2_theta_j_layer(inputs)  # inputs not used
+    model_output = model_output_layers(model_input_dropout)
+    mu_theta_jt = mu_theta_jt_layer(model_output)
+    log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
-    ll_loss = log_likelihood_layer([inputs, theta_t, mu_j, D_j])
-    kl_loss = kl_loss_layer([m_theta_t, s2_theta_t, mu_theta_jt, sigma2_theta_j])
+    m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
+    ll_loss = log_likelihood_layer([inputs, m_t, C_t])
+    kl_loss = kl_loss_layer(
+        [m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j]
+    )
 
     outputs = [
         ll_loss,
         kl_loss,
         theta_t,
         m_theta_t,
-        s2_theta_t,
+        log_s2_theta_t,
         mu_theta_jt,
-        sigma2_theta_j,
-        mu_j,
-        D_j,
+        log_sigma2_theta_j,
     ]
 
-    model = Model(inputs=inputs, outputs=outputs,)
+    model = Model(inputs=inputs, outputs=outputs)
 
     return model

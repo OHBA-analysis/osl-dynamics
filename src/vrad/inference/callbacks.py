@@ -1,3 +1,5 @@
+import os
+import time
 from abc import ABC
 from pathlib import Path
 
@@ -7,7 +9,27 @@ from matplotlib import pyplot as plt
 from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
-from vrad.inference.layers import MVNLayer
+from vrad.inference.layers import MultivariateNormalLayer
+
+
+class SavePredictionCallback(callbacks.Callback):
+    def __init__(self, prediction_dataset, dir_name, save_frequency=1):
+        super().__init__()
+
+        self.prediction_dataset = prediction_dataset
+        self.save_frequency = save_frequency
+
+        path = Path(dir_name, time.strftime("%Y%m%d_%H%M%S"))
+        path.mkdir(parents=True, exist_ok=True)
+
+        self.pattern = str(path / "predict_epoch_{:03d}")
+
+    def on_epoch_end(self, epoch, logs=None):
+        if epoch % self.save_frequency == 0:
+            np.save(
+                self.pattern.format(epoch),
+                self.model.predict_states(self.prediction_dataset),
+            )
 
 
 class AnnealingCallback(callbacks.Callback):
@@ -42,7 +64,10 @@ class BurninCallback(callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         self.mvn = self.model.layers[
-            [isinstance(layer, MVNLayer) for layer in self.model.layers].index(True)
+            [
+                isinstance(layer, MultivariateNormalLayer)
+                for layer in self.model.layers
+            ].index(True)
         ]
 
     def on_epoch_begin(self, epoch, logs=None):

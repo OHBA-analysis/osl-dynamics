@@ -12,14 +12,22 @@ class HMMSimulation(Simulation):
         trans_prob: np.ndarray,
         n_samples: int = 20000,
         n_channels: int = 7,
+        n_states: int = 4,
         sim_varying_means: bool = False,
         random_covariance_weights: bool = False,
-        e_std: float = 0.2,
+        observation_error: float = 0.2,
         markov_lag: int = 1,
-        djs: np.ndarray = None,
+        covariances: np.ndarray = None,
+        random_seed: int = None,
     ):
-        if djs is not None:
-            n_channels = djs.shape[1]
+        if covariances is not None:
+            n_channels = covariances.shape[1]
+
+        if n_states != trans_prob.shape[0]:
+            raise ValueError(
+                f"Number of states ({n_states}) and shape of transition "
+                + f"probability matrix {trans_prob.shape} incomptible."
+            )
 
         self.markov_lag = markov_lag
         self.trans_prob = trans_prob
@@ -28,11 +36,12 @@ class HMMSimulation(Simulation):
         super().__init__(
             n_samples=n_samples,
             n_channels=n_channels,
-            n_states=trans_prob.shape[0],
+            n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
-            e_std=e_std,
-            djs=djs,
+            observation_error=observation_error,
+            covariances=covariances,
+            random_seed=random_seed,
         )
 
     def generate_states(self) -> np.ndarray:
@@ -40,7 +49,7 @@ class HMMSimulation(Simulation):
         self.cumsum_trans_prob = np.cumsum(self.trans_prob, axis=1)
         alpha_sim = np.zeros((self.n_samples, self.n_states))
         z = np.zeros([self.n_samples + 1], dtype=int)
-        rands = np.random.rand(self.n_samples)
+        rands = self._rng.random(self.n_samples)
 
         for tt in range(self.markov_lag - 1, self.n_samples):
             tmp = rands[tt]
@@ -62,7 +71,8 @@ class SequenceHMMSimulation(HMMSimulation):
         markov_lag: int = 1,
         stay_prob: float = 0.95,
         random_covariance_weights: bool = False,
-        e_std: float = 0.2,
+        observation_error: float = 0.2,
+        random_seed: int = None,
     ):
 
         super().__init__(
@@ -71,9 +81,10 @@ class SequenceHMMSimulation(HMMSimulation):
             n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
-            e_std=e_std,
+            observation_error=observation_error,
             markov_lag=markov_lag,
             trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
+            random_seed=random_seed,
         )
 
     @staticmethod
@@ -98,7 +109,8 @@ class BasicHMMSimulation(HMMSimulation):
         markov_lag: int = 1,
         stay_prob: float = 0.95,
         random_covariance_weights: bool = False,
-        e_std: float = 0.2,
+        observation_error: float = 0.2,
+        random_seed: int = None,
     ):
 
         self.markov_lag = markov_lag
@@ -112,8 +124,9 @@ class BasicHMMSimulation(HMMSimulation):
             n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
-            e_std=e_std,
+            observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
+            random_seed=random_seed,
         )
 
     @staticmethod
@@ -142,7 +155,8 @@ class UniHMMSimulation(HMMSimulation):
         markov_lag: int = 1,
         stay_prob: float = 0.95,
         random_covariance_weights: bool = False,
-        e_std: float = 0.2,
+        observation_error: float = 0.2,
+        random_seed: int = None,
     ):
 
         self.markov_lag = markov_lag
@@ -154,8 +168,9 @@ class UniHMMSimulation(HMMSimulation):
             n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
-            e_std=e_std,
+            observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(stay_prob),
+            random_seed=random_seed,
         )
 
     @staticmethod
@@ -180,7 +195,8 @@ class RandomHMMSimulation(HMMSimulation):
         n_states: int = 4,
         sim_varying_means: bool = False,
         random_covariance_weights: bool = False,
-        e_std: float = 0.2,
+        observation_error: float = 0.2,
+        random_seed: int = None,
     ):
 
         super().__init__(
@@ -189,8 +205,9 @@ class RandomHMMSimulation(HMMSimulation):
             n_states=n_states,
             sim_varying_means=sim_varying_means,
             random_covariance_weights=random_covariance_weights,
-            e_std=e_std,
+            observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(n_states),
+            random_seed=random_seed,
         )
 
     @staticmethod

@@ -1,14 +1,24 @@
 """Model data using a `BayesianGaussianMixture` model from Scikit-Learn
 
 """
+import logging
 import warnings
-from typing import Tuple, Union
+from typing import Union
 
 import numpy as np
-import scipy.linalg
 from sklearn.mixture import BayesianGaussianMixture
 from vrad.data import Data
+from vrad.inference.functions import cholesky_factor
 from vrad.utils.misc import override_dict_defaults, time_axis_first
+
+_logger = logging.getLogger("VRAD")
+
+
+def wishart_random_sigmas(data, n_states):
+    mix = BayesianGaussianMixture(n_components=n_states, max_iter=1)
+    warnings.filterwarnings("ignore")
+    mix.fit(data)
+    return mix.covariances_
 
 
 def learn_mu_sigma(
@@ -17,8 +27,9 @@ def learn_mu_sigma(
     learn_means: bool = False,
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
-    take_random_sample: int = 0,
+    take_random_sample: int = None,
     return_gmm: bool = False,
+    random_seed: int = None,
 ):
     """Find a mixture of Gaussian distributions which characterises a dataset.
 
@@ -54,10 +65,10 @@ def learn_mu_sigma(
     if retry_attempts < 1:
         raise ValueError("retry_attempts cannot be less than 1")
 
-    default_gmm_kwargs = {"verbose": 2, "n_init": 5}
+    default_gmm_kwargs = {"verbose": 2, "n_init": 1}
     gmm_kwargs = override_dict_defaults(default_gmm_kwargs, gmm_kwargs)
 
-    data, transposed = time_axis_first(data)
+    data = time_axis_first(data)
 
     if take_random_sample:
         data = np.random.permutation(data)[:take_random_sample]
@@ -67,7 +78,10 @@ def learn_mu_sigma(
     if learn_means:
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
-            n_components=n_states, covariance_type="full", **gmm_kwargs,
+            n_components=n_states,
+            covariance_type="full",
+            **gmm_kwargs,
+            random_state=random_seed,
         )
     else:
         # make sure we force means to be zero:
@@ -76,6 +90,7 @@ def learn_mu_sigma(
             covariance_type="full",
             mean_prior=np.zeros(n_channels),
             mean_precision_prior=1e12,
+            random_state=random_seed,
             **gmm_kwargs,
         )
     for attempt in range(retry_attempts):
@@ -126,31 +141,6 @@ def process_covariance(
     return full_covariances
 
 
-def matrix_sqrt_3d(matrix):
-    """A wrapper function for `scipy.linalg.sqrtm`.
-
-    SciPy's matrix square root function only works on [N x N] 2D matrices. This
-    function provides a simple solution for performing this operation on a stack of
-    [N x N] 2D arrays.
-
-    Parameters
-    ----------
-    matrix : numpy.ndarray
-        [M x N x N] matrix.
-
-    Returns
-    -------
-    matrix_sqrt : numpy.ndarray
-        A stack of matrix square roots of the same dimensions as `matrix` ([M x N x N])
-    """
-    if matrix.ndim != 3 or matrix.shape[1] != matrix.shape[2]:
-        raise ValueError("Only accepts matrices with dimensions M x N x N")
-    return_matrix = np.empty_like(matrix)
-    for index, layer in enumerate(matrix):
-        return_matrix[index] = scipy.linalg.sqrtm(layer)
-    return return_matrix
-
-
 def find_cholesky_decompositions(
     covariances: np.ndarray, means: np.ndarray, learn_means: bool,
 ):
@@ -177,14 +167,8 @@ def find_cholesky_decompositions(
         [n_states x n_channels x n_channels] array containing the Cholesky
         decompositions of full covariance matrices.
     """
-    n_states, n_channels = covariances.shape[:2]
-    w = np.identity(n_channels)
     if learn_means:
-        full_cov = process_covariance(covariances, means, learn_means)
+        full_covariances = process_covariance(covariances, means, learn_means)
     else:
-        full_cov = covariances
-    b_k = np.linalg.pinv(w) @ full_cov
-    matrix_sqrt = matrix_sqrt_3d(b_k @ b_k.transpose(0, 2, 1))
-    cholesky_djs = np.linalg.cholesky(matrix_sqrt)
-
-    return cholesky_djs
+        full_covariances = covariances
+    return cholesky_factor(full_covariances)

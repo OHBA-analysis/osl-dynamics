@@ -2,24 +2,68 @@
 
 """
 
+import numpy as np
+import scipy
 import tensorflow as tf
-import tensorflow_probability as tfp
+
+
+def is_symmetric(matrix):
+    """Checks if a matrix is symmetric"""
+    return np.all(np.abs(matrix - np.transpose(matrix, (0, 2, 1))) < 1e-8)
 
 
 @tf.function
-def pseudo_sigma_to_sigma(pseudo_sigma):
-    """Returns a legal non-singular covariance matrix from a 'pseudo_sigma' tensor."""
-    # Convert flattened tensors into matrices
-    pseudo_sigma = tfp.math.fill_triangular(pseudo_sigma)
-    sigma = tf.matmul(pseudo_sigma, tf.transpose(pseudo_sigma, (0, 2, 1)))
-    sigma = tf.add(
-        sigma,
+def cholesky_factor_to_full_matrix(cholesky_factor):
+    """Returns a legal non-singular matrix from a cholesky_factor tensor."""
+    # The upper triangle is trainable but we should zero it because the array
+    # is the cholesky factor of the full covariance
+    cholesky_factor = tf.linalg.band_part(cholesky_factor, -1, 0)
+
+    # Calculate the full matrix
+    full_matrix = tf.matmul(cholesky_factor, tf.transpose(cholesky_factor, (0, 2, 1)))
+    full_matrix = tf.add(
+        full_matrix,
         1e-6
         * tf.eye(
-            sigma.shape[1], batch_shape=[pseudo_sigma.shape[0]], dtype=sigma.dtype
+            full_matrix.shape[1],
+            batch_shape=[cholesky_factor.shape[0]],
+            dtype=full_matrix.dtype,
         ),
     )
-    return sigma
+    return full_matrix
+
+
+def cholesky_factor(full_matrix):
+    """Calculate the cholesky decomposition of a matrix"""
+    cholesky_factor = np.empty(full_matrix.shape)
+    for i in range(full_matrix.shape[0]):
+        cholesky_factor[i] = np.linalg.cholesky(full_matrix[i])
+    return cholesky_factor
+
+
+def matrix_sqrt_3d(matrix):
+    """A wrapper function for `scipy.linalg.sqrtm`.
+
+    SciPy's matrix square root function only works on [N x N] 2D matrices. This
+    function provides a simple solution for performing this operation on a stack of
+    [N x N] 2D arrays.
+
+    Parameters
+    ----------
+    matrix : numpy.ndarray
+        [M x N x N] matrix.
+
+    Returns
+    -------
+    matrix_sqrt : numpy.ndarray
+        A stack of matrix square roots of the same dimensions as `matrix` ([M x N x N])
+    """
+    if matrix.ndim != 3 or matrix.shape[1] != matrix.shape[2]:
+        raise ValueError("Only accepts matrices with dimensions M x N x N")
+    return_matrix = np.empty_like(matrix)
+    for index, layer in enumerate(matrix):
+        return_matrix[index] = scipy.linalg.sqrtm(layer)
+    return return_matrix
 
 
 def normalise_covariance(covariance):

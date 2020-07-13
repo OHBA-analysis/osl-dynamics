@@ -1,7 +1,8 @@
 import logging
-from typing import Tuple
 
 import numpy as np
+
+_logger = logging.getLogger("VRAD")
 
 
 def override_dict_defaults(default_dict: dict, override_dict: dict = None) -> dict:
@@ -20,15 +21,23 @@ def listify(obj: object):
         return [obj]
 
 
-def time_axis_first(input_array: np.ndarray) -> Tuple[np.ndarray, bool]:
+def check_iterable_type(iterable, object_type: type):
+    """Check iterable is non-empty and contains only objects of specific type."""
+    if isinstance(iterable, np.ndarray):
+        return iterable.dtype == object_type
+    return bool(iterable) and all(isinstance(elem, object_type) for elem in iterable)
+
+
+def time_axis_first(input_array: np.ndarray) -> np.ndarray:
     if input_array.ndim != 2:
-        logging.info("Non-2D array not transposed.")
-        return input_array, False
-    transposed = False
+        _logger.info("Non-2D array not transposed.")
+        return input_array
     if input_array.shape[1] > input_array.shape[0]:
-        input_array = input_array.T
-        transposed = True
-    return input_array, transposed
+        input_array = np.transpose(input_array)
+        _logger.warning(
+            "More channels than time points detected. Time series has been transposed."
+        )
+    return input_array
 
 
 class LoggingContext:

@@ -2,7 +2,13 @@
 
 """
 
+import os
 import tensorflow as tf
+import tensorflow.keras.models as models
+from vrad.inference.models.variational_rnn_autoencoder import (
+    _create_kl_loss_fn,
+    _ll_loss_fn,
+)
 
 
 def gpu_growth():
@@ -24,6 +30,14 @@ def gpu_growth():
             print(e)
 
 
+def select_gpu(gpu_number):
+    """Allows the user to pick a GPU to use."""
+    if isinstance(gpu_number, int):
+        gpu_number = str(gpu_number)
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_number
+    print(f"Using GPU {gpu_number}")
+
+
 def train_predict_dataset(
     time_series, sequence_length, batch_size=32, window_shift=None
 ):
@@ -37,13 +51,35 @@ def train_predict_dataset(
     )
 
     training_dataset = training_dataset.shuffle(time_series.shape[0])
-    training_dataset = training_dataset.batch(batch_size)
+    training_dataset = training_dataset.batch(batch_size, drop_remainder=True)
     training_dataset = training_dataset.prefetch(tf.data.experimental.AUTOTUNE)
     training_dataset = tf.data.Dataset.zip(
         (training_dataset, training_dataset)
     )  # dataset must return input and target
 
     prediction_dataset = tf.data.Dataset.from_tensor_slices(time_series)
-    prediction_dataset = prediction_dataset.batch(sequence_length).batch(batch_size)
+    prediction_dataset = prediction_dataset.batch(
+        sequence_length, drop_remainder=True
+    ).batch(batch_size, drop_remainder=True)
+
+    if not len(list(training_dataset)) or not len(list(prediction_dataset)):
+        max_batch_size = int(time_series.shape[0] / sequence_length)
+        raise ValueError(
+            f"For a non-windowed time series, the maximum batch size is "
+            f"int(time_series.shape[0] / sequence_length) = {max_batch_size}"
+        )
 
     return training_dataset, prediction_dataset
+
+
+def load_model(filename):
+    """Loads a model saved with its .save(filename) method.
+    """
+    model = models.load_model(
+        filename,
+        custom_objects={
+            "_ll_loss_fn": _ll_loss_fn,
+            "_kl_loss_fn": _create_kl_loss_fn(1.0),
+        },
+    )
+    return model
