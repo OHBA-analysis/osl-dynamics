@@ -1,9 +1,9 @@
 from typing import Union
 
 import tensorflow as tf
+import tensorflow.keras.layers as layers
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
-import tensorflow.keras.layers as layers
 from tensorflow.keras.activations import softmax, softplus
 from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (

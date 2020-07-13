@@ -67,10 +67,8 @@ class BurninCallback(callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         for layer in self.model.layers:
-            if hasattr(layer, "layers"):
-                for sub_layer in layer.layers:
-                    if isinstance(sub_layer, MultivariateNormalLayer):
-                        self.mvn = sub_layer
+            if isinstance(layer, MultivariateNormalLayer):
+                self.mvn = layer
 
         if self.mvn is None:
             _logger.warning("MVN layer not found by burnin callback.")

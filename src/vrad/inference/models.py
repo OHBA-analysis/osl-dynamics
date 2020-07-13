@@ -56,9 +56,23 @@ def create_model(
         strategy = get_strategy()
 
     with strategy.scope():
+        if not generative_only:
+            # Model to infer latent states
+            inference_inputs, inference_outputs = _inference_model_structure(
+                n_states=n_states,
+                n_channels=n_channels,
+                sequence_length=sequence_length,
+                n_layers=n_layers_inference,
+                n_units=n_units_inference,
+                dropout_rate=dropout_rate_inference,
+            )
+
+        else:
+            inference_outputs = None
 
         # Model to generate observations from states
-        generative_model = _generative_model_structure(
+        generative_inputs, generative_outputs = _generative_model_structure(
+            inference_outputs,
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
@@ -72,46 +86,16 @@ def create_model(
             alpha_xform=alpha_xform,
         )
 
-        if not generative_only:
-            # Model to infer latent states
-            inference_model = _inference_model_structure(
-                n_states=n_states,
-                n_channels=n_channels,
-                sequence_length=sequence_length,
-                n_layers=n_layers_inference,
-                n_units=n_units_inference,
-                dropout_rate=dropout_rate_inference,
-            )
-
-            # Build the full model: inference + generative model
-            inputs = inference_model.input
-            inference_output = inference_model(inputs)
-            outputs = generative_model(inference_output)
-            model = Model(inputs=inputs, outputs=outputs)
-
+        if generative_only:
+            model = Model(inputs=generative_inputs, outputs=generative_outputs)
         else:
-            model = generative_model
+            model = Model(inputs=inference_inputs, outputs=generative_outputs)
 
         # Compile the model
         model.compile(
             optimizer=optimizer,
             loss=[_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)],
         )
-
-    # Override original summary method
-    if not generative_only:
-        model.original_summary = model.summary
-
-        def full_summary(*args, **kwargs):
-            # Display summary for the inference model
-            inference_model = model.get_layer("inference_model")
-            inference_model.summary(*args, **kwargs)
-
-            # Display summary for the generative model
-            generative_model = model.get_layer("generative_model")
-            generative_model.summary(*args, **kwargs)
-
-        model.summary = full_summary
 
     # Callbacks
     burnin_callback = BurninCallback(epochs=n_epochs_burnin)
@@ -175,14 +159,12 @@ def create_model(
     # Method to get the learned means and covariances for each state
     def state_means_covariances():
         for layer in model.layers:
-            if hasattr(layer, "layers"):
-                for sub_layer in layer.layers:
-                    if isinstance(sub_layer, MultivariateNormalLayer):
-                        mvn_layer = sub_layer
+            if isinstance(layer, MultivariateNormalLayer):
+                mvn_layer = layer
 
-                        means = mvn_layer.get_means()
-                        covariances = mvn_layer.get_covariances()
-                        return means, covariances
+                means = mvn_layer.get_means()
+                covariances = mvn_layer.get_covariances()
+                return means, covariances
 
     model.state_means_covariances = state_means_covariances
 
@@ -247,10 +229,11 @@ def _inference_model_structure(
     # Inference model outputs
     outputs = [inputs, theta_t, m_theta_t, log_s2_theta_t]
 
-    return Model(inputs=inputs, outputs=outputs, name="inference_model")
+    return inputs, outputs
 
 
 def _generative_model_structure(
+    inference_outputs,
     n_states: int,
     n_channels: int,
     sequence_length: int,
@@ -269,12 +252,15 @@ def _generative_model_structure(
        - log_sigma2_theta_j  = trainable constant
     """
     # Definition of layers
-    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
-    theta_t = layers.Input(shape=(sequence_length, n_states), name="theta_t")
-    m_theta_t = layers.Input(shape=(sequence_length, n_states), name="m_theta_t")
-    log_s2_theta_t = layers.Input(
-        shape=(sequence_length, n_states), name="log_s2_theta_t"
-    )
+    if inference_outputs is None:
+        inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
+        theta_t = layers.Input(shape=(sequence_length, n_states), name="theta_t")
+        m_theta_t = layers.Input(shape=(sequence_length, n_states), name="m_theta_t")
+        log_s2_theta_t = layers.Input(
+            shape=(sequence_length, n_states), name="log_s2_theta_t"
+        )
+    else:
+        inputs, theta_t, m_theta_t, log_s2_theta_t = inference_outputs
 
     theta_t_dropout_layer = layers.Dropout(dropout_rate)
     output_layers = ModelRNNLayers(n_layers, n_units, dropout_rate)
@@ -326,4 +312,4 @@ def _generative_model_structure(
         log_sigma2_theta_j,
     ]
 
-    return Model(inputs=inputs, outputs=outputs, name="generative_model")
+    return inputs, outputs
