@@ -6,13 +6,13 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.layers import (
     InferenceRNNLayers,
-    ReparameterizationLayer,
-    TrainableVariablesLayer,
-    MultivariateNormalLayer,
+    KLDivergenceLayer,
+    LogLikelihoodLayer,
     MixMeansCovsLayer,
     ModelRNNLayers,
-    LogLikelihoodLayer,
-    KLDivergenceLayer,
+    MultivariateNormalLayer,
+    ReparameterizationLayer,
+    TrainableVariablesLayer,
 )
 from vrad.utils.misc import listify
 
@@ -174,10 +174,15 @@ def create_model(
 
     # Method to get the learned means and covariances for each state
     def state_means_covariances():
-        mvn_layer = model.get_layer("mvn")
-        means = mvn_layer.get_means()
-        covariances = mvn_layer.get_covariances()
-        return means, covariances
+        for layer in model.layers:
+            if hasattr(layer, "layers"):
+                for sub_layer in layer.layers:
+                    if isinstance(sub_layer, MultivariateNormalLayer):
+                        mvn_layer = sub_layer
+
+                        means = mvn_layer.get_means()
+                        covariances = mvn_layer.get_covariances()
+                        return means, covariances
 
     model.state_means_covariances = state_means_covariances
 
