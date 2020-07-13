@@ -13,7 +13,7 @@ from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
 from vrad.inference import gmm, metrics, tf_ops
-from vrad.inference.models.variational_rnn_autoencoder import create_model
+from vrad.inference.models import create_model
 from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
 

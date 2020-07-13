@@ -6,6 +6,8 @@
 - Line 106, 127, 128 can be uncommented to produce a plot of the inferred
   covariances and state time courses.
 """
+
+print("Importing packages")
 import mat73
 import numpy as np
 from tensorflow.python.data import Dataset
@@ -13,10 +15,8 @@ from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
-from vrad.inference.models.variational_rnn_autoencoder import create_model
+from vrad.inference.models import create_model
 from vrad.utils import plotting
-
-print("Importing packages")
 
 # GPU settings
 tf_ops.gpu_growth()
