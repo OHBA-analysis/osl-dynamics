@@ -151,10 +151,16 @@ def create_model(
         model.predict_states = predict_states
 
     # Method to calculate the free energy (log likelihood + KL divergence)
-    def free_energy(*args, **kwargs):
-        ll_loss = model.predict(*args, **kwargs)["ll_loss"]
-        kl_loss = model.predict(*args, **kwargs)["kl_loss"]
-        return np.mean(ll_loss + kl_loss)
+    def free_energy(dataset, return_all=False):
+        predictions = model.predict(dataset)
+        ll_loss = np.mean(predictions["ll_loss"])
+        kl_loss = np.mean(predictions["kl_loss"])
+        if return_all:
+            return ll_loss + kl_loss, ll_loss, kl_loss
+        else:
+            return ll_loss + kl_loss
+
+    model.free_energy = free_energy
 
     # Method to get the learned means and covariances for each state
     def state_means_covariances():
