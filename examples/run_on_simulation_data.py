@@ -89,9 +89,8 @@ covariances, means = gmm.learn_mu_sigma(
 )
 
 # Prepare dataset
-training_dataset, prediction_dataset = tf_ops.train_predict_dataset(
-    time_series=meg_data, sequence_length=sequence_length, batch_size=batch_size,
-)
+training_dataset = meg_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
 model = create_model(
