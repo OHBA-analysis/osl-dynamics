@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from abc import ABC
@@ -10,6 +11,8 @@ from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
 from vrad.inference.layers import MultivariateNormalLayer
+
+_logger = logging.getLogger("VRAD")
 
 
 class SavePredictionCallback(callbacks.Callback):
@@ -63,15 +66,18 @@ class BurninCallback(callbacks.Callback):
         self.mvn = None
 
     def on_train_begin(self, logs=None):
-        self.mvn = self.model.layers[
-            [
-                isinstance(layer, MultivariateNormalLayer)
-                for layer in self.model.layers
-            ].index(True)
-        ]
+        for layer in self.model.layers:
+            if hasattr(layer, "layers"):
+                for sub_layer in layer.layers:
+                    if isinstance(sub_layer, MultivariateNormalLayer):
+                        self.mvn = sub_layer
+
+        if self.mvn is None:
+            _logger.warning("MVN layer not found by burnin callback.")
 
     def on_epoch_begin(self, epoch, logs=None):
-        self.mvn.burnin.assign(epoch < self.epochs)
+        if self.mvn is not None:
+            self.mvn.burnin.assign(epoch < self.epochs)
 
 
 class Callback(ABC):
