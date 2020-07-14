@@ -40,7 +40,6 @@ def create_model(
     clip_normalization: float = None,
     multi_gpu: bool = False,
     strategy: str = None,
-    generative_only: bool = False,
 ):
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
@@ -56,40 +55,22 @@ def create_model(
         strategy = get_strategy()
 
     with strategy.scope():
-        if not generative_only:
-            # Model to infer latent states
-            inference_inputs, inference_outputs = _inference_model_structure(
-                n_states=n_states,
-                n_channels=n_channels,
-                sequence_length=sequence_length,
-                n_layers=n_layers_inference,
-                n_units=n_units_inference,
-                dropout_rate=dropout_rate_inference,
-            )
-
-        else:
-            inference_outputs = None
-
-        # Model to generate observations from states
-        generative_inputs, generative_outputs = _generative_model_structure(
-            inference_outputs,
+        model = _model_structure(
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            n_layers=n_layers_model,
-            n_units=n_units_model,
-            dropout_rate=dropout_rate_model,
+            n_layers_inference=n_layers_inference,
+            n_layers_model=n_layers_model,
+            n_units_inference=n_units_inference,
+            n_units_model=n_units_model,
+            dropout_rate_inference=dropout_rate_inference,
+            dropout_rate_model=dropout_rate_model,
             learn_means=learn_means,
             learn_covariances=learn_covariances,
             initial_mean=initial_mean,
             initial_covariances=initial_covariances,
             alpha_xform=alpha_xform,
         )
-
-        if generative_only:
-            model = Model(inputs=generative_inputs, outputs=generative_outputs)
-        else:
-            model = Model(inputs=inference_inputs, outputs=generative_outputs)
 
         # Compile the model
         model.compile(
@@ -142,13 +123,11 @@ def create_model(
     model.predict = named_predict
 
     # Method to predict the inferred state time course
-    if not generative_only:
+    def predict_states(*args, **kwargs):
+        m_theta_t = model.predict(*args, **kwargs)["m_theta_t"]
+        return np.concatenate(m_theta_t)
 
-        def predict_states(*args, **kwargs):
-            m_theta_t = model.predict(*args, **kwargs)["m_theta_t"]
-            return np.concatenate(m_theta_t)
-
-        model.predict_states = predict_states
+    model.predict_states = predict_states
 
     # Method to calculate the free energy (log likelihood + KL divergence)
     def free_energy(dataset, return_all=False):
@@ -200,76 +179,63 @@ def _create_kl_loss_fn(annealing_factor):
     return _kl_loss_fn
 
 
-def _inference_model_structure(
+def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
-    n_layers: int,
-    n_units: int,
-    dropout_rate: float,
-):
-    """Inference RNN
-       - q(theta_t)     ~ N(m_theta_t, s2_theta_t)
-       - m_theta_t      ~ affine(RNN(Y_<=t))
-       - log_s2_theta_t ~ affine(RNN(Y_<=t))
-    """
-    # Definition of layers
-    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
-    input_normalisation_layer = layers.LayerNormalization()
-    input_dropout_layer = layers.Dropout(dropout_rate)
-    output_layers = InferenceRNNLayers(n_layers, n_units, dropout_rate)
-    m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
-    log_s2_theta_t_layer = layers.Dense(
-        n_states, activation="linear", name="log_s2_theta_t"
-    )
-    theta_t_layer = ReparameterizationLayer(name="theta_t")
-
-    # Inference RNN data flow
-    inputs_norm = input_normalisation_layer(inputs)
-    inputs_norm_dropout = input_dropout_layer(inputs_norm)
-    output = output_layers(inputs_norm_dropout)
-    m_theta_t = m_theta_t_layer(output)
-    log_s2_theta_t = log_s2_theta_t_layer(output)
-    theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
-
-    # Inference model outputs
-    outputs = [inputs, theta_t, m_theta_t, log_s2_theta_t]
-
-    return inputs, outputs
-
-
-def _generative_model_structure(
-    inference_outputs,
-    n_states: int,
-    n_channels: int,
-    sequence_length: int,
-    n_layers: int,
-    n_units: int,
-    dropout_rate: float,
+    n_layers_inference: int,
+    n_layers_model: int,
+    n_units_inference: int,
+    n_units_model: int,
+    dropout_rate_inference: float,
+    dropout_rate_model: float,
     learn_means: bool,
     learn_covariances: bool,
     initial_mean: np.ndarray,
     initial_covariances: np.ndarray,
     alpha_xform: str,
 ):
-    """Model RNN
-       - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
-       - mu_theta_jt         ~ affine(RNN(theta_<t))
-       - log_sigma2_theta_j  = trainable constant
-    """
-    # Definition of layers
-    if inference_outputs is None:
-        inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
-        theta_t = layers.Input(shape=(sequence_length, n_states), name="theta_t")
-        m_theta_t = layers.Input(shape=(sequence_length, n_states), name="m_theta_t")
-        log_s2_theta_t = layers.Input(
-            shape=(sequence_length, n_states), name="log_s2_theta_t"
-        )
-    else:
-        inputs, theta_t, m_theta_t, log_s2_theta_t = inference_outputs
+    # Layer for input
+    inputs = layers.Input(shape=(sequence_length, n_channels))
 
-    theta_t_dropout_layer = layers.Dropout(dropout_rate)
-    output_layers = ModelRNNLayers(n_layers, n_units, dropout_rate)
+    # Inference RNN
+    # - q(theta_t)     ~ N(m_theta_t, s2_theta_t)
+    # - m_theta_t      ~ affine(RNN(Y_<=t))
+    # - log_s2_theta_t ~ affine(RNN(Y_<=t))
+
+    # Definition of layers
+    input_normalisation_layer = layers.LayerNormalization()
+    inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
+    inference_output_layers = InferenceRNNLayers(
+        n_layers_inference, n_units_inference, dropout_rate_inference
+    )
+    m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
+    log_s2_theta_t_layer = layers.Dense(
+        n_states, activation="linear", name="log_s2_theta_t"
+    )
+
+    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
+    # reparameterisation trick
+    theta_t_layer = ReparameterizationLayer(name="theta_t")
+
+    # Inference RNN data flow
+    inputs_norm = input_normalisation_layer(inputs)
+    inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
+    inference_output = inference_output_layers(inputs_norm_dropout)
+    m_theta_t = m_theta_t_layer(inference_output)
+    log_s2_theta_t = log_s2_theta_t_layer(inference_output)
+    theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
+
+    # Model RNN
+    # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
+    # - mu_theta_jt         ~ affine(RNN(theta_<t))
+    # - log_sigma2_theta_j  = trainable constant
+
+    # Definition of layers
+    model_input_dropout_layer = layers.Dropout(dropout_rate_model)
+    model_output_layers = ModelRNNLayers(
+        n_layers_model, n_units_model, dropout_rate_model
+    )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
     log_sigma2_theta_j_layer = TrainableVariablesLayer(
         [n_states],
@@ -278,6 +244,7 @@ def _generative_model_structure(
         name="log_sigma2_theta_j",
     )
 
+    # Layers for the means and covariances for observation model of each state
     observation_means_covs_layer = MultivariateNormalLayer(
         n_states,
         n_channels,
@@ -291,13 +258,14 @@ def _generative_model_structure(
         n_states, n_channels, alpha_xform, name="mix_means_covs"
     )
 
+    # Layers to calculate the negative of the log likelihood and KL divergence
     log_likelihood_layer = LogLikelihoodLayer(name="ll")
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
-    theta_t_dropout = theta_t_dropout_layer(theta_t)
-    output = output_layers(theta_t_dropout)
-    mu_theta_jt = mu_theta_jt_layer(output)
+    model_input_dropout = model_input_dropout_layer(theta_t)
+    model_output = model_output_layers(model_input_dropout)
+    mu_theta_jt = mu_theta_jt_layer(model_output)
     log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
@@ -306,8 +274,6 @@ def _generative_model_structure(
         [m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j]
     )
 
-    # Generative model inputs and outputs
-    inputs = [inputs, theta_t, m_theta_t, log_s2_theta_t]
     outputs = [
         ll_loss,
         kl_loss,
@@ -318,4 +284,4 @@ def _generative_model_structure(
         log_sigma2_theta_j,
     ]
 
-    return inputs, outputs
+    return Model(inputs=inputs, outputs=outputs)

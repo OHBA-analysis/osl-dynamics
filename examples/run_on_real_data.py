@@ -10,7 +10,6 @@
 print("Importing packages")
 import mat73
 import numpy as np
-from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
@@ -126,8 +125,8 @@ inf_stc = array_ops.get_one_hot(inf_stc)
 matched_stc, matched_inf_stc = array_ops.match_states(hmm_stc, inf_stc)
 
 # Compare state time courses
-plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
-plotting.plot_state_time_courses(matched_stc, filename="stc.png")
-plotting.plot_state_time_courses(matched_inf_stc, filename="inf_stc.png")
+# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# plotting.plot_state_time_courses(matched_stc, filename="stc.png")
+# plotting.plot_state_time_courses(matched_inf_stc, filename="inf_stc.png")
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
