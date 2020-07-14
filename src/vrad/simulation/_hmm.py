@@ -91,7 +91,7 @@ class SequenceHMMSimulation(HMMSimulation):
     def construct_trans_prob_matrix(n_states: int, stay_prob: float) -> np.ndarray:
 
         trans_prob = np.zeros([n_states, n_states])
-        np.fill_diagonal(trans_prob, 0.95)
+        np.fill_diagonal(trans_prob, stay_prob)
         np.fill_diagonal(trans_prob[:, 1:], 1 - stay_prob)
         trans_prob[-1, 0] = 1 - stay_prob
         return trans_prob
