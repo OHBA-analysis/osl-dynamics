@@ -330,10 +330,10 @@ class LogLikelihoodLayer(layers.Layer):
 
         # Calculate third term: -0.5 * [(x - mu)^T sigma^-1 (x - mu)]
         inv_sigma = tf.linalg.inv(sigma + 1e-8 * tf.eye(sigma.shape[-1]))
-        mu_minus_sigma = tf.subtract(x, mu)
-        mu_minus_sigma_T = tf.transpose(mu_minus_sigma, perm=[0, 1, 3, 2])
+        x_minus_mu = tf.subtract(x, mu)
+        x_minus_mu_T = tf.transpose(x_minus_mu, perm=[0, 1, 3, 2])
         third_term = -0.5 * tf.matmul(
-            tf.matmul(mu_minus_sigma, inv_sigma), mu_minus_sigma_T
+            tf.matmul(x_minus_mu, inv_sigma), x_minus_mu_T
         )
         third_term = tf.squeeze(tf.squeeze(third_term, axis=3), axis=2)
 
