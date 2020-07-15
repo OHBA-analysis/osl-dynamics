@@ -1,3 +1,7 @@
+"""Tensorflow layers used in the inference and generative model.
+
+"""
+
 from typing import Union
 
 import tensorflow as tf
@@ -332,9 +336,7 @@ class LogLikelihoodLayer(layers.Layer):
         inv_sigma = tf.linalg.inv(sigma + 1e-8 * tf.eye(sigma.shape[-1]))
         x_minus_mu = tf.subtract(x, mu)
         x_minus_mu_T = tf.transpose(x_minus_mu, perm=[0, 1, 3, 2])
-        third_term = -0.5 * tf.matmul(
-            tf.matmul(x_minus_mu, inv_sigma), x_minus_mu_T
-        )
+        third_term = -0.5 * tf.matmul(tf.matmul(x_minus_mu, inv_sigma), x_minus_mu_T)
         third_term = tf.squeeze(tf.squeeze(third_term, axis=3), axis=2)
 
         # Calculate the log likelihood

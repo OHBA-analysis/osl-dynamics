@@ -1,3 +1,7 @@
+"""Inference and generative model.
+
+"""
+
 import numpy as np
 from tensorflow.keras import Model, layers, optimizers
 from tensorflow.python import Variable, zeros

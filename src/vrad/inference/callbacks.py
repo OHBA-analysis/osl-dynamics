@@ -1,3 +1,7 @@
+"""A series of Tensorflow callbacks.
+
+"""
+
 import logging
 import os
 import time

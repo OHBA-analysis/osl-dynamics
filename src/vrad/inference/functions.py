@@ -66,23 +66,46 @@ def matrix_sqrt_3d(matrix):
     return return_matrix
 
 
-def normalise_covariance(covariance):
+def normalise_covariances(covariances):
     """Normalise covariance matrix based on its trace.
 
     The trace of `covariance` is taken. All values are then divided by it.
 
     Parameters
     ----------
-    covariance : tf.Tensor
+    covariances : tf.Tensor
         Tensor of the form [M x N x N]
 
     Returns
     -------
-    normalised_covariance : tf.Tensor
+    normalised_covariances : tf.Tensor
         Tensor of the form [M x N x N]
     """
-    normalisation = tf.reduce_sum(tf.linalg.diag_part(covariance), axis=1)[
+    normalisation = tf.reduce_sum(tf.linalg.diag_part(covariances), axis=1)[
         ..., tf.newaxis, tf.newaxis
     ]
-    normalised_covariance = covariance / normalisation
-    return normalised_covariance
+    normalised_covariances = covariances / normalisation
+    return normalised_covariances
+
+
+def full_covariances(means, covariances):
+    """Calculate full covariance.
+
+    Given a set of covariances and means, calculate the full covariance matrices.
+
+    Parameters
+    ----------
+    means : numpy.ndarray
+        Matrix of means of dimensions [n_states x n_channels].
+    covariances : numpy.ndarray
+        Matrix of covariances of dimensions [n_states x n_channels x n_channels].
+
+    Returns
+    -------
+    full_covariances : numpy.ndarray
+        Normalised full covariance matrices of dimensions [n_states x n_channels
+        x n_channels].
+    """
+    means = means[:, np.newaxis, :]
+    full_covariances = (means @ means.transpose(0, 2, 1)) + covariances
+    return full_covariances
