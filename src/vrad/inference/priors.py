@@ -124,11 +124,13 @@ def hmm(
     learn_means: bool = False,
     n_initialisations: int = 5,
     simulation: str = "sequence",
-    random_seed: int = None,
 ):
-    """Estimates means and covariances by sampling a BasicHMMSimulation.
+    """Estimates means and covariances by sampling an HMM.
     
     """
+    if isinstance(data, Data):
+        data = data.time_series
+
     n_samples = data.shape[0]
     n_channels = data.shape[1]
 
@@ -155,7 +157,8 @@ def hmm(
         else:
             if simulation != "sequence":
                 _logger.warning(
-                    f"simulation={simulation} unknown. SequenceHMMSimulation will be used."
+                    f"simulation={simulation} unknown. "
+                    + "SequenceHMMSimulation will be used."
                 )
             sim = SequenceHMMSimulation(
                 n_samples=n_samples,
@@ -170,6 +173,11 @@ def hmm(
             time_series = data[stc[:, i] == 1]
             means[n, i] = np.mean(time_series, axis=0)
             covariances[n, i] = np.cov(time_series, rowvar=False)
+
+            if not learn_means:
+                # Absorb means into the covariances
+                covariances[n, i] += np.outer(means[n, i], means[n, i])
+                means[n, i] = np.zeros(n_channels, dtype=np.float32)
 
         # Calculate the log likelihood:
         # ll = c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
@@ -199,10 +207,5 @@ def hmm(
     print(f"Using initialization {argmax_ll}")
     means = means[argmax_ll]
     covariances = covariances[argmax_ll]
-
-    # Absorb the means in the covariance matrix if we are not learning the means
-    if not learn_means:
-        covariances = full_covariances(means, covariances)
-        means = np.zeros([n_states, n_channels], dtype=np.float32)
 
     return means, covariances
