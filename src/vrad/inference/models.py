@@ -103,6 +103,8 @@ def create_model(
                 annealing_callback,
                 burnin_callback,
             ]
+        else:
+            kwargs["callbacks"] = [annealing_callback, burnin_callback]
         return model.original_fit_method(*args, **kwargs)
 
     model.fit = anneal_burnin_fit
