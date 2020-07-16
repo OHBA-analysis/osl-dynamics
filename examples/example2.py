@@ -1,8 +1,9 @@
-"""Example script for running inference on real MEG data.
+"""Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Takes approximately 4 minutes to train (on compG017).
 - Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
+- Uses the final covariances inferred by an HMM fit from OSL.
 - Line 106, 127, 128 can be uncommented to produce a plot of the inferred
   covariances and state time courses.
 """
