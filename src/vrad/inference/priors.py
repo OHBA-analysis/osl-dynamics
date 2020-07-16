@@ -157,8 +157,8 @@ def hmm(
         else:
             if simulation != "sequence":
                 _logger.warning(
-                    f"simulation={simulation} unknown. " + \
-                     "SequenceHMMSimulation will be used."
+                    f"simulation={simulation} unknown. "
+                    + "SequenceHMMSimulation will be used."
                 )
             sim = SequenceHMMSimulation(
                 n_samples=n_samples,

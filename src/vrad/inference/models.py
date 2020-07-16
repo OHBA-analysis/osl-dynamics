@@ -202,7 +202,7 @@ def _model_structure(
     alpha_xform: str,
 ):
     # Layer for input
-    inputs = layers.Input(shape=(sequence_length, n_channels))
+    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
     # Inference RNN
     # - q(theta_t)     ~ N(m_theta_t, s2_theta_t)
