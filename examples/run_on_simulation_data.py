@@ -88,10 +88,6 @@ means, covariances = priors.gaussian_mixture_model(
     random_seed=124,
 )
 
-# Prepare dataset
-training_dataset = meg_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
-
 # Build model
 model = create_model(
     n_channels=n_channels,
@@ -120,6 +116,10 @@ model = create_model(
 
 model.summary()
 
+# Prepare dataset
+training_dataset = meg_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
+
 # Train the model
 print("Training model")
 history = model.fit(
@@ -135,13 +135,9 @@ inf_means, inf_cov = model.state_means_covariances()
 # Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="covariances.png")
 
-# Inferred state time course
+# Inferred state time courses
 inf_stc = model.predict_states(prediction_dataset)
-
-# Hard classify
 inf_stc = inf_stc.argmax(axis=1)
-
-# One hot encode the inferred state time courses
 inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance to ground truth state time courses

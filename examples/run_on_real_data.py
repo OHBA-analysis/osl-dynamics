@@ -62,11 +62,7 @@ hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
 covariances = hmm.covariances
 means = np.zeros([n_states, n_channels], dtype=np.float32)
 
-# Prepare dataset
-training_dataset = meg_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
-
-# Build autoencoder model
+# Build model
 model = create_model(
     n_channels=n_channels,
     n_states=n_states,
@@ -94,6 +90,10 @@ model = create_model(
 
 model.summary()
 
+# Prepare dataset
+training_dataset = meg_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
+
 # Train the model
 print("Training model")
 history = model.fit(
@@ -109,24 +109,15 @@ int_means, inf_cov = model.state_means_covariances()
 # Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="covariances.png")
 
-# Inferred state probabilities
+# Inferred state time courses
 inf_stc = model.predict_states(prediction_dataset)
-
-# Read file containing state probabilities inferred by OSL
-hmm_stc = hmm.viterbi_path
-
-# Hard classify
 inf_stc = inf_stc.argmax(axis=1)
-
-# One hot encode
 inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance between state time courses
-matched_stc, matched_inf_stc = array_ops.match_states(hmm_stc, inf_stc)
+matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
 
 # Compare state time courses
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
-# plotting.plot_state_time_courses(matched_stc, filename="stc.png")
-# plotting.plot_state_time_courses(matched_inf_stc, filename="inf_stc.png")
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
