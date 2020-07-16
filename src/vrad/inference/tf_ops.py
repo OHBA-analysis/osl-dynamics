@@ -3,17 +3,13 @@
 """
 
 import os
-
 import tensorflow as tf
-import tensorflow.keras.models as models
-from vrad.inference.models import _create_kl_loss_fn, _ll_loss_fn
 
 
 def gpu_growth():
     """Only allocate the amount of memory required on the GPU.
 
     If resources are shared between multiple users, it's polite not to hog the GPUs!
-
     """
     gpus = tf.config.experimental.list_physical_devices("GPU")
     if gpus:
@@ -68,16 +64,3 @@ def train_predict_dataset(
         )
 
     return training_dataset, prediction_dataset
-
-
-def load_model(filename):
-    """Loads a model saved with its .save(filename) method.
-    """
-    model = models.load_model(
-        filename,
-        custom_objects={
-            "_ll_loss_fn": _ll_loss_fn,
-            "_kl_loss_fn": _create_kl_loss_fn(1.0),
-        },
-    )
-    return model

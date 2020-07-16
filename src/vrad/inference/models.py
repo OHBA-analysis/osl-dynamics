@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-from tensorflow.keras import Model, layers, optimizers
+from tensorflow.keras import Model, layers, optimizers, models
 from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
@@ -291,3 +291,15 @@ def _model_structure(
     ]
 
     return Model(inputs=inputs, outputs=outputs)
+
+
+def load_model(filename):
+    """Loads a model saved."""
+    model = models.load_model(
+        filename,
+        custom_objects={
+            "_ll_loss_fn": _ll_loss_fn,
+            "_kl_loss_fn": _create_kl_loss_fn(None),
+        },
+    )
+    return model
