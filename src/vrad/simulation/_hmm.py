@@ -139,7 +139,7 @@ class BasicHMMSimulation(HMMSimulation):
             State time course
 
         """
-        single_trans_prob = (1 - stay_prob) / n_states
+        single_trans_prob = (1 - stay_prob) / (n_states - 1)
         trans_prob = np.ones((n_states, n_states)) * single_trans_prob
         trans_prob[np.diag_indices(n_states)] = stay_prob
         return trans_prob
