@@ -44,6 +44,7 @@ def create_model(
     clip_normalization: float,
     multi_gpu: bool = False,
     strategy: str = None,
+    weights: str = None,
 ):
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
@@ -82,6 +83,11 @@ def create_model(
             loss=[_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)],
         )
 
+    # Load in weights
+    if weights is not None:
+        model.load_weights(weights)
+
+    # Override default Keras model methods
     model = override_methods(
         model,
         n_epochs_burnin,
