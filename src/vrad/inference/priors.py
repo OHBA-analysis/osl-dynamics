@@ -122,8 +122,10 @@ def hmm(
     n_states: int,
     stay_prob: float = 0.9,
     learn_means: bool = False,
-    n_initialisations: int = 5,
+    n_initialisations: int = 10,
     simulation: str = "sequence",
+    random: bool = False,
+    random_seed: int = None,
 ):
     """Estimates means and covariances by sampling an HMM.
     
@@ -169,15 +171,26 @@ def hmm(
         stc = sim.state_time_course
 
         # Calculate the mean and covariance for each state
-        for i in range(n_states):
-            time_series = data[stc[:, i] == 1]
-            means[n, i] = np.mean(time_series, axis=0)
-            covariances[n, i] = np.cov(time_series, rowvar=False)
+        if random:
+            # Randomly sample the elements of the mean vector and covariance matrix
+            rng = np.random.default_rng(random_seed)
+            for i in range(n_states):
+                if learn_means:
+                    means[n, i] = rng.normal(0, 1, n_channels)
+                else:
+                    means[n, i] = np.zeros(n_channels)
+                covariances[n, i] = np.diag(abs(rng.normal(0, 1, n_channels)))
+        else:
+            # Compute the mean and covariance when the state is on
+            for i in range(n_states):
+                time_series = data[stc[:, i] == 1]
+                means[n, i] = np.mean(time_series, axis=0)
+                covariances[n, i] = np.cov(time_series, rowvar=False)
 
-            if not learn_means:
-                # Absorb means into the covariances
-                covariances[n, i] += np.outer(means[n, i], means[n, i])
-                means[n, i] = np.zeros(n_channels, dtype=np.float32)
+                if not learn_means:
+                    # Absorb means into the covariances
+                    covariances[n, i] += np.outer(means[n, i], means[n, i])
+                    means[n, i] = np.zeros(n_channels, dtype=np.float32)
 
         # Calculate the log likelihood:
         # ll = c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
