@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
 from vrad.data import Data
 from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation
-from vrad.inference.functions import cholesky_factor, full_covariances
+from vrad.inference.functions import cholesky_factor
 from vrad.utils.misc import override_dict_defaults, time_axis_first
 
 _logger = logging.getLogger("VRAD")
@@ -31,6 +31,7 @@ def gaussian_mixture_model(
     data: Union[np.ndarray, Data],
     n_states: int,
     learn_means: bool = False,
+    covariance_type: str = "full",
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
     take_random_sample: int = None,
@@ -85,7 +86,7 @@ def gaussian_mixture_model(
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
             n_components=n_states,
-            covariance_type="full",
+            covariance_type=covariance_type,
             **gmm_kwargs,
             random_state=random_seed,
         )
@@ -93,7 +94,7 @@ def gaussian_mixture_model(
         # make sure we force means to be zero:
         gmm = BayesianGaussianMixture(
             n_components=n_states,
-            covariance_type="full",
+            covariance_type=covariance_type,
             mean_prior=np.zeros(n_channels),
             mean_precision_prior=1e12,
             random_state=random_seed,
@@ -109,7 +110,12 @@ def gaussian_mixture_model(
 
     # Cast means and covariances to float32 for tensorflow
     means = gmm.means_.astype(np.float32)
-    covariances = gmm.covariances_.astype(np.float32)
+    if covariance_type == "diag":
+        covariances = np.empty([n_states, n_channels, n_channels], dtype=np.float32)
+        for i in range(gmm.covariances_.shape[0]):
+            covariances[i] = np.diag(gmm.covariances_[i])
+    else:
+        covariances = gmm.covariances_.astype(np.float32)
 
     if return_gmm:
         return gmm, means, covariances

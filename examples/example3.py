@@ -61,7 +61,7 @@ means, covariances = priors.hmm(
     stay_prob=0.95,
     learn_means=learn_means,
     n_initialisations=10,
-    simulation='basic',
+    simulation="basic",
 )
 
 # Build model
@@ -133,5 +133,3 @@ print(f"Dice coefficient: {dc}")
 # Free energy
 free_energy, ll_loss, kl_loss = model.free_energy(prediction_dataset, return_all=True)
 print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")
-
-
