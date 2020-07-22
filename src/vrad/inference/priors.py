@@ -8,9 +8,10 @@ from typing import Union
 
 import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
+from tqdm import trange
 from vrad.data import Data
-from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation
 from vrad.inference.functions import cholesky_factor
+from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation
 from vrad.utils.misc import override_dict_defaults, time_axis_first
 
 _logger = logging.getLogger("VRAD")
@@ -161,6 +162,7 @@ def hmm(
                 n_channels=n_channels,
                 n_states=n_states,
                 stay_prob=stay_prob,
+                simulate=False,
             )
         else:
             if simulation != "sequence":
@@ -173,6 +175,7 @@ def hmm(
                 n_channels=n_channels,
                 n_states=n_states,
                 stay_prob=stay_prob,
+                simulate=False,
             )
         stc = sim.state_time_course
 
@@ -222,6 +225,96 @@ def hmm(
         print(f"Initialization {n}: nll={-ll[n]}")
 
     # Find the initialisation which has the maximum likelihood
+    argmax_ll = np.argmax(ll)
+    print(f"Using initialization {argmax_ll}")
+    means = means[argmax_ll]
+    covariances = covariances[argmax_ll]
+
+    return means, covariances
+
+
+def new_hmm(
+    data: Union[np.ndarray, Data],
+    n_states: int,
+    stay_prob: float = 0.9,
+    learn_means: bool = False,
+    n_initialisations: int = 10,
+    simulation: str = "sequence",
+    random: bool = False,
+    random_seed: int = None,
+):
+    rng = np.random.default_rng(random_seed)
+
+    if isinstance(data, Data):
+        data = data.time_series
+    n_samples = data.shape[0]
+    n_channels = data.shape[1]
+
+    stcs = [
+        BasicHMMSimulation(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=n_states,
+            stay_prob=stay_prob,
+            simulate=False,
+        ).state_time_course.argmax(axis=-1)
+        for initialisation in trange(n_initialisations, desc="Simulating stcs")
+    ]
+
+    if random:
+        if learn_means:
+            means = rng.normal(size=(n_initialisations, n_states, n_channels))
+        else:
+            means = np.zeros((n_initialisations, n_states, n_channels))
+
+        covariances = np.abs(
+            rng.normal(size=(n_initialisations, n_states, n_channels, n_channels))
+            * np.eye(n_channels)
+        )
+
+    else:
+        covariances = np.array(
+            [
+                [np.cov(data[stc == state], rowvar=False) for state in range(n_states)]
+                for stc in stcs
+            ]
+        )
+        means = np.array(
+            [
+                [np.mean(data[stc == state], axis=0) for state in range(n_states)]
+                for stc in stcs
+            ]
+        )
+
+        if not learn_means:
+            covariances = np.array(
+                [
+                    [
+                        covariances[init, state]
+                        + np.outer(means[init, state], means[init, state])
+                        for state in range(n_states)
+                    ]
+                    for init in range(n_initialisations)
+                ]
+            )
+            means = np.zeros((n_initialisations, n_states, n_channels))
+
+    _, log_det_sigma = np.linalg.slogdet(covariances)
+    inv_sigma = np.linalg.inv(covariances) + 1e-8 * np.eye(covariances.shape[-1])
+
+    ll = np.zeros(n_initialisations)
+    for init in trange(n_initialisations, desc="Calculating LL"):
+        sep_states = [data[stcs[init] == i] for i in range(n_states)]
+        num_state_samples = np.array([arr.shape[0] for arr in sep_states])
+        max_samples = num_state_samples.max()
+        state_sorted = np.zeros([n_states, max_samples, n_channels])
+        for i, state in enumerate(sep_states):
+            state_sorted[i, : state.shape[0], :n_channels] = state
+        xmm = state_sorted - means[init, :, None, :]
+        ll[init] = -0.5 * np.tensordot(
+            np.matmul(xmm, inv_sigma[init]), xmm, axes=3
+        ) - 0.5 * np.sum(num_state_samples * log_det_sigma[init])
+
     argmax_ll = np.argmax(ll)
     print(f"Using initialization {argmax_ll}")
     means = means[argmax_ll]
