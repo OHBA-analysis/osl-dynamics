@@ -1,7 +1,7 @@
 import numpy as np
 from vrad.array_ops import get_one_hot
 from vrad.simulation import Simulation
-from vrad.utils.decorators import auto_repr, auto_yaml
+from vrad.utils.decorators import auto_repr, auto_yaml, timing
 
 
 class HMMSimulation(Simulation):
@@ -19,6 +19,7 @@ class HMMSimulation(Simulation):
         markov_lag: int = 1,
         covariances: np.ndarray = None,
         random_seed: int = None,
+        simulate: bool = True,
     ):
         if covariances is not None:
             n_channels = covariances.shape[1]
@@ -42,23 +43,23 @@ class HMMSimulation(Simulation):
             observation_error=observation_error,
             covariances=covariances,
             random_seed=random_seed,
+            simulate=simulate,
         )
 
+        if not simulate:
+            self.state_time_course = self.generate_states()
+
     def generate_states(self) -> np.ndarray:
+        rng = np.random.default_rng()
+        rands = [
+            iter(rng.choice(self.n_states, size=self.n_samples, p=self.trans_prob[i]))
+            for i in range(self.n_states)
+        ]
 
-        self.cumsum_trans_prob = np.cumsum(self.trans_prob, axis=1)
-        alpha_sim = np.zeros((self.n_samples, self.n_states))
-        z = np.zeros([self.n_samples + 1], dtype=int)
-        rands = self._rng.random(self.n_samples)
-
-        for tt in range(self.markov_lag - 1, self.n_samples):
-            tmp = rands[tt]
-            for kk in range(self.cumsum_trans_prob.shape[1]):
-                if tmp < self.cumsum_trans_prob[z[tt - self.markov_lag], kk]:
-                    z[tt] = kk
-                    break
-            alpha_sim[tt, z[tt]] = 1
-        return alpha_sim
+        states = np.zeros(self.n_samples, int)
+        for sample in range(1, self.n_samples):
+            states[sample] = next(rands[states[sample - 1]])
+        return get_one_hot(states, n_states=self.n_states)
 
 
 class SequenceHMMSimulation(HMMSimulation):
@@ -73,6 +74,7 @@ class SequenceHMMSimulation(HMMSimulation):
         random_covariance_weights: bool = False,
         observation_error: float = 0.2,
         random_seed: int = None,
+        simulate: bool = True,
     ):
 
         super().__init__(
@@ -85,6 +87,7 @@ class SequenceHMMSimulation(HMMSimulation):
             markov_lag=markov_lag,
             trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
             random_seed=random_seed,
+            simulate=simulate,
         )
 
     @staticmethod
@@ -111,6 +114,7 @@ class BasicHMMSimulation(HMMSimulation):
         random_covariance_weights: bool = False,
         observation_error: float = 0.2,
         random_seed: int = None,
+        simulate: bool = True,
     ):
 
         self.markov_lag = markov_lag
@@ -127,6 +131,7 @@ class BasicHMMSimulation(HMMSimulation):
             observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
             random_seed=random_seed,
+            simulate=simulate,
         )
 
     @staticmethod

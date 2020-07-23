@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from matplotlib import pyplot as plt
 from vrad.utils import plotting
+from vrad.utils.decorators import timing
 
 
 class Simulation(ABC):
@@ -150,14 +151,12 @@ class Simulation(ABC):
         else:
             mus_sim = np.zeros((self.n_states, self.n_channels))
 
+        stc = self.state_time_course.argmax(axis=1)
+
         data_sim = np.zeros((self.n_samples, self.n_channels))
         for i in range(self.n_states):
-            data_sim[
-                self.state_time_course.argmax(axis=1) == i
-            ] = self._rng.multivariate_normal(
-                mus_sim[i],
-                self.covariances[i],
-                size=np.count_nonzero(self.state_time_course.argmax(axis=1) == i),
+            data_sim[stc == i] = self._rng.multivariate_normal(
+                mus_sim[i], self.covariances[i], size=np.count_nonzero(stc == i),
             )
 
         data_sim += self._rng.normal(scale=self.observation_error, size=data_sim.shape)

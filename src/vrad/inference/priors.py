@@ -15,6 +15,7 @@ from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation
 from vrad.utils.misc import override_dict_defaults, time_axis_first
 
 _logger = logging.getLogger("VRAD")
+_rng = np.random.default_rng()
 
 
 def wishart(data, n_states):
@@ -24,6 +25,43 @@ def wishart(data, n_states):
 
     # Cast to float32 for tensorflow
     covariances = gmm.covariances_.astype(np.float32)
+
+    return covariances
+
+
+def wishart_covariances(time_series, n_states, covariance_prior, mean_prior):
+    reg_covar = 1e-6
+    n_components = n_states
+
+    n_samples, dof_prior = time_series.shape
+
+    resp = _rng.random((n_samples, n_components))
+
+    nk = resp.sum(axis=0) + 10 * np.finfo(resp.dtype).eps
+    xk = np.dot(resp.T, time_series) / nk[:, None]
+
+    mean_precision = nk + 1
+    means = (mean_prior + nk[:, None] * xk) / mean_precision[:, None]
+
+    n_features = xk.shape[1]
+    dof = n_features + nk
+
+    full_diff = time_series - means[:, None, :]
+    sk = (
+        np.matmul(resp.T[:, None, :] * full_diff.transpose(0, 2, 1), full_diff)
+        / nk[:, None, None]
+        + np.eye(n_features, n_features) * reg_covar
+    )
+    full_diff = xk - mean_prior
+    covariances = (
+        covariance_prior
+        + nk[:, None, None] * sk
+        + (nk / mean_precision)[:, None, None]
+        * full_diff[..., None]
+        @ full_diff[:, None, :]
+    )
+
+    covariances /= dof[:, None, None]
 
     return covariances
 
@@ -267,9 +305,15 @@ def new_hmm(
         else:
             means = np.zeros((n_initialisations, n_states, n_channels))
 
-        covariances = np.abs(
-            rng.normal(size=(n_initialisations, n_states, n_channels, n_channels))
-            * np.eye(n_channels)
+        # covariances = np.abs(
+        #     rng.normal(size=(n_initialisations, n_states, n_channels, n_channels))
+        #     * np.eye(n_channels)
+        # )
+        covariances = np.array(
+            [
+                wishart_covariances(data, n_states, np.cov(data.T), data.mean(axis=0))
+                for init in trange(n_initialisations, desc="Generating covariances")
+            ]
         )
 
     else:
@@ -316,7 +360,7 @@ def new_hmm(
         ) - 0.5 * np.sum(num_state_samples * log_det_sigma[init])
 
     argmax_ll = np.argmax(ll)
-    print(f"Using initialization {argmax_ll}")
+    print(f"Using initialization {argmax_ll}\nFE: {-ll[argmax_ll]}")
     means = means[argmax_ll]
     covariances = covariances[argmax_ll]
 
