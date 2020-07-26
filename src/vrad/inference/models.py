@@ -27,7 +27,7 @@ def create_model(
     sequence_length: int,
     learn_means: bool,
     learn_covariances: bool,
-    initial_mean: np.ndarray,
+    initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     n_layers_inference: int,
     n_layers_model: int,
@@ -72,7 +72,7 @@ def create_model(
             dropout_rate_model=dropout_rate_model,
             learn_means=learn_means,
             learn_covariances=learn_covariances,
-            initial_mean=initial_mean,
+            initial_means=initial_means,
             initial_covariances=initial_covariances,
             alpha_xform=alpha_xform,
         )
@@ -127,7 +127,7 @@ def _model_structure(
     dropout_rate_model: float,
     learn_means: bool,
     learn_covariances: bool,
-    initial_mean: np.ndarray,
+    initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     alpha_xform: str,
 ):
@@ -186,7 +186,7 @@ def _model_structure(
         n_channels,
         learn_means=learn_means,
         learn_covariances=learn_covariances,
-        initial_means=initial_mean,
+        initial_means=initial_means,
         initial_covariances=initial_covariances,
         name="mvn",
     )
