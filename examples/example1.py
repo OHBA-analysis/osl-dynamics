@@ -130,7 +130,7 @@ history = model.fit(
 )
 
 # Inferred covariances
-inf_means, inf_cov = model.state_means_covariances()
+inf_means, inf_cov = model.get_means_covariances()
 
 # Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="covariances.png")

@@ -299,16 +299,25 @@ def override_methods(
     model.free_energy = free_energy
 
     # Method to get the learned means and covariances for each state
-    def state_means_covariances():
+    def get_means_covariances():
         for layer in model.layers:
             if isinstance(layer, MultivariateNormalLayer):
                 mvn_layer = layer
-
                 means = mvn_layer.get_means()
                 covariances = mvn_layer.get_covariances()
                 return means, covariances
 
-    model.state_means_covariances = state_means_covariances
+    model.get_means_covariances = get_means_covariances
+
+    # Method to set means and covariances for each state
+    def set_means_covariances(means=None, covariances=None):
+        for layer in model.layers:
+            if isinstance(layer, MultivariateNormalLayer):
+                mvn_layer = layer
+                mvn_layer.set_means(means)
+                mvn_layer.set_covariances(covariances)
+
+    model.set_means_covariances = set_means_covariances
 
     # Method to get the alpha scaling of each state
     def alpha_scaling():

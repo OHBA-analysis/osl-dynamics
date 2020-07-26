@@ -138,8 +138,10 @@ class MultivariateNormalLayer(layers.Layer):
     def set_means(self, means):
         """Overrides the means weights"""
         weights = self.get_weights()
-        weights[0] = means
-        self.set_weight(weights)
+        for i in range(len(weights)):
+            if weights[i].shape == means.shape:
+                weights[i] = means
+        self.set_weights(weights)
 
     def set_covariances(self, covariances):
         """Overrides the covariances weights"""
@@ -148,17 +150,19 @@ class MultivariateNormalLayer(layers.Layer):
 
         # Set layer weights
         weights = self.get_weights()
-        weights[1] = cholesky_covariances
+        for i in range(len(weights)):
+            if weights[i].shape == cholesky_covariances.shape:
+                weights[i] = cholesky_covariances
         self.set_weights(weights)
 
     def get_means(self):
         """Returns the means"""
-        return self.means
+        return self.means.numpy()
 
     def get_covariances(self):
         """Returns the covariances"""
         covariances = cholesky_factor_to_full_matrix(self.cholesky_covariances)
-        return covariances
+        return covariances.numpy()
 
     def compute_output_shape(self, input_shape):
         return [
