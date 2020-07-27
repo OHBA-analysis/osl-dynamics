@@ -209,25 +209,23 @@ class TrainableVariablesLayer(layers.Layer):
 class MixMeansCovsLayer(layers.Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
-    def __init__(self, n_states, n_channels, alpha_xform, **kwargs):
+    def __init__(
+        self, n_states, n_channels, alpha_xform, learn_alpha_scaling, **kwargs
+    ):
         super().__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
+        self.learn_alpha_scaling = learn_alpha_scaling
 
     def build(self, input_shape):
-
-        # Only learn alpha_scaling if softmax is being used
-        trainable = True if self.alpha_xform == "softmax" else False
-
         self.alpha_scaling = self.add_weight(
             "alpha_scaling",
             shape=self.n_states,
             dtype=K.floatx(),
             initializer=tf.keras.initializers.Ones(),
-            trainable=trainable,
+            trainable=self.learn_alpha_scaling,
         )
-
         self.built = True
 
     def call(self, inputs, **kwargs):
@@ -271,6 +269,7 @@ class MixMeansCovsLayer(layers.Layer):
                 "n_states": self.n_states,
                 "n_channels": self.n_channels,
                 "alpha_xform": self.alpha_xform,
+                "learn_alpha_scaling": self.learn_alpha_scaling,
             }
         )
         return config
