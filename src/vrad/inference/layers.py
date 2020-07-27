@@ -131,38 +131,9 @@ class MultivariateNormalLayer(layers.Layer):
             return cholesky_factor_to_full_matrix(self.cholesky_covariances)
 
         # If we are in the burn-in phase call no_grad, otherwise call with_grad
-        self.covariances = tf.cond(self.burnin, no_grad, with_grad,)
+        self.covariances = tf.cond(self.burnin, no_grad, with_grad)
 
         return [self.means, self.covariances]
-
-    def set_means(self, means):
-        """Overrides the means weights"""
-        weights = self.get_weights()
-        for i in range(len(weights)):
-            if weights[i].shape == means.shape:
-                weights[i] = means
-        self.set_weights(weights)
-
-    def set_covariances(self, covariances):
-        """Overrides the covariances weights"""
-        # Calculate the cholesky factor
-        cholesky_covariances = cholesky_factor(covariances)
-
-        # Set layer weights
-        weights = self.get_weights()
-        for i in range(len(weights)):
-            if weights[i].shape == cholesky_covariances.shape:
-                weights[i] = cholesky_covariances
-        self.set_weights(weights)
-
-    def get_means(self):
-        """Returns the means"""
-        return self.means.numpy()
-
-    def get_covariances(self):
-        """Returns the covariances"""
-        covariances = cholesky_factor_to_full_matrix(self.cholesky_covariances)
-        return covariances.numpy()
 
     def compute_output_shape(self, input_shape):
         return [
@@ -259,10 +230,6 @@ class MixMeansCovsLayer(layers.Layer):
 
         self.built = True
 
-    def get_alpha_scaling(self):
-        """Returns the alpha_scaling weight"""
-        return self.alpha_scaling
-
     def call(self, inputs, **kwargs):
         """Computes m_t = Sum_j alpha_jt mu_j and C_t = Sum_j alpha_jt D_j."""
         # Unpack the inputs:
@@ -322,7 +289,7 @@ class LogLikelihoodLayer(layers.Layer):
         """Computes the log likelihood:
            c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
            where:
-           - x are the observations
+           - x is a single observation
            - mu is the mean vector
            - sigma is the covariance matrix
            - c is a constant

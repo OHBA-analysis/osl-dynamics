@@ -18,6 +18,7 @@ from vrad.inference.layers import (
     ReparameterizationLayer,
     TrainableVariablesLayer,
 )
+from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
 from vrad.utils.misc import listify
 
 
@@ -295,30 +296,40 @@ def override_methods(
 
     # Method to get the learned means and covariances for each state
     def get_means_covariances():
-        for layer in model.layers:
-            if isinstance(layer, MultivariateNormalLayer):
-                mvn_layer = layer
-                means = mvn_layer.get_means()
-                covariances = mvn_layer.get_covariances()
-                print(means, covariances)
-                return means, covariances
+        mvn_layer = model.get_layer("mvn")
+        means = mvn_layer.means.numpy()
+        cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
+        covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+        return means, covariances
 
     model.get_means_covariances = get_means_covariances
 
     # Method to set means and covariances for each state
     def set_means_covariances(means=None, covariances=None):
-        for layer in model.layers:
-            if isinstance(layer, MultivariateNormalLayer):
-                mvn_layer = layer
-                mvn_layer.set_means(means)
-                mvn_layer.set_covariances(covariances)
+        mvn_layer = model.get_layer("mvn")
+        layer_weights = mvn_layer.get_weights()
+
+        # Replace means in the layer weights
+        if means is not None:
+            for i in range(len(layer_weights)):
+                if layer_weights[i].shape == means.shape:
+                    layer_weights[i] = means
+
+        # Replace covariances in the layer weights
+        if covariances is not None:
+            for i in range(len(layer_weights)):
+                if layer_weights[i].shape == covariances.shape:
+                    layer_weights[i] = cholesky_factor(covariances)
+
+        # Set the weights of the layer
+        mvn_layer.set_weights(layer_weights)
 
     model.set_means_covariances = set_means_covariances
 
     # Method to get the alpha scaling of each state
     def get_alpha_scaling():
         mix_means_covs_layer = model.get_layer("mix_means_covs")
-        alpha_scaling = mix_means_covs_layer.get_alpha_scaling()
+        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
         return alpha_scaling
 
     model.get_alpha_scaling = get_alpha_scaling
