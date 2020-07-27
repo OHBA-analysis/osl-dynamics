@@ -109,3 +109,8 @@ def full_covariances(means, covariances):
     means = means[:, np.newaxis, :]
     full_covariances = (means @ means.transpose(0, 2, 1)) + covariances
     return full_covariances
+
+
+def softplus(x):
+    """Softplus function"""
+    return np.log(1 + np.exp(x))
