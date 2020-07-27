@@ -320,12 +320,13 @@ def override_methods(
     model.set_means_covariances = set_means_covariances
 
     # Method to get the alpha scaling of each state
-    def alpha_scaling():
+    def get_alpha_scaling():
         mix_means_covs_layer = model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.get_alpha_scaling()
         return alpha_scaling
 
-    model.alpha_scaling = alpha_scaling
+    model.get_alpha_scaling = get_alpha_scaling
+
     return model
 
 
