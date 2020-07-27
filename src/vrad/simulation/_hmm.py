@@ -50,9 +50,12 @@ class HMMSimulation(Simulation):
             self.state_time_course = self.generate_states()
 
     def generate_states(self) -> np.ndarray:
-        rng = np.random.default_rng()
         rands = [
-            iter(rng.choice(self.n_states, size=self.n_samples, p=self.trans_prob[i]))
+            iter(
+                self._rng.choice(
+                    self.n_states, size=self.n_samples, p=self.trans_prob[:, i]
+                )
+            )
             for i in range(self.n_states)
         ]
 
