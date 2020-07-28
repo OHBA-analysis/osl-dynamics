@@ -3,11 +3,12 @@
 """
 
 import numpy as np
-from tensorflow.keras import Model, layers, optimizers, models
+from tensorflow.keras import Model, layers, models, optimizers
 from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
+from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
 from vrad.inference.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
@@ -18,7 +19,6 @@ from vrad.inference.layers import (
     ReparameterizationLayer,
     TrainableVariablesLayer,
 )
-from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
 from vrad.utils.misc import listify
 
 

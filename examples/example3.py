@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
-from vrad.inference import metrics, tf_ops, priors
+from vrad.inference import metrics, priors, tf_ops
 from vrad.inference.models import create_model
 from vrad.utils import plotting
 
