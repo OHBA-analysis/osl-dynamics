@@ -51,6 +51,54 @@ def correlate_states(
     return correlation
 
 
+def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
+    """Matches matrices based on Frobenius norm of the difference of the matrices.
+
+    Each matrix must be 3D: (n_states, n_channels, n_channels).
+
+    The Frobenius norm is F = [Sum_{i,j} abs(a_{ij}^2)]^0.5,
+    where A is the element-wise difference of two matrices.
+    """
+    # Check all matrices have the same shape
+    for matrix in matrices[1:]:
+        if matrix.shape != matrices[0].shape:
+            raise ValueError("Matrices must have the same shape.")
+
+    # Number of arguments and number of matrices in each argument passed
+    n_args = len(matrices)
+    n_matrices = matrices[0].shape[0]
+
+    # Calculate the similarity between matrices
+    F = np.empty([n_matrices, n_matrices])
+    matched_matrices = [matrices[0]]
+    for i in range(1, n_args):
+        for j in range(n_matrices):
+            # Find the matrix that is most similar to matrix j
+            for k in range(n_matrices):
+                A = abs(np.diagonal(matrices[i][k]) - np.diagonal(matrices[0][j]))
+                F[j, k] = np.linalg.norm(A)
+        order = F.argmin(axis=1)
+
+        # Check that we haven't repeated any matches
+        if order.shape[0] != np.unique(order).shape[0]:
+            for l in np.unique(order):
+                repeated_matrices = np.argwhere(order == l)
+                if len(repeated_matrices) > 1:
+                    for m in np.squeeze(repeated_matrices):
+                        if F[:, l].argmin() != m:
+                            # Find the second smallest F
+                            order[m] = np.partition(F[m], 2)[2]
+
+        # Warn the user if we still couldn't find a good match for each matrix
+        if order.shape[0] != np.unique(order).shape[0]:
+            print("WARNING: could not match matrices.")
+
+        # Add the ordered matrix to the list
+        matched_matrices.append(matrices[i][order])
+
+    return tuple(matched_matrices)
+
+
 @transpose
 def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
     """Find correlated states between state time courses.
