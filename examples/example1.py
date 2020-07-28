@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
-from vrad.inference import priors, metrics, tf_ops
+from vrad.inference import gmm, metrics, tf_ops
 from vrad.inference.models import create_model
 from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
@@ -74,7 +74,7 @@ meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
 # Priors
-means, covariances = priors.gaussian_mixture_model(
+means, covariances = gmm.final_means_covariances(
     meg_data,
     n_states,
     gmm_kwargs={
