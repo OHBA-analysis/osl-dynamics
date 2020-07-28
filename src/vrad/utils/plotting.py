@@ -951,6 +951,63 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     plot_matrices([confusion, nan_diagonal], group_color_scale=False)
 
 
+def plot_loss(
+    losses: np.ndarray,
+    labels: list = None,
+    legend_loc: int = 1,
+    x_range: list = None,
+    y_range: list = None,
+    title: str = None,
+    filename: str = None,
+):
+    """Plot a training loss curve."""
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    if isinstance(losses, list):
+        losses = np.array(losses)
+
+    if losses.ndim == 1:
+        losses = [losses]
+
+    if x_range is None:
+        x_range = [None, None]
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = [labels]
+        else:
+            if len(labels) != len(losses):
+                raise ValueError("Incorrect number of losses or labels passed.")
+        add_legend = True
+    else:
+        labels = [None] * len(losses)
+        add_legend = False
+
+    # Plot the loss curves
+    for i in range(len(losses)):
+        ax.plot(range(1, len(losses[i]) + 1), losses[i], label=labels[i])
+
+    # Set axis range
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+
+    #  Add a legend
+    if add_legend:
+        ax.legend(loc=legend_loc)
+
+    # Clean up layout and show or save
+    plt.tight_layout()
+    show_or_save(filename)
+
+
 def show_or_save(filename: str = None):
     if filename is None:
         plt.show()
