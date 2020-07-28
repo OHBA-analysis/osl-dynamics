@@ -9,7 +9,6 @@
 """
 
 print("Importing packages")
-import mat73
 import numpy as np
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
@@ -53,6 +52,9 @@ learn_covariances = True
 
 alpha_xform = "softmax"
 learn_alpha_scaling = False
+
+n_initializations = None
+n_epochs_initialization = None
 
 # Read MEG data
 print("Reading MEG data")
