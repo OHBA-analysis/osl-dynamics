@@ -77,21 +77,7 @@ def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
             for k in range(n_matrices):
                 A = abs(np.diagonal(matrices[i][k]) - np.diagonal(matrices[0][j]))
                 F[j, k] = np.linalg.norm(A)
-        order = F.argmin(axis=1)
-
-        # Check that we haven't repeated any matches
-        if order.shape[0] != np.unique(order).shape[0]:
-            for l in np.unique(order):
-                repeated_matrices = np.argwhere(order == l)
-                if len(repeated_matrices) > 1:
-                    for m in np.squeeze(repeated_matrices):
-                        if F[:, l].argmin() != m:
-                            # Find the second smallest F
-                            order[m] = np.partition(F[m], 2)[2]
-
-        # Warn the user if we still couldn't find a good match for each matrix
-        if order.shape[0] != np.unique(order).shape[0]:
-            print("WARNING: could not match matrices.")
+        order = linear_sum_assignment(F)[1]
 
         # Add the ordered matrix to the list
         matched_matrices.append(matrices[i][order])
