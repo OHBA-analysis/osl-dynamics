@@ -1,4 +1,4 @@
-"""Inference and generative model.
+"""Inference network and generative model.
 
 """
 
@@ -8,7 +8,7 @@ from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
-from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
+from vrad.inference.initializers import reinitialize_model_weights
 from vrad.inference.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
@@ -42,6 +42,8 @@ def create_model(
     annealing_sharpness: float,
     n_epochs_annealing: int,
     n_epochs_burnin: int,
+    n_initializations: int,
+    n_epochs_initialization: int,
     learning_rate: float,
     clip_normalization: float,
     multi_gpu: bool = False,
@@ -60,6 +62,7 @@ def create_model(
     elif strategy is None:
         strategy = get_strategy()
 
+    # Create the model
     with strategy.scope():
         model = _model_structure(
             n_states=n_states,
@@ -79,21 +82,192 @@ def create_model(
             learn_alpha_scaling=learn_alpha_scaling,
         )
 
-        # Compile the model
-        model.compile(
-            optimizer=optimizer,
-            loss=[_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)],
-        )
+    # Override the compile method (to ensure the model is always compiled with
+    # the right distributed strategy)
+    model.original_compile = model.compile
 
-    # Override default Keras model methods
-    model = override_methods(
-        model,
-        n_epochs_burnin,
-        do_annealing,
-        annealing_factor,
-        annealing_sharpness,
-        n_epochs_annealing,
+    def compile():
+        with strategy.scope():
+            model.original_compile(
+                optimizer=optimizer,
+                loss=[
+                    _ll_loss_fn,
+                    _create_kl_loss_fn(annealing_factor=annealing_factor),
+                ],
+            )
+
+    model.compile = compile
+
+    # Compile the model
+    model.compile()
+
+    # Override the load_weights model (to ensure the model weights are loaded
+    # in the correct scope)
+    model.original_load_weights = model.load_weights
+
+    def load_weights(filepath):
+        with strategy.scope():
+            model.original_load_weights(filepath)
+
+    model.load_weights = load_weights
+
+    # Override original predict method
+    model.original_predict = model.predict
+
+    def named_predict(*args, **kwargs):
+        prediction = model.original_predict(*args, **kwargs)
+        return_names = [
+            "ll_loss",
+            "kl_loss",
+            "theta_t",
+            "m_theta_t",
+            "log_s2_theta_t",
+            "mu_theta_jt",
+            "log_sigma2_theta_j",
+        ]
+        prediction_dict = dict(zip(return_names, prediction))
+        return prediction_dict
+
+    model.predict = named_predict
+
+    # Method to predict the inferred state time course
+    def predict_states(*args, **kwargs):
+        m_theta_t = model.predict(*args, **kwargs)["m_theta_t"]
+        return np.concatenate(m_theta_t)
+
+    model.predict_states = predict_states
+
+    # Method to calculate the free energy (log likelihood + KL divergence)
+    def free_energy(dataset, return_all=False):
+        predictions = model.predict(dataset)
+        ll_loss = np.mean(predictions["ll_loss"])
+        kl_loss = np.mean(predictions["kl_loss"])
+        if return_all:
+            return ll_loss + kl_loss, ll_loss, kl_loss
+        else:
+            return ll_loss + kl_loss
+
+    model.free_energy = free_energy
+
+    # Callbacks
+    burnin_callback = BurninCallback(epochs=n_epochs_burnin)
+
+    annealing_callback = AnnealingCallback(
+        annealing_factor=annealing_factor,
+        annealing_sharpness=annealing_sharpness,
+        n_epochs_annealing=n_epochs_annealing,
     )
+
+    # Keep original fit method to train the model
+    model.original_fit = model.fit
+
+    # A fit method which includes annealing and burn-in in training
+    def anneal_burnin_fit(*args, **kwargs):
+        args = list(args)
+
+        # Add annealing and burn-in callbacks
+        if len(args) > 5:
+            args[5] = listify(args[5]) + [annealing_callback, burnin_callback]
+        if "callbacks" in kwargs:
+            kwargs["callbacks"] = listify(kwargs["callbacks"]) + [
+                annealing_callback,
+                burnin_callback,
+            ]
+        else:
+            kwargs["callbacks"] = [annealing_callback, burnin_callback]
+
+        # Train the model
+        model.original_fit(*args, **kwargs)
+
+    # Initialize the means and covariances by training the model for
+    # a few epochs and picking the model with the best free energy.
+    def initialize_means_covariances(*args, **kwargs):
+
+        # Set the epochs argument to n_epochs_initialization
+        args = list(args)
+        if len(args) > 3:
+            args[3] = n_epochs_initialization
+        if "epochs" in kwargs:
+            kwargs["epochs"] = n_epochs_initialization
+
+        # Pick the initialization with the lowest free energy
+        best_free_energy = np.Inf
+        for n in range(n_initializations):
+            print(f"Initialization {n}")
+
+            # Reset model weights, optimizer and annealing factor
+            reinitialize_model_weights(model)
+            model.compile()
+            if do_annealing:
+                annealing_factor.assign(0.0)
+
+            # Train the model
+            anneal_burnin_fit(*args, **kwargs)
+
+            # Get the model weights if it's the best model
+            free_energy = model.free_energy(args[0])
+            print(f"Free energy: {free_energy}")
+            if free_energy < best_free_energy:
+                best_initialization = n
+                best_free_energy = free_energy
+                best_weights = model.get_weights()
+
+        # Use the best model for the rest of training and reset the annealing factor
+        print(f"Using initialization {best_initialization}")
+        model.set_weights(best_weights)
+        if do_annealing:
+            annealing_factor.assign(0.0)
+
+    # Override the fit method to include initialization and annealing/burn-in
+    def fit(*args, **kwargs):
+        if not hasattr(model, "initialized") and n_initializations is not None:
+            initialize_means_covariances(*args, **kwargs)
+            model.initialized = True
+
+        # Train the model
+        anneal_burnin_fit(*args, **kwargs)
+
+    model.fit = fit
+
+    # Method to get the learned means and covariances for each state
+    def get_means_covariances():
+        mvn_layer = model.get_layer("mvn")
+        means = mvn_layer.means.numpy()
+        cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
+        covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+        return means, covariances
+
+    model.get_means_covariances = get_means_covariances
+
+    # Method to set means and covariances for each state
+    def set_means_covariances(means=None, covariances=None):
+        mvn_layer = model.get_layer("mvn")
+        layer_weights = mvn_layer.get_weights()
+
+        # Replace means in the layer weights
+        if means is not None:
+            for i in range(len(layer_weights)):
+                if layer_weights[i].shape == means.shape:
+                    layer_weights[i] = means
+
+        # Replace covariances in the layer weights
+        if covariances is not None:
+            for i in range(len(layer_weights)):
+                if layer_weights[i].shape == covariances.shape:
+                    layer_weights[i] = cholesky_factor(covariances)
+
+        # Set the weights of the layer
+        mvn_layer.set_weights(layer_weights)
+
+    model.set_means_covariances = set_means_covariances
+
+    # Method to get the alpha scaling of each state
+    def get_alpha_scaling():
+        mix_means_covs_layer = model.get_layer("mix_means_covs")
+        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
+        return alpha_scaling
+
+    model.get_alpha_scaling = get_alpha_scaling
 
     return model
 
@@ -220,152 +394,3 @@ def _model_structure(
     ]
 
     return Model(inputs=inputs, outputs=outputs)
-
-
-def override_methods(
-    model,
-    n_epochs_burnin,
-    do_annealing,
-    annealing_factor,
-    annealing_sharpness,
-    n_epochs_annealing,
-):
-    """Overrides default Keras model methods."""
-
-    # Callbacks
-    burnin_callback = BurninCallback(epochs=n_epochs_burnin)
-
-    annealing_callback = AnnealingCallback(
-        annealing_factor=annealing_factor,
-        annealing_sharpness=annealing_sharpness,
-        n_epochs_annealing=n_epochs_annealing,
-    )
-
-    # Override original fit method
-    model.original_fit_method = model.fit
-
-    def anneal_burnin_fit(*args, **kwargs):
-        args = list(args)
-        if len(args) > 5:
-            args[5] = listify(args[5]) + [annealing_callback, burnin_callback]
-        if "callbacks" in kwargs:
-            kwargs["callbacks"] = listify(kwargs["callbacks"]) + [
-                annealing_callback,
-                burnin_callback,
-            ]
-        else:
-            kwargs["callbacks"] = [annealing_callback, burnin_callback]
-        return model.original_fit_method(*args, **kwargs)
-
-    model.fit = anneal_burnin_fit
-
-    # Override original predict method
-    model.original_predict_function = model.predict
-
-    def named_predict(*args, **kwargs):
-        prediction = model.original_predict_function(*args, **kwargs)
-        return_names = [
-            "ll_loss",
-            "kl_loss",
-            "theta_t",
-            "m_theta_t",
-            "log_s2_theta_t",
-            "mu_theta_jt",
-            "log_sigma2_theta_j",
-        ]
-        prediction_dict = dict(zip(return_names, prediction))
-        return prediction_dict
-
-    model.predict = named_predict
-
-    # Method to predict the inferred state time course
-    def predict_states(*args, **kwargs):
-        m_theta_t = model.predict(*args, **kwargs)["m_theta_t"]
-        return np.concatenate(m_theta_t)
-
-    model.predict_states = predict_states
-
-    # Method to calculate the free energy (log likelihood + KL divergence)
-    def free_energy(dataset, return_all=False):
-        predictions = model.predict(dataset)
-        ll_loss = np.mean(predictions["ll_loss"])
-        kl_loss = np.mean(predictions["kl_loss"])
-        if return_all:
-            return ll_loss + kl_loss, ll_loss, kl_loss
-        else:
-            return ll_loss + kl_loss
-
-    model.free_energy = free_energy
-
-    # Method to get the learned means and covariances for each state
-    def get_means_covariances():
-        mvn_layer = model.get_layer("mvn")
-        means = mvn_layer.means.numpy()
-        cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
-        covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
-        return means, covariances
-
-    model.get_means_covariances = get_means_covariances
-
-    # Method to set means and covariances for each state
-    def set_means_covariances(means=None, covariances=None):
-        mvn_layer = model.get_layer("mvn")
-        layer_weights = mvn_layer.get_weights()
-
-        # Replace means in the layer weights
-        if means is not None:
-            for i in range(len(layer_weights)):
-                if layer_weights[i].shape == means.shape:
-                    layer_weights[i] = means
-
-        # Replace covariances in the layer weights
-        if covariances is not None:
-            for i in range(len(layer_weights)):
-                if layer_weights[i].shape == covariances.shape:
-                    layer_weights[i] = cholesky_factor(covariances)
-
-        # Set the weights of the layer
-        mvn_layer.set_weights(layer_weights)
-
-    model.set_means_covariances = set_means_covariances
-
-    # Method to get the alpha scaling of each state
-    def get_alpha_scaling():
-        mix_means_covs_layer = model.get_layer("mix_means_covs")
-        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
-        return alpha_scaling
-
-    model.get_alpha_scaling = get_alpha_scaling
-
-    return model
-
-
-def load_model(
-    filename,
-    n_epochs_burnin=None,
-    do_annealing=False,
-    annealing_factor=None,
-    annealing_sharpness=None,
-    n_epochs_annealing=None,
-):
-    """Loads a model saved."""
-    annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
-
-    model = models.load_model(
-        filename,
-        custom_objects={
-            "_ll_loss_fn": _ll_loss_fn,
-            "_kl_loss_fn": _create_kl_loss_fn(annealing_factor),
-        },
-    )
-
-    model = override_methods(
-        model,
-        n_epochs_burnin,
-        do_annealing,
-        annealing_factor,
-        annealing_sharpness,
-        n_epochs_annealing,
-    )
-
-    return model

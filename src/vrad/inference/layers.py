@@ -89,7 +89,7 @@ class MultivariateNormalLayer(layers.Layer):
     def build(self, input_shape):
         # Initializer for means
         if self.initial_means is None:
-            self.means_initializer = tf.keras.initializers.Zeros
+            self.means_initializer = tf.keras.initializers.Zeros()
         else:
             self.means_initializer = MeansInitializer(self.initial_means)
 
@@ -104,7 +104,7 @@ class MultivariateNormalLayer(layers.Layer):
 
         # Initializer for covariances
         if self.initial_cholesky_covariances is None:
-            self.cholesky_covariances_initializer = Identity3D
+            self.cholesky_covariances_initializer = Identity3D()
         else:
             self.cholesky_covariances_initializer = CholeskyCovariancesInitializer(
                 self.initial_cholesky_covariances
@@ -169,19 +169,19 @@ class TrainableVariablesLayer(layers.Layer):
         self.initial_values = initial_values
         self.trainable = trainable
 
-    def _variables_initializer(self, shape, dtype=tf.float32):
-        values = self.initial_values
-        return values
-
     def build(self, input_shape):
 
         # If no initial values have been passed, initialise with zeros
         if self.initial_values is None:
-            self.values_initializer = tf.keras.initializers.Zeros
+            self.values_initializer = tf.keras.initializers.Zeros()
 
         # Otherwise, initialise with the variables passed
         else:
-            self.values_initializer = self._variables_initializer
+
+            def variables_initializer(shape, dtype=None):
+                return self.initial_values
+
+            self.values_initializer = variables_initializer
 
         # Create traininable weights
         self.values = self.add_weight(
@@ -219,11 +219,12 @@ class MixMeansCovsLayer(layers.Layer):
         self.learn_alpha_scaling = learn_alpha_scaling
 
     def build(self, input_shape):
+        self.alpha_scaling_initializer = tf.keras.initializers.Ones()
         self.alpha_scaling = self.add_weight(
             "alpha_scaling",
             shape=self.n_states,
             dtype=K.floatx(),
-            initializer=tf.keras.initializers.Ones(),
+            initializer=self.alpha_scaling_initializer,
             trainable=self.learn_alpha_scaling,
         )
         self.built = True

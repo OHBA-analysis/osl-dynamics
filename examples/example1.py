@@ -56,6 +56,9 @@ learn_covariances = True
 alpha_xform = "softmax"
 learn_alpha_scaling = False
 
+n_initializations = None
+n_epochs_initialization = None
+
 # Load state transition probability matrix and covariances of each state
 init_trans_prob = np.load("data/prob_000.npy")
 init_cov = np.load("data/state_000.npy")
@@ -110,6 +113,8 @@ model = create_model(
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
     n_epochs_burnin=n_epochs_burnin,
+    n_initializations=n_initializations,
+    n_epochs_initialization=n_epochs_initialization,
     learning_rate=learning_rate,
     clip_normalization=clip_normalization,
     multi_gpu=multi_gpu,
