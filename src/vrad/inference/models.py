@@ -8,6 +8,7 @@ from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
+from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
 from vrad.inference.initializers import reinitialize_model_weights
 from vrad.inference.layers import (
     InferenceRNNLayers,
