@@ -184,7 +184,7 @@ def create_model(
             kwargs["callbacks"] = additional_callbacks
 
         # Train the model
-        model.original_fit(*args, **kwargs)
+        return model.original_fit(*args, **kwargs)
 
     # Initialize the means and covariances by training the model for
     # a few epochs and picking the model with the best free energy.
@@ -236,7 +236,7 @@ def create_model(
             model.initialized = True
 
         # Train the model
-        anneal_burnin_fit(*args, **kwargs)
+        return anneal_burnin_fit(*args, **kwargs)
 
     model.fit = fit
 
