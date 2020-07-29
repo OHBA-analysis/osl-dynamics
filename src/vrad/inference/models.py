@@ -227,7 +227,11 @@ def create_model(
 
     # Override the fit method to include initialization and annealing/burn-in
     def fit(*args, **kwargs):
-        if not hasattr(model, "initialized") and n_initializations is not None:
+        if (
+            not hasattr(model, "initialized")
+            and n_initializations is not None
+            and n_initializations > 0
+        ):
             initialize_means_covariances(*args, **kwargs)
             model.initialized = True
 
