@@ -9,8 +9,6 @@
 
 print("Importing packages")
 import numpy as np
-from tqdm import tqdm
-from tqdm.keras import TqdmCallback
 from vrad import array_ops, data
 from vrad.inference import gmm, metrics, tf_ops
 from vrad.inference.models import create_model
@@ -129,12 +127,7 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Train the model
 print("Training model")
-history = model.fit(
-    training_dataset,
-    callbacks=[TqdmCallback(tqdm_class=tqdm, verbose=0)],
-    epochs=n_epochs,
-    verbose=0,
-)
+history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
 # Inferred covariances
 inf_means, inf_cov = model.get_means_covariances()
