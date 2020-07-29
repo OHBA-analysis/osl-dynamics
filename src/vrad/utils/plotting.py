@@ -757,7 +757,7 @@ def add_figure_colorbar(fig: plt.Figure, mappable):
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
     state_time_course: np.ndarray,
-    bins: int = 20,
+    bins: int = "auto",
     density: bool = False,
     match_scale_x=True,
     match_scale_y=True,
