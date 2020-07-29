@@ -7,6 +7,8 @@ from tensorflow.keras import Model, layers, models, optimizers
 from tensorflow.python import Variable, zeros
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
+from tqdm import tqdm
+from tqdm.keras import TqdmCallback
 from vrad.inference.callbacks import AnnealingCallback, BurninCallback
 from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
 from vrad.inference.initializers import reinitialize_model_weights
@@ -163,19 +165,23 @@ def create_model(
     model.original_fit = model.fit
 
     # A fit method which includes annealing and burn-in in training
-    def anneal_burnin_fit(*args, **kwargs):
+    def anneal_burnin_fit(*args, use_tqdm=False, tqdm_class=None, **kwargs):
         args = list(args)
 
         # Add annealing and burn-in callbacks
+        additional_callbacks = [annealing_callback, burnin_callback]
+        if use_tqdm:
+            if tqdm_class is not None:
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+            else:
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
+            additional_callbacks.append(tqdm_callback)
         if len(args) > 5:
-            args[5] = listify(args[5]) + [annealing_callback, burnin_callback]
+            args[5] = listify(args[5]) + additional_callbacks
         if "callbacks" in kwargs:
-            kwargs["callbacks"] = listify(kwargs["callbacks"]) + [
-                annealing_callback,
-                burnin_callback,
-            ]
+            kwargs["callbacks"] = listify(kwargs["callbacks"]) + additional_callbacks
         else:
-            kwargs["callbacks"] = [annealing_callback, burnin_callback]
+            kwargs["callbacks"] = additional_callbacks
 
         # Train the model
         model.original_fit(*args, **kwargs)
