@@ -1,9 +1,9 @@
 """Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Initialises the covariances with the identity matrix. This is in constrast to
-  example2.py, which uses the final covariances from an HMM fit using OSL.
-- Takes approximately 4 minutes to train (on compG017).
+- Data preparation is performed within V-RAD. This is in contrast to examples3.py,
+  which used data that's already been prepared.
+- Initialises the covariances with the identity matrix.
 - Achieves a dice coefficient of ~0.4 (when compared to the OSL HMM state time course).
 - Achieved a free energy of ~240,000.
 """
@@ -56,7 +56,8 @@ n_epochs_initialization = 25
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
+meg_data = data.Data("/well/woolrich/shared/vrad/preprocessed_data/subject1.mat")
+meg_data.prepare(n_embeddings=13, n_pca_components=80, whiten=True)
 n_channels = meg_data.n_channels
 
 # Use defaults for the initial means and covariances

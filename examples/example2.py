@@ -1,11 +1,10 @@
 """Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- Uses the final covariances inferred by an HMM fit from OSL.
 - Takes approximately 4 minutes to train (on compG017).
 - Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
-- Uses the final covariances inferred by an HMM fit from OSL.
-- Line 106, 127, 128 can be uncommented to produce a plot of the inferred
-  covariances and state time courses.
+- Achieves a free energy of ~240,000.
 """
 
 print("Importing packages")
@@ -105,8 +104,6 @@ history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
 # Inferred covariance matrices
 int_means, inf_cov = model.get_means_covariances()
-
-# Plot covariance matrices
 # plotting.plot_matrices(inf_cov, filename="covariances.png")
 
 # Inferred state time courses
@@ -116,8 +113,11 @@ inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance between state time courses
 matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
-
-# Compare state time courses
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 
+# Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
+
+# Free energy
+free_energy, ll_loss, kl_loss = model.free_energy(prediction_dataset, return_all=True)
+print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")
