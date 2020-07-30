@@ -368,6 +368,7 @@ def _model_structure(
         n_channels,
         learn_means=learn_means,
         learn_covariances=learn_covariances,
+        learn_alpha_scaling=learn_alpha_scaling,
         initial_means=initial_means,
         initial_covariances=initial_covariances,
         name="mvn",

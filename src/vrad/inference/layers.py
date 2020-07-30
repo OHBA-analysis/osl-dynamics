@@ -4,6 +4,7 @@
 
 from typing import Union
 
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as layers
 import tensorflow_probability as tfp
@@ -14,6 +15,7 @@ from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     is_symmetric,
+    normalize_covariances,
 )
 from vrad.inference.initializers import (
     CholeskyCovariancesInitializer,
@@ -61,6 +63,7 @@ class MultivariateNormalLayer(layers.Layer):
         dim,
         learn_means=True,
         learn_covariances=True,
+        learn_alpha_scaling=True,
         initial_means=None,
         initial_covariances=None,
         **kwargs
@@ -70,6 +73,7 @@ class MultivariateNormalLayer(layers.Layer):
         self.dim = dim
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances
+        self.learn_alpha_scaling = learn_alpha_scaling
         self.initial_means = initial_means
         self.burnin = tf.Variable(False, trainable=False)
 
@@ -133,6 +137,10 @@ class MultivariateNormalLayer(layers.Layer):
         # If we are in the burn-in phase call no_grad, otherwise call with_grad
         self.covariances = tf.cond(self.burnin, no_grad, with_grad)
 
+        # If we're learning an alpha scaling we should normalise the covariances
+        if self.learn_alpha_scaling:
+            self.covariances = normalize_covariances(self.covariances)
+
         return [self.means, self.covariances]
 
     def compute_output_shape(self, input_shape):
@@ -149,8 +157,10 @@ class MultivariateNormalLayer(layers.Layer):
                 "dim": self.dim,
                 "learn_means": self.learn_means,
                 "learn_covariances": self.learn_covariances,
+                "learn_alpha_scaling": self.learn_alpha_scaling,
                 "initial_means": self.initial_means,
                 "initial_cholesky_covariances": self.initial_cholesky_covariances,
+                "burnin": self.burnin,
             }
         )
         return config
@@ -219,7 +229,10 @@ class MixMeansCovsLayer(layers.Layer):
         self.learn_alpha_scaling = learn_alpha_scaling
 
     def build(self, input_shape):
-        self.alpha_scaling_initializer = tf.keras.initializers.Ones()
+        # Initialise such that softplus(alpha_scaling) = 1
+        self.alpha_scaling_initializer = tf.keras.initializers.Constant(
+            np.log(np.exp(1.0) - 1.0)
+        )
         self.alpha_scaling = self.add_weight(
             "alpha_scaling",
             shape=self.n_states,
