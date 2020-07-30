@@ -54,11 +54,6 @@ def create_model(
 ):
     annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
 
-    # Setup optimizer
-    optimizer = optimizers.Adam(
-        learning_rate=learning_rate, clipnorm=clip_normalization,
-    )
-
     # Stretegy for distributed learning
     if multi_gpu:
         strategy = MirroredStrategy()
@@ -85,19 +80,21 @@ def create_model(
             learn_alpha_scaling=learn_alpha_scaling,
         )
 
-    # Override the compile method (to ensure the model is always compiled with
-    # the right distributed strategy)
+    # Override the compile method
     model.original_compile = model.compile
 
-    def compile():
-        with strategy.scope():
-            model.original_compile(
-                optimizer=optimizer,
-                loss=[
-                    _ll_loss_fn,
-                    _create_kl_loss_fn(annealing_factor=annealing_factor),
-                ],
+    def compile(optimizer=None):
+        if optimizer == None:
+            # Setup optimizer
+            optimizer = optimizers.Adam(
+                learning_rate=learning_rate, clipnorm=clip_normalization,
             )
+
+        # Loss functions
+        loss = [_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)]
+
+        # Compile
+        model.original_compile(optimizer=optimizer, loss=loss)
 
     model.compile = compile
 
@@ -202,9 +199,9 @@ def create_model(
         for n in range(n_initializations):
             print(f"Initialization {n}")
 
-            # Reset model weights, optimizer and annealing factor
-            reinitialize_model_weights(model)
+            # Reset optimizer, model weights and annealing factor
             model.compile()
+            reinitialize_model_weights(model)
             if do_annealing:
                 annealing_factor.assign(0.0)
 
@@ -212,15 +209,16 @@ def create_model(
             anneal_burnin_fit(*args, **kwargs)
 
             # Get the model weights if it's the best model
-            free_energy = model.free_energy(args[0])
-            print(f"Free energy: {free_energy}")
+            free_energy = model.evaluate(args[0], verbose=0)[0]
             if free_energy < best_free_energy:
                 best_initialization = n
                 best_free_energy = free_energy
                 best_weights = model.get_weights()
+                best_optimizer = model.optimizer
 
         # Use the best model for the rest of training and reset the annealing factor
         print(f"Using initialization {best_initialization}")
+        model.compile(optimizer=best_optimizer)
         model.set_weights(best_weights)
         if do_annealing:
             annealing_factor.assign(0.0)
