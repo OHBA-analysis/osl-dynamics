@@ -41,6 +41,7 @@ def create_model(
     dropout_rate_model: float,
     alpha_xform: str,
     learn_alpha_scaling: bool,
+    normalize_covariances: bool,
     do_annealing: bool,
     annealing_sharpness: float,
     n_epochs_annealing: int,
@@ -78,6 +79,7 @@ def create_model(
             initial_covariances=initial_covariances,
             alpha_xform=alpha_xform,
             learn_alpha_scaling=learn_alpha_scaling,
+            normalize_covariances=normalize_covariances,
         )
 
     # Override the compile method
@@ -312,6 +314,7 @@ def _model_structure(
     initial_covariances: np.ndarray,
     alpha_xform: str,
     learn_alpha_scaling: bool,
+    normalize_covariances: bool,
 ):
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
@@ -368,7 +371,7 @@ def _model_structure(
         n_channels,
         learn_means=learn_means,
         learn_covariances=learn_covariances,
-        learn_alpha_scaling=learn_alpha_scaling,
+        normalize_covariances=normalize_covariances,
         initial_means=initial_means,
         initial_covariances=initial_covariances,
         name="mvn",

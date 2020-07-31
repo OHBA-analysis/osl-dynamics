@@ -61,11 +61,11 @@ class MultivariateNormalLayer(layers.Layer):
         self,
         n_gaussians,
         dim,
-        learn_means=True,
-        learn_covariances=True,
-        learn_alpha_scaling=True,
-        initial_means=None,
-        initial_covariances=None,
+        learn_means,
+        learn_covariances,
+        normalize_covariances,
+        initial_means,
+        initial_covariances,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -73,7 +73,7 @@ class MultivariateNormalLayer(layers.Layer):
         self.dim = dim
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances
-        self.learn_alpha_scaling = learn_alpha_scaling
+        self.normalize_covariances = normalize_covariances
         self.initial_means = initial_means
         self.burnin = tf.Variable(False, trainable=False)
 
@@ -137,8 +137,7 @@ class MultivariateNormalLayer(layers.Layer):
         # If we are in the burn-in phase call no_grad, otherwise call with_grad
         self.covariances = tf.cond(self.burnin, no_grad, with_grad)
 
-        # If we're learning an alpha scaling we should normalise the covariances
-        if self.learn_alpha_scaling:
+        if self.normalize_covariances:
             self.covariances = normalize_covariances(self.covariances)
 
         return [self.means, self.covariances]
@@ -157,7 +156,7 @@ class MultivariateNormalLayer(layers.Layer):
                 "dim": self.dim,
                 "learn_means": self.learn_means,
                 "learn_covariances": self.learn_covariances,
-                "learn_alpha_scaling": self.learn_alpha_scaling,
+                "normalize_covariances": self.normalize_covariances,
                 "initial_means": self.initial_means,
                 "initial_cholesky_covariances": self.initial_cholesky_covariances,
                 "burnin": self.burnin,

@@ -49,6 +49,7 @@ learn_covariances = True
 
 alpha_xform = "softmax"
 learn_alpha_scaling = False
+normalize_covariances = False
 
 n_initializations = None
 n_epochs_initialization = None
@@ -80,6 +81,7 @@ model = create_model(
     dropout_rate_model=dropout_rate_model,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
+    normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
