@@ -1,29 +1,30 @@
-"""Example script for running inference on real MEG data for one subject.
+"""Example script for running inference on simulated HMM data.
 
-- The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Initialises the covariances with the identity matrix. This is in constrast to
-  example2.py, which uses the final covariances from an HMM fit using OSL.
-- Takes approximately 4 minutes to train (on compG017).
-- Achieves a dice coefficient of ~0.4 (when compared to the OSL HMM state time course).
-- Achieved a free energy of ~240,000.
+- This script sets a seed for the random number generators for reproducibility.
+- Should achieve a dice coefficient of ~0.94.
+- Takes approximately 1 minute to train (on compG017).
 """
 
 print("Importing packages")
 import numpy as np
 from vrad import array_ops, data
-from vrad.inference import metrics, tf_ops
+from vrad.inference import gmm, metrics, tf_ops
 from vrad.inference.models import create_model
+from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
 
-multi_gpu = True
+multi_gpu = False
 strategy = None
 
 # Settings
-n_states = 6
-sequence_length = 400
+n_samples = 25000
+observation_error = 0.2
+
+n_states = 5
+sequence_length = 100
 batch_size = 32
 
 learning_rate = 0.01
@@ -32,8 +33,8 @@ clip_normalization = None
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 200
-n_epochs_annealing = 150
+n_epochs = 100
+n_epochs_annealing = 80
 n_epochs_burnin = 0
 
 dropout_rate_inference = 0.4
@@ -52,17 +53,41 @@ alpha_xform = "softmax"
 learn_alpha_scaling = False
 normalize_covariances = False
 
-n_initializations = 5
-n_epochs_initialization = 25
+n_initializations = None
+n_epochs_initialization = None
 
-# Read MEG data
-print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
+# Load state transition probability matrix and covariances of each state
+init_trans_prob = np.load("data/prob_000.npy")
+init_cov = np.load("data/state_000.npy")
+
+# Simulate data
+print("Simulating data")
+sim = HMMSimulation(
+    n_states=n_states,
+    trans_prob=init_trans_prob,
+    covariances=init_cov,
+    n_samples=n_samples,
+    observation_error=observation_error,
+    random_seed=123,
+)
+meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
-# Use defaults for the initial means and covariances
-means = None
-covariances = None
+# Priors
+means, covariances = gmm.final_means_covariances(
+    meg_data,
+    n_states,
+    gmm_kwargs={
+        "n_init": 1,
+        "verbose": 2,
+        "verbose_interval": 50,
+        "max_iter": 10000,
+        "tol": 1e-6,
+    },
+    retry_attempts=1,
+    learn_means=False,
+    random_seed=124,
+)
 
 # Build model
 model = create_model(
@@ -104,8 +129,8 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
-# Inferred covariance matrices
-int_means, inf_cov = model.get_means_covariances()
+# Inferred covariances
+inf_means, inf_cov = model.get_means_covariances()
 # plotting.plot_matrices(inf_cov, filename="covariances.png")
 
 # Inferred state time courses
@@ -113,14 +138,9 @@ inf_stc = model.predict_states(prediction_dataset)
 inf_stc = inf_stc.argmax(axis=1)
 inf_stc = array_ops.get_one_hot(inf_stc)
 
-# Find correspondance between state time courses
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
-matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
+# Find correspondance to ground truth state time courses
+matched_stc, matched_inf_stc = array_ops.match_states(sim.state_time_course, inf_stc)
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# plotting.plot_state_time_courses(matched_stc, matched_inf_stc, filename='stc.png')
 
-# Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
-
-# Free energy
-free_energy, ll_loss, kl_loss = model.free_energy(prediction_dataset, return_all=True)
-print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")

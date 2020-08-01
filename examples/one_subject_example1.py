@@ -1,11 +1,10 @@
 """Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Data preparation is performed within V-RAD. This is in contrast to examples3.py,
-  which used data that's already been prepared.
-- Initialises the covariances with the identity matrix.
-- Achieves a dice coefficient of ~0.4 (when compared to the OSL HMM state time course).
-- Achieved a free energy of ~240,000.
+- Uses the final covariances inferred by an HMM fit from OSL.
+- Takes approximately 4 minutes to train (on compG017).
+- Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~240,000.
 """
 
 print("Importing packages")
@@ -34,7 +33,7 @@ annealing_sharpness = 5
 
 n_epochs = 200
 n_epochs_annealing = 150
-n_epochs_burnin = 0
+n_epochs_burnin = 30
 
 dropout_rate_inference = 0.4
 dropout_rate_model = 0.4
@@ -49,21 +48,21 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-learn_alpha_scaling = False
-normalize_covariances = False
+learn_alpha_scaling = True
+normalize_covariances = True
 
-n_initializations = 5
-n_epochs_initialization = 25
+n_initializations = None
+n_epochs_initialization = None
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/preprocessed_data/subject1.mat")
-meg_data.prepare(n_embeddings=13, n_pca_components=80, whiten=True)
+meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
 n_channels = meg_data.n_channels
 
-# Use defaults for the initial means and covariances
-means = None
-covariances = None
+# Priors: we use the covariance matrices inferred by fitting an HMM with OSL
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
+covariances = hmm.covariances
+means = np.zeros([n_states, n_channels], dtype=np.float32)
 
 # Build model
 model = create_model(
@@ -115,7 +114,6 @@ inf_stc = inf_stc.argmax(axis=1)
 inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance between state time courses
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
 matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 

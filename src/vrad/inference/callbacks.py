@@ -49,8 +49,6 @@ class AnnealingCallback(callbacks.Callback):
         self.n_epochs_annealing = n_epochs_annealing
 
     def on_epoch_end(self, epoch, logs=None):
-        if logs is None:
-            logs = {}
         new_value = (
             0.5
             * tanh(

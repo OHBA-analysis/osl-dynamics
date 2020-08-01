@@ -157,6 +157,11 @@ class Data:
             )
             self.prepared = True
 
+    def scale(self):
+        """"Normalises (z-transforms) the data."""
+        for i in range(self.n_subjects):
+            self.subjects[i].scale()
+
     def training_dataset(
         self, sequence_length: int, batch_size: int = 32, window_step: int = None
     ):

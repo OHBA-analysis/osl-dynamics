@@ -2,12 +2,13 @@
 
 """
 
+import logging
 from typing import Union
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.layers as layers
 import tensorflow_probability as tfp
+from tensorflow.keras import layers
 from tensorflow.keras import backend as K
 from tensorflow.keras.activations import softmax, softplus
 from tensorflow.python.keras.backend import stop_gradient
@@ -15,13 +16,15 @@ from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     is_symmetric,
-    normalize_covariances,
+    trace_normalize,
 )
 from vrad.inference.initializers import (
     CholeskyCovariancesInitializer,
     Identity3D,
     MeansInitializer,
 )
+
+_logger = logging.getLogger("VRAD")
 
 
 class ReparameterizationLayer(layers.Layer):
@@ -78,6 +81,10 @@ class MultivariateNormalLayer(layers.Layer):
         self.burnin = tf.Variable(False, trainable=False)
 
         if initial_covariances is not None:
+            # Normalise the covariances if required
+            if normalize_covariances:
+                initial_covariances = trace_normalize(initial_covariances)
+
             # If the matrix is symmetric we assume it's the full covariance matrix
             # WARNING: diagonal matrices are assumed to be the full covariance matrix
             if is_symmetric(initial_covariances):
@@ -138,7 +145,7 @@ class MultivariateNormalLayer(layers.Layer):
         self.covariances = tf.cond(self.burnin, no_grad, with_grad)
 
         if self.normalize_covariances:
-            self.covariances = normalize_covariances(self.covariances)
+            self.covariances = trace_normalize(self.covariances)
 
         return [self.means, self.covariances]
 
@@ -225,7 +232,13 @@ class MixMeansCovsLayer(layers.Layer):
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
-        self.learn_alpha_scaling = learn_alpha_scaling
+        self.learn_alpha_scaling = learn_alpha_scaling and alpha_xform is not "softplus"
+
+        if learn_alpha_scaling and alpha_xform == "softplus":
+            _logger.warning(
+                "Warning: learn_alpha_scaling set to False because "
+                + "alpha_xform=softplus is being used."
+            )
 
     def build(self, input_shape):
         # Initialise such that softplus(alpha_scaling) = 1
