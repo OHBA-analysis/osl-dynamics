@@ -3,7 +3,6 @@
 """
 
 import logging
-from typing import Union
 
 import numpy as np
 import tensorflow as tf
@@ -27,8 +26,58 @@ from vrad.inference.initializers import (
 _logger = logging.getLogger("VRAD")
 
 
+class TrainableVariablesLayer(layers.Layer):
+    """Generic trainable variables layer.
+
+    Sets up trainable parameters/weights tensor of a certain shape.
+    Parameters/weights are outputted.
+    """
+
+    def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.initial_values = initial_values
+        self.trainable = trainable
+
+    def build(self, input_shape):
+
+        # If no initial values have been passed, initialise with zeros
+        if self.initial_values is None:
+            self.values_initializer = tf.keras.initializers.Zeros()
+
+        # Otherwise, initialise with the variables passed
+        else:
+
+            def variables_initializer(shape, dtype=None):
+                return self.initial_values
+
+            self.values_initializer = variables_initializer
+
+        # Create traininable weights
+        self.values = self.add_weight(
+            "values",
+            shape=self.shape,
+            dtype=K.floatx(),
+            initializer=self.values_initializer,
+            trainable=self.trainable,
+        )
+
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        return self.values
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(self.shape)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"shape": self.shape, "trainable": self.trainable})
+        return config
+
+
 class ReparameterizationLayer(layers.Layer):
-    """Resample a normal distribution.
+    """Performs the reparameterisation trick.
 
     The reparameterization trick is used to provide a differentiable random sample.
     By optimizing the values which define the distribution (i.e. mu and sigma), a model
@@ -56,8 +105,10 @@ class ReparameterizationLayer(layers.Layer):
 
 
 class MultivariateNormalLayer(layers.Layer):
-    """Parameterises multiple multivariate Gaussians and in terms of their means
-       and covariances. Means and covariances are outputted.
+    """Layer for Gaussian observations.
+
+    Parameterises multiple multivariate Gaussians and in terms of their means
+    and covariances. Means and covariances are outputted.
     """
 
     def __init__(
@@ -172,56 +223,6 @@ class MultivariateNormalLayer(layers.Layer):
         return config
 
 
-class TrainableVariablesLayer(layers.Layer):
-    """Generic trainable variables layer.
-
-       Sets up trainable parameters/weights tensor of a certain shape.
-       Parameters/weights are outputted.
-    """
-
-    def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-        self.initial_values = initial_values
-        self.trainable = trainable
-
-    def build(self, input_shape):
-
-        # If no initial values have been passed, initialise with zeros
-        if self.initial_values is None:
-            self.values_initializer = tf.keras.initializers.Zeros()
-
-        # Otherwise, initialise with the variables passed
-        else:
-
-            def variables_initializer(shape, dtype=None):
-                return self.initial_values
-
-            self.values_initializer = variables_initializer
-
-        # Create traininable weights
-        self.values = self.add_weight(
-            "values",
-            shape=self.shape,
-            dtype=K.floatx(),
-            initializer=self.values_initializer,
-            trainable=self.trainable,
-        )
-
-        self.built = True
-
-    def call(self, inputs, **kwargs):
-        return self.values
-
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape(self.shape)
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"shape": self.shape, "trainable": self.trainable})
-        return config
-
-
 class MixMeansCovsLayer(layers.Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
@@ -302,7 +303,7 @@ class MixMeansCovsLayer(layers.Layer):
 
 
 class LogLikelihoodLayer(layers.Layer):
-    """Computes log likelihood."""
+    """Computes the negative log likelihood."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -370,11 +371,9 @@ class KLDivergenceLayer(layers.Layer):
         prior = tfp.distributions.Normal(
             loc=shifted_model_mu, scale=tf.exp(model_log_sigma)
         )
-
         posterior = tfp.distributions.Normal(
             loc=inference_mu, scale=tf.exp(inference_log_sigma)
         )
-
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
         return K.expand_dims(kl_loss)

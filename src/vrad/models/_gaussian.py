@@ -1,18 +1,9 @@
-"""Inference network and generative model.
-
-"""
-
 import numpy as np
-from tensorflow.keras import Model, layers, models, optimizers
-from tensorflow.python import Variable, zeros
-from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
-from tqdm import tqdm
-from tqdm.keras import TqdmCallback
-from vrad.inference.callbacks import AnnealingCallback, BurninCallback
+from tensorflow.keras import Model, layers
+from tensorflow.python import zeros
+from vrad.models import BaseModel
 from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
-from vrad.inference.initializers import reinitialize_model_weights
-from vrad.inference.layers import (
+from vrad.model.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
     LogLikelihoodLayer,
@@ -22,16 +13,10 @@ from vrad.inference.layers import (
     ReparameterizationLayer,
     TrainableVariablesLayer,
 )
-from vrad.utils.misc import listify
 
 
-class Model:
-    """Main model used in V-RAD.
-
-    Contains the inference RNN and generative model.
-    Acts as a wrapper for a standard Keras model. The Keras model can be accessed
-    through the model.keras attribute.
-    """
+class GaussianRNN(BaseModel):
+    """Inference RNN and generative model with Gaussian observations."""
 
     def __init__(
         n_states: int,
@@ -59,20 +44,7 @@ class Model:
         multi_gpu: bool = False,
         strategy: str = None,
     ):
-        # Number of latent states and dimensionality of the data
-        self.n_states = n_states
-        self.n_channels = n_channels
-
-        # Model hyperparameters
-        self.sequence_length = sequence_length
-        self.n_layers_inference = n_layers_inference
-        self.n_layers_model = n_layers_model
-        self.n_units_inference = n_units_inference
-        self.n_units_model = n_units_model
-        self.dropout_rate_inference = dropout_rate_inference
-        self.dropout_rate_model = dropout_rate_model
-
-        # Parameters related to the means and covariances
+        # Parameters related to the observation model
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances
         self.initial_means = initial_means
@@ -81,36 +53,27 @@ class Model:
         self.learn_alpha_scaling = learn_alpha_scaling
         self.normalize_covariances = normalize_covariances
 
-        # KL annealing and burn-in
-        self.do_annealing = do_annealing
-        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
-        self.annealing_sharpness = annealing_sharpness
-        self.n_epochs_annealing = n_epochs_annealing
-        self.n_epochs_burnin = n_epochs_burnin
-
-        # Callbacks
-        self.burnin_callback = BurninCallback(epochs=self.n_epochs_burnin)
-        self.annealing_callback = AnnealingCallback(
-            annealing_factor=self.annealing_factor,
-            annealing_sharpness=self.annealing_sharpness,
-            n_epochs_annealing=self.n_epochs_annealing,
+        # Initialise the model base class
+        # This will build and compile the keras model
+        super().__init__(
+            n_states=n_states,
+            n_channels=n_channels,
+            sequence_length=sequence_length,
+            n_layers_inference=n_layers_inference,
+            n_layers_model=n_layers_model,
+            n_units_inference=n_units_inference,
+            n_units_model=n_units_model,
+            dropout_rate_inference=dropout_rate_inference,
+            dropout_rate_model=dropout_rate_model,
+            do_annealing=do_annealing,
+            annealing_sharpness=annealing_sharpness,
+            n_epochs_annealing=n_epochs_annealing,
+            n_epochs_burnin=n_epochs_burnin,
+            learning_rate=learning_rate,
+            clip_normalization=clip_normalization,
+            multi_gpu=multi_gpu,
+            strategy=strategy,
         )
-
-        # Training Parameters
-        self.learning_rate = learning_rate
-        self.clip_normalization = clip_normalization
-
-        # Stretegy for distributed learning
-        if multi_gpu:
-            self.strategy = MirroredStrategy()
-        elif strategy is None:
-            self.strategy = get_strategy()
-
-        # Build the model
-        self.build_model()
-
-        # Compile the model
-        self.compile()
 
         def build_model(self):
             """Builds a keras model."""
@@ -132,96 +95,6 @@ class Model:
                 learn_alpha_scaling=self.learn_alpha_scaling,
                 normalize_covariances=self.normalize_covariances,
             )
-
-        def compile(self, optimizer=None):
-            """Wrapper for the standard keras compile method.
-            
-            Sets up the optimiser and loss functions.
-            """
-            # Setup optimizer
-            if optimizer == None:
-                optimizer = optimizers.Adam(
-                    learning_rate=self.learning_rate, clipnorm=self.clip_normalization,
-                )
-
-            # Loss functions
-            loss = [
-                _ll_loss_fn,
-                _create_kl_loss_fn(annealing_factor=self.annealing_factor),
-            ]
-
-            # Compile
-            self.keras.compile(optimizer=optimizer, loss=loss)
-
-        def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
-            """Wrapper for the standard keras fit method.
-
-            Adds callbacks for KL annealing and burn-in.
-            """
-            args = list(args)
-
-            # Add annealing, burn-in and tqdm callbacks
-            additional_callbacks = [self.annealing_callback, self.burnin_callback]
-            if use_tqdm:
-                if tqdm_class is not None:
-                    tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-                else:
-                    tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
-                additional_callbacks.append(tqdm_callback)
-            if len(args) > 5:
-                args[5] = listify(args[5]) + additional_callbacks
-            if "callbacks" in kwargs:
-                kwargs["callbacks"] = (
-                    listify(kwargs["callbacks"]) + additional_callbacks
-                )
-            else:
-                kwargs["callbacks"] = additional_callbacks
-
-            # Train the model
-            return self.keras.fit(*args, **kwargs)
-
-        def predict(self, *args, **kwargs):
-            """Wrapper for the standard keras predict method.
-
-            Returns a dictionary with labels for each prediction.
-            """
-            predictions = self.keras.predict(*args, *kwargs)
-            return_names = [
-                "ll_loss",
-                "kl_loss",
-                "theta_t",
-                "m_theta_t",
-                "log_s2_theta_t",
-                "mu_theta_jt",
-                "log_sigma2_theta_j",
-            ]
-            predictions_dict = dict(zip(return_names, predictions))
-            return predictions_dict
-
-        def predict_states(self, *args, **kwargs):
-            """Infers the latent state time course."""
-            m_theta_t = self.keras.predict(*args, **kwargs)["m_theta_t"]
-            return np.concatenate(m_theta_t)
-
-        def free_energy(self, dataset, return_all=False):
-            """Calculates the variational free energy of a model."""
-            predictions = self.predict(dataset)
-            ll_loss = np.mean(predictions["ll_loss"])
-            kl_loss = np.mean(predictions["kl_loss"])
-            if return_all:
-                return ll_loss + kl_loss, ll_loss, kl_loss
-            else:
-                return ll_loss + kl_loss
-
-        def reset_model(self):
-            """Reset the model as if you've built a new model.
-
-            Resets the model weights, optimizer and annealing factor.
-            """
-            self.compile()
-            reinitialize_model_weights(self.keras)
-            if self.do_annealing:
-                self.annealing_factor.assign(0.0)
 
         def initialize_means_covariances(
             self,
@@ -294,30 +167,6 @@ class Model:
             mix_means_covs_layer = self.keras.get_layer("mix_means_covs")
             alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
             return alpha_scaling
-
-        def save_weights(self, filepath):
-            """Save weights of the model."""
-            self.keras.save_weights(filepath)
-
-        def load_weights(self, filepath):
-            """Load weights of the model from a file."""
-            with strategy.scope():
-                self.keras.load_weights(filepath)
-
-
-def _ll_loss_fn(y_true, ll_loss):
-    """The first output of the model is the negative log likelihood
-       so we just need to return it."""
-    return ll_loss
-
-
-def _create_kl_loss_fn(annealing_factor):
-    def _kl_loss_fn(y_true, kl_loss):
-        """Second output of the model is the KL divergence loss.
-        We multiply with an annealing factor."""
-        return annealing_factor * kl_loss
-
-    return _kl_loss_fn
 
 
 def _model_structure(
