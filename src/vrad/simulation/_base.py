@@ -28,14 +28,14 @@ class Simulation(ABC):
 
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
-        random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
-        covariances: np.ndarray = None,
-        simulate: bool = True,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        covariances: np.ndarray,
+        observation_error: float,
+        random_covariance_weights: bool,
+        simulate: bool,
         random_seed: int = None,
     ):
 

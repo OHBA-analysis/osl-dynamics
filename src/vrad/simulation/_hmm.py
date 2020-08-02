@@ -10,14 +10,14 @@ class HMMSimulation(Simulation):
     def __init__(
         self,
         trans_prob: np.ndarray,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
+        n_samples: int,
+        n_states: int,
+        sim_varying_means: bool,
+        observation_error: float,
+        covariances: np.ndarray,
+        n_channels: int = None,
         random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
         markov_lag: int = 1,
-        covariances: np.ndarray = None,
         random_seed: int = None,
         simulate: bool = True,
     ):
@@ -68,14 +68,14 @@ class HMMSimulation(Simulation):
 class SequenceHMMSimulation(HMMSimulation):
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
-        markov_lag: int = 1,
-        stay_prob: float = 0.95,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        stay_prob: float ,
+        observation_error: float,
         random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
+        markov_lag: int = 1,
         random_seed: int = None,
         simulate: bool = True,
     ):
@@ -108,14 +108,14 @@ class BasicHMMSimulation(HMMSimulation):
     @auto_repr
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
-        markov_lag: int = 1,
-        stay_prob: float = 0.95,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        stay_prob: float,
+        observation_error: float,
         random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
+        markov_lag: int = 1,
         random_seed: int = None,
         simulate: bool = True,
     ):
@@ -156,14 +156,14 @@ class BasicHMMSimulation(HMMSimulation):
 class UniHMMSimulation(HMMSimulation):
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
-        markov_lag: int = 1,
-        stay_prob: float = 0.95,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        stay_prob: float,
+        observation_error: float,
         random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
+        markov_lag: int = 1,
         random_seed: int = None,
     ):
 
@@ -198,12 +198,12 @@ class UniHMMSimulation(HMMSimulation):
 class RandomHMMSimulation(HMMSimulation):
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        observation_error: float,
         random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
         random_seed: int = None,
     ):
 
