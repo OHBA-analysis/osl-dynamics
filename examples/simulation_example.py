@@ -9,15 +9,12 @@ print("Importing packages")
 import numpy as np
 from vrad import array_ops, data
 from vrad.inference import gmm, metrics, tf_ops
-from vrad.inference.models import create_model
+from vrad.models import RNNGaussian
 from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
-
-multi_gpu = False
-strategy = None
 
 # Settings
 n_samples = 25000
@@ -27,15 +24,11 @@ n_states = 5
 sequence_length = 100
 batch_size = 32
 
-learning_rate = 0.01
-clip_normalization = None
-
 do_annealing = True
 annealing_sharpness = 5
 
 n_epochs = 100
 n_epochs_annealing = 80
-n_epochs_burnin = 0
 
 dropout_rate_inference = 0.4
 dropout_rate_model = 0.4
@@ -52,9 +45,6 @@ learn_covariances = True
 alpha_xform = "softmax"
 learn_alpha_scaling = False
 normalize_covariances = False
-
-n_initializations = None
-n_epochs_initialization = None
 
 # Load state transition probability matrix and covariances of each state
 init_trans_prob = np.load("data/prob_000.npy")
@@ -91,7 +81,7 @@ means, covariances = gmm.final_means_covariances(
 )
 
 # Build model
-model = create_model(
+model = RNNGaussian(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -111,13 +101,6 @@ model = create_model(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
-    n_epochs_burnin=n_epochs_burnin,
-    n_initializations=n_initializations,
-    n_epochs_initialization=n_epochs_initialization,
-    learning_rate=learning_rate,
-    clip_normalization=clip_normalization,
-    multi_gpu=multi_gpu,
-    strategy=strategy,
 )
 
 model.summary()

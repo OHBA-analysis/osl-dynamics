@@ -4,21 +4,19 @@
 - Uses the final covariances inferred by an HMM fit from OSL.
 - Takes approximately 4 minutes to train (on compG017).
 - Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~240,000.
+- Achieves a free energy of ~490,000.
 """
 
 print("Importing packages")
 import numpy as np
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
-from vrad.inference.models import create_model
+from vrad.models import RNNGaussian
 from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
-
 multi_gpu = True
-strategy = None
 
 # Settings
 n_states = 6
@@ -51,9 +49,6 @@ alpha_xform = "softmax"
 learn_alpha_scaling = True
 normalize_covariances = True
 
-n_initializations = None
-n_epochs_initialization = None
-
 # Read MEG data
 print("Reading MEG data")
 meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
@@ -65,7 +60,7 @@ covariances = hmm.covariances
 means = np.zeros([n_states, n_channels], dtype=np.float32)
 
 # Build model
-model = create_model(
+model = RNNGaussian(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -86,12 +81,7 @@ model = create_model(
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
     n_epochs_burnin=n_epochs_burnin,
-    n_initializations=n_initializations,
-    n_epochs_initialization=n_epochs_initialization,
-    learning_rate=learning_rate,
-    clip_normalization=clip_normalization,
     multi_gpu=multi_gpu,
-    strategy=strategy,
 )
 
 model.summary()

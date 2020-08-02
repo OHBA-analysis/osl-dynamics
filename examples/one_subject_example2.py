@@ -5,21 +5,19 @@
   which used data that's already been prepared.
 - Initialises the covariances with the identity matrix.
 - Achieves a dice coefficient of ~0.4 (when compared to the OSL HMM state time course).
-- Achieved a free energy of ~240,000.
+- Achieved a free energy of ~480,000.
 """
 
 print("Importing packages")
 import numpy as np
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
-from vrad.inference.models import create_model
+from vrad.models import RNNGaussian
 from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
-
 multi_gpu = True
-strategy = None
 
 # Settings
 n_states = 6
@@ -34,7 +32,6 @@ annealing_sharpness = 5
 
 n_epochs = 200
 n_epochs_annealing = 150
-n_epochs_burnin = 0
 
 dropout_rate_inference = 0.4
 dropout_rate_model = 0.4
@@ -61,19 +58,13 @@ meg_data = data.Data("/well/woolrich/shared/vrad/preprocessed_data/subject1.mat"
 meg_data.prepare(n_embeddings=13, n_pca_components=80, whiten=True)
 n_channels = meg_data.n_channels
 
-# Use defaults for the initial means and covariances
-initial_means = None
-initial_covariances = None
-
 # Build model
-model = create_model(
+model = RNNGaussian(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
     learn_means=learn_means,
     learn_covariances=learn_covariances,
-    initial_means=initial_means,
-    initial_covariances=initial_covariances,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -86,13 +77,7 @@ model = create_model(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
-    n_epochs_burnin=n_epochs_burnin,
-    n_initializations=n_initializations,
-    n_epochs_initialization=n_epochs_initialization,
-    learning_rate=learning_rate,
-    clip_normalization=clip_normalization,
     multi_gpu=multi_gpu,
-    strategy=strategy,
 )
 
 model.summary()
@@ -100,6 +85,15 @@ model.summary()
 # Prepare dataset
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
+
+# Initialise means and covariances
+model.initialize_means_covariances(
+    n_initializations=n_initializations,
+    n_epochs_initialization=n_epochs_initialization,
+    training_dataset=training_dataset,
+    verbose=0,
+    use_tqdm=True,
+)
 
 # Train the model
 print("Training model")

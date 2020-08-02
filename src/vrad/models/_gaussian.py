@@ -3,7 +3,7 @@ from tensorflow.keras import Model, layers
 from tensorflow.python import zeros
 from vrad.models import BaseModel
 from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
-from vrad.model.layers import (
+from vrad.models.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
     LogLikelihoodLayer,
@@ -15,17 +15,16 @@ from vrad.model.layers import (
 )
 
 
-class GaussianRNN(BaseModel):
+class RNNGaussian(BaseModel):
     """Inference RNN and generative model with Gaussian observations."""
 
     def __init__(
+        self,
         n_states: int,
         n_channels: int,
         sequence_length: int,
         learn_means: bool,
         learn_covariances: bool,
-        initial_means: np.ndarray,
-        initial_covariances: np.ndarray,
         n_layers_inference: int,
         n_layers_model: int,
         n_units_inference: int,
@@ -38,11 +37,13 @@ class GaussianRNN(BaseModel):
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
-        n_epochs_burnin: int,
-        learning_rate: float,
-        clip_normalization: float,
+        n_epochs_burnin: int = 0,
+        learning_rate: float = 0.01,
+        clip_normalization: float = None,
         multi_gpu: bool = False,
         strategy: str = None,
+        initial_means: np.ndarray = None,
+        initial_covariances: np.ndarray = None,
     ):
         # Parameters related to the observation model
         self.learn_means = learn_means
@@ -75,98 +76,100 @@ class GaussianRNN(BaseModel):
             strategy=strategy,
         )
 
-        def build_model(self):
-            """Builds a keras model."""
-            self.keras = _model_structure(
-                n_states=self.n_states,
-                n_channels=self.n_channels,
-                sequence_length=self.sequence_length,
-                n_layers_inference=self.n_layers_inference,
-                n_layers_model=self.n_layers_model,
-                n_units_inference=self.n_units_inference,
-                n_units_model=self.n_units_model,
-                dropout_rate_inference=self.dropout_rate_inference,
-                dropout_rate_model=self.dropout_rate_model,
-                learn_means=self.learn_means,
-                learn_covariances=self.learn_covariances,
-                initial_means=self.initial_means,
-                initial_covariances=self.initial_covariances,
-                alpha_xform=self.alpha_xform,
-                learn_alpha_scaling=self.learn_alpha_scaling,
-                normalize_covariances=self.normalize_covariances,
+    def build_model(self):
+        """Builds a keras model."""
+        self.keras = _model_structure(
+            n_states=self.n_states,
+            n_channels=self.n_channels,
+            sequence_length=self.sequence_length,
+            n_layers_inference=self.n_layers_inference,
+            n_layers_model=self.n_layers_model,
+            n_units_inference=self.n_units_inference,
+            n_units_model=self.n_units_model,
+            dropout_rate_inference=self.dropout_rate_inference,
+            dropout_rate_model=self.dropout_rate_model,
+            learn_means=self.learn_means,
+            learn_covariances=self.learn_covariances,
+            initial_means=self.initial_means,
+            initial_covariances=self.initial_covariances,
+            alpha_xform=self.alpha_xform,
+            learn_alpha_scaling=self.learn_alpha_scaling,
+            normalize_covariances=self.normalize_covariances,
+        )
+
+    def initialize_means_covariances(
+        self,
+        n_initializations,
+        n_epochs_initialization,
+        training_dataset,
+        verbose=1,
+        use_tqdm=False,
+        tqdm_class=None,
+    ):
+        """Initialize the means and covariances.
+    
+        The model is trained for a few epochs and the model with the best
+        free energy is chosen.
+        """
+
+        # Pick the initialization with the lowest free energy
+        best_free_energy = np.Inf
+        for n in range(n_initializations):
+            print(f"Initialization {n}")
+            self.reset_model()
+            history = self.fit(
+                training_dataset,
+                epochs=n_epochs_initialization,
+                verbose=verbose,
+                use_tqdm=use_tqdm,
+                tqdm_class=tqdm_class,
             )
+            free_energy = history.history["loss"][-1]
+            if free_energy < best_free_energy:
+                best_initialization = n
+                best_free_energy = free_energy
+                best_weights = self.keras.get_weights()
+                best_optimizer = self.keras.optimizer
 
-        def initialize_means_covariances(
-            self,
-            n_initializations,
-            n_epochs_initialization,
-            verbose=1,
-            use_tqdm=False,
-            tqdm_class=None,
-        ):
-            """Initialize the means and covariances.
-        
-            The model is trained for a few epochs and the model with the best
-            free energy is chosen.
-            """
+        print(f"Using initialization {best_initialization}")
+        self.compile(optimizer=best_optimizer)
+        self.keras.set_weights(best_weights)
+        if self.do_annealing:
+            self.annealing_factor.assign(0.0)
 
-            # Pick the initialization with the lowest free energy
-            best_free_energy = np.Inf
-            for n in range(n_initializations):
-                print(f"Initialization {n}")
-                self.reset_model()
-                self.fit(
-                    epochs=n_epochs_initialization,
-                    verbose=verbose,
-                    use_tqdm=use_tqm,
-                    tqdm_class=tqdm_class,
-                )
-                free_energy = self.keras.evaluate(args[0], verbose=0)[0]
-                if free_energy < best_free_energy:
-                    best_initialization = n
-                    best_free_energy = free_energy
-                    best_weights = keras.get_weights()
-                    best_optimizer = keras.optimizer
+    def get_means_covariances(self):
+        """Get the means and covariances of each state"""
+        mvn_layer = self.keras.get_layer("mvn")
+        means = mvn_layer.means.numpy()
+        cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
+        covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+        return means, covariances
 
-            print(f"Using initialization {best_initialization}")
-            self.compile(optimizer=best_optimizer)
-            self.keras.set_weights(best_weights)
-            if self.do_annealing:
-                self.annealing_factor.assign(0.0)
+    def set_means_covariances(self, means=None, covariances=None):
+        """Set the means and covariances of each state."""
+        mvn_layer = self.keras.get_layer("mvn")
+        layer_weights = mvn_layer.get_weights()
 
-        def get_means_covariances(self):
-            """Get the means and covariances of each state"""
-            mvn_layer = self.keras.get_layer("mvn")
-            means = mvn_layer.means.numpy()
-            cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
-            covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
-            return means, covariances
+        # Replace means in the layer weights
+        if means is not None:
+            for i in range(len(layer_weights)):
+                if layer_weights[i].shape == means.shape:
+                    layer_weights[i] = means
 
-        def set_means_covariances(self, means=None, covariances=None):
-            """Set the means and covariances of each state."""
-            mvn_layer = self.keras.get_layer("mvn")
-            layer_weights = mvn_layer.get_weights()
+        # Replace covariances in the layer weights
+        if covariances is not None:
+            for i in range(len(layer_weights)):
+                if layer_weights[i].shape == covariances.shape:
+                    layer_weights[i] = cholesky_factor(covariances)
 
-            # Replace means in the layer weights
-            if means is not None:
-                for i in range(len(layer_weights)):
-                    if layer_weights[i].shape == means.shape:
-                        layer_weights[i] = means
+        # Set the weights of the layer
+        mvn_layer.set_weights(layer_weights)
 
-            # Replace covariances in the layer weights
-            if covariances is not None:
-                for i in range(len(layer_weights)):
-                    if layer_weights[i].shape == covariances.shape:
-                        layer_weights[i] = cholesky_factor(covariances)
-
-            # Set the weights of the layer
-            mvn_layer.set_weights(layer_weights)
-
-        def get_alpha_scaling(self):
-            """Get the alpha scaling of each state."""
-            mix_means_covs_layer = self.keras.get_layer("mix_means_covs")
-            alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
-            return alpha_scaling
+    def get_alpha_scaling(self):
+        """Get the alpha scaling of each state."""
+        mix_means_covs_layer = self.keras.get_layer("mix_means_covs")
+        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
+        return alpha_scaling
 
 
 def _model_structure(

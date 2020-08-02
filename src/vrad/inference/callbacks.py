@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 from tensorflow.python import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
-from vrad.inference.layers import MultivariateNormalLayer
+from vrad.models.layers import MultivariateNormalLayer
 
 _logger = logging.getLogger("VRAD")
 

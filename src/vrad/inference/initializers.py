@@ -9,7 +9,7 @@ import logging
 import tensorflow as tf
 from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
-from vrad import inference
+from vrad import models
 
 _logger = logging.getLogger("VRAD")
 
@@ -120,8 +120,8 @@ def reinitialize_model_weights(model):
         # to this function
         if (
             isinstance(layer, Model)
-            or isinstance(layer, inference.layers.InferenceRNNLayers)
-            or isinstance(layer, inference.layers.ModelRNNLayers)
+            or isinstance(layer, models.InferenceRNNLayers)
+            or isinstance(layer, models.ModelRNNLayers)
         ):
             for l in layer.layers:
                 # If the layer is bidirectional we need to re-initialise the

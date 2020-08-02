@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 from tensorflow.keras import optimizers
 from tensorflow.python import Variable
@@ -10,7 +12,7 @@ from vrad.inference.initializers import reinitialize_model_weights
 from vrad.utils.misc import listify
 
 
-class Model:
+class BaseModel:
     """Base class for models.
 
     Contains the inference RNN and generative model.
@@ -19,6 +21,7 @@ class Model:
     """
 
     def __init__(
+        self,
         n_states: int,
         n_channels: int,
         sequence_length: int,
@@ -75,110 +78,115 @@ class Model:
         elif strategy is None:
             self.strategy = get_strategy()
 
-        # Build the model
+        # Build and compile the model
         self.build_model()
-
-        # Compile the model
         self.compile()
 
-        def compile(self, optimizer=None):
-            """Wrapper for the standard keras compile method.
-            
-            Sets up the optimiser and loss functions.
-            """
-            # Setup optimizer
-            if optimizer == None:
-                optimizer = optimizers.Adam(
-                    learning_rate=self.learning_rate, clipnorm=self.clip_normalization,
-                )
+    @abstractmethod
+    def build_model(self):
+        """Build a keras model."""
+        pass
 
-            # Loss functions
-            loss = [
-                _ll_loss_fn,
-                _create_kl_loss_fn(annealing_factor=self.annealing_factor),
-            ]
+    def compile(self, optimizer=None):
+        """Wrapper for the standard keras compile method.
+        
+        Sets up the optimiser and loss functions.
+        """
+        # Setup optimizer
+        if optimizer == None:
+            optimizer = optimizers.Adam(
+                learning_rate=self.learning_rate, clipnorm=self.clip_normalization,
+            )
 
-            # Compile
-            self.keras.compile(optimizer=optimizer, loss=loss)
+        # Loss functions
+        loss = [
+            _ll_loss_fn,
+            _create_kl_loss_fn(annealing_factor=self.annealing_factor),
+        ]
 
-        def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
-            """Wrapper for the standard keras fit method.
+        # Compile
+        self.keras.compile(optimizer=optimizer, loss=loss)
 
-            Adds callbacks for KL annealing and burn-in then trains the model.
-            """
-            args = list(args)
+    def summary(self):
+        """Wrapper for the keras model summary method."""
+        self.keras.summary()
 
-            # Add annealing, burn-in and tqdm callbacks
-            additional_callbacks = [self.annealing_callback, self.burnin_callback]
-            if use_tqdm:
-                if tqdm_class is not None:
-                    tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-                else:
-                    tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
-                additional_callbacks.append(tqdm_callback)
-            if len(args) > 5:
-                args[5] = listify(args[5]) + additional_callbacks
-            if "callbacks" in kwargs:
-                kwargs["callbacks"] = (
-                    listify(kwargs["callbacks"]) + additional_callbacks
-                )
+    def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        Adds callbacks for KL annealing and burn-in then trains the model.
+        """
+        args = list(args)
+
+        # Add annealing, burn-in and tqdm callbacks
+        additional_callbacks = [self.annealing_callback, self.burnin_callback]
+        if use_tqdm:
+            if tqdm_class is not None:
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
             else:
-                kwargs["callbacks"] = additional_callbacks
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
+            additional_callbacks.append(tqdm_callback)
+        if len(args) > 5:
+            args[5] = listify(args[5]) + additional_callbacks
+        if "callbacks" in kwargs:
+            kwargs["callbacks"] = listify(kwargs["callbacks"]) + additional_callbacks
+        else:
+            kwargs["callbacks"] = additional_callbacks
 
-            # Train the model
-            return self.keras.fit(*args, **kwargs)
+        # Train the model
+        return self.keras.fit(*args, **kwargs)
 
-        def predict(self, *args, **kwargs):
-            """Wrapper for the standard keras predict method.
+    def predict(self, *args, **kwargs):
+        """Wrapper for the standard keras predict method.
 
-            Returns a dictionary with labels for each prediction.
-            """
-            predictions = self.keras.predict(*args, *kwargs)
-            return_names = [
-                "ll_loss",
-                "kl_loss",
-                "theta_t",
-                "m_theta_t",
-                "log_s2_theta_t",
-                "mu_theta_jt",
-                "log_sigma2_theta_j",
-            ]
-            predictions_dict = dict(zip(return_names, predictions))
-            return predictions_dict
+        Returns a dictionary with labels for each prediction.
+        """
+        predictions = self.keras.predict(*args, *kwargs)
+        return_names = [
+            "ll_loss",
+            "kl_loss",
+            "theta_t",
+            "m_theta_t",
+            "log_s2_theta_t",
+            "mu_theta_jt",
+            "log_sigma2_theta_j",
+        ]
+        predictions_dict = dict(zip(return_names, predictions))
+        return predictions_dict
 
-        def predict_states(self, *args, **kwargs):
-            """Infers the latent state time course."""
-            m_theta_t = self.keras.predict(*args, **kwargs)["m_theta_t"]
-            return np.concatenate(m_theta_t)
+    def predict_states(self, *args, **kwargs):
+        """Infers the latent state time course."""
+        m_theta_t = self.predict(*args, **kwargs)["m_theta_t"]
+        return np.concatenate(m_theta_t)
 
-        def free_energy(self, dataset, return_all=False):
-            """Calculates the variational free energy of a model."""
-            predictions = self.predict(dataset)
-            ll_loss = np.mean(predictions["ll_loss"])
-            kl_loss = np.mean(predictions["kl_loss"])
-            if return_all:
-                return ll_loss + kl_loss, ll_loss, kl_loss
-            else:
-                return ll_loss + kl_loss
+    def free_energy(self, dataset, return_all=False):
+        """Calculates the variational free energy of a model."""
+        predictions = self.predict(dataset)
+        ll_loss = np.mean(predictions["ll_loss"])
+        kl_loss = np.mean(predictions["kl_loss"])
+        if return_all:
+            return ll_loss + kl_loss, ll_loss, kl_loss
+        else:
+            return ll_loss + kl_loss
 
-        def reset_model(self):
-            """Reset the model as if you've built a new model.
+    def reset_model(self):
+        """Reset the model as if you've built a new model.
 
-            Resets the model weights, optimizer and annealing factor.
-            """
-            self.compile()
-            reinitialize_model_weights(self.keras)
-            if self.do_annealing:
-                self.annealing_factor.assign(0.0)
+        Resets the model weights, optimizer and annealing factor.
+        """
+        self.compile()
+        reinitialize_model_weights(self.keras)
+        if self.do_annealing:
+            self.annealing_factor.assign(0.0)
 
-        def save_weights(self, filepath):
-            """Save weights of the model."""
-            self.keras.save_weights(filepath)
+    def save_weights(self, filepath):
+        """Save weights of the model."""
+        self.keras.save_weights(filepath)
 
-        def load_weights(self, filepath):
-            """Load weights of the model from a file."""
-            with strategy.scope():
-                self.keras.load_weights(filepath)
+    def load_weights(self, filepath):
+        """Load weights of the model from a file."""
+        with strategy.scope():
+            self.keras.load_weights(filepath)
 
 
 def _ll_loss_fn(y_true, ll_loss):
