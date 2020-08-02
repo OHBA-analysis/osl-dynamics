@@ -1,3 +1,6 @@
+"""Base class for models in V-RAD.
+
+"""
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -15,9 +18,7 @@ from vrad.utils.misc import listify
 class BaseModel:
     """Base class for models.
 
-    Contains the inference RNN and generative model.
-    Acts as a wrapper for a standard Keras model. The Keras model can be accessed
-    through the model.keras attribute.
+    Acts as a wrapper for a standard Keras model.
     """
 
     def __init__(
@@ -82,6 +83,10 @@ class BaseModel:
         self.build_model()
         self.compile()
 
+    # Allow access to the keras model attributes
+    def __getattr__(self, attr):
+        return getattr(self.keras, attr)
+
     @abstractmethod
     def build_model(self):
         """Build a keras model."""
@@ -106,10 +111,6 @@ class BaseModel:
 
         # Compile
         self.keras.compile(optimizer=optimizer, loss=loss)
-
-    def summary(self):
-        """Wrapper for the keras model summary method."""
-        self.keras.summary()
 
     def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
         """Wrapper for the standard keras fit method.
@@ -178,10 +179,6 @@ class BaseModel:
         reinitialize_model_weights(self.keras)
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
-
-    def save_weights(self, filepath):
-        """Save weights of the model."""
-        self.keras.save_weights(filepath)
 
     def load_weights(self, filepath):
         """Load weights of the model from a file."""

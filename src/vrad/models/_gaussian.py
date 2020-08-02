@@ -1,3 +1,7 @@
+"""Model class for a generative model with Gaussian observations.
+
+"""
+
 import numpy as np
 from tensorflow.keras import Model, layers
 from tensorflow.python import zeros
