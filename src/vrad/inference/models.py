@@ -25,262 +25,284 @@ from vrad.inference.layers import (
 from vrad.utils.misc import listify
 
 
-def create_model(
-    n_states: int,
-    n_channels: int,
-    sequence_length: int,
-    learn_means: bool,
-    learn_covariances: bool,
-    initial_means: np.ndarray,
-    initial_covariances: np.ndarray,
-    n_layers_inference: int,
-    n_layers_model: int,
-    n_units_inference: int,
-    n_units_model: int,
-    dropout_rate_inference: float,
-    dropout_rate_model: float,
-    alpha_xform: str,
-    learn_alpha_scaling: bool,
-    normalize_covariances: bool,
-    do_annealing: bool,
-    annealing_sharpness: float,
-    n_epochs_annealing: int,
-    n_epochs_burnin: int,
-    n_initializations: int,
-    n_epochs_initialization: int,
-    learning_rate: float,
-    clip_normalization: float,
-    multi_gpu: bool = False,
-    strategy: str = None,
-):
-    annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
+class Model:
+    """Main model used in V-RAD.
 
-    # Stretegy for distributed learning
-    if multi_gpu:
-        strategy = MirroredStrategy()
-    elif strategy is None:
-        strategy = get_strategy()
+    Contains the inference RNN and generative model.
+    Acts as a wrapper for a standard Keras model. The Keras model can be accessed
+    through the model.keras attribute.
+    """
 
-    # Create the model
-    with strategy.scope():
-        model = _model_structure(
-            n_states=n_states,
-            n_channels=n_channels,
-            sequence_length=sequence_length,
-            n_layers_inference=n_layers_inference,
-            n_layers_model=n_layers_model,
-            n_units_inference=n_units_inference,
-            n_units_model=n_units_model,
-            dropout_rate_inference=dropout_rate_inference,
-            dropout_rate_model=dropout_rate_model,
-            learn_means=learn_means,
-            learn_covariances=learn_covariances,
-            initial_means=initial_means,
-            initial_covariances=initial_covariances,
-            alpha_xform=alpha_xform,
-            learn_alpha_scaling=learn_alpha_scaling,
-            normalize_covariances=normalize_covariances,
+    def __init__(
+        n_states: int,
+        n_channels: int,
+        sequence_length: int,
+        learn_means: bool,
+        learn_covariances: bool,
+        initial_means: np.ndarray,
+        initial_covariances: np.ndarray,
+        n_layers_inference: int,
+        n_layers_model: int,
+        n_units_inference: int,
+        n_units_model: int,
+        dropout_rate_inference: float,
+        dropout_rate_model: float,
+        alpha_xform: str,
+        learn_alpha_scaling: bool,
+        normalize_covariances: bool,
+        do_annealing: bool,
+        annealing_sharpness: float,
+        n_epochs_annealing: int,
+        n_epochs_burnin: int,
+        learning_rate: float,
+        clip_normalization: float,
+        multi_gpu: bool = False,
+        strategy: str = None,
+    ):
+        # Number of latent states and dimensionality of the data
+        self.n_states = n_states
+        self.n_channels = n_channels
+
+        # Model hyperparameters
+        self.sequence_length = sequence_length
+        self.n_layers_inference = n_layers_inference
+        self.n_layers_model = n_layers_model
+        self.n_units_inference = n_units_inference
+        self.n_units_model = n_units_model
+        self.dropout_rate_inference = dropout_rate_inference
+        self.dropout_rate_model = dropout_rate_model
+
+        # Parameters related to the means and covariances
+        self.learn_means = learn_means
+        self.learn_covariances = learn_covariances
+        self.initial_means = initial_means
+        self.initial_covariances = initial_covariances
+        self.alpha_xform = alpha_xform
+        self.learn_alpha_scaling = learn_alpha_scaling
+        self.normalize_covariances = normalize_covariances
+
+        # KL annealing and burn-in
+        self.do_annealing = do_annealing
+        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
+        self.annealing_sharpness = annealing_sharpness
+        self.n_epochs_annealing = n_epochs_annealing
+        self.n_epochs_burnin = n_epochs_burnin
+
+        # Callbacks
+        self.burnin_callback = BurninCallback(epochs=self.n_epochs_burnin)
+        self.annealing_callback = AnnealingCallback(
+            annealing_factor=self.annealing_factor,
+            annealing_sharpness=self.annealing_sharpness,
+            n_epochs_annealing=self.n_epochs_annealing,
         )
 
-    # Override the compile method
-    model.original_compile = model.compile
+        # Training Parameters
+        self.learning_rate = learning_rate
+        self.clip_normalization = clip_normalization
 
-    def compile(optimizer=None):
-        if optimizer == None:
-            # Setup optimizer
-            optimizer = optimizers.Adam(
-                learning_rate=learning_rate, clipnorm=clip_normalization,
+        # Stretegy for distributed learning
+        if multi_gpu:
+            self.strategy = MirroredStrategy()
+        elif strategy is None:
+            self.strategy = get_strategy()
+
+        # Build the model
+        self.build_model()
+
+        # Compile the model
+        self.compile()
+
+        def build_model(self):
+            """Builds a keras model."""
+            self.keras = _model_structure(
+                n_states=self.n_states,
+                n_channels=self.n_channels,
+                sequence_length=self.sequence_length,
+                n_layers_inference=self.n_layers_inference,
+                n_layers_model=self.n_layers_model,
+                n_units_inference=self.n_units_inference,
+                n_units_model=self.n_units_model,
+                dropout_rate_inference=self.dropout_rate_inference,
+                dropout_rate_model=self.dropout_rate_model,
+                learn_means=self.learn_means,
+                learn_covariances=self.learn_covariances,
+                initial_means=self.initial_means,
+                initial_covariances=self.initial_covariances,
+                alpha_xform=self.alpha_xform,
+                learn_alpha_scaling=self.learn_alpha_scaling,
+                normalize_covariances=self.normalize_covariances,
             )
 
-        # Loss functions
-        loss = [_ll_loss_fn, _create_kl_loss_fn(annealing_factor=annealing_factor)]
+        def compile(self, optimizer=None):
+            """Wrapper for the standard keras compile method.
+            
+            Sets up the optimiser and loss functions.
+            """
+            # Setup optimizer
+            if optimizer == None:
+                optimizer = optimizers.Adam(
+                    learning_rate=self.learning_rate, clipnorm=self.clip_normalization,
+                )
 
-        # Compile
-        model.original_compile(optimizer=optimizer, loss=loss)
+            # Loss functions
+            loss = [
+                _ll_loss_fn,
+                _create_kl_loss_fn(annealing_factor=self.annealing_factor),
+            ]
 
-    model.compile = compile
+            # Compile
+            self.keras.compile(optimizer=optimizer, loss=loss)
 
-    # Compile the model
-    model.compile()
+        def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
+            """Wrapper for the standard keras fit method.
 
-    # Override the load_weights model (to ensure the model weights are loaded
-    # in the correct scope)
-    model.original_load_weights = model.load_weights
+            Adds callbacks for KL annealing and burn-in.
+            """
+            args = list(args)
 
-    def load_weights(filepath):
-        with strategy.scope():
-            model.original_load_weights(filepath)
-
-    model.load_weights = load_weights
-
-    # Override original predict method
-    model.original_predict = model.predict
-
-    def named_predict(*args, **kwargs):
-        prediction = model.original_predict(*args, **kwargs)
-        return_names = [
-            "ll_loss",
-            "kl_loss",
-            "theta_t",
-            "m_theta_t",
-            "log_s2_theta_t",
-            "mu_theta_jt",
-            "log_sigma2_theta_j",
-        ]
-        prediction_dict = dict(zip(return_names, prediction))
-        return prediction_dict
-
-    model.predict = named_predict
-
-    # Method to predict the inferred state time course
-    def predict_states(*args, **kwargs):
-        m_theta_t = model.predict(*args, **kwargs)["m_theta_t"]
-        return np.concatenate(m_theta_t)
-
-    model.predict_states = predict_states
-
-    # Method to calculate the free energy (log likelihood + KL divergence)
-    def free_energy(dataset, return_all=False):
-        predictions = model.predict(dataset)
-        ll_loss = np.mean(predictions["ll_loss"])
-        kl_loss = np.mean(predictions["kl_loss"])
-        if return_all:
-            return ll_loss + kl_loss, ll_loss, kl_loss
-        else:
-            return ll_loss + kl_loss
-
-    model.free_energy = free_energy
-
-    # Callbacks
-    burnin_callback = BurninCallback(epochs=n_epochs_burnin)
-
-    annealing_callback = AnnealingCallback(
-        annealing_factor=annealing_factor,
-        annealing_sharpness=annealing_sharpness,
-        n_epochs_annealing=n_epochs_annealing,
-    )
-
-    # Keep original fit method to train the model
-    model.original_fit = model.fit
-
-    # A fit method which includes annealing and burn-in in training
-    def anneal_burnin_fit(*args, use_tqdm=False, tqdm_class=None, **kwargs):
-        args = list(args)
-
-        # Add annealing and burn-in callbacks
-        additional_callbacks = [annealing_callback, burnin_callback]
-        if use_tqdm:
-            if tqdm_class is not None:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+            # Add annealing, burn-in and tqdm callbacks
+            additional_callbacks = [self.annealing_callback, self.burnin_callback]
+            if use_tqdm:
+                if tqdm_class is not None:
+                    tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+                else:
+                    tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
+                additional_callbacks.append(tqdm_callback)
+            if len(args) > 5:
+                args[5] = listify(args[5]) + additional_callbacks
+            if "callbacks" in kwargs:
+                kwargs["callbacks"] = (
+                    listify(kwargs["callbacks"]) + additional_callbacks
+                )
             else:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
-            additional_callbacks.append(tqdm_callback)
-        if len(args) > 5:
-            args[5] = listify(args[5]) + additional_callbacks
-        if "callbacks" in kwargs:
-            kwargs["callbacks"] = listify(kwargs["callbacks"]) + additional_callbacks
-        else:
-            kwargs["callbacks"] = additional_callbacks
-
-        # Train the model
-        return model.original_fit(*args, **kwargs)
-
-    # Initialize the means and covariances by training the model for
-    # a few epochs and picking the model with the best free energy.
-    def initialize_means_covariances(*args, **kwargs):
-
-        # Set the epochs argument to n_epochs_initialization
-        args = list(args)
-        if len(args) > 3:
-            args[3] = n_epochs_initialization
-        if "epochs" in kwargs:
-            kwargs["epochs"] = n_epochs_initialization
-
-        # Pick the initialization with the lowest free energy
-        best_free_energy = np.Inf
-        for n in range(n_initializations):
-            print(f"Initialization {n}")
-
-            # Reset optimizer, model weights and annealing factor
-            model.compile()
-            reinitialize_model_weights(model)
-            if do_annealing:
-                annealing_factor.assign(0.0)
+                kwargs["callbacks"] = additional_callbacks
 
             # Train the model
-            anneal_burnin_fit(*args, **kwargs)
+            return self.keras.fit(*args, **kwargs)
 
-            # Get the model weights if it's the best model
-            free_energy = model.evaluate(args[0], verbose=0)[0]
-            if free_energy < best_free_energy:
-                best_initialization = n
-                best_free_energy = free_energy
-                best_weights = model.get_weights()
-                best_optimizer = model.optimizer
+        def predict(self, *args, **kwargs):
+            """Wrapper for the standard keras predict method.
 
-        # Use the best model for the rest of training and reset the annealing factor
-        print(f"Using initialization {best_initialization}")
-        model.compile(optimizer=best_optimizer)
-        model.set_weights(best_weights)
-        if do_annealing:
-            annealing_factor.assign(0.0)
+            Returns a dictionary with labels for each prediction.
+            """
+            predictions = self.keras.predict(*args, *kwargs)
+            return_names = [
+                "ll_loss",
+                "kl_loss",
+                "theta_t",
+                "m_theta_t",
+                "log_s2_theta_t",
+                "mu_theta_jt",
+                "log_sigma2_theta_j",
+            ]
+            predictions_dict = dict(zip(return_names, predictions))
+            return predictions_dict
 
-    # Override the fit method to include initialization and annealing/burn-in
-    def fit(*args, **kwargs):
-        if (
-            not hasattr(model, "initialized")
-            and n_initializations is not None
-            and n_initializations > 0
+        def predict_states(self, *args, **kwargs):
+            """Infers the latent state time course."""
+            m_theta_t = self.keras.predict(*args, **kwargs)["m_theta_t"]
+            return np.concatenate(m_theta_t)
+
+        def free_energy(self, dataset, return_all=False):
+            """Calculates the variational free energy of a model."""
+            predictions = self.predict(dataset)
+            ll_loss = np.mean(predictions["ll_loss"])
+            kl_loss = np.mean(predictions["kl_loss"])
+            if return_all:
+                return ll_loss + kl_loss, ll_loss, kl_loss
+            else:
+                return ll_loss + kl_loss
+
+        def reset_model(self):
+            """Reset the model as if you've built a new model.
+
+            Resets the model weights, optimizer and annealing factor.
+            """
+            self.compile()
+            reinitialize_model_weights(self.keras)
+            if self.do_annealing:
+                self.annealing_factor.assign(0.0)
+
+        def initialize_means_covariances(
+            self,
+            n_initializations,
+            n_epochs_initialization,
+            verbose=1,
+            use_tqdm=False,
+            tqdm_class=None,
         ):
-            initialize_means_covariances(*args, **kwargs)
-            model.initialized = True
+            """Initialize the means and covariances.
+        
+            The model is trained for a few epochs and the model with the best
+            free energy is chosen.
+            """
 
-        # Train the model
-        return anneal_burnin_fit(*args, **kwargs)
+            # Pick the initialization with the lowest free energy
+            best_free_energy = np.Inf
+            for n in range(n_initializations):
+                print(f"Initialization {n}")
+                self.reset_model()
+                self.fit(
+                    epochs=n_epochs_initialization,
+                    verbose=verbose,
+                    use_tqdm=use_tqm,
+                    tqdm_class=tqdm_class,
+                )
+                free_energy = self.keras.evaluate(args[0], verbose=0)[0]
+                if free_energy < best_free_energy:
+                    best_initialization = n
+                    best_free_energy = free_energy
+                    best_weights = keras.get_weights()
+                    best_optimizer = keras.optimizer
 
-    model.fit = fit
+            print(f"Using initialization {best_initialization}")
+            self.compile(optimizer=best_optimizer)
+            self.keras.set_weights(best_weights)
+            if self.do_annealing:
+                self.annealing_factor.assign(0.0)
 
-    # Method to get the learned means and covariances for each state
-    def get_means_covariances():
-        mvn_layer = model.get_layer("mvn")
-        means = mvn_layer.means.numpy()
-        cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
-        covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
-        return means, covariances
+        def get_means_covariances(self):
+            """Get the means and covariances of each state"""
+            mvn_layer = self.keras.get_layer("mvn")
+            means = mvn_layer.means.numpy()
+            cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
+            covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+            return means, covariances
 
-    model.get_means_covariances = get_means_covariances
+        def set_means_covariances(self, means=None, covariances=None):
+            """Set the means and covariances of each state."""
+            mvn_layer = self.keras.get_layer("mvn")
+            layer_weights = mvn_layer.get_weights()
 
-    # Method to set means and covariances for each state
-    def set_means_covariances(means=None, covariances=None):
-        mvn_layer = model.get_layer("mvn")
-        layer_weights = mvn_layer.get_weights()
+            # Replace means in the layer weights
+            if means is not None:
+                for i in range(len(layer_weights)):
+                    if layer_weights[i].shape == means.shape:
+                        layer_weights[i] = means
 
-        # Replace means in the layer weights
-        if means is not None:
-            for i in range(len(layer_weights)):
-                if layer_weights[i].shape == means.shape:
-                    layer_weights[i] = means
+            # Replace covariances in the layer weights
+            if covariances is not None:
+                for i in range(len(layer_weights)):
+                    if layer_weights[i].shape == covariances.shape:
+                        layer_weights[i] = cholesky_factor(covariances)
 
-        # Replace covariances in the layer weights
-        if covariances is not None:
-            for i in range(len(layer_weights)):
-                if layer_weights[i].shape == covariances.shape:
-                    layer_weights[i] = cholesky_factor(covariances)
+            # Set the weights of the layer
+            mvn_layer.set_weights(layer_weights)
 
-        # Set the weights of the layer
-        mvn_layer.set_weights(layer_weights)
+        def get_alpha_scaling(self):
+            """Get the alpha scaling of each state."""
+            mix_means_covs_layer = self.keras.get_layer("mix_means_covs")
+            alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
+            return alpha_scaling
 
-    model.set_means_covariances = set_means_covariances
+        def save_weights(self, filepath):
+            """Save weights of the model."""
+            self.keras.save_weights(filepath)
 
-    # Method to get the alpha scaling of each state
-    def get_alpha_scaling():
-        mix_means_covs_layer = model.get_layer("mix_means_covs")
-        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
-        return alpha_scaling
-
-    model.get_alpha_scaling = get_alpha_scaling
-
-    return model
+        def load_weights(self, filepath):
+            """Load weights of the model from a file."""
+            with strategy.scope():
+                self.keras.load_weights(filepath)
 
 
 def _ll_loss_fn(y_true, ll_loss):
