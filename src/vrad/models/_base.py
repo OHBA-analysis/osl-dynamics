@@ -1,7 +1,7 @@
 """Base class for models in V-RAD.
 
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import numpy as np
 from tensorflow.keras import optimizers
