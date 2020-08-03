@@ -72,7 +72,7 @@ class SequenceHMMSimulation(HMMSimulation):
         n_channels: int,
         n_states: int,
         sim_varying_means: bool,
-        stay_prob: float ,
+        stay_prob: float,
         observation_error: float,
         random_covariance_weights: bool = False,
         markov_lag: int = 1,

@@ -5,8 +5,8 @@
 import numpy as np
 from tensorflow.keras import Model, layers
 from tensorflow.python import zeros
-from vrad.models import BaseModel
 from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
+from vrad.models import BaseModel
 from vrad.models.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
