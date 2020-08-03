@@ -115,6 +115,24 @@ class BaseModel:
         # Compile
         self.model.compile(optimizer=optimizer, loss=loss)
 
+    def create_callbacks(self, use_tqdm, tqdm_class):
+        annealing_callback = AnnealingCallback(
+            annealing_factor=self.annealing_factor,
+            annealing_sharpness=self.annealing_sharpness,
+            n_epochs_annealing=self.n_epochs_annealing,
+        )
+        burnin_callback = BurninCallback(epochs=self.n_epochs_burnin)
+        additional_callbacks = [annealing_callback, burnin_callback]
+        if use_tqdm:
+            if tqdm_class is not None:
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+            else:
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
+
+            additional_callbacks.append(tqdm_callback)
+
+        return additional_callbacks
+
     def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
         """Wrapper for the standard keras fit method.
 
