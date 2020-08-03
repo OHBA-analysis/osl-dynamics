@@ -182,7 +182,7 @@ class BaseModel:
 
     def load_weights(self, filepath):
         """Load weights of the model from a file."""
-        with strategy.scope():
+        with self.strategy.scope():
             self.keras.load_weights(filepath)
 
 
