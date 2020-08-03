@@ -2,8 +2,6 @@
 
 """
 
-import logging
-
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -22,8 +20,6 @@ from vrad.inference.initializers import (
     Identity3D,
     MeansInitializer,
 )
-
-_logger = logging.getLogger("VRAD")
 
 
 class TrainableVariablesLayer(layers.Layer):
