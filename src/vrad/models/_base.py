@@ -82,7 +82,8 @@ class BaseModel:
         # Build and compile the model
         self.model = None
 
-        self.build_model()
+        with self.strategy.scope():
+            self.build_model()
         self.compile()
 
     # Allow access to the keras model attributes
