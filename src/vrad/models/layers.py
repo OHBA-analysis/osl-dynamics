@@ -49,7 +49,7 @@ class TrainableVariablesLayer(layers.Layer):
 
             self.values_initializer = variables_initializer
 
-        # Create traininable weights
+        # Create trainable weights
         self.values = self.add_weight(
             "values",
             shape=self.shape,
