@@ -110,6 +110,6 @@ matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
 
-# Free energy
+# Free energy = Log Likelihood + KL Divergence
 free_energy, ll_loss, kl_loss = model.free_energy(prediction_dataset, return_all=True)
 print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")
