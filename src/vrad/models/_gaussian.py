@@ -5,7 +5,12 @@
 import numpy as np
 from tensorflow.keras import Model, layers
 from tensorflow.python import zeros
-from vrad.inference.functions import cholesky_factor, cholesky_factor_to_full_matrix
+from tensorflow.nn import softplus
+from vrad.inference.functions import (
+    cholesky_factor,
+    cholesky_factor_to_full_matrix,
+    trace_normalize,
+)
 from vrad.models import BaseModel
 from vrad.models.layers import (
     InferenceRNNLayers,
@@ -142,11 +147,23 @@ class RNNGaussian(BaseModel):
             self.annealing_factor.assign(0.0)
 
     def get_means_covariances(self):
-        """Get the means and covariances of each state"""
+        """Get the means and covariances of each state."""
+
+        # Get the means and covariances from the MutlivariateNormalLayer
         mvn_layer = self.model.get_layer("mvn")
         means = mvn_layer.means.numpy()
         cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+
+        # Normalise covariances
+        if self.normalize_covariances:
+            covariances = trace_normalize(covariances)
+
+        # Apply alpha scaling
+        alpha_scaling = self.get_alpha_scaling()
+        means *= alpha_scaling.reshape(-1, 1)
+        covariances *= alpha_scaling.reshape(-1, 1, 1)
+
         return means, covariances
 
     def set_means_covariances(self, means=None, covariances=None):
@@ -173,6 +190,7 @@ class RNNGaussian(BaseModel):
         """Get the alpha scaling of each state."""
         mix_means_covs_layer = self.model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
+        alpha_scaling = softplus(alpha_scaling).numpy()
         return alpha_scaling
 
 
