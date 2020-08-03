@@ -82,7 +82,7 @@ class RNNGaussian(BaseModel):
 
     def build_model(self):
         """Builds a keras model."""
-        self.keras = _model_structure(
+        self.model = _model_structure(
             n_states=self.n_states,
             n_channels=self.n_channels,
             sequence_length=self.sequence_length,
@@ -132,18 +132,18 @@ class RNNGaussian(BaseModel):
             if free_energy < best_free_energy:
                 best_initialization = n
                 best_free_energy = free_energy
-                best_weights = self.keras.get_weights()
-                best_optimizer = self.keras.optimizer
+                best_weights = self.model.get_weights()
+                best_optimizer = self.model.optimizer
 
         print(f"Using initialization {best_initialization}")
         self.compile(optimizer=best_optimizer)
-        self.keras.set_weights(best_weights)
+        self.model.set_weights(best_weights)
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
 
     def get_means_covariances(self):
         """Get the means and covariances of each state"""
-        mvn_layer = self.keras.get_layer("mvn")
+        mvn_layer = self.model.get_layer("mvn")
         means = mvn_layer.means.numpy()
         cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
@@ -151,7 +151,7 @@ class RNNGaussian(BaseModel):
 
     def set_means_covariances(self, means=None, covariances=None):
         """Set the means and covariances of each state."""
-        mvn_layer = self.keras.get_layer("mvn")
+        mvn_layer = self.model.get_layer("mvn")
         layer_weights = mvn_layer.get_weights()
 
         # Replace means in the layer weights
@@ -171,7 +171,7 @@ class RNNGaussian(BaseModel):
 
     def get_alpha_scaling(self):
         """Get the alpha scaling of each state."""
-        mix_means_covs_layer = self.keras.get_layer("mix_means_covs")
+        mix_means_covs_layer = self.model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
         return alpha_scaling
 

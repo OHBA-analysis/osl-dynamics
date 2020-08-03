@@ -80,12 +80,14 @@ class BaseModel:
             self.strategy = get_strategy()
 
         # Build and compile the model
+        self.model = None
+
         self.build_model()
         self.compile()
 
     # Allow access to the keras model attributes
     def __getattr__(self, attr):
-        return getattr(self.keras, attr)
+        return getattr(self.model, attr)
 
     @abstractmethod
     def build_model(self):
@@ -110,7 +112,7 @@ class BaseModel:
         ]
 
         # Compile
-        self.keras.compile(optimizer=optimizer, loss=loss)
+        self.model.compile(optimizer=optimizer, loss=loss)
 
     def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
         """Wrapper for the standard keras fit method.
@@ -135,14 +137,14 @@ class BaseModel:
             kwargs["callbacks"] = additional_callbacks
 
         # Train the model
-        return self.keras.fit(*args, **kwargs)
+        return self.model.fit(*args, **kwargs)
 
     def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.
 
         Returns a dictionary with labels for each prediction.
         """
-        predictions = self.keras.predict(*args, *kwargs)
+        predictions = self.model.predict(*args, *kwargs)
         return_names = [
             "ll_loss",
             "kl_loss",
@@ -176,14 +178,14 @@ class BaseModel:
         Resets the model weights, optimizer and annealing factor.
         """
         self.compile()
-        reinitialize_model_weights(self.keras)
+        reinitialize_model_weights(self.model)
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
 
     def load_weights(self, filepath):
         """Load weights of the model from a file."""
         with self.strategy.scope():
-            self.keras.load_weights(filepath)
+            self.model.load_weights(filepath)
 
 
 def _ll_loss_fn(y_true, ll_loss):
