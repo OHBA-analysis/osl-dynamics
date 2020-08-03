@@ -227,13 +227,21 @@ class MixMeansCovsLayer(layers.Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
     def __init__(
-        self, n_states, n_channels, alpha_xform, learn_alpha_scaling, **kwargs
+        self,
+        n_states,
+        n_channels,
+        alpha_xform,
+        learn_alpha_scaling,
+        softplus_and_scale=False,
+        **kwargs
     ):
         super().__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
         self.learn_alpha_scaling = learn_alpha_scaling and alpha_xform is not "softplus"
+        if softplus_and_scale:
+            self.learn_alpha_scaling = True
 
         if learn_alpha_scaling and alpha_xform == "softplus":
             _logger.warning(

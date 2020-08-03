@@ -48,6 +48,7 @@ class RNNGaussian(BaseModel):
         strategy: str = None,
         initial_means: np.ndarray = None,
         initial_covariances: np.ndarray = None,
+        softplus_and_scale: bool = False,
     ):
         # Parameters related to the observation model
         self.learn_means = learn_means
@@ -57,6 +58,7 @@ class RNNGaussian(BaseModel):
         self.alpha_xform = alpha_xform
         self.learn_alpha_scaling = learn_alpha_scaling
         self.normalize_covariances = normalize_covariances
+        self.softplus_and_scale = softplus_and_scale
 
         # Initialise the model base class
         # This will build and compile the keras model
@@ -99,6 +101,7 @@ class RNNGaussian(BaseModel):
             alpha_xform=self.alpha_xform,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
+            softplus_and_scale=self.softplus_and_scale,
         )
 
     def initialize_means_covariances(
@@ -193,6 +196,7 @@ def _model_structure(
     alpha_xform: str,
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
+    softplus_and_scale=False,
 ):
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
@@ -255,7 +259,12 @@ def _model_structure(
         name="mvn",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, alpha_xform, learn_alpha_scaling, name="mix_means_covs"
+        n_states,
+        n_channels,
+        alpha_xform,
+        learn_alpha_scaling,
+        softplus_and_scale,
+        name="mix_means_covs",
     )
 
     # Layers to calculate the negative of the log likelihood and KL divergence
