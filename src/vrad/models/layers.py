@@ -301,7 +301,7 @@ class LogLikelihoodLayer(layers.Layer):
     def build(self, input_shape):
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
         """Computes the log likelihood:
            c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
            where:
@@ -421,7 +421,7 @@ class ModelRNNLayers(layers.Layer):
             self.layers.append(layers.LayerNormalization())
             self.layers.append(layers.Dropout(dropout_rate))
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
         for layer in self.layers:
             inputs = layer(inputs)
         return inputs
