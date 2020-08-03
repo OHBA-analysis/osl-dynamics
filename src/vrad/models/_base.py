@@ -98,7 +98,7 @@ class BaseModel:
         Sets up the optimiser and loss functions.
         """
         # Setup optimizer
-        if optimizer == None:
+        if optimizer is None:
             optimizer = optimizers.Adam(
                 learning_rate=self.learning_rate, clipnorm=self.clip_normalization,
             )
