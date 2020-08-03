@@ -10,9 +10,9 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
-from vrad.inference.callbacks import AnnealingCallback, BurninCallback
+from vrad.inference.callbacks import AnnealingCallback, BurninCallback, SaveBestCallback
 from vrad.inference.initializers import reinitialize_model_weights
-from vrad.utils.misc import listify
+from vrad.utils.misc import listify, replace_argument
 
 
 class BaseModel:
@@ -86,6 +86,8 @@ class BaseModel:
             self.build_model()
         self.compile()
 
+        self._identifier = np.random.randint(100000)
+
     # Allow access to the keras model attributes
     def __getattr__(self, attr):
         return getattr(self.model, attr)
@@ -115,7 +117,7 @@ class BaseModel:
         # Compile
         self.model.compile(optimizer=optimizer, loss=loss)
 
-    def create_callbacks(self, use_tqdm, tqdm_class):
+    def create_callbacks(self, use_tqdm, tqdm_class, save_best_after):
         annealing_callback = AnnealingCallback(
             annealing_factor=self.annealing_factor,
             annealing_sharpness=self.annealing_sharpness,
@@ -131,29 +133,33 @@ class BaseModel:
 
             additional_callbacks.append(tqdm_callback)
 
+        if save_best_after is not None:
+            save_best_callback = SaveBestCallback(
+                save_best_after=save_best_after,
+                filepath=f"/tmp/model_weights/best_{self._identifier}",
+            )
+            additional_callbacks.append(save_best_callback)
+
         return additional_callbacks
 
-    def fit(self, *args, use_tqdm=False, tqdm_class=None, **kwargs):
+    def fit(
+        self, *args, use_tqdm=False, tqdm_class=None, save_best_after=None, **kwargs
+    ):
         """Wrapper for the standard keras fit method.
 
         Adds callbacks for KL annealing and burn-in then trains the model.
         """
-        args = list(args)
-
-        # Add annealing, burn-in and tqdm callbacks
-        additional_callbacks = [self.annealing_callback, self.burnin_callback]
         if use_tqdm:
-            if tqdm_class is not None:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-            else:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
-            additional_callbacks.append(tqdm_callback)
-        if len(args) > 5:
-            args[5] = listify(args[5]) + additional_callbacks
-        if "callbacks" in kwargs:
-            kwargs["callbacks"] = listify(kwargs["callbacks"]) + additional_callbacks
-        else:
-            kwargs["callbacks"] = additional_callbacks
+            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+
+        args, kwargs = replace_argument(
+            func=self.model.fit,
+            name="callbacks",
+            item=self.create_callbacks(use_tqdm, tqdm_class, save_best_after),
+            args=args,
+            kwargs=kwargs,
+            append=True,
+        )
 
         # Train the model
         return self.model.fit(*args, **kwargs)

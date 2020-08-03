@@ -19,6 +19,8 @@ def listify(obj: object):
         return []
     if isinstance(obj, list):
         return obj
+    if isinstance(obj, tuple):
+        return list(obj)
     else:
         return [obj]
 
