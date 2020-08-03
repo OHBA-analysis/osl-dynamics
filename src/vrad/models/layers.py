@@ -301,7 +301,7 @@ class LogLikelihoodLayer(layers.Layer):
     def build(self, input_shape):
         self.built = True
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         """Computes the log likelihood:
            c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
            where:
@@ -352,7 +352,7 @@ class KLDivergenceLayer(layers.Layer):
     def build(self, input_shape):
         self.built = True
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
         # model_mu needs shifting forward by one time point
@@ -392,7 +392,7 @@ class InferenceRNNLayers(layers.Layer):
             self.layers.append(layers.LayerNormalization())
             self.layers.append(layers.Dropout(dropout_rate))
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         for layer in self.layers:
             inputs = layer(inputs)
         return inputs
@@ -421,7 +421,7 @@ class ModelRNNLayers(layers.Layer):
             self.layers.append(layers.LayerNormalization())
             self.layers.append(layers.Dropout(dropout_rate))
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         for layer in self.layers:
             inputs = layer(inputs)
         return inputs
