@@ -233,13 +233,7 @@ class MixMeansCovsLayer(layers.Layer):
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
-        self.learn_alpha_scaling = learn_alpha_scaling and alpha_xform is not "softplus"
-
-        if learn_alpha_scaling and alpha_xform == "softplus":
-            _logger.warning(
-                "Warning: learn_alpha_scaling set to False because "
-                + "alpha_xform=softplus is being used."
-            )
+        self.learn_alpha_scaling = learn_alpha_scaling
 
     def build(self, input_shape):
         # Initialise such that softplus(alpha_scaling) = 1
@@ -267,7 +261,7 @@ class MixMeansCovsLayer(layers.Layer):
             alpha_t = softplus(theta_t)
         elif self.alpha_xform == "softmax":
             alpha_t = softmax(theta_t, axis=2)
-            alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
+        alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
         alpha_t = K.expand_dims(alpha_t, axis=-1)
