@@ -33,6 +33,7 @@ class Subject:
         self._id = _id
         self._original_shape = self.time_series.shape
         self.prepared = False
+        self.scaler = None
 
         # Time axis
         self.t = np.arange(self.time_series.shape[0]) / self.sampling_frequency
@@ -46,6 +47,10 @@ class Subject:
             f"prepared: {self.prepared}",
         ]
         return "\n  ".join(return_string)
+
+    @property
+    def original_shape(self):
+        return self._original_shape
 
     def __getitem__(self, val):
         return self.time_series[val]

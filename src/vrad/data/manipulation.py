@@ -3,6 +3,9 @@ from typing import Union
 
 import numpy as np
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from tqdm import trange
+from vrad.simulation import VRADSimulation
 from vrad.utils.decorators import transpose
 
 _logger = logging.getLogger("VRAD")
@@ -245,33 +248,13 @@ def prepare(
     # List to hold the weighted covariance matrix of each subjects time series
     covariances = []
 
-    for i in ids:
+    for subject in subjects:
         # Perform time embedding
-        subjects[i].time_embed(n_embeddings, random_seed=random_seed)
+        subject.time_embed(n_embeddings, random_seed=random_seed)
 
         # Rescale (z-transform) the time series
-        subjects[i].scale()
-
-    #     # Calculate weighted covariances
-    #     covariances.append(covariance(subjects[i].time_series, weighted=True))
-    #
-    # # Sum and normalise the covariance matrices
-    # covariances = np.sum(covariances, axis=0)
-    # covariances /= n_total_samples - 1
-    #
-    # # Calculate the eigen decomposition and keep the top n_pca_components
-    # eigenvalues, eigenvectors = eigen_decomposition(covariances, n_pca_components)
-    #
-    # # Whiten the eigenvectors
-    # if whiten:
-    #     eigenvectors = eigenvectors @ np.diag(1.0 / np.sqrt(eigenvalues))
-
-    # # Apply dimensionality reduction
-    # for i in ids:
-    #     subjects[i].time_series = subjects[i].time_series @ eigenvectors
-    #
-    #     # Update flag to indicate data has been prepared
-    #     subjects[i].prepared = True
+        subject.scaler = StandardScaler()
+        subject.time_series = subject.scaler.fit_transform(subject.time_series)
 
     pca_object = PCA(n_pca_components, svd_solver="full", whiten=whiten)
     for subject in subjects:
@@ -283,3 +266,33 @@ def prepare(
         return subjects, pca_object
 
     return subjects
+
+
+def inferred_states_to_source_space(inferred_covariances, state_time_course, meg_data):
+    """Take VRAD results and transform them to source space."""
+
+    n_states = inferred_covariances.shape[0]
+    n_source_channels = meg_data[0].original_shape[1]
+    n_embeddings = meg_data.pca.components_.shape[1] // n_source_channels
+    n_samples = state_time_course.shape[0]
+
+    state_indexer = np.eye(n_states, dtype=bool)
+
+    state_covariances = np.empty((n_states, n_source_channels, n_source_channels))
+    state_recon_time_series = np.empty((n_states, n_samples, n_source_channels))
+
+    for state in trange(n_states, desc="Recovering source space"):
+        inferred_state_covariance = (
+            inferred_covariances * state_indexer[state][:, None, None]
+        )
+
+        state_sim = VRADSimulation(inferred_state_covariance, state_time_course)
+        state_sim.simulate()
+
+        time_embedded_state_sim = meg_data.pca.inverse_transform(state_sim.time_series)
+        state_recon_time_series[state] = time_embedded_state_sim.reshape(
+            n_samples, n_source_channels, -1
+        )[..., (n_embeddings + 1) // 2]
+        state_covariances[state] = np.cov(state_recon_time_series[state].T)
+
+    return state_recon_time_series, state_covariances
