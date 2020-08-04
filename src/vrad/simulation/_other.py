@@ -11,17 +11,17 @@ class HiddenSemiMarkovSimulation(Simulation):
     @auto_repr
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
-        random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
-        off_diagonal_trans_prob: np.ndarray = None,
-        full_trans_prob: np.ndarray = None,
-        stay_prob: float = 0.95,
-        gamma_shape: float = 5,
-        gamma_scale: float = 10,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        random_covariance_weights: bool,
+        observation_error: float,
+        off_diagonal_trans_prob: np.ndarray,
+        full_trans_prob: np.ndarray,
+        stay_prob: float,
+        gamma_shape: float,
+        gamma_scale: float,
     ):
         self.off_diagonal_trans_prob = off_diagonal_trans_prob
         self.full_trans_prob = full_trans_prob
@@ -106,3 +106,23 @@ class HiddenSemiMarkovSimulation(Simulation):
         logging.debug(f"one_hot_alpha_sim.shape = {one_hot_alpha_sim.shape}")
 
         return one_hot_alpha_sim
+
+
+class VRADSimulation(Simulation):
+    """Simulate a dataset from the covariances and state time course of a model."""
+
+    def __init__(self, covariances, state_time_course):
+        super().__init__(
+            n_samples=state_time_course.shape[0],
+            n_channels=covariances.shape[-1],
+            n_states=covariances.shape[0],
+            sim_varying_means=False,
+            covariances=covariances,
+            observation_error=0.0,
+            random_covariance_weights=False,
+            simulate=False,
+        )
+        self.state_time_course = state_time_course
+
+    def generate_states(self):
+        return self.state_time_course

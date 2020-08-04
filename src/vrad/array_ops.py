@@ -86,7 +86,9 @@ def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
 
 
 @transpose
-def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
+def match_states(
+    *state_time_courses: np.ndarray, return_order=False
+) -> List[np.ndarray]:
     """Find correlated states between state time courses.
 
     Given N state time courses and using the first given state time course as a basis,
@@ -110,6 +112,7 @@ def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
 
     # Match time courses based on correlation
     matched_state_time_courses = [state_time_courses[0][:n_samples]]
+    orders = [np.arange(state_time_courses[0].shape[1])]
     for state_time_course in state_time_courses[1:]:
         correlation = correlate_states(
             state_time_courses[0][:n_samples], state_time_course[:n_samples]
@@ -117,8 +120,12 @@ def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
         correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
         matches = linear_sum_assignment(-correlation)
         matched_state_time_courses.append(state_time_course[:n_samples, matches[1]])
+        orders.append(matches[1])
 
-    return matched_state_time_courses
+    if return_order:
+        return orders
+    else:
+        return matched_state_time_courses
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):

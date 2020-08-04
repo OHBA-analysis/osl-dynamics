@@ -11,12 +11,34 @@ from pathlib import Path
 import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
-from tensorflow.python import tanh
+from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
-from vrad.inference.layers import MultivariateNormalLayer
+from vrad.models.layers import MultivariateNormalLayer
 
 _logger = logging.getLogger("VRAD")
+
+
+class SaveBestCallback(callbacks.ModelCheckpoint):
+    def __init__(self, save_best_after, *args, **kwargs):
+        self.save_best_after = save_best_after
+
+        kwargs.update(
+            dict(
+                save_weights_only=True, monitor="loss", mode="min", save_best_only=True,
+            )
+        )
+
+        super().__init__(*args, **kwargs)
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.epochs_since_last_save += 1
+        if epoch >= self.save_best_after:
+            if self.save_freq == "epoch":
+                self._save_model(epoch=epoch, logs=logs)
+
+    def on_train_end(self, logs=None):
+        self.model.load_weights(self.filepath)
 
 
 class SavePredictionCallback(callbacks.Callback):

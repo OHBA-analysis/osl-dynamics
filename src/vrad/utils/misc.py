@@ -1,4 +1,6 @@
+import inspect
 import logging
+from copy import copy
 
 import numpy as np
 
@@ -17,8 +19,28 @@ def listify(obj: object):
         return []
     if isinstance(obj, list):
         return obj
+    if isinstance(obj, tuple):
+        return list(obj)
     else:
         return [obj]
+
+
+def replace_argument(func, name, item, args, kwargs, append=False):
+    args = copy(listify(args))
+    kwargs = copy(kwargs)
+    param_order = list(inspect.signature(func).parameters)
+    param_position = param_order.index(name)
+    if len(args) > param_position:
+        if append:
+            args[param_position] = listify(args[param_position]) + listify(item)
+        else:
+            args[param_position] = item
+    elif name in kwargs:
+        if append:
+            kwargs[name] = listify(kwargs[name]) + listify(item)
+    else:
+        kwargs[name] = item
+    return args, kwargs
 
 
 def check_iterable_type(iterable, object_type: type):

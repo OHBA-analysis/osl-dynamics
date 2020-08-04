@@ -2,14 +2,11 @@
 
 """
 
-import logging
-from typing import Union
-
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import layers
 from tensorflow.keras import backend as K
+from tensorflow.keras import layers
 from tensorflow.keras.activations import softmax, softplus
 from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (
@@ -24,11 +21,59 @@ from vrad.inference.initializers import (
     MeansInitializer,
 )
 
-_logger = logging.getLogger("VRAD")
+
+class TrainableVariablesLayer(layers.Layer):
+    """Generic trainable variables layer.
+
+    Sets up trainable parameters/weights tensor of a certain shape.
+    Parameters/weights are outputted.
+    """
+
+    def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.initial_values = initial_values
+        self.trainable = trainable
+
+    def build(self, input_shape):
+
+        # If no initial values have been passed, initialise with zeros
+        if self.initial_values is None:
+            self.values_initializer = tf.keras.initializers.Zeros()
+
+        # Otherwise, initialise with the variables passed
+        else:
+
+            def variables_initializer(shape, dtype=None):
+                return self.initial_values
+
+            self.values_initializer = variables_initializer
+
+        # Create trainable weights
+        self.values = self.add_weight(
+            "values",
+            shape=self.shape,
+            dtype=K.floatx(),
+            initializer=self.values_initializer,
+            trainable=self.trainable,
+        )
+
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        return self.values
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(self.shape)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"shape": self.shape, "trainable": self.trainable})
+        return config
 
 
 class ReparameterizationLayer(layers.Layer):
-    """Resample a normal distribution.
+    """Performs the reparameterisation trick.
 
     The reparameterization trick is used to provide a differentiable random sample.
     By optimizing the values which define the distribution (i.e. mu and sigma), a model
@@ -56,8 +101,10 @@ class ReparameterizationLayer(layers.Layer):
 
 
 class MultivariateNormalLayer(layers.Layer):
-    """Parameterises multiple multivariate Gaussians and in terms of their means
-       and covariances. Means and covariances are outputted.
+    """Layer for Gaussian observations.
+
+    Parameterises multiple multivariate Gaussians and in terms of their means
+    and covariances. Means and covariances are outputted.
     """
 
     def __init__(
@@ -172,56 +219,6 @@ class MultivariateNormalLayer(layers.Layer):
         return config
 
 
-class TrainableVariablesLayer(layers.Layer):
-    """Generic trainable variables layer.
-
-       Sets up trainable parameters/weights tensor of a certain shape.
-       Parameters/weights are outputted.
-    """
-
-    def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-        self.initial_values = initial_values
-        self.trainable = trainable
-
-    def build(self, input_shape):
-
-        # If no initial values have been passed, initialise with zeros
-        if self.initial_values is None:
-            self.values_initializer = tf.keras.initializers.Zeros()
-
-        # Otherwise, initialise with the variables passed
-        else:
-
-            def variables_initializer(shape, dtype=None):
-                return self.initial_values
-
-            self.values_initializer = variables_initializer
-
-        # Create traininable weights
-        self.values = self.add_weight(
-            "values",
-            shape=self.shape,
-            dtype=K.floatx(),
-            initializer=self.values_initializer,
-            trainable=self.trainable,
-        )
-
-        self.built = True
-
-    def call(self, inputs, **kwargs):
-        return self.values
-
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape(self.shape)
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"shape": self.shape, "trainable": self.trainable})
-        return config
-
-
 class MixMeansCovsLayer(layers.Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
@@ -232,13 +229,7 @@ class MixMeansCovsLayer(layers.Layer):
         self.n_states = n_states
         self.n_channels = n_channels
         self.alpha_xform = alpha_xform
-        self.learn_alpha_scaling = learn_alpha_scaling and alpha_xform is not "softplus"
-
-        if learn_alpha_scaling and alpha_xform == "softplus":
-            _logger.warning(
-                "Warning: learn_alpha_scaling set to False because "
-                + "alpha_xform=softplus is being used."
-            )
+        self.learn_alpha_scaling = learn_alpha_scaling
 
     def build(self, input_shape):
         # Initialise such that softplus(alpha_scaling) = 1
@@ -266,7 +257,7 @@ class MixMeansCovsLayer(layers.Layer):
             alpha_t = softplus(theta_t)
         elif self.alpha_xform == "softmax":
             alpha_t = softmax(theta_t, axis=2)
-            alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
+        alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
         alpha_t = K.expand_dims(alpha_t, axis=-1)
@@ -302,7 +293,7 @@ class MixMeansCovsLayer(layers.Layer):
 
 
 class LogLikelihoodLayer(layers.Layer):
-    """Computes log likelihood."""
+    """Computes the negative log likelihood."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -361,7 +352,7 @@ class KLDivergenceLayer(layers.Layer):
     def build(self, input_shape):
         self.built = True
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
         # model_mu needs shifting forward by one time point
@@ -370,11 +361,9 @@ class KLDivergenceLayer(layers.Layer):
         prior = tfp.distributions.Normal(
             loc=shifted_model_mu, scale=tf.exp(model_log_sigma)
         )
-
         posterior = tfp.distributions.Normal(
             loc=inference_mu, scale=tf.exp(inference_log_sigma)
         )
-
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
         return K.expand_dims(kl_loss)
@@ -403,7 +392,7 @@ class InferenceRNNLayers(layers.Layer):
             self.layers.append(layers.LayerNormalization())
             self.layers.append(layers.Dropout(dropout_rate))
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         for layer in self.layers:
             inputs = layer(inputs)
         return inputs
