@@ -232,7 +232,8 @@ def prepare(
     n_pca_components: int,
     whiten: bool,
     random_seed: int = None,
-) -> list:
+    return_pca_object: bool = False,
+):
     """Prepares subject data by time embeddings and performing PCA.
 
     Follows the data preparation done in the OSL script teh_groupinference_parcels.m
@@ -251,25 +252,34 @@ def prepare(
         # Rescale (z-transform) the time series
         subjects[i].scale()
 
-        # Calculate weighted covariances
-        covariances.append(covariance(subjects[i].time_series, weighted=True))
+    #     # Calculate weighted covariances
+    #     covariances.append(covariance(subjects[i].time_series, weighted=True))
+    #
+    # # Sum and normalise the covariance matrices
+    # covariances = np.sum(covariances, axis=0)
+    # covariances /= n_total_samples - 1
+    #
+    # # Calculate the eigen decomposition and keep the top n_pca_components
+    # eigenvalues, eigenvectors = eigen_decomposition(covariances, n_pca_components)
+    #
+    # # Whiten the eigenvectors
+    # if whiten:
+    #     eigenvectors = eigenvectors @ np.diag(1.0 / np.sqrt(eigenvalues))
 
-    # Sum and normalise the covariance matrices
-    covariances = np.sum(covariances, axis=0)
-    covariances /= n_total_samples - 1
+    # # Apply dimensionality reduction
+    # for i in ids:
+    #     subjects[i].time_series = subjects[i].time_series @ eigenvectors
+    #
+    #     # Update flag to indicate data has been prepared
+    #     subjects[i].prepared = True
 
-    # Calculate the eigen decomposition and keep the top n_pca_components
-    eigenvalues, eigenvectors = eigen_decomposition(covariances, n_pca_components)
+    pca_object = PCA(n_pca_components, svd_solver="full", whiten=whiten)
+    for subject in subjects:
+        pca_object.fit(subject.time_series)
+    for subject in subjects:
+        subject.time_series = pca_object.transform(subject.time_series)
 
-    # Whiten the eigenvectors
-    if whiten:
-        eigenvectors = eigenvectors @ np.diag(1.0 / np.sqrt(eigenvalues))
-
-    # Apply dimensionality reduction
-    for i in ids:
-        subjects[i].time_series = subjects[i].time_series @ eigenvectors
-
-        # Update flag to indicate data has been prepared
-        subjects[i].prepared = True
+    if return_pca_object:
+        return subjects, pca_object
 
     return subjects
