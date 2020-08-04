@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
-from tensorflow.python import tanh
+from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
 from vrad.models.layers import MultivariateNormalLayer
