@@ -4,8 +4,8 @@
 from abc import abstractmethod
 
 import numpy as np
-from tensorflow.keras import optimizers
 from tensorflow import Variable
+from tensorflow.keras import optimizers
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm import tqdm
