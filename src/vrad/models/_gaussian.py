@@ -4,7 +4,7 @@
 
 import numpy as np
 from tensorflow.keras import Model, layers
-from tensorflow.python import zeros
+from tensorflow import zeros
 from tensorflow.python.keras.backend import softplus
 from vrad.inference.functions import (
     cholesky_factor,
