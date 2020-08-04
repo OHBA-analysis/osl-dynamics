@@ -74,6 +74,7 @@ class BaseModel:
         self.clip_normalization = clip_normalization
 
         # Strategy for distributed learning
+        self.strategy = strategy
         if multi_gpu:
             self.strategy = MirroredStrategy()
         elif strategy is None:
