@@ -73,6 +73,15 @@ class Data:
         if check_iterable_type(subjects, str):
             return subjects
 
+        if isinstance(subjects, list) and check_iterable_type(subjects, np.ndarray):
+            for subject in subjects:
+                if subject.ndim != 2:
+                    raise ValueError(
+                        "When passing a list of subjects as arrays,"
+                        " each subject must be 2D."
+                    )
+            return subjects
+
         # Try to get a useable type
         subjects = np.asarray(subjects)
 
