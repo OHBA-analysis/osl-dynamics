@@ -224,7 +224,10 @@ def _model_structure(
     input_normalisation_layer = layers.LayerNormalization()
     inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
     inference_output_layers = InferenceRNNLayers(
-        n_layers_inference, n_units_inference, dropout_rate_inference
+        n_layers_inference,
+        n_units_inference,
+        dropout_rate_inference,
+        name="inference_rnn",
     )
     m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
     log_s2_theta_t_layer = layers.Dense(
@@ -251,7 +254,7 @@ def _model_structure(
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model)
     model_output_layers = ModelRNNLayers(
-        n_layers_model, n_units_model, dropout_rate_model
+        n_layers_model, n_units_model, dropout_rate_model, name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
     log_sigma2_theta_j_layer = TrainableVariablesLayer(

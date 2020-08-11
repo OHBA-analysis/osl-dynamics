@@ -6,12 +6,19 @@ from abc import abstractmethod
 import numpy as np
 from tensorflow import Variable
 from tensorflow.keras import optimizers
+from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
-from vrad.inference.callbacks import AnnealingCallback, BurninCallback, SaveBestCallback
+from vrad.inference.callbacks import (
+    AnnealingCallback,
+    BurninCallback,
+    SaveBestCallback,
+    tensorboard_run_logdir,
+)
 from vrad.inference.initializers import reinitialize_model_weights
+from vrad.inference.losses import LogLikelihoodLoss, KullbackLeiblerLoss
 from vrad.utils.misc import listify, replace_argument
 
 
@@ -110,22 +117,30 @@ class BaseModel:
             )
 
         # Loss functions
-        loss = [
-            _ll_loss_fn,
-            _create_kl_loss_fn(annealing_factor=self.annealing_factor),
-        ]
+        ll_loss = LogLikelihoodLoss()
+        kl_loss = KullbackLeiblerLoss(self.annealing_factor)
+        loss = [ll_loss, kl_loss]
 
         # Compile
         self.model.compile(optimizer=optimizer, loss=loss)
 
-    def create_callbacks(self, use_tqdm, tqdm_class, save_best_after):
+    def create_callbacks(
+        self, use_tqdm, tqdm_class, use_tensorboard, tensorboard_dir, save_best_after
+    ):
+
+        # Callback for KL annealing
         annealing_callback = AnnealingCallback(
             annealing_factor=self.annealing_factor,
             annealing_sharpness=self.annealing_sharpness,
             n_epochs_annealing=self.n_epochs_annealing,
         )
+
+        # Callback for a burn-in training period
         burnin_callback = BurninCallback(epochs=self.n_epochs_burnin)
+
         additional_callbacks = [annealing_callback, burnin_callback]
+
+        # Callback to display a progress bar with tqdm
         if use_tqdm:
             if tqdm_class is not None:
                 tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
@@ -134,17 +149,35 @@ class BaseModel:
 
             additional_callbacks.append(tqdm_callback)
 
+        # Callback for Tensorboard visulisation
+        if use_tensorboard:
+            if tensorboard_dir is not None:
+                tensorboard_cb = TensorBoard(tensoboard_dir)
+            else:
+                tensorboard_cb = TensorBoard(tensorboard_run_logdir())
+
+            additional_callbacks.append(tensorboard_cb)
+
+        # Callback to save the best model after a certain number of epochs
         if save_best_after is not None:
             save_best_callback = SaveBestCallback(
                 save_best_after=save_best_after,
                 filepath=f"/tmp/model_weights/best_{self._identifier}",
             )
+
             additional_callbacks.append(save_best_callback)
 
         return additional_callbacks
 
     def fit(
-        self, *args, use_tqdm=False, tqdm_class=None, save_best_after=None, **kwargs
+        self,
+        *args,
+        use_tqdm=False,
+        tqdm_class=None,
+        use_tensorboard=None,
+        tensorboard_dir=None,
+        save_best_after=None,
+        **kwargs,
     ):
         """Wrapper for the standard keras fit method.
 
@@ -156,7 +189,9 @@ class BaseModel:
         args, kwargs = replace_argument(
             func=self.model.fit,
             name="callbacks",
-            item=self.create_callbacks(use_tqdm, tqdm_class, save_best_after),
+            item=self.create_callbacks(
+                use_tqdm, tqdm_class, use_tensorboard, tensorboard_dir, save_best_after
+            ),
             args=args,
             kwargs=kwargs,
             append=True,
@@ -212,24 +247,3 @@ class BaseModel:
         """Load weights of the model from a file."""
         with self.strategy.scope():
             self.model.load_weights(filepath)
-
-
-def _ll_loss_fn(y_true, ll_loss):
-    """Negative log-likelihood loss.
-
-    The first output of the model is the negative log likelihood
-    so we just need to return it.
-    """
-    return ll_loss
-
-
-def _create_kl_loss_fn(annealing_factor):
-    def _kl_loss_fn(y_true, kl_loss):
-        """KL divergence loss.
-
-        The second output of the model is the KL divergence loss.
-        We multiply with an annealing factor.
-        """
-        return annealing_factor * kl_loss
-
-    return _kl_loss_fn

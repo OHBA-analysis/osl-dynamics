@@ -211,9 +211,6 @@ class MultivariateNormalLayer(layers.Layer):
                 "learn_means": self.learn_means,
                 "learn_covariances": self.learn_covariances,
                 "normalize_covariances": self.normalize_covariances,
-                "initial_means": self.initial_means,
-                "initial_cholesky_covariances": self.initial_cholesky_covariances,
-                "burnin": self.burnin,
             }
         )
         return config

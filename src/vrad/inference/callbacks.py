@@ -177,3 +177,10 @@ class ComparisonCallback(Callback):
     def tqdm_update(self, *args, **kwargs):
         if len(self.dice_history) > 0:
             self.trainer.post_fix.update({"dice": self.dice_history[-1]})
+
+
+def tensorboard_run_logdir():
+    """Creates a directory name to store TensorBoard logs."""
+    root_logdir = os.path.join(os.curdir, "logs")
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    return os.path.join(root_logdir, run_id)
