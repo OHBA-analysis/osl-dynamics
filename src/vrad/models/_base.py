@@ -18,7 +18,7 @@ from vrad.inference.callbacks import (
     tensorboard_run_logdir,
 )
 from vrad.inference.initializers import reinitialize_model_weights
-from vrad.inference.losses import LogLikelihoodLoss, KullbackLeiblerLoss
+from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
 from vrad.utils.misc import listify, replace_argument
 
 
@@ -152,7 +152,7 @@ class BaseModel:
         # Callback for Tensorboard visulisation
         if use_tensorboard:
             if tensorboard_dir is not None:
-                tensorboard_cb = TensorBoard(tensoboard_dir)
+                tensorboard_cb = TensorBoard(tensorboard_dir)
             else:
                 tensorboard_cb = TensorBoard(tensorboard_run_logdir())
 
