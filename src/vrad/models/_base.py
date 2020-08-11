@@ -144,9 +144,13 @@ class BaseModel:
         # Callback for Tensorboard visulisation
         if use_tensorboard:
             if tensorboard_dir is not None:
-                tensorboard_cb = TensorBoard(tensorboard_dir, histogram_freq=1)
+                tensorboard_cb = TensorBoard(
+                    tensorboard_dir, histogram_freq=1, profile_batch="2,10"
+                )
             else:
-                tensorboard_cb = TensorBoard(tensorboard_run_logdir(), histogram_freq=1)
+                tensorboard_cb = TensorBoard(
+                    tensorboard_run_logdir(), histogram_freq=1, profile_batch="2,10"
+                )
 
             additional_callbacks.append(tensorboard_cb)
 
