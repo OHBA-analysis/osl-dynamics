@@ -51,7 +51,7 @@ n_epochs_initialization = 35
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/ten_subjects_1.mat")
+meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/ten_subjects.mat")
 n_channels = meg_data.n_channels
 
 # Build model
@@ -101,7 +101,7 @@ inf_stc = inf_stc.argmax(axis=1)
 inf_stc = array_ops.get_one_hot(inf_stc)
 
 # State time course from HMM
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/ten_subjects_1/hmm.mat")
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/ten_subjects.mat")
 hmm_stc = hmm.viterbi_path
 
 # Find correspondance between state time courses

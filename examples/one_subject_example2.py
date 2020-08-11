@@ -109,7 +109,7 @@ inf_stc = inf_stc.argmax(axis=1)
 inf_stc = array_ops.get_one_hot(inf_stc)
 
 # Find correspondance between state time courses
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
 matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 

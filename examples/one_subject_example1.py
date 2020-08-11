@@ -55,7 +55,7 @@ meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
 n_channels = meg_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject/hmm.mat")
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
 covariances = hmm.covariances
 means = np.zeros([n_states, n_channels], dtype=np.float32)
 
