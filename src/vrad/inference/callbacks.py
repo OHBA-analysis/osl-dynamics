@@ -84,9 +84,9 @@ class AnnealingCallback(callbacks.Callback):
 
 
 class BurninCallback(callbacks.Callback):
-    def __init__(self, epochs):
+    """Used to make the epoch number available to the MultivariateNormal layer."""
+    def __init__(self):
         super().__init__()
-        self.epochs = epochs
         self.mvn = None
 
     def on_train_begin(self, logs=None):
@@ -95,11 +95,11 @@ class BurninCallback(callbacks.Callback):
                 self.mvn = layer
 
         if self.mvn is None:
-            _logger.warning("MVN layer not found by burnin callback.")
+            _logger.warning("MultivariateNormal layer not found by burn-in callback.")
 
     def on_epoch_begin(self, epoch, logs=None):
         if self.mvn is not None:
-            self.mvn.burnin.assign(epoch < self.epochs)
+            self.mvn.epoch = epoch
 
 
 class Callback(ABC):

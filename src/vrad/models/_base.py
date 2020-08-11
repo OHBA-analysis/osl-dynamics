@@ -68,14 +68,6 @@ class BaseModel:
         self.n_epochs_annealing = n_epochs_annealing
         self.n_epochs_burnin = n_epochs_burnin
 
-        # Callbacks
-        self.burnin_callback = BurninCallback(epochs=self.n_epochs_burnin)
-        self.annealing_callback = AnnealingCallback(
-            annealing_factor=self.annealing_factor,
-            annealing_sharpness=self.annealing_sharpness,
-            n_epochs_annealing=self.n_epochs_annealing,
-        )
-
         # Training Parameters
         self.learning_rate = learning_rate
         self.clip_normalization = clip_normalization
@@ -136,7 +128,7 @@ class BaseModel:
         )
 
         # Callback for a burn-in training period
-        burnin_callback = BurninCallback(epochs=self.n_epochs_burnin)
+        burnin_callback = BurninCallback()
 
         additional_callbacks = [annealing_callback, burnin_callback]
 
@@ -152,9 +144,9 @@ class BaseModel:
         # Callback for Tensorboard visulisation
         if use_tensorboard:
             if tensorboard_dir is not None:
-                tensorboard_cb = TensorBoard(tensorboard_dir)
+                tensorboard_cb = TensorBoard(tensorboard_dir, histogram_freq=1)
             else:
-                tensorboard_cb = TensorBoard(tensorboard_run_logdir())
+                tensorboard_cb = TensorBoard(tensorboard_run_logdir(), histogram_freq=1)
 
             additional_callbacks.append(tensorboard_cb)
 

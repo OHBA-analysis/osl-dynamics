@@ -101,6 +101,7 @@ class RNNGaussian(BaseModel):
             learn_covariances=self.learn_covariances,
             initial_means=self.initial_means,
             initial_covariances=self.initial_covariances,
+            n_epochs_burnin=self.n_epochs_burnin,
             alpha_xform=self.alpha_xform,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
@@ -208,6 +209,7 @@ def _model_structure(
     learn_covariances: bool,
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
+    n_epochs_burnin: int,
     alpha_xform: str,
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
@@ -273,6 +275,7 @@ def _model_structure(
         normalize_covariances=normalize_covariances,
         initial_means=initial_means,
         initial_covariances=initial_covariances,
+        n_epochs_burnin=n_epochs_burnin,
         name="mvn",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
