@@ -9,7 +9,6 @@
 """
 
 print("Importing packages")
-import numpy as np
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
 from vrad.models import RNNGaussian

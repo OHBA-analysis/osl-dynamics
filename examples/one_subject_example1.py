@@ -80,7 +80,6 @@ model = RNNGaussian(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
-    n_epochs_burnin=n_epochs_burnin,
     multi_gpu=multi_gpu,
 )
 
@@ -91,7 +90,12 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Train the model
-print("Training model")
+print("Training burn-in model")
+history = model.burn_in(
+    training_dataset, epochs=n_epochs_burnin, verbose=0, use_tqdm=True
+)
+
+print("Training full model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
 # Inferred covariance matrices
