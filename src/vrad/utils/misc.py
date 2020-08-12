@@ -38,6 +38,8 @@ def replace_argument(func, name, item, args, kwargs, append=False):
     elif name in kwargs:
         if append:
             kwargs[name] = listify(kwargs[name]) + listify(item)
+        else:
+            kwargs[name] = item
     else:
         kwargs[name] = item
     return args, kwargs
