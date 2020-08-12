@@ -637,6 +637,7 @@ def plot_matrices(
     matrix: Iterable[np.ndarray],
     group_color_scale: bool = True,
     titles: list = None,
+    main_title: str = None,
     cmap="viridis",
     nan_color="white",
     filename: str = None,
@@ -653,6 +654,8 @@ def plot_matrices(
         If True, all matrices will have the same colormap scale.
     titles: list of str
         Titles to give to each matrix axis.
+    main_title: str
+        Main title to be placed at the top of the plot.
     cmap: str
         Matplotlib colormap.
     nan_color: str
@@ -700,6 +703,8 @@ def plot_matrices(
             cax = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(pl, cax=cax)
         plt.tight_layout()
+
+    fig.suptitle(main_title)
 
     show_or_save(filename)
 
