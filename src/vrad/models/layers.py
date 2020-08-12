@@ -116,7 +116,6 @@ class MultivariateNormalLayer(layers.Layer):
         normalize_covariances,
         initial_means,
         initial_covariances,
-        n_epochs_burnin,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -126,8 +125,6 @@ class MultivariateNormalLayer(layers.Layer):
         self.learn_covariances = learn_covariances
         self.normalize_covariances = normalize_covariances
         self.initial_means = initial_means
-        self.epoch = 0
-        self.n_epochs_burnin = n_epochs_burnin
 
         if initial_covariances is not None:
             # Normalise the covariances if required
@@ -182,19 +179,10 @@ class MultivariateNormalLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        def no_grad():
-            return stop_gradient(
-                cholesky_factor_to_full_matrix(self.cholesky_covariances)
-            )
+        # Calculate the covariance matrix from the cholesky factor
+        self.covariances = cholesky_factor_to_full_matrix(self.cholesky_covariances)
 
-        def with_grad():
-            return cholesky_factor_to_full_matrix(self.cholesky_covariances)
-
-        # If we are in the burn-in phase call no_grad, otherwise call with_grad
-        self.covariances = tf.cond(
-            tf.less(self.epoch, self.n_epochs_burnin), no_grad, with_grad
-        )
-
+        # Normalise the covariance
         if self.normalize_covariances:
             self.covariances = trace_normalize(self.covariances)
 
@@ -215,8 +203,6 @@ class MultivariateNormalLayer(layers.Layer):
                 "learn_means": self.learn_means,
                 "learn_covariances": self.learn_covariances,
                 "normalize_covariances": self.normalize_covariances,
-                "epoch": self.epoch,
-                "n_epochs_burnin": self.n_epochs_burnin,
             }
         )
         return config

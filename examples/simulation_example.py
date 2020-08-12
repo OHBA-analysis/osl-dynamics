@@ -1,8 +1,8 @@
 """Example script for running inference on simulated HMM data.
 
 - This script sets a seed for the random number generators for reproducibility.
-- Should achieve a dice coefficient of ~0.94.
-- Takes approximately 1 minute to train (on compG017).
+- Should achieve a dice coefficient of ~0.95.
+- Takes approximately 2 minutes to train (on compG017).
 """
 
 print("Importing packages")
@@ -29,6 +29,7 @@ annealing_sharpness = 5
 
 n_epochs = 100
 n_epochs_annealing = 80
+n_epochs_burnin = 20
 
 dropout_rate_inference = 0.4
 dropout_rate_model = 0.4
@@ -110,7 +111,12 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Train the model
-print("Training model")
+print("Training burn-in model")
+history = model.burn_in(
+    training_dataset, epochs=n_epochs_burnin, verbose=0, use_tqdm=True
+)
+
+print("Training full model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
 # Inferred covariances

@@ -46,7 +46,6 @@ class RNNGaussian(BaseModel):
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
-        n_epochs_burnin: int = 0,
         learning_rate: float = 0.01,
         clip_normalization: float = None,
         multi_gpu: bool = False,
@@ -78,7 +77,6 @@ class RNNGaussian(BaseModel):
             do_annealing=do_annealing,
             annealing_sharpness=annealing_sharpness,
             n_epochs_annealing=n_epochs_annealing,
-            n_epochs_burnin=n_epochs_burnin,
             learning_rate=learning_rate,
             clip_normalization=clip_normalization,
             multi_gpu=multi_gpu,
@@ -101,7 +99,6 @@ class RNNGaussian(BaseModel):
             learn_covariances=self.learn_covariances,
             initial_means=self.initial_means,
             initial_covariances=self.initial_covariances,
-            n_epochs_burnin=self.n_epochs_burnin,
             alpha_xform=self.alpha_xform,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
@@ -146,6 +143,23 @@ class RNNGaussian(BaseModel):
         self.model.set_weights(best_weights)
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
+
+    def burn_in(self, *args, **kwargs):
+        """Burn-in training phase.
+
+        Fits the model with means and covariances non-trainable.
+        """
+        # Make means and covariances non-trainable and compile
+        mvn_layer = self.model.get_layer("mvn")
+        mvn_layer.trainable = False
+        self.compile()
+
+        # Train the model
+        self.fit(*args, **kwargs, no_annealing=True)
+
+        # Make means and covariances trainable again and compile
+        mvn_layer.trainable = True
+        self.compile()
 
     def get_means_covariances(self):
         """Get the means and covariances of each state."""
@@ -209,7 +223,6 @@ def _model_structure(
     learn_covariances: bool,
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
-    n_epochs_burnin: int,
     alpha_xform: str,
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
@@ -275,7 +288,6 @@ def _model_structure(
         normalize_covariances=normalize_covariances,
         initial_means=initial_means,
         initial_covariances=initial_covariances,
-        n_epochs_burnin=n_epochs_burnin,
         name="mvn",
     )
     mix_means_covs_layer = MixMeansCovsLayer(

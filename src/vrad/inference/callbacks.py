@@ -14,7 +14,6 @@ from matplotlib import pyplot as plt
 from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
-from vrad.models.layers import MultivariateNormalLayer
 
 _logger = logging.getLogger("VRAD")
 
@@ -81,25 +80,6 @@ class AnnealingCallback(callbacks.Callback):
             + 0.5
         )
         self.annealing_factor.assign(new_value)
-
-
-class BurninCallback(callbacks.Callback):
-    """Used to make the epoch number available to the MultivariateNormal layer."""
-    def __init__(self):
-        super().__init__()
-        self.mvn = None
-
-    def on_train_begin(self, logs=None):
-        for layer in self.model.layers:
-            if isinstance(layer, MultivariateNormalLayer):
-                self.mvn = layer
-
-        if self.mvn is None:
-            _logger.warning("MultivariateNormal layer not found by burn-in callback.")
-
-    def on_epoch_begin(self, epoch, logs=None):
-        if self.mvn is not None:
-            self.mvn.epoch = epoch
 
 
 class Callback(ABC):

@@ -13,7 +13,6 @@ from tqdm import tqdm
 from tqdm.keras import TqdmCallback
 from vrad.inference.callbacks import (
     AnnealingCallback,
-    BurninCallback,
     SaveBestCallback,
     tensorboard_run_logdir,
 )
@@ -42,12 +41,14 @@ class BaseModel:
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
-        n_epochs_burnin: int,
         learning_rate: float,
         clip_normalization: float,
         multi_gpu: bool,
         strategy: str,
     ):
+        # Identifier for the model
+        self._identifier = np.random.randint(100000)
+
         # Number of latent states and dimensionality of the data
         self.n_states = n_states
         self.n_channels = n_channels
@@ -61,12 +62,11 @@ class BaseModel:
         self.dropout_rate_inference = dropout_rate_inference
         self.dropout_rate_model = dropout_rate_model
 
-        # KL annealing and burn-in
+        # KL annealing
         self.do_annealing = do_annealing
         self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
         self.annealing_sharpness = annealing_sharpness
         self.n_epochs_annealing = n_epochs_annealing
-        self.n_epochs_burnin = n_epochs_burnin
 
         # Training Parameters
         self.learning_rate = learning_rate
@@ -81,12 +81,9 @@ class BaseModel:
 
         # Build and compile the model
         self.model = None
-
         with self.strategy.scope():
             self.build_model()
         self.compile()
-
-        self._identifier = np.random.randint(100000)
 
     # Allow access to the keras model attributes
     def __getattr__(self, attr):
@@ -117,20 +114,25 @@ class BaseModel:
         self.model.compile(optimizer=optimizer, loss=loss)
 
     def create_callbacks(
-        self, use_tqdm, tqdm_class, use_tensorboard, tensorboard_dir, save_best_after
+        self,
+        no_annealing,
+        use_tqdm,
+        tqdm_class,
+        use_tensorboard,
+        tensorboard_dir,
+        save_best_after,
     ):
+        additional_callbacks = []
 
         # Callback for KL annealing
-        annealing_callback = AnnealingCallback(
-            annealing_factor=self.annealing_factor,
-            annealing_sharpness=self.annealing_sharpness,
-            n_epochs_annealing=self.n_epochs_annealing,
-        )
+        if not no_annealing:
+            annealing_callback = AnnealingCallback(
+                annealing_factor=self.annealing_factor,
+                annealing_sharpness=self.annealing_sharpness,
+                n_epochs_annealing=self.n_epochs_annealing,
+            )
 
-        # Callback for a burn-in training period
-        burnin_callback = BurninCallback()
-
-        additional_callbacks = [annealing_callback, burnin_callback]
+            additional_callbacks.append(annealing_callback)
 
         # Callback to display a progress bar with tqdm
         if use_tqdm:
@@ -168,6 +170,7 @@ class BaseModel:
     def fit(
         self,
         *args,
+        no_annealing=False,
         use_tqdm=False,
         tqdm_class=None,
         use_tensorboard=None,
@@ -177,7 +180,7 @@ class BaseModel:
     ):
         """Wrapper for the standard keras fit method.
 
-        Adds callbacks for KL annealing and burn-in then trains the model.
+        Adds callbacks and then trains the model.
         """
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
@@ -186,14 +189,18 @@ class BaseModel:
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                use_tqdm, tqdm_class, use_tensorboard, tensorboard_dir, save_best_after
+                no_annealing,
+                use_tqdm,
+                tqdm_class,
+                use_tensorboard,
+                tensorboard_dir,
+                save_best_after,
             ),
             args=args,
             kwargs=kwargs,
             append=True,
         )
 
-        # Train the model
         return self.model.fit(*args, **kwargs)
 
     def predict(self, *args, **kwargs):
