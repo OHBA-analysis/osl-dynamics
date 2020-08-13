@@ -383,7 +383,7 @@ class InferenceRNNLayers(layers.Layer):
 
     def call(self, inputs, **kwargs):
         for layer in self.layers:
-            inputs = layer(inputs)
+            inputs = layer(inputs, **kwargs)
         return inputs
 
     def compute_output_shape(self, input_shape):
@@ -410,9 +410,9 @@ class ModelRNNLayers(layers.Layer):
             self.layers.append(layers.LayerNormalization())
             self.layers.append(layers.Dropout(dropout_rate))
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         for layer in self.layers:
-            inputs = layer(inputs)
+            inputs = layer(inputs, **kwargs)
         return inputs
 
     def compute_output_shape(self, input_shape):
