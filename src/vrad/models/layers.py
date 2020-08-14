@@ -72,39 +72,34 @@ class TrainableVariablesLayer(layers.Layer):
         return config
 
 
-class ReparameterizationLayer(layers.Layer):
-    """Performs the reparameterisation trick.
+class SampleNormalDistributionLayer(layers.Layer):
+    """Layer for sampling a normal distribution.
 
-    The reparameterization trick is used to provide a differentiable random sample.
-    By optimizing the values which define the distribution (i.e. mu and sigma), a model
-    can be trained while still maintaining its stochasticity.
+    This layer accepts the mean and (log of) the standard deviation and
+    outputs samples from a normal distribution.
     """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def call(self, inputs, **kwargs):
-        z_mean, z_log_var = inputs
-        batch = tf.shape(z_mean)[0]
-        dim = K.int_shape(z_mean)[1]
-        chans = K.int_shape(z_mean)[2]
-        epsilon = K.random_normal(shape=(batch, dim, chans))
-        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+        mu, log_sigma = inputs
+        sigma = tf.exp(log_sigma)
+        return K.random_normal(mean=mu, stddev=sigma, shape=tf.shape(mu))
 
     def compute_output_shape(self, input_shape):
-        z_mean_shape, z_log_var_shape = input_shape
-        return z_mean_shape
+        mu_shape, log_sigma_shape = input_shape
+        return mu_shape
 
     def get_config(self):
         config = super().get_config()
         return config
 
 
-class MultivariateNormalLayer(layers.Layer):
-    """Layer for Gaussian observations.
+class MeansCovsLayer(layers.Layer):
+    """Layer to learn the mean and covariance of each state.
 
-    Parameterises multiple multivariate Gaussians and in terms of their means
-    and covariances. Means and covariances are outputted.
+    Outputs the mean vector and covariance matrix of each state.
     """
 
     def __init__(
@@ -344,7 +339,7 @@ class KLDivergenceLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
-        # model_mu needs shifting forward by one time point
+        # model_mu needs be shifted one time point to the right
         shifted_model_mu = tf.roll(model_mu, shift=1, axis=1)
 
         prior = tfp.distributions.Normal(

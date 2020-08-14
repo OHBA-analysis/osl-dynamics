@@ -19,8 +19,8 @@ from vrad.models.layers import (
     LogLikelihoodLayer,
     MixMeansCovsLayer,
     ModelRNNLayers,
-    MultivariateNormalLayer,
-    ReparameterizationLayer,
+    SampleNormalDistributionLayer,
+    MeansCovsLayer,
     TrainableVariablesLayer,
 )
 
@@ -151,24 +151,24 @@ class RNNGaussian(BaseModel):
         Fits the model with means and covariances non-trainable.
         """
         # Make means and covariances non-trainable and compile
-        mvn_layer = self.model.get_layer("mvn")
-        mvn_layer.trainable = False
+        means_covs_layer = self.model.get_layer("means_covs")
+        means_covs_layer.trainable = False
         self.compile()
 
         # Train the model
         self.fit(*args, **kwargs, no_annealing=True)
 
         # Make means and covariances trainable again and compile
-        mvn_layer.trainable = True
+        means_covs_layer.trainable = True
         self.compile()
 
     def get_means_covariances(self):
         """Get the means and covariances of each state."""
 
-        # Get the means and covariances from the MutlivariateNormalLayer
-        mvn_layer = self.model.get_layer("mvn")
-        means = mvn_layer.means.numpy()
-        cholesky_covariances = mvn_layer.cholesky_covariances.numpy()
+        # Get the means and covariances from the MeansCovsLayer
+        means_covs_layer = self.model.get_layer("means_covs")
+        means = means_covs_layer.means.numpy()
+        cholesky_covariances = means_covs_layer.cholesky_covariances.numpy()
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
 
         # Normalise covariances
@@ -184,8 +184,8 @@ class RNNGaussian(BaseModel):
 
     def set_means_covariances(self, means=None, covariances=None):
         """Set the means and covariances of each state."""
-        mvn_layer = self.model.get_layer("mvn")
-        layer_weights = mvn_layer.get_weights()
+        means_covs_layer = self.model.get_layer("means_covs")
+        layer_weights = means_covs_layer.get_weights()
 
         # Replace means in the layer weights
         if means is not None:
@@ -200,7 +200,7 @@ class RNNGaussian(BaseModel):
                     layer_weights[i] = cholesky_factor(covariances)
 
         # Set the weights of the layer
-        mvn_layer.set_weights(layer_weights)
+        means_covs_layer.set_weights(layer_weights)
 
     def get_alpha_scaling(self):
         """Get the alpha scaling of each state."""
@@ -220,17 +220,18 @@ class RNNGaussian(BaseModel):
 
         # Calculate the standard deviation of the probability distribution function
         # This has been learnt for each state during training
-        log_sigma2_theta_j = self.model.get_layer("log_sigma2_theta_j").get_weights()[0]
-        sigma2_theta_j = np.exp(log_sigma2_theta_j)
+        log_sigma_theta_j = self.model.get_layer("log_sigma_theta_j").get_weights()[0]
+        sigma_theta_j = np.exp(log_sigma_theta_j)
 
         # State time course and sequence of latent states
         sampled_stc = np.zeros([n_samples, self.n_states])
         theta_t = np.zeros([sequence_length, self.n_states], dtype=np.float32)
 
+        # Normally distributed random numbers used to sample the state time course
+        epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states])
+
         # Randomly select the first theta_t assuming zero means
-        theta_t[-1] = np.random.multivariate_normal(
-            np.zeros(self.n_states), np.diag(sigma2_theta_j)
-        )
+        theta_t[-1] = sigma_theta_j * epsilon[-1]
 
         # Sample state time course
         for i in trange(n_samples, desc="Sampling state time course"):
@@ -239,7 +240,7 @@ class RNNGaussian(BaseModel):
             trimmed_theta_t = theta_t[~np.all(theta_t == 0, axis=1)][np.newaxis, :, :]
 
             # Predict the probability distribution function for theta_t one time step
-            # in the future, p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
+            # in the future, p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_j)
             model_rnn = model_rnn_layer(trimmed_theta_t)
             mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
 
@@ -247,9 +248,7 @@ class RNNGaussian(BaseModel):
             theta_t = np.roll(theta_t, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t[-1] = np.random.multivariate_normal(
-                mu_theta_jt, np.diag(sigma2_theta_j)
-            )
+            theta_t[-1] = mu_theta_jt + sigma_theta_j * epsilon[i]
 
             # Hard classify the state time course
             sampled_stc[i, np.argmax(theta_t[-1])] = 1
@@ -279,9 +278,9 @@ def _model_structure(
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
     # Inference RNN
-    # - q(theta_t)     ~ N(m_theta_t, s2_theta_t)
-    # - m_theta_t      ~ affine(RNN(Y_<=t))
-    # - log_s2_theta_t ~ affine(RNN(Y_<=t))
+    # - q(theta_t)    ~ N(m_theta_t, s^2_theta_t)
+    # - m_theta_t     ~ affine(RNN(inputs_<=t))
+    # - log_s_theta_t ~ affine(RNN(inputs_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
@@ -293,26 +292,23 @@ def _model_structure(
         name="inference_rnn",
     )
     m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
-    log_s2_theta_t_layer = layers.Dense(
-        n_states, activation="linear", name="log_s2_theta_t"
+    log_s_theta_t_layer = layers.Dense(
+        n_states, activation="linear", name="log_s_theta_t",
     )
-
-    # Layer to generate a sample from q(theta_t) ~ N(m_theta_t, log_s2_theta_t) via the
-    # reparameterisation trick
-    theta_t_layer = ReparameterizationLayer(name="theta_t")
+    theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
 
     # Inference RNN data flow
     inputs_norm = input_normalisation_layer(inputs)
     inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
     inference_output = inference_output_layers(inputs_norm_dropout)
     m_theta_t = m_theta_t_layer(inference_output)
-    log_s2_theta_t = log_s2_theta_t_layer(inference_output)
-    theta_t = theta_t_layer([m_theta_t, log_s2_theta_t])
+    log_s_theta_t = log_s_theta_t_layer(inference_output)
+    theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
 
     # Model RNN
-    # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
+    # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j)
     # - mu_theta_jt         ~ affine(RNN(theta_<t))
-    # - log_sigma2_theta_j  = trainable constant
+    # - log_sigma_theta_j   = trainable constant
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model)
@@ -320,15 +316,12 @@ def _model_structure(
         n_layers_model, n_units_model, dropout_rate_model, name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
-    log_sigma2_theta_j_layer = TrainableVariablesLayer(
-        [n_states],
-        initial_values=zeros(n_states),
-        trainable=True,
-        name="log_sigma2_theta_j",
+    log_sigma_theta_j_layer = TrainableVariablesLayer(
+        shape=(n_states,), trainable=True, name="log_sigma_theta_j"
     )
 
     # Layers for the means and covariances for observation model of each state
-    observation_means_covs_layer = MultivariateNormalLayer(
+    means_covs_layer = MeansCovsLayer(
         n_states,
         n_channels,
         learn_means=learn_means,
@@ -336,7 +329,7 @@ def _model_structure(
         normalize_covariances=normalize_covariances,
         initial_means=initial_means,
         initial_covariances=initial_covariances,
-        name="mvn",
+        name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
         n_states, n_channels, alpha_xform, learn_alpha_scaling, name="mix_means_covs"
@@ -350,22 +343,20 @@ def _model_structure(
     model_input_dropout = model_input_dropout_layer(theta_t)
     model_output = model_output_layers(model_input_dropout)
     mu_theta_jt = mu_theta_jt_layer(model_output)
-    log_sigma2_theta_j = log_sigma2_theta_j_layer(inputs)  # inputs not used
-    mu_j, D_j = observation_means_covs_layer(inputs)  # inputs not used
+    log_sigma_theta_j = log_sigma_theta_j_layer(inputs)  # inputs not used
+    mu_j, D_j = means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
     ll_loss = log_likelihood_layer([inputs, m_t, C_t])
-    kl_loss = kl_loss_layer(
-        [m_theta_t, log_s2_theta_t, mu_theta_jt, log_sigma2_theta_j]
-    )
+    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_j])
 
     outputs = [
         ll_loss,
         kl_loss,
         theta_t,
         m_theta_t,
-        log_s2_theta_t,
+        log_s_theta_t,
         mu_theta_jt,
-        log_sigma2_theta_j,
+        log_sigma_theta_j,
     ]
 
     return Model(inputs=inputs, outputs=outputs)
