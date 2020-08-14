@@ -6,6 +6,7 @@ import numpy as np
 from tensorflow import zeros
 from tensorflow.keras import Model, layers
 from tensorflow.python.keras.backend import softplus
+from tqdm import trange
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
@@ -207,6 +208,53 @@ class RNNGaussian(BaseModel):
         alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
         alpha_scaling = softplus(alpha_scaling).numpy()
         return alpha_scaling
+
+    def sample_state_time_course(self, n_samples=1, sequence_length=None):
+        """Uses the model RNN to sample a state time course."""
+        if sequence_length is None:
+            sequence_length = self.sequence_length
+
+        # Get layers
+        model_rnn_layer = self.model.get_layer("model_rnn")
+        mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
+
+        # Calculate the standard deviation of the probability distribution function
+        # This has been learnt for each state during training
+        log_sigma2_theta_j = self.model.get_layer("log_sigma2_theta_j").get_weights()[0]
+        sigma2_theta_j = np.exp(log_sigma2_theta_j)
+
+        # State time course and sequence of latent states
+        sampled_stc = np.zeros([n_samples, self.n_states])
+        theta_t = np.zeros([sequence_length, self.n_states], dtype=np.float32)
+
+        # Randomly select the first theta_t assuming zero means
+        theta_t[-1] = np.random.multivariate_normal(
+            np.zeros(self.n_states), np.diag(sigma2_theta_j)
+        )
+
+        # Sample state time course
+        for i in trange(n_samples, desc="Sampling state time course"):
+
+            # If there are leading zeros we trim theta_t so that we don't pass the zeros
+            trimmed_theta_t = theta_t[~np.all(theta_t == 0, axis=1)][np.newaxis, :, :]
+
+            # Predict the probability distribution function for theta_t one time step
+            # in the future, p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma2_theta_j)
+            model_rnn = model_rnn_layer(trimmed_theta_t)
+            mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
+
+            # Shift theta_t one time step to the left
+            theta_t = np.roll(theta_t, -1, axis=0)
+
+            # Sample from the probability distribution function
+            theta_t[-1] = np.random.multivariate_normal(
+                mu_theta_jt, np.diag(sigma2_theta_j)
+            )
+
+            # Hard classify the state time course
+            sampled_stc[i, np.argmax(theta_t[-1])] = 1
+
+        return sampled_stc
 
 
 def _model_structure(
