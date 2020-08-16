@@ -31,3 +31,11 @@ def select_gpu(gpu_number):
         gpu_number = str(gpu_number)
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_number
     print(f"Using GPU {gpu_number}")
+
+
+def unzip_dataset(zipped_dataset):
+    num_datasets = len(zipped_dataset.element_spec)
+    datasets = [
+        zipped_dataset.map(lambda *x: x[index]) for index in range(num_datasets)
+    ]
+    return datasets
