@@ -5,7 +5,7 @@
 import numpy as np
 from tensorflow import zeros
 from tensorflow.keras import Model, layers
-from tensorflow.python.keras.backend import softplus
+from tensorflow.python.keras.backend import softplus, softmax
 from tqdm import trange
 from vrad.inference.functions import (
     cholesky_factor,
@@ -233,6 +233,9 @@ class RNNGaussian(BaseModel):
         # Randomly select the first theta_t assuming zero means
         theta_t[-1] = sigma_theta_j * epsilon[-1]
 
+        # Get the alpha scaling so we can calculate alpha_t from theta_t
+        alpha_scaling = self.get_alpha_scaling()
+
         # Sample state time course
         for i in trange(n_samples, desc="Sampling state time course"):
 
@@ -250,8 +253,11 @@ class RNNGaussian(BaseModel):
             # Sample from the probability distribution function
             theta_t[-1] = mu_theta_jt + sigma_theta_j * epsilon[i]
 
+            # Calculate the state probabilities
+            alpha_t = softmax(theta_t[-1]) * alpha_scaling
+
             # Hard classify the state time course
-            sampled_stc[i, np.argmax(theta_t[-1])] = 1
+            sampled_stc[i, np.argmax(alpha_t)] = 1
 
         return sampled_stc
 
@@ -317,7 +323,7 @@ def _model_structure(
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
     log_sigma_theta_j_layer = TrainableVariablesLayer(
-        shape=(n_states,), trainable=True, name="log_sigma_theta_j"
+        n_states, name="log_sigma_theta_j"
     )
 
     # Layers for the means and covariances for observation model of each state

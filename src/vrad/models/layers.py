@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
-from tensorflow.keras import layers
+from tensorflow.keras import layers, activations
 from tensorflow.keras.activations import softmax, softplus
 from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (
@@ -29,11 +29,11 @@ class TrainableVariablesLayer(layers.Layer):
     Parameters/weights are outputted.
     """
 
-    def __init__(self, shape, initial_values=None, trainable=True, **kwargs):
+    def __init__(self, n_units, activation=None, initial_values=None, **kwargs):
         super().__init__(**kwargs)
-        self.shape = shape
+        self.n_units = n_units
         self.initial_values = initial_values
-        self.trainable = trainable
+        self.activation = activations.get(activation)
 
     def build(self, input_shape):
 
@@ -52,23 +52,28 @@ class TrainableVariablesLayer(layers.Layer):
         # Create trainable weights
         self.values = self.add_weight(
             "values",
-            shape=self.shape,
+            shape=(self.n_units,),
             dtype=K.floatx(),
             initializer=self.values_initializer,
-            trainable=self.trainable,
+            trainable=True,
         )
 
         self.built = True
 
     def call(self, inputs, **kwargs):
-        return self.values
+        return self.activation(self.values)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape(self.shape)
 
     def get_config(self):
         config = super().get_config()
-        config.update({"shape": self.shape, "trainable": self.trainable})
+        config.update(
+            {
+                "n_units": self.n_units,
+                "activation": activations.serialize(self.activation),
+            }
+        )
         return config
 
 
