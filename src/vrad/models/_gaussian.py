@@ -283,10 +283,10 @@ def _model_structure(
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
-    # Inference RNN
-    # - q(theta_t)    ~ N(m_theta_t, s^2_theta_t)
-    # - m_theta_t     ~ affine(RNN(inputs_<=t))
-    # - log_s_theta_t ~ affine(RNN(inputs_<=t))
+    # Inference RNN:
+    # - Learns q(theta_t) ~ N(m_theta_t, s^2_theta_t), where
+    #     - m_theta_t     ~ affine(RNN(inputs_<=t))
+    #     - log_s_theta_t ~ affine(RNN(inputs_<=t))
 
     # Definition of layers
     input_normalisation_layer = layers.LayerNormalization()
@@ -301,6 +301,8 @@ def _model_structure(
     log_s_theta_t_layer = layers.Dense(
         n_states, activation="linear", name="log_s_theta_t",
     )
+
+    # Layer to sample theta_t from q(theta_t)
     theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
 
     # Inference RNN data flow
@@ -311,10 +313,10 @@ def _model_structure(
     log_s_theta_t = log_s_theta_t_layer(inference_output)
     theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
 
-    # Model RNN
-    # - p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j)
-    # - mu_theta_jt         ~ affine(RNN(theta_<t))
-    # - log_sigma_theta_j   = trainable constant
+    # Model RNN:
+    # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
+    #     - mu_theta_jt       ~ affine(RNN(theta_<t))
+    #     - log_sigma_theta_j = trainable constant
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model)
@@ -326,7 +328,7 @@ def _model_structure(
         n_states, name="log_sigma_theta_j"
     )
 
-    # Layers for the means and covariances for observation model of each state
+    # Layers for the means and covariances for the observation model of each state
     means_covs_layer = MeansCovsLayer(
         n_states,
         n_channels,
@@ -342,7 +344,7 @@ def _model_structure(
     )
 
     # Layers to calculate the negative of the log likelihood and KL divergence
-    log_likelihood_layer = LogLikelihoodLayer(name="ll")
+    ll_loss_layer = LogLikelihoodLayer(name="ll")
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
@@ -352,7 +354,7 @@ def _model_structure(
     log_sigma_theta_j = log_sigma_theta_j_layer(inputs)  # inputs not used
     mu_j, D_j = means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
-    ll_loss = log_likelihood_layer([inputs, m_t, C_t])
+    ll_loss = ll_loss_layer([inputs, m_t, C_t])
     kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_j])
 
     outputs = [
