@@ -41,7 +41,6 @@ def cholesky_factor(full_matrix):
     return cholesky_factor
 
 
-@tf.function
 def trace_normalize(matrices):
     """Normalise a matrix based on its trace.
 

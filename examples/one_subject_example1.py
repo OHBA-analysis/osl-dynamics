@@ -56,8 +56,7 @@ n_channels = meg_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
 hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
-covariances = hmm.covariances
-means = np.zeros([n_states, n_channels], dtype=np.float32)
+initial_covariances = hmm.covariances
 
 # Build model
 model = RNNGaussian(
@@ -66,8 +65,7 @@ model = RNNGaussian(
     sequence_length=sequence_length,
     learn_means=learn_means,
     learn_covariances=learn_covariances,
-    initial_means=means,
-    initial_covariances=covariances,
+    initial_covariances=initial_covariances,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
