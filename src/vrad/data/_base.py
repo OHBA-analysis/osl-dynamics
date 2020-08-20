@@ -164,7 +164,6 @@ class Data:
         else:
             self.subjects, self.pca = prepare(
                 self.subjects,
-                ids,
                 n_embeddings,
                 n_pca_components,
                 whiten,

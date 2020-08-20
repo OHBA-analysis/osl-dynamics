@@ -230,7 +230,6 @@ def eigen_decomposition(
 
 def prepare(
     subjects,
-    ids: list,
     n_embeddings: int,
     n_pca_components: int,
     whiten: bool,
@@ -241,12 +240,6 @@ def prepare(
 
     Follows the data preparation done in the OSL script teh_groupinference_parcels.m
     """
-
-    # Total number of time points to prepare
-    n_total_samples = np.sum([subjects[i].time_series.shape[0] for i in ids])
-
-    # List to hold the weighted covariance matrix of each subjects time series
-    covariances = []
 
     for subject in subjects:
         # Perform time embedding

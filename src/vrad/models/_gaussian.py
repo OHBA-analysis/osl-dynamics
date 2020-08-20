@@ -5,7 +5,7 @@
 import numpy as np
 from tensorflow import zeros
 from tensorflow.keras import Model, layers
-from tensorflow.python.keras.backend import softplus, softmax
+from tensorflow.python.keras.backend import softmax, softplus
 from tqdm import trange
 from vrad.inference.functions import (
     cholesky_factor,
@@ -17,10 +17,10 @@ from vrad.models.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
     LogLikelihoodLayer,
+    MeansCovsLayer,
     MixMeansCovsLayer,
     ModelRNNLayers,
     SampleNormalDistributionLayer,
-    MeansCovsLayer,
     TrainableVariablesLayer,
 )
 
