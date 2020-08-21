@@ -1,6 +1,8 @@
 """Model class for a generative model with Gaussian observations.
 
 """
+import logging
+from operator import lt
 
 import numpy as np
 from tensorflow import zeros
@@ -23,6 +25,9 @@ from vrad.models.layers import (
     SampleNormalDistributionLayer,
     TrainableVariablesLayer,
 )
+from vrad.utils.misc import check_arguments
+
+_logger = logging.getLogger("VRAD")
 
 
 class RNNGaussian(BaseModel):
@@ -117,6 +122,12 @@ class RNNGaussian(BaseModel):
         The model is trained for a few epochs and the model with the best
         free energy is chosen.
         """
+        if n_initializations is None or n_initializations == 0:
+            _logger.warning(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
 
         # Pick the initialization with the lowest free energy
         best_free_energy = np.Inf
@@ -148,6 +159,12 @@ class RNNGaussian(BaseModel):
 
         Fits the model with means and covariances non-trainable.
         """
+        if check_arguments(args, kwargs, 3, "epochs", 1, lt):
+            _logger.warning(
+                "Number of burn-in epochs is less than 1. Skipping burn-in."
+            )
+            return
+
         # Make means and covariances non-trainable and compile
         means_covs_layer = self.model.get_layer("means_covs")
         means_covs_layer.trainable = False

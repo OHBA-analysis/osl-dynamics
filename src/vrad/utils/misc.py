@@ -45,6 +45,23 @@ def replace_argument(func, name, item, args, kwargs, append=False):
     return args, kwargs
 
 
+def check_arguments(args, kwargs, index, name, value, comparison_op):
+    """Checks the arguments passed to a function."""
+
+    # Check if the argument we want to check is a normal argument
+    args = listify(args)
+    if len(args) >= index:
+        return comparison_op(args[index], value)
+
+    # Check if it is a keyword argument
+    elif name in kwargs:
+        return comparison_op(kwargs[name], value)
+
+    # Otherwise the argument we want to check isn't in args or kwargs
+    else:
+        return False
+
+
 def check_iterable_type(iterable, object_type: type):
     """Check iterable is non-empty and contains only objects of specific type."""
     if isinstance(iterable, np.ndarray):
