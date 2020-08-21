@@ -42,7 +42,6 @@ class BaseModel:
         annealing_sharpness: float,
         n_epochs_annealing: int,
         learning_rate: float,
-        clip_normalization: float,
         multi_gpu: bool,
         strategy: str,
     ):
@@ -70,7 +69,6 @@ class BaseModel:
 
         # Training Parameters
         self.learning_rate = learning_rate
-        self.clip_normalization = clip_normalization
 
         # Strategy for distributed learning
         self.strategy = strategy
@@ -101,9 +99,7 @@ class BaseModel:
         """
         # Setup optimizer
         if optimizer is None:
-            optimizer = optimizers.Adam(
-                learning_rate=self.learning_rate, clipnorm=self.clip_normalization,
-            )
+            optimizer = optimizers.Adam(learning_rate=self.learning_rate)
 
         # Loss functions
         ll_loss = LogLikelihoodLoss()

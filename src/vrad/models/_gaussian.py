@@ -48,7 +48,6 @@ class RNNGaussian(BaseModel):
         annealing_sharpness: float,
         n_epochs_annealing: int,
         learning_rate: float = 0.01,
-        clip_normalization: float = None,
         multi_gpu: bool = False,
         strategy: str = None,
         initial_means: np.ndarray = None,
@@ -79,7 +78,6 @@ class RNNGaussian(BaseModel):
             annealing_sharpness=annealing_sharpness,
             n_epochs_annealing=n_epochs_annealing,
             learning_rate=learning_rate,
-            clip_normalization=clip_normalization,
             multi_gpu=multi_gpu,
             strategy=strategy,
         )

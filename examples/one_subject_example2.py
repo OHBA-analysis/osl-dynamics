@@ -23,9 +23,6 @@ n_states = 6
 sequence_length = 400
 batch_size = 32
 
-learning_rate = 0.01
-clip_normalization = None
-
 do_annealing = True
 annealing_sharpness = 5
 
