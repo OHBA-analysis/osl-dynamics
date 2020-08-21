@@ -129,3 +129,5 @@ def memmap_dataset(
 
     # TODO: Subject tracking hasn't been implemented yet
     training_dataset = Dataset.zip((training_dataset, empty_dataset)).batch(batch_size)
+
+    return training_dataset
