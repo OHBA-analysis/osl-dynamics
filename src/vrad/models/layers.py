@@ -90,9 +90,9 @@ class SampleNormalDistributionLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         mu, log_sigma = inputs
-        # TODO: should really be sigma = tf.exp(log_sigma)
-        sigma = tf.exp(0.5 * log_sigma)
-        return K.random_normal(mean=mu, stddev=sigma, shape=tf.shape(mu))
+        # TODO: should really be scale=tf.exp(log_sigma)
+        N = tfp.distributions.Normal(loc=mu, scale=tf.exp(0.5 * log_sigma))
+        return N.sample()
 
     def compute_output_shape(self, input_shape):
         mu_shape, log_sigma_shape = input_shape
