@@ -106,6 +106,11 @@ class LoggingContext:
             self.handler.close()
 
 
+def array_to_memmap(filename, array):
+    np.save(filename, array)
+    return np.load(filename, mmap_mode="r+")
+
+
 class MockFlags:
     def __init__(self, shape, c_contiguous=True):
         self.c_contiguous = c_contiguous
