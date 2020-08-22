@@ -104,3 +104,36 @@ class LoggingContext:
             self.logger.removeHandler(self.handler)
         if self.handler and self.close:
             self.handler.close()
+
+
+class MockFlags:
+    def __init__(self, shape, c_contiguous=True):
+        self.c_contiguous = c_contiguous
+        self.f_contiguous = (not c_contiguous) or (c_contiguous and len(shape) == 1)
+
+
+class MockArray:
+    def __init__(self, shape, dtype=np.float64, c_contiguous=True):
+        self.shape = shape
+        self.dtype = np.dtype(dtype)
+        self.flags = MockFlags(shape, c_contiguous)
+
+    def save(self, filename):
+        if self.dtype.itemsize == 0:
+            buffersize = 0
+        else:
+            # Set buffer size to 16 MiB to hide the Python loop overhead.
+            buffersize = max(16 * 1024 ** 2 // self.dtype.itemsize, 1)
+
+        n_chunks, remainder = np.divmod(
+            np.product(self.shape) * self.dtype.itemsize, buffersize
+        )
+
+        with open("test_header.npy", "wb") as f:
+            np.lib.format.write_array_header_2_0(
+                f, np.lib.format.header_data_from_array_1_0(self)
+            )
+
+            for chunk in range(n_chunks):
+                f.write(b"\x00" * buffersize)
+            f.write(b"\x00" * remainder)
