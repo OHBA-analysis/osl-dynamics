@@ -1,14 +1,10 @@
 import pathlib
-from glob import glob
-from typing import List
 
 import numpy as np
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 from tensorflow.python.data import Dataset
-from tqdm import tqdm, trange
+from tqdm import tqdm
 from vrad.data import io, manipulation
-from vrad.data.subject import Subject
 from vrad.utils.misc import MockArray, array_to_memmap
 
 _rng = np.random.default_rng()
