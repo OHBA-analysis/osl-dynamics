@@ -173,14 +173,22 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose
-def time_embed(time_series: np.ndarray, n_embeddings: int, random_seed: int = None):
+def time_embed(
+    time_series: np.ndarray,
+    n_embeddings: int,
+    random_seed: int = None,
+    output_file=None,
+):
     """Performs time embedding. This function reproduces the OSL function embedx.
     """
     n_samples, n_channels = time_series.shape
     lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
 
     # Generate time embedded dataset
-    time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
+    if output_file is None:
+        time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
+    else:
+        time_embedded_series = output_file
     for i in range(n_channels):
         for j in range(len(lags)):
             time_embedded_series[:, i * (n_embeddings + 1) + j] = np.roll(
