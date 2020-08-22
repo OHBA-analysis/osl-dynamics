@@ -118,22 +118,42 @@ class MockArray:
         self.dtype = np.dtype(dtype)
         self.flags = MockFlags(shape, c_contiguous)
 
+        self.filename = None
+
     def save(self, filename):
+        if filename[-4:] != ".npy":
+            filename = f"{filename}.npy"
+        self.filename = filename
         if self.dtype.itemsize == 0:
-            buffersize = 0
+            buffer_size = 0
         else:
             # Set buffer size to 16 MiB to hide the Python loop overhead.
-            buffersize = max(16 * 1024 ** 2 // self.dtype.itemsize, 1)
+            buffer_size = max(16 * 1024 ** 2 // self.dtype.itemsize, 1)
 
         n_chunks, remainder = np.divmod(
-            np.product(self.shape) * self.dtype.itemsize, buffersize
+            np.product(self.shape) * self.dtype.itemsize, buffer_size
         )
 
-        with open("test_header.npy", "wb") as f:
+        with open(filename, "wb") as f:
             np.lib.format.write_array_header_2_0(
                 f, np.lib.format.header_data_from_array_1_0(self)
             )
 
             for chunk in range(n_chunks):
-                f.write(b"\x00" * buffersize)
+                f.write(b"\x00" * buffer_size)
             f.write(b"\x00" * remainder)
+
+    def memmap(self):
+        if self.filename is None:
+            raise ValueError("filename has not been provided.")
+        return np.load(self.filename, mmap_mode="r+")
+
+    @classmethod
+    def to_disk(cls, filename, shape, dtype=np.float64, c_contiguous=True):
+        mock_array = cls(shape, dtype, c_contiguous)
+        mock_array.save(filename)
+
+    @classmethod
+    def get_memmap(cls, filename, shape, dtype=np.float64, c_contiguous=True):
+        cls.to_disk(filename, shape, dtype, c_contiguous)
+        return np.load(filename, mmap_mode="r+")
