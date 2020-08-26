@@ -1,4 +1,4 @@
-"""Functions to analyse results of a fit.
+"""Functions to perform spectral analysis of a fit.
 
 """
 
@@ -6,48 +6,9 @@ import numpy as np
 from scipy.signal.windows import dpss
 from tqdm import trange
 
+from vrad.analysis.functions import fourier_transform, nextpow2
+from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import scale
-from vrad.utils.misc import nextpow2
-
-
-def get_state_time_series(data, state_probabilities):
-    """Returns the data for when a state is on."""
-
-    # Make sure the data and state time courses have the same length
-    n_samples = min(data.shape[0], state_probabilities.shape[0])
-    data = data[:n_samples]
-    state_probabilities = state_probabilities[:n_samples]
-
-    # Number of states and channels
-    n_states = state_probabilities.shape[1]
-    n_channels = data.shape[1]
-
-    # Get the corresponding time series for when a state is on
-    state_time_series = np.empty([n_states, n_samples, n_channels])
-    for i in range(n_states):
-        state_time_series[i] = data * state_probabilities[:, i, np.newaxis]
-
-    return state_time_series
-
-
-def fourier_transform(data, sampling_frequency, nfft=None, args_range=None):
-    """Calculates a Fast Fourier Transform (FFT)."""
-
-    # Number of data points
-    n = data.shape[-1]
-
-    # Number of FFT data points to calculate
-    if nfft is None:
-        nfft = max(256, 2 ** nextpow2(n))
-
-    # Calculate the FFT
-    X = np.fft.fft(data, nfft) / sampling_frequency
-
-    # Only keep the desired frequency range
-    if args_range is not None:
-        X = X[:, :, args_range[0] : args_range[1]]
-
-    return X
 
 
 def multitaper(
@@ -118,7 +79,8 @@ def state_spectra(
 ):
     """Calculates spectra for inferred states.
 
-    Follows the same procedure are the OSL function HMM-MAR/spectral/hmmspectamt.m
+    This include power spectra and coherence.
+    Follows the same procedure as the OSL function HMM-MAR/spectral/hmmspectamt.m
     """
 
     # Validation
@@ -175,14 +137,12 @@ def state_spectra(
     # Number of segments in the time series
     n_segments = round(n_samples / segment_length)
 
-    # Spectra for each state and segment
-    spectra = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
+    # Power spectra for each state and segment
+    power_spectra = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
 
-    print("Calculating spectra:")
+    print("Calculating power spectra")
     for i in range(n_states):
-
-        print(f"State {i}")
-        for j in trange(n_segments, desc="Segments"):
+        for j in trange(n_segments, desc=f"State {i}"):
 
             # Time series for state i and segment j
             time_series_segment = state_time_series[
@@ -198,7 +158,7 @@ def state_spectra(
                 ]
 
             # Calculate the spectrum using the multitaper method
-            spectra[i] += multitaper(
+            power_spectra[i] += multitaper(
                 time_series_segment,
                 sampling_frequency,
                 nfft=nfft,
@@ -206,39 +166,35 @@ def state_spectra(
                 args_range=args_range,
             )
 
-    # Normalise the spectra
+    # Normalise the power spectra
     sum_probabilities = np.sum(state_probabilities ** 2, axis=0)[
         :, np.newaxis, np.newaxis, np.newaxis
     ]
-    spectra *= n_samples / (sum_probabilities * n_tapers * n_segments)
+    power_spectra *= n_samples / (sum_probabilities * n_tapers * n_segments)
 
-    return frequencies, np.squeeze(spectra)
-
-
-def state_coherences_phases(spectra):
-    """Calculates the coherence spectrum for each state."""
-
-    # Validation
-    if spectra.ndim == 2:
-        raise ValueError("Only the spectrum for one channel has been passed.")
-
-    if spectra.ndim == 3:
-        spectra = spectra[np.newaxis, :, :, :]
-
-    # Number of states, channels and frequency bins
-    n_states, n_channels, n_channels, n_f = spectra.shape
-
-    # Coherences and phases for each state
+    # Coherences for each state
     coherences = np.empty([n_states, n_channels, n_channels, n_f])
-    phases = np.empty([n_states, n_channels, n_channels, n_f])
 
-    print("Calculating coherences and phases")
+    print("Calculating coherences")
     for i in range(n_states):
         for j in range(n_channels):
             for k in range(n_channels):
                 coherences[i, j, k] = abs(
-                    spectra[i, j, k] / np.sqrt(spectra[i, j, j] * spectra[i, k, k])
+                    power_spectra[i, j, k]
+                    / np.sqrt(power_spectra[i, j, j] * power_spectra[i, k, k])
                 )
-                phases[i, j, k] = np.angle(spectra[i, j, k])
 
-    return np.squeeze(coherences), np.squeeze(phases)
+    return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
+
+
+def decompose_spectra(spectra, n_components, spectrum_type="coherence"):
+    """Performs spectral decomposition.
+
+    Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
+    """
+
+    # Validation
+    if spectrum_type not in ["power", "coherence"]:
+        raise ValueError("spectrum_type must be 'power' or 'coherence'.")
+
+    return
