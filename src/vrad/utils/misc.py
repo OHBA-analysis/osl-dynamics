@@ -162,3 +162,11 @@ class MockArray:
     def get_memmap(cls, filename, shape, dtype=np.float64, c_contiguous=True):
         cls.to_disk(filename, shape, dtype, c_contiguous)
         return np.load(filename, mmap_mode="r+")
+
+
+def nextpow2(x):
+    """Returns the smallest power of two that is greater than or equal to the
+    absolute value of x.
+    """
+    res = np.ceil(np.log2(x))
+    return res.astype("int")

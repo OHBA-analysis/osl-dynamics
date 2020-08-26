@@ -7,6 +7,7 @@ from scipy.signal.windows import dpss
 from tqdm import trange
 
 from vrad.data.manipulation import scale
+from vrad.utils.misc import nextpow2
 
 
 def get_state_time_series(data, state_probabilities):
@@ -27,14 +28,6 @@ def get_state_time_series(data, state_probabilities):
         state_time_series[i] = data * state_probabilities[:, i, np.newaxis]
 
     return state_time_series
-
-
-def nextpow2(x):
-    """Returns the smallest power of two that is greater than or equal to the
-    absolute value of x.
-    """
-    res = np.ceil(np.log2(x))
-    return res.astype("int")
 
 
 def fourier_transform(data, sampling_frequency, nfft=None, args_range=None):
@@ -131,11 +124,22 @@ def state_spectra(
     # Validation
     if data.ndim == 1:
         data = data.reshape(-1, 1)
+
     if data.ndim != 2:
         raise ValueError(
             "a 1D numpy array [n_samples] or 2D numpy array [n_samples, n_channels] "
-            + "must be passed."
+            + "must be passed for data."
         )
+
+    if state_probabilities.ndim == 1:
+        state_probabilities = state_probabilities.reshape(-1, 1)
+
+    if state_probabilities.ndim != 2:
+        raise ValueError(
+            "a 1D numpy array [n_samples] or 2D numpy array [n_samples, n_channels] "
+            + "must be passed for state_probabilities."
+        )
+
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
@@ -152,10 +156,10 @@ def state_spectra(
     nfft = max(256, 2 ** nextpow2(segment_length))
 
     # Calculate the argments to keep for the given frequency range
-    f = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(f > frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(f < frequency_range[1])[-1, 0]
-    f = f[f_min_arg:f_max_arg]
+    frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
+    f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+    frequencies = frequencies[f_min_arg : f_max_arg + 1]
     args_range = [f_min_arg, f_max_arg + 1]
 
     # Number of frequency bins
@@ -172,7 +176,7 @@ def state_spectra(
     n_segments = round(n_samples / segment_length)
 
     # Spectra for each state and segment
-    P = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
+    spectra = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
 
     print("Calculating spectra:")
     for i in range(n_states):
@@ -194,7 +198,7 @@ def state_spectra(
                 ]
 
             # Calculate the spectrum using the multitaper method
-            P[i] += multitaper(
+            spectra[i] += multitaper(
                 time_series_segment,
                 sampling_frequency,
                 nfft=nfft,
@@ -206,6 +210,35 @@ def state_spectra(
     sum_probabilities = np.sum(state_probabilities ** 2, axis=0)[
         :, np.newaxis, np.newaxis, np.newaxis
     ]
-    P *= n_samples / (sum_probabilities * n_tapers * n_segments)
+    spectra *= n_samples / (sum_probabilities * n_tapers * n_segments)
 
-    return f, P
+    return frequencies, np.squeeze(spectra)
+
+
+def state_coherences_phases(spectra):
+    """Calculates the coherence spectrum for each state."""
+
+    # Validation
+    if spectra.ndim == 2:
+        raise ValueError("Only the spectrum for one channel has been passed.")
+
+    if spectra.ndim == 3:
+        spectra = spectra[np.newaxis, :, :, :]
+
+    # Number of states, channels and frequency bins
+    n_states, n_channels, n_channels, n_f = spectra.shape
+
+    # Coherences and phases for each state
+    coherences = np.empty([n_states, n_channels, n_channels, n_f])
+    phases = np.empty([n_states, n_channels, n_channels, n_f])
+
+    print("Calculating coherences and phases")
+    for i in range(n_states):
+        for j in range(n_channels):
+            for k in range(n_channels):
+                coherences[i, j, k] = abs(
+                    spectra[i, j, k] / np.sqrt(spectra[i, j, j] * spectra[i, k, k])
+                )
+                phases[i, j, k] = np.angle(spectra[i, j, k])
+
+    return np.squeeze(coherences), np.squeeze(phases)
