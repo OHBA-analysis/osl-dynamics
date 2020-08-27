@@ -79,12 +79,10 @@ def standardize(
 
 
 @transpose
-def scale(time_series: np.ndarray) -> np.ndarray:
-    """Scale time_series to have mean zero and standard deviation 1.
-
-    """
-    time_series -= time_series.mean(axis=0)
-    time_series /= time_series.std(axis=0)
+def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
+    """Scale time_series to have mean zero and standard deviation 1."""
+    time_series -= time_series.mean(axis=axis)
+    time_series /= time_series.std(axis=axis)
     return time_series
 
 

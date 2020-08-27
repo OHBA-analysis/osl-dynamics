@@ -2,13 +2,17 @@
 
 """
 
+import logging
 import numpy as np
 from scipy.signal.windows import dpss
+from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 
 from vrad.analysis.functions import fourier_transform, nextpow2
 from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import scale
+
+_logger = logging.getLogger("VRAD")
 
 
 def multitaper(
@@ -72,9 +76,9 @@ def state_spectra(
     data,
     state_probabilities,
     sampling_frequency,
-    segment_length,
     time_half_bandwidth,
     n_tapers,
+    segment_length=None,
     frequency_range=None,
 ):
     """Calculates spectra for inferred states.
@@ -84,35 +88,42 @@ def state_spectra(
     """
 
     # Validation
-    if data.ndim == 1:
-        data = data.reshape(-1, 1)
+    if data.ndim == 2:
+        # Data for one subject has been passed, so we add one dimension
+        data = data[np.newaxis, :, :]
 
-    if data.ndim != 2:
+    if data.ndim != 3:
         raise ValueError(
-            "a 1D numpy array [n_samples] or 2D numpy array [n_samples, n_channels] "
-            + "must be passed for data."
+            "data must have shape (n_samples, n_channels) or "
+            + "(n_subjects, n_samples, n_channels)."
         )
 
-    if state_probabilities.ndim == 1:
-        state_probabilities = state_probabilities.reshape(-1, 1)
+    if state_probabilities.ndim == 2:
+        # Data for one subject has been passed, so we add one dimension
+        state_probabilities = state_probabilities[np.newaxis, :, :]
 
-    if state_probabilities.ndim != 2:
+    if state_probabilities.ndim != 3:
         raise ValueError(
-            "a 1D numpy array [n_samples] or 2D numpy array [n_samples, n_channels] "
-            + "must be passed for state_probabilities."
+            "state_probabilities must have shape (n_samples, n_states) or "
+            + "(n_subjects, n_samples, n_states)."
         )
+
+    if segment_length is None:
+        segment_length = 2 * sampling_frequency
+    elif segment_length != 2 * sampling_frequency:
+        _logger.warning("segment_length is recommended to be 2*sampling_frequency.")
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
     # Standardise (z-transform) the data
-    data = scale(data)
+    data = scale(data, axis=1)
 
     # Use the state probabilities to get a time series for each state
     state_time_series = get_state_time_series(data, state_probabilities)
 
-    # Number of states, samples and channels
-    n_states, n_samples, n_channels = state_time_series.shape
+    # Number of subjects, states, samples and channels
+    n_subjects, n_states, n_samples, n_channels = state_time_series.shape
 
     # Number of FFT data points to calculate
     nfft = max(256, 2 ** nextpow2(segment_length))
@@ -137,64 +148,102 @@ def state_spectra(
     # Number of segments in the time series
     n_segments = round(n_samples / segment_length)
 
-    # Power spectra for each state and segment
-    power_spectra = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
+    # Power spectra for each state
+    power_spectra = np.zeros(
+        [n_subjects, n_states, n_channels, n_channels, n_f], dtype=np.complex_
+    )
 
     print("Calculating power spectra")
-    for i in range(n_states):
-        for j in trange(n_segments, desc=f"State {i}"):
+    for i in range(n_subjects):
+        for j in range(n_states):
+            for k in trange(n_segments, desc=f"Subject {i}, state {j}"):
 
-            # Time series for state i and segment j
-            time_series_segment = state_time_series[
-                i, j * segment_length : (j + 1) * segment_length
-            ]
-
-            # If we're missing samples we pad with zeros either side of the data
-            if time_series_segment.shape[0] != segment_length:
-                n_zeros = segment_length - time_series_segment.shape[0]
-                n_padding = n_zeros // 2
-                time_series_segment = np.pad(time_series_segment, n_padding)[
-                    :, n_padding:-n_padding
+                # Time series for state j and segment k
+                time_series_segment = state_time_series[
+                    i, j, k * segment_length : (k + 1) * segment_length
                 ]
 
-            # Calculate the spectrum using the multitaper method
-            power_spectra[i] += multitaper(
-                time_series_segment,
-                sampling_frequency,
-                nfft=nfft,
-                tapers=tapers,
-                args_range=args_range,
-            )
+                # If we're missing samples we pad with zeros either side of the data
+                if time_series_segment.shape[0] != segment_length:
+                    n_zeros = segment_length - time_series_segment.shape[0]
+                    n_padding = n_zeros // 2
+                    time_series_segment = np.pad(time_series_segment, n_padding)[
+                        :, n_padding:-n_padding
+                    ]
+
+                # Calculate the power (and cross) spectrum using the multitaper method
+                power_spectra[i, j] += multitaper(
+                    time_series_segment,
+                    sampling_frequency,
+                    nfft=nfft,
+                    tapers=tapers,
+                    args_range=args_range,
+                )
 
     # Normalise the power spectra
-    sum_probabilities = np.sum(state_probabilities ** 2, axis=0)[
-        :, np.newaxis, np.newaxis, np.newaxis
+    sum_probabilities = np.sum(state_probabilities ** 2, axis=1)[
+        :, :, np.newaxis, np.newaxis, np.newaxis
     ]
     power_spectra *= n_samples / (sum_probabilities * n_tapers * n_segments)
 
     # Coherences for each state
-    coherences = np.empty([n_states, n_channels, n_channels, n_f])
+    coherences = np.empty([n_subjects, n_states, n_channels, n_channels, n_f])
 
     print("Calculating coherences")
-    for i in range(n_states):
-        for j in range(n_channels):
+    for i in range(n_subjects):
+        for j in range(n_states):
             for k in range(n_channels):
-                coherences[i, j, k] = abs(
-                    power_spectra[i, j, k]
-                    / np.sqrt(power_spectra[i, j, j] * power_spectra[i, k, k])
-                )
+                for l in range(n_channels):
+                    coherences[i, j, k, l] = abs(
+                        power_spectra[i, j, k, l]
+                        / np.sqrt(power_spectra[i, j, k, k] * power_spectra[i, j, l, l])
+                    )
 
     return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
 
 
-def decompose_spectra(spectra, n_components, spectrum_type="coherence"):
+def decompose_spectra(spectra, n_components, max_iter=10000):
     """Performs spectral decomposition.
 
+    A power spectrum or coherence spectrum can be passed.
     Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
     """
+    print("Performing spectral decomposition")
 
     # Validation
-    if spectrum_type not in ["power", "coherence"]:
-        raise ValueError("spectrum_type must be 'power' or 'coherence'.")
+    if spectra.ndim == 3:
+        # The spectra for one subject and one state has been passed, so we
+        # add two dimensions
+        spectra = spectra[np.newaxis, np.newaxis, :, :, :]
 
-    return
+    if spectra.ndim == 4:
+        # The spectra for one subject has been passed, so we add one dimension
+        spectra = spectra[np.newaxis, :, :, :]
+
+    if spectra.ndim != 5:
+        raise ValueError(
+            "a 3D numpy array [n_channels, n_channels, n_frequency_bins] or "
+            + "4D numpy array [n_states, n_channels, n_channels, n_frequency_bins] "
+            + "must be passed for spectra."
+        )
+
+    # Number of subjects, states, channels and frequency bins
+    n_subjects, n_states, n_channels, n_channels, n_f = spectra.shape
+
+    # Indices of the upper triangle of the [n_channels, n_channels, n_f] sub-array
+    i, j = np.triu_indices(n_channels, 1)
+
+    # Concatenate spectra for each subject and state and only keep the upper triangle
+    spectra = spectra[:, :, i, j].reshape(-1, n_f)
+
+    # Perform non-negative matrix factorisation
+    weights, components, n_iter = non_negative_factorization(
+        spectra, n_components=n_components, max_iter=max_iter,
+    )
+
+    # Order the weights and components in ascending frequency
+    order = np.argsort(components.argmax(axis=1))
+    weights = weights[:, order]
+    components = components[order]
+
+    return weights, components
