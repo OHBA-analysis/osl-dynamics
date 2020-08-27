@@ -172,9 +172,7 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 @transpose
 def time_embed(
-    time_series: np.ndarray,
-    n_embeddings: int,
-    output_file=None,
+    time_series: np.ndarray, n_embeddings: int, output_file=None,
 ):
     """Performs time embedding."""
     n_samples, n_channels = time_series.shape
@@ -191,8 +189,8 @@ def time_embed(
                 time_series[:, i], lags[j]
             )
 
-    # Only keep the data points we have all the lags for
-    time_embedded_series = time_embedded_series[lags[-1]:-lags[0]]
+    # Only keep the data points we have all the lags for
+    time_embedded_series = time_embedded_series[lags[-1] : -lags[0]]
 
     return time_embedded_series
 
