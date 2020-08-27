@@ -98,11 +98,9 @@ class Subject:
     def scale(self):
         self.time_series = scale(self.time_series)
 
-    def time_embed(self, n_embeddings: int, random_seed: int = None):
+    def time_embed(self, n_embeddings: int):
         logging.info(f"Applying time embedding with n_embeddings={n_embeddings}")
-        self.time_series = time_embed(
-            self.time_series, n_embeddings, random_seed=random_seed
-        )
+        self.time_series = time_embed(self.time_series, n_embeddings)
 
     def plot(self, n_samples: int = 10000, filename: str = None):
         """Plot data.
