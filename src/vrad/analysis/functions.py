@@ -13,7 +13,7 @@ def residuals_gaussian_fit(data):
     x = range(n_f)
     for i in range(n_components):
         y = data[i, :] / max(data[i, :])
-        params, _ = curve_fit(gaussian, x, y)
+        params, _ = curve_fit(gaussian, x, y, maxfev=100000)
         fit = gaussian(x, params[0], params[1], params[2])
         residuals_squared += sum((y - fit) ** 2)
     return residuals_squared
@@ -50,3 +50,21 @@ def nextpow2(x):
     """
     res = np.ceil(np.log2(x))
     return res.astype("int")
+
+
+def validate_array(array, correct_dimensionality, error_message):
+    """Checks if an array has been passed correctly."""
+
+    if array.ndim == correct_dimensionality - 2:
+        # The first two dimensions are missing
+        array = array[np.newaxis, np.newaxis, :, :, :]
+
+    if array.ndim == correct_dimensionality - 1:
+        # The first dimension is missing
+        array = array[np.newaxis, :, :, :]
+
+    if array.ndim != correct_dimensionality:
+        # The array doesn't have the array dimensionality
+        raise ValueError(error_message)
+
+    return array

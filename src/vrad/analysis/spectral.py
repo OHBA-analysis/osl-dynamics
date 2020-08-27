@@ -8,7 +8,12 @@ from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 
-from vrad.analysis.functions import fourier_transform, nextpow2, residuals_gaussian_fit
+from vrad.analysis.functions import (
+    fourier_transform,
+    nextpow2,
+    residuals_gaussian_fit,
+    validate_array,
+)
 from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import scale
 
@@ -88,25 +93,11 @@ def state_spectra(
     """
 
     # Validation
-    if data.ndim == 2:
-        # Data for one subject has been passed, so we add one dimension
-        data = data[np.newaxis, :, :]
-
-    if data.ndim != 3:
-        raise ValueError(
-            "data must have shape (n_samples, n_channels) or "
-            + "(n_subjects, n_samples, n_channels)."
-        )
-
-    if state_probabilities.ndim == 2:
-        # Data for one subject has been passed, so we add one dimension
-        state_probabilities = state_probabilities[np.newaxis, :, :]
-
-    if state_probabilities.ndim != 3:
-        raise ValueError(
-            "state_probabilities must have shape (n_samples, n_states) or "
-            + "(n_subjects, n_samples, n_states)."
-        )
+    error_message = (
+        "state_probabilities must a numpy array with shape (n_samples, n_states) or "
+        + "(n_subjects, n_samples, n_states)."
+    )
+    data = validate_array(data, correct_dimensionality=3, error_message=error_message)
 
     if segment_length is None:
         segment_length = 2 * sampling_frequency
@@ -203,7 +194,7 @@ def state_spectra(
 
 
 def decompose_spectra(
-    spectra,
+    coherences,
     n_components,
     n_iter=100,
     init="random",
@@ -211,47 +202,34 @@ def decompose_spectra(
     random_state=None,
     verbose=0,
 ):
-    """Performs spectral decomposition.
+    """Performs spectral decomposition using coherences.
 
     Uses non-negative matrix factorization to decompose spectra.
-    A power spectrum or coherence spectrum can be passed.
     Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
+
+    Return the spectral components.
     """
     print("Performing spectral decomposition")
 
     # Validation
-    if spectra.ndim == 3:
-        # The spectra for one subject and one state has been passed, so we
-        # add two dimensions
-        spectra = spectra[np.newaxis, np.newaxis, :, :, :]
-
-    if spectra.ndim == 4:
-        # The spectra for one subject has been passed, so we add one dimension
-        spectra = spectra[np.newaxis, :, :, :]
-
-    if spectra.ndim != 5:
-        raise ValueError(
-            "a 3D numpy array [n_channels, n_channels, n_frequency_bins] or "
-            + "4D numpy array [n_states, n_channels, n_channels, n_frequency_bins] "
-            + "must be passed for spectra."
-        )
+    coherences = validate_spectra(coherences)
 
     # Number of subjects, states, channels and frequency bins
-    n_subjects, n_states, n_channels, n_channels, n_f = spectra.shape
+    n_subjects, n_states, n_channels, n_channels, n_f = coherences.shape
 
     # Indices of the upper triangle of the [n_channels, n_channels, n_f] sub-array
     i, j = np.triu_indices(n_channels, 1)
 
-    # Concatenate spectra for each subject and state and only keep the upper triangle
-    spectra = spectra[:, :, i, j].reshape(-1, n_f)
+    # Concatenate coherences for each subject and state and only keep the upper triangle
+    coherences = coherences[:, :, i, j].reshape(-1, n_f)
 
     # Perform full procedure n_iter times
     best_residuals_squared = np.Inf
     for i in trange(n_iter, desc="Iterating"):
 
         # Perform non-negative matrix factorisation
-        weights, components, _ = non_negative_factorization(
-            spectra,
+        _, components, _ = non_negative_factorization(
+            coherences,
             n_components=n_components,
             init=init,
             max_iter=max_iter,
@@ -266,12 +244,69 @@ def decompose_spectra(
         # Keep the best factorisation
         if residuals_squared < best_residuals_squared:
             best_residuals_squared = residuals_squared
-            best_weights = weights
             best_components = components
 
     # Order the weights and components in ascending frequency
     order = np.argsort(best_components.argmax(axis=1))
-    best_weights = best_weights[:, order]
     best_components = best_components[order]
 
-    return best_weights, best_components
+    return best_components
+
+
+def state_spatial_maps(power_spectra, coherences, components):
+    """Calculates a spatial map.
+
+    Calculates the spatial maps using the power spectra and spectral components.
+    """
+    # Validation
+    error_message = (
+        "a 3D numpy array (n_channels, n_channels, n_frequency_bins) "
+        + "or 4D numpy array (n_states, n_channels, n_channels, "
+        + "n_frequency_bins) must be passed for spectra."
+    )
+    power_spectra = validate_array(
+        power_spectra, correct_dimensionality=5, error_message=error_message
+    )
+    coherences = validate_array(
+        coherences, correct_dimensionality=5, error_message=error_message
+    )
+
+    # Number of subjects, states, channels and frequency bins
+    n_subjects, n_states, n_channels, n_channels, n_f = power_spectra.shape
+
+    # Number of components
+    n_components = components.shape[0]
+
+    # Remove cross-spectral densities from the power spectra array and concatenate
+    # over subjects and states
+    psd = power_spectra[:, :, range(n_channels), range(n_channels)].reshape(-1, n_f)
+
+    # PSDs are real valued so we can recast
+    psd = psd.real
+
+    # Calculate PSDs for each spectral component
+    psd = psd @ components.T
+    psd = psd.T
+    psd = psd.reshape(n_components, n_states, n_channels)
+
+    # Power map
+    p = np.zeros([n_components, n_states, n_channels, n_channels])
+    p[:, :, range(n_channels), range(n_channels)] = psd
+
+    # Only keep the upper triangle of the coherences and concatenate over subjects
+    # and states
+    i, j = np.triu_indices(n_channels, 1)
+    coh = coherences[:, :, i, j].reshape(-1, n_f)
+
+    #  Calculate coherences for each spectral component
+    coh = coh @ components.T
+    coh = coh.T
+    coh = coh.reshape(n_components, n_states, n_channels * (n_channels - 1) // 2)
+
+    # Coherence map
+    c = np.zeros([n_components, n_states, n_channels, n_channels])
+    c[:, :, i, j] = coh
+    c[:, :, j, i] = coh
+    c[:, :, range(n_channels), range(n_channels)] = 1
+
+    return p, c
