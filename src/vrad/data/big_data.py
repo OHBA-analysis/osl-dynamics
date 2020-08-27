@@ -76,11 +76,11 @@ class BigData:
     def prepare(
         self,
         n_embeddings: int,
-        n_components: int,
+        n_pca_components: int,
         whiten: bool,
         random_seed: int = None,
     ):
-        self.n_components = n_components
+        self.n_components = n_pca_components
 
         for new_file, memmap in zip(
             self.te_filenames, tqdm(self.data_memmaps, desc="time embedding")
@@ -98,7 +98,7 @@ class BigData:
 
             self.te_memmaps.append(te_memmap)
 
-        pca_object = PCA(n_components, svd_solver="full", whiten=whiten)
+        pca_object = PCA(n_pca_components, svd_solver="full", whiten=whiten)
         for te_memmap in tqdm(self.te_memmaps, desc="calculating pca"):
             pca_object.fit(te_memmap)
         for te_memmap, output_file in zip(

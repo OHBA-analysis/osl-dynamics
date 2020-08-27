@@ -7,10 +7,12 @@ import numpy as np
 from tensorflow import Variable
 from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
+from vrad.data.big_data import BigData
 from vrad.inference.callbacks import (
     AnnealingCallback,
     SaveBestCallback,
@@ -18,7 +20,7 @@ from vrad.inference.callbacks import (
 )
 from vrad.inference.initializers import reinitialize_model_weights
 from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
-from vrad.utils.misc import listify, replace_argument
+from vrad.utils.misc import check_iterable_type, listify, replace_argument
 
 
 class BaseModel:
@@ -217,10 +219,36 @@ class BaseModel:
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
-    def predict_states(self, *args, **kwargs):
+    def _make_dataset(self, inputs):
+        if isinstance(inputs, Dataset):
+            return [inputs]
+        if isinstance(inputs, str):
+            return [BigData(inputs).prediction_dataset(self.sequence_length)]
+        if isinstance(inputs, np.ndarray):
+            if inputs.ndim == 2:
+                return [BigData(inputs).prediction_dataset(self.sequence_length)]
+            if inputs.ndim == 3:
+                return [
+                    BigData(subject).prediction_dataset(self.sequence_length)
+                    for subject in inputs
+                ]
+        if check_iterable_type(inputs, Dataset):
+            return inputs
+        if check_iterable_type(inputs, str):
+            datasets = [
+                BigData(subject).prediction_dataset(self.sequence_length)
+                for subject in inputs
+            ]
+            return datasets
+
+    def predict_states(self, inputs, *args, **kwargs):
         """Infers the latent state time course."""
-        m_theta_t = self.predict(*args, **kwargs)["m_theta_t"]
-        return np.concatenate(m_theta_t)
+        inputs = self._make_dataset(inputs)
+        outputs = []
+        for dataset in inputs:
+            m_theta_t = self.predict(dataset, *args, **kwargs)["m_theta_t"]
+            outputs.append(np.concatenate(m_theta_t))
+        return outputs
 
     def free_energy(self, dataset, return_all=False):
         """Calculates the variational free energy of a model."""
