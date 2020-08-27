@@ -8,7 +8,7 @@ from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 
-from vrad.analysis.functions import fourier_transform, nextpow2
+from vrad.analysis.functions import fourier_transform, nextpow2, residuals_gaussian_fit
 from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import scale
 
@@ -202,9 +202,18 @@ def state_spectra(
     return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
 
 
-def decompose_spectra(spectra, n_components, max_iter=10000):
+def decompose_spectra(
+    spectra,
+    n_components,
+    n_iter=100,
+    init="random",
+    max_iter=2000,
+    random_state=None,
+    verbose=0,
+):
     """Performs spectral decomposition.
 
+    Uses non-negative matrix factorization to decompose spectra.
     A power spectrum or coherence spectrum can be passed.
     Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
     """
@@ -236,14 +245,33 @@ def decompose_spectra(spectra, n_components, max_iter=10000):
     # Concatenate spectra for each subject and state and only keep the upper triangle
     spectra = spectra[:, :, i, j].reshape(-1, n_f)
 
-    # Perform non-negative matrix factorisation
-    weights, components, n_iter = non_negative_factorization(
-        spectra, n_components=n_components, max_iter=max_iter,
-    )
+    # Perform full procedure n_iter times
+    best_residuals_squared = np.Inf
+    for i in trange(n_iter, desc="Iterating"):
+
+        # Perform non-negative matrix factorisation
+        weights, components, _ = non_negative_factorization(
+            spectra,
+            n_components=n_components,
+            init=init,
+            max_iter=max_iter,
+            random_state=random_state,
+            verbose=verbose,
+        )
+
+        # Fit a Gaussian to each component and calculate residuals
+        # This is done to find spectral components which have a single peak
+        residuals_squared = residuals_gaussian_fit(components)
+
+        # Keep the best factorisation
+        if residuals_squared < best_residuals_squared:
+            best_residuals_squared = residuals_squared
+            best_weights = weights
+            best_components = components
 
     # Order the weights and components in ascending frequency
-    order = np.argsort(components.argmax(axis=1))
-    weights = weights[:, order]
-    components = components[order]
+    order = np.argsort(best_components.argmax(axis=1))
+    best_weights = best_weights[:, order]
+    best_components = best_components[order]
 
-    return weights, components
+    return best_weights, best_components
