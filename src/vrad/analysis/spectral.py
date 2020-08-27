@@ -194,13 +194,7 @@ def state_spectra(
 
 
 def decompose_spectra(
-    coherences,
-    n_components,
-    n_iter=100,
-    init="random",
-    max_iter=2000,
-    random_state=None,
-    verbose=0,
+    coherences, n_components, max_iter=2000, random_state=None, verbose=0,
 ):
     """Performs spectral decomposition using coherences.
 
@@ -223,34 +217,21 @@ def decompose_spectra(
     # Concatenate coherences for each subject and state and only keep the upper triangle
     coherences = coherences[:, :, i, j].reshape(-1, n_f)
 
-    # Perform full procedure n_iter times
-    best_residuals_squared = np.Inf
-    for i in trange(n_iter, desc="Iterating"):
-
-        # Perform non-negative matrix factorisation
-        _, components, _ = non_negative_factorization(
-            coherences,
-            n_components=n_components,
-            init=init,
-            max_iter=max_iter,
-            random_state=random_state,
-            verbose=verbose,
-        )
-
-        # Fit a Gaussian to each component and calculate residuals
-        # This is done to find spectral components which have a single peak
-        residuals_squared = residuals_gaussian_fit(components)
-
-        # Keep the best factorisation
-        if residuals_squared < best_residuals_squared:
-            best_residuals_squared = residuals_squared
-            best_components = components
+    # Perform non-negative matrix factorisation
+    _, components, _ = non_negative_factorization(
+        coherences,
+        n_components=n_components,
+        init=None,
+        max_iter=max_iter,
+        random_state=random_state,
+        verbose=verbose,
+    )
 
     # Order the weights and components in ascending frequency
-    order = np.argsort(best_components.argmax(axis=1))
-    best_components = best_components[order]
+    order = np.argsort(components.argmax(axis=1))
+    components = components[order]
 
-    return best_components
+    return components
 
 
 def state_spatial_maps(power_spectra, coherences, components):
