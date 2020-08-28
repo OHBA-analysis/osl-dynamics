@@ -65,7 +65,7 @@ class BaseModel:
 
         # KL annealing
         self.do_annealing = do_annealing
-        self.annealing_factor = Variable(0.0)
+        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
         self.annealing_sharpness = annealing_sharpness
         self.n_epochs_annealing = n_epochs_annealing
 
