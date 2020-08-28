@@ -3,16 +3,12 @@
 """
 
 import logging
+
 import numpy as np
 from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
-
-from vrad.analysis.functions import (
-    fourier_transform,
-    nextpow2,
-    validate_array,
-)
+from vrad.analysis.functions import fourier_transform, nextpow2, validate_array
 from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import scale
 

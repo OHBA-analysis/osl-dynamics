@@ -199,11 +199,10 @@ class Data:
         return dataset.batch(batch_size).cache().shuffle(10000).prefetch(-1)
 
     def prediction_dataset(self, sequence_length: int, batch_size: int = 32):
-        return (
-            Dataset.from_tensor_slices(self.time_series)
-            .batch(sequence_length, drop_remainder=True)
-            .batch(batch_size, drop_remainder=True)
-        )
+        return [
+            subject.dataset(sequence_length).batch(batch_size).prefetch(-1)
+            for subject in self.subjects
+        ]
 
 
 # noinspection PyPep8Naming

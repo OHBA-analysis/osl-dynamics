@@ -98,17 +98,19 @@ int_means, inf_cov = model.get_means_covariances()
 # plotting.plot_matrices(inf_cov, filename="covariances.png")
 
 # Inferred state time courses
-inf_stc = model.predict_states(prediction_dataset)
-inf_stc = inf_stc.argmax(axis=1)
-inf_stc = array_ops.get_one_hot(inf_stc)
+inf_stcs = model.predict_states(prediction_dataset)
+inf_stcs = [inf_stc.argmax(axis=1) for inf_stc in inf_stcs]
+inf_stcs = [array_ops.get_one_hot(inf_stc) for inf_stc in inf_stcs]
 
 # Find correspondance between state time courses
-matched_stc, matched_inf_stc = array_ops.match_states(hmm.viterbi_path, inf_stc)
+matched_stc, *matched_inf_stcs = array_ops.match_states(hmm.viterbi_path, *inf_stcs)
 # plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
 
 # Dice coefficient
-print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
+for matched_inf_stc in matched_inf_stcs:
+    print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
 
 # Free energy = Log Likelihood + KL Divergence
-free_energy, ll_loss, kl_loss = model.free_energy(prediction_dataset, return_all=True)
-print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")
+for subject_dataset in prediction_dataset:
+    free_energy, ll_loss, kl_loss = model.free_energy(subject_dataset, return_all=True)
+    print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")

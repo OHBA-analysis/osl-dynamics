@@ -128,11 +128,12 @@ class BigData:
     def prediction_dataset(self, sequence_length, batch_size=32, step_size=None):
         subjects = self.output_memmaps or self.data_memmaps
 
-        subject_datasets = [Dataset.from_tensor_slices(subject) for subject in subjects]
-        full_dataset = subject_datasets[0]
-        for subject_dataset in subject_datasets[1:]:
-            full_dataset = full_dataset.concatenate(subject_dataset)
+        subject_datasets = [
+            Dataset.from_tensor_slices(subject)
+            .batch(sequence_length, drop_remainder=True)
+            .batch(batch_size)
+            .prefetch(-1)
+            for subject in subjects
+        ]
 
-        full_dataset = full_dataset.batch(sequence_length, drop_remainder=True)
-
-        return full_dataset.batch(batch_size).prefetch(-1)
+        return subject_datasets
