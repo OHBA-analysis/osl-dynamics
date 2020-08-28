@@ -79,12 +79,10 @@ def standardize(
 
 
 @transpose
-def scale(time_series: np.ndarray) -> np.ndarray:
-    """Scale time_series to have mean zero and standard deviation 1.
-
-    """
-    time_series -= time_series.mean(axis=0)
-    time_series /= time_series.std(axis=0)
+def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
+    """Scale time_series to have mean zero and standard deviation 1."""
+    time_series -= time_series.mean(axis=axis)
+    time_series /= time_series.std(axis=axis)
     return time_series
 
 
@@ -174,13 +172,9 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 @transpose
 def time_embed(
-    time_series: np.ndarray,
-    n_embeddings: int,
-    random_seed: int = None,
-    output_file=None,
+    time_series: np.ndarray, n_embeddings: int, output_file=None,
 ):
-    """Performs time embedding. This function reproduces the OSL function embedx.
-    """
+    """Performs time embedding."""
     n_samples, n_channels = time_series.shape
     lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
 
@@ -195,17 +189,8 @@ def time_embed(
                 time_series[:, i], lags[j]
             )
 
-    # Calculate the standard deviation of the first 500 time points
-    sigma = np.std(time_series[:500])
-
-    # Setup random number generator
-    rng = np.random.default_rng(random_seed)
-
-    # We fill the values we don't have all the time lags for with Gaussian
-    # random numbers
-    for i in range(n_channels * len(lags)):
-        time_embedded_series[: lags[-1], i] = rng.normal(0, sigma, lags[-1])
-        time_embedded_series[lags[0] :, i] = rng.normal(0, sigma, abs(lags[0]))
+    # Only keep the data points we have all the lags for
+    time_embedded_series = time_embedded_series[lags[-1] : -lags[0]]
 
     return time_embedded_series
 
@@ -241,7 +226,6 @@ def prepare(
     n_embeddings: int,
     n_pca_components: int,
     whiten: bool,
-    random_seed: int = None,
     return_pca_object: bool = False,
 ):
     """Prepares subject data by time embeddings and performing PCA.
@@ -251,7 +235,7 @@ def prepare(
 
     for subject in subjects:
         # Perform time embedding
-        subject.time_embed(n_embeddings, random_seed=random_seed)
+        subject.time_embed(n_embeddings)
 
         # Rescale (z-transform) the time series
         subject.scaler = StandardScaler()
