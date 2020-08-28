@@ -12,6 +12,7 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm import tqdm
 from tqdm.keras import TqdmCallback
+from vrad.data import Data
 from vrad.data.big_data import BigData
 from vrad.inference.callbacks import (
     AnnealingCallback,
@@ -220,6 +221,8 @@ class BaseModel:
         return predictions_dict
 
     def _make_dataset(self, inputs):
+        if isinstance(inputs, (Data, BigData)):
+            return inputs.prediction_dataset(self.sequence_length)
         if isinstance(inputs, Dataset):
             return [inputs]
         if isinstance(inputs, str):
