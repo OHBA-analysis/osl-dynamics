@@ -110,7 +110,7 @@ class BigData:
 
         return pca_object
 
-    def training_dataset(self, sequence_length, step_size=None):
+    def training_dataset(self, sequence_length, batch_size=32, step_size=None):
         subjects = self.output_memmaps or self.data_memmaps
 
         subject_datasets = [
@@ -123,9 +123,9 @@ class BigData:
         for subject_dataset in subject_datasets[1:]:
             full_dataset = full_dataset.concatenate(subject_dataset)
 
-        return full_dataset
+        return full_dataset.batch(batch_size).prefetch(-1)
 
-    def prediction_dataset(self, sequence_length, step_size=None):
+    def prediction_dataset(self, sequence_length, batch_size=32, step_size=None):
         subjects = self.output_memmaps or self.data_memmaps
 
         subject_datasets = [Dataset.from_tensor_slices(subject) for subject in subjects]
@@ -135,4 +135,4 @@ class BigData:
 
         full_dataset = full_dataset.batch(sequence_length, drop_remainder=True)
 
-        return full_dataset
+        return full_dataset.batch(batch_size).prefetch(-1)
