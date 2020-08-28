@@ -97,14 +97,22 @@ def state_spectra(
         "data must be a numpy array with shape (n_samples, n_states) or "
         + "(n_subjects, n_samples, n_states)."
     )
-    data = validate_array(data, correct_dimensionality=3, error_message=error_message)
+    data = validate_array(
+        data,
+        correct_dimensionality=3,
+        allow_dimensions=[2],
+        error_message=error_message,
+    )
 
     error_message = (
         "state_probabilities must a numpy array with shape (n_samples, n_states) or "
         + "(n_subjects, n_samples, n_states)."
     )
     state_probabilities = validate_array(
-        state_probabilities, correct_dimensionality=3, error_message=error_message
+        state_probabilities,
+        correct_dimensionality=3,
+        allow_dimensions=[2],
+        error_message=error_message,
     )
 
     if segment_length is None:
@@ -214,7 +222,17 @@ def decompose_spectra(
     print("Performing spectral decomposition")
 
     # Validation
-    coherences = validate_array(coherences)
+    error_message = (
+        "coherences must be a numpy array with shape (n_channels, n_channels), "
+        + "(n_states, n_channels, n_channels) or (n_subjects, n_states, "
+        + "n_channels, n_channels)."
+    )
+    coherences = validate_array(
+        coherences,
+        correct_dimensionality=5,
+        allow_dimensions=[2, 3, 4],
+        error_message=error_message,
+    )
 
     # Number of subjects, states, channels and frequency bins
     n_subjects, n_states, n_channels, n_channels, n_f = coherences.shape
@@ -254,10 +272,16 @@ def state_maps(power_spectra, coherences, components):
         + "n_frequency_bins) must be passed for spectra."
     )
     power_spectra = validate_array(
-        power_spectra, correct_dimensionality=5, error_message=error_message
+        power_spectra,
+        correct_dimensionality=5,
+        allow_dimensions=[3, 4],
+        error_message=error_message,
     )
     coherences = validate_array(
-        coherences, correct_dimensionality=5, error_message=error_message
+        coherences,
+        correct_dimensionality=5,
+        allow_dimensions=[3, 4],
+        error_message=error_message,
     )
 
     # Number of subjects, states, channels and frequency bins

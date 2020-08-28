@@ -52,19 +52,22 @@ def nextpow2(x):
     return res.astype("int")
 
 
-def validate_array(array, correct_dimensionality, error_message):
+def validate_array(
+    array: np.ndarray,
+    correct_dimensionality: int,
+    allow_dimensions: list,
+    error_message: str,
+):
     """Checks if an array has been passed correctly."""
 
-    if array.ndim == correct_dimensionality - 2:
-        # The first two dimensions are missing
-        array = array[np.newaxis, np.newaxis, ...]
+    # Add dimensions to ensure array has the correct dimensionality
+    for dimensionality in allow_dimensions:
+        if array.ndim == dimensionality:
+            for i in range(correct_dimensionality - dimensionality):
+                array = array[np.newaxis, ...]
 
-    if array.ndim == correct_dimensionality - 1:
-        # The first dimension is missing
-        array = array[np.newaxis, ...]
-
+    # Check no other dimensionality has been passed
     if array.ndim != correct_dimensionality:
-        # The array doesn't have the array dimensionality
         raise ValueError(error_message)
 
     return array
