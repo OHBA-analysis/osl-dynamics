@@ -6,19 +6,6 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 
-def residuals_gaussian_fit(data):
-    """Fits a Gaussian to data and returns the residuals squared."""
-    residuals_squared = 0
-    n_components, n_f = data.shape
-    x = range(n_f)
-    for i in range(n_components):
-        y = data[i, :] / max(data[i, :])
-        params, _ = curve_fit(gaussian, x, y, maxfev=100000)
-        fit = gaussian(x, params[0], params[1], params[2])
-        residuals_squared += sum((y - fit) ** 2)
-    return residuals_squared
-
-
 def fourier_transform(data, sampling_frequency, nfft=None, args_range=None):
     """Calculates a Fast Fourier Transform (FFT)."""
 
@@ -37,11 +24,6 @@ def fourier_transform(data, sampling_frequency, nfft=None, args_range=None):
         X = X[:, :, args_range[0] : args_range[1]]
 
     return X
-
-
-def gaussian(x, A, mu, sigma):
-    """Gaussian function."""
-    return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
 
 
 def nextpow2(x):
