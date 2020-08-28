@@ -94,10 +94,18 @@ def state_spectra(
 
     # Validation
     error_message = (
-        "state_probabilities must a numpy array with shape (n_samples, n_states) or "
+        "data must be a numpy array with shape (n_samples, n_states) or "
         + "(n_subjects, n_samples, n_states)."
     )
     data = validate_array(data, correct_dimensionality=3, error_message=error_message)
+
+    error_message = (
+        "state_probabilities must a numpy array with shape (n_samples, n_states) or "
+        + "(n_subjects, n_samples, n_states)."
+    )
+    state_probabilities = validate_array(
+        state_probabilities, correct_dimensionality=3, error_message=error_message
+    )
 
     if segment_length is None:
         segment_length = 2 * sampling_frequency
@@ -206,7 +214,7 @@ def decompose_spectra(
     print("Performing spectral decomposition")
 
     # Validation
-    coherences = validate_spectra(coherences)
+    coherences = validate_array(coherences)
 
     # Number of subjects, states, channels and frequency bins
     n_subjects, n_states, n_channels, n_channels, n_f = coherences.shape
@@ -234,7 +242,7 @@ def decompose_spectra(
     return components
 
 
-def state_spatial_maps(power_spectra, coherences, components):
+def state_maps(power_spectra, coherences, components):
     """Calculates a spatial map.
 
     Calculates the spatial maps using the power spectra and spectral components.

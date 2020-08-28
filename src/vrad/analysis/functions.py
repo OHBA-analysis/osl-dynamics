@@ -57,11 +57,11 @@ def validate_array(array, correct_dimensionality, error_message):
 
     if array.ndim == correct_dimensionality - 2:
         # The first two dimensions are missing
-        array = array[np.newaxis, np.newaxis, :, :, :]
+        array = array[np.newaxis, np.newaxis, ...]
 
     if array.ndim == correct_dimensionality - 1:
         # The first dimension is missing
-        array = array[np.newaxis, :, :, :]
+        array = array[np.newaxis, ...]
 
     if array.ndim != correct_dimensionality:
         # The array doesn't have the array dimensionality
