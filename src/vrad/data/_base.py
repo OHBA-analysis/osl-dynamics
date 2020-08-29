@@ -145,7 +145,6 @@ class Data:
         n_embeddings: int = None,
         n_pca_components: int = None,
         whiten: bool = False,
-        random_seed: int = None,
     ):
         """Prepares the subjects specified by ids."""
         if isinstance(ids, int):
@@ -167,7 +166,6 @@ class Data:
                 n_embeddings,
                 n_pca_components,
                 whiten,
-                random_seed,
                 return_pca_object=True,
             )
             self.prepared = True
