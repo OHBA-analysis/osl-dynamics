@@ -2,17 +2,15 @@
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Uses the final covariances inferred by an HMM fit from OSL.
-- Takes approximately 4 minutes to train (on compG017).
-- Achieves a dice coefficient of ~0.7 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~490,000.
+- Takes approximately 5 minutes to train (on compG017).
+- Achieves a dice coefficient of ~0.67 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~231,000.
 """
 
 print("Importing packages")
-import numpy as np
-from vrad import array_ops, data
-from vrad.inference import metrics, tf_ops
+from vrad import data
+from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
-from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -93,24 +91,18 @@ history = model.burn_in(
 print("Training full model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
-# Inferred covariance matrices
-int_means, inf_cov = model.get_means_covariances()
-# plotting.plot_matrices(inf_cov, filename="covariances.png")
+# Inferred state probabilities and state time course
+alpha = model.predict_states(prediction_dataset)
+stc = states.time_courses(alpha)
 
-# Inferred state time courses
-inf_stcs = model.predict_states(prediction_dataset)
-inf_stcs = [inf_stc.argmax(axis=1) for inf_stc in inf_stcs]
-inf_stcs = [array_ops.get_one_hot(inf_stc) for inf_stc in inf_stcs]
-
-# Find correspondance between state time courses
-matched_stc, *matched_inf_stcs = array_ops.match_states(hmm.viterbi_path, *inf_stcs)
-# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+# Find correspondance between HMM and inferred state time courses
+matched_hmm_stc, *matched_inf_stc = states.match_states(hmm.state_time_course, *stc)
 
 # Dice coefficient
-for matched_inf_stc in matched_inf_stcs:
-    print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
+for miv in matched_inf_stc:
+    print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, miv))
 
 # Free energy = Log Likelihood + KL Divergence
 for subject_dataset in prediction_dataset:
-    free_energy, ll_loss, kl_loss = model.free_energy(subject_dataset, return_all=True)
-    print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")
+    free_energy = model.free_energy(subject_dataset)
+    print(f"Free energy: {free_energy}")
