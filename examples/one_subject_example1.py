@@ -7,8 +7,9 @@
 - Achieves a free energy of ~231,000.
 """
 
-print("Importing packages")
+print("Setting up")
 from vrad import data
+from vrad.analysis import spectral, maps
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
 
@@ -46,8 +47,8 @@ normalize_covariances = True
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
-n_channels = meg_data.n_channels
+prepared_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
+n_channels = prepared_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
 hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
@@ -79,8 +80,8 @@ model = RNNGaussian(
 model.summary()
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
+training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Train the model
 print("Training burn-in model")
@@ -106,3 +107,35 @@ for miv in matched_inf_stc:
 for subject_dataset in prediction_dataset:
     free_energy = model.free_energy(subject_dataset)
     print(f"Free energy: {free_energy}")
+
+# Load preprocessed (i.e. unprepared) data to calculate state spectra
+preprocessed_data = data.Data(
+    "/well/woolrich/shared/vrad/preprocessed_data/subject1.mat"
+)
+
+# Compute spectra for states
+f, psd, coh = spectral.state_spectra(
+    data=preprocessed_data.time_series,
+    state_probabilities=alpha,
+    sampling_frequency=250,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=[1, 45],
+)
+
+# Perform spectral decomposition (into 2 components) based on coherence spectra
+components = spectral.decompose_spectra(coh, n_components=2)
+
+# Calculate spatial maps
+p_map, c_map = maps.state_maps(psd, coh, components)
+
+# Save the power map for the first component as NIFTI file
+# (The second component is noise)
+maps.save_nii_file(
+    mask_file="files/MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="files"
+    + "/fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    power_map=p_map,
+    filename="power_map.nii.gz",
+    component=0,
+)

@@ -1,12 +1,12 @@
 """Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Data preparation is performed within V-RAD. This is in contrast to examples3.py,
+- Data preparation is performed within V-RAD.
   which used data that's already been prepared.
 - Initialises the covariances with the identity matrix.
 """
 
-print("Importing packages")
+print("Setting up")
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
 from vrad.models import RNNGaussian
@@ -109,3 +109,30 @@ for miv in matched_inf_stc:
 for subject_dataset in prediction_dataset:
     free_energy = model.free_energy(subject_dataset)
     print(f"Free energy: {free_energy}")
+
+# Compute spectra for states
+f, psd, coh = spectral.state_spectra(
+    data=meg_data.time_series,
+    state_probabilities=alpha,
+    sampling_frequency=250,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=[1, 45],
+)
+
+# Perform spectral decomposition (into 2 components) based on coherence spectra
+components = spectral.decompose_spectra(coh, n_components=2)
+
+# Calculate spatial maps
+p_map, c_map = maps.state_maps(psd, coh, components)
+
+# Save the power map for the first component as NIFTI file
+# (The second component is noise)
+maps.save_nii_file(
+    mask_file="files/MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="files"
+    + "/fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    power_map=p_map,
+    filename="power_map.nii.gz",
+    component=0,
+)

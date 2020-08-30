@@ -4,7 +4,7 @@
 - Uses prepared data for 10 subjects.
 """
 
-print("Importing packages")
+print("Setting up")
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
 from vrad.models import RNNGaussian

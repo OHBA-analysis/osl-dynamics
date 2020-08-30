@@ -5,7 +5,7 @@
 - Takes approximately 2 minutes to train (on compG017).
 """
 
-print("Importing packages")
+print("Setting up")
 import numpy as np
 from vrad import array_ops, data
 from vrad.inference import gmm, metrics, states, tf_ops
@@ -47,8 +47,8 @@ learn_alpha_scaling = False
 normalize_covariances = False
 
 # Load state transition probability matrix and covariances of each state
-init_trans_prob = np.load("data/prob_000.npy")
-init_cov = np.load("data/state_000.npy")
+init_trans_prob = np.load("files/prob_000.npy")
+init_cov = np.load("files/state_000.npy")
 
 # Simulate data
 print("Simulating data")
@@ -119,7 +119,6 @@ stc = states.time_courses(alpha)
 
 # Find correspondance to ground truth state time courses
 matched_sim_stc, *matched_inf_stc = states.match_states(sim.state_time_course, *stc)
-# plotting.compare_state_data(matched_sim_stc, matched_inf_stc, filename="compare.png")
 
 for miv in matched_inf_stc:
     print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, miv))
