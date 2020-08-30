@@ -294,7 +294,7 @@ class RNNGaussian(BaseModel):
         alpha_scaling = self.get_alpha_scaling()
 
         # Sample state time course
-        for i in trange(n_samples, desc="Sampling state time course"):
+        for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
             # If there are leading zeros we trim theta_t so that we don't pass the zeros
             trimmed_theta_t = theta_t[~np.all(theta_t == 0, axis=1)][np.newaxis, :, :]

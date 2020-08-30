@@ -14,6 +14,7 @@ from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
 
 # GPU settings
+tf_ops.suppress_messages()
 tf_ops.gpu_growth()
 
 # Settings

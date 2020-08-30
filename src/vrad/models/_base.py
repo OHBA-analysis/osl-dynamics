@@ -10,7 +10,7 @@ from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
-from tqdm import tqdm
+from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
 from vrad.data.big_data import BigData
@@ -130,15 +130,21 @@ class BaseModel:
                 annealing_sharpness=self.annealing_sharpness,
                 n_epochs_annealing=self.n_epochs_annealing,
             )
-
             additional_callbacks.append(annealing_callback)
 
         # Callback to display a progress bar with tqdm
         if use_tqdm:
             if tqdm_class is not None:
                 tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+
             else:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
+                # Create a tqdm class with a progress bar width of 98 characters
+                class tqdm_class(tqdm_auto):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs, ncols=98)
+
+                # Create tqdm callback
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
 
             additional_callbacks.append(tqdm_callback)
 
@@ -152,7 +158,6 @@ class BaseModel:
                 tensorboard_cb = TensorBoard(
                     tensorboard_run_logdir(), histogram_freq=1, profile_batch="2,10"
                 )
-
             additional_callbacks.append(tensorboard_cb)
 
         # Callback to save the best model after a certain number of epochs

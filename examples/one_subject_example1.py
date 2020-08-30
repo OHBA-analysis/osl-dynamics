@@ -14,8 +14,8 @@ from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
 
 # GPU settings
+tf_ops.suppress_messages()
 tf_ops.gpu_growth()
-multi_gpu = True
 
 # Settings
 n_states = 6
@@ -74,7 +74,6 @@ model = RNNGaussian(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
-    multi_gpu=multi_gpu,
 )
 
 model.summary()
