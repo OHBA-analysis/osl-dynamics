@@ -7,7 +7,7 @@ from operator import lt
 import numpy as np
 from tensorflow import zeros
 from tensorflow.keras import Model, layers
-from tensorflow.python.keras.backend import softmax, softplus
+from tensorflow.nn import softmax, softplus
 from tqdm import trange
 from vrad.inference.functions import (
     cholesky_factor,
@@ -107,6 +107,48 @@ class RNNGaussian(BaseModel):
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
         )
+
+    def predict(self, *args, **kwargs):
+        """Wrapper for the standard keras predict method.
+
+        Returns a dictionary with labels for each prediction.
+        """
+        predictions = self.model.predict(*args, *kwargs)
+        return_names = [
+            "ll_loss",
+            "kl_loss",
+            "theta_t",
+            "m_theta_t",
+            "log_s2_theta_t",
+            "mu_theta_jt",
+            "log_sigma2_theta_j",
+        ]
+        predictions_dict = dict(zip(return_names, predictions))
+        return predictions_dict
+
+    def predict_states(self, inputs, *args, **kwargs):
+        """Return the probability for each state at each time point."""
+        inputs = self._make_dataset(inputs)
+        outputs = []
+        for dataset in inputs:
+            m_theta_t = self.predict(dataset, *args, **kwargs)["m_theta_t"]
+            m_theta_t = np.concatenate(m_theta_t)
+            if self.alpha_xform == "softmax":
+                alpha = softmax(m_theta_t).numpy()
+            elif self.alpha_xform == "softplus":
+                alpha = softplus(m_theta_t).numpy()
+            outputs.append(alpha)
+        return outputs
+
+    def free_energy(self, dataset, return_all=False):
+        """Calculates the variational free energy of a model."""
+        predictions = self.predict(dataset)
+        ll_loss = np.mean(predictions["ll_loss"])
+        kl_loss = np.mean(predictions["kl_loss"])
+        if return_all:
+            return ll_loss + kl_loss, ll_loss, kl_loss
+        else:
+            return ll_loss + kl_loss
 
     def initialize_means_covariances(
         self,

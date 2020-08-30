@@ -202,24 +202,6 @@ class BaseModel:
 
         return self.model.fit(*args, **kwargs)
 
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns a dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, *kwargs)
-        return_names = [
-            "ll_loss",
-            "kl_loss",
-            "theta_t",
-            "m_theta_t",
-            "log_s2_theta_t",
-            "mu_theta_jt",
-            "log_sigma2_theta_j",
-        ]
-        predictions_dict = dict(zip(return_names, predictions))
-        return predictions_dict
-
     def _make_dataset(self, inputs):
         if isinstance(inputs, (Data, BigData)):
             return inputs.prediction_dataset(self.sequence_length)
@@ -243,25 +225,6 @@ class BaseModel:
                 for subject in inputs
             ]
             return datasets
-
-    def predict_states(self, inputs, *args, **kwargs):
-        """Infers the latent state time course."""
-        inputs = self._make_dataset(inputs)
-        outputs = []
-        for dataset in inputs:
-            m_theta_t = self.predict(dataset, *args, **kwargs)["m_theta_t"]
-            outputs.append(np.concatenate(m_theta_t))
-        return outputs
-
-    def free_energy(self, dataset, return_all=False):
-        """Calculates the variational free energy of a model."""
-        predictions = self.predict(dataset)
-        ll_loss = np.mean(predictions["ll_loss"])
-        kl_loss = np.mean(predictions["kl_loss"])
-        if return_all:
-            return ll_loss + kl_loss, ll_loss, kl_loss
-        else:
-            return ll_loss + kl_loss
 
     def reset_model(self):
         """Reset the model as if you've built a new model.

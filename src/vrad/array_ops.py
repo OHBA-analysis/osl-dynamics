@@ -9,19 +9,6 @@ from scipy.optimize import linear_sum_assignment
 from vrad.utils.decorators import transpose
 
 
-def softplus(time_course: np.ndarray):
-    """Calculate the softplus activation of a time series."""
-    time_course = np.asarray(time_course)
-    zero = np.asarray(0).astype(time_course.dtype)
-    return np.logaddexp(zero, time_course)
-
-
-def softmax(time_course: np.ndarray):
-    """Calculate the softmax activation of a time series over the last axis."""
-    time_course = np.asarray(time_course)
-    return scipy.special.softmax(time_course, axis=-1)
-
-
 def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
     """Matches matrices based on Frobenius norm of the difference of the matrices.
 
