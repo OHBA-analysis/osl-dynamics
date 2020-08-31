@@ -2,8 +2,13 @@
 
 """
 
+import os
+import pathlib
+import subprocess
+
 import nibabel as nib
 import numpy as np
+from vrad.analysis import std_masks
 from vrad.analysis.functions import validate_array
 
 
@@ -123,3 +128,90 @@ def save_nii_file(mask_file, parcellation_file, power_map, filename, component=0
     print(f"Saving {filename}")
     nii_file = nib.Nifti1Image(spatial_map_grid, mask.affine, mask.header)
     nib.save(nii_file, filename)
+
+
+def vrad_render_4d(nii, save_dir=None, interptype="trilinear", visualise=True):
+    nii = pathlib.Path(nii)
+
+    if not nii.exists() or ".nii" not in nii.suffixes:
+        raise ValueError(f"nii should be a nii or nii.gz file." f"found {nii}.")
+
+    if save_dir is None:
+        save_dir = os.getcwd()
+
+    save_dir = pathlib.Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    in_file = pathlib.Path(str(nii).replace(".gz", "").replace(".nii", ""))
+    out_file = save_dir / in_file
+
+    # Load surfaces
+    surf_right = std_masks.surf_right
+    surf_left = std_masks.surf_left
+    surf_right_inf = std_masks.surf_right_inf
+    surf_left_inf = std_masks.surf_left_inf
+    surf_right_vinf = std_masks.surf_right_vinf
+    surf_left_vinf = std_masks.surf_left_vinf
+
+    output_right = out_file.parent / (str(out_file) + "_right.func.gii")
+    output_left = out_file.parent / (str(out_file) + "_left.func.gii")
+
+    subprocess.run(
+        [
+            "wb_command",
+            "-volume-to-surface-mapping",
+            str(nii),
+            str(surf_right),
+            str(output_right),
+            f"-{interptype}",
+        ]
+    )
+
+    subprocess.run(
+        [
+            "wb_command",
+            "-volume-to-surface-mapping",
+            str(nii),
+            str(surf_left),
+            str(output_left),
+            f"-{interptype}",
+        ]
+    )
+
+    cifti_right = str(output_right).replace(".func.gii", ".dtseries.nii")
+    cifti_left = str(output_left).replace(".func.gii", ".dtseries.nii")
+
+    subprocess.run(
+        [
+            "wb_command",
+            "-cifti-create-dense-timeseries",
+            cifti_right,
+            "-right-metric",
+            output_right,
+        ]
+    )
+
+    subprocess.run(
+        [
+            "wb_command",
+            "-cifti-create-dense-timeseries",
+            cifti_left,
+            "-left-metric",
+            output_left,
+        ]
+    )
+
+    if visualise:
+        subprocess.run(
+            [
+                "wb_view",
+                str(surf_left),
+                str(surf_right),
+                str(surf_left_inf),
+                str(surf_right_inf),
+                str(surf_left_vinf),
+                str(surf_right_vinf),
+                cifti_left,
+                cifti_right,
+            ]
+        )
