@@ -8,7 +8,7 @@ import subprocess
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import std_masks
+from vrad.analysis import scene, std_masks
 from vrad.analysis.functions import validate_array
 
 
@@ -214,7 +214,7 @@ def vrad_render_4d(nii, save_dir=None, interptype="trilinear", visualise=True):
                 cifti_left,
                 cifti_right,
                 "-scene-load",
-                "/Users/evanroberts/vrad_visualisations/surface_maps.wb_scene",
+                scene,
                 "1",
             ]
         )
