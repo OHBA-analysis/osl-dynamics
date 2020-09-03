@@ -10,12 +10,10 @@ import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from vrad.array_ops import (
+from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
+from vrad.inference.states import (
     correlate_states,
-    from_cholesky,
-    get_one_hot,
     match_states,
-    mean_diagonal,
     state_activation,
     state_lifetimes,
 )

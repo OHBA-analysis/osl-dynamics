@@ -5,15 +5,16 @@
 - Takes approximately 2 minutes to train (on compG017).
 """
 
-print("Importing packages")
+print("Setting up")
 import numpy as np
 from vrad import array_ops, data
-from vrad.inference import gmm, metrics, tf_ops
+from vrad.inference import gmm, metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import HMMSimulation
 from vrad.utils import plotting
 
 # GPU settings
+tf_ops.suppress_messages()
 tf_ops.gpu_growth()
 
 # Settings
@@ -47,8 +48,8 @@ learn_alpha_scaling = False
 normalize_covariances = False
 
 # Load state transition probability matrix and covariances of each state
-init_trans_prob = np.load("data/prob_000.npy")
-init_cov = np.load("data/state_000.npy")
+init_trans_prob = np.load("files/prob_000.npy")
+init_cov = np.load("files/state_000.npy")
 
 # Simulate data
 print("Simulating data")
@@ -113,21 +114,12 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
-# Inferred covariances
-inf_means, inf_cov = model.get_means_covariances()
-# plotting.plot_matrices(inf_cov, filename="covariances.png")
-
-# Inferred state time courses
-inf_stcs = model.predict_states(prediction_dataset)
-inf_stcs = [inf_stc.argmax(axis=1) for inf_stc in inf_stcs]
-inf_stcs = [array_ops.get_one_hot(inf_stc) for inf_stc in inf_stcs]
+# Inferred state probabiliites and state time course
+alpha = model.predict_states(prediction_dataset)
+stc = states.time_courses(alpha)
 
 # Find correspondance to ground truth state time courses
-matched_stc, *matched_inf_stcs = array_ops.match_states(
-    sim.state_time_course, *inf_stcs
-)
-# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
-# plotting.plot_state_time_courses(matched_stc, matched_inf_stc, filename='stc.png')
+matched_sim_stc, *matched_inf_stc = states.match_states(sim.state_time_course, *stc)
 
-for matched_inf_stc in matched_inf_stcs:
-    print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
+for miv in matched_inf_stc:
+    print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, miv))

@@ -9,11 +9,11 @@ from abc import ABC
 from pathlib import Path
 
 import numpy as np
-import vrad.inference.metrics
 from matplotlib import pyplot as plt
 from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
+from vrad.inference import metrics, states
 
 _logger = logging.getLogger("VRAD")
 
@@ -139,10 +139,10 @@ class ComparisonCallback(Callback):
             self.comparison_array, pred_stc
         )
         try:
-            matched_comp_array, matched_pred_stc = array_ops.match_states(
+            matched_comp_array, matched_pred_stc = states.match_states(
                 aligned_comp_array, aligned_pred_stc
             )
-            self.trainer.dice = vrad.inference.metrics.dice_coefficient(
+            self.trainer.dice = metrics.dice_coefficient(
                 matched_comp_array, matched_pred_stc
             )
         except ValueError:

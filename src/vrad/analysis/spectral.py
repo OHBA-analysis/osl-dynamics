@@ -158,7 +158,7 @@ def state_spectra(
     print("Calculating power spectra")
     for i in range(n_subjects):
         for j in range(n_states):
-            for k in trange(n_segments, desc=f"Subject {i}, state {j}"):
+            for k in trange(n_segments, desc=f"Subject {i}, state {j}", ncols=98):
 
                 # Time series for state j and segment k
                 time_series_segment = state_time_series[
