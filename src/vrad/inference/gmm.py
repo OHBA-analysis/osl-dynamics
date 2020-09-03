@@ -8,7 +8,6 @@ from typing import Union
 
 import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
-from tqdm import trange
 from vrad.data import Data
 from vrad.inference.functions import cholesky_factor
 from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation

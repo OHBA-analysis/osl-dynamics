@@ -145,7 +145,6 @@ class Data:
         n_embeddings: int = None,
         n_pca_components: int = None,
         whiten: bool = False,
-        random_seed: int = None,
     ):
         """Prepares the subjects specified by ids."""
         if isinstance(ids, int):
@@ -167,7 +166,6 @@ class Data:
                 n_embeddings,
                 n_pca_components,
                 whiten,
-                random_seed,
                 return_pca_object=True,
             )
             self.prepared = True
@@ -242,17 +240,17 @@ class OSL_HMM:
                 for state in self.state.Omega
             ]
         )
-        self.state_time_course = self.gamma
-        self.viterbi_path = array_ops.get_one_hot(self.state_path - 1)
+        self.alpha = self.gamma
+        self.state_time_course = array_ops.get_one_hot(self.state_path - 1)
 
     def plot_covariances(self, *args, **kwargs):
         """Wraps plotting.plot_matrices for self.covariances."""
         plotting.plot_matrices(self.covariances, *args, **kwargs)
 
     def plot_states(self, *args, **kwargs):
-        """Wraps plotting.highlight_states for self.viterbi_path."""
+        """Wraps plotting.highlight_states for self.state_time_course."""
 
-        plotting.state_barcode(self.viterbi_path, *args, **kwargs)
+        plotting.state_barcode(self.state_time_course, *args, **kwargs)
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"

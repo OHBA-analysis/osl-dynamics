@@ -1,14 +1,12 @@
 """Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Data preparation is performed within V-RAD. This is in contrast to examples3.py,
+- Data preparation is performed within V-RAD.
   which used data that's already been prepared.
 - Initialises the covariances with the identity matrix.
-- Achieves a dice coefficient of ~0.4 (when compared to the OSL HMM state time course).
-- Achieved a free energy of ~480,000.
 """
 
-print("Importing packages")
+print("Setting up")
 from vrad import array_ops, data
 from vrad.inference import metrics, tf_ops
 from vrad.models import RNNGaussian
@@ -95,25 +93,46 @@ model.initialize_means_covariances(
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
-# Inferred covariance matrices
-int_means, inf_cov = model.get_means_covariances()
-# plotting.plot_matrices(inf_cov, filename="covariances.png")
+# Inferred state probabilities and state time course
+alpha = model.predict_states(prediction_dataset)
+stc = states.time_courses(alpha)
 
-# Inferred state time courses
-inf_stcs = model.predict_states(prediction_dataset)
-inf_stcs = [inf_stc.argmax(axis=1) for inf_stc in inf_stcs]
-inf_stcs = [array_ops.get_one_hot(inf_stc) for inf_stc in inf_stcs]
-
-# Find correspondance between state time courses
+# Find correspondance between HMM and inferred state time courses
 hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
-matched_stc, *matched_inf_stcs = array_ops.match_states(hmm.viterbi_path, *inf_stcs)
-# plotting.compare_state_data(matched_stc, matched_inf_stc, filename="compare.png")
+matched_hmm_stc, *matched_inf_stc = states.match_states(hmm.state_time_course, *stc)
 
 # Dice coefficient
-for matched_inf_stc in matched_inf_stcs:
-    print("Dice coefficient:", metrics.dice_coefficient(matched_stc, matched_inf_stc))
+for miv in matched_inf_stc:
+    print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, miv))
 
 # Free energy = Log Likelihood + KL Divergence
 for subject_dataset in prediction_dataset:
-    free_energy, ll_loss, kl_loss = model.free_energy(subject_dataset, return_all=True)
-    print(f"Free energy: {ll_loss} + {kl_loss} = {free_energy}")
+    free_energy = model.free_energy(subject_dataset)
+    print(f"Free energy: {free_energy}")
+
+# Compute spectra for states
+f, psd, coh = spectral.state_spectra(
+    data=meg_data.time_series,
+    state_probabilities=alpha,
+    sampling_frequency=250,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=[1, 45],
+)
+
+# Perform spectral decomposition (into 2 components) based on coherence spectra
+components = spectral.decompose_spectra(coh, n_components=2)
+
+# Calculate spatial maps
+p_map, c_map = maps.state_maps(psd, coh, components)
+
+# Save the power map for the first component as NIFTI file
+# (The second component is noise)
+maps.save_nii_file(
+    mask_file="files/MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="files"
+    + "/fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    power_map=p_map,
+    filename="power_map.nii.gz",
+    component=0,
+)

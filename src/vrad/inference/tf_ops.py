@@ -3,7 +3,6 @@
 """
 
 import os
-
 import tensorflow as tf
 
 
@@ -31,6 +30,14 @@ def select_gpu(gpu_number):
         gpu_number = str(gpu_number)
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_number
     print(f"Using GPU {gpu_number}")
+
+
+def suppress_messages(level=3):
+    """Suppress messages from tensorflow.
+
+    Must be called before gpu_growth() and select_gpu().
+    """
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(level)
 
 
 def unzip_dataset(zipped_dataset):

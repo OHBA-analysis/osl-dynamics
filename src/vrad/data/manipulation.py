@@ -266,7 +266,7 @@ def inferred_states_to_source_space(inferred_covariances, state_time_course, meg
     state_covariances = np.empty((n_states, n_source_channels, n_source_channels))
     state_recon_time_series = np.empty((n_states, n_samples, n_source_channels))
 
-    for state in trange(n_states, desc="Recovering source space"):
+    for state in trange(n_states, desc="Recovering source space", ncols=98):
         inferred_state_covariance = (
             inferred_covariances * state_indexer[state][:, None, None]
         )

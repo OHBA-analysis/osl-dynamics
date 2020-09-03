@@ -10,7 +10,7 @@ from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
-from tqdm import tqdm
+from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
 from vrad.data.big_data import BigData
@@ -130,15 +130,21 @@ class BaseModel:
                 annealing_sharpness=self.annealing_sharpness,
                 n_epochs_annealing=self.n_epochs_annealing,
             )
-
             additional_callbacks.append(annealing_callback)
 
         # Callback to display a progress bar with tqdm
         if use_tqdm:
             if tqdm_class is not None:
                 tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+
             else:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm)
+                # Create a tqdm class with a progress bar width of 98 characters
+                class tqdm_class(tqdm_auto):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs, ncols=98)
+
+                # Create tqdm callback
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
 
             additional_callbacks.append(tqdm_callback)
 
@@ -152,7 +158,6 @@ class BaseModel:
                 tensorboard_cb = TensorBoard(
                     tensorboard_run_logdir(), histogram_freq=1, profile_batch="2,10"
                 )
-
             additional_callbacks.append(tensorboard_cb)
 
         # Callback to save the best model after a certain number of epochs
@@ -202,24 +207,6 @@ class BaseModel:
 
         return self.model.fit(*args, **kwargs)
 
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns a dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, *kwargs)
-        return_names = [
-            "ll_loss",
-            "kl_loss",
-            "theta_t",
-            "m_theta_t",
-            "log_s2_theta_t",
-            "mu_theta_jt",
-            "log_sigma2_theta_j",
-        ]
-        predictions_dict = dict(zip(return_names, predictions))
-        return predictions_dict
-
     def _make_dataset(self, inputs):
         if isinstance(inputs, (Data, BigData)):
             return inputs.prediction_dataset(self.sequence_length)
@@ -243,25 +230,6 @@ class BaseModel:
                 for subject in inputs
             ]
             return datasets
-
-    def predict_states(self, inputs, *args, **kwargs):
-        """Infers the latent state time course."""
-        inputs = self._make_dataset(inputs)
-        outputs = []
-        for dataset in inputs:
-            m_theta_t = self.predict(dataset, *args, **kwargs)["m_theta_t"]
-            outputs.append(np.concatenate(m_theta_t))
-        return outputs
-
-    def free_energy(self, dataset, return_all=False):
-        """Calculates the variational free energy of a model."""
-        predictions = self.predict(dataset)
-        ll_loss = np.mean(predictions["ll_loss"])
-        kl_loss = np.mean(predictions["kl_loss"])
-        if return_all:
-            return ll_loss + kl_loss, ll_loss, kl_loss
-        else:
-            return ll_loss + kl_loss
 
     def reset_model(self):
         """Reset the model as if you've built a new model.

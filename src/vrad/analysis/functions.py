@@ -41,6 +41,7 @@ def validate_array(
     error_message: str,
 ):
     """Checks if an array has been passed correctly."""
+    array = np.array(array)
 
     # Add dimensions to ensure array has the correct dimensionality
     for dimensionality in allow_dimensions:
