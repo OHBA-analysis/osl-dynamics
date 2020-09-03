@@ -49,6 +49,11 @@ class Subject:
         return "\n  ".join(return_string)
 
     @property
+    def raw_data(self):
+        if self._from_file:
+            return np.load(self._from_file)
+
+    @property
     def original_shape(self):
         return self._original_shape
 

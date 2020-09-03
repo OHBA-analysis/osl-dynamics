@@ -42,6 +42,10 @@ class Data:
         self.pca = None
 
     @property
+    def raw_data(self):
+        return [subject.raw_data() for subject in self.subjects]
+
+    @property
     def n_channels(self):
         return self.subjects[0].shape[1]
 

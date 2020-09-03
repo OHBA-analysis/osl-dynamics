@@ -49,6 +49,10 @@ class BigData:
 
         self.n_components = None
 
+    @property
+    def raw_data(self):
+        return self.data_memmaps
+
     def load_data(self):
         for in_file, out_file in zip(
             tqdm(self.files, desc="loading_files"), self.data_filenames
