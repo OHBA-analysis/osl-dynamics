@@ -213,8 +213,5 @@ def vrad_render_4d(nii, save_dir=None, interptype="trilinear", visualise=True):
                 str(surf_right_vinf),
                 cifti_left,
                 cifti_right,
-                "-scene-load",
-                scene,
-                "1",
             ]
         )
