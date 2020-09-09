@@ -82,7 +82,6 @@ class BigData:
         n_embeddings: int,
         n_pca_components: int,
         whiten: bool,
-        random_seed: int = None,
     ):
         self.n_components = n_pca_components
 
@@ -96,7 +95,7 @@ class BigData:
             te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
 
             te_memmap = manipulation.time_embed(
-                memmap, n_embeddings, random_seed, output_file=te_memmap
+                memmap, n_embeddings, output_file=te_memmap
             )
             te_memmap = manipulation.scale(te_memmap)
 

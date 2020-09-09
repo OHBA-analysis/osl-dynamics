@@ -39,7 +39,6 @@ class Data:
 
         # Flag to indicate if the data has been prepared
         self.prepared = False
-        self.pca = None
 
     @property
     def raw_data(self):
@@ -165,12 +164,11 @@ class Data:
             logging.warning("Data has already been prepared. No changes made.")
 
         else:
-            self.subjects, self.pca = prepare(
+            self.subjects = prepare(
                 self.subjects,
                 n_embeddings,
                 n_pca_components,
                 whiten,
-                return_pca_object=True,
             )
             self.prepared = True
 

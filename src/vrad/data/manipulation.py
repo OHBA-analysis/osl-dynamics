@@ -173,7 +173,7 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 @transpose
 def time_embed(
     time_series: np.ndarray, n_embeddings: int, output_file=None,
-):
+) -> np.ndarray:
     """Performs time embedding."""
     n_samples, n_channels = time_series.shape
     lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
@@ -190,7 +190,7 @@ def time_embed(
             )
 
     # Only keep the data points we have all the lags for
-    time_embedded_series = time_embedded_series[lags[-1] : -lags[0]]
+    time_embedded_series = time_embedded_series[lags[-1] : lags[0]]
 
     return time_embedded_series
 
@@ -241,11 +241,9 @@ def prepare(
         subject.scaler = StandardScaler()
         subject.time_series = subject.scaler.fit_transform(subject.time_series)
 
-    pca_object = PCA(n_pca_components, svd_solver="full", whiten=whiten)
+    pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
     for subject in subjects:
-        pca_object.fit(subject.time_series)
-    for subject in subjects:
-        subject.time_series = pca_object.transform(subject.time_series)
+        subject.time_series = pca.fit_transform(subject.time_series)
 
     if return_pca_object:
         return subjects, pca_object
