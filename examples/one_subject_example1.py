@@ -3,8 +3,8 @@
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Uses the final covariances inferred by an HMM fit from OSL.
 - Takes approximately 5 minutes to train (on compG017).
-- Achieves a dice coefficient of ~0.67 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~231,000.
+- Achieves a dice coefficient of ~0.58 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~457,000.
 """
 
 print("Setting up")
@@ -29,8 +29,8 @@ n_epochs = 200
 n_epochs_annealing = 150
 n_epochs_burnin = 30
 
-dropout_rate_inference = 0.4
-dropout_rate_model = 0.4
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 n_layers_inference = 1
 n_layers_model = 1

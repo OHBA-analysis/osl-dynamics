@@ -2,19 +2,21 @@
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Data preparation is performed within V-RAD.
-  which used data that's already been prepared.
 - Initialises the covariances with the identity matrix.
+- Achieves a dice coefficient of ~0.27 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~457,000.
 """
 
 print("Setting up")
 from vrad import array_ops, data
-from vrad.inference import metrics, tf_ops
+from vrad.analysis import spectral, maps
+from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.utils import plotting
 
 # GPU settings
+tf_ops.suppress_messages()
 tf_ops.gpu_growth()
-multi_gpu = True
 
 # Settings
 n_states = 6
@@ -27,8 +29,8 @@ annealing_sharpness = 5
 n_epochs = 200
 n_epochs_annealing = 150
 
-dropout_rate_inference = 0.4
-dropout_rate_model = 0.4
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -71,7 +73,6 @@ model = RNNGaussian(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
-    multi_gpu=multi_gpu,
 )
 
 model.summary()
@@ -112,7 +113,7 @@ for subject_dataset in prediction_dataset:
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
-    data=meg_data.time_series,
+    data=meg_data.raw_data,
     state_probabilities=alpha,
     sampling_frequency=250,
     time_half_bandwidth=4,

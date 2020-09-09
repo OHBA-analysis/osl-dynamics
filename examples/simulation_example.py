@@ -1,7 +1,7 @@
 """Example script for running inference on simulated HMM data.
 
 - This script sets a seed for the random number generators for reproducibility.
-- Should achieve a dice coefficient of ~0.94.
+- Should achieve a dice coefficient of ~0.98.
 - Takes approximately 2 minutes to train (on compG017).
 """
 
@@ -31,8 +31,8 @@ annealing_sharpness = 5
 n_epochs = 100
 n_epochs_annealing = 50
 
-dropout_rate_inference = 0.4
-dropout_rate_model = 0.4
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 n_layers_inference = 1
 n_layers_model = 1
