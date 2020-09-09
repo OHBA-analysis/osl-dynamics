@@ -42,7 +42,7 @@ class Data:
 
     @property
     def raw_data(self):
-        return [subject.raw_data() for subject in self.subjects]
+        return [subject.raw_data for subject in self.subjects]
 
     @property
     def n_channels(self):

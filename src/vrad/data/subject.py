@@ -51,7 +51,8 @@ class Subject:
     @property
     def raw_data(self):
         if self._from_file:
-            return np.load(self._from_file)
+            time_series, sampling_frequency = load_data(self._from_file)
+            return time_series
 
     @property
     def original_shape(self):
