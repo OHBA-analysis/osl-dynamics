@@ -90,8 +90,8 @@ class BigData:
     def prepare(
         self, n_embeddings: int, n_pca_components: int, whiten: bool,
     ):
-        for new_file, memmap in zip(
-            self.te_filenames, tqdm(self.data_memmaps, desc="Time embedding", ncols=98)
+        for memmap, new_file in zip(
+            tqdm(self.data_memmaps, desc="Time embedding", ncols=98), self.te_filenames
         ):
             te_shape = (
                 memmap.shape[0],
@@ -109,8 +109,8 @@ class BigData:
         pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
         for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
             pca.fit(te_memmap)
-        for te_memmap, output_file in zip(
-            self.te_memmaps, tqdm(self.output_filenames, desc="Applying PCA", ncols=98)
+        for output_file, te_memmap in zip(
+            tqdm(self.output_filenames, desc="Applying PCA", ncols=98), self.te_memmaps
         ):
             pca_result = pca.transform(te_memmap)
             pca_result = array_to_memmap(output_file, pca_result)
