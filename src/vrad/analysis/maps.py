@@ -130,7 +130,7 @@ def save_nii_file(mask_file, parcellation_file, power_map, filename, component=0
     nib.save(nii_file, filename)
 
 
-def vrad_render_4d(nii, save_dir=None, interptype="trilinear", visualise=True):
+def workbench_render(nii, save_dir=None, interptype="trilinear", visualise=True):
     nii = pathlib.Path(nii)
 
     if not nii.exists() or ".nii" not in nii.suffixes:
