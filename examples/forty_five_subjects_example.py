@@ -1,4 +1,4 @@
-"""Example script for running inference on real MEG data for ten subjects.
+"""Example script for running inference on real MEG data for forty five subjects.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 """
@@ -12,11 +12,12 @@ from vrad.utils import plotting
 
 # GPU settings
 tf_ops.suppress_messages()
+tf_ops.select_gpu(0)
 tf_ops.gpu_growth()
 
 # Settings
 n_states = 6
-sequence_length = 800
+sequence_length = 1200
 batch_size = 32
 
 do_annealing = True
@@ -31,8 +32,8 @@ dropout_rate_model = 0.0
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 128
-n_units_model = 128
+n_units_inference = 256
+n_units_model = 256
 
 learn_means = False
 learn_covariances = True
@@ -45,11 +46,10 @@ n_initializations = 4
 n_epochs_initialization = 35
 
 # Read MEG data
-print("Reading MEG data")
-meg_data = data.Data(
+meg_data = data.BigData(
     [
         f"/well/woolrich/shared/vrad/preprocessed_data/subject{i}.mat"
-        for i in range(1, 11)
+        for i in range(1, 46)
     ]
 )
 meg_data.prepare(n_embeddings=13, n_pca_components=80, whiten=True)
@@ -96,7 +96,7 @@ alpha = model.predict_states(prediction_dataset)
 stc = states.time_courses(alpha)
 
 # Find correspondance between HMM and inferred state time courses
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/ten_subjects.mat")
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/forty_five_subjects.mat")
 matched_hmm_stc, *matched_inf_stc = states.match_states(hmm.state_time_course, *stc)
 
 # Dice coefficient
