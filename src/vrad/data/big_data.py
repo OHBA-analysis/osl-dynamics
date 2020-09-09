@@ -7,8 +7,6 @@ from tqdm import tqdm
 from vrad.data import io, manipulation
 from vrad.utils.misc import MockArray, array_to_memmap
 
-_rng = np.random.default_rng()
-
 
 class BigData:
     def __init__(self, files, store_dir="tmp", output_file="dataset.npy"):
@@ -25,18 +23,21 @@ class BigData:
             width=len(str(len(self.files)))
         )
 
+        # Preprocessed data memory maps
         self.data_memmaps = []
         self.data_filenames = [
             str(self.store_dir / self.input_pattern.format(i=i))
             for i, _ in enumerate(files)
         ]
 
+        # Time embedded data memory maps
         self.te_memmaps = []
         self.te_filenames = [
             str(self.store_dir / self.te_pattern.format(i=i))
             for i, _ in enumerate(files)
         ]
 
+        # Prepared data memory maps
         self.output_memmaps = []
         self.output_filenames = [
             str(self.store_dir / self.output_pattern.format(i=i))
@@ -45,13 +46,22 @@ class BigData:
 
         self.output_file = output_file
 
-        self.load_data()
+        # Flag to indicate whether output_memmaps are been generated
+        self.prepared = False
 
-        self.n_components = None
+        # Load the preprocessed data
+        self.load_data()
 
     @property
     def raw_data(self):
         return self.data_memmaps
+
+    @property
+    def n_channels(self):
+        if self.prepared:
+            return self.output_memmaps[0].shape[1]
+        else:
+            return self.data_memmaps[0].shape[1]
 
     def load_data(self):
         for in_file, out_file in zip(
@@ -78,13 +88,8 @@ class BigData:
         )
 
     def prepare(
-        self,
-        n_embeddings: int,
-        n_pca_components: int,
-        whiten: bool,
+        self, n_embeddings: int, n_pca_components: int, whiten: bool,
     ):
-        self.n_components = n_pca_components
-
         for new_file, memmap in zip(
             self.te_filenames, tqdm(self.data_memmaps, desc="Time embedding", ncols=98)
         ):
@@ -101,17 +106,17 @@ class BigData:
 
             self.te_memmaps.append(te_memmap)
 
-        pca_object = PCA(n_pca_components, svd_solver="full", whiten=whiten)
+        pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
         for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
-            pca_object.fit(te_memmap)
+            pca.fit(te_memmap)
         for te_memmap, output_file in zip(
             self.te_memmaps, tqdm(self.output_filenames, desc="Applying PCA", ncols=98)
         ):
-            pca_result = pca_object.transform(te_memmap)
+            pca_result = pca.transform(te_memmap)
             pca_result = array_to_memmap(output_file, pca_result)
             self.output_memmaps.append(pca_result)
 
-        return pca_object
+        self.prepared = True
 
     def training_dataset(self, sequence_length, batch_size=32, step_size=None):
         subjects = self.output_memmaps or self.data_memmaps

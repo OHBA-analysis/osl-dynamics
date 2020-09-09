@@ -165,10 +165,7 @@ class Data:
 
         else:
             self.subjects = prepare(
-                self.subjects,
-                n_embeddings,
-                n_pca_components,
-                whiten,
+                self.subjects, n_embeddings, n_pca_components, whiten,
             )
             self.prepared = True
 
