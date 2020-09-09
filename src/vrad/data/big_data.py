@@ -55,7 +55,7 @@ class BigData:
 
     def load_data(self):
         for in_file, out_file in zip(
-            tqdm(self.files, desc="loading_files"), self.data_filenames
+            tqdm(self.files, desc="Loading files", ncols=98), self.data_filenames
         ):
             np.save(out_file, io.load_data(in_file)[0])
             self.data_memmaps.append((np.load(out_file, mmap_mode="r+")))
@@ -86,7 +86,7 @@ class BigData:
         self.n_components = n_pca_components
 
         for new_file, memmap in zip(
-            self.te_filenames, tqdm(self.data_memmaps, desc="time embedding")
+            self.te_filenames, tqdm(self.data_memmaps, desc="Time embedding", ncols=98)
         ):
             te_shape = (
                 memmap.shape[0],
@@ -102,10 +102,10 @@ class BigData:
             self.te_memmaps.append(te_memmap)
 
         pca_object = PCA(n_pca_components, svd_solver="full", whiten=whiten)
-        for te_memmap in tqdm(self.te_memmaps, desc="calculating pca"):
+        for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
             pca_object.fit(te_memmap)
         for te_memmap, output_file in zip(
-            self.te_memmaps, tqdm(self.output_filenames, desc="applying pca")
+            self.te_memmaps, tqdm(self.output_filenames, desc="Applying PCA", ncols=98)
         ):
             pca_result = pca_object.transform(te_memmap)
             pca_result = array_to_memmap(output_file, pca_result)
