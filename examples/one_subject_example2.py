@@ -100,16 +100,14 @@ stc = states.time_courses(alpha)
 
 # Find correspondance between HMM and inferred state time courses
 hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
-matched_hmm_stc, *matched_inf_stc = states.match_states(hmm.state_time_course, *stc)
+matched_hmm_stc, matched_inf_stc = states.match_states(hmm.state_time_course, stc[0])
 
 # Dice coefficient
-for miv in matched_inf_stc:
-    print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, miv))
+print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, matched_inf_stc))
 
 # Free energy = Log Likelihood + KL Divergence
-for subject_dataset in prediction_dataset:
-    free_energy = model.free_energy(subject_dataset)
-    print(f"Free energy: {free_energy}")
+free_energy = model.free_energy(prediction_dataset)
+print(f"Free energy: {free_energy}")
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
