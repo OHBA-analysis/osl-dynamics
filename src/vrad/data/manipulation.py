@@ -226,13 +226,12 @@ def prepare(
     n_embeddings: int,
     n_pca_components: int,
     whiten: bool,
-    return_pca_object: bool = False,
 ):
     """Prepares subject data by time embeddings and performing PCA.
 
     Follows the data preparation done in the OSL script teh_groupinference_parcels.m
     """
-
+    pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
     for subject in subjects:
         # Perform time embedding
         subject.time_embed(n_embeddings)
@@ -241,12 +240,11 @@ def prepare(
         subject.scaler = StandardScaler()
         subject.time_series = subject.scaler.fit_transform(subject.time_series)
 
-    pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
-    for subject in subjects:
+        # Perform PCA
         subject.time_series = pca.fit_transform(subject.time_series)
 
-    if return_pca_object:
-        return subjects, pca_object
+        # Set subject's prepared flag
+        subject.prepared = True
 
     return subjects
 
