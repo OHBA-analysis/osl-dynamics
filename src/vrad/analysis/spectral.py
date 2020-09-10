@@ -88,30 +88,35 @@ def state_spectra(
     """
 
     # Validation
-    error_message = (
-        "data must be a numpy array with shape (n_samples, n_states) or "
-        + "(n_subjects, n_samples, n_states)."
-    )
-    data = validate_array(
-        data,
-        correct_dimensionality=3,
-        allow_dimensions=[2],
-        error_message=error_message,
-    )
+    if type(data) != type(state_probabilities):
+        raise ValueError(
+            f"data is type {type(data)} and state_probabilities is type "
+            + f"{type(state_probabilities)}. They must both be lists or numpy arrays."
+        )
 
-    error_message = (
-        "state_probabilities must a numpy array with shape (n_samples, n_states) or "
-        + "(n_subjects, n_samples, n_states)."
-    )
-    state_probabilities = validate_array(
-        state_probabilities,
-        correct_dimensionality=3,
-        allow_dimensions=[2],
-        error_message=error_message,
-    )
+    if isinstance(data, list):
+        # A list of subject data has been pass so let's concatenate
+        data = np.concatenate(data, axis=0)
+
+    if isinstance(state_probabilities, list):
+        # A list of subject state probabilities has been pass so let's concatenate
+        data = np.concatenate(state_probabilities, axis=0)
+
+    if data.ndim != 2:
+        raise ValueError(
+            "data must have shape (n_samples, n_states) "
+            + "or (n_subjects, n_samples, n_states)."
+        )
+
+    if state_probabilities.ndim != 2:
+        raise ValueError(
+            "state_probabilities must have shape (n_samples, n_states) "
+            + "or (n_subjects, n_samples, n_states)."
+        )
 
     if segment_length is None:
         segment_length = 2 * sampling_frequency
+
     elif segment_length != 2 * sampling_frequency:
         _logger.warning("segment_length is recommended to be 2*sampling_frequency.")
 
@@ -119,13 +124,13 @@ def state_spectra(
         frequency_range = [0, sampling_frequency / 2]
 
     # Standardise (z-transform) the data
-    data = scale(data, axis=1)
+    data = scale(data, axis=0)
 
     # Use the state probabilities to get a time series for each state
     state_time_series = get_state_time_series(data, state_probabilities)
 
     # Number of subjects, states, samples and channels
-    n_subjects, n_states, n_samples, n_channels = state_time_series.shape
+    n_states, n_samples, n_channels = state_time_series.shape
 
     # Number of FFT data points to calculate
     nfft = max(256, 2 ** nextpow2(segment_length))
@@ -151,55 +156,51 @@ def state_spectra(
     n_segments = round(n_samples / segment_length)
 
     # Power spectra for each state
-    power_spectra = np.zeros(
-        [n_subjects, n_states, n_channels, n_channels, n_f], dtype=np.complex_
-    )
+    power_spectra = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
 
     print("Calculating power spectra")
-    for i in range(n_subjects):
-        for j in range(n_states):
-            for k in trange(n_segments, desc=f"Subject {i}, state {j}", ncols=98):
+    for i in range(n_states):
+        for j in trange(n_segments, desc=f"State {i}", ncols=98):
 
-                # Time series for state j and segment k
-                time_series_segment = state_time_series[
-                    i, j, k * segment_length : (k + 1) * segment_length
+            # Time series for state i and segment j
+            time_series_segment = state_time_series[
+                i, j * segment_length : (j + 1) * segment_length
+            ]
+
+            # If we're missing samples we pad with zeros either side of the data
+            if time_series_segment.shape[0] != segment_length:
+                n_zeros = segment_length - time_series_segment.shape[0]
+                n_padding = n_zeros // 2
+                time_series_segment = np.pad(time_series_segment, n_padding)[
+                    :, n_padding:-n_padding
                 ]
 
-                # If we're missing samples we pad with zeros either side of the data
-                if time_series_segment.shape[0] != segment_length:
-                    n_zeros = segment_length - time_series_segment.shape[0]
-                    n_padding = n_zeros // 2
-                    time_series_segment = np.pad(time_series_segment, n_padding)[
-                        :, n_padding:-n_padding
-                    ]
-
-                # Calculate the power (and cross) spectrum using the multitaper method
-                power_spectra[i, j] += multitaper(
-                    time_series_segment,
-                    sampling_frequency,
-                    nfft=nfft,
-                    tapers=tapers,
-                    args_range=args_range,
-                )
+            # Calculate the power (and cross) spectrum using the multitaper method
+            power_spectra[i] += multitaper(
+                time_series_segment,
+                sampling_frequency,
+                nfft=nfft,
+                tapers=tapers,
+                args_range=args_range,
+            )
 
     # Normalise the power spectra
-    sum_probabilities = np.sum(state_probabilities ** 2, axis=1)[
-        :, :, np.newaxis, np.newaxis, np.newaxis
+    sum_probabilities = np.sum(state_probabilities ** 2, axis=0)[
+        ..., np.newaxis, np.newaxis, np.newaxis
     ]
     power_spectra *= n_samples / (sum_probabilities * n_tapers * n_segments)
 
     # Coherences for each state
-    coherences = np.empty([n_subjects, n_states, n_channels, n_channels, n_f])
+    coherences = np.empty([n_states, n_channels, n_channels, n_f])
 
     print("Calculating coherences")
-    for i in range(n_subjects):
-        for j in range(n_states):
+    for i in range(n_states):
+        for j in range(n_channels):
             for k in range(n_channels):
-                for l in range(n_channels):
-                    coherences[i, j, k, l] = abs(
-                        power_spectra[i, j, k, l]
-                        / np.sqrt(power_spectra[i, j, k, k] * power_spectra[i, j, l, l])
-                    )
+                coherences[i, j, k] = abs(
+                    power_spectra[i, j, k]
+                    / np.sqrt(power_spectra[i, j, j] * power_spectra[i, k, k])
+                )
 
     return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
 

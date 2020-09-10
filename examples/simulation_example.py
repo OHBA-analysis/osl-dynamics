@@ -115,10 +115,10 @@ print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
 
 # Inferred state probabiliites and state time course
-alpha = model.predict_states(prediction_dataset)
+alpha = model.predict_states(prediction_dataset)[0]
 stc = states.time_courses(alpha)
 
 # Find correspondance to ground truth state time courses
-matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, stc[0])
+matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, stc)
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))

@@ -2,7 +2,7 @@
 
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -10,13 +10,17 @@ from vrad import array_ops
 from vrad.utils.decorators import transpose
 
 
-def time_courses(alpha: np.ndarray) -> np.ndarray:
+def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
     Hard classifies the state probabilities (alpha).
     """
-    stcs = [a.argmax(axis=1) for a in alpha]
-    stcs = [array_ops.get_one_hot(stc) for stc in stcs]
+    if isinstance(alpha, list):
+        stcs = [a.argmax(axis=1) for a in alpha]
+        stcs = [array_ops.get_one_hot(stc) for stc in stcs]
+    else:
+        stcs = alpha.argmax(axis=1)
+        stcs = array_ops.get_one_hot(stcs)
     return stcs
 
 
