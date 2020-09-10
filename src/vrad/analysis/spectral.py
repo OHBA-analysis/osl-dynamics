@@ -100,7 +100,7 @@ def state_spectra(
 
     if isinstance(state_probabilities, list):
         # A list of subject state probabilities has been pass so let's concatenate
-        data = np.concatenate(state_probabilities, axis=0)
+        state_probabilities = np.concatenate(state_probabilities, axis=0)
 
     if data.ndim != 2:
         raise ValueError(
@@ -206,7 +206,7 @@ def state_spectra(
 
 
 def decompose_spectra(
-    coherences, n_components, max_iter=2000, random_state=None, verbose=0,
+    coherences, n_components, max_iter=10000, random_state=None, verbose=0,
 ):
     """Performs spectral decomposition using coherences.
 
