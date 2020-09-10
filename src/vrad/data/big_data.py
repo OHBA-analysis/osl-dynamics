@@ -120,13 +120,19 @@ class BigData:
 
     def training_dataset(self, sequence_length, batch_size=32, step_size=None):
         subjects = self.output_memmaps or self.data_memmaps
+        num_batches = self.count_batches(sequence_length, step_size)
 
-        subject_datasets = [
-            Dataset.from_tensor_slices(subject).batch(
+        subject_datasets = []
+        for i in range(len(subjects)):
+            subject = subjects[i]
+            subject_data = Dataset.from_tensor_slices(subject).batch(
                 sequence_length, drop_remainder=True
             )
-            for subject in subjects
-        ]
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(num_batches[i], dtype=np.float32) + i
+            )
+            subject_datasets.append(Dataset.zip((subject_data, subject_tracker)))
+
         full_dataset = subject_datasets[0]
         for subject_dataset in subject_datasets[1:]:
             full_dataset = full_dataset.concatenate(subject_dataset)
