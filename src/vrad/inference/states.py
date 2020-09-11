@@ -2,12 +2,16 @@
 
 """
 
+import logging
 from typing import List, Tuple, Union
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from vrad import array_ops
 from vrad.utils.decorators import transpose
+
+
+_logger = logging.getLogger("VRAD")
 
 
 def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
