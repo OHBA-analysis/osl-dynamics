@@ -1,12 +1,15 @@
 """Helper functions using NumPy.
 
 """
+import logging
 from typing import List, Tuple
 
 import numpy as np
 import scipy.special
 from scipy.optimize import linear_sum_assignment
 from vrad.utils.decorators import transpose
+
+_logger = logging.getLogger("VRAD")
 
 
 def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
