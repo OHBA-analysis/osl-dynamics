@@ -11,7 +11,6 @@ from vrad.models import RNNGaussian
 from vrad.utils import plotting
 
 # GPU settings
-tf_ops.suppress_messages()
 tf_ops.gpu_growth()
 
 # Settings
@@ -83,12 +82,22 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise means and covariances
 model.initialize_means_covariances(
-    n_initializations, n_epochs_initialization, training_dataset, use_tqdm=True
+    n_initializations, n_epochs_initialization, training_dataset
 )
 
 # Train the model
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs, use_tqdm=True)
+history = model.fit(training_dataset, epochs=n_epochs)
+
+# Save trained model
+model.save_weights(
+    "/well/woolrich/shared/vrad/trained_models/forty_five_subjects/model"
+)
+
+# Load a previously trained model
+# model.load_weights(
+#    "/well/woolrich/shared/vrad/trained_models/forty_five_subjects/model"
+# )
 
 # Inferred state probabilities and state time course
 alpha = model.predict_states(prediction_dataset)
