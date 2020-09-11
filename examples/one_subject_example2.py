@@ -9,7 +9,7 @@
 
 print("Setting up")
 from vrad import array_ops, data
-from vrad.analysis import spectral, maps
+from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.utils import plotting

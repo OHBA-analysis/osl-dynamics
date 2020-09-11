@@ -10,7 +10,6 @@ from scipy.optimize import linear_sum_assignment
 from vrad import array_ops
 from vrad.utils.decorators import transpose
 
-
 _logger = logging.getLogger("VRAD")
 
 

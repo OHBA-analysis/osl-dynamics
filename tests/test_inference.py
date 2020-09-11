@@ -1,8 +1,7 @@
 from unittest import TestCase
 
 import numpy as np
-from vrad import array_ops
-from vrad import inference
+from vrad import array_ops, inference
 
 
 class TestCorrelateStates(TestCase):

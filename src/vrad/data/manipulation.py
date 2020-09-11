@@ -222,10 +222,7 @@ def eigen_decomposition(
 
 
 def prepare(
-    subjects,
-    n_embeddings: int,
-    n_pca_components: int,
-    whiten: bool,
+    subjects, n_embeddings: int, n_pca_components: int, whiten: bool,
 ):
     """Prepares subject data by time embeddings and performing PCA.
 
