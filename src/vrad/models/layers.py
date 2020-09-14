@@ -88,10 +88,13 @@ class SampleNormalDistributionLayer(layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         mu, log_sigma = inputs
-        N = tfp.distributions.Normal(loc=mu, scale=tf.exp(log_sigma))
-        return N.sample()
+        if training:
+            N = tfp.distributions.Normal(loc=mu, scale=tf.exp(log_sigma))
+            return N.sample()
+        else:
+            return mu
 
     def compute_output_shape(self, input_shape):
         mu_shape, log_sigma_shape = input_shape
