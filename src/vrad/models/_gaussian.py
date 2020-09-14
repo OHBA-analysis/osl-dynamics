@@ -126,12 +126,12 @@ class RNNGaussian(BaseModel):
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
-    def predict_states(self, inputs, *args, **kwargs):
+    def predict_states(self, inputs, *args, output_name="m_theta_t", **kwargs):
         """Return the probability for each state at each time point."""
         inputs = self._make_dataset(inputs)
         outputs = []
         for dataset in inputs:
-            m_theta_t = self.predict(dataset, *args, **kwargs)["m_theta_t"]
+            m_theta_t = self.predict(dataset, *args, **kwargs)[output_name]
             m_theta_t = np.concatenate(m_theta_t)
             if self.alpha_xform == "softmax":
                 alpha = softmax(m_theta_t).numpy()
