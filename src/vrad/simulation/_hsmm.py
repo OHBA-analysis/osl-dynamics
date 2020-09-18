@@ -71,9 +71,6 @@ class HSMMSimulation(Simulation):
                 / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
             )
 
-        if self.off_diagonal_trans_prob is not None:
-            self.off_diagonal_trans_prob = self.off_diagonal_trans_prob
-
         if self.full_trans_prob is not None:
             self.off_diagonal_trans_prob = (
                 self.full_trans_prob / self.full_trans_prob.sum(axis=1)[:, None]
