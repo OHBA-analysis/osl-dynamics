@@ -8,4 +8,5 @@ which can be analysed.
 
 from vrad.simulation._base import *
 from vrad.simulation._hmm import *
+from vrad.simulation._hsmm import *
 from vrad.simulation._other import *

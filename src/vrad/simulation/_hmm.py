@@ -1,3 +1,7 @@
+"""Classes for simulation Hidden Markov Models (HMMs).
+
+"""
+
 import numpy as np
 from vrad.array_ops import get_one_hot
 from vrad.simulation import Simulation
