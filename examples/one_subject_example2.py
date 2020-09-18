@@ -12,10 +12,8 @@ from vrad import array_ops, data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
-from vrad.utils import plotting
 
 # GPU settings
-tf_ops.suppress_messages()
 tf_ops.gpu_growth()
 
 # Settings
@@ -92,7 +90,7 @@ model.initialize_means_covariances(
 
 # Train the model
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 # Inferred state probabilities and state time course
 alpha = model.predict_states(prediction_dataset)[0]

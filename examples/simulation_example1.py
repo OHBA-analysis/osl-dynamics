@@ -1,4 +1,4 @@
-"""Example script for running inference on simulated HMM data.
+"""Example script for running inference on simulated HSMM data.
 
 - This script sets a seed for the random number generators for reproducibility.
 - Should achieve a dice coefficient of ~0.98.
@@ -11,10 +11,8 @@ from vrad import array_ops, data
 from vrad.inference import gmm, metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import HMMSimulation
-from vrad.utils import plotting
 
 # GPU settings
-tf_ops.suppress_messages()
 tf_ops.gpu_growth()
 
 # Settings
@@ -48,8 +46,8 @@ learn_alpha_scaling = False
 normalize_covariances = False
 
 # Load state transition probability matrix and covariances of each state
-init_trans_prob = np.load("files/prob_000.npy")
-init_cov = np.load("files/state_000.npy")
+trans_prob = np.load("files/prob_000.npy")
+cov = np.load("files/state_000.npy")
 
 # Simulate data
 print("Simulating data")
@@ -57,8 +55,8 @@ sim = HMMSimulation(
     n_samples=n_samples,
     n_states=n_states,
     sim_varying_means=learn_means,
-    covariances=init_cov,
-    trans_prob=init_trans_prob,
+    covariances=cov,
+    trans_prob=trans_prob,
     observation_error=observation_error,
     random_seed=123,
 )
@@ -112,7 +110,7 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Train the model
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 # Inferred state probabiliites and state time course
 alpha = model.predict_states(prediction_dataset)[0]

@@ -14,7 +14,6 @@ from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
 
 # GPU settings
-tf_ops.suppress_messages()
 tf_ops.gpu_growth()
 
 # Settings
@@ -84,12 +83,10 @@ prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_siz
 
 # Train the model
 print("Training burn-in model")
-history = model.burn_in(
-    training_dataset, epochs=n_epochs_burnin, verbose=0, use_tqdm=True
-)
+history = model.burn_in(training_dataset, epochs=n_epochs_burnin)
 
 print("Training full model")
-history = model.fit(training_dataset, epochs=n_epochs, verbose=0, use_tqdm=True)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 # Inferred state probabilities and state time course
 alpha = model.predict_states(prediction_dataset)[0]
