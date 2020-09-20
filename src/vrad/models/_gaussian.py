@@ -151,14 +151,14 @@ class RNNGaussian(BaseModel):
             ll_loss = []
             kl_loss = []
             for prediction in predictions:
-                ll_loss.append(np.mean(prediction["ll_loss"]))
-                kl_loss.append(np.mean(prediction["kl_loss"]))
-            ll_loss = np.mean(ll_loss)
-            kl_loss = np.mean(kl_loss)
+                ll_loss.append(np.sum(prediction["ll_loss"]))
+                kl_loss.append(np.sum(prediction["kl_loss"]))
+            ll_loss = np.sum(ll_loss)
+            kl_loss = np.sum(kl_loss)
         else:
             predictions = self.predict(dataset)
-            ll_loss = np.mean(predictions["ll_loss"])
-            kl_loss = np.mean(predictions["kl_loss"])
+            ll_loss = np.sum(predictions["ll_loss"])
+            kl_loss = np.sum(predictions["kl_loss"])
 
         free_energy = ll_loss + kl_loss
 
