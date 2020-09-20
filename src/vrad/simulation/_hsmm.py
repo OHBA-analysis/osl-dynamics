@@ -64,17 +64,17 @@ class HSMMSimulation(Simulation):
 
         if (self.off_diagonal_trans_prob is None) and (self.full_trans_prob is None):
             self.off_diagonal_trans_prob = np.ones([self.n_states, self.n_states])
-            np.fill_diagonal(self.off_diagonal_trans_prob, 0)
-
-            self.off_diagonal_trans_prob = (
-                self.off_diagonal_trans_prob
-                / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
-            )
 
         if self.full_trans_prob is not None:
             self.off_diagonal_trans_prob = (
                 self.full_trans_prob / self.full_trans_prob.sum(axis=1)[:, None]
             )
+
+        np.fill_diagonal(self.off_diagonal_trans_prob, 0)
+        self.off_diagonal_trans_prob = (
+            self.off_diagonal_trans_prob
+            / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
+        )
 
         with np.printoptions(linewidth=np.nan):
             _logger.info(
@@ -101,15 +101,11 @@ class HSMMSimulation(Simulation):
                 current_position : current_position + state_lifetime
             ] = current_state
 
-            for kk in range(self.cumsum_off_diagonal_trans_prob.shape[1]):
-                if (
-                    random_sample()
-                    < self.cumsum_off_diagonal_trans_prob[current_state, kk]
-                ):
-                    break
-
+            rand = random_sample()
+            current_state = np.argmin(
+                self.cumsum_off_diagonal_trans_prob[current_state] < rand
+            )
             current_position += state_lifetime
-            current_state = kk
 
         _logger.debug(f"n_states present in alpha sim = {len(np.unique(alpha_sim))}")
 
