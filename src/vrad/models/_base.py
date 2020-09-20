@@ -41,6 +41,7 @@ class BaseModel:
         n_units_model: int,
         dropout_rate_inference: float,
         dropout_rate_model: float,
+        normalization_type: str,
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
@@ -48,6 +49,19 @@ class BaseModel:
         multi_gpu: bool,
         strategy: str,
     ):
+        # Validation
+        if n_units_inference < 1 or n_units_model < 1:
+            raise ValueError("n_units must be greater than zero.")
+
+        if n_layers_inference < 1 or n_layers_model < 1:
+            raise ValueError("n_layers must be greater than zero.")
+
+        if dropout_rate_inference < 0 or dropout_rate_model < 0:
+            raise ValueError("dropout_rate must be greater than or equal to zero.")
+
+        if normalization_type not in ["layer", "batch"]:
+            raise ValueError("normalization_type must be 'layer' or 'batch'.")
+
         # Identifier for the model
         self._identifier = np.random.randint(100000)
 
@@ -63,6 +77,7 @@ class BaseModel:
         self.n_units_model = n_units_model
         self.dropout_rate_inference = dropout_rate_inference
         self.dropout_rate_model = dropout_rate_model
+        self.normalization_type = normalization_type
 
         # KL annealing
         self.do_annealing = do_annealing

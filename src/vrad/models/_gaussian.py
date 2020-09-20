@@ -46,6 +46,7 @@ class RNNGaussian(BaseModel):
         n_units_model: int,
         dropout_rate_inference: float,
         dropout_rate_model: float,
+        normalization_type: str,
         alpha_xform: str,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
@@ -79,6 +80,7 @@ class RNNGaussian(BaseModel):
             n_units_model=n_units_model,
             dropout_rate_inference=dropout_rate_inference,
             dropout_rate_model=dropout_rate_model,
+            normalization_type=normalization_type,
             do_annealing=do_annealing,
             annealing_sharpness=annealing_sharpness,
             n_epochs_annealing=n_epochs_annealing,
@@ -99,6 +101,7 @@ class RNNGaussian(BaseModel):
             n_units_model=self.n_units_model,
             dropout_rate_inference=self.dropout_rate_inference,
             dropout_rate_model=self.dropout_rate_model,
+            normalization_type=self.normalization_type,
             learn_means=self.learn_means,
             learn_covariances=self.learn_covariances,
             initial_means=self.initial_means,
@@ -343,6 +346,7 @@ def _model_structure(
     n_units_model: int,
     dropout_rate_inference: float,
     dropout_rate_model: float,
+    normalization_type: str,
     learn_means: bool,
     learn_covariances: bool,
     initial_means: np.ndarray,
@@ -351,6 +355,12 @@ def _model_structure(
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
 ):
+    # Pick normalization layer
+    if normalization_type == "batch":
+        NormalizationLayer = layers.BatchNormalization
+    elif normalization_type == "layer":
+        NormalizationLayer = layers.LayerNormalization
+
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
@@ -360,29 +370,38 @@ def _model_structure(
     #     - log_s_theta_t ~ affine(RNN(inputs_<=t))
 
     # Definition of layers
-    input_normalisation_layer = layers.LayerNormalization()
-    inference_input_dropout_layer = layers.Dropout(dropout_rate_inference)
+    input_norm_layer = NormalizationLayer(name="data_norm")
+    inference_input_dropout_layer = layers.Dropout(
+        dropout_rate_inference, name="data_norm_drop"
+    )
     inference_output_layers = InferenceRNNLayers(
         n_layers_inference,
         n_units_inference,
         dropout_rate_inference,
+        NormalizationLayer,
         name="inference_rnn",
     )
     m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
+    m_theta_t_norm_layer = NormalizationLayer(name="m_theta_t_norm")
     log_s_theta_t_layer = layers.Dense(
         n_states, activation="linear", name="log_s_theta_t",
     )
+    log_s_theta_t_norm_layer = NormalizationLayer(name="log_s_theta_t_norm")
 
     # Layer to sample theta_t from q(theta_t)
     theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
+    theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
 
     # Inference RNN data flow
-    inputs_norm = input_normalisation_layer(inputs)
+    inputs_norm = input_norm_layer(inputs)
     inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
     inference_output = inference_output_layers(inputs_norm_dropout)
     m_theta_t = m_theta_t_layer(inference_output)
+    m_theta_t_norm = m_theta_t_norm_layer(m_theta_t)
     log_s_theta_t = log_s_theta_t_layer(inference_output)
-    theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
+    log_s_theta_t_norm = log_s_theta_t_norm_layer(log_s_theta_t)
+    theta_t = theta_t_layer([m_theta_t_norm, log_s_theta_t_norm])
+    theta_t_norm = theta_t_norm_layer(theta_t)
 
     # Model RNN:
     # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
@@ -390,14 +409,22 @@ def _model_structure(
     #     - log_sigma_theta_j = trainable constant
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(dropout_rate_model)
+    model_input_dropout_layer = layers.Dropout(
+        dropout_rate_model, name="theta_t_norm_drop"
+    )
     model_output_layers = ModelRNNLayers(
-        n_layers_model, n_units_model, dropout_rate_model, name="model_rnn",
+        n_layers_model,
+        n_units_model,
+        dropout_rate_model,
+        NormalizationLayer,
+        name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
+    mu_theta_jt_norm_layer = NormalizationLayer(name="mu_theta_jt_norm")
     log_sigma_theta_j_layer = TrainableVariablesLayer(
         n_states, name="log_sigma_theta_j"
     )
+    log_sigma_theta_j_norm_layer = NormalizationLayer(name="log_sigma_theta_j_norm")
 
     # Layers for the means and covariances for the observation model of each state
     means_covs_layer = MeansCovsLayer(
@@ -419,23 +446,27 @@ def _model_structure(
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
-    model_input_dropout = model_input_dropout_layer(theta_t)
+    model_input_dropout = model_input_dropout_layer(theta_t_norm)
     model_output = model_output_layers(model_input_dropout)
     mu_theta_jt = mu_theta_jt_layer(model_output)
+    mu_theta_jt_norm = mu_theta_jt_norm_layer(mu_theta_jt)
     log_sigma_theta_j = log_sigma_theta_j_layer(inputs)  # inputs not used
+    log_sigma_theta_j_norm = log_sigma_theta_j_norm_layer(log_sigma_theta_j)
     mu_j, D_j = means_covs_layer(inputs)  # inputs not used
-    m_t, C_t = mix_means_covs_layer([theta_t, mu_j, D_j])
+    m_t, C_t = mix_means_covs_layer([theta_t_norm, mu_j, D_j])
     ll_loss = ll_loss_layer([inputs, m_t, C_t])
-    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_j])
+    kl_loss = kl_loss_layer(
+        [m_theta_t_norm, log_s_theta_t_norm, mu_theta_jt_norm, log_sigma_theta_j_norm]
+    )
 
     outputs = [
         ll_loss,
         kl_loss,
-        theta_t,
-        m_theta_t,
-        log_s_theta_t,
-        mu_theta_jt,
-        log_sigma_theta_j,
+        theta_t_norm,
+        m_theta_t_norm,
+        log_s_theta_t_norm,
+        mu_theta_jt_norm,
+        log_sigma_theta_j_norm,
     ]
 
     return Model(inputs=inputs, outputs=outputs)
