@@ -32,6 +32,8 @@ n_epochs_annealing = 50
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
+normalization_type = "layer"
+
 n_layers_inference = 1
 n_layers_model = 1
 
@@ -94,6 +96,7 @@ model = RNNGaussian(
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
+    normalization_type=normalization_type,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
@@ -111,6 +114,13 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 # Train the model
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
+
+# Save trained model
+model.save_weights("/well/woolrich/shared/vrad/trained_models/simulation/example1")
+
+# Free energy = Log Likelihood + KL Divergence
+free_energy = model.free_energy(prediction_dataset)
+print(f"Free energy: {free_energy}")
 
 # Inferred state probabiliites and state time course
 alpha = model.predict_states(prediction_dataset)[0]

@@ -1,6 +1,10 @@
 """Example script for running inference on real MEG data for forty five subjects.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- Data preparation is performed within V-RAD.
+- Uses the BigData class to manage the data.
+- Initialises the covariances with the identity matrix.
+- Achieves a free energy of ~126,000,000.
 """
 
 print("Setting up")
@@ -8,21 +12,21 @@ from vrad import array_ops, data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
-from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
+multi_gpu = True
 
 # Settings
-n_states = 6
-sequence_length = 1200
-batch_size = 32
+n_states = 12
+sequence_length = 400
+batch_size = 128
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 250
-n_epochs_annealing = 125
+n_epochs = 200
+n_epochs_annealing = 100
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -30,8 +34,10 @@ dropout_rate_model = 0.0
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 256
-n_units_model = 256
+normalization_type = "layer"
+
+n_units_inference = 128
+n_units_model = 128
 
 learn_means = False
 learn_covariances = True
@@ -41,7 +47,7 @@ learn_alpha_scaling = True
 normalize_covariances = True
 
 n_initializations = 4
-n_epochs_initialization = 35
+n_epochs_initialization = 20
 
 # Read MEG data
 meg_data = data.BigData(
@@ -66,12 +72,14 @@ model = RNNGaussian(
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
+    normalization_type=normalization_type,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
+    multi_gpu=multi_gpu,
 )
 
 model.summary()
@@ -91,21 +99,16 @@ history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
 model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/forty_five_subjects/model"
+    "/well/woolrich/shared/vrad/trained_models/forty_five_subjects/example1"
 )
-
-# Load a previously trained model
-# model.load_weights(
-#    "/well/woolrich/shared/vrad/trained_models/forty_five_subjects/model"
-# )
-
-# Inferred state probabilities and state time course
-alpha = model.predict_states(prediction_dataset)
-stc = states.time_courses(alpha)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
+
+# Inferred state probabilities and state time course
+alpha = model.predict_states(prediction_dataset)
+stc = states.time_courses(alpha)
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(

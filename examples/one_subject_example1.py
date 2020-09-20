@@ -2,9 +2,8 @@
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Uses the final covariances inferred by an HMM fit from OSL.
-- Takes approximately 5 minutes to train (on compG017).
-- Achieves a dice coefficient of ~0.58 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~457,000.
+- Achieves a dice coefficient of ~0.63 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~2,680,000.
 """
 
 print("Setting up")
@@ -15,21 +14,24 @@ from vrad.models import RNNGaussian
 
 # GPU settings
 tf_ops.gpu_growth()
+multi_gpu = True
 
 # Settings
 n_states = 6
 sequence_length = 400
-batch_size = 32
+batch_size = 64
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 200
-n_epochs_annealing = 150
-n_epochs_burnin = 30
+n_epochs = 180
+n_epochs_annealing = 80
+n_epochs_burnin = 20
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
+
+normalization_type = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -67,12 +69,14 @@ model = RNNGaussian(
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
+    normalization_type=normalization_type,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
+    multi_gpu=multi_gpu,
 )
 
 model.summary()
@@ -88,6 +92,13 @@ history = model.burn_in(training_dataset, epochs=n_epochs_burnin)
 print("Training full model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
+# Save trained model
+model.save_weights("/well/woolrich/shared/vrad/trained_models/one_subject/example1")
+
+# Free energy = Log Likelihood + KL Divergence
+free_energy = model.free_energy(prediction_dataset)
+print(f"Free energy: {free_energy}")
+
 # Inferred state probabilities and state time course
 alpha = model.predict_states(prediction_dataset)[0]
 stc = states.time_courses(alpha)
@@ -97,10 +108,6 @@ matched_hmm_stc, matched_inf_stc = states.match_states(hmm.state_time_course, st
 
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, matched_inf_stc))
-
-# Free energy = Log Likelihood + KL Divergence
-free_energy = model.free_energy(prediction_dataset)
-print(f"Free energy: {free_energy}")
 
 # Load preprocessed (i.e. unprepared) data to calculate state spectra
 preprocessed_data = data.Data(

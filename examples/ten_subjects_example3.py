@@ -1,10 +1,10 @@
-"""Example script for running inference on real MEG data for one subject.
+"""Example script for running inference on real MEG data for ten subjects.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Data preparation is performed within V-RAD.
+- Uses the BigData class to manage the data.
 - Initialises the covariances with the identity matrix.
-- Achieves a dice coefficient of ~0.27 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~2,680,000.
+- Achieves a free energy of ~25,900,000.
 """
 
 print("Setting up")
@@ -20,7 +20,7 @@ multi_gpu = True
 # Settings
 n_states = 6
 sequence_length = 400
-batch_size = 64
+batch_size = 128
 
 do_annealing = True
 annealing_sharpness = 5
@@ -31,13 +31,13 @@ n_epochs_annealing = 100
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-normalization_type = "layer"
-
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 64
+normalization_type = "layer"
+
+n_units_inference = 128
+n_units_model = 128
 
 learn_means = False
 learn_covariances = True
@@ -47,11 +47,16 @@ learn_alpha_scaling = True
 normalize_covariances = True
 
 n_initializations = 4
-n_epochs_initialization = 20
+n_epochs_initialization = 15
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/preprocessed_data/subject1.mat")
+meg_data = data.BigData(
+    [
+        f"/well/woolrich/shared/vrad/preprocessed_data/subject{i}.mat"
+        for i in range(1, 11)
+    ]
+)
 meg_data.prepare(n_embeddings=13, n_pca_components=80, whiten=True)
 n_channels = meg_data.n_channels
 
@@ -86,9 +91,7 @@ prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise means and covariances
 model.initialize_means_covariances(
-    n_initializations=n_initializations,
-    n_epochs_initialization=n_epochs_initialization,
-    training_dataset=training_dataset,
+    n_initializations, n_epochs_initialization, training_dataset
 )
 
 # Train the model
@@ -96,26 +99,18 @@ print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
-model.save_weights("/well/woolrich/shared/vrad/trained_models/one_subject/example2")
+model.save_weights("/well/woolrich/shared/vrad/trained_models/ten_subjects/example3")
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state probabilities and state time course
-alpha = model.predict_states(prediction_dataset)[0]
-stc = states.time_courses(alpha)
-
-# Find correspondance between HMM and inferred state time courses
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
-matched_hmm_stc, matched_inf_stc = states.match_states(hmm.state_time_course, stc)
-
-# Dice coefficient
-print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, matched_inf_stc))
+alpha = model.predict_states(prediction_dataset)
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
-    data=meg_data.raw_data[0],
+    data=meg_data.raw_data,
     state_probabilities=alpha,
     sampling_frequency=250,
     time_half_bandwidth=4,

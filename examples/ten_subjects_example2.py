@@ -1,6 +1,9 @@
 """Example script for running inference on real MEG data for ten subjects.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- Data preparation is performed within V-RAD.
+- Initialises the covariances with the identity matrix.
+- Achieves a free energy of ~27,300,000.
 """
 
 print("Setting up")
@@ -11,23 +14,26 @@ from vrad.models import RNNGaussian
 
 # GPU settings
 tf_ops.gpu_growth()
+multi_gpu = True
 
 # Settings
 n_states = 6
-sequence_length = 800
-batch_size = 32
+sequence_length = 400
+batch_size = 128
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 250
-n_epochs_annealing = 125
+n_epochs = 200
+n_epochs_annealing = 100
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
 n_layers_inference = 1
 n_layers_model = 1
+
+normalization_type = "layer"
 
 n_units_inference = 128
 n_units_model = 128
@@ -40,7 +46,7 @@ learn_alpha_scaling = True
 normalize_covariances = True
 
 n_initializations = 4
-n_epochs_initialization = 35
+n_epochs_initialization = 15
 
 # Read MEG data
 print("Reading MEG data")
@@ -66,12 +72,14 @@ model = RNNGaussian(
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
+    normalization_type=normalization_type,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
+    multi_gpu=multi_gpu,
 )
 
 model.summary()
@@ -89,13 +97,15 @@ model.initialize_means_covariances(
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
-# Inferred state probabilities and state time course
-alpha = model.predict_states(prediction_dataset)
-stc = states.time_courses(alpha)
+# Save trained model
+model.save_weights("/well/woolrich/shared/vrad/trained_models/ten_subjects/example2")
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
+
+# Inferred state probabilities and state time course
+alpha = model.predict_states(prediction_dataset)
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
