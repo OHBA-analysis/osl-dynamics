@@ -291,11 +291,15 @@ class RNNGaussian(BaseModel):
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
+        mu_theta_jt_norm_layer = self.model.get_layer("mu_theta_jt_norm")
+        theta_t_norm_layer = self.model.get_layer("theta_t_norm")
 
         # Calculate the standard deviation of the probability distribution function
         # This has been learnt for each state during training
         log_sigma_theta_j = self.model.get_layer("log_sigma_theta_j").get_weights()[0]
-        sigma_theta_j = np.exp(log_sigma_theta_j)
+        log_sigma_theta_j_norm_layer = self.model.get_layer("log_sigma_theta_j_norm")
+        log_sigma_theta_j_norm = log_sigma_theta_j_norm_layer(log_sigma_theta_j)
+        sigma_theta_j_norm = np.exp(log_sigma_theta_j_norm)
 
         # State time course and sequence of latent states
         sampled_stc = np.zeros([n_samples, self.n_states])
@@ -305,7 +309,7 @@ class RNNGaussian(BaseModel):
         epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states])
 
         # Randomly select the first theta_t assuming zero means
-        theta_t[-1] = sigma_theta_j * epsilon[-1]
+        theta_t[-1] = sigma_theta_j_norm * epsilon[-1]
 
         # Get the alpha scaling so we can calculate alpha_t from theta_t
         alpha_scaling = self.get_alpha_scaling()
@@ -317,15 +321,18 @@ class RNNGaussian(BaseModel):
             trimmed_theta_t = theta_t[~np.all(theta_t == 0, axis=1)][np.newaxis, :, :]
 
             # Predict the probability distribution function for theta_t one time step
-            # in the future, p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_j)
-            model_rnn = model_rnn_layer(trimmed_theta_t)
-            mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
+            # in the future,
+            # p(theta_t|theta_<t) ~ N(mu_theta_jt_norm, sigma_theta_j_norm)
+            theta_t_norm = theta_t_norm_layer(trimmed_theta_t)
+            model_rnn = model_rnn_layer(theta_t_norm)
+            mu_theta_jt = mu_theta_jt_layer(model_rnn)
+            mu_theta_jt_norm = mu_theta_jt_norm_layer(mu_theta_jt)[0, -1]
 
             # Shift theta_t one time step to the left
             theta_t = np.roll(theta_t, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t[-1] = mu_theta_jt + sigma_theta_j * epsilon[i]
+            theta_t[-1] = mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]
 
             # Calculate the state probabilities
             alpha_t = softmax(theta_t[-1]) * alpha_scaling
