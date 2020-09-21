@@ -18,7 +18,7 @@ tf_ops.gpu_growth()
 multi_gpu = True
 
 # Settings
-n_states = 12
+n_states = 6
 sequence_length = 400
 batch_size = 128
 
@@ -81,7 +81,6 @@ model = RNNGaussian(
     n_epochs_annealing=n_epochs_annealing,
     multi_gpu=multi_gpu,
 )
-
 model.summary()
 
 # Prepare dataset

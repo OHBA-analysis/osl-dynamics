@@ -1,7 +1,7 @@
 """Example script for running inference on simulated HMM data.
 
 - This script sets a seed for the random number generators for reproducibility.
-- Should achieve a dice coefficient of ~0.92.
+- Should achieve a dice coefficient of ~0.99.
 - Takes approximately 2 minutes to train (on compG017).
 """
 
@@ -106,7 +106,6 @@ model = RNNGaussian(
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
 )
-
 model.summary()
 
 # Prepare dataset
@@ -118,7 +117,9 @@ print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
-model.save_weights("/well/woolrich/shared/vrad/trained_models/simulation/example2")
+model.save_weights(
+    "/well/woolrich/shared/vrad/trained_models/simulation_example2/weights"
+)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)

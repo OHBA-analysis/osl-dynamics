@@ -2,8 +2,8 @@
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Uses the final covariances inferred by an HMM fit from OSL.
-- Achieves a dice coefficient of ~0.63 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~2,680,000.
+- Achieves a dice coefficient of ~0.54 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~2,670,000.
 """
 
 print("Setting up")
@@ -24,9 +24,8 @@ batch_size = 64
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 180
-n_epochs_annealing = 80
-n_epochs_burnin = 20
+n_epochs = 200
+n_epochs_annealing = 100
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -78,22 +77,19 @@ model = RNNGaussian(
     n_epochs_annealing=n_epochs_annealing,
     multi_gpu=multi_gpu,
 )
-
 model.summary()
 
 # Prepare dataset
 training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
-# Train the model
-print("Training burn-in model")
-history = model.burn_in(training_dataset, epochs=n_epochs_burnin)
-
-print("Training full model")
+print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
-model.save_weights("/well/woolrich/shared/vrad/trained_models/one_subject/example1")
+model.save_weights(
+    "/well/woolrich/shared/vrad/trained_models/one_subject_example1/weights"
+)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)

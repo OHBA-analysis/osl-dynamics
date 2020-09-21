@@ -77,7 +77,6 @@ model = RNNGaussian(
     n_epochs_annealing=n_epochs_annealing,
     multi_gpu=multi_gpu,
 )
-
 model.summary()
 
 # Prepare dataset
@@ -96,7 +95,9 @@ print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
-model.save_weights("/well/woolrich/shared/vrad/trained_models/one_subject/example2")
+model.save_weights(
+    "/well/woolrich/shared/vrad/trained_models/one_subject_example2/weights"
+)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
