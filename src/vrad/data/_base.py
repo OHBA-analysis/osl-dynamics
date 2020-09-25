@@ -219,18 +219,34 @@ class OSL_HMM:
         self.prior = self.hmm.prior
         self.train = self.hmm.train
 
-        self.data_files = self.hmm.data_files
-        self.epoched_state_path_sub = self.hmm.epoched_statepath_sub
-        self.filenames = self.hmm.filenames
-        self.f_sample = self.hmm.fsample
-        self.gamma = self.hmm.gamma
-        self.is_epoched = self.hmm.is_epoched
-        self.options = self.hmm.options
-        self.state_map_parcel_vectors = self.hmm.statemap_parcel_vectors
-        self.subject_state_map_parcel_vectors = self.hmm.statemap_parcel_vectors_persubj
-        self.state_maps = self.hmm.statemaps
-        self.state_path = self.hmm.statepath.astype(np.int)
-        self.subject_indices = self.hmm.subj_inds
+        hmm_fields = dir(self.hmm)
+
+        self.data_files = self.hmm.data_files if "data_files" in hmm_fields else None
+        self.epoched_state_path_sub = (
+            self.hmm.epoched_statepath_sub
+            if "epoched_state_path_sub" in hmm_fields
+            else None
+        )
+        self.filenames = self.hmm.filenames if "filenames" in hmm_fields else None
+        self.f_sample = self.hmm.fsample if "fsample" in hmm_fields else None
+        self.gamma = self.hmm.gamma if "gamma" in hmm_fields else None
+        self.is_epoched = self.hmm.is_epoched if "is_epoched" in hmm_fields else None
+        self.options = self.hmm.options if "options" in hmm_fields else None
+        self.state_map_parcel_vectors = (
+            self.hmm.statemap_parcel_vectors
+            if "statemap_parcel_vectors" in hmm_fields
+            else None
+        )
+        self.subject_state_map_parcel_vectors = (
+            self.hmm.statemap_parcel_vectors_persubj
+            if "statemap_parcel_vectors_persubj" in hmm_fields
+            else None
+        )
+        self.state_maps = self.hmm.statemaps if "statemaps" in hmm_fields else None
+        self.state_path = (
+            self.hmm.statepath.astype(np.int) if "statepath" in hmm_fields else None
+        )
+        self.subject_indices = self.hmm.subj_inds if "subj_inds" in hmm_fields else None
 
         # Aliases
         self.covariances = np.array(
@@ -240,7 +256,15 @@ class OSL_HMM:
             ]
         )
         self.alpha = self.gamma
-        self.state_time_course = array_ops.get_one_hot(self.state_path - 1)
+        self.state_time_course = (
+            array_ops.get_one_hot(self.state_path - 1)
+            if self.state_path is not None
+            else None
+        )
+
+        if self.gamma is not None and self.state_time_course is None:
+            stc = self.gamma.argmax(axis=1)
+            self.state_time_course = array_ops.get_one_hot(stc)
 
     def plot_covariances(self, *args, **kwargs):
         """Wraps plotting.plot_matrices for self.covariances."""
