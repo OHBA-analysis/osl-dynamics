@@ -762,8 +762,9 @@ def plot_state_lifetimes(
     state_time_course: np.ndarray,
     bins: int = "auto",
     density: bool = False,
-    match_scale_x=False,
-    match_scale_y=False,
+    match_scale_x: bool = False,
+    match_scale_y: bool = False,
+    x_range: list = None,
     hist_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
@@ -853,6 +854,10 @@ def plot_state_lifetimes(
             axis.set_xlim(0, furthest_value * 1.1)
         if match_scale_y:
             axis.set_ylim(0, largest_bar * 1.1)
+        if x_range is not None:
+            if len(x_range) != 2:
+                raise ValueError("x_range must be [x_min, x_max].")
+            axis.set_xlim(x_range[0], x_range[1])
     plt.tight_layout()
 
     show_or_save(filename)
