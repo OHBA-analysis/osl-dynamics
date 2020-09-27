@@ -14,6 +14,7 @@ from vrad.inference.functions import (
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
+from vrad.array_ops import get_one_hot
 from vrad.models import BaseModel
 from vrad.models.layers import (
     InferenceRNNLayers,
@@ -129,18 +130,31 @@ class RNNGaussian(BaseModel):
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
+    def state_probabilities(self, theta_t):
+        """Calculates the state probability alpha_t given the logits theta_t."""
+        if self.alpha_xform == "softplus":
+            alpha_t = softplus(theta_t).numpy()
+        elif self.alpha_xform == "softmax":
+            alpha_t = softmax(theta_t).numpy()
+        elif self.alpha_xform == "categorical":
+            alpha_t = softmax(theta_t).numpy()
+            alpha_t = alpha_t.argmax(axis=1)
+            alpha_t = get_one_hot(alpha_t)
+        else:
+            raise ValueError(
+                "alpha_xform must be 'softplus', 'softmax' or 'categorical'."
+            )
+        return alpha_t
+
     def predict_states(self, inputs, *args, output_name="m_theta_t", **kwargs):
         """Return the probability for each state at each time point."""
         inputs = self._make_dataset(inputs)
         outputs = []
         for dataset in inputs:
-            m_theta_t = self.predict(dataset, *args, **kwargs)[output_name]
-            m_theta_t = np.concatenate(m_theta_t)
-            if self.alpha_xform == "softmax":
-                alpha = softmax(m_theta_t).numpy()
-            elif self.alpha_xform == "softplus":
-                alpha = softplus(m_theta_t).numpy()
-            outputs.append(alpha)
+            theta_t = self.predict(dataset, *args, **kwargs)[output_name]
+            theta_t = np.concatenate(theta_t)
+            alpha_t = self.state_probabilities(theta_t)
+            outputs.append(alpha_t)
         return outputs
 
     def free_energy(self, dataset, return_all=False):
@@ -335,7 +349,7 @@ class RNNGaussian(BaseModel):
             theta_t[-1] = mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]
 
             # Calculate the state probabilities
-            alpha_t = softmax(theta_t[-1]) * alpha_scaling
+            alpha_t = self.state_probabilities(theta_t[-1])
 
             # Hard classify the state time course
             sampled_stc[i, np.argmax(alpha_t)] = 1

@@ -250,6 +250,11 @@ class MixMeansCovsLayer(layers.Layer):
             alpha_t = softplus(theta_t)
         elif self.alpha_xform == "softmax":
             alpha_t = softmax(theta_t, axis=2)
+        elif self.alpha_xform == "categorical":
+            gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
+                temperature=0.5, probs=softmax(theta_t, axis=2)
+            )
+            alpha_t = gumbel_softmax_distribution.sample()
         alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
@@ -257,14 +262,14 @@ class MixMeansCovsLayer(layers.Layer):
         mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
 
         # Calculate the mean: m_t = Sum_j alpha_jt mu_j
-        m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), 2)
+        m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), axis=2)
 
         # Reshape alpha_t and D for multiplication
         alpha_t = K.expand_dims(alpha_t, axis=-1)
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
 
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
-        C_t = tf.reduce_sum(tf.multiply(alpha_t, D), 2)
+        C_t = tf.reduce_sum(tf.multiply(alpha_t, D), axis=2)
 
         return [m_t, C_t]
 
