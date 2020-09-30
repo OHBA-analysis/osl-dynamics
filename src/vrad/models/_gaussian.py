@@ -244,7 +244,7 @@ class RNNGaussian(BaseModel):
         self.compile()
 
         # Train the model
-        self.fit(*args, **kwargs, no_annealing=True)
+        self.fit(*args, **kwargs)
 
         # Make means and covariances trainable again and compile
         means_covs_layer.trainable = True
