@@ -80,6 +80,7 @@ def state_spectra(
     n_tapers,
     segment_length=None,
     frequency_range=None,
+    n_embeddings=None,
 ):
     """Calculates spectra for inferred states.
 
@@ -127,7 +128,7 @@ def state_spectra(
     data = scale(data, axis=0)
 
     # Use the state probabilities to get a time series for each state
-    state_time_series = get_state_time_series(data, state_probabilities)
+    state_time_series = get_state_time_series(data, state_probabilities, n_embeddings)
 
     # Number of subjects, states, samples and channels
     n_states, n_samples, n_channels = state_time_series.shape
