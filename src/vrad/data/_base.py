@@ -229,7 +229,6 @@ class OSL_HMM:
         )
         self.filenames = self.hmm.filenames if "filenames" in hmm_fields else None
         self.f_sample = self.hmm.fsample if "fsample" in hmm_fields else None
-        self.gamma = self.hmm.gamma if "gamma" in hmm_fields else None
         self.is_epoched = self.hmm.is_epoched if "is_epoched" in hmm_fields else None
         self.options = self.hmm.options if "options" in hmm_fields else None
         self.state_map_parcel_vectors = (
@@ -247,6 +246,9 @@ class OSL_HMM:
             self.hmm.statepath.astype(np.int) if "statepath" in hmm_fields else None
         )
         self.subject_indices = self.hmm.subj_inds if "subj_inds" in hmm_fields else None
+        self.gamma = self.hmm.gamma if "gamma" in hmm_fields else None
+        if self.gamma is None and "Gamma" in hmm_fields:
+            self.gamma = self.hmm.Gamma
 
         # Aliases
         self.covariances = np.array(
