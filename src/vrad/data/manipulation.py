@@ -274,3 +274,12 @@ def inferred_states_to_source_space(inferred_covariances, state_time_course, meg
         state_covariances[state] = np.cov(state_recon_time_series[state].T)
 
     return state_recon_time_series, state_covariances
+
+
+def num_batches(arr, sequence_length: int, step_size: int = None):
+    step_size = step_size or sequence_length
+    final_slice_start = arr.shape[0] - sequence_length + 1
+    index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
+        sequence_length
+    )
+    return len(index)

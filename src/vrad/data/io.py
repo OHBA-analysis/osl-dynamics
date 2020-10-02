@@ -4,7 +4,7 @@ from typing import Tuple, Union
 import mat73
 import numpy as np
 import scipy.io
-from vrad.utils.misc import listify, time_axis_first
+from vrad.utils.misc import check_iterable_type, listify, time_axis_first
 
 _logger = logging.getLogger("VRAD")
 
@@ -83,6 +83,7 @@ def load_data(
     time_series: Union[str, np.ndarray],
     sampling_frequency: float = 1,
     ignored_keys=None,
+    mmap_location=None,
 ) -> Tuple[np.ndarray, float]:
 
     # Read time series from a file
@@ -109,4 +110,43 @@ def load_data(
     # Check time is the first axis, channels are the second axis
     time_series = time_axis_first(time_series)
 
+    if mmap_location is not None:
+        np.save(mmap_location, time_series)
+        time_series = np.load(mmap_location, mmap_mode="r+")
+
     return time_series, sampling_frequency
+
+
+def validate_inputs(subjects: Union[str, list, np.ndarray]):
+    """Checks is the subjects argument has been passed correctly."""
+
+    # Check if only one filename has been pass
+    if isinstance(subjects, str):
+        return [subjects]
+
+    if check_iterable_type(subjects, str):
+        return subjects
+
+    if isinstance(subjects, list) and check_iterable_type(subjects, np.ndarray):
+        for subject in subjects:
+            if subject.ndim != 2:
+                raise ValueError(
+                    "When passing a list of subjects as arrays,"
+                    " each subject must be 2D."
+                )
+        return subjects
+
+    # Try to get a useable type
+    subjects = np.asarray(subjects)
+
+    # If the data array has been passed, check its shape
+    if isinstance(subjects, np.ndarray):
+        if (subjects.ndim != 2) and (subjects.ndim != 3):
+            raise ValueError(
+                "A 2D (single subject) or 3D (multiple subject) array must "
+                + "be passed."
+            )
+        if subjects.ndim == 2:
+            subjects = subjects[np.newaxis, :, :]
+
+    return subjects
