@@ -94,6 +94,14 @@ def state_spectra(
             + f"{type(state_probabilities)}. They must both be lists or numpy arrays."
         )
 
+    if isinstance(data, np.ndarray):
+        if state_probabilities.shape[0] < data.shape[0]:
+            # When we time embed we lose some data points so we trim the data
+            n_padding = (data.shape[0] - state_probabilities.shape[0]) // 2
+            data = data[n_padding:-n_padding]
+        elif state_probabilities.shape[0] != data.shape[0]:
+            raise ValueError("data cannot have less samples than state_probabilities.")
+
     if isinstance(data, list):
         # Check data and state probabilities for the same number of subjects has
         # been passed
@@ -104,37 +112,20 @@ def state_spectra(
                 + f"len(state_probabilities)={len(state_probabilities)}."
             )
 
-        # A list of subject data has been pass so let's concatenate
-        data = np.concatenate(data, axis=0)
-
-    if isinstance(state_probabilities, list):
         # Check the number of samples in data and state_probabilities
         for i in range(len(state_probabilities)):
             if state_probabilities[i].shape[0] < data[i].shape[0]:
-                # When we time embed we lose some data points so we need to pad the
-                # state probabilities for each subject
+                # When we time embed we lose some data points so we trim the data
                 n_padding = (data[i].shape[0] - state_probabilities[i].shape[0]) // 2
-                state_probabilities[i] = np.pad(state_probabilities[i], n_padding)[
-                    :, n_padding:-n_padding
-                ]
+                data = data[n_padding:-n_padding]
             elif state_probabilities[i].shape[0] != data[i].shape[0]:
                 raise ValueError(
                     "data cannot have less samples than state_probabilities."
                 )
 
-        # A list of subject state probabilities has been pass so let's concatenate
+        # Concatenate the data and state probabilities for each subject
+        data = np.concatenate(data, axis=0)
         state_probabilities = np.concatenate(state_probabilities, axis=0)
-
-    if isinstance(state_probabilities, np.ndarray):
-        if state_probabilities.shape[0] < data.shape[0]:
-            # When we time embed we lose some data points so we need to pad the
-            # state probabilities for each subject
-            n_padding = (data.shape[0] - state_probabilities.shape[0]) // 2
-            state_probabilities = np.pad(state_probabilities, n_padding)[
-                :, n_padding:-n_padding
-            ]
-        elif state_probabilities.shape[0] != data.shape[0]:
-            raise ValueError("data cannot have less samples than state_probabilities.")
 
     if data.ndim != 2:
         raise ValueError(
