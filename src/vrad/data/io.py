@@ -105,38 +105,3 @@ def load_data(
         time_series = np.load(mmap_location, mmap_mode="r+")
 
     return time_series, discontinuity_indices, sampling_frequency
-
-
-def validate_inputs(subjects: Union[str, list, np.ndarray]):
-    """Checks is the subjects argument has been passed correctly."""
-
-    # Check if only one filename has been pass
-    if isinstance(subjects, str):
-        return [subjects]
-
-    if check_iterable_type(subjects, str):
-        return subjects
-
-    if isinstance(subjects, list) and check_iterable_type(subjects, np.ndarray):
-        for subject in subjects:
-            if subject.ndim != 2:
-                raise ValueError(
-                    "When passing a list of subjects as arrays,"
-                    " each subject must be 2D."
-                )
-        return subjects
-
-    # Try to get a useable type
-    subjects = np.asarray(subjects)
-
-    # If the data array has been passed, check its shape
-    if isinstance(subjects, np.ndarray):
-        if (subjects.ndim != 2) and (subjects.ndim != 3):
-            raise ValueError(
-                "A 2D (single subject) or 3D (multiple subject) array must "
-                + "be passed."
-            )
-        if subjects.ndim == 2:
-            subjects = subjects[np.newaxis, :, :]
-
-    return subjects

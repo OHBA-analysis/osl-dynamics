@@ -1,9 +1,8 @@
 import numpy as np
-from sklearn.decomposition import PCA
 from tqdm import tqdm
 from vrad.data import manipulation
 from vrad.data._base import Data
-from vrad.utils.misc import MockArray, array_to_memmap
+from vrad.utils.misc import MockArray
 
 
 class PreprocessedData(Data):
@@ -19,11 +18,11 @@ class PreprocessedData(Data):
             self.output_file = f"dataset_{self._identifier}.npy"
 
     def prepare_memmap_filenames(self):
-        self.te_pattern = "te_data_{{i:0{width}d}}.npy".format(
-            width=len(str(len(self.inputs)))
+        self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(self.inputs))), identifier=self._identifier
         )
-        self.output_pattern = "output_data_{{i:0{width}d}}.npy".format(
-            width=len(str(len(self.inputs)))
+        self.output_pattern = "output_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(self.inputs))), identifier=self._identifier
         )
 
         # Time embedded data memory maps
@@ -41,7 +40,7 @@ class PreprocessedData(Data):
         ]
 
     def prepare(
-        self, n_embeddings: int, n_pca_components: int, whiten: bool,
+        self, n_embeddings: int, n_pca_components: int, whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
@@ -76,17 +75,28 @@ class PreprocessedData(Data):
             self.discontinuities[i] -= n_embeddings
 
         # Perform principle component analysis (PCA)
-        pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
-        for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
-            pca.fit(te_memmap)
+        print("Calculating PCA")
+        covariance = np.zeros([te_memmap.shape[1], te_memmap.shape[1]])
+        for te_memmap in self.te_memmaps:
+            covariance += np.transpose(te_memmap - te_memmap.mean(axis=0)) @ (
+                te_memmap - te_memmap.mean(axis=0)
+            )
+        u, s, vh = np.linalg.svd(covariance)
+        u = u[:, :n_pca_components]
+        s = s[:n_pca_components]
+        if whiten:
+            u = u @ np.diag(1.0 / np.sqrt(s))
 
-        # Apply PCA to the data for each subject
-        for output_file, te_memmap in zip(
-            tqdm(self.output_filenames, desc="Applying PCA", ncols=98), self.te_memmaps
+        # Apply PCA to the data for each subject and standardise again
+        for output_file, te_memmap, discontinuities in zip(
+            tqdm(self.output_filenames, desc="Applying PCA", ncols=98),
+            self.te_memmaps,
+            self.discontinuities,
         ):
-            pca_result = pca.transform(te_memmap)
-            pca_result = array_to_memmap(output_file, pca_result)
-            self.output_memmaps.append(pca_result)
+            # Apply PCA and standardise again
+            pca_te_memmap = te_memmap @ u
+            pca_te_memmap = manipulation.standardize(pca_te_memmap, discontinuities)
+            self.output_memmaps.append(pca_te_memmap)
 
         # Update subjects to return the prepared data
         self.subjects = self.output_memmaps
