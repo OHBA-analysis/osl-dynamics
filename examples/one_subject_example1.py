@@ -5,12 +5,13 @@
 - Achieves a dice coefficient of ~0.54 (when compared to the OSL HMM state time course).
 - Achieves a free energy of ~2,670,000.
 """
-
-print("Setting up")
+import vrad.data.osl
 from vrad import data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
+
+print("Setting up")
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -51,7 +52,7 @@ prepared_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.
 n_channels = prepared_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
+hmm = vrad.data.osl.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
 initial_covariances = hmm.covariances
 
 # Build model

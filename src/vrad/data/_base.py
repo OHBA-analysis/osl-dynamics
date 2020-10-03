@@ -1,64 +1,37 @@
-import logging
-from typing import Union
+import pathlib
+from typing import List
 
-import mat73
 import numpy as np
+from sklearn.decomposition import PCA
 from tensorflow.python.data import Dataset
-from vrad import array_ops
-from vrad.data.manipulation import prepare
-from vrad.data.subject import Subject
-from vrad.utils import plotting
-from vrad.utils.decorators import auto_repr
-from vrad.utils.misc import check_iterable_type
-
-_logger = logging.getLogger("VRAD")
+from tqdm import tqdm
+from vrad.data import io, manipulation
+from vrad.utils.misc import MockArray, array_to_memmap
 
 
 class Data:
-    """A class for holding time series data for multiple subjects."""
+    raw_data_pattern = "input_data_{{i:0{width}d}}.npy"
+    n_embeddings = None
 
-    @auto_repr
-    def __init__(
-        self, subjects: Union[str, list, np.ndarray], sampling_frequency: float = 1.0,
-    ):
-        # Validate the subjects
-        subjects = self.validate_inputs(subjects)
+    def __init__(self, inputs, store_dir="tmp", output_file="dataset.npy"):
+        self.inputs = inputs
+        self.store_dir = pathlib.Path(store_dir)
+        self.store_dir.mkdir(parents=True, exist_ok=True)
+        self.raw_data_pattern = self.raw_data_pattern.format(
+            width=len(str(len(inputs)))
+        )
 
-        # Number of subjects
-        self.n_subjects = len(subjects)
-
-        # Load subjects
-        self.subjects = [
-            Subject(
-                time_series=subjects[i], _id=i, sampling_frequency=sampling_frequency,
-            )
-            for i in range(self.n_subjects)
+        # raw data memory maps
+        self.raw_data_filenames = [
+            str(self.store_dir / self.raw_data_pattern.format(i=i))
+            for i, _ in enumerate(inputs)
         ]
 
-        self.validate_subjects()
+        self.output_file = output_file
 
-        # Flag to indicate if the data has been prepared
-        self.prepared = False
-
-    @property
-    def raw_data(self):
-        return [subject.raw_data for subject in self.subjects]
-
-    @property
-    def n_channels(self):
-        return self.subjects[0].shape[1]
-
-    def __getattr__(self, attr):
-        if attr[:2] == "__":
-            raise AttributeError(f"No attribute called {attr}.")
-        return getattr(self.time_series, attr)
-
-    def __array__(self, *args, **kwargs):
-        return np.asarray(self.time_series, *args, **kwargs)
-
-    def __str__(self):
-        return_string = [self.subjects[i].__str__() for i in range(self.n_subjects)]
-        return "\n\n".join(return_string)
+        # Load the preprocessed data
+        self.raw_data_memmaps = self.load_data()
+        self.subjects = self.raw_data_memmaps
 
     def __iter__(self):
         return iter(self.subjects)
@@ -66,216 +39,125 @@ class Data:
     def __getitem__(self, item):
         return self.subjects[item]
 
-    def validate_inputs(self, subjects: Union[str, list, np.ndarray]):
-        """Checks is the subjects argument has been passed correctly."""
-
-        # Check if only one filename has been pass
-        if isinstance(subjects, str):
-            return [subjects]
-
-        if check_iterable_type(subjects, str):
-            return subjects
-
-        if isinstance(subjects, list) and check_iterable_type(subjects, np.ndarray):
-            for subject in subjects:
-                if subject.ndim != 2:
-                    raise ValueError(
-                        "When passing a list of subjects as arrays,"
-                        " each subject must be 2D."
-                    )
-            return subjects
-
-        # Try to get a useable type
-        subjects = np.asarray(subjects)
-
-        # If the data array has been passed, check its shape
-        if isinstance(subjects, np.ndarray):
-            if (subjects.ndim != 2) and (subjects.ndim != 3):
-                raise ValueError(
-                    "A 2D (single subject) or 3D (multiple subject) array must "
-                    + "be passed."
-                )
-            if subjects.ndim == 2:
-                subjects = subjects[np.newaxis, :, :]
-
-        return subjects
-
     def validate_subjects(self):
+        """Check all Subjects have the same shape."""
         n_channels = [subject.shape[1] for subject in self.subjects]
         if not np.equal(n_channels, n_channels[0]).all():
-            raise ValueError("All subjects should have an the same number of channels.")
+            raise ValueError("All subjects should have the same number of channels.")
 
     @property
-    def time_series(self):
-        return np.concatenate([subject for subject in self.subjects])
+    def raw_data(self) -> List:
+        """Return raw data as a list of arrays."""
+        return self.raw_data_memmaps
 
-    def add(
-        self,
-        new_subjects: Union[str, list, np.ndarray],
-        sampling_frequency: float = 1.0,
-    ):
-        """Adds one or more subjects to the data object."""
+    @property
+    def n_channels(self) -> int:
+        """Return the number of channels in the current data state."""
+        return self.subjects[0].shape[1]
 
-        # Check new subjects are been passed correctly
-        new_subjects = self.validate_inputs(new_subjects)
+    def load_data(self):
+        """Import data into a list of Subjects."""
+        memmaps = []
+        for in_file, out_file in zip(
+            tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
+        ):
+            memmaps.append(io.load_data(out_file, mmap_location=out_file)[0])
+        return memmaps
 
-        # Add the number of new subjects to the total
-        n_new_subjects = len(new_subjects)
-        self.n_subjects += n_new_subjects
-
-        # Create subject objects for the new subjects
-        for i in range(n_new_subjects):
-            self.subjects.append(
-                Subject(
-                    time_series=new_subjects[i],
-                    _ids=self.n_subjects + i,
-                    sampling_frequency=sampling_frequency,
-                )
-            )
-
-        self.validate_subjects()
-
-    def remove(self, ids: Union[int, list, np.ndarray]):
-        """Removes the subject objects for the subjects specified through ids."""
-        if isinstance(ids, int):
-            ids = [ids]
-        for i in ids:
-            del self.subjects[i]
-
-    def prepare(
-        self,
-        ids: Union[int, list, np.ndarray, str] = "all",
-        n_embeddings: int = None,
-        n_pca_components: int = None,
-        whiten: bool = False,
-    ):
-        """Prepares the subjects specified by ids."""
-        if isinstance(ids, int):
-            ids = [ids]
-
-        if isinstance(ids, str):
-            if ids == "all":
-                ids = range(self.n_subjects)
-            else:
-                raise ValueError(f"ids={ids} unknown in data preparation.")
-
-        # Check the time series has not already been prepared
-        if self.prepared:
-            logging.warning("Data has already been prepared. No changes made.")
-
-        else:
-            self.subjects = prepare(
-                self.subjects, n_embeddings, n_pca_components, whiten,
-            )
-            self.prepared = True
-
-    def scale(self):
-        """"Normalises (z-transforms) the data."""
-        for i in range(self.n_subjects):
-            self.subjects[i].scale()
-
-    def training_dataset(
-        self, sequence_length: int, batch_size: int = 32, window_step: int = None
-    ):
-        empty_data = Dataset.from_tensor_slices(
-            np.zeros((0, sequence_length, self.n_channels), dtype=np.float32)
+    def count_batches(self, sequence_length, step_size=None):
+        return np.array(
+            [
+                manipulation.num_batches(memmap, sequence_length, step_size)
+                for memmap in self.subjects
+            ]
         )
-        empty_tracker = Dataset.from_tensor_slices(np.zeros(0, dtype=np.float32))
-        dataset = Dataset.zip((empty_data, empty_tracker))
 
-        for subject in self.subjects:
-            subject_data = subject.dataset(sequence_length, window_step)
-            subject_tracker = Dataset.from_tensor_slices(
-                np.zeros(
-                    subject.num_batches(sequence_length, window_step), dtype=np.float32
-                )
-                + subject._id
+    def training_dataset(self, sequence_length, batch_size=32, step_size=None):
+        num_batches = self.count_batches(sequence_length, step_size)
+
+        subject_datasets = []
+        for i in range(len(self.subjects)):
+            subject = self.subjects[i]
+            subject_data = Dataset.from_tensor_slices(subject).batch(
+                sequence_length, drop_remainder=True
             )
-            dataset = dataset.concatenate(Dataset.zip((subject_data, subject_tracker)))
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(num_batches[i], dtype=np.float32) + i
+            )
+            subject_datasets.append(Dataset.zip((subject_data, subject_tracker)))
 
-        return dataset.batch(batch_size).cache().shuffle(10000).prefetch(-1)
+        full_dataset = subject_datasets[0]
+        for subject_dataset in subject_datasets[1:]:
+            full_dataset = full_dataset.concatenate(subject_dataset)
 
-    def prediction_dataset(self, sequence_length: int, batch_size: int = 32):
-        return [
-            subject.dataset(sequence_length).batch(batch_size).prefetch(-1)
+        return full_dataset.batch(batch_size).prefetch(-1)
+
+    def prediction_dataset(self, sequence_length, batch_size=32):
+        start = self.n_embeddings // 2 if self.n_embeddings else None
+        end = -start if start else None
+
+        subject_datasets = [
+            Dataset.from_tensor_slices(subject[start:end])
+            .batch(sequence_length, drop_remainder=True)
+            .batch(batch_size)
+            .prefetch(-1)
             for subject in self.subjects
         ]
 
+        return subject_datasets
 
-# noinspection PyPep8Naming
-class OSL_HMM:
-    """Import and encapsulate OSL HMMs"""
-
-    def __init__(self, filename):
-        self.filename = filename
-        self.hmm = mat73.loadmat(filename)["hmm"]
-
-        self.state = self.hmm.state
-        self.k = int(self.hmm.K)
-        self.p = self.hmm.P
-        self.dir_2d_alpha = self.hmm.Dir2d_alpha
-        self.pi = self.hmm.Pi
-        self.dir_alpha = self.hmm.Dir_alpha
-        self.prior = self.hmm.prior
-        self.train = self.hmm.train
-
-        hmm_fields = dir(self.hmm)
-
-        self.data_files = self.hmm.data_files if "data_files" in hmm_fields else None
-        self.epoched_state_path_sub = (
-            self.hmm.epoched_statepath_sub
-            if "epoched_state_path_sub" in hmm_fields
-            else None
+    def prepare_memmap_filenames(self):
+        self.te_pattern = "te_data_{{i:0{width}d}}.npy".format(
+            width=len(str(len(self.inputs)))
         )
-        self.filenames = self.hmm.filenames if "filenames" in hmm_fields else None
-        self.f_sample = self.hmm.fsample if "fsample" in hmm_fields else None
-        self.is_epoched = self.hmm.is_epoched if "is_epoched" in hmm_fields else None
-        self.options = self.hmm.options if "options" in hmm_fields else None
-        self.state_map_parcel_vectors = (
-            self.hmm.statemap_parcel_vectors
-            if "statemap_parcel_vectors" in hmm_fields
-            else None
-        )
-        self.subject_state_map_parcel_vectors = (
-            self.hmm.statemap_parcel_vectors_persubj
-            if "statemap_parcel_vectors_persubj" in hmm_fields
-            else None
-        )
-        self.state_maps = self.hmm.statemaps if "statemaps" in hmm_fields else None
-        self.state_path = (
-            self.hmm.statepath.astype(np.int) if "statepath" in hmm_fields else None
-        )
-        self.subject_indices = self.hmm.subj_inds if "subj_inds" in hmm_fields else None
-        self.gamma = self.hmm.gamma if "gamma" in hmm_fields else None
-        if self.gamma is None and "Gamma" in hmm_fields:
-            self.gamma = self.hmm.Gamma
-
-        # Aliases
-        self.covariances = np.array(
-            [
-                state.Gam_rate / (state.Gam_shape - len(state.Gam_rate) - 1)
-                for state in self.state.Omega
-            ]
-        )
-        self.alpha = self.gamma
-        self.state_time_course = (
-            array_ops.get_one_hot(self.state_path - 1)
-            if self.state_path is not None
-            else None
+        self.output_pattern = "output_data_{{i:0{width}d}}.npy".format(
+            width=len(str(len(self.inputs)))
         )
 
-        if self.gamma is not None and self.state_time_course is None:
-            stc = self.gamma.argmax(axis=1)
-            self.state_time_course = array_ops.get_one_hot(stc)
+        # Time embedded data memory maps
+        self.te_memmaps = []
+        self.te_filenames = [
+            str(self.store_dir / self.te_pattern.format(i=i))
+            for i, _ in enumerate(self.inputs)
+        ]
 
-    def plot_covariances(self, *args, **kwargs):
-        """Wraps plotting.plot_matrices for self.covariances."""
-        plotting.plot_matrices(self.covariances, *args, **kwargs)
+        # Prepared data memory maps
+        self.output_memmaps = []
+        self.output_filenames = [
+            str(self.store_dir / self.output_pattern.format(i=i))
+            for i, _ in enumerate(self.inputs)
+        ]
 
-    def plot_states(self, *args, **kwargs):
-        """Wraps plotting.highlight_states for self.state_time_course."""
+    def prepare(
+        self, n_embeddings: int, n_pca_components: int, whiten: bool,
+    ):
+        self.prepare_memmap_filenames()
+        for memmap, new_file in zip(
+            tqdm(self.raw_data_memmaps, desc="Time embedding", ncols=98),
+            self.te_filenames,
+        ):
+            te_shape = (
+                memmap.shape[0],
+                memmap.shape[1] * len(range(-n_embeddings // 2, n_embeddings // 2 + 1)),
+            )
+            te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
 
-        plotting.state_barcode(self.state_time_course, *args, **kwargs)
+            te_memmap = manipulation.time_embed(
+                memmap, n_embeddings, output_file=te_memmap
+            )
+            te_memmap = manipulation.scale(te_memmap)
 
-    def __str__(self):
-        return f"OSL HMM object from file {self.filename}"
+            self.te_memmaps.append(te_memmap)
+
+        pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
+        for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
+            pca.fit(te_memmap)
+        for output_file, te_memmap in zip(
+            tqdm(self.output_filenames, desc="Applying PCA", ncols=98), self.te_memmaps
+        ):
+            pca_result = pca.transform(te_memmap)
+            pca_result = array_to_memmap(output_file, pca_result)
+            self.output_memmaps.append(pca_result)
+
+        self.prepared = True
+        self.n_embeddings = n_embeddings

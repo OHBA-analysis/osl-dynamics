@@ -9,12 +9,12 @@ from tensorflow import zeros
 from tensorflow.keras import Model, layers
 from tensorflow.nn import softmax, softplus
 from tqdm import trange
+from vrad.array_ops import get_one_hot
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
-from vrad.array_ops import get_one_hot
 from vrad.models import BaseModel
 from vrad.models.layers import (
     InferenceRNNLayers,

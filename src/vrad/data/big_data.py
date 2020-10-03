@@ -5,6 +5,7 @@ from sklearn.decomposition import PCA
 from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from vrad.data import io, manipulation
+from vrad.data.manipulation import num_batches
 from vrad.utils.misc import MockArray, array_to_memmap
 
 
@@ -70,19 +71,10 @@ class BigData:
             np.save(out_file, io.load_data(in_file)[0])
             self.data_memmaps.append((np.load(out_file, mmap_mode="r+")))
 
-    @staticmethod
-    def num_batches(arr, sequence_length: int, step_size: int = None):
-        step_size = step_size or sequence_length
-        final_slice_start = arr.shape[0] - sequence_length + 1
-        index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
-            sequence_length
-        )
-        return len(index)
-
     def count_batches(self, sequence_length, step_size=None):
         return np.array(
             [
-                self.num_batches(memmap, sequence_length, step_size)
+                num_batches(memmap, sequence_length, step_size)
                 for memmap in self.output_memmaps
             ]
         )
