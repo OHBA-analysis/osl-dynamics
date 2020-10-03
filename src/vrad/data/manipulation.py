@@ -42,45 +42,24 @@ def trim_trials(
         )
 
 
-def standardize(
-    time_series: np.ndarray,
-    n_components: Union[float, int] = 0.9,
-    pre_scale: bool = True,
-    do_pca: Union[bool, str] = True,
-    post_scale: bool = True,
-):
-    """Function for scaling and performing PCA on time_series.
+def standardize(time_series: np.ndarray, discontinuities: np.ndarray) -> np.ndarray:
+    """Standardizes time series data.
 
-    Wraps scale and pca.
-
-    Parameters
-    ----------
-    n_components: int or float
-        If >1, number of components to be kept in PCA. If <1, the amount of
-        variance to be explained by PCA. Passed to Data.pca.
-    pre_scale: bool
-        If True (default) scale data to have mean of zero and standard
-        deviation of one before PCA is applied.
-    do_pca: bool or str
-        If True perform PCA on time_series. n_components = 1 is equivalent to
-        False. If PCA has already been performed on time_series, set to "force".
-        This is a safety check to make sure PCA isn't accidentally run twice.
-    post_scale: bool
-        If True (default) scale data to have mean of zero and standard
-        deviation of one after PCA is applied.
+    Returns a time series standardized over continuous segments of data.
     """
-    if pre_scale:
-        time_series = scale(time_series=time_series)
-    if do_pca:
-        time_series = pca(time_series=time_series, n_components=n_components)
-    if post_scale:
-        time_series = scale(time_series=time_series)
+    for i in range(len(discontinuities)):
+        start = sum(discontinuities[:i])
+        end = sum(discontinuities[: i + 1])
+        time_series[start:end] = scale(time_series[start:end], axis=0)
     return time_series
 
 
 @transpose
 def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
-    """Scale time_series to have mean zero and standard deviation 1."""
+    """Scales a time series.
+
+    Returns a time series with zero mean and unit variance.
+    """
     time_series -= time_series.mean(axis=axis)
     time_series /= time_series.std(axis=axis)
     return time_series
@@ -172,52 +151,54 @@ def trials_to_continuous(trials_time_course: np.ndarray) -> np.ndarray:
 
 @transpose
 def time_embed(
-    time_series: np.ndarray, n_embeddings: int, output_file=None,
+    time_series: np.ndarray,
+    discontinuities: np.ndarray,
+    n_embeddings: int,
+    output_file=None,
 ) -> np.ndarray:
     """Performs time embedding."""
-    n_samples, n_channels = time_series.shape
-    lags = range(-n_embeddings // 2, n_embeddings // 2 + 1)
 
-    # Generate time embedded dataset
+    if n_embeddings % 2 == 0:
+        raise ValueError("n_embeddings must be an odd number.")
+
+    # Unpack shape of the original data
+    n_samples, n_channels = time_series.shape
+
+    # If an output file hasn't been passed we create a numpy array for the
+    # time embedded data
     if output_file is None:
-        time_embedded_series = np.empty([n_samples, n_channels * len(lags)])
+        time_embedded_series = np.empty(
+            [
+                n_samples - (n_embeddings + 1) * len(discontinuties),
+                n_channels * (n_embeddings + 2),
+            ]
+        )
     else:
         time_embedded_series = output_file
-    for i in range(n_channels):
-        for j in range(len(lags)):
-            time_embedded_series[:, i * (n_embeddings + 1) + j] = np.roll(
-                time_series[:, i], lags[j]
-            )
 
-    # Only keep the data points we have all the lags for
-    time_embedded_series = time_embedded_series[lags[-1] : lags[0]]
+    # Loop through continuous segments of data
+    for i in range(len(discontinuities)):
+        n_segment = discontinuities[i]
+        start = sum(discontinuities[:i])
+        end = sum(discontinuities[: i + 1])
+        original_time_series = time_series[start:end]
+
+        # Generate time embedded data
+        time_embedded_segment = np.empty(
+            [n_segment - (n_embeddings + 1), n_channels * (n_embeddings + 2)]
+        )
+        for j in range(n_channels):
+            for k in range(n_embeddings + 2):
+                time_embedded_segment[
+                    :, j * (n_embeddings + 2) + k
+                ] = original_time_series[n_embeddings + 1 - k : n_segment - k, j]
+
+        # Fill the final time embedded series array
+        time_embedded_series[
+            start - (n_embeddings + 1) * i : end - (n_embeddings + 1) * (i + 1)
+        ] = time_embedded_segment
 
     return time_embedded_series
-
-
-def prepare(
-    subjects, n_embeddings: int, n_pca_components: int, whiten: bool,
-):
-    """Prepares subject data by time embeddings and performing PCA.
-
-    Follows the data preparation done in the OSL script teh_groupinference_parcels.m
-    """
-    pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
-    for subject in subjects:
-        # Perform time embedding
-        subject.time_embed(n_embeddings)
-
-        # Rescale (z-transform) the time series
-        subject.scaler = StandardScaler()
-        subject.time_series = subject.scaler.fit_transform(subject.time_series)
-
-        # Perform PCA
-        subject.time_series = pca.fit_transform(subject.time_series)
-
-        # Set subject's prepared flag
-        subject.prepared = True
-
-    return subjects
 
 
 def num_batches(arr, sequence_length: int, step_size: int = None):

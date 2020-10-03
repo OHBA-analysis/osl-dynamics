@@ -33,7 +33,7 @@ class PreprocessedData(Data):
             for i, _ in enumerate(self.inputs)
         ]
 
-        # Prepared data memory maps
+        # Prepared data memory maps (time embedded and pca'ed)
         self.output_memmaps = []
         self.output_filenames = [
             str(self.store_dir / self.output_pattern.format(i=i))
@@ -43,25 +43,37 @@ class PreprocessedData(Data):
     def prepare(
         self, n_embeddings: int, n_pca_components: int, whiten: bool,
     ):
+        """Prepares data to train the model with.
+
+        Performs standardization, time embedding and principle component analysis.
+        """
         self.prepare_memmap_filenames()
 
-        # Time embed the data for each subject
-        for memmap, new_file in zip(
+        # Standardise and time embed the data for each subject
+        for memmap, discontinuities, new_file in zip(
             tqdm(self.raw_data_memmaps, desc="Time embedding", ncols=98),
+            self.discontinuities,
             self.te_filenames,
         ):
+            # Standardise
+            memmap = manipulation.standardize(memmap, discontinuities)
+
+            # Time embeddings
             te_shape = (
-                memmap.shape[0],
-                memmap.shape[1] * len(range(-n_embeddings // 2, n_embeddings // 2 + 1)),
+                memmap.shape[0] - (n_embeddings + 1) * len(discontinuities),
+                memmap.shape[1] * (n_embeddings + 2),
             )
             te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
 
             te_memmap = manipulation.time_embed(
-                memmap, n_embeddings, output_file=te_memmap
+                memmap, discontinuities, n_embeddings, output_file=te_memmap
             )
-            te_memmap = manipulation.scale(te_memmap)
 
             self.te_memmaps.append(te_memmap)
+
+        # Update discontinuity indices
+        for i in range(len(self.discontinuities)):
+            self.discontinuities[i] -= n_embeddings
 
         # Perform principle component analysis (PCA)
         pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)

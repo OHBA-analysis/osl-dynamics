@@ -29,7 +29,7 @@ class Data:
         ]
 
         # Load the preprocessed data
-        self.raw_data_memmaps = self.load_data()
+        self.raw_data_memmaps, self.discontinuities = self.load_data()
         self.subjects = self.raw_data_memmaps
 
         # Validation
@@ -60,12 +60,16 @@ class Data:
     def load_data(self):
         """Import data into a list of memory maps."""
         memmaps = []
+        discontinuities = []
         for in_file, out_file in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
-            np.save(out_file, io.load_data(in_file)[0])
-            memmaps.append(io.load_data(out_file, mmap_location=out_file)[0])
-        return memmaps
+            data, discontinuity_indices, sampling_frequency = io.load_data(
+                in_file, mmap_location=out_file
+            )
+            memmaps.append(data)
+            discontinuities.append(discontinuity_indices)
+        return memmaps, discontinuities
 
     def count_batches(self, sequence_length, step_size=None):
         return np.array(
