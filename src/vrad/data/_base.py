@@ -2,18 +2,15 @@ import pathlib
 from typing import List
 
 import numpy as np
-from sklearn.decomposition import PCA
 from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from vrad.data import io, manipulation
-from vrad.utils.misc import MockArray, array_to_memmap
 
 
 class Data:
-    raw_data_pattern = "input_data_{{i:0{width}d}}_{identifier}.npy"
-    n_embeddings = None
+    """Base class for data."""
 
-    def __init__(self, inputs, store_dir="tmp", output_file=None):
+    def __init__(self, inputs, store_dir="tmp"):
         # Identifier for the data
         self._identifier = id(inputs)
 
@@ -21,22 +18,22 @@ class Data:
         self.inputs = [inputs] if isinstance(inputs, str) else inputs
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
-        self.raw_data_pattern = self.raw_data_pattern.format(
+        self.raw_data_pattern = "input_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(inputs))), identifier=self._identifier
         )
 
-        # raw data memory maps
+        # Raw data memory maps
         self.raw_data_filenames = [
             str(self.store_dir / self.raw_data_pattern.format(i=i))
             for i, _ in enumerate(inputs)
         ]
 
-        if output_file is None:
-            self.output_file = f"dataset_{self._identifier}.npy"
-
         # Load the preprocessed data
         self.raw_data_memmaps = self.load_data()
         self.subjects = self.raw_data_memmaps
+
+        # Validation
+        self.validate_subjects()
 
     def __iter__(self):
         return iter(self.subjects)
@@ -45,7 +42,7 @@ class Data:
         return self.subjects[item]
 
     def validate_subjects(self):
-        """Check all Subjects have the same shape."""
+        """Validate data files."""
         n_channels = [subject.shape[1] for subject in self.subjects]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All subjects should have the same number of channels.")
@@ -57,11 +54,11 @@ class Data:
 
     @property
     def n_channels(self) -> int:
-        """Return the number of channels in the current data state."""
+        """Number of channels in the data files."""
         return self.subjects[0].shape[1]
 
     def load_data(self):
-        """Import data into a list of Subjects."""
+        """Import data into a list of memory maps."""
         memmaps = []
         for in_file, out_file in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
@@ -78,7 +75,8 @@ class Data:
             ]
         )
 
-    def training_dataset(self, sequence_length, batch_size=32, step_size=None):
+    def training_dataset(self, sequence_length, batch_size, step_size=None):
+        """Returns a tensorflow dataset for training."""
         num_batches = self.count_batches(sequence_length, step_size)
 
         subject_datasets = []
@@ -98,12 +96,10 @@ class Data:
 
         return full_dataset.batch(batch_size).prefetch(-1)
 
-    def prediction_dataset(self, sequence_length, batch_size=32):
-        start = self.n_embeddings // 2 if self.n_embeddings else None
-        end = -start if start else None
-
+    def prediction_dataset(self, sequence_length, batch_size):
+        """Returns a tensorflow dataset for predicting the hidden state time course."""
         subject_datasets = [
-            Dataset.from_tensor_slices(subject[start:end])
+            Dataset.from_tensor_slices(subject)
             .batch(sequence_length, drop_remainder=True)
             .batch(batch_size)
             .prefetch(-1)
@@ -111,59 +107,3 @@ class Data:
         ]
 
         return subject_datasets
-
-    def prepare_memmap_filenames(self):
-        self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(self.inputs))), identifier=self._identifier
-        )
-        self.output_pattern = "output_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(self.inputs))), identifier=self._identifier
-        )
-
-        # Time embedded data memory maps
-        self.te_memmaps = []
-        self.te_filenames = [
-            str(self.store_dir / self.te_pattern.format(i=i))
-            for i, _ in enumerate(self.inputs)
-        ]
-
-        # Prepared data memory maps
-        self.output_memmaps = []
-        self.output_filenames = [
-            str(self.store_dir / self.output_pattern.format(i=i))
-            for i, _ in enumerate(self.inputs)
-        ]
-
-    def prepare(
-        self, n_embeddings: int, n_pca_components: int, whiten: bool,
-    ):
-        self.prepare_memmap_filenames()
-        for memmap, new_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Time embedding", ncols=98),
-            self.te_filenames,
-        ):
-            te_shape = (
-                memmap.shape[0],
-                memmap.shape[1] * len(range(-n_embeddings // 2, n_embeddings // 2 + 1)),
-            )
-            te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
-
-            te_memmap = manipulation.time_embed(
-                memmap, n_embeddings, output_file=te_memmap
-            )
-            te_memmap = manipulation.scale(te_memmap)
-
-            self.te_memmaps.append(te_memmap)
-
-        pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
-        for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
-            pca.fit(te_memmap)
-        for output_file, te_memmap in zip(
-            tqdm(self.output_filenames, desc="Applying PCA", ncols=98), self.te_memmaps
-        ):
-            pca_result = pca.transform(te_memmap)
-            pca_result = array_to_memmap(output_file, pca_result)
-            self.output_memmaps.append(pca_result)
-
-        self.prepared = True
-        self.n_embeddings = n_embeddings

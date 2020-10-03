@@ -7,10 +7,18 @@ from vrad.utils.misc import MockArray, array_to_memmap
 
 
 class PreprocessedData(Data):
-    def __init__(self, inputs, store_dir="tmp"):
-        super().__init__(inputs, store_dir)
+    """Class for loading preprocessed data.
 
-    def prepare_memmaps(self):
+    Contains methods which can be used to prepare the data for training a model.
+    This includes methods to perform time embedding and PCA.
+    """
+
+    def __init__(self, inputs, store_dir="tmp", output_file=None):
+        super().__init__(inputs, store_dir)
+        if output_file is None:
+            self.output_file = f"dataset_{self._identifier}.npy"
+
+    def prepare_memmap_filenames(self):
         self.te_pattern = "te_data_{{i:0{width}d}}.npy".format(
             width=len(str(len(self.inputs)))
         )
@@ -35,6 +43,9 @@ class PreprocessedData(Data):
     def prepare(
         self, n_embeddings: int, n_pca_components: int, whiten: bool,
     ):
+        self.prepare_memmap_filenames()
+
+        # Time embed the data for each subject
         for memmap, new_file in zip(
             tqdm(self.raw_data_memmaps, desc="Time embedding", ncols=98),
             self.te_filenames,
@@ -52,9 +63,12 @@ class PreprocessedData(Data):
 
             self.te_memmaps.append(te_memmap)
 
+        # Perform principle component analysis (PCA)
         pca = PCA(n_pca_components, svd_solver="full", whiten=whiten)
         for te_memmap in tqdm(self.te_memmaps, desc="Calculating PCA", ncols=98):
             pca.fit(te_memmap)
+
+        # Apply PCA to the data for each subject
         for output_file, te_memmap in zip(
             tqdm(self.output_filenames, desc="Applying PCA", ncols=98), self.te_memmaps
         ):
@@ -62,4 +76,10 @@ class PreprocessedData(Data):
             pca_result = array_to_memmap(output_file, pca_result)
             self.output_memmaps.append(pca_result)
 
+        # Update subjects to return the prepared data
+        self.subjects = self.output_memmaps
+
         self.prepared = True
+        self.n_embeddings = n_embeddings
+        self.n_pca_components = n_pca_components
+        self.whiten = whiten
