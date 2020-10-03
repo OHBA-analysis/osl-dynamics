@@ -195,32 +195,6 @@ def time_embed(
     return time_embedded_series
 
 
-def covariance(time_series: np.ndarray, weighted: bool = False) -> np.ndarray:
-    if weighted:
-        weight = time_series.shape[0] - 1
-    else:
-        weight = 1.0
-    return weight * np.cov(time_series, rowvar=False)
-
-
-def eigen_decomposition(
-    covariance: np.ndarray, n_components: int
-) -> (np.ndarray, np.ndarray):
-    # Calculate the eigen decomposition
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
-
-    # Sort the eigenvalues into desending order
-    order = np.argsort(eigenvalues)[::-1]
-    eigenvalues = eigenvalues[order]
-    eigenvectors = eigenvectors[:, order]
-
-    # Only keep the first n_components
-    eigenvalues = eigenvalues[:n_components]
-    eigenvectors = eigenvectors[:, :n_components]
-
-    return eigenvalues, eigenvectors
-
-
 def prepare(
     subjects, n_embeddings: int, n_pca_components: int, whiten: bool,
 ):
@@ -244,36 +218,6 @@ def prepare(
         subject.prepared = True
 
     return subjects
-
-
-def inferred_states_to_source_space(inferred_covariances, state_time_course, meg_data):
-    """Take VRAD results and transform them to source space."""
-
-    n_states = inferred_covariances.shape[0]
-    n_source_channels = meg_data[0].original_shape[1]
-    n_embeddings = meg_data.pca.components_.shape[1] // n_source_channels
-    n_samples = state_time_course.shape[0]
-
-    state_indexer = np.eye(n_states, dtype=bool)
-
-    state_covariances = np.empty((n_states, n_source_channels, n_source_channels))
-    state_recon_time_series = np.empty((n_states, n_samples, n_source_channels))
-
-    for state in trange(n_states, desc="Recovering source space", ncols=98):
-        inferred_state_covariance = (
-            inferred_covariances * state_indexer[state][:, None, None]
-        )
-
-        state_sim = VRADSimulation(inferred_state_covariance, state_time_course)
-        state_sim.simulate()
-
-        time_embedded_state_sim = meg_data.pca.inverse_transform(state_sim.time_series)
-        state_recon_time_series[state] = time_embedded_state_sim.reshape(
-            n_samples, n_source_channels, -1
-        )[..., (n_embeddings + 1) // 2]
-        state_covariances[state] = np.cov(state_recon_time_series[state].T)
-
-    return state_recon_time_series, state_covariances
 
 
 def num_batches(arr, sequence_length: int, step_size: int = None):
