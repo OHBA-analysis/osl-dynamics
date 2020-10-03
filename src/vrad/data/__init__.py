@@ -1,5 +1,6 @@
-from vrad.data.big_data import BigData
-from vrad.data.osl import OSL_HMM
-from vrad.data.subject import Subject
+from vrad.data._base import Data
+from vrad.data._preprocessed import PreprocessedData
+from vrad.data._osl import OSL_HMM
+from vrad.data._subject import Subject
 
-__all__ = ["BigData", "Subject", "OSL_HMM"]
+__all__ = ["Data", "PreprocessedData", "OSL_HMM", "Subject"]

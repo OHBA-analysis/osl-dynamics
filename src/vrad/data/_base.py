@@ -10,15 +10,19 @@ from vrad.utils.misc import MockArray, array_to_memmap
 
 
 class Data:
-    raw_data_pattern = "input_data_{{i:0{width}d}}.npy"
+    raw_data_pattern = "input_data_{{i:0{width}d}}_{identifier}.npy"
     n_embeddings = None
 
-    def __init__(self, inputs, store_dir="tmp", output_file="dataset.npy"):
-        self.inputs = inputs
+    def __init__(self, inputs, store_dir="tmp", output_file=None):
+        # Identifier for the data
+        self._identifier = id(inputs)
+
+        # Input files
+        self.inputs = [inputs] if isinstance(inputs, str) else inputs
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
         self.raw_data_pattern = self.raw_data_pattern.format(
-            width=len(str(len(inputs)))
+            width=len(str(len(inputs))), identifier=self._identifier
         )
 
         # raw data memory maps
@@ -27,7 +31,8 @@ class Data:
             for i, _ in enumerate(inputs)
         ]
 
-        self.output_file = output_file
+        if output_file is None:
+            self.output_file = f"dataset_{self._identifier}.npy"
 
         # Load the preprocessed data
         self.raw_data_memmaps = self.load_data()
@@ -61,6 +66,7 @@ class Data:
         for in_file, out_file in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
+            np.save(out_file, io.load_data(in_file)[0])
             memmaps.append(io.load_data(out_file, mmap_location=out_file)[0])
         return memmaps
 
@@ -107,11 +113,11 @@ class Data:
         return subject_datasets
 
     def prepare_memmap_filenames(self):
-        self.te_pattern = "te_data_{{i:0{width}d}}.npy".format(
-            width=len(str(len(self.inputs)))
+        self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(self.inputs))), identifier=self._identifier
         )
-        self.output_pattern = "output_data_{{i:0{width}d}}.npy".format(
-            width=len(str(len(self.inputs)))
+        self.output_pattern = "output_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(self.inputs))), identifier=self._identifier
         )
 
         # Time embedded data memory maps
