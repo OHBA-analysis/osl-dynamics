@@ -88,7 +88,9 @@ def state_spectra(
     """
 
     # Validation
-    if type(data) != type(state_probabilities):
+    if (isinstance(data, list) != isinstance(state_probabilities, list)) or (
+        isinstance(data, np.ndarray) != isinstance(state_probabilities, np.ndarray)
+    ):
         raise ValueError(
             f"data is type {type(data)} and state_probabilities is type "
             + f"{type(state_probabilities)}. They must both be lists or numpy arrays."

@@ -54,20 +54,15 @@ class PreprocessedData(Data):
             self.discontinuities,
             self.te_filenames,
         ):
-            # Standardise
             memmap = manipulation.standardize(memmap, discontinuities)
-
-            # Time embeddings
             te_shape = (
                 memmap.shape[0] - (n_embeddings + 1) * len(discontinuities),
                 memmap.shape[1] * (n_embeddings + 2),
             )
             te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
-
             te_memmap = manipulation.time_embed(
                 memmap, discontinuities, n_embeddings, output_file=te_memmap
             )
-
             self.te_memmaps.append(te_memmap)
 
         # Update discontinuity indices
@@ -88,12 +83,18 @@ class PreprocessedData(Data):
             u = u @ np.diag(1.0 / np.sqrt(s))
 
         # Apply PCA to the data for each subject and standardise again
-        for output_file, te_memmap, discontinuities in zip(
-            tqdm(self.output_filenames, desc="Applying PCA", ncols=98),
-            self.te_memmaps,
+        for te_memmap, discontinuities, output_file in zip(
+            tqdm(self.te_memmaps, desc="Applying PCA", ncols=98),
             self.discontinuities,
+            self.output_filenames,
         ):
-            # Apply PCA and standardise again
+            pca_te_shape = (
+                te_memmap.shape[0] - (n_embeddings + 1) * len(discontinuities),
+                n_pca_components,
+            )
+            pca_te_memmap = MockArray.get_memmap(
+                output_file, pca_te_shape, dtype=np.float32
+            )
             pca_te_memmap = te_memmap @ u
             pca_te_memmap = manipulation.standardize(pca_te_memmap, discontinuities)
             self.output_memmaps.append(pca_te_memmap)
@@ -105,3 +106,23 @@ class PreprocessedData(Data):
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components
         self.whiten = whiten
+
+
+    def trim_raw_time_series(self, n_embeddings=None, sequence_length=None):
+        """Trims the raw preprocessed data time series.
+
+        Removes the data points that are removed when the data is prepared,
+        i.e. due to time embedding and separating into sequences, but does not
+        perform time embedding or batching into sequences on the time series.
+        """
+        trimmed_raw_time_series = []
+        for memmap in self.raw_data_memmaps:
+            if n_embeddings is not None:
+                # Remove data points which are removed due to time embedding
+                memmap = memmap[n_embeddings // 2 : -n_embeddings // 2]
+            if sequence_length is not None:
+                # Remove data points which are removed due to separating into sequences
+                n_sequences = memmap.shape[0] // sequence_length
+                memmap = memmap[: n_sequences * sequence_length]
+            trimmed_raw_time_series.append(memmap)
+        return trimmed_raw_time_series

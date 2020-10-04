@@ -1,17 +1,17 @@
-"""Example script for running inference on real MEG data for one subject.
+"""Example script for running inference on real MEG data for ten subjects.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
 - Uses the final covariances inferred by an HMM fit from OSL.
-- Achieves a dice coefficient of ~0.54 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~2,670,000.
+- Achieves a dice coefficient of ~0.37 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~26,600,000.
 """
-import vrad.data.osl
+
+print("Setting up")
+import numpy as np
 from vrad import data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
-
-print("Setting up")
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -20,7 +20,7 @@ multi_gpu = True
 # Settings
 n_states = 6
 sequence_length = 400
-batch_size = 64
+batch_size = 128
 
 do_annealing = True
 annealing_sharpness = 5
@@ -36,23 +36,25 @@ normalization_type = "layer"
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 64
+n_units_inference = 128
+n_units_model = 128
 
 learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-learn_alpha_scaling = True
-normalize_covariances = True
+learn_alpha_scaling = False
+normalize_covariances = False
 
 # Read MEG data
 print("Reading MEG data")
-prepared_data = data.Data("/well/woolrich/shared/vrad/prepared_data/one_subject.mat")
+prepared_data = data.Data(
+    [f"/well/woolrich/shared/vrad/prepared_data/subject{i}.mat" for i in range(1, 11)]
+)
 n_channels = prepared_data.n_channels
 
 # Priors: we use the covariance matrices inferred by fitting an HMM with OSL
-hmm = vrad.data.osl.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/nSubjects-10_K-6/hmm.mat")
 initial_covariances = hmm.covariances
 
 # Build model
@@ -89,31 +91,42 @@ history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
 model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/one_subject_example1/weights"
+    "/well/woolrich/shared/vrad/trained_models/ten_subjects_example/weights"
 )
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state probabilities and state time course
-alpha = model.predict_states(prediction_dataset)[0]
-stc = states.time_courses(alpha)
-
-# Find correspondance between HMM and inferred state time courses
-matched_hmm_stc, matched_inf_stc = states.match_states(hmm.state_time_course, stc)
+# Inferred state probabilities and state time courses
+alpha = model.predict_states(prediction_dataset)
+inf_stc = np.concatenate(states.time_courses(alpha), axis=0)
+hmm_stc = np.concatenate(
+    hmm.get_state_time_course(
+        discontinuities=prepared_data.discontinuities,
+        n_embeddings=13,
+        sequence_length=sequence_length,
+    ),
+    axis=0,
+)
 
 # Dice coefficient
-print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, matched_inf_stc))
+print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
-# Load preprocessed (i.e. unprepared) data to calculate state spectra
-preprocessed_data = data.Data(
-    "/well/woolrich/shared/vrad/preprocessed_data/subject1.mat"
+# Load preprocessed data to calculate spatial power maps
+preprocessed_data = data.PreprocessedData(
+    [
+        f"/well/woolrich/shared/vrad/preprocessed_data/subject{i}.mat"
+        for i in range(1, 11)
+    ]
+)
+preprocessed_time_series = preprocessed_data.trim_raw_time_series(
+    n_embeddings=13, sequence_length=sequence_length
 )
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
-    data=preprocessed_data.time_series,
+    data=preprocessed_time_series,
     state_probabilities=alpha,
     sampling_frequency=250,
     time_half_bandwidth=4,

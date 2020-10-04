@@ -75,7 +75,7 @@ def time_embed(
     return time_embedded_series
 
 
-def num_batches(arr, sequence_length: int, step_size: int = None):
+def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
     step_size = step_size or sequence_length
     final_slice_start = arr.shape[0] - sequence_length + 1
     index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(

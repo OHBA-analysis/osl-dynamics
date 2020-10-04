@@ -127,9 +127,9 @@ print(f"Free energy: {free_energy}")
 
 # Inferred state probabiliites and state time course
 alpha = model.predict_states(prediction_dataset)[0]
-stc = states.time_courses(alpha)
+inf_stc = states.time_courses(alpha)
 
 # Find correspondance to ground truth state time courses
-matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, stc)
+matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))

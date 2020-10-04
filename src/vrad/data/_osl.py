@@ -43,6 +43,24 @@ class OSL_HMM:
             ]
         )
 
+    def get_state_time_course(
+        self, discontinuities, n_embeddings, sequence_length,
+    ):
+        # Separate the state time course in subject state time courses
+        subject_data_lengths = [sum(d) for d in discontinuities]
+        hmm_stc = []
+        for i in range(len(subject_data_lengths)):
+            start = sum(subject_data_lengths[:i])
+            end = sum(subject_data_lengths[:i+1])
+            hmm_stc.append(self.state_time_course[start:end])
+
+        # Remove data points lost to separating into sequences
+        for i in range(len(hmm_stc)):
+            n_sequences = hmm_stc[i].shape[0] // sequence_length
+            hmm_stc[i] = hmm_stc[i][: n_sequences * sequence_length]
+
+        return hmm_stc
+
     def plot_covariances(self, *args, **kwargs):
         """Wraps plotting.plot_matrices for self.covariances."""
         plotting.plot_matrices(self.covariances, *args, **kwargs)

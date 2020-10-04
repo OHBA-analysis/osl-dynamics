@@ -13,7 +13,6 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
-from vrad.data.big_data import BigData
 from vrad.inference.callbacks import (
     AnnealingCallback,
     SaveBestCallback,
@@ -223,25 +222,25 @@ class BaseModel:
         return self.model.fit(*args, **kwargs)
 
     def _make_dataset(self, inputs):
-        if isinstance(inputs, (Data, BigData)):
+        if isinstance(inputs, Data):
             return inputs.prediction_dataset(self.sequence_length)
         if isinstance(inputs, Dataset):
             return [inputs]
         if isinstance(inputs, str):
-            return [BigData(inputs).prediction_dataset(self.sequence_length)]
+            return [Data(inputs).prediction_dataset(self.sequence_length)]
         if isinstance(inputs, np.ndarray):
             if inputs.ndim == 2:
-                return [BigData(inputs).prediction_dataset(self.sequence_length)]
+                return [Data(inputs).prediction_dataset(self.sequence_length)]
             if inputs.ndim == 3:
                 return [
-                    BigData(subject).prediction_dataset(self.sequence_length)
+                    Data(subject).prediction_dataset(self.sequence_length)
                     for subject in inputs
                 ]
         if check_iterable_type(inputs, Dataset):
             return inputs
         if check_iterable_type(inputs, str):
             datasets = [
-                BigData(subject).prediction_dataset(self.sequence_length)
+                Data(subject).prediction_dataset(self.sequence_length)
                 for subject in inputs
             ]
             return datasets

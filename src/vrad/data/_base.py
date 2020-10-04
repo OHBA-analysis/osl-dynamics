@@ -98,7 +98,7 @@ class Data:
         for subject_dataset in subject_datasets[1:]:
             full_dataset = full_dataset.concatenate(subject_dataset)
 
-        return full_dataset.batch(batch_size).prefetch(-1)
+        return full_dataset.batch(batch_size).shuffle(100000).prefetch(-1)
 
     def prediction_dataset(self, sequence_length, batch_size):
         """Returns a tensorflow dataset for predicting the hidden state time course."""

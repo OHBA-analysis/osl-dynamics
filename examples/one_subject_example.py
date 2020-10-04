@@ -1,18 +1,16 @@
 """Example script for running inference on real MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Data preparation is performed within V-RAD.
-- Initialises the covariances with the identity matrix.
-- Achieves a dice coefficient of ~0.27 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~2,680,000.
+- Uses the final covariances inferred by an HMM fit from OSL.
+- Achieves a dice coefficient of ~0.5 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~2,600,000.
 """
-import vrad.data.osl
-from vrad import array_ops, data
+
+print("Setting up")
+from vrad import data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
-
-print("Setting up")
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -44,17 +42,17 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-learn_alpha_scaling = True
-normalize_covariances = True
-
-n_initializations = 4
-n_epochs_initialization = 20
+learn_alpha_scaling = False
+normalize_covariances = False
 
 # Read MEG data
 print("Reading MEG data")
-meg_data = data.Data("/well/woolrich/shared/vrad/preprocessed_data/subject1.mat")
-meg_data.prepare(n_embeddings=13, n_pca_components=80, whiten=True)
-n_channels = meg_data.n_channels
+prepared_data = data.Data("/well/woolrich/shared/vrad/prepared_data/subject1.mat")
+n_channels = prepared_data.n_channels
+
+# Priors: we use the covariance matrices inferred by fitting an HMM with OSL
+hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/nSubjects-1_K-6/hmm.mat")
+initial_covariances = hmm.covariances
 
 # Build model
 model = RNNGaussian(
@@ -63,6 +61,7 @@ model = RNNGaussian(
     sequence_length=sequence_length,
     learn_means=learn_means,
     learn_covariances=learn_covariances,
+    initial_covariances=initial_covariances,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -81,43 +80,44 @@ model = RNNGaussian(
 model.summary()
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
+training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
-# Initialise means and covariances
-model.initialize_means_covariances(
-    n_initializations=n_initializations,
-    n_epochs_initialization=n_epochs_initialization,
-    training_dataset=training_dataset,
-)
-
-# Train the model
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Save trained model
 model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/one_subject_example2/weights"
+    "/well/woolrich/shared/vrad/trained_models/one_subject_example/weights"
 )
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state probabilities and state time course
+# Inferred state probabilities and state time courses
 alpha = model.predict_states(prediction_dataset)[0]
-stc = states.time_courses(alpha)
-
-# Find correspondance between HMM and inferred state time courses
-hmm = vrad.data.osl.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/one_subject.mat")
-matched_hmm_stc, matched_inf_stc = states.match_states(hmm.state_time_course, stc)
+inf_stc = states.time_courses(alpha)
+hmm_stc = hmm.get_state_time_course(
+    discontinuities=prepared_data.discontinuities,
+    n_embeddings=13,
+    sequence_length=sequence_length,
+)[0]
 
 # Dice coefficient
-print("Dice coefficient:", metrics.dice_coefficient(matched_hmm_stc, matched_inf_stc))
+print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
+
+# Load preprocessed data to calculate spatial power maps
+preprocessed_data = data.PreprocessedData(
+    "/well/woolrich/shared/vrad/preprocessed_data/subject1.mat"
+)
+preprocessed_time_series = preprocessed_data.trim_raw_time_series(
+    n_embeddings=13, sequence_length=sequence_length
+)[0]
 
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
-    data=meg_data.raw_data[0],
+    data=preprocessed_time_series,
     state_probabilities=alpha,
     sampling_frequency=250,
     time_half_bandwidth=4,
