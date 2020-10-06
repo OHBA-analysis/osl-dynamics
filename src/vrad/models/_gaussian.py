@@ -349,7 +349,7 @@ class RNNGaussian(BaseModel):
             theta_t[-1] = mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]
 
             # Calculate the state probabilities
-            alpha_t = self.state_probabilities(theta_t[-1])
+            alpha_t = self.state_probabilities([theta_t[-1]])[0]
 
             # Hard classify the state time course
             sampled_stc[i, np.argmax(alpha_t)] = 1
