@@ -134,6 +134,7 @@ class BaseModel:
         use_tensorboard,
         tensorboard_dir,
         save_best_after,
+        save_filepath,
     ):
         additional_callbacks = []
 
@@ -176,9 +177,11 @@ class BaseModel:
 
         # Callback to save the best model after a certain number of epochs
         if save_best_after is not None:
+            if save_filepath is None:
+                save_filepath = f"/tmp/model_weights/best_{self._identifier}"
             save_best_callback = SaveBestCallback(
                 save_best_after=save_best_after,
-                filepath=f"/tmp/model_weights/best_{self._identifier}",
+                filepath=save_filepath,
             )
 
             additional_callbacks.append(save_best_callback)
@@ -194,6 +197,7 @@ class BaseModel:
         use_tensorboard=None,
         tensorboard_dir=None,
         save_best_after=None,
+        save_filepath=None,
         **kwargs,
     ):
         """Wrapper for the standard keras fit method.
@@ -213,6 +217,7 @@ class BaseModel:
                 use_tensorboard,
                 tensorboard_dir,
                 save_best_after,
+                save_filepath,
             ),
             args=args,
             kwargs=kwargs,
