@@ -4,7 +4,7 @@ from typing import Tuple, Union
 import mat73
 import numpy as np
 import scipy.io
-from vrad.utils.misc import check_iterable_type, listify, time_axis_first
+from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")
 
@@ -45,7 +45,7 @@ def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
 
 def load_matlab(
     file_name: str, sampling_frequency: float = 1, ignored_keys=None
-) -> Tuple[np.ndarray, float]:
+) -> Tuple[np.ndarray, np.ndarray, float]:
     try:
         mat = scipy.io.loadmat(file_name)
     except NotImplementedError:
@@ -71,9 +71,9 @@ def load_data(
     time_series: Union[str, np.ndarray],
     sampling_frequency: float = 1,
     mmap_location=None,
-) -> Tuple[np.ndarray, float]:
-
+) -> Tuple[np.ndarray, np.ndarray, float]:
     # Read time series from a file
+    discontinuity_indices = None
     if isinstance(time_series, str):
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
