@@ -70,7 +70,7 @@ class Simulation(ABC):
         return self.time_series
 
     def __iter__(self):
-        return iter(self.time_series)
+        return iter([self.time_series])
 
     def __getattr__(self, attr):
         if attr == "time_series":
@@ -78,6 +78,9 @@ class Simulation(ABC):
         if attr[:2] == "__":
             raise AttributeError(f"No attribute called {attr}.")
         return getattr(self.time_series, attr)
+
+    def __len__(self):
+        return 1
 
     @abstractmethod
     def generate_states(self) -> np.ndarray:

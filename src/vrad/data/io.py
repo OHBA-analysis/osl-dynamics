@@ -72,8 +72,13 @@ def load_data(
     sampling_frequency: float = 1,
     mmap_location=None,
 ) -> Tuple[np.ndarray, np.ndarray, float]:
-    # Read time series from a file
+    """Loads data.
+
+    Accepts a numpy array or a string containing the path to a .npy or .mat file.
+    """
     discontinuity_indices = None
+
+    # Read time series from a file
     if isinstance(time_series, str):
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
@@ -95,13 +100,14 @@ def load_data(
     # Check time is the first axis, channels are the second axis
     time_series = time_axis_first(time_series)
 
+    # Load from memmap
+    if mmap_location is not None:
+        np.save(mmap_location, time_series)
+        time_series = np.load(mmap_location, mmap_mode="r+")
+
     # Indicate the entire time series is continuous if discontinuities have not
     # been passed
     if discontinuity_indices is None:
         discontinuity_indices = [time_series.shape[0]]
-
-    if mmap_location is not None:
-        np.save(mmap_location, time_series)
-        time_series = np.load(mmap_location, mmap_mode="r+")
 
     return time_series, discontinuity_indices, sampling_frequency

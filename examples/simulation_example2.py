@@ -69,7 +69,7 @@ n_channels = meg_data.n_channels
 
 # Priors
 means, covariances = gmm.final_means_covariances(
-    meg_data,
+    meg_data.subjects[0],
     n_states,
     gmm_kwargs={
         "n_init": 1,
