@@ -102,7 +102,8 @@ print(f"Free energy: {free_energy}")
 alpha = model.predict_states(prediction_dataset)
 inf_stc = np.concatenate(states.time_courses(alpha), axis=0)
 hmm_stc = np.concatenate(
-    hmm.get_state_time_course(
+    hmm.trim_time_series(
+        time_series=hmm.state_time_course,
         discontinuities=prepared_data.discontinuities,
         n_embeddings=13,
         sequence_length=sequence_length,

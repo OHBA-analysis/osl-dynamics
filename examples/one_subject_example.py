@@ -98,7 +98,8 @@ print(f"Free energy: {free_energy}")
 # Inferred state probabilities and state time courses
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
-hmm_stc = hmm.get_state_time_course(
+hmm_stc = hmm.trim_time_series(
+    time_series=hmm.state_time_course,
     discontinuities=prepared_data.discontinuities,
     n_embeddings=13,
     sequence_length=sequence_length,
