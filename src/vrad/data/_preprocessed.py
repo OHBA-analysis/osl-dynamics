@@ -107,7 +107,6 @@ class PreprocessedData(Data):
         self.n_pca_components = n_pca_components
         self.whiten = whiten
 
-
     def trim_raw_time_series(self, n_embeddings=None, sequence_length=None):
         """Trims the raw preprocessed data time series.
 

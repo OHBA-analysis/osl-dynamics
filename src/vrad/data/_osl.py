@@ -43,30 +43,6 @@ class OSL_HMM:
             ]
         )
 
-    def trim_time_series(
-        self, time_series, discontinuities, n_embeddings, sequence_length,
-    ):
-        """Trim a time series to calculate spatial maps.
-
-        Separates a time series into the time series for subjects and removes
-        data points lost due to separating the data into sequences.
-        """
-
-        # Separate the time series for each subject
-        subject_data_lengths = [sum(d) for d in discontinuities]
-        ts = []
-        for i in range(len(subject_data_lengths)):
-            start = sum(subject_data_lengths[:i])
-            end = sum(subject_data_lengths[:i+1])
-            ts.append(time_series[start:end])
-
-        # Remove data points lost to separating into sequences
-        for i in range(len(ts)):
-            n_sequences = ts[i].shape[0] // sequence_length
-            ts[i] = ts[i][: n_sequences * sequence_length]
-
-        return ts
-
     def plot_covariances(self, *args, **kwargs):
         """Wraps plotting.plot_matrices for self.covariances."""
         plotting.plot_matrices(self.covariances, *args, **kwargs)

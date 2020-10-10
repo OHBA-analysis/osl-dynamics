@@ -82,3 +82,28 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
         sequence_length
     )
     return len(index)
+
+
+def trim_time_series(
+    time_series, discontinuities, n_embeddings, sequence_length,
+):
+    """Trims a time series.
+
+    Removes data points lost to time embedding and separating a time series
+    into sequences.
+    """
+
+    # Separate the time series for each subject
+    subject_data_lengths = [sum(d) for d in discontinuities]
+    ts = []
+    for i in range(len(subject_data_lengths)):
+        start = sum(subject_data_lengths[:i])
+        end = sum(subject_data_lengths[: i + 1])
+        ts.append(time_series[start:end])
+
+    # Remove data points lost to separating into sequences
+    for i in range(len(ts)):
+        n_sequences = ts[i].shape[0] // sequence_length
+        ts[i] = ts[i][: n_sequences * sequence_length]
+
+    return ts
