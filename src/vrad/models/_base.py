@@ -128,7 +128,7 @@ class BaseModel:
 
     def create_callbacks(
         self,
-        no_annealing,
+        no_annealing_callback,
         use_tqdm,
         tqdm_class,
         use_tensorboard,
@@ -139,7 +139,7 @@ class BaseModel:
         additional_callbacks = []
 
         # Callback for KL annealing
-        if not no_annealing:
+        if not no_annealing_callback:
             annealing_callback = AnnealingCallback(
                 annealing_factor=self.annealing_factor,
                 annealing_sharpness=self.annealing_sharpness,
@@ -191,7 +191,7 @@ class BaseModel:
     def fit(
         self,
         *args,
-        no_annealing=False,
+        no_annealing_callback=False,
         use_tqdm=False,
         tqdm_class=None,
         use_tensorboard=None,
@@ -211,7 +211,7 @@ class BaseModel:
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                no_annealing,
+                no_annealing_callback,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
