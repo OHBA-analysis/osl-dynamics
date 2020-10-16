@@ -7,7 +7,7 @@ from operator import lt
 import numpy as np
 from tensorflow import zeros
 from tensorflow.keras import Model, layers
-from tensorflow.nn import softmax, softplus
+from tensorflow.nn import softmax, softplus, relu
 from tqdm import trange
 from vrad.array_ops import get_one_hot
 from vrad.inference.functions import (
@@ -134,6 +134,8 @@ class RNNGaussian(BaseModel):
         """Calculates the state probability alpha_t given the logits theta_t."""
         if self.alpha_xform == "softplus":
             alpha_t = softplus(theta_t).numpy()
+        elif self.alpha_xform == "relu":
+            alpha_t = relu(theta_t).numpy()
         elif self.alpha_xform == "softmax":
             alpha_t = softmax(theta_t).numpy()
         elif self.alpha_xform == "categorical":
@@ -142,7 +144,7 @@ class RNNGaussian(BaseModel):
             alpha_t = get_one_hot(alpha_t)
         else:
             raise ValueError(
-                "alpha_xform must be 'softplus', 'softmax' or 'categorical'."
+                "alpha_xform must be 'softplus', 'relu', 'softmax' or 'categorical'."
             )
         return alpha_t
 

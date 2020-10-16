@@ -5,10 +5,8 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations
 from tensorflow.keras import backend as K
-from tensorflow.keras import layers
-from tensorflow.keras.activations import softmax, softplus
+from tensorflow.keras import activations, layers
 from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (
     cholesky_factor,
@@ -247,15 +245,17 @@ class MixMeansCovsLayer(layers.Layer):
         theta_t, mu, D = inputs
 
         if self.alpha_xform == "softplus":
-            alpha_t = softplus(theta_t)
+            alpha_t = activations.softplus(theta_t)
+        elif self.alpha_xform == "relu":
+            alpha_t = activations.relu(theta_t)
         elif self.alpha_xform == "softmax":
-            alpha_t = softmax(theta_t, axis=2)
+            alpha_t = activations.softmax(theta_t, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=0.5, probs=softmax(theta_t, axis=2)
+                temperature=0.5, probs=activations.softmax(theta_t, axis=2)
             )
             alpha_t = gumbel_softmax_distribution.sample()
-        alpha_t = tf.multiply(alpha_t, softplus(self.alpha_scaling))
+        alpha_t = tf.multiply(alpha_t, activations.softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
         alpha_t = K.expand_dims(alpha_t, axis=-1)
