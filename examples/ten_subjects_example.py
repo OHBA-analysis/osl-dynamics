@@ -151,3 +151,6 @@ maps.save_nii_file(
     filename="power_map.nii.gz",
     component=0,
 )
+
+# Delete the temporary folder holding the data
+meg_data.delete_dir()
