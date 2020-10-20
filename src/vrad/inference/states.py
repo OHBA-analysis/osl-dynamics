@@ -19,11 +19,13 @@ def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
     Hard classifies the state probabilities (alpha).
     """
     if isinstance(alpha, list):
+        n_states = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
-        stcs = [array_ops.get_one_hot(stc) for stc in stcs]
+        stcs = [array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs]
     else:
+        n_states = alpha.shape[1]
         stcs = alpha.argmax(axis=1)
-        stcs = array_ops.get_one_hot(stcs)
+        stcs = array_ops.get_one_hot(stcs, n_states=n_states)
     return stcs
 
 
