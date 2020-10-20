@@ -864,25 +864,33 @@ def plot_state_lifetimes(
 
 
 def plot_state_time_courses(
-    state_time_course: np.ndarray,
-    axis: plt.Axes = None,
+    *state_time_courses: List[np.ndarray],
     n_samples: int = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
-    y_tick_values: list = None,
     filename: str = None,
 ):
-    """Alias for plot_time_series."""
+    """Plot state time courses as separate subplots."""
 
-    plot_time_series(
-        time_series=state_time_course,
-        axis=axis,
-        n_samples=n_samples,
-        plot_kwargs=plot_kwargs,
-        fig_kwargs=fig_kwargs,
-        y_tick_values=y_tick_values,
-        filename=filename,
-    )
+    state_time_courses = np.asarray(state_time_courses)
+
+    n_lines = state_time_courses.shape[0]
+    n_samples = min(n_samples or np.inf, state_time_courses.shape[1])
+    n_states = state_time_courses.shape[2]
+
+    default_fig_kwargs = {"figsize": (20, 10)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+    fig, axis = plt.subplots(n_states, **fig_kwargs)
+
+    default_plot_kwargs = {"lw": 0.7}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+    for i in range(n_lines):
+        for j in range(n_states):
+            axis[j].plot(state_time_courses[i, :n_samples, j])
+
+    plt.tight_layout()
+    show_or_save(filename)
 
 
 def compare_state_data(
