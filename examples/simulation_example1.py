@@ -66,7 +66,7 @@ meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
 # Priors
-means, covariances = gmm.final_means_covariances(
+initial_means, initial_covariances = gmm.final_means_covariances(
     meg_data.subjects[0],
     n_states,
     gmm_kwargs={
@@ -88,8 +88,8 @@ model = RNNGaussian(
     sequence_length=sequence_length,
     learn_means=learn_means,
     learn_covariances=learn_covariances,
-    initial_means=means,
-    initial_covariances=covariances,
+    initial_means=initial_means,
+    initial_covariances=initial_covariances,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -131,3 +131,6 @@ inf_stc = states.time_courses(alpha)
 matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
+
+# Delete the temporary folder holding the data
+meg_data.delete_dir()

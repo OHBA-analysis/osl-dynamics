@@ -2,6 +2,7 @@ import pathlib
 from typing import List
 
 import numpy as np
+from shutil import rmtree
 from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from vrad.data import io, manipulation
@@ -78,6 +79,10 @@ class Data:
                 for memmap in self.subjects
             ]
         )
+
+    def delete_dir(self):
+        """Deletes the directory that stores the memory maps."""
+        rmtree(self.store_dir, ignore_errors=True)
 
     def training_dataset(self, sequence_length, batch_size, step_size=None):
         """Returns a tensorflow dataset for training."""
