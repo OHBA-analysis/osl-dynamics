@@ -133,29 +133,22 @@ class RNNGaussian(BaseModel):
             outputs.append(alpha_t)
         return outputs
 
-    def free_energy(self, dataset, return_all=False):
-        """Calculates the variational free energy of a model given a dataset."""
-
+    def losses(self, dataset):
+        """Calculates the log-likelihood and KL loss for a dataset."""
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
-            ll_loss = []
-            kl_loss = []
-            for prediction in predictions:
-                ll_loss.append(np.sum(prediction["ll_loss"]))
-                kl_loss.append(np.sum(prediction["kl_loss"]))
-            ll_loss = np.sum(ll_loss)
-            kl_loss = np.sum(kl_loss)
+            ll_loss = np.sum([np.sum(p["ll_loss"]) for p in predictions])
+            kl_loss = np.sum([np.sum(p["kl_loss"]) for p in predictions])
         else:
             predictions = self.predict(dataset)
             ll_loss = np.sum(predictions["ll_loss"])
             kl_loss = np.sum(predictions["kl_loss"])
+        return ll_loss, kl_loss
 
-        free_energy = ll_loss + kl_loss
-
-        if return_all:
-            return free_energy, ll_loss, kl_loss
-        else:
-            return free_energy
+    def free_energy(self, dataset):
+        """Calculates the variational free energy of a dataset."""
+        ll_loss, kl_loss = self.losses(dataset)
+        return ll_loss + kl_loss
 
     def initialize_means_covariances(
         self,
