@@ -170,6 +170,24 @@ class Simulation(ABC):
 
         return data_sim.astype(np.float32)
 
+    def standardize(self):
+        """Standardizes the data.
+
+        The time series data is z-transformed and the covariances are converted
+        to correlation matrices.
+        """
+        self.means = np.mean(self.time_series, axis=0)
+        self.standard_deviations = np.std(self.time_series, axis=0)
+
+        # Z-transform
+        self.time_series -= self.means
+        self.time_series /= self.standard_deviations
+
+        # Convert covariance matrices to correlation matrices
+        self.covariances /= np.outer(
+            self.standard_deviations, self.standard_deviations
+        )[np.newaxis, ...]
+
     def plot_data(self, n_points: int = 1000, filename: str = None):
         """Method for plotting simulated data.
 
