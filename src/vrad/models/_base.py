@@ -58,8 +58,8 @@ class BaseModel:
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if normalization_type not in ["layer", "batch"]:
-            raise ValueError("normalization_type must be 'layer' or 'batch'.")
+        if normalization_type not in ["layer", "batch", None]:
+            raise ValueError("normalization_type must be 'layer', 'batch' or None.")
 
         # Identifier for the model
         self._identifier = np.random.randint(100000)

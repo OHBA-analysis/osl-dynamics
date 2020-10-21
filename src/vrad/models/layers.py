@@ -21,6 +21,26 @@ from vrad.inference.initializers import (
 )
 
 
+class DummyLayer(layers.Layer):
+    """Dummy layer.
+
+    Returns the inputs without modification.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, inputs, **kwargs):
+        return inputs
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def get_config(self):
+        config = super().get_config()
+        return config
+
+
 class TrainableVariablesLayer(layers.Layer):
     """Generic trainable variables layer.
 
@@ -103,8 +123,8 @@ class SampleNormalDistributionLayer(layers.Layer):
         return config
 
 
-class StateProbabilityLayer(layers.Layer):
-    """Layer for calculating state probabilities.
+class StateMixingRatiosLayer(layers.Layer):
+    """Layer for calculating the mixing ratio of the states.
 
     This layer accepts the logits theta_t and outputs alpha_t.
     """
@@ -268,6 +288,7 @@ class MixMeansCovsLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         """Computes m_t = Sum_j alpha_jt mu_j and C_t = Sum_j alpha^2_jt D_j."""
+
         # Unpack the inputs:
         # - alpha_t.shape = (None, sequence_length, n_states)
         # - mu.shape      = (n_states, n_channels)

@@ -17,6 +17,7 @@ from vrad.inference.functions import (
 )
 from vrad.models import BaseModel
 from vrad.models.layers import (
+    DummyLayer,
     InferenceRNNLayers,
     KLDivergenceLayer,
     LogLikelihoodLayer,
@@ -24,7 +25,7 @@ from vrad.models.layers import (
     MixMeansCovsLayer,
     ModelRNNLayers,
     SampleNormalDistributionLayer,
-    StateProbabilityLayer,
+    StateMixingRatiosLayer,
     TrainableVariablesLayer,
 )
 from vrad.utils.misc import check_arguments
@@ -353,6 +354,8 @@ def _model_structure(
         NormalizationLayer = layers.BatchNormalization
     elif normalization_type == "layer":
         NormalizationLayer = layers.LayerNormalization
+    else:
+        NormalizationLayer = DummyLayer
 
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
@@ -386,7 +389,7 @@ def _model_structure(
     theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
 
     # Layer to convert theta_t into state probabilities alpha_t
-    alpha_t_layer = StateProbabilityLayer(alpha_xform, name="alpha_t")
+    alpha_t_layer = StateMixingRatiosLayer(alpha_xform, name="alpha_t")
 
     # Inference RNN data flow
     inputs_norm = input_norm_layer(inputs)
