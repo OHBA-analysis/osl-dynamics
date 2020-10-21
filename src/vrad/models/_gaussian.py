@@ -282,13 +282,13 @@ class RNNGaussian(BaseModel):
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
         mu_theta_jt_norm_layer = self.model.get_layer("mu_theta_jt_norm")
+        log_sigma_theta_j_norm_layer = self.model.get_layer("log_sigma_theta_j_norm")
         theta_t_norm_layer = self.model.get_layer("theta_t_norm")
         alpha_t_layer = self.model.get_layer("alpha_t")
 
         # Calculate the standard deviation of the probability distribution function
         # This has been learnt for each state during training
         log_sigma_theta_j = self.model.get_layer("log_sigma_theta_j").get_weights()[0]
-        log_sigma_theta_j_norm_layer = self.model.get_layer("log_sigma_theta_j_norm")
         log_sigma_theta_j_norm = log_sigma_theta_j_norm_layer(log_sigma_theta_j)
         sigma_theta_j_norm = np.exp(log_sigma_theta_j_norm)
 
@@ -297,17 +297,19 @@ class RNNGaussian(BaseModel):
         theta_t_norm = np.zeros([sequence_length, self.n_states], dtype=np.float32)
 
         # Normally distributed random numbers used to sample the logits theta_t
-        epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states])
+        epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states]).astype(
+            np.float32
+        )
 
         # Randomly select the first theta_t assuming zero means
-        theta_t = sigma_theta_j_norm * epsilon[-1]
-        theta_t_norm[-1] = theta_t_norm_layer(theta_t)
+        theta_t = np.array([[sigma_theta_j_norm * epsilon[-1]]])
+        theta_t_norm[-1] = theta_t_norm_layer(theta_t)[0]
 
         # Sample state time course
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
             # If there are leading zeros we trim theta_t so that we don't pass the zeros
-            trimmed_theta_t_norm = theta_t_norm[~np.all(theta_t == 0, axis=1)][
+            trimmed_theta_t_norm = theta_t_norm[~np.all(theta_t_norm == 0, axis=1)][
                 np.newaxis, :, :
             ]
 
@@ -322,11 +324,11 @@ class RNNGaussian(BaseModel):
             theta_t_norm = np.roll(theta_t_norm, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t = mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]
-            theta_t_norm[-1] = theta_t_norm_layer(theta_t)
+            theta_t = np.array([[mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]]])
+            theta_t_norm[-1] = theta_t_norm_layer(theta_t)[0]
 
             # Calculate the state probabilities
-            alpha_t = alpha_t_layer([theta_t_norm[-1]])[0]
+            alpha_t = alpha_t_layer(theta_t_norm[-1][np.newaxis, np.newaxis, :])
 
             # Hard classify the state time course
             sampled_stc[i, np.argmax(alpha_t)] = 1
