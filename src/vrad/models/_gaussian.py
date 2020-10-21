@@ -25,7 +25,7 @@ from vrad.models.layers import (
     MixMeansCovsLayer,
     ModelRNNLayers,
     SampleNormalDistributionLayer,
-    StateMixingRatiosLayer,
+    StateMixingFactorsLayer,
     TrainableVariablesLayer,
 )
 from vrad.utils.misc import check_arguments
@@ -56,7 +56,7 @@ class RNNGaussian(BaseModel):
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
-        learning_rate: float = 0.01,
+        learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
         initial_means: np.ndarray = None,
@@ -389,7 +389,7 @@ def _model_structure(
     theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
 
     # Layer to convert theta_t into state probabilities alpha_t
-    alpha_t_layer = StateMixingRatiosLayer(alpha_xform, name="alpha_t")
+    alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
 
     # Inference RNN data flow
     inputs_norm = input_norm_layer(inputs)

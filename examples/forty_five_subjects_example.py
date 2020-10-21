@@ -46,6 +46,8 @@ alpha_xform = "softmax"
 learn_alpha_scaling = False
 normalize_covariances = False
 
+learning_rate = 0.01
+
 # Read MEG data
 print("Reading MEG data")
 prepared_data = data.Data(
@@ -78,6 +80,7 @@ model = RNNGaussian(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
+    learning_rate=learning_rate,
     multi_gpu=multi_gpu,
 )
 model.summary()

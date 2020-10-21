@@ -47,6 +47,8 @@ alpha_xform = "softmax"
 learn_alpha_scaling = False
 normalize_covariances = False
 
+learning_rate = 0.01
+
 # Load state transition probability matrix and covariances of each state
 trans_prob = np.load("files/prob_000.npy")
 cov = np.load("files/state_000.npy")
@@ -103,6 +105,7 @@ model = RNNGaussian(
     do_annealing=do_annealing,
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
+    learning_rate=learning_rate,
 )
 model.summary()
 
