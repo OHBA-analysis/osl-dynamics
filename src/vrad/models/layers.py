@@ -103,6 +103,39 @@ class SampleNormalDistributionLayer(layers.Layer):
         return config
 
 
+class StateProbabilityLayer(layers.Layer):
+    """Layer for calculating state probabilities.
+
+    This layer accepts the logits theta_t and outputs alpha_t.
+    """
+
+    def __init__(self, alpha_xform, **kwargs):
+        super().__init__(**kwargs)
+        self.alpha_xform = alpha_xform
+
+    def call(self, theta_t, **kwargs):
+        if self.alpha_xform == "softplus":
+            alpha_t = activations.softplus(theta_t)
+        elif self.alpha_xform == "relu":
+            alpha_t = activations.relu(theta_t)
+        elif self.alpha_xform == "softmax":
+            alpha_t = activations.softmax(theta_t, axis=2)
+        elif self.alpha_xform == "categorical":
+            gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
+                temperature=0.5, probs=activations.softmax(theta_t, axis=2)
+            )
+            alpha_t = gumbel_softmax_distribution.sample()
+        return alpha_t
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"alpha_xform": self.alpha_xform})
+        return config
+
+
 class MeansCovsLayer(layers.Layer):
     """Layer to learn the mean and covariance of each state.
 
@@ -213,13 +246,10 @@ class MeansCovsLayer(layers.Layer):
 class MixMeansCovsLayer(layers.Layer):
     """Computes a probabilistic mixture of means and covariances."""
 
-    def __init__(
-        self, n_states, n_channels, alpha_xform, learn_alpha_scaling, **kwargs
-    ):
+    def __init__(self, n_states, n_channels, learn_alpha_scaling, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
         self.n_channels = n_channels
-        self.alpha_xform = alpha_xform
         self.learn_alpha_scaling = learn_alpha_scaling
 
     def build(self, input_shape):
@@ -239,22 +269,12 @@ class MixMeansCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         """Computes m_t = Sum_j alpha_jt mu_j and C_t = Sum_j alpha^2_jt D_j."""
         # Unpack the inputs:
-        # - theta_t.shape = (None, sequence_length, n_states)
+        # - alpha_t.shape = (None, sequence_length, n_states)
         # - mu.shape      = (n_states, n_channels)
         # - D.shape       = (n_states, n_channels, n_channels)
-        theta_t, mu, D = inputs
+        alpha_t, mu, D = inputs
 
-        if self.alpha_xform == "softplus":
-            alpha_t = activations.softplus(theta_t)
-        elif self.alpha_xform == "relu":
-            alpha_t = activations.relu(theta_t)
-        elif self.alpha_xform == "softmax":
-            alpha_t = activations.softmax(theta_t, axis=2)
-        elif self.alpha_xform == "categorical":
-            gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=0.5, probs=activations.softmax(theta_t, axis=2)
-            )
-            alpha_t = gumbel_softmax_distribution.sample()
+        # Rescale the state probabilities
         alpha_t = tf.multiply(alpha_t, activations.softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
@@ -274,7 +294,7 @@ class MixMeansCovsLayer(layers.Layer):
         return [m_t, C_t]
 
     def compute_output_shape(self, input_shape):
-        theta_t_shape, mu_shape, D_shape = input_shape
+        alpha_t_shape, mu_shape, D_shape = input_shape
         return [mu_shape, D_shape]
 
     def get_config(self):
@@ -283,7 +303,6 @@ class MixMeansCovsLayer(layers.Layer):
             {
                 "n_states": self.n_states,
                 "n_channels": self.n_channels,
-                "alpha_xform": self.alpha_xform,
                 "learn_alpha_scaling": self.learn_alpha_scaling,
             }
         )
