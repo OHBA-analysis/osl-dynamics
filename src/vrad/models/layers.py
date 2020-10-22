@@ -36,10 +36,6 @@ class DummyLayer(layers.Layer):
     def compute_output_shape(self, input_shape):
         return input_shape
 
-    def get_config(self):
-        config = super().get_config()
-        return config
-
 
 class TrainableVariablesLayer(layers.Layer):
     """Generic trainable variables layer.
@@ -117,10 +113,6 @@ class SampleNormalDistributionLayer(layers.Layer):
     def compute_output_shape(self, input_shape):
         mu_shape, log_sigma_shape = input_shape
         return mu_shape
-
-    def get_config(self):
-        config = super().get_config()
-        return config
 
 
 class StateMixingFactorsLayer(layers.Layer):
@@ -376,10 +368,6 @@ class LogLikelihoodLayer(layers.Layer):
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
 
-    def get_config(self):
-        config = super().get_config()
-        return config
-
 
 class KLDivergenceLayer(layers.Layer):
     """Computes KL Divergence."""
@@ -408,10 +396,6 @@ class KLDivergenceLayer(layers.Layer):
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
-
-    def get_config(self):
-        config = super().get_config()
-        return config
 
 
 class InferenceRNNLayers(layers.Layer):
