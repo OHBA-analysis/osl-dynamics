@@ -226,8 +226,8 @@ class RNNGaussian(BaseModel):
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
         means = means_covs_layer.means.numpy()
-        cholesky_covariances = means_covs_layer.cholesky_covariances.numpy()
-        covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+        cholesky_covariances = means_covs_layer.cholesky_covariances
+        covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
 
         # Normalise covariances
         if self.normalize_covariances:
