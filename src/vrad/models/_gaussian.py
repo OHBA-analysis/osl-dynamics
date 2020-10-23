@@ -321,7 +321,7 @@ class RNNGaussian(BaseModel):
             theta_t = np.array([[mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]]])
             theta_t_norm[-1] = theta_t_norm_layer(theta_t)[0]
 
-            # Calculate the state probabilities
+            # Calculate the state mixing factors
             alpha_t = alpha_t_layer(theta_t_norm[-1][np.newaxis, np.newaxis, :])
 
             # Hard classify the state time course
@@ -388,7 +388,7 @@ def _model_structure(
     theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
     theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
 
-    # Layer to convert theta_t into state probabilities alpha_t
+    # Layer to convert theta_t into state mixing factors alpha_t
     alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
 
     # Inference RNN data flow

@@ -101,7 +101,7 @@ model.save_weights(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state probabilities and state time courses
+# Inferred state mixing factors and state time courses
 alpha = model.predict_states(prediction_dataset)
 inf_stc = np.concatenate(states.time_courses(alpha), axis=0)
 hmm_stc = np.concatenate(
@@ -131,7 +131,7 @@ preprocessed_time_series = preprocessed_data.trim_raw_time_series(
 # Compute spectra for states
 f, psd, coh = spectral.state_spectra(
     data=preprocessed_time_series,
-    state_probabilities=alpha,
+    state_mix_factors=alpha,
     sampling_frequency=250,
     time_half_bandwidth=4,
     n_tapers=7,

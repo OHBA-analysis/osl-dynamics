@@ -74,7 +74,7 @@ def multitaper(
 
 def state_spectra(
     data,
-    state_probabilities,
+    state_mixing_factors,
     sampling_frequency,
     time_half_bandwidth,
     n_tapers,
@@ -88,46 +88,46 @@ def state_spectra(
     """
 
     # Validation
-    if (isinstance(data, list) != isinstance(state_probabilities, list)) or (
-        isinstance(data, np.ndarray) != isinstance(state_probabilities, np.ndarray)
+    if (isinstance(data, list) != isinstance(state_mixing_factors, list)) or (
+        isinstance(data, np.ndarray) != isinstance(state_mixing_factors, np.ndarray)
     ):
         raise ValueError(
-            f"data is type {type(data)} and state_probabilities is type "
-            + f"{type(state_probabilities)}. They must both be lists or numpy arrays."
+            f"data is type {type(data)} and state_mixing_factors is type "
+            + f"{type(state_mixing_factors)}. They must both be lists or numpy arrays."
         )
 
     if isinstance(data, np.ndarray):
-        if state_probabilities.shape[0] < data.shape[0]:
+        if state_mixing_factors.shape[0] < data.shape[0]:
             # When we time embed we lose some data points so we trim the data
-            n_padding = (data.shape[0] - state_probabilities.shape[0]) // 2
+            n_padding = (data.shape[0] - state_mixing_factors.shape[0]) // 2
             data = data[n_padding:-n_padding]
-        elif state_probabilities.shape[0] != data.shape[0]:
-            raise ValueError("data cannot have less samples than state_probabilities.")
+        elif state_mixing_factors.shape[0] != data.shape[0]:
+            raise ValueError("data cannot have less samples than state_mixing_factors.")
 
     if isinstance(data, list):
-        # Check data and state probabilities for the same number of subjects has
+        # Check data and state mixing factors for the same number of subjects has
         # been passed
-        if len(data) != len(state_probabilities):
+        if len(data) != len(state_mixing_factors):
             raise ValueError(
                 "A different number of subjects has been passed for "
-                + f"data and state_probabilities: len(data)={len(data)}, "
-                + f"len(state_probabilities)={len(state_probabilities)}."
+                + f"data and state_mixing_factors: len(data)={len(data)}, "
+                + f"len(state_mixing_factors)={len(state_mixing_factors)}."
             )
 
-        # Check the number of samples in data and state_probabilities
-        for i in range(len(state_probabilities)):
-            if state_probabilities[i].shape[0] < data[i].shape[0]:
+        # Check the number of samples in data and state_mixing_factors
+        for i in range(len(state_mixing_factors)):
+            if state_mixing_factors[i].shape[0] < data[i].shape[0]:
                 # When we time embed we lose some data points so we trim the data
-                n_padding = (data[i].shape[0] - state_probabilities[i].shape[0]) // 2
+                n_padding = (data[i].shape[0] - state_mixing_factors[i].shape[0]) // 2
                 data = data[n_padding:-n_padding]
-            elif state_probabilities[i].shape[0] != data[i].shape[0]:
+            elif state_mixing_factors[i].shape[0] != data[i].shape[0]:
                 raise ValueError(
-                    "data cannot have less samples than state_probabilities."
+                    "data cannot have less samples than state_mixing_factors."
                 )
 
-        # Concatenate the data and state probabilities for each subject
+        # Concatenate the data and state mixing factors for each subject
         data = np.concatenate(data, axis=0)
-        state_probabilities = np.concatenate(state_probabilities, axis=0)
+        state_mixing_factors = np.concatenate(state_mixing_factors, axis=0)
 
     if data.ndim != 2:
         raise ValueError(
@@ -135,9 +135,9 @@ def state_spectra(
             + "or (n_subjects, n_samples, n_states)."
         )
 
-    if state_probabilities.ndim != 2:
+    if state_mixing_factors.ndim != 2:
         raise ValueError(
-            "state_probabilities must have shape (n_samples, n_states) "
+            "state_mixing_factors must have shape (n_samples, n_states) "
             + "or (n_subjects, n_samples, n_states)."
         )
 
@@ -153,8 +153,8 @@ def state_spectra(
     # Standardise (z-transform) the data
     data = scale(data, axis=0)
 
-    # Use the state probabilities to get a time series for each state
-    state_time_series = get_state_time_series(data, state_probabilities)
+    # Use the state mixing factors to get a time series for each state
+    state_time_series = get_state_time_series(data, state_mixing_factors)
 
     # Number of subjects, states, samples and channels
     n_states, n_samples, n_channels = state_time_series.shape
@@ -212,10 +212,10 @@ def state_spectra(
             )
 
     # Normalise the power spectra
-    sum_probabilities = np.sum(state_probabilities ** 2, axis=0)[
+    sum_factors = np.sum(state_mixing_factors ** 2, axis=0)[
         ..., np.newaxis, np.newaxis, np.newaxis
     ]
-    power_spectra *= n_samples / (sum_probabilities * n_tapers * n_segments)
+    power_spectra *= n_samples / (sum_factors * n_tapers * n_segments)
 
     # Coherences for each state
     coherences = np.empty([n_states, n_channels, n_channels, n_f])

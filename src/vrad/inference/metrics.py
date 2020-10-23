@@ -113,7 +113,7 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     return dice_coefficient_1d(sequence_1, sequence_2)
 
 
-def log_likelihood(time_series, state_probabilities, covariances, means=None):
+def log_likelihood(time_series, state_mixing_factors, covariances, means=None):
     """Calculates the log likelihood.
 
     The log likelihood is calculated as:
@@ -132,9 +132,9 @@ def log_likelihood(time_series, state_probabilities, covariances, means=None):
     nll = 0
 
     # Loop through the data
-    for i in range(state_probabilities.shape[0]):
+    for i in range(state_mixing_factors.shape[0]):
         x = time_series[i]
-        alpha = state_probabilities[i]
+        alpha = state_mixing_factors[i]
 
         # State mixing
         mu = np.sum(alpha[..., np.newaxis] * means, axis=0)

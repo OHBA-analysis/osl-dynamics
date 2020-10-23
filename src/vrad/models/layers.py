@@ -287,7 +287,7 @@ class MixMeansCovsLayer(layers.Layer):
         # - D.shape       = (n_states, n_channels, n_channels)
         alpha_t, mu, D = inputs
 
-        # Rescale the state probabilities
+        # Rescale the state mixing factors
         alpha_t = tf.multiply(alpha_t, activations.softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
