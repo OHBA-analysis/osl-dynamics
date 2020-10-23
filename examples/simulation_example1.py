@@ -1,4 +1,4 @@
-"""Example script for running inference on simulated HSMM data.
+"""Example script for running inference on simulated HMM data.
 
 - This script sets a seed for the random number generators for reproducibility.
 - Should achieve a dice coefficient of ~0.98.
@@ -67,7 +67,7 @@ sim = HMMSimulation(
 meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
-# Priors
+# Initialsation of means and covariances
 initial_means, initial_covariances = gmm.final_means_covariances(
     meg_data.subjects[0],
     n_states,
@@ -126,7 +126,7 @@ model.save_weights(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state probabiliites and state time course
+# Inferred state mixing factors and state time course
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
 

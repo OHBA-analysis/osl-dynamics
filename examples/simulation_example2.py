@@ -1,4 +1,4 @@
-"""Example script for running inference on simulated HMM data.
+"""Example script for running inference on simulated HSMM data.
 
 - This script sets a seed for the random number generators for reproducibility.
 - Should achieve a dice coefficient of ~0.99.
@@ -11,6 +11,7 @@ from vrad import array_ops, data
 from vrad.inference import gmm, metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import HSMMSimulation
+from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -18,17 +19,17 @@ tf_ops.gpu_growth()
 # Settings
 n_samples = 25000
 observation_error = 0.2
-gamma_shape = 100
-gamma_scale = 1
+gamma_shape = 5
+gamma_scale = 10
 
 n_states = 5
-sequence_length = 100
-batch_size = 32
+sequence_length = 200
+batch_size = 64
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 100
+n_epochs = 500
 n_epochs_annealing = 50
 
 dropout_rate_inference = 0.0
@@ -40,13 +41,13 @@ n_layers_inference = 1
 n_layers_model = 1
 
 n_units_inference = 64
-n_units_model = 64
+n_units_model = 128
 
 learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-learn_alpha_scaling = False
+learn_alpha_scaling = True
 normalize_covariances = False
 
 learning_rate = 0.01
@@ -69,7 +70,7 @@ sim = HSMMSimulation(
 meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
-# Priors
+# Initialisation of means and covariances
 initial_means, initial_covariances = gmm.final_means_covariances(
     meg_data.subjects[0],
     n_states,
@@ -128,7 +129,7 @@ model.save_weights(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state probabiliites and state time course
+# Inferred state mixing factors and state time course
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
 
@@ -136,6 +137,13 @@ inf_stc = states.time_courses(alpha)
 matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
 
 print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
+
+# Sample from the model RNN
+mod_stc = model.sample_state_time_course(n_samples=25000)
+
+# Plot the ground truth state lifetimes and the sampled state lifetimes from the model
+plotting.plot_state_lifetimes(sim.state_time_course, filename="sim_lt.png")
+plotting.plot_state_lifetimes(mod_stc, filename="mod_lt.png")
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

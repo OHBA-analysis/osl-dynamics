@@ -55,7 +55,7 @@ prepared_data = data.Data(
 )
 n_channels = prepared_data.n_channels
 
-# Priors: we use the covariance matrices inferred by fitting an HMM with OSL
+# Initialise covariances with the final HMM covariances
 hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/nSubjects-10_K-6/hmm.mat")
 initial_covariances = hmm.covariances
 
