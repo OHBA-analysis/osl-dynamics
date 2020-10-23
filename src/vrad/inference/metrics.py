@@ -138,7 +138,7 @@ def log_likelihood(time_series, state_probabilities, covariances, means=None):
 
         # State mixing
         mu = np.sum(alpha[..., np.newaxis] * means, axis=0)
-        sigma = np.sum((alpha[..., np.newaxis, np.newaxis] ** 2) * covariances, axis=0)
+        sigma = np.sum(alpha[..., np.newaxis, np.newaxis] * covariances, axis=0)
 
         # Calculate second term: -0.5 * log(|sigma|)
         sign, logdet = np.linalg.slogdet(sigma)
