@@ -147,4 +147,5 @@ maps.save_nii_file(
 )
 
 # Delete the temporary folder holding the data
-meg_data.delete_dir()
+prepared_data.delete_dir()
+preprocessed_data.delete_dir()
