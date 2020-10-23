@@ -220,7 +220,7 @@ class RNNGaussian(BaseModel):
         means_covs_layer.trainable = True
         self.compile()
 
-    def get_means_covariances(self):
+    def get_means_covariances(self, alpha_scale=True):
         """Get the means and covariances of each state."""
 
         # Get the means and covariances from the MeansCovsLayer
@@ -234,9 +234,10 @@ class RNNGaussian(BaseModel):
             covariances = trace_normalize(covariances)
 
         # Apply alpha scaling
-        alpha_scaling = self.get_alpha_scaling()
-        means *= alpha_scaling.reshape(-1, 1)
-        covariances *= alpha_scaling.reshape(-1, 1, 1)
+        if alpha_scale:
+            alpha_scaling = self.get_alpha_scaling()
+            means *= alpha_scaling.reshape(-1, 1)
+            covariances *= alpha_scaling.reshape(-1, 1, 1)
 
         return means, covariances
 
