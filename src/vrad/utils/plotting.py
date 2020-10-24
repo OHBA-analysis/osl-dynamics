@@ -874,9 +874,9 @@ def plot_state_time_courses(
 
     state_time_courses = np.asarray(state_time_courses)
 
-    n_lines = state_time_courses.shape[0]
-    n_samples = min(n_samples or np.inf, state_time_courses.shape[1])
-    n_states = state_time_courses.shape[2]
+    n_lines = len(state_time_courses)
+    n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
+    n_states = state_time_courses[0].shape[1]
 
     default_fig_kwargs = {"figsize": (20, 10)}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
@@ -887,7 +887,7 @@ def plot_state_time_courses(
 
     for i in range(n_lines):
         for j in range(n_states):
-            axis[j].plot(state_time_courses[i, :n_samples, j])
+            axis[j].plot(state_time_courses[i][:n_samples, j])
 
     plt.tight_layout()
     show_or_save(filename)
