@@ -23,11 +23,18 @@ class Simulation(ABC):
         Number of states to simulate
     sim_varying_means : bool
         If False, means will be set to zero.
+    covariances : np.ndarray
+        covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels).
+    observation_error : float
+        The standard deviation of noise added to the signal from a normal distribution.
     random_covariance_weights : bool
         Should the simulation use random covariance weights? False gives structured
         covariances.
-    observation_error : float
-        The standard deviation of noise added to the signal from a normal distribution.
+    simulate : bool
+        Should we simulate the time series.
+    random_seed : int
+        Seed for the random number generator
     """
 
     def __init__(
@@ -158,14 +165,27 @@ class Simulation(ABC):
         else:
             mus_sim = np.zeros((self.n_states, self.n_channels))
 
-        stc = self.state_time_course.argmax(axis=1)
+        # State time course, shape=(n_samples, n_states)
+        # This contains the mixing factors of each states at each time point
+        stc = self.state_time_course
 
+        # Array to hold the simulated data
         data_sim = np.zeros((self.n_samples, self.n_channels))
-        for i in range(self.n_states):
-            data_sim[stc == i] = self._rng.multivariate_normal(
-                mus_sim[i], self.covariances[i], size=np.count_nonzero(stc == i),
+
+        # Loop through all unique combinations of states
+        for alpha in np.unique(stc, axis=0):
+
+            # Mean and covariance for this combination of states
+            mu = np.sum(mus_sim * alpha[:, np.newaxis], axis=0)
+            sigma = np.sum(self.covariances * alpha[:, np.newaxis, np.newaxis], axis=0)
+
+            # Generate data for the time points that this combination of states is
+            # active
+            data_sim[np.all(stc == alpha, axis=1)] = self._rng.multivariate_normal(
+                mu, sigma, size=np.count_nonzero(np.all(stc == alpha, axis=1))
             )
 
+        # Add an error to the data at all time points
         data_sim += self._rng.normal(scale=self.observation_error, size=data_sim.shape)
 
         return data_sim.astype(np.float32)
