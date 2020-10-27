@@ -35,7 +35,7 @@ n_epochs_annealing = 50
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-normalization_type = "layer"
+normalization_type = None
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -67,6 +67,7 @@ sim = HSMMSimulation(
     gamma_scale=gamma_scale,
     random_seed=123,
 )
+sim.standardize()
 meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
