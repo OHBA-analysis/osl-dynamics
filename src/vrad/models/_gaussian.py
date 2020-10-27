@@ -276,17 +276,20 @@ class RNNGaussian(BaseModel):
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
-        theta_t_layer = self.model.get_layer("theta_t")
+        mu_theta_jt_norm_layer = self.model.get_layer("mu_theta_jt_norm")
+        log_sigma_theta_j_norm_layer = self.model.get_layer("log_sigma_theta_j_norm")
+        theta_t_norm_layer = self.model.get_layer("theta_t_norm")
         alpha_t_layer = self.model.get_layer("alpha_t")
 
         # Calculate the standard deviation of the probability distribution function
         # This has been learnt for each state during training
         log_sigma_theta_j = self.model.get_layer("log_sigma_theta_j").get_weights()[0]
-        sigma_theta_j = np.exp(log_sigma_theta_j)
+        log_sigma_theta_j_norm = log_sigma_theta_j_norm_layer(log_sigma_theta_j)
+        sigma_theta_j_norm = np.exp(log_sigma_theta_j_norm)
 
         # State time course and sequence of the underlying logits theta_t
         sampled_stc = np.zeros([n_samples, self.n_states])
-        theta_t = np.zeros([sequence_length, self.n_states], dtype=np.float32)
+        theta_t_norm = np.zeros([sequence_length, self.n_states], dtype=np.float32)
 
         # Normally distributed random numbers used to sample the logits theta_t
         epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states]).astype(
@@ -294,28 +297,33 @@ class RNNGaussian(BaseModel):
         )
 
         # Randomly select the first theta_t assuming zero means
-        theta_t[-1] = sigma_theta_j * epsilon[-1]
+        theta_t = np.array([[sigma_theta_j_norm * epsilon[-1]]])
+        theta_t_norm[-1] = theta_t_norm_layer(theta_t)[0]
 
         # Sample state time course
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
             # If there are leading zeros we trim theta_t so that we don't pass the zeros
-            trimmed_theta_t = theta_t[~np.all(theta_t == 0, axis=1)][np.newaxis, ...]
+            trimmed_theta_t_norm = theta_t_norm[~np.all(theta_t_norm == 0, axis=1)][
+                np.newaxis, :, :
+            ]
 
             # Predict the probability distribution function for theta_t one time step
             # in the future,
-            # p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_j)
-            model_rnn = model_rnn_layer(trimmed_theta_t)
-            mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
+            # p(theta_t|theta_<t) ~ N(mu_theta_jt_norm, sigma_theta_j_norm)
+            model_rnn = model_rnn_layer(trimmed_theta_t_norm)
+            mu_theta_jt = mu_theta_jt_layer(model_rnn)
+            mu_theta_jt_norm = mu_theta_jt_norm_layer(mu_theta_jt)[0, -1]
 
-            # Shift theta_t one time step to the left
-            theta_t = np.roll(theta_t, -1, axis=0)
+            # Shift theta_t_norm one time step to the left
+            theta_t_norm = np.roll(theta_t_norm, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t[-1] = mu_theta_jt + sigma_theta_j * epsilon[i]
+            theta_t = np.array([[mu_theta_jt_norm + sigma_theta_j_norm * epsilon[i]]])
+            theta_t_norm[-1] = theta_t_norm_layer(theta_t)[0]
 
             # Calculate the state mixing factors
-            alpha_t = alpha_t_layer(theta_t[-1][np.newaxis, np.newaxis, :])
+            alpha_t = alpha_t_layer(theta_t_norm[-1][np.newaxis, np.newaxis, :])
 
             # Hard classify the state time course
             sampled_stc[i, np.argmax(alpha_t)] = 1
@@ -359,34 +367,42 @@ def _model_structure(
     #     - log_s_theta_t ~ affine(RNN(inputs_<=t))
 
     # Definition of layers
+    input_norm_layer = NormalizationLayer(name="data_norm")
     inference_input_dropout_layer = layers.Dropout(
-        dropout_rate_inference, name="data_drop"
+        dropout_rate_inference, name="data_norm_drop"
     )
     inference_output_layers = InferenceRNNLayers(
         n_layers_inference,
         n_units_inference,
         dropout_rate_inference,
-        layers.LayerNormalization,
+        NormalizationLayer,
         name="inference_rnn",
     )
     m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
+    m_theta_t_norm_layer = NormalizationLayer(name="m_theta_t_norm")
     log_s_theta_t_layer = layers.Dense(
         n_states, activation="linear", name="log_s_theta_t",
     )
+    log_s_theta_t_norm_layer = NormalizationLayer(name="log_s_theta_t_norm")
 
     # Layer to sample theta_t from q(theta_t)
     theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
+    theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
 
     # Layer to convert theta_t into state mixing factors alpha_t
     alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
 
     # Inference RNN data flow
-    inference_input_dropout = inference_input_dropout_layer(inputs)
-    inference_output = inference_output_layers(inference_input_dropout)
+    inputs_norm = input_norm_layer(inputs)
+    inputs_norm_dropout = inference_input_dropout_layer(inputs_norm)
+    inference_output = inference_output_layers(inputs_norm_dropout)
     m_theta_t = m_theta_t_layer(inference_output)
+    m_theta_t_norm = m_theta_t_norm_layer(m_theta_t)
     log_s_theta_t = log_s_theta_t_layer(inference_output)
-    theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
-    alpha_t = alpha_t_layer(theta_t)
+    log_s_theta_t_norm = log_s_theta_t_norm_layer(log_s_theta_t)
+    theta_t = theta_t_layer([m_theta_t_norm, log_s_theta_t_norm])
+    theta_t_norm = theta_t_norm_layer(theta_t)
+    alpha_t = alpha_t_layer(theta_t_norm)
 
     # Model RNN:
     # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
@@ -394,18 +410,22 @@ def _model_structure(
     #     - log_sigma_theta_j = trainable constant
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(dropout_rate_model, name="theta_t_drop")
+    model_input_dropout_layer = layers.Dropout(
+        dropout_rate_model, name="theta_t_norm_drop"
+    )
     model_output_layers = ModelRNNLayers(
         n_layers_model,
         n_units_model,
         dropout_rate_model,
-        layers.LayerNormalization,
+        NormalizationLayer,
         name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
+    mu_theta_jt_norm_layer = NormalizationLayer(name="mu_theta_jt_norm")
     log_sigma_theta_j_layer = TrainableVariablesLayer(
         n_states, name="log_sigma_theta_j"
     )
+    log_sigma_theta_j_norm_layer = NormalizationLayer(name="log_sigma_theta_j_norm")
 
     # Layers for the means and covariances for the observation model of each state
     means_covs_layer = MeansCovsLayer(
@@ -427,13 +447,17 @@ def _model_structure(
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Model RNN data flow
-    model_input_dropout = model_input_dropout_layer(theta_t)
+    model_input_dropout = model_input_dropout_layer(theta_t_norm)
     model_output = model_output_layers(model_input_dropout)
     mu_theta_jt = mu_theta_jt_layer(model_output)
+    mu_theta_jt_norm = mu_theta_jt_norm_layer(mu_theta_jt)
     log_sigma_theta_j = log_sigma_theta_j_layer(inputs)  # inputs not used
+    log_sigma_theta_j_norm = log_sigma_theta_j_norm_layer(log_sigma_theta_j)
     mu_j, D_j = means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
     ll_loss = ll_loss_layer([inputs, m_t, C_t])
-    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_j])
+    kl_loss = kl_loss_layer(
+        [m_theta_t_norm, log_s_theta_t_norm, mu_theta_jt_norm, log_sigma_theta_j_norm]
+    )
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha_t])
