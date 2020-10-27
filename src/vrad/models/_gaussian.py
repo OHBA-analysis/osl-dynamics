@@ -51,6 +51,7 @@ class RNNGaussian(BaseModel):
         dropout_rate_model: float,
         normalization_type: str,
         alpha_xform: str,
+        lasso_alpha_regularization: bool,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
         do_annealing: bool,
@@ -68,6 +69,7 @@ class RNNGaussian(BaseModel):
         self.initial_means = initial_means
         self.initial_covariances = initial_covariances
         self.alpha_xform = alpha_xform
+        self.lasso_alpha_regularization = lasso_alpha_regularization
         self.learn_alpha_scaling = learn_alpha_scaling
         self.normalize_covariances = normalize_covariances
 
@@ -110,6 +112,7 @@ class RNNGaussian(BaseModel):
             initial_means=self.initial_means,
             initial_covariances=self.initial_covariances,
             alpha_xform=self.alpha_xform,
+            lasso_alpha_regularization=self.lasso_alpha_regularization,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
         )
@@ -347,6 +350,7 @@ def _model_structure(
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     alpha_xform: str,
+    lasso_alpha_regularization: bool,
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
 ):
@@ -390,7 +394,9 @@ def _model_structure(
     theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
 
     # Layer to convert theta_t into state mixing factors alpha_t
-    alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
+    alpha_t_layer = StateMixingFactorsLayer(
+        alpha_xform, lasso_alpha_regularization, name="alpha_t"
+    )
 
     # Inference RNN data flow
     inputs_norm = input_norm_layer(inputs)

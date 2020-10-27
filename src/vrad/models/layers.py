@@ -121,11 +121,14 @@ class StateMixingFactorsLayer(layers.Layer):
     This layer accepts the logits theta_t and outputs alpha_t.
     """
 
-    def __init__(self, alpha_xform, **kwargs):
+    def __init__(self, alpha_xform, lasso_alpha_regularization, **kwargs):
         super().__init__(**kwargs)
         self.alpha_xform = alpha_xform
+        self.lasso_alpha_regularization = lasso_alpha_regularization
 
     def call(self, theta_t, **kwargs):
+
+        # Calculate alpha_t from theta_t
         if self.alpha_xform == "softplus":
             alpha_t = activations.softplus(theta_t)
         elif self.alpha_xform == "relu":
@@ -137,6 +140,11 @@ class StateMixingFactorsLayer(layers.Layer):
                 temperature=0.5, probs=activations.softmax(theta_t, axis=2)
             )
             alpha_t = gumbel_softmax_distribution.sample()
+
+        # Regularisation on alpha_t
+        if self.lasso_alpha_regularization:
+            self.add_loss(tf.reduce_sum(alpha_t))
+
         return alpha_t
 
     def compute_output_shape(self, input_shape):
@@ -144,7 +152,12 @@ class StateMixingFactorsLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({"alpha_xform": self.alpha_xform})
+        config.update(
+            {
+                "alpha_xform": self.alpha_xform,
+                "lasso_alpha_regularization": self.lasso_alpha_regularization,
+            }
+        )
         return config
 
 

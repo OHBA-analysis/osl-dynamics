@@ -43,6 +43,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
+lasso_alpha_regularization = True
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -75,6 +76,7 @@ model = RNNGaussian(
     dropout_rate_model=dropout_rate_model,
     normalization_type=normalization_type,
     alpha_xform=alpha_xform,
+    lasso_alpha_regularization=lasso_alpha_regularization,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,

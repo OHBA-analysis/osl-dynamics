@@ -23,7 +23,7 @@ gamma_shape = 5
 gamma_scale = 10
 
 n_states = 5
-sequence_length = 200
+sequence_length = 400
 batch_size = 64
 
 do_annealing = True
@@ -35,7 +35,7 @@ n_epochs_annealing = 50
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-normalization_type = None
+normalization_type = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -47,6 +47,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
+lasso_alpha_regularization = True
 learn_alpha_scaling = True
 normalize_covariances = False
 
@@ -104,6 +105,7 @@ model = RNNGaussian(
     dropout_rate_model=dropout_rate_model,
     normalization_type=normalization_type,
     alpha_xform=alpha_xform,
+    lasso_alpha_regularization=lasso_alpha_regularization,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
