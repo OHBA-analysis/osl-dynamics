@@ -1,8 +1,8 @@
-"""Example script for running inference on simulated HMM data.
+"""Example script for running inference on simulated HSMM data.
 
-- This script sets a seed for the random number generators for reproducibility.
-- Should achieve a dice coefficient of ~0.96.
-- Takes approximately 2 minutes to train (on compG017).
+- Demonstrates the temporal regularisation provided by the model RNN.
+- Should achieve a dice coefficient of ~0.83 without the KL term included in the loss
+  function and ~0.99 with the KL term.
 """
 
 print("Setting up")
@@ -10,7 +10,8 @@ import numpy as np
 from vrad import array_ops, data
 from vrad.inference import gmm, metrics, states, tf_ops
 from vrad.models import RNNGaussian
-from vrad.simulation import HMMSimulation
+from vrad.simulation import HSMMSimulation
+from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -18,15 +19,17 @@ tf_ops.gpu_growth()
 # Settings
 n_samples = 25000
 observation_error = 0.2
+gamma_shape = 10
+gamma_scale = 10
 
 n_states = 5
-sequence_length = 100
-batch_size = 32
+sequence_length = 400
+batch_size = 64
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 100
+n_epochs = 200
 n_epochs_annealing = 50
 
 dropout_rate_inference = 0.0
@@ -51,25 +54,25 @@ normalize_covariances = False
 learning_rate = 0.01
 
 # Load state transition probability matrix and covariances of each state
-trans_prob = np.load("files/prob_000.npy")
 cov = np.load("files/state_000.npy")
 
 # Simulate data
 print("Simulating data")
-sim = HMMSimulation(
+sim = HSMMSimulation(
     n_samples=n_samples,
     n_states=n_states,
     sim_varying_means=learn_means,
     covariances=cov,
-    trans_prob=trans_prob,
     observation_error=observation_error,
+    gamma_shape=gamma_shape,
+    gamma_scale=gamma_scale,
     random_seed=123,
 )
 sim.standardize()
 meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
-# Initialsation of means and covariances
+# Initialisation of means and covariances
 initial_means, initial_covariances = gmm.final_means_covariances(
     meg_data.subjects[0],
     n_states,
@@ -116,27 +119,57 @@ model.summary()
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
-# Train the model
-print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
-
-# Save trained model
-model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/simulation_example1/weights"
-)
-
-# Free energy = Log Likelihood + KL Divergence
-free_energy = model.free_energy(prediction_dataset)
-print(f"Free energy: {free_energy}")
+# Train the model without the KL term in the loss function
+print("Training model without KL loss")
+history = model.fit(training_dataset, epochs=n_epochs, no_annealing_callback=True)
 
 # Inferred state mixing factors and state time course
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
-
-# Find correspondance to ground truth state time courses
 matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
+print(
+    "Dice coefficient (without KL term):",
+    metrics.dice_coefficient(matched_sim_stc, matched_inf_stc),
+)
 
-print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
+# Build a new model
+model = RNNGaussian(
+    n_channels=n_channels,
+    n_states=n_states,
+    sequence_length=sequence_length,
+    learn_means=learn_means,
+    learn_covariances=learn_covariances,
+    initial_means=initial_means,
+    initial_covariances=initial_covariances,
+    n_layers_inference=n_layers_inference,
+    n_layers_model=n_layers_model,
+    n_units_inference=n_units_inference,
+    n_units_model=n_units_model,
+    dropout_rate_inference=dropout_rate_inference,
+    dropout_rate_model=dropout_rate_model,
+    normalization_type=normalization_type,
+    alpha_xform=alpha_xform,
+    lasso_alpha_regularization=lasso_alpha_regularization,
+    learn_alpha_scaling=learn_alpha_scaling,
+    normalize_covariances=normalize_covariances,
+    do_annealing=do_annealing,
+    annealing_sharpness=annealing_sharpness,
+    n_epochs_annealing=n_epochs_annealing,
+    learning_rate=learning_rate,
+)
+
+# Train the model with the full loss function: loss = ll_loss + kl_loss
+print("Training model with full loss function")
+history = model.fit(training_dataset, epochs=n_epochs)
+
+# Inferred state mixing factors and state time course
+alpha = model.predict_states(prediction_dataset)[0]
+inf_stc = states.time_courses(alpha)
+matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
+print(
+    "Dice coefficient (with KL term):",
+    metrics.dice_coefficient(matched_sim_stc, matched_inf_stc),
+)
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

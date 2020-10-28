@@ -47,8 +47,8 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-lasso_alpha_regularization = True
-learn_alpha_scaling = True
+lasso_alpha_regularization = False
+learn_alpha_scaling = False
 normalize_covariances = False
 
 learning_rate = 0.01
