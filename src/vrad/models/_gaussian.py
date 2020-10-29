@@ -26,7 +26,6 @@ from vrad.models.layers import (
     ModelRNNLayers,
     SampleNormalDistributionLayer,
     StateMixingFactorsLayer,
-    TrainableVariablesLayer,
 )
 from vrad.utils.misc import check_arguments
 
@@ -276,13 +275,9 @@ class RNNGaussian(BaseModel):
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
+        log_sigma_theta_jt_layer = self.model.get_layer("log_sigma_theta_jt")
         theta_t_layer = self.model.get_layer("theta_t")
         alpha_t_layer = self.model.get_layer("alpha_t")
-
-        # Calculate the standard deviation of the probability distribution function
-        # This has been learnt for each state during training
-        log_sigma_theta_j = self.model.get_layer("log_sigma_theta_j").get_weights()[0]
-        sigma_theta_j = np.exp(log_sigma_theta_j)
 
         # State time course and sequence of the underlying logits theta_t
         sampled_stc = np.zeros([n_samples, self.n_states])
@@ -293,8 +288,8 @@ class RNNGaussian(BaseModel):
             np.float32
         )
 
-        # Randomly select the first theta_t assuming zero means
-        theta_t[-1] = sigma_theta_j * epsilon[-1]
+        # Randomly select the first theta_t
+        theta_t[-1] = epsilon[-1]
 
         # Sample state time course
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
@@ -304,15 +299,17 @@ class RNNGaussian(BaseModel):
 
             # Predict the probability distribution function for theta_t one time step
             # in the future,
-            # p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_j)
+            # p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta_t)
             mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
+            log_sigma_theta_jt = log_sigma_theta_jt_layer(model_rnn)[0, -1]
+            sigma_theta_jt = np.exp(log_sigma_theta_jt)
 
             # Shift theta_t one time step to the left
             theta_t = np.roll(theta_t, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t[-1] = mu_theta_jt + sigma_theta_j * epsilon[i]
+            theta_t[-1] = mu_theta_jt + sigma_theta_jt * epsilon[i]
 
             # Calculate the state mixing factors
             alpha_t = alpha_t_layer(theta_t[-1][np.newaxis, np.newaxis, :])
@@ -390,8 +387,8 @@ def _model_structure(
 
     # Model RNN:
     # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
-    #     - mu_theta_jt       ~ affine(RNN(theta_<t))
-    #     - log_sigma_theta_j = trainable constant
+    #     - mu_theta_jt        ~ affine(RNN(theta_<t))
+    #     - log_sigma_theta_jt ~ affine(RNN(thetea_<t))
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model, name="theta_t_drop")
@@ -403,9 +400,7 @@ def _model_structure(
         name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
-    log_sigma_theta_j_layer = TrainableVariablesLayer(
-        n_states, name="log_sigma_theta_j"
-    )
+    log_sigma_theta_jt_layer = layers.Dense(n_states, activation="linear", name="log_sigma_theta_jt")
 
     # Layers for the means and covariances for the observation model of each state
     means_covs_layer = MeansCovsLayer(
@@ -430,10 +425,10 @@ def _model_structure(
     model_input_dropout = model_input_dropout_layer(theta_t)
     model_output = model_output_layers(model_input_dropout)
     mu_theta_jt = mu_theta_jt_layer(model_output)
-    log_sigma_theta_j = log_sigma_theta_j_layer(inputs)  # inputs not used
+    log_sigma_theta_jt = log_sigma_theta_jt_layer(model_output)
     mu_j, D_j = means_covs_layer(inputs)  # inputs not used
     m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
     ll_loss = ll_loss_layer([inputs, m_t, C_t])
-    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_j])
+    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_jt])
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha_t])
