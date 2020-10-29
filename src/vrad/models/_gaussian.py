@@ -291,8 +291,8 @@ class RNNGaussian(BaseModel):
             np.float32
         )
 
-        # Randomly select the first theta_t
-        theta_t[-1] = epsilon[-1]
+        # Activate the first state for the first sample
+        theta_t[-1, 0] = 1
 
         # Sample state time course
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
