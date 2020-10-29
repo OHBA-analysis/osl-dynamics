@@ -405,17 +405,32 @@ class InferenceRNNLayers(layers.Layer):
     """RNN layers for the inference network."""
 
     def __init__(
-        self, n_layers, n_units, dropout_rate, NormalizationLayer=None, **kwargs
+        self,
+        rnn_type,
+        n_layers,
+        n_units,
+        dropout_rate,
+        NormalizationLayer=None,
+        **kwargs
     ):
         super().__init__(**kwargs)
+        self.n_units = n_units
+
+        # Choice of RNN
+        if rnn_type == "lstm":
+            RNNLayer = layers.LSTM
+        else:
+            RNNLayer = layers.GRU
+
+        # Choice of normalisation layer
         if NormalizationLayer is None:
             NormalizationLayer = layers.LayerNormalization
-        self.n_units = n_units
+
         self.layers = []
         for n in range(n_layers):
             self.layers.append(
                 layers.Bidirectional(
-                    layer=layers.LSTM(n_units, return_sequences=True, stateful=False)
+                    layer=RNNLayer(n_units, return_sequences=True, stateful=False)
                 )
             )
             self.layers.append(NormalizationLayer())
@@ -440,12 +455,27 @@ class ModelRNNLayers(layers.Layer):
     """RNN layers for the generative model."""
 
     def __init__(
-        self, n_layers, n_units, dropout_rate, NormalizationLayer=None, **kwargs
+        self,
+        rnn_type,
+        n_layers,
+        n_units,
+        dropout_rate,
+        NormalizationLayer=None,
+        **kwargs
     ):
         super().__init__(**kwargs)
+        self.n_units = n_units
+
+        # Choice of RNN
+        if rnn_type == "lstm":
+            RNNLayer = layers.LSTM
+        else:
+            RNNLayer = layers.GRU
+
+        # Choice of normalisation layer
         if NormalizationLayer is None:
             NormalizationLayer = layers.LayerNormalization
-        self.n_units = n_units
+
         self.layers = []
         for n in range(n_layers):
             self.layers.append(

@@ -42,6 +42,7 @@ class RNNGaussian(BaseModel):
         sequence_length: int,
         learn_means: bool,
         learn_covariances: bool,
+        rnn_type: str,
         n_layers_inference: int,
         n_layers_model: int,
         n_units_inference: int,
@@ -76,6 +77,7 @@ class RNNGaussian(BaseModel):
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
+            rnn_type=rnn_type,
             n_layers_inference=n_layers_inference,
             n_layers_model=n_layers_model,
             n_units_inference=n_units_inference,
@@ -97,6 +99,7 @@ class RNNGaussian(BaseModel):
             n_states=self.n_states,
             n_channels=self.n_channels,
             sequence_length=self.sequence_length,
+            rnn_type=self.rnn_type,
             n_layers_inference=self.n_layers_inference,
             n_layers_model=self.n_layers_model,
             n_units_inference=self.n_units_inference,
@@ -324,6 +327,7 @@ def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
+    rnn_type: str,
     n_layers_inference: int,
     n_layers_model: int,
     n_units_inference: int,
@@ -360,6 +364,7 @@ def _model_structure(
         dropout_rate_inference, name="data_drop"
     )
     inference_output_layers = InferenceRNNLayers(
+        rnn_type,
         n_layers_inference,
         n_units_inference,
         dropout_rate_inference,
@@ -393,6 +398,7 @@ def _model_structure(
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(dropout_rate_model, name="theta_t_drop")
     model_output_layers = ModelRNNLayers(
+        rnn_type,
         n_layers_model,
         n_units_model,
         dropout_rate_model,
@@ -400,7 +406,9 @@ def _model_structure(
         name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
-    log_sigma_theta_jt_layer = layers.Dense(n_states, activation="linear", name="log_sigma_theta_jt")
+    log_sigma_theta_jt_layer = layers.Dense(
+        n_states, activation="linear", name="log_sigma_theta_jt"
+    )
 
     # Layers for the means and covariances for the observation model of each state
     means_covs_layer = MeansCovsLayer(

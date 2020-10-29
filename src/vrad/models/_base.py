@@ -34,6 +34,7 @@ class BaseModel:
         n_states: int,
         n_channels: int,
         sequence_length: int,
+        rnn_type: str,
         n_layers_inference: int,
         n_layers_model: int,
         n_units_inference: int,
@@ -49,6 +50,9 @@ class BaseModel:
         strategy: str,
     ):
         # Validation
+        if rnn_type not in ["lstm", "gru"]:
+            raise ValueError("rnn_type must be 'lstm' or 'gru'.")
+
         if n_units_inference < 1 or n_units_model < 1:
             raise ValueError("n_units must be greater than zero.")
 
@@ -70,6 +74,7 @@ class BaseModel:
 
         # Model hyperparameters
         self.sequence_length = sequence_length
+        self.rnn_type = rnn_type
         self.n_layers_inference = n_layers_inference
         self.n_layers_model = n_layers_model
         self.n_units_inference = n_units_inference
