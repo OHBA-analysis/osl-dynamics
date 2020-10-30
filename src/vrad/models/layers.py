@@ -5,7 +5,6 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import backend as K
 from tensorflow.keras import activations, layers
 from tensorflow.python.keras.backend import stop_gradient
 from vrad.inference.functions import (
@@ -68,7 +67,7 @@ class TrainableVariablesLayer(layers.Layer):
         self.values = self.add_weight(
             "values",
             shape=(self.n_units,),
-            dtype=K.floatx(),
+            dtype=tf.float32,
             initializer=self.values_initializer,
             trainable=True,
         )
@@ -275,7 +274,7 @@ class MixMeansCovsLayer(layers.Layer):
         self.alpha_scaling = self.add_weight(
             "alpha_scaling",
             shape=self.n_states,
-            dtype=K.floatx(),
+            dtype=tf.float32,
             initializer=self.alpha_scaling_initializer,
             trainable=self.learn_alpha_scaling,
         )
@@ -294,14 +293,14 @@ class MixMeansCovsLayer(layers.Layer):
         alpha_t = tf.multiply(alpha_t, activations.softplus(self.alpha_scaling))
 
         # Reshape alpha_t and mu for multiplication
-        alpha_t = K.expand_dims(alpha_t, axis=-1)
+        alpha_t = tf.expand_dims(alpha_t, axis=-1)
         mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
 
         # Calculate the mean: m_t = Sum_j alpha_jt mu_j
         m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), axis=2)
 
         # Reshape alpha_t and D for multiplication
-        alpha_t = K.expand_dims(alpha_t, axis=-1)
+        alpha_t = tf.expand_dims(alpha_t, axis=-1)
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
 
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
@@ -366,7 +365,7 @@ class LogLikelihoodLayer(layers.Layer):
         # We return the negative of the log likelihood
         nll_loss = -ll_loss
 
-        return K.expand_dims(nll_loss)
+        return tf.expand_dims(nll_loss)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
@@ -401,7 +400,7 @@ class KLDivergenceLayer(layers.Layer):
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
-        return K.expand_dims(kl_loss)
+        return tf.expand_dims(kl_loss)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
