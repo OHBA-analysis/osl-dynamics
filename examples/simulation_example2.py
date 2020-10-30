@@ -1,8 +1,7 @@
 """Example script for running inference on simulated HSMM data.
 
-- This script sets a seed for the random number generators for reproducibility.
 - Should achieve a dice coefficient of ~0.99.
-- Takes approximately 2 minutes to train (on compG017).
+- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
@@ -19,29 +18,30 @@ tf_ops.gpu_growth()
 # Settings
 n_samples = 25000
 observation_error = 0.2
-gamma_shape = 5
-gamma_scale = 10
+gamma_shape = 10
+gamma_scale = 5
 
 n_states = 5
-sequence_length = 400
-batch_size = 64
+sequence_length = 200
+batch_size = 32
 
 do_annealing = True
 annealing_sharpness = 5
 
 n_epochs = 500
-n_epochs_annealing = 50
+n_epochs_annealing = 100
 
-dropout_rate_inference = 0.0
-dropout_rate_model = 0.0
-
+rnn_type = "lstm"
 normalization_type = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 128
+n_units_inference = 32
+n_units_model = 48
+
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 learn_means = False
 learn_covariances = True
@@ -52,7 +52,7 @@ normalize_covariances = False
 
 learning_rate = 0.01
 
-# Load state transition probability matrix and covariances of each state
+# Load covariances for each state
 cov = np.load("files/state_000.npy")
 
 # Simulate data
@@ -96,6 +96,7 @@ model = RNNGaussian(
     learn_covariances=learn_covariances,
     initial_means=initial_means,
     initial_covariances=initial_covariances,
+    rnn_type=rnn_type,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -117,13 +118,12 @@ model.summary()
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
-# Train the model
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
-
-# Save trained model
-model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/simulation_example2/weights"
+history = model.fit(
+    training_dataset,
+    epochs=n_epochs,
+    save_best_after=n_epochs_annealing,
+    save_filepath="/well/woolrich/shared/vrad/trained_models/simulation_example2/weights",
 )
 
 # Free energy = Log Likelihood + KL Divergence
@@ -142,8 +142,10 @@ print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf
 # Sample from the model RNN
 mod_stc = model.sample_state_time_course(n_samples=25000)
 
-# Plot the ground truth state lifetimes and the sampled state lifetimes from the model
+# Plot lifetime distributions for the ground truth, inferred state time course
+# and sampled state time course
 plotting.plot_state_lifetimes(sim.state_time_course, filename="sim_lt.png")
+plotting.plot_state_lifetimes(inf_stc, filename="inf_lt.png")
 plotting.plot_state_lifetimes(mod_stc, filename="mod_lt.png")
 
 # Delete the temporary folder holding the data

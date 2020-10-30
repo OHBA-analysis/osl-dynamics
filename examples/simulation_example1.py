@@ -1,8 +1,7 @@
 """Example script for running inference on simulated HMM data.
 
-- This script sets a seed for the random number generators for reproducibility.
-- Should achieve a dice coefficient of ~0.96.
-- Takes approximately 2 minutes to train (on compG017).
+- Should achieve a dice coefficient of ~0.95.
+- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
@@ -20,7 +19,7 @@ n_samples = 25000
 observation_error = 0.2
 
 n_states = 5
-sequence_length = 100
+sequence_length = 50
 batch_size = 32
 
 do_annealing = True
@@ -29,16 +28,17 @@ annealing_sharpness = 5
 n_epochs = 100
 n_epochs_annealing = 50
 
-dropout_rate_inference = 0.0
-dropout_rate_model = 0.0
-
+rnn_type = "lstm"
 normalization_type = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 64
+n_units_inference = 16
+n_units_model = 24
+
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 learn_means = False
 learn_covariances = True
@@ -93,6 +93,7 @@ model = RNNGaussian(
     learn_covariances=learn_covariances,
     initial_means=initial_means,
     initial_covariances=initial_covariances,
+    rnn_type=rnn_type,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -114,13 +115,12 @@ model.summary()
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
-# Train the model
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
-
-# Save trained model
-model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/simulation_example1/weights"
+history = model.fit(
+    training_dataset,
+    epochs=n_epochs,
+    save_best_after=n_epochs_annealing,
+    save_filepath="/well/woolrich/shared/vrad/trained_models/simulation_example1/weights",
 )
 
 # Free energy = Log Likelihood + KL Divergence

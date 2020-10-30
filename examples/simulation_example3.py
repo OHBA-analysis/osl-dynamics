@@ -1,14 +1,16 @@
-"""Example script for running inference on data with a mixture of states.
+"""Example script for running inference on simulated HSMM data.
 
-- This script sets a seed for the random number generators for reproducibility.
+- Demonstrates the temporal regularisation provided by the model RNN.
+- Should achieve a dice coefficient of ~0.83 without the KL term included in the
+  loss function and ~0.99 with the KL term.
 """
 
 print("Setting up")
 import numpy as np
 from vrad import array_ops, data
-from vrad.inference import gmm, states, tf_ops
+from vrad.inference import gmm, metrics, states, tf_ops
 from vrad.models import RNNGaussian
-from vrad.simulation import MixedHSMMSimulation
+from vrad.simulation import HSMMSimulation
 from vrad.utils import plotting
 
 # GPU settings
@@ -18,28 +20,29 @@ tf_ops.gpu_growth()
 n_samples = 25000
 observation_error = 0.2
 gamma_shape = 10
-gamma_scale = 10
+gamma_scale = 5
 
 n_states = 5
-sequence_length = 400
-batch_size = 64
+sequence_length = 200
+batch_size = 32
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 500
-n_epochs_annealing = 200
+n_epochs = 200
+n_epochs_annealing = 100
 
-dropout_rate_inference = 0.0
-dropout_rate_model = 0.0
-
+rnn_type = "lstm"
 normalization_type = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 64
+n_units_inference = 32
+n_units_model = 48
+
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 learn_means = False
 learn_covariances = True
@@ -50,20 +53,14 @@ normalize_covariances = False
 
 learning_rate = 0.01
 
-# Load state transition probability matrix and covariances of each state
+# Load covariances for each state
 cov = np.load("files/state_000.npy")
-
-# Mixtures of states to include in the simulation
-mixed_state_vectors = np.array(
-    [[0.5, 0.5, 0, 0, 0], [0, 0.3, 0, 0.7, 0], [0, 0, 0.6, 0.4, 0]]
-)
 
 # Simulate data
 print("Simulating data")
-sim = MixedHSMMSimulation(
+sim = HSMMSimulation(
     n_samples=n_samples,
     n_states=n_states,
-    mixed_state_vectors=mixed_state_vectors,
     sim_varying_means=learn_means,
     covariances=cov,
     observation_error=observation_error,
@@ -100,6 +97,7 @@ model = RNNGaussian(
     learn_covariances=learn_covariances,
     initial_means=initial_means,
     initial_covariances=initial_covariances,
+    rnn_type=rnn_type,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -121,27 +119,64 @@ model.summary()
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
-# Train the model
-print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
-
-# Save trained model
-model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/simulation_example3/weights"
-)
-
-# Free energy = Log Likelihood + KL Divergence
-free_energy = model.free_energy(prediction_dataset)
-print(f"Free energy: {free_energy}")
+print("Training model without KL loss")
+history = model.fit(training_dataset, epochs=n_epochs, no_annealing_callback=True)
 
 # Inferred state mixing factors and state time course
 alpha = model.predict_states(prediction_dataset)[0]
-matched_sim_stc, matched_alpha = states.match_states(sim.state_time_course, alpha)
-
-# Compare the inferred state time course to the ground truth
-plotting.plot_state_time_courses(
-    matched_alpha, matched_sim_stc, n_samples=10000, filename="stc.png"
+inf_stc = states.time_courses(alpha)
+matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
+print(
+    "Dice coefficient (without KL term):",
+    metrics.dice_coefficient(matched_sim_stc, matched_inf_stc),
 )
+
+# Build a new model
+model = RNNGaussian(
+    n_channels=n_channels,
+    n_states=n_states,
+    sequence_length=sequence_length,
+    learn_means=learn_means,
+    learn_covariances=learn_covariances,
+    initial_means=initial_means,
+    initial_covariances=initial_covariances,
+    rnn_type=rnn_type,
+    n_layers_inference=n_layers_inference,
+    n_layers_model=n_layers_model,
+    n_units_inference=n_units_inference,
+    n_units_model=n_units_model,
+    dropout_rate_inference=dropout_rate_inference,
+    dropout_rate_model=dropout_rate_model,
+    normalization_type=normalization_type,
+    alpha_xform=alpha_xform,
+    learn_alpha_scaling=learn_alpha_scaling,
+    normalize_covariances=normalize_covariances,
+    do_annealing=do_annealing,
+    annealing_sharpness=annealing_sharpness,
+    n_epochs_annealing=n_epochs_annealing,
+    learning_rate=learning_rate,
+)
+
+print("Training new model with full loss function")
+history = model.fit(training_dataset, epochs=n_epochs)
+
+# Inferred state mixing factors and state time course
+alpha = model.predict_states(prediction_dataset)[0]
+inf_stc = states.time_courses(alpha)
+matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
+print(
+    "Dice coefficient (with KL term):",
+    metrics.dice_coefficient(matched_sim_stc, matched_inf_stc),
+)
+
+# Sample from the model RNN
+mod_stc = model.sample_state_time_course(n_samples=25000)
+
+# Plot lifetime distributions for the ground truth, inferred state time course
+# and sampled state time course
+plotting.plot_state_lifetimes(sim.state_time_course, filename="sim_lt.png")
+plotting.plot_state_lifetimes(inf_stc, filename="inf_lt.png")
+plotting.plot_state_lifetimes(mod_stc, filename="mod_lt.png")
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
