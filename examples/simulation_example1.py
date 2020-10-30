@@ -50,8 +50,8 @@ normalize_covariances = False
 learning_rate = 0.01
 
 # Load state transition probability matrix and covariances of each state
-trans_prob = np.load("files/prob_000.npy")
-cov = np.load("files/state_000.npy")
+trans_prob = np.load("files/hmm_trans_prob.npy")
+cov = np.load("files/hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")

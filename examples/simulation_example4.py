@@ -53,7 +53,7 @@ normalize_covariances = False
 learning_rate = 0.01
 
 # Load covariances for each state
-cov = np.load("files/state_000.npy")
+cov = np.load("files/hmm_cov.npy")
 
 # Mixtures of states to include in the simulation
 mixed_state_vectors = np.array(
