@@ -384,15 +384,21 @@ class KLDivergenceLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
-        # model_mu needs be shifted one time point to the right
-        shifted_model_mu = tf.roll(model_mu, shift=1, axis=1)
+        # The model predicts one time step in the future so we roll the mu and sigma
+        # one time point to the left
+        model_mu = tf.roll(model_mu, shift=1, axis=1)
+        model_log_sigma = tf.roll(model_log_sigma, shift=1, axis=1)
 
-        prior = tfp.distributions.Normal(
-            loc=shifted_model_mu, scale=tf.exp(model_log_sigma)
-        )
-        posterior = tfp.distributions.Normal(
-            loc=inference_mu, scale=tf.exp(inference_log_sigma)
-        )
+        # We need to clip the first and last elements of each mu and sigma
+        # because they don't correspond to the same time points
+        inference_mu = inference_mu[1:-1]
+        inference_sigma = tf.exp(inference_log_sigma)[1:-1]
+        model_mu = model_mu[1:-1]
+        model_sigma = tf.exp(model_log_sigma)[1:-1]
+
+        # Calculate the KL diverence between the posterior and prior
+        prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
+        posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
         return K.expand_dims(kl_loss)
