@@ -365,7 +365,7 @@ class LogLikelihoodLayer(layers.Layer):
         # We return the negative of the log likelihood
         nll_loss = -ll_loss
 
-        return tf.expand_dims(nll_loss)
+        return tf.expand_dims(nll_loss, axis=-1)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
@@ -400,7 +400,7 @@ class KLDivergenceLayer(layers.Layer):
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
 
-        return tf.expand_dims(kl_loss)
+        return tf.expand_dims(kl_loss, axis=-1)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])

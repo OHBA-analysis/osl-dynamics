@@ -238,8 +238,8 @@ class RNNGaussian(BaseModel):
         # Apply alpha scaling
         if alpha_scale:
             alpha_scaling = self.get_alpha_scaling()
-            means *= alpha_scaling.reshape(-1, 1)
-            covariances *= alpha_scaling.reshape(-1, 1, 1)
+            means *= alpha_scaling[:, np.newaxis]
+            covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
 
         return means, covariances
 
@@ -270,10 +270,8 @@ class RNNGaussian(BaseModel):
         alpha_scaling = softplus(alpha_scaling).numpy()
         return alpha_scaling
 
-    def sample_state_time_course(self, n_samples=1, sequence_length=None):
+    def sample_state_time_course(self, n_samples):
         """Uses the model RNN to sample a state time course."""
-        if sequence_length is None:
-            sequence_length = self.sequence_length
 
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
@@ -347,7 +345,7 @@ def _model_structure(
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
     # Inference RNN:
-    # - Learns q(theta_t) ~ N(m_theta_t, s^2_theta_t), where
+    # - Learns q(theta_t) ~ N(m_theta_t, s_theta_t), where
     #     - m_theta_t     ~ affine(RNN(inputs_<=t))
     #     - log_s_theta_t ~ affine(RNN(inputs_<=t))
 
@@ -363,10 +361,8 @@ def _model_structure(
         dropout_rate_inference,
         name="inference_rnn",
     )
-    m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
-    log_s_theta_t_layer = layers.Dense(
-        n_states, activation="linear", name="log_s_theta_t",
-    )
+    m_theta_t_layer = layers.Dense(n_states, name="m_theta_t")
+    log_s_theta_t_layer = layers.Dense(n_states, name="log_s_theta_t")
 
     # Layers to sample theta_t from q(theta_t) and to convert to state mixing
     # factors alpha_t
@@ -409,7 +405,7 @@ def _model_structure(
     ll_loss = ll_loss_layer([inputs, m_t, C_t])
 
     # Model RNN:
-    # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
+    # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt), where
     #     - mu_theta_jt        ~ affine(RNN(theta_<t))
     #     - log_sigma_theta_jt ~ affine(RNN(thetea_<t))
 
@@ -423,10 +419,8 @@ def _model_structure(
         dropout_rate_model,
         name="model_rnn",
     )
-    mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
-    log_sigma_theta_jt_layer = layers.Dense(
-        n_states, activation="linear", name="log_sigma_theta_jt"
-    )
+    mu_theta_jt_layer = layers.Dense(n_states, name="mu_theta_jt")
+    log_sigma_theta_jt_layer = layers.Dense(n_states, name="log_sigma_theta_jt")
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Data flow
