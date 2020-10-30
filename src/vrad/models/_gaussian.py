@@ -343,14 +343,6 @@ def _model_structure(
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
 ):
-    # Pick normalization layer
-    if normalization_type == "batch":
-        NormalizationLayer = layers.BatchNormalization
-    elif normalization_type == "layer":
-        NormalizationLayer = layers.LayerNormalization
-    else:
-        NormalizationLayer = DummyLayer
-
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
@@ -365,10 +357,10 @@ def _model_structure(
     )
     inference_output_layers = InferenceRNNLayers(
         rnn_type,
+        normalization_type,
         n_layers_inference,
         n_units_inference,
         dropout_rate_inference,
-        layers.LayerNormalization,
         name="inference_rnn",
     )
     m_theta_t_layer = layers.Dense(n_states, activation="linear", name="m_theta_t")
@@ -376,13 +368,12 @@ def _model_structure(
         n_states, activation="linear", name="log_s_theta_t",
     )
 
-    # Layer to sample theta_t from q(theta_t)
+    # Layers to sample theta_t from q(theta_t) and to convert to state mixing
+    # factors alpha_t
     theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
-
-    # Layer to convert theta_t into state mixing factors alpha_t
     alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
 
-    # Inference RNN data flow
+    # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)
     inference_output = inference_output_layers(inference_input_dropout)
     m_theta_t = m_theta_t_layer(inference_output)
@@ -390,27 +381,13 @@ def _model_structure(
     theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
     alpha_t = alpha_t_layer(theta_t)
 
-    # Model RNN:
-    # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
-    #     - mu_theta_jt        ~ affine(RNN(theta_<t))
-    #     - log_sigma_theta_jt ~ affine(RNN(thetea_<t))
+    # Observation model:
+    # - We use a multivariate normal with a mean vector and covariance matrix for
+    #   each state as the observation model.
+    # - We calculate the likelihood of generating the training data with alpha_t
+    #   and the observation model.
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(dropout_rate_model, name="theta_t_drop")
-    model_output_layers = ModelRNNLayers(
-        rnn_type,
-        n_layers_model,
-        n_units_model,
-        dropout_rate_model,
-        layers.LayerNormalization,
-        name="model_rnn",
-    )
-    mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
-    log_sigma_theta_jt_layer = layers.Dense(
-        n_states, activation="linear", name="log_sigma_theta_jt"
-    )
-
-    # Layers for the means and covariances for the observation model of each state
     means_covs_layer = MeansCovsLayer(
         n_states,
         n_channels,
@@ -424,19 +401,39 @@ def _model_structure(
     mix_means_covs_layer = MixMeansCovsLayer(
         n_states, n_channels, learn_alpha_scaling, name="mix_means_covs"
     )
-
-    # Layers to calculate the negative of the log likelihood and KL divergence
     ll_loss_layer = LogLikelihoodLayer(name="ll")
+
+    # Data flow
+    mu_j, D_j = means_covs_layer(inputs)  # inputs not used
+    m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
+    ll_loss = ll_loss_layer([inputs, m_t, C_t])
+
+    # Model RNN:
+    # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma^2_theta_j), where
+    #     - mu_theta_jt        ~ affine(RNN(theta_<t))
+    #     - log_sigma_theta_jt ~ affine(RNN(thetea_<t))
+
+    # Definition of layers
+    model_input_dropout_layer = layers.Dropout(dropout_rate_model, name="theta_t_drop")
+    model_output_layers = ModelRNNLayers(
+        rnn_type,
+        normalization_type,
+        n_layers_model,
+        n_units_model,
+        dropout_rate_model,
+        name="model_rnn",
+    )
+    mu_theta_jt_layer = layers.Dense(n_states, activation="linear", name="mu_theta_jt")
+    log_sigma_theta_jt_layer = layers.Dense(
+        n_states, activation="linear", name="log_sigma_theta_jt"
+    )
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
-    # Model RNN data flow
+    # Data flow
     model_input_dropout = model_input_dropout_layer(theta_t)
     model_output = model_output_layers(model_input_dropout)
     mu_theta_jt = mu_theta_jt_layer(model_output)
     log_sigma_theta_jt = log_sigma_theta_jt_layer(model_output)
-    mu_j, D_j = means_covs_layer(inputs)  # inputs not used
-    m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
-    ll_loss = ll_loss_layer([inputs, m_t, C_t])
     kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_jt])
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha_t])

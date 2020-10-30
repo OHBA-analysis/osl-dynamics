@@ -1,4 +1,4 @@
-"""Tensorflow layers used in the inference and generative model.
+"""Tensorflow layers used in the inference network and generative model.
 
 """
 
@@ -411,13 +411,7 @@ class InferenceRNNLayers(layers.Layer):
     """RNN layers for the inference network."""
 
     def __init__(
-        self,
-        rnn_type,
-        n_layers,
-        n_units,
-        dropout_rate,
-        NormalizationLayer=None,
-        **kwargs
+        self, rnn_type, normalization_type, n_layers, n_units, dropout_rate, **kwargs
     ):
         super().__init__(**kwargs)
         self.n_units = n_units
@@ -429,8 +423,12 @@ class InferenceRNNLayers(layers.Layer):
             RNNLayer = layers.GRU
 
         # Choice of normalisation layer
-        if NormalizationLayer is None:
+        if normalization_type == "layer":
             NormalizationLayer = layers.LayerNormalization
+        elif normalization_type == "batch":
+            NormalizationLayer = layers.BatchNormalization
+        else:
+            NormalizationLayer = DummyLayer
 
         self.layers = []
         for n in range(n_layers):
@@ -461,13 +459,7 @@ class ModelRNNLayers(layers.Layer):
     """RNN layers for the generative model."""
 
     def __init__(
-        self,
-        rnn_type,
-        n_layers,
-        n_units,
-        dropout_rate,
-        NormalizationLayer=None,
-        **kwargs
+        self, rnn_type, normalization_type, n_layers, n_units, dropout_rate, **kwargs
     ):
         super().__init__(**kwargs)
         self.n_units = n_units
@@ -479,8 +471,12 @@ class ModelRNNLayers(layers.Layer):
             RNNLayer = layers.GRU
 
         # Choice of normalisation layer
-        if NormalizationLayer is None:
+        if normalization_type == "layer":
             NormalizationLayer = layers.LayerNormalization
+        elif normalization_type == "batch":
+            NormalizationLayer = layers.BatchNormalization
+        else:
+            NormalizationLayer = DummyLayer
 
         self.layers = []
         for n in range(n_layers):
