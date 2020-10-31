@@ -6,7 +6,7 @@
 
 print("Setting up")
 import numpy as np
-from vrad import array_ops, data
+from vrad import data
 from vrad.inference import gmm, metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import HMMSimulation
@@ -68,6 +68,10 @@ sim.standardize()
 meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
 
+# Prepare dataset
+training_dataset = meg_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
+
 # Initialsation of means and covariances
 initial_means, initial_covariances = gmm.final_means_covariances(
     meg_data.subjects[0],
@@ -110,10 +114,6 @@ model = RNNGaussian(
     learning_rate=learning_rate,
 )
 model.summary()
-
-# Prepare dataset
-training_dataset = meg_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 print("Training model")
 history = model.fit(

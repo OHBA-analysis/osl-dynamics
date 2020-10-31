@@ -6,7 +6,7 @@
 
 print("Setting up")
 import numpy as np
-from vrad import array_ops, data
+from vrad import data
 from vrad.inference import gmm, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import MixedHSMMSimulation
@@ -22,7 +22,7 @@ gamma_shape = 20
 gamma_scale = 10
 
 n_states = 5
-sequence_length = 200
+sequence_length = 400
 batch_size = 32
 
 do_annealing = True
@@ -37,8 +37,8 @@ normalization_type = "layer"
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 32
-n_units_model = 48
+n_units_inference = 64
+n_units_model = 96
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -76,6 +76,10 @@ sim = MixedHSMMSimulation(
 sim.standardize()
 meg_data = data.Data(sim)
 n_channels = meg_data.n_channels
+
+# Prepare dataset
+training_dataset = meg_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialisation of means and covariances
 initial_means, initial_covariances = gmm.final_means_covariances(
@@ -119,10 +123,6 @@ model = RNNGaussian(
     learning_rate=learning_rate,
 )
 model.summary()
-
-# Prepare dataset
-training_dataset = meg_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 print("Training model")
 history = model.fit(

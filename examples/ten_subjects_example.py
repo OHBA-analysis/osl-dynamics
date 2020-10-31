@@ -1,9 +1,11 @@
-"""Example script for running inference on real MEG data for ten subjects.
+"""Example script for running inference on resting-state MEG data for ten subjects.
 
 - The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
-- Uses the final covariances inferred by an HMM fit from OSL.
-- Achieves a dice coefficient of ~0.37 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~26,600,000.
+- Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
+  state.
+- Covariances are NOT trainable.
+- Achieves a dice coefficient of ~0.76 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~27,900,000.
 """
 
 print("Setting up")
@@ -28,21 +30,22 @@ annealing_sharpness = 5
 n_epochs = 200
 n_epochs_annealing = 100
 
-dropout_rate_inference = 0.0
-dropout_rate_model = 0.0
-
+rnn_type = "lstm"
 normalization_type = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 128
-n_units_model = 128
+n_units_inference = 64
+n_units_model = 96
+
+dropout_rate_inference = 0.0
+dropout_rate_model = 0.0
 
 learn_means = False
-learn_covariances = True
+learn_covariances = False
 
-alpha_xform = "softmax"
+alpha_xform = "categorical"
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -54,6 +57,10 @@ prepared_data = data.Data(
     [f"/well/woolrich/shared/vrad/prepared_data/subject{i}.mat" for i in range(1, 11)]
 )
 n_channels = prepared_data.n_channels
+
+# Prepare dataset
+training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
+prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with the final HMM covariances
 hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/nSubjects-10_K-6/hmm.mat")
@@ -67,6 +74,7 @@ model = RNNGaussian(
     learn_means=learn_means,
     learn_covariances=learn_covariances,
     initial_covariances=initial_covariances,
+    rnn_type=rnn_type,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
@@ -85,16 +93,12 @@ model = RNNGaussian(
 )
 model.summary()
 
-# Prepare dataset
-training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
-
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
-
-# Save trained model
-model.save_weights(
-    "/well/woolrich/shared/vrad/trained_models/ten_subjects_example/weights"
+history = model.fit(
+    training_dataset,
+    epochs=n_epochs,
+    save_best_after=n_epochs_annealing,
+    save_filepath="/well/woolrich/shared/vrad/trained_models/ten_subjects_example/weights",
 )
 
 # Free energy = Log Likelihood + KL Divergence
