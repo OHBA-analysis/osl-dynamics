@@ -62,6 +62,12 @@ class RNNGaussian(BaseModel):
         initial_means: np.ndarray = None,
         initial_covariances: np.ndarray = None,
     ):
+        # Validation
+        if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:
+            raise ValueError(
+                "alpha_xform must be 'categorical', 'softmax', 'softplus' or 'relu'."
+            )
+
         # Parameters related to the observation model
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances

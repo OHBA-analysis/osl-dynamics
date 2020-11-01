@@ -50,20 +50,34 @@ class BaseModel:
         strategy: str,
     ):
         # Validation
+        if sequence_length < 1:
+            raise ValueError("sequence_length must be greater than zero.")
+
         if rnn_type not in ["lstm", "gru"]:
             raise ValueError("rnn_type must be 'lstm' or 'gru'.")
 
-        if n_units_inference < 1 or n_units_model < 1:
-            raise ValueError("n_units must be greater than zero.")
-
         if n_layers_inference < 1 or n_layers_model < 1:
             raise ValueError("n_layers must be greater than zero.")
+
+        if n_units_inference < 1 or n_units_model < 1:
+            raise ValueError("n_units must be greater than zero.")
 
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
         if normalization_type not in ["layer", "batch", None]:
             raise ValueError("normalization_type must be 'layer', 'batch' or None.")
+
+        if annealing_sharpness <= 0:
+            raise ValueError("annealing_sharpness must be greater than zero.")
+
+        if n_epochs_annealing < 0:
+            raise ValueError(
+                "n_epochs_annealing must be equal to or greater than zero."
+            )
+
+        if learning_rate <= 0:
+            raise ValueError("learning_rate must be greater than zero.")
 
         # Identifier for the model
         self._identifier = np.random.randint(100000)
