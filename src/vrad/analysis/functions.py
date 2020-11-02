@@ -10,7 +10,7 @@ def fourier_transform(
     sampling_frequency: float,
     nfft: int = None,
     args_range: list = None,
-):
+) -> np.ndarray:
     """Calculates a Fast Fourier Transform (FFT).
     
     Parameters
@@ -47,7 +47,7 @@ def fourier_transform(
     return X
 
 
-def nextpow2(x: int):
+def nextpow2(x: int) -> int:
     """Next power of 2.
 
     Parameters
@@ -70,7 +70,7 @@ def validate_array(
     correct_dimensionality: int,
     allow_dimensions: list,
     error_message: str,
-):
+) -> np.ndarray:
     """Checks if an array has been passed correctly.
 
     In particular this function checks the dimensionality of the array is correct.
