@@ -1,3 +1,7 @@
+"""Metrics to analyse model performance.
+
+"""
+
 import numpy as np
 from sklearn.metrics import confusion_matrix as sklearn_confusion
 from vrad.utils.decorators import transpose
@@ -113,17 +117,36 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     return dice_coefficient_1d(sequence_1, sequence_2)
 
 
-def log_likelihood(time_series, state_mixing_factors, covariances, means=None):
+def log_likelihood(
+    time_series: np.ndarray,
+    state_mixing_factors: np.ndarray,
+    covariances: np.ndarray,
+    means: np.ndarray = None,
+) -> float:
     """Calculates the log likelihood.
 
     The log likelihood is calculated as:
-    c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-           where:
-           - x is a single observation
-           - mu is the mean vector
-           - sigma is the covariance matrix
-           - c is a constant
-    The negative of the log likelihood is returned.
+
+    c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+
+    where x is a single observation, mu is the mean vector, sigma is the
+    covariance matrix and c is a constant.
+
+    Parameters
+    ----------
+    time_series : np.ndarray
+        Data time series.
+    state_mixing_factors : np.ndarary
+        Times series containing the state mixing factors alpha_t.
+    covariances : np.ndarray
+        Covariance matrix for each state.
+    means : np.ndarray
+        Mean vector for each state.
+
+    Returns
+    -------
+    nll: float
+        The negative of the log likelihood.
     """
     if means is None:
         means = np.zeros([covariances.shape[0], covariances.shape[1]])
