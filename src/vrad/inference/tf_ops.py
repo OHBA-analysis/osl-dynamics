@@ -1,10 +1,8 @@
-"""Helper functions for TensorFlow
+"""Helper functions for TensorFlow operations.
 
 """
 
 import os
-
-import numpy as np
 import tensorflow as tf
 
 
@@ -26,34 +24,46 @@ def gpu_growth():
             print(e)
 
 
-def select_gpu(gpu_number):
-    """Allows the user to pick a GPU to use."""
+def select_gpu(gpu_number: int):
+    """Allows the user to pick a GPU to use.
+
+    Parameters
+    ----------
+    gpu_number : int
+        ID number for the GPU to use.
+    
+    """
     if isinstance(gpu_number, int):
         gpu_number = str(gpu_number)
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_number
     print(f"Using GPU {gpu_number}")
 
 
-def suppress_messages(level=3):
+def suppress_messages(level: int=3):
     """Suppress messages from tensorflow.
 
     Must be called before gpu_growth() and select_gpu().
+
+    Parameters
+    ----------
+    level : int
+        The level for the messages to suppress.
+
     """
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(level)
 
 
-def unzip_dataset(zipped_dataset):
-    num_datasets = len(zipped_dataset.element_spec)
-    datasets = [
-        zipped_dataset.map(lambda *x: x[index]) for index in range(num_datasets)
-    ]
-    return datasets
+def tensorboard_run_logdir():
+    """Creates a directory name to store TensorBoard logs.
 
+    Returns
+    -------
+    logs_filepath : str
+        Path for TensorBoard log files.
 
-def train_test_split(dataset, fraction_train):
-    len_dataset = sum(1 for _ in dataset)
-    num_train = int(np.ceil(fraction_train * len_dataset))
-    num_test = len_dataset - num_train
-    train_dataset = dataset.take(num_train)
-    test_dataset = dataset.skip(num_test)
-    return train_dataset, test_dataset
+    """
+    root_logdir = os.path.join(os.curdir, "logs")
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    logs_filepath = os.path.join(root_logdir, run_id)
+    return logs_filepath
+

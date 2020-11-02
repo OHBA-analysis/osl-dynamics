@@ -13,13 +13,10 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
-from vrad.inference.callbacks import (
-    AnnealingCallback,
-    SaveBestCallback,
-    tensorboard_run_logdir,
-)
+from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
 from vrad.inference.initializers import reinitialize_model_weights
 from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
+from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.utils.misc import check_iterable_type, listify, replace_argument
 
 
