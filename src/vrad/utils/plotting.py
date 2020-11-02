@@ -10,12 +10,10 @@ import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from vrad.array_ops import (
+from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
+from vrad.inference.states import (
     correlate_states,
-    from_cholesky,
-    get_one_hot,
     match_states,
-    mean_diagonal,
     state_activation,
     state_lifetimes,
 )
@@ -637,6 +635,7 @@ def plot_matrices(
     matrix: Iterable[np.ndarray],
     group_color_scale: bool = True,
     titles: list = None,
+    main_title: str = None,
     cmap="viridis",
     nan_color="white",
     filename: str = None,
@@ -653,6 +652,8 @@ def plot_matrices(
         If True, all matrices will have the same colormap scale.
     titles: list of str
         Titles to give to each matrix axis.
+    main_title: str
+        Main title to be placed at the top of the plot.
     cmap: str
         Matplotlib colormap.
     nan_color: str
@@ -700,6 +701,8 @@ def plot_matrices(
             cax = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(pl, cax=cax)
         plt.tight_layout()
+
+    fig.suptitle(main_title)
 
     show_or_save(filename)
 
@@ -757,10 +760,11 @@ def add_figure_colorbar(fig: plt.Figure, mappable):
 @transpose(0, "state_time_course")
 def plot_state_lifetimes(
     state_time_course: np.ndarray,
-    bins: int = 20,
+    bins: int = "auto",
     density: bool = False,
-    match_scale_x=True,
-    match_scale_y=True,
+    match_scale_x: bool = False,
+    match_scale_y: bool = False,
+    x_range: list = None,
     hist_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
@@ -850,31 +854,43 @@ def plot_state_lifetimes(
             axis.set_xlim(0, furthest_value * 1.1)
         if match_scale_y:
             axis.set_ylim(0, largest_bar * 1.1)
+        if x_range is not None:
+            if len(x_range) != 2:
+                raise ValueError("x_range must be [x_min, x_max].")
+            axis.set_xlim(x_range[0], x_range[1])
     plt.tight_layout()
 
     show_or_save(filename)
 
 
 def plot_state_time_courses(
-    state_time_course: np.ndarray,
-    axis: plt.Axes = None,
+    *state_time_courses: List[np.ndarray],
     n_samples: int = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
-    y_tick_values: list = None,
     filename: str = None,
 ):
-    """Alias for plot_time_series."""
+    """Plot state time courses as separate subplots."""
 
-    plot_time_series(
-        time_series=state_time_course,
-        axis=axis,
-        n_samples=n_samples,
-        plot_kwargs=plot_kwargs,
-        fig_kwargs=fig_kwargs,
-        y_tick_values=y_tick_values,
-        filename=filename,
-    )
+    state_time_courses = np.asarray(state_time_courses)
+
+    n_lines = len(state_time_courses)
+    n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
+    n_states = state_time_courses[0].shape[1]
+
+    default_fig_kwargs = {"figsize": (20, 10)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+    fig, axis = plt.subplots(n_states, **fig_kwargs)
+
+    default_plot_kwargs = {"lw": 0.7}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+    for i in range(n_lines):
+        for j in range(n_states):
+            axis[j].plot(state_time_courses[i][:n_samples, j])
+
+    plt.tight_layout()
+    show_or_save(filename)
 
 
 def compare_state_data(
@@ -949,6 +965,63 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     nan_diagonal = confusion.copy().astype(float)
     nan_diagonal[np.diag_indices_from(nan_diagonal)] = np.nan
     plot_matrices([confusion, nan_diagonal], group_color_scale=False)
+
+
+def plot_loss(
+    losses: np.ndarray,
+    labels: list = None,
+    legend_loc: int = 1,
+    x_range: list = None,
+    y_range: list = None,
+    title: str = None,
+    filename: str = None,
+):
+    """Plot a training loss curve."""
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    if isinstance(losses, list):
+        losses = np.array(losses)
+
+    if losses.ndim == 1:
+        losses = [losses]
+
+    if x_range is None:
+        x_range = [None, None]
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = [labels]
+        else:
+            if len(labels) != len(losses):
+                raise ValueError("Incorrect number of losses or labels passed.")
+        add_legend = True
+    else:
+        labels = [None] * len(losses)
+        add_legend = False
+
+    # Plot the loss curves
+    for i in range(len(losses)):
+        ax.plot(range(1, len(losses[i]) + 1), losses[i], label=labels[i])
+
+    # Set axis range
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+
+    #  Add a legend
+    if add_legend:
+        ax.legend(loc=legend_loc)
+
+    # Clean up layout and show or save
+    plt.tight_layout()
+    show_or_save(filename)
 
 
 def show_or_save(filename: str = None):

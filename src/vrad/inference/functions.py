@@ -41,48 +41,23 @@ def cholesky_factor(full_matrix):
     return cholesky_factor
 
 
-def matrix_sqrt_3d(matrix):
-    """A wrapper function for `scipy.linalg.sqrtm`.
+def trace_normalize(matrices):
+    """Normalise a matrix based on its trace.
 
-    SciPy's matrix square root function only works on [N x N] 2D matrices. This
-    function provides a simple solution for performing this operation on a stack of
-    [N x N] 2D arrays.
-
-    Parameters
-    ----------
-    matrix : numpy.ndarray
-        [M x N x N] matrix.
-
-    Returns
-    -------
-    matrix_sqrt : numpy.ndarray
-        A stack of matrix square roots of the same dimensions as `matrix` ([M x N x N])
-    """
-    if matrix.ndim != 3 or matrix.shape[1] != matrix.shape[2]:
-        raise ValueError("Only accepts matrices with dimensions M x N x N")
-    return_matrix = np.empty_like(matrix)
-    for index, layer in enumerate(matrix):
-        return_matrix[index] = scipy.linalg.sqrtm(layer)
-    return return_matrix
-
-
-def normalise_covariance(covariance):
-    """Normalise covariance matrix based on its trace.
-
-    The trace of `covariance` is taken. All values are then divided by it.
+    The trace of each matrix in 'matrices' is taken. All values are then
+    divided by it.
 
     Parameters
     ----------
-    covariance : tf.Tensor
+    covariances : tf.Tensor
         Tensor of the form [M x N x N]
 
     Returns
     -------
-    normalised_covariance : tf.Tensor
+    normalized_covariances : tf.Tensor
         Tensor of the form [M x N x N]
     """
-    normalisation = tf.reduce_sum(tf.linalg.diag_part(covariance), axis=1)[
+    normalization = tf.reduce_sum(tf.linalg.diag_part(matrices), axis=1)[
         ..., tf.newaxis, tf.newaxis
     ]
-    normalised_covariance = covariance / normalisation
-    return normalised_covariance
+    return matrices.shape[1] * matrices / normalization

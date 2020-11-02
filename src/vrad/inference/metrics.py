@@ -111,3 +111,47 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     if len(sequence_2.shape) == 2:
         sequence_2 = sequence_2.argmax(axis=1)
     return dice_coefficient_1d(sequence_1, sequence_2)
+
+
+def log_likelihood(time_series, state_mixing_factors, covariances, means=None):
+    """Calculates the log likelihood.
+
+    The log likelihood is calculated as:
+    c - 0.5 * log(|sigma|) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+           where:
+           - x is a single observation
+           - mu is the mean vector
+           - sigma is the covariance matrix
+           - c is a constant
+    The negative of the log likelihood is returned.
+    """
+    if means is None:
+        means = np.zeros([covariances.shape[0], covariances.shape[1]])
+
+    # Negative log likelihood
+    nll = 0
+
+    # Loop through the data
+    for i in range(state_mixing_factors.shape[0]):
+        x = time_series[i]
+        alpha = state_mixing_factors[i]
+
+        # State mixing
+        mu = np.sum(alpha[..., np.newaxis] * means, axis=0)
+        sigma = np.sum(alpha[..., np.newaxis, np.newaxis] * covariances, axis=0)
+
+        # Calculate second term: -0.5 * log(|sigma|)
+        sign, logdet = np.linalg.slogdet(sigma)
+        second_term = -0.5 * sign * logdet
+
+        # Calculate third term: -0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+        inv_sigma = np.linalg.inv(sigma + 1e-8 * np.eye(sigma.shape[-1]))
+        x_minus_mu = x[..., np.newaxis] - mu[..., np.newaxis]
+        x_minus_mu_T = np.transpose(x_minus_mu)
+        third_term = -0.5 * x_minus_mu_T @ inv_sigma @ x_minus_mu
+
+        # Calculate the negative log likelihood
+        # We ignore the first term which is a constant
+        nll -= np.squeeze(second_term + third_term)
+
+    return nll

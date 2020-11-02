@@ -1,15 +1,43 @@
+"""A series of Tensorflow callbacks.
+
+"""
+
+import logging
 import os
 import time
 from abc import ABC
 from pathlib import Path
 
 import numpy as np
-import vrad.inference.metrics
 from matplotlib import pyplot as plt
-from tensorflow.python import tanh
+from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 from vrad import array_ops
-from vrad.inference.layers import MultivariateNormalLayer
+from vrad.inference import metrics, states
+
+_logger = logging.getLogger("VRAD")
+
+
+class SaveBestCallback(callbacks.ModelCheckpoint):
+    def __init__(self, save_best_after, *args, **kwargs):
+        self.save_best_after = save_best_after
+
+        kwargs.update(
+            dict(
+                save_weights_only=True, monitor="loss", mode="min", save_best_only=True,
+            )
+        )
+
+        super().__init__(*args, **kwargs)
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.epochs_since_last_save += 1
+        if epoch >= self.save_best_after:
+            if self.save_freq == "epoch":
+                self._save_model(epoch=epoch, logs=logs)
+
+    def on_train_end(self, logs=None):
+        self.model.load_weights(self.filepath)
 
 
 class SavePredictionCallback(callbacks.Callback):
@@ -42,8 +70,6 @@ class AnnealingCallback(callbacks.Callback):
         self.n_epochs_annealing = n_epochs_annealing
 
     def on_epoch_end(self, epoch, logs=None):
-        if logs is None:
-            logs = {}
         new_value = (
             0.5
             * tanh(
@@ -54,24 +80,6 @@ class AnnealingCallback(callbacks.Callback):
             + 0.5
         )
         self.annealing_factor.assign(new_value)
-
-
-class BurninCallback(callbacks.Callback):
-    def __init__(self, epochs):
-        super().__init__()
-        self.epochs = epochs
-        self.mvn = None
-
-    def on_train_begin(self, logs=None):
-        self.mvn = self.model.layers[
-            [
-                isinstance(layer, MultivariateNormalLayer)
-                for layer in self.model.layers
-            ].index(True)
-        ]
-
-    def on_epoch_begin(self, epoch, logs=None):
-        self.mvn.burnin.assign(epoch < self.epochs)
 
 
 class Callback(ABC):
@@ -131,10 +139,10 @@ class ComparisonCallback(Callback):
             self.comparison_array, pred_stc
         )
         try:
-            matched_comp_array, matched_pred_stc = array_ops.match_states(
+            matched_comp_array, matched_pred_stc = states.match_states(
                 aligned_comp_array, aligned_pred_stc
             )
-            self.trainer.dice = vrad.inference.metrics.dice_coefficient(
+            self.trainer.dice = metrics.dice_coefficient(
                 matched_comp_array, matched_pred_stc
             )
         except ValueError:
@@ -149,3 +157,10 @@ class ComparisonCallback(Callback):
     def tqdm_update(self, *args, **kwargs):
         if len(self.dice_history) > 0:
             self.trainer.post_fix.update({"dice": self.dice_history[-1]})
+
+
+def tensorboard_run_logdir():
+    """Creates a directory name to store TensorBoard logs."""
+    root_logdir = os.path.join(os.curdir, "logs")
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    return os.path.join(root_logdir, run_id)

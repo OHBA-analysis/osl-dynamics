@@ -13,4 +13,5 @@ Version 1.1.0
         - initial_pseudo_cov |rarr| initial_covariances (can accept non-cholesky matrices)
         - learn_covs |rarr| learn_covariances
         - activation_function |rarr| alpha_xform
-        - Added n_layers_inference, n_layers_model.
+        - Added n_layers_inference, n_layers_model
+        - initial_mean |rarr| initial_means

@@ -1,8 +1,13 @@
+"""Base class for simulations.
+
+"""
+
 from abc import ABC, abstractmethod
 
 import numpy as np
 from matplotlib import pyplot as plt
 from vrad.utils import plotting
+from vrad.utils.decorators import timing
 
 
 class Simulation(ABC):
@@ -18,23 +23,30 @@ class Simulation(ABC):
         Number of states to simulate
     sim_varying_means : bool
         If False, means will be set to zero.
+    covariances : np.ndarray
+        covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels).
+    observation_error : float
+        The standard deviation of noise added to the signal from a normal distribution.
     random_covariance_weights : bool
         Should the simulation use random covariance weights? False gives structured
         covariances.
-    observation_error : float
-        The standard deviation of noise added to the signal from a normal distribution.
+    simulate : bool
+        Should we simulate the time series.
+    random_seed : int
+        Seed for the random number generator
     """
 
     def __init__(
         self,
-        n_samples: int = 20000,
-        n_channels: int = 7,
-        n_states: int = 4,
-        sim_varying_means: bool = False,
-        random_covariance_weights: bool = False,
-        observation_error: float = 0.2,
-        covariances: np.ndarray = None,
-        simulate: bool = True,
+        n_samples: int,
+        n_channels: int,
+        n_states: int,
+        sim_varying_means: bool,
+        covariances: np.ndarray,
+        observation_error: float,
+        random_covariance_weights: bool,
+        simulate: bool,
         random_seed: int = None,
     ):
 
@@ -65,7 +77,7 @@ class Simulation(ABC):
         return self.time_series
 
     def __iter__(self):
-        return iter(self.time_series)
+        return iter([self.time_series])
 
     def __getattr__(self, attr):
         if attr == "time_series":
@@ -73,6 +85,9 @@ class Simulation(ABC):
         if attr[:2] == "__":
             raise AttributeError(f"No attribute called {attr}.")
         return getattr(self.time_series, attr)
+
+    def __len__(self):
+        return 1
 
     @abstractmethod
     def generate_states(self) -> np.ndarray:
@@ -150,19 +165,48 @@ class Simulation(ABC):
         else:
             mus_sim = np.zeros((self.n_states, self.n_channels))
 
+        # State time course, shape=(n_samples, n_states)
+        # This contains the mixing factors of each states at each time point
+        stc = self.state_time_course
+
+        # Array to hold the simulated data
         data_sim = np.zeros((self.n_samples, self.n_channels))
-        for i in range(self.n_states):
-            data_sim[
-                self.state_time_course.argmax(axis=1) == i
-            ] = self._rng.multivariate_normal(
-                mus_sim[i],
-                self.covariances[i],
-                size=np.count_nonzero(self.state_time_course.argmax(axis=1) == i),
+
+        # Loop through all unique combinations of states
+        for alpha in np.unique(stc, axis=0):
+
+            # Mean and covariance for this combination of states
+            mu = np.sum(mus_sim * alpha[:, np.newaxis], axis=0)
+            sigma = np.sum(self.covariances * alpha[:, np.newaxis, np.newaxis], axis=0)
+
+            # Generate data for the time points that this combination of states is
+            # active
+            data_sim[np.all(stc == alpha, axis=1)] = self._rng.multivariate_normal(
+                mu, sigma, size=np.count_nonzero(np.all(stc == alpha, axis=1))
             )
 
+        # Add an error to the data at all time points
         data_sim += self._rng.normal(scale=self.observation_error, size=data_sim.shape)
 
         return data_sim.astype(np.float32)
+
+    def standardize(self):
+        """Standardizes the data.
+
+        The time series data is z-transformed and the covariances are converted
+        to correlation matrices.
+        """
+        self.means = np.mean(self.time_series, axis=0)
+        self.standard_deviations = np.std(self.time_series, axis=0)
+
+        # Z-transform
+        self.time_series -= self.means
+        self.time_series /= self.standard_deviations
+
+        # Convert covariance matrices to correlation matrices
+        self.covariances /= np.outer(
+            self.standard_deviations, self.standard_deviations
+        )[np.newaxis, ...]
 
     def plot_data(self, n_points: int = 1000, filename: str = None):
         """Method for plotting simulated data.

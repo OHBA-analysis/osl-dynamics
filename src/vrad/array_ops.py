@@ -1,4 +1,4 @@
-"""Helper functions using NumPy
+"""Helper functions using NumPy.
 
 """
 import logging
@@ -12,79 +12,38 @@ from vrad.utils.decorators import transpose
 _logger = logging.getLogger("VRAD")
 
 
-def softplus(time_course: np.ndarray):
-    """Calculate the softplus activation of a time series."""
-    time_course = np.asarray(time_course)
-    zero = np.asarray(0).astype(time_course.dtype)
-    return np.logaddexp(zero, time_course)
+def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
+    """Matches matrices based on Frobenius norm of the difference of the matrices.
 
+    Each matrix must be 3D: (n_states, n_channels, n_channels).
 
-def softmax(time_course: np.ndarray):
-    """Calculate the softmax activation of a time series over the last axis."""
-    time_course = np.asarray(time_course)
-    return scipy.special.softmax(time_course, axis=-1)
-
-
-@transpose
-def correlate_states(
-    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
-) -> np.ndarray:
-    """Calculate the correlation matrix between states in two state-time-courses.
-
-    Given two state time courses, calculate the correlation between each pair of states
-    in the state time courses. The output for each value in the matrix is the value
-    numpy.corrcoef(state_time_course_1, state_time_course_2)[0, 1].
-
-    Parameters
-    ----------
-    state_time_course_1: numpy.ndarray
-    state_time_course_2: numpy.ndarray
-
-    Returns
-    -------
-    correlation_matrix: numpy.ndarray
+    The Frobenius norm is F = [Sum_{i,j} abs(a_{ij}^2)]^0.5,
+    where A is the element-wise difference of two matrices.
     """
-    correlation = np.zeros((state_time_course_1.shape[1], state_time_course_2.shape[1]))
-    for i, state1 in enumerate(state_time_course_1.T):
-        for j, state2 in enumerate(state_time_course_2.T):
-            correlation[i, j] = np.corrcoef(state1, state2)[0, 1]
-    return correlation
+    # Check all matrices have the same shape
+    for matrix in matrices[1:]:
+        if matrix.shape != matrices[0].shape:
+            raise ValueError("Matrices must have the same shape.")
 
+    # Number of arguments and number of matrices in each argument passed
+    n_args = len(matrices)
+    n_matrices = matrices[0].shape[0]
 
-@transpose
-def match_states(*state_time_courses: np.ndarray) -> List[np.ndarray]:
-    """Find correlated states between state time courses.
+    # Calculate the similarity between matrices
+    F = np.empty([n_matrices, n_matrices])
+    matched_matrices = [matrices[0]]
+    for i in range(1, n_args):
+        for j in range(n_matrices):
+            # Find the matrix that is most similar to matrix j
+            for k in range(n_matrices):
+                A = abs(np.diagonal(matrices[i][k]) - np.diagonal(matrices[0][j]))
+                F[j, k] = np.linalg.norm(A)
+        order = linear_sum_assignment(F)[1]
 
-    Given N state time courses and using the first given state time course as a basis,
-    find the best matches for states between all of the state time courses. Once found,
-    the state time courses are returned with the states reordered so that the states
-    match.
+        # Add the ordered matrix to the list
+        matched_matrices.append(matrices[i][order])
 
-    Given two arrays with columns ABCD and CBAD, both will be returned with states in
-    the order ABCD.
-
-    Parameters
-    ----------
-    state_time_courses: list of numpy.ndarray
-
-    Returns
-    -------
-    matched_state_time_courses: list of numpy.ndarray
-    """
-    # If the state time courses have different length we only use the first n_samples
-    n_samples = min([stc.shape[0] for stc in state_time_courses])
-
-    # Match time courses based on correlation
-    matched_state_time_courses = [state_time_courses[0][:n_samples]]
-    for state_time_course in state_time_courses[1:]:
-        correlation = correlate_states(
-            state_time_courses[0][:n_samples], state_time_course[:n_samples]
-        )
-        correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
-        matches = linear_sum_assignment(-correlation)
-        matched_state_time_courses.append(state_time_course[:n_samples, matches[1]])
-
-    return matched_state_time_courses
+    return tuple(matched_matrices)
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):
@@ -183,102 +142,6 @@ def align_arrays(*sequences, alignment: str = "left") -> List[np.ndarray]:
 
     else:
         raise ValueError("Alignment must be left, right or center.")
-
-
-@transpose(0, "state_time_course")
-def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Calculate state activations for a state time course.
-
-    Given a state time course (strictly binary), calculate the beginning and end of each
-    activation of each state.
-
-    Parameters
-    ----------
-    state_time_course : numpy.ndarray
-        State time course (strictly binary).
-
-    Returns
-    -------
-    ons : list of numpy.ndarray
-        List containing state beginnings in the order they occur for each channel.
-        This cannot necessarily be converted into an array as an equal number of
-        elements in each array is not guaranteed.
-    offs : list of numpy.ndarray
-        List containing state ends in the order they occur for each channel.
-        This cannot necessarily be converted into an array as an equal number of
-        elements in each array is not guaranteed.
-
-    """
-    channel_on = []
-    channel_off = []
-
-    diffs = np.diff(state_time_course, axis=0)
-    for i, diff in enumerate(diffs.T):
-        on = (diff == 1).nonzero()[0]
-        off = (diff == -1).nonzero()[0]
-        try:
-            if on[-1] > off[-1]:
-                off = np.append(off, len(diff))
-
-            if off[0] < on[0]:
-                on = np.insert(on, 0, -1)
-
-            channel_on.append(on)
-            channel_off.append(off)
-        except IndexError:
-            _logger.info(f"No activation in state {i}.")
-            channel_on.append(np.array([]))
-            channel_off.append(np.array([]))
-
-    channel_on = np.array(channel_on)
-    channel_off = np.array(channel_off)
-
-    return channel_on, channel_off
-
-
-@transpose(0, "state_time_course")
-def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
-    """Remove empty states from a state time course.
-
-    If a state has no activation in the state time course, remove the column
-    corresponding to that state.
-
-    Parameters
-    ----------
-    state_time_course: numpy.ndarray
-
-    Returns
-    -------
-    reduced_state_time_course: numpy.ndarray
-        A state time course with no states with no activation.
-
-    """
-    return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
-
-
-@transpose(0, "state_time_course")
-def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
-    """Calculate state lifetimes for a state time course.
-
-    Given a state time course (one-hot encoded), calculate the lifetime of each
-    activation of each state.
-
-    Parameters
-    ----------
-    state_time_course : numpy.ndarray
-        State time course (strictly binary).
-
-    Returns
-    -------
-    channel_lifetimes : list of numpy.ndarray
-        List containing an array of lifetimes in the order they occur for each channel.
-        This cannot necessarily be converted into an array as an equal number of
-        elements in each array is not guaranteed.
-
-    """
-    ons, offs = state_activation(state_time_course)
-    channel_lifetimes = offs - ons
-    return channel_lifetimes
 
 
 def from_cholesky(cholesky_matrix: np.ndarray):

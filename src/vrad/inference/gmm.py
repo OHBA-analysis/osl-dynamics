@@ -1,6 +1,7 @@
-"""Model data using a `BayesianGaussianMixture` model from Scikit-Learn
+"""Functions to fit a Gaussian Mixture Model to data.
 
 """
+
 import logging
 import warnings
 from typing import Union
@@ -9,22 +10,63 @@ import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
 from vrad.data import Data
 from vrad.inference.functions import cholesky_factor
+from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation
 from vrad.utils.misc import override_dict_defaults, time_axis_first
 
 _logger = logging.getLogger("VRAD")
+_rng = np.random.default_rng()
 
 
-def wishart_random_sigmas(data, n_states):
-    mix = BayesianGaussianMixture(n_components=n_states, max_iter=1)
+def wishart_covariances(time_series, n_states, covariance_prior, mean_prior):
+    reg_covar = 1e-6
+    n_components = n_states
+
+    n_samples, dof_prior = time_series.shape
+
+    resp = _rng.random((n_samples, n_components))
+
+    nk = resp.sum(axis=0) + 10 * np.finfo(resp.dtype).eps
+    xk = np.dot(resp.T, time_series) / nk[:, None]
+
+    mean_precision = nk + 1
+    means = (mean_prior + nk[:, None] * xk) / mean_precision[:, None]
+
+    n_features = xk.shape[1]
+    dof = n_features + nk
+
+    full_diff = time_series - means[:, None, :]
+    sk = (
+        np.matmul(resp.T[:, None, :] * full_diff.transpose(0, 2, 1), full_diff)
+        / nk[:, None, None]
+        + np.eye(n_features, n_features) * reg_covar
+    )
+    full_diff = xk - mean_prior
+    covariances = (
+        covariance_prior
+        + nk[:, None, None] * sk
+        + (nk / mean_precision)[:, None, None]
+        * full_diff[..., None]
+        @ full_diff[:, None, :]
+    )
+
+    covariances /= dof[:, None, None]
+
+    return covariances
+
+
+def initial_covariances(data, n_states):
+    gmm = BayesianGaussianMixture(n_components=n_states, max_iter=1)
     warnings.filterwarnings("ignore")
-    mix.fit(data)
-    return mix.covariances_
+    gmm.fit(data)
+    covariances = gmm.covariances_.astype(np.float32)  # for tensorflow
+    return covariances
 
 
-def learn_mu_sigma(
+def final_means_covariances(
     data: Union[np.ndarray, Data],
     n_states: int,
     learn_means: bool = False,
+    covariance_type: str = "full",
     retry_attempts: int = 5,
     gmm_kwargs: dict = None,
     take_random_sample: int = None,
@@ -55,12 +97,12 @@ def learn_mu_sigma(
 
     Returns
     -------
-    covariances : numpy.ndarray
-        Covariances of the states (Gaussian distributions) found with dimensions
-        [n_states x n_channels x n_channels]
     means : numpy.ndarray
         Means of the states (Gaussian distributions) found with dimensions [n_states x
         n_channels]
+    covariances : numpy.ndarray
+        Covariances of the states (Gaussian distributions) found with dimensions
+        [n_states x n_channels x n_channels]
     """
     if retry_attempts < 1:
         raise ValueError("retry_attempts cannot be less than 1")
@@ -79,7 +121,7 @@ def learn_mu_sigma(
         # use sklearn learn to do GMM
         gmm = BayesianGaussianMixture(
             n_components=n_states,
-            covariance_type="full",
+            covariance_type=covariance_type,
             **gmm_kwargs,
             random_state=random_seed,
         )
@@ -87,7 +129,7 @@ def learn_mu_sigma(
         # make sure we force means to be zero:
         gmm = BayesianGaussianMixture(
             n_components=n_states,
-            covariance_type="full",
+            covariance_type=covariance_type,
             mean_prior=np.zeros(n_channels),
             mean_precision_prior=1e12,
             random_state=random_seed,
@@ -101,74 +143,16 @@ def learn_mu_sigma(
             break
         print(f"Failed to converge on iteration {attempt}")
 
+    # Cast means and covariances to float32 for tensorflow
+    means = gmm.means_.astype(np.float32)
+    if covariance_type == "diag":
+        covariances = np.empty([n_states, n_channels, n_channels], dtype=np.float32)
+        for i in range(gmm.covariances_.shape[0]):
+            covariances[i] = np.diag(gmm.covariances_[i])
+    else:
+        covariances = gmm.covariances_.astype(np.float32)
+
     if return_gmm:
-        return gmm.covariances_, gmm.means_, gmm
-    return gmm.covariances_, gmm.means_
+        return gmm, means, covariances
 
-
-def process_covariance(
-    covariances: np.ndarray, means: np.ndarray, learn_means: bool
-) -> np.ndarray:
-    """Calculate normalised full covariance.
-
-    Given a set of covariances and means, calculate the full covariance matrices and
-    normalise them by their traces.
-
-    Parameters
-    ----------
-    covariances : numpy.ndarray
-        Matrix of covariances of dimensions [n_states x n_channels x n_channels].
-    means : numpy.ndarray
-        Matrix of means of dimensions [n_states x n_channels].
-    learn_means : bool
-        If True, include means in calculation (i.e. calculate full covariance).
-
-    Returns
-    -------
-    full_covariance : numpy.ndarray
-        Normalised full covariance matrices of dimensions [n_states x n_channels
-        x n_channels].
-    """
-    if learn_means:
-        full_covariances = covariances
-    else:
-        means = means[:, np.newaxis, :]
-        full_covariances = (means @ means.transpose(0, 2, 1)) + covariances
-
-    norms = np.trace(full_covariances, axis1=1, axis2=2)
-    full_covariances /= norms[:, np.newaxis, np.newaxis]
-
-    return full_covariances
-
-
-def find_cholesky_decompositions(
-    covariances: np.ndarray, means: np.ndarray, learn_means: bool,
-):
-    """Calculate the Cholesky decomposition of the full covariance of a distribution.
-
-    Given a set of covariances [n_states x n_channels x n_channels] and means
-    [n_states x n_channels], calculate the full covariance (i.e. with means included).
-    We then take the matrix square root (sqrtm(M) * sqrtm(M) = M) and project it onto
-    a set of principle components W. For now, this is implemented only as the identity
-    matrix. A Cholesky decomposition is then performed on the result.
-
-    Parameters
-    ----------
-    covariances : numpy.ndarray
-        Covariance matrices for states [n_states x n_channels x n_channels]
-    means : numpy.ndarray
-        Means for states [n_states x n_channels]
-    learn_means : bool
-        If True, means will be incorporated to form full covariance matrices.
-
-    Returns
-    -------
-    cholesky_decompositions : numpy.array
-        [n_states x n_channels x n_channels] array containing the Cholesky
-        decompositions of full covariance matrices.
-    """
-    if learn_means:
-        full_covariances = process_covariance(covariances, means, learn_means)
-    else:
-        full_covariances = covariances
-    return cholesky_factor(full_covariances)
+    return means, covariances

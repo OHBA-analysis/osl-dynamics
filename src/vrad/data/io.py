@@ -4,22 +4,9 @@ from typing import Tuple, Union
 import mat73
 import numpy as np
 import scipy.io
-from vrad.utils.misc import listify, time_axis_first
+from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")
-
-
-def get_ignored_keys(new_keys):
-    new_keys = listify(new_keys)
-    ignored_matlab_keys = [
-        "__globals__",
-        "__header__",
-        "__version__",
-        "save_time",
-        "pca_applied",
-        "T",
-    ] + new_keys
-    return ignored_matlab_keys
 
 
 def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
@@ -58,42 +45,46 @@ def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
 
 def load_matlab(
     file_name: str, sampling_frequency: float = 1, ignored_keys=None
-) -> Tuple[np.ndarray, float]:
-    ignored_keys = get_ignored_keys(ignored_keys)
+) -> Tuple[np.ndarray, np.ndarray, float]:
     try:
         mat = scipy.io.loadmat(file_name)
     except NotImplementedError:
         mat = mat73.loadmat(file_name)
 
+    discontinuity_indices = None
+
     if "D" in mat:
         _logger.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
         time_series, sampling_frequency = load_spm(file_name=file_name)
     else:
-        for key in mat:
-            if key not in ignored_keys:
-                time_series = mat[key]
-                break
-        else:
-            raise KeyError("No keys found which aren't excluded.")
+        try:
+            time_series = mat["X"]
+            if "T" in mat:
+                discontinuity_indices = mat["T"][0].astype(int)
+        except:
+            raise KeyError("data in MATLAB file must be contained in a field called X.")
 
-    return time_series, sampling_frequency
+    return time_series, discontinuity_indices, sampling_frequency
 
 
 def load_data(
     time_series: Union[str, np.ndarray],
     sampling_frequency: float = 1,
-    ignored_keys=None,
-) -> Tuple[np.ndarray, float]:
+    mmap_location=None,
+) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Loads data.
+
+    Accepts a numpy array or a string containing the path to a .npy or .mat file.
+    """
+    discontinuity_indices = None
 
     # Read time series from a file
     if isinstance(time_series, str):
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
         elif time_series[-4:] == ".mat":
-            time_series, sampling_frequency = load_matlab(
-                file_name=time_series,
-                sampling_frequency=sampling_frequency,
-                ignored_keys=ignored_keys,
+            time_series, discontinuity_indices, sampling_frequency = load_matlab(
+                file_name=time_series, sampling_frequency=sampling_frequency,
             )
 
     # If a python list has been passed, convert to a numpy array
@@ -109,4 +100,14 @@ def load_data(
     # Check time is the first axis, channels are the second axis
     time_series = time_axis_first(time_series)
 
-    return time_series, sampling_frequency
+    # Load from memmap
+    if mmap_location is not None:
+        np.save(mmap_location, time_series)
+        time_series = np.load(mmap_location, mmap_mode="r+")
+
+    # Indicate the entire time series is continuous if discontinuities have not
+    # been passed
+    if discontinuity_indices is None:
+        discontinuity_indices = [time_series.shape[0]]
+
+    return time_series, discontinuity_indices, sampling_frequency

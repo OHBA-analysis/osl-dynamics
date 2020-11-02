@@ -7,7 +7,9 @@ They are used to initialize weights in custom layers.
 import logging
 
 import tensorflow as tf
+from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
+from vrad import models
 
 _logger = logging.getLogger("VRAD")
 
@@ -17,7 +19,7 @@ class Identity3D(Initializer):
 
     """
 
-    def __call__(self, shape, **kwargs):
+    def __call__(self, shape, dtype=None):
         """Create stacked identity matrices with dimensions [M x N x N]
 
         Parameters
@@ -85,3 +87,52 @@ class UnchangedInitializer(Initializer):
 
     def __call__(self, shape, dtype=None):
         return self.initial_values
+
+
+def reinitialize_layer_weights(layer):
+    """Re-initialises the weights in a particular layer.
+
+    This function relies on each layer having an initializer attribute.
+    Therefore, you must specific a self.*_initializer attribute in custom
+    layers, otherwise this function will break.
+    """
+    # Get the initialisation container
+    if hasattr(layer, "cell"):
+        init_container = layer.cell
+    else:
+        init_container = layer
+
+    # Re-initialise
+    for key, initializer in init_container.__dict__.items():
+        if "initializer" not in key:
+            continue
+        if key == "recurrent_initializer":
+            var = getattr(init_container, "recurrent_kernel")
+        else:
+            var = getattr(init_container, key.replace("_initializer", ""))
+        var.assign(initializer(var.shape, var.dtype))
+
+
+def reinitialize_model_weights(model):
+    """Re-initialises the weights in the model."""
+    for layer in model.layers:
+        # If the layer consists and multiple layers pass the layer back
+        # to this function
+        if (
+            isinstance(layer, Model)
+            or isinstance(layer, models.InferenceRNNLayers)
+            or isinstance(layer, models.ModelRNNLayers)
+        ):
+            for l in layer.layers:
+                # If the layer is bidirectional we need to re-initialise the
+                # forward and backward layers
+                if isinstance(l, layers.Bidirectional):
+                    reinitialize_layer_weights(l.forward_layer)
+                    reinitialize_layer_weights(l.backward_layer)
+                # Otherwise, just re-initialise as a normal layer
+                else:
+                    reinitialize_layer_weights(l)
+
+        # Otherwise, this is just a single layer
+        else:
+            reinitialize_layer_weights(layer)
