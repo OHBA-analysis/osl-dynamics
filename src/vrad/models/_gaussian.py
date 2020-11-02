@@ -5,11 +5,11 @@ import logging
 from operator import lt
 
 import numpy as np
-from tensorflow import zeros
+
 from tensorflow.keras import Model, layers
-from tensorflow.nn import softmax, softplus, relu
+from tensorflow.nn import softplus
 from tqdm import trange
-from vrad.array_ops import get_one_hot
+
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
@@ -33,7 +33,63 @@ _logger = logging.getLogger("VRAD")
 
 
 class RNNGaussian(BaseModel):
-    """Inference RNN and generative model with Gaussian observations."""
+    """Inference RNN and generative model with Gaussian observations.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Length of sequence passed to the inference network and generative model.
+    learn_means : bool
+        Should we learn the mean vector for each state?
+    learn_covariances : bool
+        Should we learn the covariance matrix for each state?
+    rnn_type : str
+        RNN to use, either 'lstm' or 'gru'.
+    n_layers_inference : int
+        Number of layers in the inference network.
+    n_layers_model : int
+        Number of layers in the generative model neural network.
+    n_units_inference : int
+        Number of units/neurons in the inference network.
+    n_units_model : int
+        Number of units/neurons in the generative model neural network.
+    dropout_rate_inference : float
+        Dropout rate in the inference network.
+    dropout_rate_model : float
+        Dropout rate in the generative model neural network.
+    normalization_type : str
+        Normalization type in the inference network and generative model. Either
+        'layer', 'batch' or None.
+    alpha_xform : str
+        Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
+        'relu'.
+    learn_alpha_scaling : bool
+        Should we learn a scaling for alpha?
+    normalize_covariances : bool
+        Should we trace normalize the state covariances?
+    do_annealing : bool
+        Should we use KL annealing during training?
+    annealing_sharpness : float
+        Parameter to control the annealing curve.
+    n_epochs_annealing : int
+        Number of epochs to perform annealing.
+    learning_rate : float
+        Learning rate for updating model parameters/weights.
+    multi_gpu : bool
+        Should be use multiple GPUs for training?
+    strategy : str
+        Strategy for distributed learning.
+    initial_means : np.ndarray
+        Initial values for the state means. Should have shape (n_states, n_channels).
+    initial_covariances : np.ndarray
+        Initial values for the state covariances. Should have shape (n_states,
+        n_channels, n_channels).
+
+    """
 
     def __init__(
         self,
@@ -125,7 +181,11 @@ class RNNGaussian(BaseModel):
     def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.
 
-        Returns a dictionary with labels for each prediction.
+        Returns
+        -------
+        predictions : dict
+            Dictionary with labels for each prediction.
+
         """
         predictions = self.model.predict(*args, *kwargs)
         return_names = ["ll_loss", "kl_loss", "alpha_t"]
@@ -133,7 +193,19 @@ class RNNGaussian(BaseModel):
         return predictions_dict
 
     def predict_states(self, inputs, *args, **kwargs):
-        """Return the probability for each state at each time point."""
+        """State mixing factors, alpha_t.
+        
+        Parameters
+        ----------
+        inputs : tensorflow.data.Dataset
+            Prediction dataset.
+
+        Returns
+        -------
+        alpha_t : np.ndarray
+            State mixing factors with shape (n_samples, n_states).
+
+        """
         inputs = self._make_dataset(inputs)
         outputs = []
         for dataset in inputs:
@@ -143,7 +215,21 @@ class RNNGaussian(BaseModel):
         return outputs
 
     def losses(self, dataset):
-        """Calculates the log-likelihood and KL loss for a dataset."""
+        """Calculates the log-likelihood and KL loss for a dataset.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset
+            Dataset to calculate losses for.
+
+        Returns
+        -------
+        ll_loss : float
+            Negative log-likelihood loss.
+        kl_loss : float
+            KL divergence loss.
+
+        """
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
             ll_loss = np.sum([np.sum(p["ll_loss"]) for p in predictions])
@@ -155,9 +241,22 @@ class RNNGaussian(BaseModel):
         return ll_loss, kl_loss
 
     def free_energy(self, dataset):
-        """Calculates the variational free energy of a dataset."""
+        """Calculates the variational free energy of a dataset.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset
+            Dataset to calculate the variational free energy for.
+
+        Returns
+        -------
+        free_energy : float
+            Variational free energy for the dataset.
+
+        """
         ll_loss, kl_loss = self.losses(dataset)
-        return ll_loss + kl_loss
+        free_energy = ll_loss + kl_loss
+        return free_energy
 
     def initialize_means_covariances(
         self,
@@ -172,6 +271,22 @@ class RNNGaussian(BaseModel):
     
         The model is trained for a few epochs and the model with the best
         free energy is chosen.
+
+        Parameters
+        ----------
+        n_initializations : int
+            Number of initializations.
+        n_epochs_initialization : int
+            Number of epochs to train the model.
+        training_dataset : tensorflow.data.Dataset
+            Dataset to use for training.
+        verbose : int
+            Show verbose (1) or not (0).
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual Tensorflow output?
+        tqdm_class : tqdm
+            Tqdm class for the progress bar.
+
         """
         if n_initializations is None or n_initializations == 0:
             _logger.warning(
@@ -229,7 +344,21 @@ class RNNGaussian(BaseModel):
         self.compile()
 
     def get_means_covariances(self, alpha_scale=True):
-        """Get the means and covariances of each state."""
+        """Get the means and covariances of each state.
+
+        Parameters
+        ----------
+        alpah_scale : bool
+            Should we apply alpha scaling? Default is True.
+
+        Returns
+        -------
+        means : np.ndarray
+            State means.
+        covariances : np.ndarary
+            State covariances.
+
+        """
 
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
@@ -250,7 +379,16 @@ class RNNGaussian(BaseModel):
         return means, covariances
 
     def set_means_covariances(self, means=None, covariances=None):
-        """Set the means and covariances of each state."""
+        """Set the means and covariances of each state.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            State means.
+        covariances : np.ndarray
+            State covariances.
+
+        """
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.get_weights()
 
@@ -270,15 +408,33 @@ class RNNGaussian(BaseModel):
         means_covs_layer.set_weights(layer_weights)
 
     def get_alpha_scaling(self):
-        """Get the alpha scaling of each state."""
+        """Get the alpha scaling of each state.
+
+        Returns
+        ----------
+        alpha_scaling : bool
+            Alpha scaling for each state.
+
+        """
         mix_means_covs_layer = self.model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
         alpha_scaling = softplus(alpha_scaling).numpy()
         return alpha_scaling
 
     def sample_state_time_course(self, n_samples):
-        """Uses the model RNN to sample a state time course."""
+        """Uses the model RNN to sample a state time course.
 
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to take.
+
+        Returns
+        -------
+        sampled_stc : np.ndarray
+            Sampled state time course.
+
+        """
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
@@ -357,6 +513,56 @@ def _model_structure(
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
 ):
+    """Model structure.
+
+    Parameters
+    ----------
+    n_states : int
+        Numeber of states.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Length of sequence passed to the inference network and generative model.
+    rnn_type : int
+        RNN to use, either 'lstm' or 'gru'.
+    n_layers_inference : int
+        Number of layers in the inference network.
+    n_layers_model : int
+        Number of layers in the generative model neural network.
+    n_units_inference : int
+        Number of units/neurons in the inference network.
+    n_units_model : int
+        Number of units/neurons in the generative model neural network.
+    dropout_rate_inference : float
+        Dropout rate in the inference network.
+    dropout_rate_model : float
+        Dropout rate in the generative model neural network.
+    normalization_type : str
+        Normalization type in the inference network and generative model. Either
+        'layer', 'batch' or None.
+    learn_means : bool
+        Should we learn the mean vector for each state?
+    learn_covariances : bool
+        Should we learn the covariance matrix for each state?
+    initial_means : np.ndarray
+        Initial values for the state means. Should have shape (n_states, n_channels).
+    initial_covariances : np.ndarray
+        Initial values for the state covariances. Should have shape (n_states,
+        n_channels, n_channels).
+    alpha_xform : str
+        Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
+        'relu'.
+    learn_alpha_scaling : bool
+        Should we learn a scaling for alpha?
+    normalize_covariances : bool
+        Should we trace normalize the state covariances?
+
+    Returns
+    -------
+    model : tensorflow.keras.Model
+        Keras model built using the functional API.
+
+    """
     # Pick normalization layer
     if normalization_type == "layer":
         NormalizationLayer = layers.LayerNormalization
