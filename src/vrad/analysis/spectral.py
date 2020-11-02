@@ -313,7 +313,7 @@ def decompose_spectra(
     Returns
     -------
     components : np.ndarray
-        Spectral components.
+        Spectral components. Shape is (n_components, n_f).
 
     """
     print("Performing spectral decomposition")
