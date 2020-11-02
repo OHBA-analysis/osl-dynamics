@@ -16,7 +16,18 @@ _logger = logging.getLogger("VRAD")
 def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
-    Hard classifies the state probabilities (alpha).
+    Hard classifies the states so that only one state is active.
+
+    Parameters
+    ----------
+    alpha : list, np.ndarray
+        State mixing factors with shape (n_samples, n_states).
+
+    Returns
+    -------
+    stcs : list, np.ndarray
+        State time courses.
+    
     """
     if isinstance(alpha, list):
         n_states = alpha[0].shape[1]
