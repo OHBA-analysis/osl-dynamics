@@ -7,7 +7,7 @@ from operator import lt
 import numpy as np
 from tensorflow import zeros
 from tensorflow.keras import Model, layers
-from tensorflow.nn import softmax, softplus, relu
+from tensorflow.nn import relu, softmax, softplus
 from tqdm import trange
 from vrad.array_ops import get_one_hot
 from vrad.inference.functions import (

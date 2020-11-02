@@ -1,5 +1,6 @@
-import numpy as np
 from typing import Union
+
+import numpy as np
 
 
 def standardize(time_series: np.ndarray, discontinuities: np.ndarray) -> np.ndarray:
