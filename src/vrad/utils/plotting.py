@@ -218,51 +218,6 @@ def get_colors(
     return colors
 
 
-@transpose(0, 1, 2, "time_series_0", "time_series_1", "time_series_2")
-def plot_two_data_scales(
-    time_series_0: np.ndarray,
-    time_series_1: np.ndarray,
-    time_series_2: np.ndarray = None,
-    n_samples: int = None,
-    fig_kwargs: dict = None,
-    plot_0_kwargs: dict = None,
-    plot_1_kwargs: dict = None,
-    plot_2_kwargs: dict = None,
-    filename: str = None,
-):
-    n_samples = min(
-        n_samples or np.inf, time_series_0.shape[0], time_series_1.shape[0],
-    )
-
-    if plot_2_kwargs is not None:
-        n_samples = min(n_samples, time_series_2.shape[0])
-
-    fig_defaults = {"figsize": (20, 10), "sharex": "all"}
-    fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
-    fig, axes = plt.subplots(2, **fig_kwargs)
-
-    plot_0_defaults = {"lw": 0.6, "color": "tab:blue"}
-    plot_0_kwargs = override_dict_defaults(plot_0_defaults, plot_0_kwargs)
-    axes[0].plot(value_separation(time_series_0[:n_samples]), **plot_0_kwargs)
-
-    plot_1_defaults = {"lw": 0.6, "color": "tab:blue"}
-    plot_1_kwargs = override_dict_defaults(plot_1_defaults, plot_1_kwargs)
-    axes[1].plot(value_separation(time_series_1[:n_samples]), **plot_1_kwargs)
-
-    if time_series_2 is not None:
-        plot_2_defaults = {"lw": 0.4, "color": "tab:orange"}
-        plot_2_kwargs = override_dict_defaults(plot_2_defaults, plot_2_kwargs)
-        axes[1].plot(value_separation(time_series_1[:n_samples]), **plot_2_kwargs)
-
-    for axis in axes:
-        axis.autoscale(axis="x", tight=True)
-        axis.set_yticks([])
-
-    plt.tight_layout()
-
-    show_or_save(filename)
-
-
 @transpose(0, 1, "time_series", "state_time_course")
 def plot_state_highlighted_data(
     time_series: Union[np.ndarray, Any],
