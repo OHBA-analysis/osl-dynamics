@@ -8,16 +8,12 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, layers
 
+from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     is_symmetric,
     trace_normalize,
-)
-from vrad.inference.initializers import (
-    CholeskyCovariancesInitializer,
-    Identity3D,
-    MeansInitializer,
 )
 
 
@@ -233,7 +229,7 @@ class MeansCovsLayer(layers.Layer):
         if self.initial_means is None:
             self.means_initializer = tf.keras.initializers.Zeros()
         else:
-            self.means_initializer = MeansInitializer(self.initial_means)
+            self.means_initializer = initializers.MeansInitializer(self.initial_means)
 
         # Create weights the means
         self.means = self.add_weight(
@@ -246,9 +242,9 @@ class MeansCovsLayer(layers.Layer):
 
         # Initializer for covariances
         if self.initial_cholesky_covariances is None:
-            self.cholesky_covariances_initializer = Identity3D()
+            self.cholesky_covariances_initializer = initializers.Identity3D()
         else:
-            self.cholesky_covariances_initializer = CholeskyCovariancesInitializer(
+            self.cholesky_covariances_initializer = initializers.CholeskyCovariancesInitializer(
                 self.initial_cholesky_covariances
             )
 

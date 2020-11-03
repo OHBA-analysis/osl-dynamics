@@ -16,8 +16,8 @@ from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
 from vrad.data import Data
+from vrad.inference import initializers
 from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
-from vrad.inference.initializers import reinitialize_model_weights
 from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
 from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.utils.misc import check_iterable_type, replace_argument
@@ -379,7 +379,7 @@ class BaseModel:
         Resets the model weights, optimizer and annealing factor.
         """
         self.compile()
-        reinitialize_model_weights(self.model)
+        initializers.reinitialize_model_weights(self.model)
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
 
