@@ -27,7 +27,6 @@ def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
     -------
     stcs : list, np.ndarray
         State time courses.
-    
     """
     if isinstance(alpha, list):
         n_states = alpha[0].shape[1]
@@ -131,7 +130,6 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
         List containing state ends in the order they occur for each channel.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
-
     """
     channel_on = []
     channel_off = []
@@ -175,7 +173,6 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
     -------
     reduced_state_time_course: numpy.ndarray
         A state time course with no states with no activation.
-
     """
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
 
@@ -198,7 +195,6 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
         List containing an array of lifetimes in the order they occur for each channel.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
-
     """
     ons, offs = state_activation(state_time_course)
     channel_lifetimes = offs - ons

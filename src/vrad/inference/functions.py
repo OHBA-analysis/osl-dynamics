@@ -16,9 +16,8 @@ def is_symmetric(matrix: np.ndarray) -> bool:
 
     Returns
     -------
-    is_symmetric : bool
+    bool
         Flag to indicate whether or not the matrix is symmetric.
-
     """
     return np.all(np.abs(matrix - np.transpose(matrix, (0, 2, 1))) < 1e-8)
 
@@ -35,10 +34,9 @@ def cholesky_factor_to_full_matrix(cholesky_factor: tf.Tensor):
     
     Returns
     -------
-    full_matrix : tf.Tensor
+    tf.Tensor
         The full matrix calculated from the cholesky factor. Shape is
         (None, n_states, n_channels, n_channels).
-
     """
     # The upper triangle is trainable but we should zero it because the array
     # is the cholesky factor of the full covariance
@@ -69,9 +67,8 @@ def cholesky_factor(full_matrix: np.ndarray):
 
     Returns
     -------
-    cholesky_factor : np.ndarray
+    np.ndarray
         Cholesky factor of the matrix. Shape is (n_states, n_channels, n_channels).
-
     """
     cholesky_factor = np.empty(full_matrix.shape)
     for i in range(full_matrix.shape[0]):
@@ -92,7 +89,7 @@ def trace_normalize(matrices):
 
     Returns
     -------
-    normalized_covariances : tf.Tensor
+    tf.Tensor
         Tensor of shape (None, n_states, n_channels, n_channels).
     """
     normalization = tf.reduce_sum(tf.linalg.diag_part(matrices), axis=1)[

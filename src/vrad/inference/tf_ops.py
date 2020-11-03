@@ -32,7 +32,6 @@ def select_gpu(gpu_number: int):
     ----------
     gpu_number : int
         ID number for the GPU to use.
-    
     """
     if isinstance(gpu_number, int):
         gpu_number = str(gpu_number)
@@ -40,7 +39,7 @@ def select_gpu(gpu_number: int):
     print(f"Using GPU {gpu_number}")
 
 
-def suppress_messages(level: int=3):
+def suppress_messages(level: int = 3):
     """Suppress messages from tensorflow.
 
     Must be called before gpu_growth() and select_gpu().
@@ -49,7 +48,6 @@ def suppress_messages(level: int=3):
     ----------
     level : int
         The level for the messages to suppress.
-
     """
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(level)
 
@@ -59,12 +57,9 @@ def tensorboard_run_logdir():
 
     Returns
     -------
-    logs_filepath : str
+    str
         Path for TensorBoard log files.
-
     """
     root_logdir = os.path.join(os.curdir, "logs")
     run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
-    logs_filepath = os.path.join(root_logdir, run_id)
-    return logs_filepath
-
+    return os.path.join(root_logdir, run_id)

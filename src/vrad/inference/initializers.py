@@ -5,17 +5,16 @@ import logging
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import Model, layers
+from tensorflow.keras import Model
 from tensorflow.keras.initializers import Initializer
+
 from vrad import models
 
 _logger = logging.getLogger("VRAD")
 
 
 class Identity3D(Initializer):
-    """Initializer to create stacked identity matrices.
-
-    """
+    """Initializer to create stacked identity matrices."""
 
     def __call__(self, shape, dtype=None):
         """Create stacked identity matrices with dimensions [M x N x N]
@@ -45,13 +44,24 @@ class CholeskyCovariancesInitializer(Initializer):
     initial_cholesky_covariances : np.ndarray
         Cholesky factors of the state covariance matrices used for initialization.
         Shape must be (n_states, n_channels, n_channels).
-
     """
 
     def __init__(self, initial_cholesky_covariances: np.ndarray):
         self.initial_cholesky_covariances = initial_cholesky_covariances
 
     def __call__(self, shape, dtype=None):
+        """Initialize weights with cholesky factor of covariance matrices.
+
+        Raises
+        ------
+        ValueError
+            If initial_cholesky_covariances has incorrect shape.
+        
+        Returns
+        -------
+        np.ndarray
+            Initial values for weights (initial_cholesky_covariances).
+        """
         if not (len(shape) == 3 and shape == self.initial_cholesky_covariances.shape):
             raise ValueError(
                 f"shape must be 3D and be equal to initial_cholesky_covariances.shape. "
@@ -71,7 +81,6 @@ class MeansInitializer(Initializer):
     initial_means : np.ndarray
         State mean vectors used for initialization.
         Shape must be [n_states, n_channels].
-
     """
 
     def __init__(self, initial_means: np.ndarray):
@@ -82,6 +91,18 @@ class MeansInitializer(Initializer):
         )
 
     def __call__(self, shape, dtype=None):
+        """Initialize weights with mean vectors.
+
+        Raises
+        ------
+        ValueError
+            If initial_means has incorrect shape.
+        
+        Returns
+        -------
+        np.ndarray
+            Initial values for weights (initial_means).
+        """
         if not (len(shape) == 2 and shape == self.initial_means.shape):
             raise ValueError(
                 f"shape must be 2D and be equal to initial_means.shape. "
@@ -100,10 +121,17 @@ class UnchangedInitializer(Initializer):
         Values to initialize with.
     """
 
-    def __init__(self, initial_values):
+    def __init__(self, initial_values: np.ndarray):
         self.initial_values = initial_values
 
     def __call__(self, shape, dtype=None):
+        """Initialize with initial values.
+        
+        Returns
+        -------
+        np.ndarray
+            Initial values.
+        """
         return self.initial_values
 
 
@@ -118,7 +146,6 @@ def reinitialize_layer_weights(layer):
     ----------
     layer: tensorflow.keras.layers.Layer
         Layer to initialize weights for.
-
     """
     # Get the initialisation container
     if hasattr(layer, "cell"):
@@ -144,7 +171,6 @@ def reinitialize_model_weights(model):
     ----------
     model: tensorflow.keras.Model
         Model to re-initialize weights for.
-
     """
     for layer in model.layers:
         # If the layer consists and multiple layers pass the layer back

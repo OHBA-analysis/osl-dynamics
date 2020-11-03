@@ -65,7 +65,6 @@ def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float
     ------
     ValueError
         If either sequence is not one dimensional.
-
     """
     if (sequence_1.ndim, sequence_2.ndim) != (1, 1):
         raise ValueError(
@@ -104,7 +103,6 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     See Also
     --------
     dice_coefficient_1D : Dice coefficient of 1D categorical sequences.
-
     """
     if (len(sequence_1.shape) not in [1, 2]) or (len(sequence_2.shape) not in [1, 2]):
         raise ValueError("Both sequences must be either 1D or 2D")

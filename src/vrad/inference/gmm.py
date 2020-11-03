@@ -34,10 +34,9 @@ def wishart_covariances(
 
     Returns
     -------
-    covariances : np.ndarray
+    np.ndarray
         Covariances to initialize the prior. Shape is
         (n_states, n_channels, n_channels).
-
     """
     reg_covar = 1e-6
     n_components = n_states
@@ -87,10 +86,9 @@ def initial_covariances(data: np.ndarray, n_states: int):
 
     Returns
     -------
-    covariances : np.ndarray
+    np.ndarray
         Initial covariances used by sklearn.mixture.BayesianGaussianMixture.
         Shape is (n_states, n_channels, n_channels).
-
     """
     gmm = BayesianGaussianMixture(n_components=n_states, max_iter=1)
     warnings.filterwarnings("ignore")

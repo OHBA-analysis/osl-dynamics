@@ -22,7 +22,6 @@ class AnnealingCallback(callbacks.Callback):
         Parameter to control the shape of the annealing curve.
     n_epochs_annealing : int
         Number of epochs to apply annealing.
-
     """
 
     def __init__(
@@ -37,6 +36,16 @@ class AnnealingCallback(callbacks.Callback):
         self.n_epochs_annealing = n_epochs_annealing
 
     def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict
+            Results for this training epoch, and for the validation epoch if 
+            validation is performed.
+        """
         new_value = (
             0.5
             * tanh(
@@ -58,7 +67,6 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
     ----------
     save_best_after : int
         Epoch number after which to save the best model.
-
     """
 
     def __init__(self, save_best_after: int, *args, **kwargs):
@@ -73,10 +81,28 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         super().__init__(*args, **kwargs)
 
     def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict
+            Results for this training epoch, and for the validation epoch if 
+            validation is performed.
+        """
         self.epochs_since_last_save += 1
         if epoch >= self.save_best_after:
             if self.save_freq == "epoch":
                 self._save_model(epoch=epoch, logs=logs)
 
     def on_train_end(self, logs=None):
+        """Action to perform at the end of training.
+
+        Parameters
+        ----------
+        logs : dict
+            Results for this training epoch, and for the validation epoch if 
+            validation is performed.
+        """
         self.model.load_weights(self.filepath)
