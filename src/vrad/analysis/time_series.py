@@ -23,7 +23,7 @@ def get_state_time_series(
 
     Returns
     -------
-    state_time_series : np.ndarray
+    np.ndarray
         Time series for each state. Shape is (n_states, n_samples, n_channels).
 
     """

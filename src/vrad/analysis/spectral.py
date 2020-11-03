@@ -46,7 +46,7 @@ def multitaper(
 
     Returns
     -------
-    P : np.ndarray
+    np.ndarray
         Power (or cross) spectral density with shape (n_channels, n_channels, n_f).
 
     """

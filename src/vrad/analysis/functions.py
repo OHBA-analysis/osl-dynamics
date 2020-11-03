@@ -15,7 +15,7 @@ def fourier_transform(
     
     Parameters
     ----------
-    data : np.ndarary
+    data : np.ndarray
         Data with shape (n_samples, n_channels) to FFT.
     sampling_frequency : float
         Frequency used to sample the data (Hz).
@@ -26,7 +26,7 @@ def fourier_transform(
 
     Returns
     -------
-    X : np.ndarray
+    np.ndarray
         FFT data.
 
     """
@@ -56,7 +56,7 @@ def nextpow2(x: int) -> int:
 
     Returns
     -------
-    res : int
+    int
         The smallest power of two that is greater than or equal to the absolute
         value of x.
 
@@ -87,7 +87,7 @@ def validate_array(
         Message to print if the array is not valid.
 
     Returns:
-    array : np.ndarray
+    np.ndarray
         Array with the correct dimensionality.
 
     """
