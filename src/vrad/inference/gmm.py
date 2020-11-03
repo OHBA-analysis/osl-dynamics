@@ -1,23 +1,44 @@
-"""Functions to fit a Gaussian Mixture Model to data.
+"""Functions to fit a Gaussian Mixture Model (GMM) to data.
 
 """
 
-import logging
 import warnings
 from typing import Union
 
 import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
 from vrad.data import Data
-from vrad.inference.functions import cholesky_factor
-from vrad.simulation import BasicHMMSimulation, SequenceHMMSimulation
 from vrad.utils.misc import override_dict_defaults, time_axis_first
 
-_logger = logging.getLogger("VRAD")
 _rng = np.random.default_rng()
 
 
-def wishart_covariances(time_series, n_states, covariance_prior, mean_prior):
+def wishart_covariances(
+    time_series: np.ndarray,
+    n_states: int,
+    covariance_prior: np.ndarray,
+    mean_prior: np.ndarray,
+):
+    """Wishart initialization for state covariances.
+
+    Parameters
+    ----------
+    time_series : np.ndarray
+        Time series data with shape (n_samples, n_channels).
+    n_states : int
+        Number of states.
+    covariance_prior : np.ndarray
+        Prior for covariances.
+    mean_prior : np.ndarray
+        Prior for means.
+
+    Returns
+    -------
+    covariances : np.ndarray
+        Covariances to initialize the prior. Shape is
+        (n_states, n_channels, n_channels).
+
+    """
     reg_covar = 1e-6
     n_components = n_states
 
@@ -54,7 +75,23 @@ def wishart_covariances(time_series, n_states, covariance_prior, mean_prior):
     return covariances
 
 
-def initial_covariances(data, n_states):
+def initial_covariances(data: np.ndarray, n_states: int):
+    """Initialize with initial covariances of a GMM.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series data with shape (n_samples, n_channels).
+    n_states : int
+        Number of states.
+
+    Returns
+    -------
+    covariances : np.ndarray
+        Initial covariances used by sklearn.mixture.BayesianGaussianMixture.
+        Shape is (n_states, n_channels, n_channels).
+
+    """
     gmm = BayesianGaussianMixture(n_components=n_states, max_iter=1)
     warnings.filterwarnings("ignore")
     gmm.fit(data)
@@ -81,7 +118,7 @@ def final_means_covariances(
     Parameters
     ----------
     data : numpy.ndarray
-        Input data of dimensions [n_channels x n_time_points]
+        Input data of dimensions (n_samples, n_channels).
     n_states : int
         Number of states (Gaussian distributions) to try to find.
     learn_means : bool
@@ -98,11 +135,11 @@ def final_means_covariances(
     Returns
     -------
     means : numpy.ndarray
-        Means of the states (Gaussian distributions) found with dimensions [n_states x
-        n_channels]
+        Means of the states (Gaussian distributions) found with dimensions (n_states x
+        n_channels).
     covariances : numpy.ndarray
         Covariances of the states (Gaussian distributions) found with dimensions
-        [n_states x n_channels x n_channels]
+        (n_states x n_channels x n_channels).
     """
     if retry_attempts < 1:
         raise ValueError("retry_attempts cannot be less than 1")

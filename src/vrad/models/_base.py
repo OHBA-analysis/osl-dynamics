@@ -1,9 +1,11 @@
-"""Base class for models in V-RAD.
+"""Base class for models.
 
 """
+
 from abc import abstractmethod
 
 import numpy as np
+
 from tensorflow import Variable
 from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import TensorBoard
@@ -12,21 +14,58 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
+
 from vrad.data import Data
-from vrad.inference.callbacks import (
-    AnnealingCallback,
-    SaveBestCallback,
-    tensorboard_run_logdir,
-)
+from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
 from vrad.inference.initializers import reinitialize_model_weights
 from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
-from vrad.utils.misc import check_iterable_type, listify, replace_argument
+from vrad.inference.tf_ops import tensorboard_run_logdir
+from vrad.utils.misc import check_iterable_type, replace_argument
 
 
 class BaseModel:
     """Base class for models.
 
     Acts as a wrapper for a standard Keras model.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Length of sequence passed to the inference network and generative model.
+    rnn_type : str
+        RNN to use, either 'lstm' or 'gru'.
+    n_layers_inference : int
+        Number of layers in the inference network.
+    n_layers_model : int
+        Number of layers in the generative model neural network.
+    n_units_inference : int
+        Number of units/neurons in the inference network.
+    n_units_model : int
+        Number of units/neurons in the generative model neural network.
+    dropout_rate_inference : float
+        Dropout rate in the inference network.
+    dropout_rate_model : float
+        Dropout rate in the generative model neural network.
+    normalization_type : str
+        Normalization type in the inference network and generative model. Either
+        'layer', 'batch' or None.
+    do_annealing : bool
+        Should we use KL annealing during training?
+    annealing_sharpness : float
+        Parameter to control the annealing curve.
+    n_epochs_annealing : int
+        Number of epochs to perform annealing.
+    learning_rate : float
+        Learning rate for updating model parameters/weights.
+    multi_gpu : bool
+        Should be use multiple GPUs for training?
+    strategy : str
+        Strategy for distributed learning.
+
     """
 
     def __init__(
@@ -50,20 +89,34 @@ class BaseModel:
         strategy: str,
     ):
         # Validation
+        if sequence_length < 1:
+            raise ValueError("sequence_length must be greater than zero.")
+
         if rnn_type not in ["lstm", "gru"]:
             raise ValueError("rnn_type must be 'lstm' or 'gru'.")
 
-        if n_units_inference < 1 or n_units_model < 1:
-            raise ValueError("n_units must be greater than zero.")
-
         if n_layers_inference < 1 or n_layers_model < 1:
             raise ValueError("n_layers must be greater than zero.")
+
+        if n_units_inference < 1 or n_units_model < 1:
+            raise ValueError("n_units must be greater than zero.")
 
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
         if normalization_type not in ["layer", "batch", None]:
             raise ValueError("normalization_type must be 'layer', 'batch' or None.")
+
+        if annealing_sharpness <= 0:
+            raise ValueError("annealing_sharpness must be greater than zero.")
+
+        if n_epochs_annealing < 0:
+            raise ValueError(
+                "n_epochs_annealing must be equal to or greater than zero."
+            )
+
+        if learning_rate <= 0:
+            raise ValueError("learning_rate must be greater than zero.")
 
         # Identifier for the model
         self._identifier = np.random.randint(100000)
@@ -118,6 +171,12 @@ class BaseModel:
         """Wrapper for the standard keras compile method.
         
         Sets up the optimiser and loss functions.
+        
+        Parameters
+        ----------
+        optimizer : tensorflow.keras.optimizers
+            Optimizer to use for training. Default is Adam.
+
         """
         # Setup optimizer
         if optimizer is None:
@@ -133,14 +192,41 @@ class BaseModel:
 
     def create_callbacks(
         self,
-        no_annealing_callback,
-        use_tqdm,
+        no_annealing_callback: bool,
+        use_tqdm: bool,
         tqdm_class,
-        use_tensorboard,
-        tensorboard_dir,
-        save_best_after,
-        save_filepath,
+        use_tensorboard: bool,
+        tensorboard_dir: str,
+        save_best_after: int,
+        save_filepath: str,
     ):
+        """"Create callbacks for training.
+        
+        Parameters
+        ----------
+        no_annealing_callback : bool
+            Should we NOT update the annealing factor during training?
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual output from
+            tensorflow.
+        tqdm_class : tqdm
+            Class for the tqdm progress bar.
+        use_tensorboard : bool
+            Should we use TensorBoard?
+        tensorboard_dir : str
+            Path to the location to save the TensorBoard log files.
+        save_best_after : int
+            Epoch number after which we should save the best model. The best model is
+            that which achieves the lowest loss.
+        save_filepath : str
+            Path to save the best model to.
+
+        Returns
+        -------
+        callbacks : list
+            A list of callbacks to use during training.
+
+        """
         additional_callbacks = []
 
         # Callback for KL annealing
@@ -207,6 +293,31 @@ class BaseModel:
         """Wrapper for the standard keras fit method.
 
         Adds callbacks and then trains the model.
+
+        Parameters
+        ----------
+        no_annealing_callback : bool
+            Should we NOT update the annealing factor during training?
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual output from
+            tensorflow.
+        tqdm_class : tqdm
+            Class for the tqdm progress bar.
+        use_tensorboard : bool
+            Should we use TensorBoard?
+        tensorboard_dir : str
+            Path to the location to save the TensorBoard log files.
+        save_best_after : int
+            Epoch number after which we should save the best model. The best model is
+            that which achieves the lowest loss.
+        save_filepath : str
+            Path to save the best model to.
+
+        Returns
+        -------
+        history
+            The training history.
+
         """
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
@@ -230,7 +341,20 @@ class BaseModel:
 
         return self.model.fit(*args, **kwargs)
 
-    def _make_dataset(self, inputs):
+    def _make_dataset(self, inputs: Data):
+        """Make a dataset.
+
+        Parameters
+        ----------
+        inputs : vrad.data.Data
+            Data object.
+
+        Returns
+        -------
+        datasets
+            Tensorflow dataset that can be used for training.
+
+        """
         if isinstance(inputs, Data):
             return inputs.prediction_dataset(self.sequence_length)
         if isinstance(inputs, Dataset):
@@ -264,7 +388,14 @@ class BaseModel:
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
 
-    def load_weights(self, filepath):
-        """Load weights of the model from a file."""
+    def load_weights(self, filepath: str):
+        """Load weights of the model from a file.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to file containing model weights.
+
+        """
         with self.strategy.scope():
             self.model.load_weights(filepath)

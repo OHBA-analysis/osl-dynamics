@@ -1,20 +1,43 @@
-"""Functions to generate maps.
+"""Functions to generate spatial maps.
 
 """
 
 import os
 import pathlib
 import subprocess
+from typing import Tuple
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import scene, std_masks
+from vrad.analysis import std_masks
 from vrad.analysis.functions import validate_array
 
 
-def state_maps(power_spectra, coherences, components):
-    """Calculates spatial maps for each spectral component and state."""
+def state_maps(
+    power_spectra: np.ndarray, coherences: np.ndarray, components: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Calculates spatial maps for each spectral component and state.
 
+    Parameters
+    ----------
+    power_spectra : np.ndarray
+        Power/cross spectra for each channel. Shape is (n_states, n_channels,
+        n_channels, n_f).
+    coherences : np.ndarray
+        Coherences for each channel. Shape is (n_states, n_channels, n_channels, n_f).
+    components : np.ndarray
+        Spectral components. Shape is (n_components, n_f).
+    
+    Returns
+    -------
+    p : np.ndarray
+        Power spectra for each component of each state. Shape is (n_components,
+        n_states, n_channels, n_channels).
+    c : np.ndarray
+        Coherence for each component of each state. Shape is (n_components,
+        n_states, n_channels, n_channels).
+
+    """
     # Validation
     error_message = (
         "a 3D numpy array (n_channels, n_channels, n_frequency_bins) "
@@ -130,7 +153,26 @@ def save_nii_file(mask_file, parcellation_file, power_map, filename, component=0
     nib.save(nii_file, filename)
 
 
-def workbench_render(nii, save_dir=None, interptype="trilinear", visualise=True):
+def workbench_render(
+    nii: str,
+    save_dir: str = None,
+    interptype: str = "trilinear",
+    visualise: bool = True,
+):
+    """Render map in workbench.
+
+    Parameters
+    ----------
+    nii : str
+        Path to nii image file.
+    save_dir : str
+        Path to save rendered surface plots.
+    interptype : str
+        Interpolation type. Default is 'trilinear'.
+    visualise : bool
+        Should we display the rendered plots in workbench? Default is True.
+
+    """
     nii = pathlib.Path(nii)
 
     if not nii.exists() or ".nii" not in nii.suffixes:

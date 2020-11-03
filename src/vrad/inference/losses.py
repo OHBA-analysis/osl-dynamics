@@ -13,13 +13,9 @@ class LogLikelihoodLoss(Loss):
         super().__init__(**kwargs)
 
     def call(self, y_true, ll_loss):
-        """Return the first output of the model, which is the negative log-likelihood.
+        """Returns the first output of the model, which is the negative log-likelihood.
         """
         return ll_loss
-
-    def get_config(self):
-        config = super().get_config()
-        return config
 
 
 class KullbackLeiblerLoss(Loss):
@@ -30,7 +26,7 @@ class KullbackLeiblerLoss(Loss):
         super().__init__(**kwargs)
 
     def call(self, y_true, kl_loss):
-        """Return the second output of the model, which is the KL loss."""
+        """Returns the second output of the model, which is the KL loss."""
         return self.annealing_factor * kl_loss
 
     def get_config(self):
