@@ -51,7 +51,6 @@ class TrainableVariablesLayer(layers.Layer):
         Activation function to apply to the output of the layer.
     initial_values : np.ndarray
         Initial values for the trainable parameters/weights.
-
     """
 
     def __init__(
@@ -140,7 +139,6 @@ class StateMixingFactorsLayer(layers.Layer):
     ----------
     alpha_xform : str
         The functional form used to convert from theta_t to alpha_t.
-
     """
 
     def __init__(self, alpha_xform: str, **kwargs):
@@ -192,7 +190,6 @@ class MeansCovsLayer(layers.Layer):
         Initial values for the mean of each state.
     initial_covariances : np.ndarray
         Initial values for the covariance of each state.
-
     """
 
     def __init__(
@@ -310,7 +307,6 @@ class MixMeansCovsLayer(layers.Layer):
         Number of channels.
     learn_alpha_scaling : bool
         Should be learn an alpha scaling?
-
     """
 
     def __init__(
@@ -386,7 +382,6 @@ class LogLikelihoodLayer(layers.Layer):
     c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
     where x is a single observation, mu is the mean vector, sigma is the
     covariance matrix and c is a constant.
-
     """
 
     def __init__(self, **kwargs):
@@ -428,7 +423,6 @@ class KLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence.
 
     The KL divergence between the posterior and prior is calculated.
-
     """
 
     def __init__(self, **kwargs):
@@ -478,7 +472,6 @@ class InferenceRNNLayers(layers.Layer):
         Number of units/neurons per layer.
     dropout_rate : float
         Dropout rate for the output of each layer.
-
     """
 
     def __init__(
@@ -547,7 +540,6 @@ class ModelRNNLayers(layers.Layer):
         Number of units/neurons per layer.
     dropout_rate : float
         Dropout rate for the output of each layer.
-
     """
 
     def __init__(

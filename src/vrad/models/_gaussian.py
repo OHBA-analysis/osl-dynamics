@@ -89,7 +89,6 @@ class RNNGaussian(BaseModel):
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels).
-
     """
 
     def __init__(
@@ -184,9 +183,8 @@ class RNNGaussian(BaseModel):
 
         Returns
         -------
-        predictions : dict
+        dict
             Dictionary with labels for each prediction.
-
         """
         predictions = self.model.predict(*args, *kwargs)
         return_names = ["ll_loss", "kl_loss", "alpha_t"]
@@ -203,9 +201,8 @@ class RNNGaussian(BaseModel):
 
         Returns
         -------
-        alpha_t : np.ndarray
+        np.ndarray
             State mixing factors with shape (n_samples, n_states).
-
         """
         inputs = self._make_dataset(inputs)
         outputs = []
@@ -229,7 +226,6 @@ class RNNGaussian(BaseModel):
             Negative log-likelihood loss.
         kl_loss : float
             KL divergence loss.
-
         """
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
@@ -251,9 +247,8 @@ class RNNGaussian(BaseModel):
 
         Returns
         -------
-        free_energy : float
+        float
             Variational free energy for the dataset.
-
         """
         ll_loss, kl_loss = self.losses(dataset)
         free_energy = ll_loss + kl_loss
@@ -287,7 +282,6 @@ class RNNGaussian(BaseModel):
             Should we use a tqdm progress bar instead of the usual Tensorflow output?
         tqdm_class : tqdm
             Tqdm class for the progress bar.
-
         """
         if n_initializations is None or n_initializations == 0:
             _logger.warning(
@@ -358,9 +352,7 @@ class RNNGaussian(BaseModel):
             State means.
         covariances : np.ndarary
             State covariances.
-
         """
-
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
         means = means_covs_layer.means.numpy()
@@ -388,7 +380,6 @@ class RNNGaussian(BaseModel):
             State means.
         covariances : np.ndarray
             State covariances.
-
         """
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.get_weights()
@@ -415,7 +406,6 @@ class RNNGaussian(BaseModel):
         ----------
         alpha_scaling : bool
             Alpha scaling for each state.
-
         """
         mix_means_covs_layer = self.model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
@@ -434,7 +424,6 @@ class RNNGaussian(BaseModel):
         -------
         sampled_stc : np.ndarray
             Sampled state time course.
-
         """
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
@@ -560,9 +549,8 @@ def _model_structure(
 
     Returns
     -------
-    model : tensorflow.keras.Model
+    tensorflow.keras.Model
         Keras model built using the functional API.
-
     """
     # Pick normalization layer
     if normalization_type == "layer":

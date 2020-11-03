@@ -65,7 +65,6 @@ class BaseModel:
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
-
     """
 
     def __init__(
@@ -174,9 +173,8 @@ class BaseModel:
         
         Parameters
         ----------
-        optimizer : tensorflow.keras.optimizers
+        tensorflow.keras.optimizers
             Optimizer to use for training. Default is Adam.
-
         """
         # Setup optimizer
         if optimizer is None:
@@ -223,9 +221,8 @@ class BaseModel:
 
         Returns
         -------
-        callbacks : list
+        list
             A list of callbacks to use during training.
-
         """
         additional_callbacks = []
 
@@ -317,7 +314,6 @@ class BaseModel:
         -------
         history
             The training history.
-
         """
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
@@ -351,9 +347,8 @@ class BaseModel:
 
         Returns
         -------
-        datasets
+        tensorflow.data.Dataset
             Tensorflow dataset that can be used for training.
-
         """
         if isinstance(inputs, Data):
             return inputs.prediction_dataset(self.sequence_length)
@@ -393,9 +388,8 @@ class BaseModel:
 
         Parameters
         ----------
-        filepath : str
+        str
             Path to file containing model weights.
-
         """
         with self.strategy.scope():
             self.model.load_weights(filepath)
