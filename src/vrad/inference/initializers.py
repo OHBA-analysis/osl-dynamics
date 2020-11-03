@@ -13,27 +13,6 @@ from vrad import models
 _logger = logging.getLogger("VRAD")
 
 
-class Identity3D(Initializer):
-    """Initializer to create stacked identity matrices."""
-
-    def __call__(self, shape, dtype=None):
-        """Create stacked identity matrices with dimensions [M x N x N]
-
-        Parameters
-        ----------
-        shape : Iterable
-            Shape of the Tensor [M x N x N].
-
-        Returns
-        -------
-        stacked_identity_matrix : tf.Tensor
-        """
-        if len(shape) != 3 or shape[1] != shape[2]:
-            raise ValueError("Weight shape must be [M x N x N]")
-
-        return tf.eye(shape[1], shape[2], [shape[0]])
-
-
 class CholeskyCovariancesInitializer(Initializer):
     """Initialize weights for cholesky factor of covariances.
 
@@ -50,18 +29,6 @@ class CholeskyCovariancesInitializer(Initializer):
         self.initial_cholesky_covariances = initial_cholesky_covariances
 
     def __call__(self, shape, dtype=None):
-        """Initialize weights with cholesky factor of covariance matrices.
-
-        Raises
-        ------
-        ValueError
-            If initial_cholesky_covariances has incorrect shape.
-        
-        Returns
-        -------
-        np.ndarray
-            Initial values for weights (initial_cholesky_covariances).
-        """
         if not (len(shape) == 3 and shape == self.initial_cholesky_covariances.shape):
             raise ValueError(
                 f"shape must be 3D and be equal to initial_cholesky_covariances.shape. "
@@ -69,6 +36,18 @@ class CholeskyCovariancesInitializer(Initializer):
                 f"initial_means.shape = {[*self.initial_cholesky_covariances.shape]} "
             )
         return self.initial_cholesky_covariances
+
+
+class Identity3D(Initializer):
+    """Initializer to create stacked identity matrices.
+
+    """
+
+    def __call__(self, shape, dtype=None):
+        if len(shape) != 3 or shape[1] != shape[2]:
+            raise ValueError("Weight shape must be [M x N x N]")
+
+        return tf.eye(shape[1], shape[2], [shape[0]])
 
 
 class MeansInitializer(Initializer):
@@ -91,18 +70,6 @@ class MeansInitializer(Initializer):
         )
 
     def __call__(self, shape, dtype=None):
-        """Initialize weights with mean vectors.
-
-        Raises
-        ------
-        ValueError
-            If initial_means has incorrect shape.
-        
-        Returns
-        -------
-        np.ndarray
-            Initial values for weights (initial_means).
-        """
         if not (len(shape) == 2 and shape == self.initial_means.shape):
             raise ValueError(
                 f"shape must be 2D and be equal to initial_means.shape. "
@@ -125,17 +92,10 @@ class UnchangedInitializer(Initializer):
         self.initial_values = initial_values
 
     def __call__(self, shape, dtype=None):
-        """Initialize with initial values.
-        
-        Returns
-        -------
-        np.ndarray
-            Initial values.
-        """
         return self.initial_values
 
 
-def reinitialize_layer_weights(layer):
+def reinitialize_layer_weights(layer: tf.keras.layers.Layer):
     """Re-initializes the weights in a particular layer.
 
     This function relies on each layer having an initializer attribute.
@@ -147,6 +107,7 @@ def reinitialize_layer_weights(layer):
     layer: tensorflow.keras.layers.Layer
         Layer to initialize weights for.
     """
+
     # Get the initialisation container
     if hasattr(layer, "cell"):
         init_container = layer.cell
@@ -164,7 +125,7 @@ def reinitialize_layer_weights(layer):
         var.assign(initializer(var.shape, var.dtype))
 
 
-def reinitialize_model_weights(model):
+def reinitialize_model_weights(model: tf.keras.Model):
     """Re-initialize the weights in the model.
 
     Parameters
@@ -172,6 +133,7 @@ def reinitialize_model_weights(model):
     model: tensorflow.keras.Model
         Model to re-initialize weights for.
     """
+
     for layer in model.layers:
         # If the layer consists and multiple layers pass the layer back
         # to this function
