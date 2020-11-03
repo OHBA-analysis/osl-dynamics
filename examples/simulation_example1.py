@@ -1,6 +1,6 @@
 """Example script for running inference on simulated HMM data.
 
-- Should achieve a dice coefficient of ~0.95.
+- Should achieve a dice coefficient of ~0.97.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -19,14 +19,14 @@ n_samples = 25000
 observation_error = 0.2
 
 n_states = 5
-sequence_length = 50
+sequence_length = 200
 batch_size = 32
 
 do_annealing = True
 annealing_sharpness = 5
 
-n_epochs = 100
-n_epochs_annealing = 50
+n_epochs = 200
+n_epochs_annealing = 100
 
 rnn_type = "lstm"
 normalization_type = "layer"
@@ -34,8 +34,8 @@ normalization_type = "layer"
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 16
-n_units_model = 24
+n_units_inference = 32
+n_units_model = 48
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
