@@ -112,7 +112,6 @@ hmm_stc = np.concatenate(
     data.manipulation.trim_time_series(
         time_series=hmm.state_time_course,
         discontinuities=prepared_data.discontinuities,
-        n_embeddings=13,
         sequence_length=sequence_length,
     ),
     axis=0,
