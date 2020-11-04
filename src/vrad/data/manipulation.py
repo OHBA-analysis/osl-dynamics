@@ -104,6 +104,22 @@ def time_embed(
 
 
 def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
+    """Calculate the number of batches an array will be split into.
+
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        Time series data.
+    sequence_length : int
+        Length of sequences which the data will be segmented in to.
+    step_size : int
+        The number of samples by which to move the sliding window between sequences.
+
+    Returns
+    -------
+    num_batches : int
+
+    """
     step_size = step_size or sequence_length
     final_slice_start = arr.shape[0] - sequence_length + 1
     index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
@@ -113,12 +129,21 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
 
 
 def trim_time_series(
-    time_series, discontinuities, n_embeddings, sequence_length,
+    time_series: np.ndarray, discontinuities: np.ndarray, sequence_length,
 ):
     """Trims a time series.
 
     Removes data points lost to time embedding and separating a time series
     into sequences.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    discontinuities : numpy.ndarray
+        A set of time points at which the time series is discontinuous (e.g. because
+        bad segments were removed in preprocessing).
+    sequence_length : int
     """
 
     # Separate the time series for each subject
