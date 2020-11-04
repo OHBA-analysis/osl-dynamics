@@ -1,7 +1,7 @@
 import inspect
 import logging
 from copy import copy
-from typing import Any
+from typing import Any, List, Union
 
 import numpy as np
 
@@ -188,17 +188,28 @@ def time_axis_first(input_array: np.ndarray) -> np.ndarray:
 
 
 class LoggingContext:
-    """
+    """Context manager to temporarily change the logging level.
 
     Parameters
     ----------
-    logger
-    suppress_level
+    logger : str or logging.Logger
+        The name of the logger (e.g. "VRAD" or "tensorflow")
+    suppress_level : str or int
+        The level of logs to suppress. String or integer matching a level from the
+        logging module.
     handler
-    close
+        A handler for the logging module.
+    close : bool
+        Should the handler be closed with the context manager?
     """
 
-    def __init__(self, logger, suppress_level="warning", handler=None, close=True):
+    def __init__(
+        self,
+        logger: Union[str, logging.Logger],
+        suppress_level: Union[str, int] = "warning",
+        handler=None,
+        close: bool = True,
+    ):
 
         self.logger = logging.getLogger(logger)
         if isinstance(suppress_level, str):
@@ -224,18 +235,54 @@ class LoggingContext:
 
 
 def array_to_memmap(filename, array):
+    """Save an array and reopen it as a numpy.memmap.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the file to save to.
+    array : numpy.ndarray
+        The array to save.
+
+    Returns
+    -------
+    memmap : numpy.memmap
+
+    """
     np.save(filename, array)
     return np.load(filename, mmap_mode="r+")
 
 
 class MockFlags:
+    """Flags for memmap header construction.
+
+    Parameters
+    ----------
+    shape : list of int
+        The shape of the array being mapped.
+    c_contiguous : bool
+        Is the array C contiguous or F contiguous?
+    """
+
     def __init__(self, shape, c_contiguous=True):
         self.c_contiguous = c_contiguous
         self.f_contiguous = (not c_contiguous) or (c_contiguous and len(shape) == 1)
 
 
 class MockArray:
-    def __init__(self, shape, dtype=np.float64, c_contiguous=True):
+    """Create an empty array on disk without creating it in memory.
+
+    Parameters
+    ----------
+    shape : list of int
+        Dimensions or the array being created.
+    dtype
+        The data type of the array.
+    c_contiguous : bool
+        Is the array C contiguous or F contiguous?
+    """
+
+    def __init__(self, shape: List[int], dtype=np.float64, c_contiguous=True):
         self.shape = shape
         self.dtype = np.dtype(dtype)
         self.flags = MockFlags(shape, c_contiguous)
