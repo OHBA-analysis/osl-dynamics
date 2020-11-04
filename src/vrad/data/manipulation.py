@@ -7,6 +7,14 @@ def standardize(time_series: np.ndarray, discontinuities: np.ndarray) -> np.ndar
     """Standardizes time series data.
 
     Returns a time series standardized over continuous segments of data.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    discontinuities : numpy.ndarray
+        A set of time points at which the time series is discontinuous (e.g. because
+        bad segments were removed in preprocessing).
     """
     for i in range(len(discontinuities)):
         start = sum(discontinuities[:i])
@@ -19,6 +27,13 @@ def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
     """Scales a time series.
 
     Returns a time series with zero mean and unit variance.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    axis : int
+        Axis on which to perform the transformation.
     """
     time_series -= time_series.mean(axis=axis)
     time_series /= time_series.std(axis=axis)
@@ -29,9 +44,21 @@ def time_embed(
     time_series: np.ndarray,
     discontinuities: np.ndarray,
     n_embeddings: int,
-    output_file=None,
+    output_file: str = None,
 ) -> np.ndarray:
-    """Performs time embedding."""
+    """Performs time embedding.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    discontinuities : numpy.ndarray
+        A set of time points at which the time series is discontinuous (e.g. because
+        bad segments were removed in preprocessing).
+    n_embeddings : int
+        Number of samples in which to shift the data.
+    output_file : str
+    """
 
     if n_embeddings % 2 == 0:
         raise ValueError("n_embeddings must be an odd number.")
