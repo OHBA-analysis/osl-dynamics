@@ -5,7 +5,13 @@ from vrad.utils import plotting
 
 
 class OSL_HMM:
-    """Import and encapsulate OSL HMMs"""
+    """Imports and encapsulates OSL HMMs as python objects.
+
+    Parameters
+    ----------
+    filename : str
+        The location of the OSL HMM saved as a mat7.3 file.
+    """
 
     def __init__(self, filename):
         self.filename = filename
