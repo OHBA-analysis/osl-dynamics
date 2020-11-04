@@ -71,7 +71,7 @@ def time_embed(
     if output_file is None:
         time_embedded_series = np.empty(
             [
-                n_samples - (n_embeddings + 1) * len(discontinuties),
+                n_samples - (n_embeddings + 1) * len(discontinuities),
                 n_channels * (n_embeddings + 2),
             ]
         )
