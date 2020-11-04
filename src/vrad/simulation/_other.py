@@ -6,7 +6,15 @@ from vrad.simulation import Simulation
 
 
 class VRADSimulation(Simulation):
-    """Simulate a dataset from the covariances and state time course of a model."""
+    """Simulate a dataset from the covariances and state time course of a model.
+
+    Parameters
+    ----------
+    covariances : np.ndarray
+        Covariances of the observation model
+    state_time_course : np.ndarray
+        Time x state array of activations.
+    """
 
     def __init__(self, covariances, state_time_course):
         super().__init__(
