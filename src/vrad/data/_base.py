@@ -9,7 +9,19 @@ from vrad.data import io, manipulation
 
 
 class Data:
-    """Base class for data."""
+    """Base class for data.
+
+    The Data class enables the input and processing of data. When given a list of files,
+     it produces a set of numpy memory maps which contain their raw data. It also
+     provides methods for batching data and creating TensorFlow Datasets.
+
+    Parameters
+    ----------
+    inputs : list of str or str
+        Filenames to be read.
+    store_dir : str
+        Directory to save results and intermediate steps to.
+    """
 
     def __init__(self, inputs, store_dir="tmp"):
         # Identifier for the data
