@@ -129,8 +129,9 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
 
 
 def trim_time_series(
-    time_series: np.ndarray, discontinuities: np.ndarray, sequence_length,
+    time_series: np.ndarray, discontinuities: np.ndarray, n_embeddings, sequence_length,
 ):
+    # TODO: Remove redundant parameter n_embeddings?
     """Trims a time series.
 
     Removes data points lost to time embedding and separating a time series
