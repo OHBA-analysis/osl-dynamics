@@ -18,6 +18,35 @@ class HSMMSimulation(Simulation):
     We sample the state using a transition probability matrix with zero
     probability for self-transitions. The lifetime of each state is sampled
     from a Gamma distribution.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    n_states : int
+        Number of states in the Markov chain.
+    sim_varying_means : bool
+        Should means vary over channels and states?
+    observation_error : float
+        Standard deviation of random noise to be added to the observations.
+    covariances : numpy.ndarray
+        Covariance matrix for each state in the observation model.
+    gamma_shape : float
+        Shape parameter for the gamma distribution of state lifetimes.
+    gamma_scale : float
+        Scale parameter for the gamma distribution of state lifetimes.
+    n_channels : int
+        Number of channels in the observation model. Inferred from covariances if None.
+    random_covariance_weights : bool
+        Randomly sample covariances.
+    off_diagonal_trans_prob : np.ndarray
+        Transition probabilities for out of state transitions.
+    full_trans_prob : np.ndarray
+        A transition probability matrix, the diagonal of which will be ignored.
+    random_seed : int
+        Seed for reproducibility.
+    simulate : bool
+        Should data be simulated? Can be called using .simulate later.
     """
 
     @auto_yaml
@@ -132,6 +161,35 @@ class MixedHSMMSimulation(Simulation):
     state_mixing_vectors is a 2D numpy array containing mixtures of the
     the states that can be simulated, e.g. with n_states=3 we could have
     state_mixing_vectors=[[0.5, 0.5, 0], [0.1, 0, 0.9]]
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    n_states : int
+        Number of states in the Markov chain.
+    mixed_state_vectors : np.ndarray
+        2D array specifying the allowed state mixings.
+    sim_varying_means : bool
+        Should means vary over channels and states?
+    observation_error : float
+        Standard deviation of random noise to be added to the observations.
+    covariances : numpy.ndarray
+        Covariance matrix for each state in the observation model.
+    gamma_shape : float
+        Shape parameter for the gamma distribution of state lifetimes.
+    gamma_scale : float
+        Scale parameter for the gamma distribution of state lifetimes.
+    n_channels : int
+        Number of channels in the observation model. Inferred from covariances if None.
+    random_covariance_weights : bool
+        Randomly sample covariances.
+    off_diagonal_trans_prob : np.ndarray
+        Transition probabilities for out of state transitions.
+    random_seed : int
+        Seed for reproducibility.
+    simulate : bool
+        Should data be simulated? Can be called using .simulate later.
     """
 
     @auto_yaml
