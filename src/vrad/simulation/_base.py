@@ -103,9 +103,8 @@ class Simulation(ABC):
         ----------
         n_points : int
             Number of time points to plot.
-
-        Returns
-        -------
+        filename : str
+            Filename to save plot to.
 
         """
         plotting.plot_state_time_courses(
@@ -215,6 +214,8 @@ class Simulation(ABC):
         ----------
         n_points : int
             Number of time points to plot.
+        filename : str
+            Filename to save plot to.
         """
         n_points = min(n_points, self.n_samples)
         plotting.plot_time_series(
