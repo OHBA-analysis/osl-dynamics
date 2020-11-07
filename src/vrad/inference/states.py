@@ -65,6 +65,40 @@ def correlate_states(
     return correlation
 
 
+def match_covariances(*covariances: np.ndarray) -> Tuple[np.ndarray]:
+    """Matches covariances based on Frobenius norm of the difference of the matrices.
+
+    Each matrix must be 3D: (n_states, n_channels, n_channels).
+
+    The Frobenius norm is F = [Sum_{i,j} abs(a_{ij}^2)]^0.5,
+    where A is the element-wise difference of two matrices.
+    """
+    # Check all matrices have the same shape
+    for matrix in covariances[1:]:
+        if matrix.shape != covariances[0].shape:
+            raise ValueError("Matrices must have the same shape.")
+
+    # Number of arguments and number of matrices in each argument passed
+    n_args = len(covariances)
+    n_matrices = covariances[0].shape[0]
+
+    # Calculate the similarity between matrices
+    F = np.empty([n_matrices, n_matrices])
+    matched_covariances = [covariances[0]]
+    for i in range(1, n_args):
+        for j in range(n_matrices):
+            # Find the matrix that is most similar to matrix j
+            for k in range(n_matrices):
+                A = abs(np.diagonal(covariances[i][k]) - np.diagonal(covariances[0][j]))
+                F[j, k] = np.linalg.norm(A)
+        order = linear_sum_assignment(F)[1]
+
+        # Add the ordered matrix to the list
+        matched_covariances.append(covariances[i][order])
+
+    return tuple(matched_covariances)
+
+
 @transpose
 def match_states(
     *state_time_courses: np.ndarray, return_order: bool = False

@@ -2,48 +2,12 @@
 
 """
 import logging
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
-import scipy.special
-from scipy.optimize import linear_sum_assignment
 from vrad.utils.decorators import transpose
 
 _logger = logging.getLogger("VRAD")
-
-
-def match_matrices(*matrices: np.ndarray) -> Tuple[np.ndarray]:
-    """Matches matrices based on Frobenius norm of the difference of the matrices.
-
-    Each matrix must be 3D: (n_states, n_channels, n_channels).
-
-    The Frobenius norm is F = [Sum_{i,j} abs(a_{ij}^2)]^0.5,
-    where A is the element-wise difference of two matrices.
-    """
-    # Check all matrices have the same shape
-    for matrix in matrices[1:]:
-        if matrix.shape != matrices[0].shape:
-            raise ValueError("Matrices must have the same shape.")
-
-    # Number of arguments and number of matrices in each argument passed
-    n_args = len(matrices)
-    n_matrices = matrices[0].shape[0]
-
-    # Calculate the similarity between matrices
-    F = np.empty([n_matrices, n_matrices])
-    matched_matrices = [matrices[0]]
-    for i in range(1, n_args):
-        for j in range(n_matrices):
-            # Find the matrix that is most similar to matrix j
-            for k in range(n_matrices):
-                A = abs(np.diagonal(matrices[i][k]) - np.diagonal(matrices[0][j]))
-                F[j, k] = np.linalg.norm(A)
-        order = linear_sum_assignment(F)[1]
-
-        # Add the ordered matrix to the list
-        matched_matrices.append(matrices[i][order])
-
-    return tuple(matched_matrices)
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):
@@ -165,79 +129,6 @@ def from_cholesky(cholesky_matrix: np.ndarray):
     return cholesky_matrix @ cholesky_matrix.transpose((0, 2, 1))
 
 
-@transpose(0, "state_time_course")
-def calculate_trans_prob_matrix(
-    state_time_course: np.ndarray, zero_diagonal: bool = False, n_states: int = None,
-) -> np.ndarray:
-    """For a given state time course, calculate the transition probability matrix.
-
-    If a 2D array is given, argmax(axis=1) will be performed upon it before proceeding.
-
-    Parameters
-    ----------
-    state_time_course: numpy.ndarray
-    zero_diagonal: bool
-        If True, return the array with diagonals set to zero.
-    n_states: int
-        The number of states in the state time course. Default is to take the highest
-        state number present in a 1D time course or the number of columns in a 2D
-        (one-hot encoded) time course.
-
-    Returns
-    -------
-
-    """
-    if state_time_course.ndim == 2:
-        n_states = state_time_course.shape[1]
-        state_time_course = state_time_course.argmax(axis=1)
-    if state_time_course.ndim != 1:
-        raise ValueError("state_time_course should either be 1D or 2D.")
-
-    vals, counts = np.unique(
-        state_time_course[
-            np.arange(2)[None, :] + np.arange(len(state_time_course) - 1)[:, None]
-        ],
-        axis=0,
-        return_counts=True,
-    )
-
-    if n_states is None:
-        n_states = state_time_course.max() + 1
-
-    trans_prob = np.zeros((n_states, n_states))
-    trans_prob[vals[:, 0], vals[:, 1]] = counts
-
-    with np.errstate(divide="ignore", invalid="ignore"):
-        trans_prob = trans_prob / trans_prob.sum(axis=1)[:, None]
-    trans_prob = np.nan_to_num(trans_prob)
-
-    if zero_diagonal:
-        np.fill_diagonal(trans_prob, 0)
-    return trans_prob
-
-
-def trace_normalize(matrix: np.ndarray):
-    """Given a matrix, divide all of its values by the sum of its diagonal.
-
-    Parameters
-    ----------
-    matrix: numpy.ndarray
-
-    Returns
-    -------
-    normalized_matrix: numpy.ndarray
-        trace(M) = 1
-
-    """
-    matrix = np.array(matrix)
-    if matrix.ndim == 2:
-        return matrix / matrix.trace()
-    if matrix.ndim != 3:
-        raise ValueError("Matrix should be 2D or 3D.")
-
-    return matrix / matrix.trace(axis1=1, axis2=2)[:, None, None]
-
-
 def mean_diagonal(array: np.ndarray):
     """Set the diagonal of a matrix to the mean of all non-diagonal elements.
 
@@ -258,16 +149,3 @@ def mean_diagonal(array: np.ndarray):
     new_array = array.copy()
     np.fill_diagonal(new_array, array[off_diagonals].mean())
     return new_array
-
-
-@transpose
-def batch(
-    array: np.ndarray,
-    window_size: int,
-    step_size: int = None,
-    selection: np.ndarray = slice(None),
-):
-    step_size = step_size or window_size
-    final_slice_start = array.shape[0] - window_size + 1
-    index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(window_size)
-    return array[index[selection]]
