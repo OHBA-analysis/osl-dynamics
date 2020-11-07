@@ -129,10 +129,9 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
 def trim_time_series(
     time_series: np.ndarray, discontinuities: np.ndarray, sequence_length,
 ):
-    """Removes data points lost to separating a time series into sequences.
+    """Trims a time seris.
 
-    Removes data points lost to time embedding and separating a time series
-    into sequences.
+    Removes data points lost to separating a time series into sequences.
 
     Parameters
     ----------
@@ -142,6 +141,11 @@ def trim_time_series(
         A set of time points at which the time series is discontinuous (e.g. because
         bad segments were removed in preprocessing).
     sequence_length : int
+
+    Returns
+    -------
+    np.ndarray
+        Trimmed time series.
     """
 
     # Separate the time series for each subject
