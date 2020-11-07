@@ -29,7 +29,7 @@ do_annealing = True
 annealing_sharpness = 5
 
 n_epochs = 500
-n_epochs_annealing = 100
+n_epochs_annealing = 150
 
 rnn_type = "lstm"
 normalization_type = "layer"
