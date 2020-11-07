@@ -25,7 +25,7 @@ class HSMMSimulation(Simulation):
         Number of samples to draw from the model.
     n_states : int
         Number of states in the Markov chain.
-    sim_varying_means : bool
+    zero_means : bool
         Should means vary over channels and states?
     observation_error : float
         Standard deviation of random noise to be added to the observations.
@@ -55,7 +55,7 @@ class HSMMSimulation(Simulation):
         self,
         n_samples: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         observation_error: float,
         covariances: np.ndarray,
         gamma_shape: float,
@@ -81,7 +81,7 @@ class HSMMSimulation(Simulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             covariances=covariances,
@@ -170,7 +170,7 @@ class MixedHSMMSimulation(Simulation):
         Number of states in the Markov chain.
     mixed_state_vectors : np.ndarray
         2D array specifying the allowed state mixings.
-    sim_varying_means : bool
+    zero_means : bool
         Should means vary over channels and states?
     observation_error : float
         Standard deviation of random noise to be added to the observations.
@@ -199,7 +199,7 @@ class MixedHSMMSimulation(Simulation):
         n_samples: int,
         n_states: int,
         mixed_state_vectors: np.ndarray,
-        sim_varying_means: bool,
+        zero_means: bool,
         observation_error: float,
         covariances: np.ndarray,
         gamma_shape: float,
@@ -234,7 +234,7 @@ class MixedHSMMSimulation(Simulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             covariances=covariances,

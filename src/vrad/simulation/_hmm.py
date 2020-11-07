@@ -19,7 +19,7 @@ class HMMSimulation(Simulation):
         Number of samples to draw from the model.
     n_states : int
         Number of states in the Markov chain.
-    sim_varying_means : bool
+    zero_means : bool
         Should means vary over channels and states?
     observation_error : float
         Standard deviation of random noise to be added to the observations.
@@ -42,7 +42,7 @@ class HMMSimulation(Simulation):
         trans_prob: np.ndarray,
         n_samples: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         observation_error: float,
         covariances: np.ndarray,
         n_channels: int = None,
@@ -66,7 +66,7 @@ class HMMSimulation(Simulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             covariances=covariances,
@@ -107,7 +107,7 @@ class SequenceHMMSimulation(HMMSimulation):
         Number of channels in the observation model. Inferred from covariances if None.
     n_states : int
         Number of states in the Markov chain.
-    sim_varying_means : bool
+    zero_means : bool
         Should means vary over channels and states?
     stay_prob : float
         Probability of staying in the current state (diagonals of transition matrix).
@@ -126,7 +126,7 @@ class SequenceHMMSimulation(HMMSimulation):
         n_samples: int,
         n_channels: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         stay_prob: float,
         observation_error: float,
         random_covariance_weights: bool = False,
@@ -138,7 +138,7 @@ class SequenceHMMSimulation(HMMSimulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
@@ -171,7 +171,7 @@ class BasicHMMSimulation(HMMSimulation):
         Number of channels in the observation model. Inferred from covariances if None.
     n_states : int
         Number of states in the Markov chain.
-    sim_varying_means : bool
+    zero_means : bool
         Should means vary over channels and states?
     stay_prob : float
         Probability of staying in the current state (diagonals of transition matrix).
@@ -192,7 +192,7 @@ class BasicHMMSimulation(HMMSimulation):
         n_samples: int,
         n_channels: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         stay_prob: float,
         observation_error: float,
         random_covariance_weights: bool = False,
@@ -208,7 +208,7 @@ class BasicHMMSimulation(HMMSimulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
@@ -230,7 +230,7 @@ class UniHMMSimulation(HMMSimulation):
         n_samples: int,
         n_channels: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         stay_prob: float,
         observation_error: float,
         random_covariance_weights: bool = False,
@@ -243,7 +243,7 @@ class UniHMMSimulation(HMMSimulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(stay_prob),
@@ -278,7 +278,7 @@ class RandomHMMSimulation(HMMSimulation):
         Number of channels in the observation model. Inferred from covariances if None.
     n_states : int
         Number of states in the Markov chain.
-    sim_varying_means : bool
+    zero_means : bool
         Should means vary over channels and states?
     observation_error : float
         Standard deviation of random noise to be added to the observations.
@@ -293,7 +293,7 @@ class RandomHMMSimulation(HMMSimulation):
         n_samples: int,
         n_channels: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         observation_error: float,
         random_covariance_weights: bool = False,
         random_seed: int = None,
@@ -303,7 +303,7 @@ class RandomHMMSimulation(HMMSimulation):
             n_samples=n_samples,
             n_channels=n_channels,
             n_states=n_states,
-            sim_varying_means=sim_varying_means,
+            zero_means=zero_means,
             random_covariance_weights=random_covariance_weights,
             observation_error=observation_error,
             trans_prob=self.construct_trans_prob_matrix(n_states),

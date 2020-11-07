@@ -21,7 +21,7 @@ class Simulation(ABC):
         Number of channels to create
     n_states : int
         Number of states to simulate
-    sim_varying_means : bool
+    zero_means : bool
         If False, means will be set to zero.
     covariances : np.ndarray
         covariance matrix for each state, shape should be (n_states, n_channels,
@@ -42,7 +42,7 @@ class Simulation(ABC):
         n_samples: int,
         n_channels: int,
         n_states: int,
-        sim_varying_means: bool,
+        zero_means: bool,
         covariances: np.ndarray,
         observation_error: float,
         random_covariance_weights: bool,
@@ -53,7 +53,7 @@ class Simulation(ABC):
         self.n_samples = n_samples
         self.n_channels = n_channels
         self.n_states = n_states
-        self.sim_varying_means = sim_varying_means
+        self.zero_means = zero_means
         self.random_covariance_weights = random_covariance_weights
         self.observation_error = observation_error
 
@@ -159,10 +159,10 @@ class Simulation(ABC):
             A float32 array containing a simulated time course of simulated data.
 
         """
-        if self.sim_varying_means:
-            mus_sim = self._rng.normal((self.n_states, self.n_channels))
-        else:
+        if self.zero_means:
             mus_sim = np.zeros((self.n_states, self.n_channels))
+        else:
+            mus_sim = self._rng.normal((self.n_states, self.n_channels))
 
         # State time course, shape=(n_samples, n_states)
         # This contains the mixing factors of each states at each time point

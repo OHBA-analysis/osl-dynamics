@@ -21,7 +21,7 @@ class VRADSimulation(Simulation):
             n_samples=state_time_course.shape[0],
             n_channels=covariances.shape[-1],
             n_states=covariances.shape[0],
-            sim_varying_means=False,
+            zero_means=True,
             covariances=covariances,
             observation_error=0.0,
             random_covariance_weights=False,
