@@ -50,6 +50,9 @@ class RNNGaussian(BaseModel):
         Should we learn the covariance matrix for each state?
     rnn_type : str
         RNN to use, either 'lstm' or 'gru'.
+    rnn_normalization : str
+        Type of normalization to use in the inference network and generative model.
+        Either 'layer', 'batch' or None.
     n_layers_inference : int
         Number of layers in the inference network.
     n_layers_model : int
@@ -62,9 +65,9 @@ class RNNGaussian(BaseModel):
         Dropout rate in the inference network.
     dropout_rate_model : float
         Dropout rate in the generative model neural network.
-    normalization_type : str
-        Normalization type in the inference network and generative model. Either
-        'layer', 'batch' or None.
+    theta_normalization : str
+        Type of normalization to apply to the posterior samples, theta_t.
+        Either 'layer', 'batch' or None.
     alpha_xform : str
         Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
         'relu'.
@@ -99,13 +102,14 @@ class RNNGaussian(BaseModel):
         learn_means: bool,
         learn_covariances: bool,
         rnn_type: str,
+        rnn_normalization: str,
         n_layers_inference: int,
         n_layers_model: int,
         n_units_inference: int,
         n_units_model: int,
         dropout_rate_inference: float,
         dropout_rate_model: float,
-        normalization_type: str,
+        theta_normalization: str,
         alpha_xform: str,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
@@ -140,13 +144,14 @@ class RNNGaussian(BaseModel):
             n_channels=n_channels,
             sequence_length=sequence_length,
             rnn_type=rnn_type,
+            rnn_normalization=rnn_normalization,
             n_layers_inference=n_layers_inference,
             n_layers_model=n_layers_model,
             n_units_inference=n_units_inference,
             n_units_model=n_units_model,
             dropout_rate_inference=dropout_rate_inference,
             dropout_rate_model=dropout_rate_model,
-            normalization_type=normalization_type,
+            theta_normalization=theta_normalization,
             do_annealing=do_annealing,
             annealing_sharpness=annealing_sharpness,
             n_epochs_annealing=n_epochs_annealing,
@@ -162,13 +167,14 @@ class RNNGaussian(BaseModel):
             n_channels=self.n_channels,
             sequence_length=self.sequence_length,
             rnn_type=self.rnn_type,
+            rnn_normalization=self.rnn_normalization,
             n_layers_inference=self.n_layers_inference,
             n_layers_model=self.n_layers_model,
             n_units_inference=self.n_units_inference,
             n_units_model=self.n_units_model,
             dropout_rate_inference=self.dropout_rate_inference,
             dropout_rate_model=self.dropout_rate_model,
-            normalization_type=self.normalization_type,
+            theta_normalization=self.theta_normalization,
             learn_means=self.learn_means,
             learn_covariances=self.learn_covariances,
             initial_means=self.initial_means,
@@ -482,13 +488,14 @@ def _model_structure(
     n_channels: int,
     sequence_length: int,
     rnn_type: str,
+    rnn_normalization: str,
     n_layers_inference: int,
     n_layers_model: int,
     n_units_inference: int,
     n_units_model: int,
     dropout_rate_inference: float,
     dropout_rate_model: float,
-    normalization_type: str,
+    theta_normalization: str,
     learn_means: bool,
     learn_covariances: bool,
     initial_means: np.ndarray,
@@ -509,6 +516,9 @@ def _model_structure(
         Length of sequence passed to the inference network and generative model.
     rnn_type : int
         RNN to use, either 'lstm' or 'gru'.
+    rnn_normalization : str
+        Type of normalization to use in the inference network and generative model.
+        Either 'layer', 'batch' or None.
     n_layers_inference : int
         Number of layers in the inference network.
     n_layers_model : int
@@ -521,9 +531,9 @@ def _model_structure(
         Dropout rate in the inference network.
     dropout_rate_model : float
         Dropout rate in the generative model neural network.
-    normalization_type : str
-        Normalization type in the inference network and generative model. Either
-        'layer', 'batch' or None.
+    theta_normalization : str
+        Type of normalization to apply to the posterior samples, theta_t.
+        Either 'layer', 'batch' or None.
     learn_means : bool
         Should we learn the mean vector for each state?
     learn_covariances : bool
@@ -546,13 +556,6 @@ def _model_structure(
     tensorflow.keras.Model
         Keras model built using the functional API.
     """
-    # Pick normalization layer
-    if normalization_type == "layer":
-        NormalizationLayer = layers.LayerNormalization
-    elif normalization_type == "batch":
-        NormalizationLayer = layers.BatchNormalization
-    else:
-        NormalizationLayer = DummyLayer
 
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
@@ -568,7 +571,7 @@ def _model_structure(
     )
     inference_output_layers = InferenceRNNLayers(
         rnn_type,
-        normalization_type,
+        rnn_normalization,
         n_layers_inference,
         n_units_inference,
         dropout_rate_inference,
@@ -580,7 +583,12 @@ def _model_structure(
     # Layers to sample theta_t from q(theta_t) and to convert to state mixing
     # factors alpha_t
     theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
-    theta_t_norm_layer = NormalizationLayer(name="theta_t_norm")
+    if theta_normalization == "layer":
+        theta_t_norm_layer = layers.LayerNormalization(name="theta_t_norm")
+    elif theta_normalization == "batch":
+        theta_t_norm_layer = layers.BatchNormalization(name="theta_t_norm")
+    else:
+        theta_t_norm_layer = DummyLayer(name="theta_t_norm")
     alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
 
     # Data flow
@@ -630,7 +638,7 @@ def _model_structure(
     )
     model_output_layers = ModelRNNLayers(
         rnn_type,
-        normalization_type,
+        rnn_normalization,
         n_layers_model,
         n_units_model,
         dropout_rate_model,

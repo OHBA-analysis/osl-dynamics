@@ -38,6 +38,9 @@ class BaseModel:
         Length of sequence passed to the inference network and generative model.
     rnn_type : str
         RNN to use, either 'lstm' or 'gru'.
+    rnn_normalization : str
+        Type of normalization to use in the inference network and generative model.
+        Either 'layer', 'batch' or None.
     n_layers_inference : int
         Number of layers in the inference network.
     n_layers_model : int
@@ -50,9 +53,9 @@ class BaseModel:
         Dropout rate in the inference network.
     dropout_rate_model : float
         Dropout rate in the generative model neural network.
-    normalization_type : str
-        Normalization type in the inference network and generative model. Either
-        'layer', 'batch' or None.
+    theta_normalization : str
+        Type of normalization to apply to the posterior samples, theta_t.
+        Either 'layer', 'batch' or None.
     do_annealing : bool
         Should we use KL annealing during training?
     annealing_sharpness : float
@@ -73,13 +76,14 @@ class BaseModel:
         n_channels: int,
         sequence_length: int,
         rnn_type: str,
+        rnn_normalization: str,
         n_layers_inference: int,
         n_layers_model: int,
         n_units_inference: int,
         n_units_model: int,
         dropout_rate_inference: float,
         dropout_rate_model: float,
-        normalization_type: str,
+        theta_normalization: str,
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
@@ -103,8 +107,12 @@ class BaseModel:
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if normalization_type not in ["layer", "batch", None]:
-            raise ValueError("normalization_type must be 'layer', 'batch' or None.")
+        if rnn_normalization not in [
+            "layer",
+            "batch",
+            None,
+        ] or theta_normalization not in ["layer", "batch", None]:
+            raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
         if annealing_sharpness <= 0:
             raise ValueError("annealing_sharpness must be greater than zero.")
@@ -127,13 +135,14 @@ class BaseModel:
         # Model hyperparameters
         self.sequence_length = sequence_length
         self.rnn_type = rnn_type
+        self.rnn_normalization = rnn_normalization
         self.n_layers_inference = n_layers_inference
         self.n_layers_model = n_layers_model
         self.n_units_inference = n_units_inference
         self.n_units_model = n_units_model
         self.dropout_rate_inference = dropout_rate_inference
         self.dropout_rate_model = dropout_rate_model
-        self.normalization_type = normalization_type
+        self.theta_normalization = theta_normalization
 
         # KL annealing
         self.do_annealing = do_annealing
