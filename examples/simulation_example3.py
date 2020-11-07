@@ -26,7 +26,7 @@ sequence_length = 400
 batch_size = 32
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
 n_epochs = 300
 n_epochs_annealing = 150

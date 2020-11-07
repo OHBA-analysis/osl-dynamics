@@ -5,7 +5,7 @@
   state.
 - Covariances are NOT trainable.
 - Achieves a dice coefficient of ~0.93 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~2,720,000.
+- Achieves a free energy of ~2,730,000.
 """
 
 print("Setting up")
@@ -24,7 +24,7 @@ sequence_length = 400
 batch_size = 64
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
 n_epochs = 200
 n_epochs_annealing = 100

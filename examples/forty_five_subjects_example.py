@@ -4,7 +4,7 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.77 (when compared to the OSL HMM state time course).
+- Achieves a dice coefficient of ~0.76 (when compared to the OSL HMM state time course).
 - Achieves a free energy of ~124,000,000.
 """
 
@@ -25,7 +25,7 @@ sequence_length = 400
 batch_size = 128
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
 n_epochs = 50
 n_epochs_annealing = 20
@@ -83,7 +83,7 @@ model = RNNGaussian(
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
-    theta_normalization=theta_normalizatio,
+    theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,

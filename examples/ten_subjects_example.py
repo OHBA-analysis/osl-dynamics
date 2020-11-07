@@ -4,7 +4,7 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.76 (when compared to the OSL HMM state time course).
+- Achieves a dice coefficient of ~0.73 (when compared to the OSL HMM state time course).
 - Achieves a free energy of ~27,900,000.
 """
 
@@ -25,7 +25,7 @@ sequence_length = 400
 batch_size = 128
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
 n_epochs = 200
 n_epochs_annealing = 100
