@@ -428,9 +428,7 @@ class RNNGaussian(BaseModel):
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
-        mu_theta_jt_norm_layer = self.model.get_layer("mu_theta_jt_norm")
         log_sigma_theta_jt_layer = self.model.get_layer("log_sigma_theta_jt")
-        log_sigma_theta_jt_norm_layer = self.model.get_layer("log_sigma_theta_jt_norm")
         theta_t_layer = self.model.get_layer("theta_t")
         theta_t_norm_layer = self.model.get_layer("theta_t_norm")
         alpha_t_layer = self.model.get_layer("alpha_t")
@@ -459,19 +457,15 @@ class RNNGaussian(BaseModel):
             # in the future,
             # p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta_t)
-            mu_theta_jt = mu_theta_jt_layer(model_rnn)
-            mu_theta_jt_norm = mu_theta_jt_norm_layer(mu_theta_jt)[0, -1]
-            log_sigma_theta_jt = log_sigma_theta_jt_layer(model_rnn)
-            log_sigma_theta_jt_norm = log_sigma_theta_jt_norm_layer(log_sigma_theta_jt)[
-                0, -1
-            ]
-            sigma_theta_jt_norm = np.exp(log_sigma_theta_jt_norm)
+            mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
+            log_sigma_theta_jt = log_sigma_theta_jt_layer(model_rnn)[0, -1]
+            sigma_theta_jt = np.exp(log_sigma_theta_jt)
 
             # Shift theta_t one time step to the left
             theta_t_norm = np.roll(theta_t_norm, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t = mu_theta_jt_norm + sigma_theta_jt_norm * epsilon[i]
+            theta_t = mu_theta_jt + sigma_theta_jt * epsilon[i]
             theta_t_norm[-1] = theta_t_norm_layer(theta_t[np.newaxis, np.newaxis, :])[0]
 
             # Calculate the state mixing factors
@@ -581,9 +575,7 @@ def _model_structure(
         name="inference_rnn",
     )
     m_theta_t_layer = layers.Dense(n_states, name="m_theta_t")
-    m_theta_t_norm_layer = NormalizationLayer(name="m_theta_t_norm")
     log_s_theta_t_layer = layers.Dense(n_states, name="log_s_theta_t")
-    log_s_theta_t_norm_layer = NormalizationLayer(name="log_s_theta_t_norm")
 
     # Layers to sample theta_t from q(theta_t) and to convert to state mixing
     # factors alpha_t
@@ -595,10 +587,8 @@ def _model_structure(
     inference_input_dropout = inference_input_dropout_layer(inputs)
     inference_output = inference_output_layers(inference_input_dropout)
     m_theta_t = m_theta_t_layer(inference_output)
-    m_theta_t_norm = m_theta_t_norm_layer(m_theta_t)
     log_s_theta_t = log_s_theta_t_layer(inference_output)
-    log_s_theta_t_norm = log_s_theta_t_norm_layer(log_s_theta_t)
-    theta_t = theta_t_layer([m_theta_t_norm, log_s_theta_t_norm])
+    theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
     theta_t_norm = theta_t_norm_layer(theta_t)
     alpha_t = alpha_t_layer(theta_t_norm)
 
@@ -647,20 +637,14 @@ def _model_structure(
         name="model_rnn",
     )
     mu_theta_jt_layer = layers.Dense(n_states, name="mu_theta_jt")
-    mu_theta_jt_norm_layer = NormalizationLayer(name="mu_theta_jt_norm")
     log_sigma_theta_jt_layer = layers.Dense(n_states, name="log_sigma_theta_jt")
-    log_sigma_theta_jt_norm_layer = NormalizationLayer(name="log_sigma_theta_jt_norm")
     kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_t_norm)
     model_output = model_output_layers(model_input_dropout)
     mu_theta_jt = mu_theta_jt_layer(model_output)
-    mu_theta_jt_norm = mu_theta_jt_norm_layer(mu_theta_jt)
     log_sigma_theta_jt = log_sigma_theta_jt_layer(model_output)
-    log_sigma_theta_jt_norm = log_sigma_theta_jt_norm_layer(log_sigma_theta_jt)
-    kl_loss = kl_loss_layer(
-        [m_theta_t_norm, log_s_theta_t_norm, mu_theta_jt_norm, log_sigma_theta_jt_norm]
-    )
+    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_jt])
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha_t])
