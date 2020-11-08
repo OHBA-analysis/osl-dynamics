@@ -53,6 +53,7 @@ def nextpow2(x: int) -> int:
     Parameters
     ----------
     x : int
+        Any integer.
 
     Returns
     -------
