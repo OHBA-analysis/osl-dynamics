@@ -128,7 +128,7 @@ class SequenceHMMSimulation(HMMSimulation):
         self,
         n_samples: int,
         stay_prob: float,
-        n_states: int,
+        n_states: int = None,
         n_channels: int = None,
         means: np.ndarray = None,
         covariances: np.ndarray = None,
@@ -138,6 +138,17 @@ class SequenceHMMSimulation(HMMSimulation):
         simulate: bool = True,
         random_seed: int = None,
     ):
+        if n_states is None:
+            # Get the number of states from the means or covariances
+            if means is not None:
+                n_states = means.shape[0]
+            elif covariances is not None:
+                n_states = covariances.shape[0]
+            else:
+                raise ValueError(
+                    "If n_states is not passed, means or covariances must be passed."
+                )
+
         self.stay_prob = stay_prob
         trans_prob = self.construct_trans_prob(n_states, stay_prob)
 
@@ -201,7 +212,7 @@ class UniformHMMSimulation(HMMSimulation):
         self,
         n_samples: int,
         stay_prob: float,
-        n_states: int,
+        n_states: int = None,
         n_channels: int = None,
         means: np.ndarray = None,
         covariances: np.ndarray = None,
@@ -211,8 +222,19 @@ class UniformHMMSimulation(HMMSimulation):
         simulate: bool = True,
         random_seed: int = None,
     ):
+        if n_states is None:
+            # Get the number of states from the means or covariances
+            if means is not None:
+                n_states = means.shape[0]
+            elif covariances is not None:
+                n_states = covariances.shape[0]
+            else:
+                raise ValueError(
+                    "If n_states is not passed, means or covariances must be passed."
+                )
+
         self.stay_prob = stay_prob
-        self.trans_prob = self.construct_trans_prob(n_states, stay_prob)
+        trans_prob = self.construct_trans_prob(n_states, stay_prob)
 
         super().__init__(
             n_samples=n_samples,

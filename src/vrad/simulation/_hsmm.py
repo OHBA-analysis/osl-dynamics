@@ -43,7 +43,8 @@ class HSMMSimulation(Simulation):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels).
     zero_means : bool
-        Should means vary over channels and states?
+        If True, means are set to zero, otherwise they are sampled from a normal
+        distribution.
     random_covariances : bool
         Should we simulate random covariances? False gives structured covariances.
     observation_error : float
@@ -193,7 +194,8 @@ class MixedHSMMSimulation(HSMMSimulation):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels).
     zero_means : bool
-        Should means vary over channels and states?
+        If True, means are set to zero, otherwise they are sampled from a normal
+        distribution.
     random_covariances : bool
         Should we simulate random covariances? False gives structured covariances.
     observation_error : float

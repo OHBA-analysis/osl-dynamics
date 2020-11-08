@@ -27,7 +27,8 @@ class Simulation(ABC):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels).
     zero_means : bool
-        If True, means will be set to zero.
+        If True, means will be set to zero, otherwise they are sampled from a
+        normal distribution.
     random_covariances : bool
         Should we simulate random covariances? False gives structured covariances.
     observation_error : float
@@ -129,7 +130,7 @@ class Simulation(ABC):
             means = np.zeros([self.n_states, self.n_channels])
         else:
             # Random normally distributed means for each channel
-            means = self._rng.normal([self.n_states, self.n_channels])
+            means = self._rng.normal(size=[self.n_states, self.n_channels])
 
         return means
 
@@ -258,7 +259,8 @@ def validate_means_covariances(
     covariances : np.ndarray
         Covariance matrices. Shape should be (n_states, n_channels, n_channels).
     zero_means : bool
-        If True, means will be set to zero.
+        If True, means will be set to zero, otherwise they are sampled from a
+        normal distribution.
     random_covariances : bool
         Should we simulate random covariances? False gives structured covariances.
 
@@ -303,6 +305,6 @@ def validate_means_covariances(
     if means is None and covariances is not None:
         n_channels = covariances.shape[1]
     if means is not None and covariances is None:
-        n_channels = covariances.shape[1]
+        n_channels = means.shape[1]
 
     return n_channels
