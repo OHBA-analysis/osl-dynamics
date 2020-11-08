@@ -2,6 +2,7 @@
 
 """
 
+import numpy as np
 from vrad.simulation import Simulation
 
 
@@ -16,7 +17,8 @@ class VRADSimulation(Simulation):
         Time x state array of activations.
     """
 
-    def __init__(self, covariances, state_time_course):
+    def __init__(self, covariances: np.ndarray, state_time_course: np.ndarray):
+        self.state_time_course = state_time_course
         super().__init__(
             n_samples=state_time_course.shape[0],
             n_channels=covariances.shape[-1],
@@ -27,7 +29,6 @@ class VRADSimulation(Simulation):
             random_covariance_weights=False,
             simulate=False,
         )
-        self.state_time_course = state_time_course
 
     def generate_states(self):
         return self.state_time_course

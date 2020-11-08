@@ -9,73 +9,74 @@ from vrad.utils.decorators import auto_repr, auto_yaml
 
 
 class HMMSimulation(Simulation):
-    """Class providing methods to simulate a hidden Markov model.
+    """Class providing methods to simulate an HMM.
 
     Parameters
     ----------
-    trans_prob : numpy.ndarray
-        Transition probability matrix.
     n_samples : int
         Number of samples to draw from the model.
-    n_states : int
-        Number of states in the Markov chain.
-    zero_means : bool
-        Should means vary over channels and states?
-    observation_error : float
-        Standard deviation of random noise to be added to the observations.
-    covariances : numpy.ndarray
-        The covariances matrices for each state in the observation
+    trans_prob : numpy.ndarray
+        Transition probability matrix.
     n_channels : int
         Number of channels in the observation model. Inferred from covariances if None.
-    random_covariance_weights : bool
-        Randomly sample covariances.
-    random_seed : int
-        Seed for reproducibility.
+    means : np.ndarray
+        Mean vector for each state, shape should be (n_states, n_channels).
+    covariances : np.ndarray
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels).
+    zero_means : bool
+        If True, means will be set to zero.
+    random_covariances : bool
+        Should we simulate random covariances? False gives structured covariances.
+    observation_error : float
+        Standard deviation of random noise to be added to the observations.
     simulate : bool
         Should data be simulated? Can be called using .simulate later.
+    random_seed : int
+        Seed for reproducibility.
     """
 
     @auto_yaml
     @auto_repr
     def __init__(
         self,
-        trans_prob: np.ndarray,
         n_samples: int,
-        n_states: int,
-        zero_means: bool,
-        observation_error: float,
-        covariances: np.ndarray,
+        trans_prob: np.ndarray,
         n_channels: int = None,
-        random_covariance_weights: bool = False,
-        random_seed: int = None,
+        means: np.ndarray = None,
+        covariances: np.ndarray = None,
+        zero_means: bool = None,
+        random_covariances: bool = None,
+        observation_error: float = 0.0,
         simulate: bool = True,
+        random_seed: int = None,
     ):
-        if covariances is not None:
-            n_channels = covariances.shape[1]
-
-        if n_states != trans_prob.shape[0]:
-            raise ValueError(
-                f"Number of states ({n_states}) and shape of transition "
-                + f"probability matrix {trans_prob.shape} incomptible."
-            )
-
         self.trans_prob = trans_prob
-        self.cumsum_trans_prob = None
+
+        if means is not None:
+            if trans_prob.shape[0] != means.shape[0]:
+                raise ValueError(
+                    "Mismatch in the number of states in trans_prob and means."
+                )
+
+        if covariances is not None:
+            if trans_prob.shape[0] != covariances.shape[0]:
+                raise ValueError(
+                    "Mismatch in the number of states in trans_prob and covariances."
+                )
 
         super().__init__(
             n_samples=n_samples,
             n_channels=n_channels,
-            n_states=n_states,
-            zero_means=zero_means,
-            random_covariance_weights=random_covariance_weights,
-            observation_error=observation_error,
+            n_states=trans_prob.shape[0],
+            means=means,
             covariances=covariances,
-            random_seed=random_seed,
+            zero_means=zero_means,
+            random_covariances=random_covariances,
+            observation_error=observation_error,
             simulate=simulate,
+            random_seed=random_seed,
         )
-
-        if not simulate:
-            self.state_time_course = self.generate_states()
 
     def generate_states(self) -> np.ndarray:
         rands = [
@@ -86,7 +87,6 @@ class HMMSimulation(Simulation):
             )
             for i in range(self.n_states)
         ]
-
         states = np.zeros(self.n_samples, int)
         for sample in range(1, self.n_samples):
             states[sample] = next(rands[states[sample - 1]])
@@ -94,7 +94,7 @@ class HMMSimulation(Simulation):
 
 
 class SequenceHMMSimulation(HMMSimulation):
-    """Class providing methods to simulate a sequential hidden Markov model.
+    """Class providing methods to simulate a sequential HMM.
 
     In a sequential HMM, each transition can only move to the next state numerically.
     So, 1 -> 2, 2 -> 3, 3 -> 4, etc.
@@ -103,52 +103,59 @@ class SequenceHMMSimulation(HMMSimulation):
     ----------
     n_samples : int
         Number of samples to draw from the model.
-    n_channels : int
-        Number of channels in the observation model. Inferred from covariances if None.
-    n_states : int
-        Number of states in the Markov chain.
-    zero_means : bool
-        Should means vary over channels and states?
     stay_prob : float
         Probability of staying in the current state (diagonals of transition matrix).
+    n_channels : int
+        Number of channels in the observation model. Inferred from covariances if None.
+    means : np.ndarray
+        Mean vector for each state, shape should be (n_states, n_channels).
+    covariances : np.ndarray
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels).
+    zero_means : bool
+        If True, means will be set to zero.
+    random_covariances : bool
+        Should we simulate random covariances? False gives structured covariances.
     observation_error : float
         Standard deviation of random noise to be added to the observations.
-    random_covariance_weights : bool
-        Randomly sample covariances.
-    random_seed : int
-        Seed for reproducibility.
     simulate : bool
         Should data be simulated? Can be called using .simulate later.
+    random_seed : int
+        Seed for reproducibility.
     """
 
     def __init__(
         self,
         n_samples: int,
-        n_channels: int,
-        n_states: int,
-        zero_means: bool,
         stay_prob: float,
-        observation_error: float,
-        random_covariance_weights: bool = False,
-        random_seed: int = None,
+        n_states: int,
+        n_channels: int = None,
+        means: np.ndarray = None,
+        covariances: np.ndarray = None,
+        zero_means: bool = None,
+        random_covariances: bool = None,
+        observation_error: float = 0.0,
         simulate: bool = True,
+        random_seed: int = None,
     ):
+        self.stay_prob = stay_prob
+        trans_prob = self.construct_trans_prob(n_states, stay_prob)
 
         super().__init__(
             n_samples=n_samples,
+            trans_prob=trans_prob,
             n_channels=n_channels,
-            n_states=n_states,
+            means=means,
+            covariances=covariances,
             zero_means=zero_means,
-            random_covariance_weights=random_covariance_weights,
+            random_covariances=random_covariances,
             observation_error=observation_error,
-            trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
-            random_seed=random_seed,
             simulate=simulate,
+            random_seed=random_seed,
         )
 
     @staticmethod
-    def construct_trans_prob_matrix(n_states: int, stay_prob: float) -> np.ndarray:
-
+    def construct_trans_prob(n_states: int, stay_prob: float) -> np.ndarray:
         trans_prob = np.zeros([n_states, n_states])
         np.fill_diagonal(trans_prob, stay_prob)
         np.fill_diagonal(trans_prob[:, 1:], 1 - stay_prob)
@@ -156,10 +163,10 @@ class SequenceHMMSimulation(HMMSimulation):
         return trans_prob
 
 
-class BasicHMMSimulation(HMMSimulation):
-    """Class providing methods to simulate a basic hidden Markov model.
+class UniformHMMSimulation(HMMSimulation):
+    """Class providing methods to simulate a uniform HMM.
 
-    In a basic HMM, the chance of moving to any state other than the current one is
+    In a uniform HMM, the chance of moving to any state other than the current one is
     equal. So there is a diagonal term and an off-diagonal term for the transition
     probability matrix.
 
@@ -167,22 +174,25 @@ class BasicHMMSimulation(HMMSimulation):
     ----------
     n_samples : int
         Number of samples to draw from the model.
-    n_channels : int
-        Number of channels in the observation model. Inferred from covariances if None.
-    n_states : int
-        Number of states in the Markov chain.
-    zero_means : bool
-        Should means vary over channels and states?
     stay_prob : float
         Probability of staying in the current state (diagonals of transition matrix).
+    n_channels : int
+        Number of channels in the observation model. Inferred from covariances if None.
+    means : np.ndarray
+        Mean vector for each state, shape should be (n_states, n_channels).
+    covariances : np.ndarray
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels).
+    zero_means : bool
+        If True, means will be set to zero.
+    random_covariances : bool
+        Should we simulate random covariances? False gives structured covariances.
     observation_error : float
         Standard deviation of random noise to be added to the observations.
-    random_covariance_weights : bool
-        Randomly sample covariances.
-    random_seed : int
-        Seed for reproducibility.
     simulate : bool
         Should data be simulated? Can be called using .simulate later.
+    random_seed : int
+        Seed for reproducibility.
     """
 
     @auto_yaml
@@ -190,132 +200,36 @@ class BasicHMMSimulation(HMMSimulation):
     def __init__(
         self,
         n_samples: int,
-        n_channels: int,
-        n_states: int,
-        zero_means: bool,
         stay_prob: float,
-        observation_error: float,
-        random_covariance_weights: bool = False,
-        random_seed: int = None,
+        n_states: int,
+        n_channels: int = None,
+        means: np.ndarray = None,
+        covariances: np.ndarray = None,
+        zero_means: bool = None,
+        random_covariances: bool = None,
+        observation_error: float = 0.0,
         simulate: bool = True,
+        random_seed: int = None,
     ):
-
         self.stay_prob = stay_prob
-
-        self.trans_prob = None
+        self.trans_prob = self.construct_trans_prob(n_states, stay_prob)
 
         super().__init__(
             n_samples=n_samples,
+            trans_prob=trans_prob,
             n_channels=n_channels,
-            n_states=n_states,
+            means=means,
+            covariances=covariances,
             zero_means=zero_means,
-            random_covariance_weights=random_covariance_weights,
+            random_covariances=random_covariances,
             observation_error=observation_error,
-            trans_prob=self.construct_trans_prob_matrix(n_states, stay_prob),
-            random_seed=random_seed,
             simulate=simulate,
+            random_seed=random_seed,
         )
 
     @staticmethod
-    def construct_trans_prob_matrix(n_states: int, stay_prob: float):
+    def construct_trans_prob(n_states: int, stay_prob: float):
         single_trans_prob = (1 - stay_prob) / (n_states - 1)
         trans_prob = np.ones((n_states, n_states)) * single_trans_prob
         trans_prob[np.diag_indices(n_states)] = stay_prob
         return trans_prob
-
-
-class UniHMMSimulation(HMMSimulation):
-    def __init__(
-        self,
-        n_samples: int,
-        n_channels: int,
-        n_states: int,
-        zero_means: bool,
-        stay_prob: float,
-        observation_error: float,
-        random_covariance_weights: bool = False,
-        random_seed: int = None,
-    ):
-
-        self.stay_prob = stay_prob
-
-        super().__init__(
-            n_samples=n_samples,
-            n_channels=n_channels,
-            n_states=n_states,
-            zero_means=zero_means,
-            random_covariance_weights=random_covariance_weights,
-            observation_error=observation_error,
-            trans_prob=self.construct_trans_prob_matrix(stay_prob),
-            random_seed=random_seed,
-        )
-
-    @staticmethod
-    def construct_trans_prob_matrix(stay_prob: float) -> np.ndarray:
-        """An HMM with equal transfer probabilities for all non-active states.
-
-        Returns
-        -------
-        alpha_sim : np.array
-            State time course
-        """
-        trans_prob = np.ones([2, 2]) * (1 - stay_prob)
-        trans_prob.trans_prob[np.diag_indices(2)] = stay_prob
-        return trans_prob
-
-
-class RandomHMMSimulation(HMMSimulation):
-    """Class providing methods to simulate a random hidden Markov model.
-
-    State choice is completely random with all elements of the transition probability
-    matrix set to the same value.
-
-    Parameters
-    ----------
-    n_samples : int
-        Number of samples to draw from the model.
-    n_channels : int
-        Number of channels in the observation model. Inferred from covariances if None.
-    n_states : int
-        Number of states in the Markov chain.
-    zero_means : bool
-        Should means vary over channels and states?
-    observation_error : float
-        Standard deviation of random noise to be added to the observations.
-    random_covariance_weights : bool
-        Randomly sample covariances.
-    random_seed : int
-        Seed for reproducibility.
-    """
-
-    def __init__(
-        self,
-        n_samples: int,
-        n_channels: int,
-        n_states: int,
-        zero_means: bool,
-        observation_error: float,
-        random_covariance_weights: bool = False,
-        random_seed: int = None,
-    ):
-
-        super().__init__(
-            n_samples=n_samples,
-            n_channels=n_channels,
-            n_states=n_states,
-            zero_means=zero_means,
-            random_covariance_weights=random_covariance_weights,
-            observation_error=observation_error,
-            trans_prob=self.construct_trans_prob_matrix(n_states),
-            random_seed=random_seed,
-        )
-
-    @staticmethod
-    def construct_trans_prob_matrix(n_states: int):
-        return np.ones((n_states, n_states)) * 1 / n_states
-
-    def generate_states(self) -> np.ndarray:
-        # TODO: Ask Mark what FOS is short for (frequency of state?)
-        z = np.random.choice(self.n_states, size=self.n_samples)
-        alpha_sim = get_one_hot(z, self.n_states)
-        return alpha_sim

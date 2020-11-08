@@ -58,10 +58,9 @@ cov = np.load("files/hmm_cov.npy")
 print("Simulating data")
 sim = HMMSimulation(
     n_samples=n_samples,
-    n_states=n_states,
-    sim_varying_means=learn_means,
-    covariances=cov,
     trans_prob=trans_prob,
+    zero_means=True,
+    covariances=cov,
     observation_error=observation_error,
     random_seed=123,
 )

@@ -65,13 +65,12 @@ mixed_state_vectors = np.array(
 print("Simulating data")
 sim = MixedHSMMSimulation(
     n_samples=n_samples,
-    n_states=n_states,
     mixed_state_vectors=mixed_state_vectors,
-    sim_varying_means=learn_means,
-    covariances=cov,
-    observation_error=observation_error,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
+    zero_means=True,
+    covariances=cov,
+    observation_error=observation_error,
     random_seed=123,
 )
 sim.standardize()
