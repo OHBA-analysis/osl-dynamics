@@ -53,7 +53,9 @@ learning_rate = 0.01
 
 # Read MEG data
 print("Reading MEG data")
-prepared_data = data.Data("/well/woolrich/shared/vrad/prepared_data/subject1.mat")
+prepared_data = data.Data(
+    "/well/woolrich/shared/vrad/resting_state_data/prepared_data/subject1.mat"
+)
 n_channels = prepared_data.n_channels
 
 # Prepare dataset
@@ -61,7 +63,9 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with the final HMM covariances
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/nSubjects-1_K-6/hmm.mat")
+hmm = data.OSL_HMM(
+    "/well/woolrich/shared/vrad/resting_state_data/hmm_fits/nSubjects-1_K-6/hmm.mat"
+)
 initial_covariances = hmm.covariances
 
 # Build model
@@ -97,7 +101,8 @@ history = model.fit(
     training_dataset,
     epochs=n_epochs,
     save_best_after=n_epochs_annealing,
-    save_filepath="/well/woolrich/shared/vrad/trained_models/one_subject_example/weights",
+    save_filepath="/well/woolrich/shared/vrad/resting_state_data"
+    + "/trained_models/one_subject_example/weights",
 )
 
 # Free energy = Log Likelihood + KL Divergence
@@ -118,7 +123,7 @@ print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
 # Load preprocessed data to calculate spatial power maps
 preprocessed_data = data.PreprocessedData(
-    "/well/woolrich/shared/vrad/preprocessed_data/subject1.mat"
+    "/well/woolrich/shared/vrad/resting_state_data/preprocessed_data/subject1.mat"
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
     n_embeddings=13, sequence_length=sequence_length

@@ -126,12 +126,7 @@ model = RNNGaussian(
 model.summary()
 
 print("Training model")
-history = model.fit(
-    training_dataset,
-    epochs=n_epochs,
-    save_best_after=n_epochs_annealing,
-    save_filepath="/well/woolrich/shared/vrad/trained_models/simulation_example3/weights",
-)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
