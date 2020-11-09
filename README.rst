@@ -1,6 +1,6 @@
-=====
-VRAD
-=====
+================================
+VariationalRNNAutoDecoder (VRAD)
+================================
 
 
 VRAD can learn your alphas!!
@@ -36,7 +36,7 @@ You can import things from VRAD like any other package.
 
 .. code-block:: python
 
-    from vrad.inference.models import create_model
+    from vrad.inference.models import RNNGaussian
 
 .. Description
     ===========
@@ -49,3 +49,4 @@ You can import things from VRAD like any other package.
 
     This project has been set up using PyScaffold 3.2.3. For details and usage
     information on PyScaffold see https://pyscaffold.org/.
+

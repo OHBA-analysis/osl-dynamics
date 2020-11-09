@@ -11,6 +11,20 @@ _logger = logging.getLogger("VRAD")
 
 
 def timing(f):
+    """Decorator to print function execution time.
+
+    Parameters
+    ----------
+    f : func
+        Function to be decorated.
+
+    Returns
+    -------
+    wrap : func
+        Decorated function.
+
+    """
+
     @wraps(f)
     def wrap(*args, **kw):
         ts = time()
@@ -28,6 +42,11 @@ def doublewrap(f):
     @decorator(with, arguments, and=kwargs)
     or
     @decorator
+
+    Parameters
+    ----------
+    f : func
+        Function to be decorated.
     """
 
     @wraps(f)
@@ -44,6 +63,25 @@ def doublewrap(f):
 
 @doublewrap
 def transpose(f, *arguments):
+    """Decorator to automatically place the longest dimension on the first axis.
+
+    By providing a series of positional and keyword arguments, this decorator
+    automatically determines which should be transposed to provide a [Time x other]
+    array.
+
+    Parameters
+    ----------
+    f : func
+        Function being decorated.
+    arguments : list
+        Arguments to be checked.
+
+    Returns
+    -------
+    wrap : func
+        Decorated function.
+
+    """
     try:
         iter(arguments)
     except TypeError:
@@ -72,6 +110,22 @@ def transpose(f, *arguments):
 
 
 def get_params(me, args, kwargs):
+    """Get a dictionary of parameters and their defaults for a class.
+
+    Parameters
+    ----------
+    me : class
+        Class to be analyzed.
+    args : list
+        Arguments to the class constructor.
+    kwargs : dict
+        Keyword arguments to the class constructor.
+
+    Returns
+    -------
+    arg_dict : dict
+        Dictionary of parameters and defaults.
+    """
     arg_dict = {}
 
     params = inspect.signature(me.__class__).parameters
@@ -88,6 +142,19 @@ def get_params(me, args, kwargs):
 
 
 def auto_repr(func):
+    """Decorator to automatically generate a __repr__ method from input parameters.
+
+    Parameters
+    ----------
+    func : func
+        Function to be decorated (typically __init__).
+
+    Returns
+    -------
+    wrapper_function : func
+        Decorated function.
+    """
+
     @wraps(func)
     def wrapper_function(me, *args, **kwargs):
         me.__arg_dict = get_params(me, args, kwargs)
@@ -112,6 +179,19 @@ def auto_repr(func):
 
 
 def auto_str(func):
+    """Decorator to automatically generate a __str__ method from input parameters.
+
+    Parameters
+    ----------
+    func : func
+        Function to be decorated (typically __init__).
+
+    Returns
+    -------
+    wrapper_function : func
+        Decorated function.
+    """
+
     @wraps(func)
     def wrapper_function(me, *args, **kwargs):
         me.__arg_dict = get_params(me, args, kwargs)
@@ -134,6 +214,19 @@ def auto_str(func):
 
 
 def auto_yaml(func):
+    """Decorator to automatically generate a yaml representation from input parameters.
+
+    Parameters
+    ----------
+    func : func
+        Function to be decorated (typically __init__).
+
+    Returns
+    -------
+    wrapper_function : func
+        Decorated function.
+    """
+
     @wraps(func)
     def wrapper_function(me, *args, **kwargs):
         me.__arg_dict = get_params(me, args, kwargs)
@@ -156,6 +249,23 @@ def auto_yaml(func):
 
 @doublewrap
 def deprecated(f, *, replaced_by: str = None, reason: str = None):
+    """Decorator to mark functions as deprecated.
+
+    Parameters
+    ----------
+    f : func
+        Function being deprecated.
+    replaced_by : str
+        Optional name of function to use instead.
+    reason : str
+        Message explaining the decision to deprecate.
+
+    Returns
+    -------
+    wrapper_function: func
+        Decorated function.
+    """
+
     @wraps(f)
     def wrapper_function(*args, **kwargs):
         message = [f"The '{f.__name__}' function is deprecated."]

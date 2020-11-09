@@ -5,7 +5,7 @@
   state.
 - Covariances are NOT trainable.
 - Achieves a dice coefficient of ~0.93 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~2,720,000.
+- Achieves a free energy of ~2,730,000.
 """
 
 print("Setting up")
@@ -24,13 +24,14 @@ sequence_length = 400
 batch_size = 64
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
 n_epochs = 200
 n_epochs_annealing = 100
 
 rnn_type = "lstm"
-normalization_type = "layer"
+rnn_normalization = "layer"
+theta_normalization = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -72,13 +73,14 @@ model = RNNGaussian(
     learn_covariances=learn_covariances,
     initial_covariances=initial_covariances,
     rnn_type=rnn_type,
+    rnn_normalization=rnn_normalization,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
-    normalization_type=normalization_type,
+    theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
@@ -108,7 +110,6 @@ inf_stc = states.time_courses(alpha)
 hmm_stc = data.manipulation.trim_time_series(
     time_series=hmm.state_time_course,
     discontinuities=prepared_data.discontinuities,
-    n_embeddings=13,
     sequence_length=sequence_length,
 )[0]
 

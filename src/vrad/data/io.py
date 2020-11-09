@@ -70,11 +70,18 @@ def load_matlab(
 def load_data(
     time_series: Union[str, np.ndarray],
     sampling_frequency: float = 1,
-    mmap_location=None,
+    mmap_location: str = None,
 ) -> Tuple[np.ndarray, np.ndarray, float]:
-    """Loads data.
+    """Loads time series data.
 
-    Accepts a numpy array or a string containing the path to a .npy or .mat file.
+    Parameters
+    ----------
+    time_series : numpy.ndarray or str
+        An array or filename of a .npy or .mat file containing timeseries data.
+    sampling_frequency : float
+        Sampling frequency of the data.
+    mmap_location : str
+        Filename to save the data as a numpy memory map.
     """
     discontinuity_indices = None
 

@@ -1,8 +1,9 @@
-"""Functions to perform spectral analysis of a fit.
+"""Functions to perform spectral analysis.
 
 """
 
 import logging
+from typing import Tuple
 
 import numpy as np
 from scipy.signal.windows import dpss
@@ -16,16 +17,39 @@ _logger = logging.getLogger("VRAD")
 
 
 def multitaper(
-    data,
-    sampling_frequency,
-    nfft=None,
-    tapers=None,
-    time_half_bandwidth=None,
-    n_tapers=None,
-    args_range=None,
-):
-    """Calculates a power (or cross) spectral density using the multitaper method."""
+    data: np.ndarray,
+    sampling_frequency: float,
+    nfft: int = None,
+    tapers: np.ndarray = None,
+    time_half_bandwidth: float = None,
+    n_tapers: int = None,
+    args_range: list = None,
+) -> np.ndarray:
+    """Calculates a power (or cross) spectral density using the multitaper method.
 
+    Parameters
+    ----------
+    data : np.ndarray
+        Data with shape (n_samples, n_channels) to calculate a multitaper for.
+    sampling_frequency : float
+        Frequency used to sample the data (Hz).
+    nfft : int
+        Number of points in the FFT.
+    tapers : np.ndarray
+        Taper functions.
+    time_half_bandwidth : float
+        Parameter to control the resolution of the multitaper.
+    n_tapers : int
+        Number of tapers.
+    args_range : list
+        Minimum and maximum indices of the multitaper to keep.
+
+    Returns
+    -------
+    np.ndarray
+        Power (or cross) spectral density with shape (n_channels, n_channels, n_f).
+
+    """
     # Transpose the data so that it is [n_channels, n_samples]
     data = np.transpose(data)
 
@@ -73,20 +97,49 @@ def multitaper(
 
 
 def state_spectra(
-    data,
-    state_mixing_factors,
-    sampling_frequency,
-    time_half_bandwidth,
-    n_tapers,
-    segment_length=None,
-    frequency_range=None,
-):
+    data: np.ndarray,
+    state_mixing_factors: np.ndarray,
+    sampling_frequency: float,
+    time_half_bandwidth: float,
+    n_tapers: int,
+    segment_length: int = None,
+    frequency_range: list = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates spectra for inferred states.
 
-    This include power spectra and coherence.
+    This includes power spectra and coherence.
     Follows the same procedure as the OSL function HMM-MAR/spectral/hmmspectamt.m
-    """
 
+    Parameters
+    ----------
+    data : np.ndarray
+        Raw time series data with shape (n_samples, n_channels).
+    state_mixing_factors : np.ndarray
+        Inferred state mixing factor alpha_t at each time point. Shape is (n_samples,
+        n_states).
+    sampling_frequency : float
+        Frequency used to sample the data (Hz).
+    time_half_bandwidth : float
+        Parameter to control the resolution of the spectra.
+    n_tapers : int
+        Number of tapers to use when calculating the multitaper.
+    segment_length : int
+        Length of the data segement to use to calculate the multitaper.
+    frequency_range : list
+        Minimum and maximum frequency to keep.
+
+    Returns
+    -------
+    frequencies : np.ndarray
+        Frequencies of the power spectra and coherences. Shape is (n_f,).
+    power_spectra : np.ndarray
+        Power (or cross) spectra calculated for each state. Shape is (n_states,
+        n_channels, n_channels, n_f).
+    coherences : np.ndarray
+        Coherences calculated for each state. Shape is (n_states, n_channels,
+        n_channels, n_f).
+
+    """
     # Validation
     if (isinstance(data, list) != isinstance(state_mixing_factors, list)) or (
         isinstance(data, np.ndarray) != isinstance(state_mixing_factors, np.ndarray)
@@ -233,14 +286,35 @@ def state_spectra(
 
 
 def decompose_spectra(
-    coherences, n_components, max_iter=10000, random_state=None, verbose=0,
-):
+    coherences: np.ndarray,
+    n_components: int,
+    max_iter: int = 50000,
+    random_state: int = None,
+    verbose: int = 0,
+) -> np.ndarray:
     """Performs spectral decomposition using coherences.
 
     Uses non-negative matrix factorization to decompose spectra.
     Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
 
-    Return the spectral components.
+    Parameters
+    ----------
+    coherences : np.ndarray
+        Coherences with shape (n_states, n_channels, n_channels, n_f).
+    n_components : int
+        Number of spectral components to fit.
+    max_iter : int
+        Maximum number of iterations in sklearn's non_negative_factorization.
+    random_state : int
+        Seed for the random number generator.
+    verbose : int
+        Show verbose? (1) yes, (0) no.
+
+    Returns
+    -------
+    components : np.ndarray
+        Spectral components. Shape is (n_components, n_f).
+
     """
     print("Performing spectral decomposition")
 

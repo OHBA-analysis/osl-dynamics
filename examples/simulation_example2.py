@@ -26,13 +26,14 @@ sequence_length = 200
 batch_size = 32
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
 n_epochs = 500
-n_epochs_annealing = 100
+n_epochs_annealing = 150
 
 rnn_type = "lstm"
-normalization_type = "layer"
+rnn_normalization = "layer"
+theta_normalization = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -59,12 +60,11 @@ cov = np.load("files/hmm_cov.npy")
 print("Simulating data")
 sim = HSMMSimulation(
     n_samples=n_samples,
-    n_states=n_states,
-    sim_varying_means=learn_means,
-    covariances=cov,
-    observation_error=observation_error,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
+    zero_means=True,
+    covariances=cov,
+    observation_error=observation_error,
     random_seed=123,
 )
 sim.standardize()
@@ -101,13 +101,14 @@ model = RNNGaussian(
     initial_means=initial_means,
     initial_covariances=initial_covariances,
     rnn_type=rnn_type,
+    rnn_normalization=rnn_normalization,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
-    normalization_type=normalization_type,
+    theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,

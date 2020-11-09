@@ -17,7 +17,7 @@ from vrad.inference.states import (
     state_activation,
     state_lifetimes,
 )
-from vrad.utils.decorators import deprecated, transpose
+from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
 
 _logger = logging.getLogger("VRAD")
@@ -218,51 +218,6 @@ def get_colors(
     return colors
 
 
-@transpose(0, 1, 2, "time_series_0", "time_series_1", "time_series_2")
-def plot_two_data_scales(
-    time_series_0: np.ndarray,
-    time_series_1: np.ndarray,
-    time_series_2: np.ndarray = None,
-    n_samples: int = None,
-    fig_kwargs: dict = None,
-    plot_0_kwargs: dict = None,
-    plot_1_kwargs: dict = None,
-    plot_2_kwargs: dict = None,
-    filename: str = None,
-):
-    n_samples = min(
-        n_samples or np.inf, time_series_0.shape[0], time_series_1.shape[0],
-    )
-
-    if plot_2_kwargs is not None:
-        n_samples = min(n_samples, time_series_2.shape[0])
-
-    fig_defaults = {"figsize": (20, 10), "sharex": "all"}
-    fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
-    fig, axes = plt.subplots(2, **fig_kwargs)
-
-    plot_0_defaults = {"lw": 0.6, "color": "tab:blue"}
-    plot_0_kwargs = override_dict_defaults(plot_0_defaults, plot_0_kwargs)
-    axes[0].plot(value_separation(time_series_0[:n_samples]), **plot_0_kwargs)
-
-    plot_1_defaults = {"lw": 0.6, "color": "tab:blue"}
-    plot_1_kwargs = override_dict_defaults(plot_1_defaults, plot_1_kwargs)
-    axes[1].plot(value_separation(time_series_1[:n_samples]), **plot_1_kwargs)
-
-    if time_series_2 is not None:
-        plot_2_defaults = {"lw": 0.4, "color": "tab:orange"}
-        plot_2_kwargs = override_dict_defaults(plot_2_defaults, plot_2_kwargs)
-        axes[1].plot(value_separation(time_series_1[:n_samples]), **plot_2_kwargs)
-
-    for axis in axes:
-        axis.autoscale(axis="x", tight=True)
-        axis.set_yticks([])
-
-    plt.tight_layout()
-
-    show_or_save(filename)
-
-
 @transpose(0, 1, "time_series", "state_time_course")
 def plot_state_highlighted_data(
     time_series: Union[np.ndarray, Any],
@@ -439,6 +394,37 @@ def state_barcode(
     filename: str = None,
     extent: List[float] = None,
 ):
+    """Create a barcode plot for a state time course.
+
+    Given a state time course either expressed as an 1D array of integer state
+     activations or as a 2D array of one-hot encoded state activations, produce a
+     barcode plot with each state represented by a color drawn from the colormap
+     provided.
+
+    Parameters
+    ----------
+    state_time_course : numpy.ndarray
+        State time course as a 1D or 2D array.
+    axis : matplotlib.pyplot.Axes
+        Optional axis on which to plot the barcode.
+    colormap : str
+        Matplotlib colormap name.
+    n_samples : int
+        Number of samples to plot.
+    sampling_frequency : str
+        Sampling frequency of the data to allow for x-axis to be time
+         rather than sample number.
+    highlight_kwargs : dict
+        Keyword arguments to pass to imshow.
+    legend : bool
+        Toggle whether a legend is displayed.
+    fig_kwargs : dict
+        Keyword arguments to pass to plt.subplots.
+    filename : str
+        Name of file to save plot to.
+    extent : list of float
+        Extent to pass to imshow.
+    """
     state_time_course = np.asarray(state_time_course)
     if state_time_course.ndim == 2:
         state_time_course = state_time_course.argmax(axis=1)
@@ -484,106 +470,6 @@ def state_barcode(
     axis.set_yticks([])
 
     if not axis_given:
-        show_or_save(filename)
-
-
-@deprecated(replaced_by="state_barcode", reason="state_barcode is more efficient.")
-@transpose(0, "state_time_course")
-def highlight_states(
-    state_time_course: np.ndarray,
-    axis: plt.Axes = None,
-    colormap: str = "gist_rainbow",
-    n_samples: int = None,
-    sampling_frequency: float = 1,
-    highlight_kwargs: dict = None,
-    legend: bool = True,
-    fig_kwargs: dict = None,
-    filename: str = None,
-):
-    """Plot vertical bars corresponding to state activation.
-
-    For a state time course, each state has its activation starts and stops calculated
-    using vrad.array_ops.state_activation. Each state is represented by a color chosen
-    at uniform separations from the colormap given. If a sample frequency is provided,
-    the x axis will be marked with time stamps rather than sample numbers.
-
-    Parameters
-    ----------
-    state_time_course: numpy.ndarray
-        The state time course to be displayed as vertical highlights.
-    axis: matplotlib.axes.Axes
-        Axis to plot on. Default is to create a new figure.
-    colormap: str
-        A matplotlib colormap from which to draw the highlight colors.
-    n_samples: int
-        Number of time points to plot.
-    sampling_frequency: float
-        The sampling frequency of the data. Default is to use sample number (i.e. 1Hz)
-    highlight_kwargs: dict
-        Keyword arguments to be passed to matplotlib.pyplot.axvspan.
-    legend: bool
-        If True a legend is added to the plot.
-    fig_kwargs: dict
-        Keyword arguments for matplotlib.pyplot.subplots.
-    filename: str
-        A file to which to save the figure.
-    """
-    n_samples = min(n_samples or np.inf, state_time_course.shape[0])
-
-    axis_given = axis is not None
-    if not axis_given:
-        fig_defaults = {
-            "figsize": (20, 3),
-        }
-        fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
-        fig, axis = plt.subplots(1, **fig_kwargs)
-
-    highlight_defaults = {"alpha": 0.2, "lw": 0}
-    highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
-
-    n_states = state_time_course.shape[1]
-    ons, offs = state_activation(state_time_course)
-
-    colors = get_colors(n_states, colormap)
-
-    for state_number, (state_ons, state_offs, color) in enumerate(
-        zip(ons, offs, colors)
-    ):
-        for highlight_number, (on, off) in enumerate(
-            zip(state_ons[:n_samples], state_offs[:n_samples])
-        ):
-            if (on > n_samples) and (off > n_samples):
-                break
-            handles, labels = axis.get_legend_handles_labels()
-            if (str(state_number) not in labels) and legend:
-                label = str(state_number)
-            else:
-                label = ""
-            axis.axvspan(
-                on / sampling_frequency,
-                min(off, n_samples) / sampling_frequency,
-                color=color,
-                **highlight_kwargs,
-                label=label,
-            )
-
-    if legend:
-        axis.legend(
-            loc=(0.0, -0.3), mode="expand", borderaxespad=0, ncol=n_states,
-        )
-
-    plt.setp(axis.spines.values(), visible=False)
-
-    axis.set_yticks([])
-
-    axis.autoscale(tight=True)
-
-    axis.set_xlim(0, n_samples / sampling_frequency)
-
-    plt.tight_layout()
-
-    if not axis_given:
-        # axis.axis("off")
         show_or_save(filename)
 
 
@@ -642,7 +528,8 @@ def plot_matrices(
 ):
     """Plot a collection of matrices.
 
-    Given an iterable of matrices, plot each matrix in its own axis.
+    Given an iterable of matrices, plot each matrix in its own axis. The axes are
+    arranged as close to a square (N x N axis grid) as possible.
 
     Parameters
     ----------
@@ -752,6 +639,17 @@ def add_axis_colorbar(axis: plt.Axes):
 
 
 def add_figure_colorbar(fig: plt.Figure, mappable):
+    """Add a colorbar to a figure based on a mappable object.
+
+    Adds an extra axis to a figure to add a colorbar. The colors are allocated based on
+    a mappable object provided.
+
+    Parameters
+    ----------
+    fig : matplotlib.pyplot.Figure
+    mappable
+        An object from which matplotlib can create a colorbar.
+    """
     fig.subplots_adjust(right=0.94)
     color_bar_axis = fig.add_axes([0.95, 0.15, 0.025, 0.7])
     fig.colorbar(mappable, cax=color_bar_axis)
@@ -776,22 +674,24 @@ def plot_state_lifetimes(
 
     Parameters
     ----------
-    state_time_course: numpy.ndarray
+    state_time_course : numpy.ndarray
         State time course to analyse.
-    bins: int
+    bins : int
         Number of bins for the histograms.
-    density: bool
+    density : bool
         If True, plot the probability density of the state activation lengths.
         If False, raw number.
-    match_scale_x: bool
+    match_scale_x : bool
         If True, all histograms will share the same x-axis scale.
-    match_scale_y: bool
+    match_scale_y : bool
         If True, all histograms will share the same y-axis scale.
-    hist_kwargs: dict
+    x_range : list
+        The limits on the values presented on the x-axis.
+    hist_kwargs : dict
         Keyword arguments to pass to matplotlib.pyplot.hist.
-    fig_kwargs: dict
+    fig_kwargs : dict
         Keyword arguments to pass to matplotlib.pyplot.subplots.
-    filename: str
+    filename : str
         A file to which to save the figure.
     """
     if state_time_course.ndim == 1:
@@ -799,7 +699,6 @@ def plot_state_lifetimes(
     if state_time_course.ndim != 2:
         raise ValueError("state_timecourse must be a 2D array")
 
-    # state_time_course = reduce_state_time_course(state_time_course)
     channel_lifetimes = state_lifetimes(state_time_course)
     n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
@@ -820,7 +719,6 @@ def plot_state_lifetimes(
             axis.remove()
             continue
         if not len(channel):
-            # axis.hist([])
             axis.text(
                 0.5,
                 0.5,
@@ -870,7 +768,21 @@ def plot_state_time_courses(
     fig_kwargs: dict = None,
     filename: str = None,
 ):
-    """Plot state time courses as separate subplots."""
+    """Plot state time courses as separate subplots.
+
+    Parameters
+    ----------
+    state_time_courses : list of numpy.ndarray
+        State time courses to be plotted  as time series.
+    n_samples : int
+        Number of samples to be shown on the x-axis.
+    plot_kwargs : dict
+        Keyword arguments to pass to matplotlib.pyplot.plot.
+    fig_kwargs : dict
+        Keyword arguments to pass to matplotlib.pyplot.subplots.
+    filename : str
+        Filename to save figure to.
+    """
 
     state_time_courses = np.asarray(state_time_courses)
 
@@ -887,7 +799,7 @@ def plot_state_time_courses(
 
     for i in range(n_lines):
         for j in range(n_states):
-            axis[j].plot(state_time_courses[i][:n_samples, j])
+            axis[j].plot(state_time_courses[i][:n_samples, j], **plot_kwargs)
 
     plt.tight_layout()
     show_or_save(filename)
@@ -915,6 +827,8 @@ def compare_state_data(
         If given the y-axis will contain timestamps rather than sample numbers.
     titles: list of str
         Titles to give to each axis.
+    filename: str
+        Filename to save figure to.
     """
     n_samples = min(n_samples or np.inf, *[len(stc) for stc in state_time_courses])
 
@@ -976,7 +890,24 @@ def plot_loss(
     title: str = None,
     filename: str = None,
 ):
-    """Plot a training loss curve."""
+    """Plot a training loss curve.
+
+    Parameters
+    ----------
+    losses : numpy.ndarray
+        A 2D array of losses-by-epochs.
+    labels : list of str
+        Legend labels for each loss.
+    legend_loc : int
+        Matplotlib legend location identifier.
+    x_range : list
+        Minimum and maximum for x-axis.
+    y_range : list
+        Minimum and maximum for y-axis.
+    title : str
+        Figure title
+    filename : str
+    """
     fig, ax = plt.subplots(figsize=(7, 4))
 
     if isinstance(losses, list):
@@ -1003,8 +934,8 @@ def plot_loss(
         add_legend = False
 
     # Plot the loss curves
-    for i in range(len(losses)):
-        ax.plot(range(1, len(losses[i]) + 1), losses[i], label=labels[i])
+    for i, (loss, label) in enumerate(zip(losses, labels)):
+        ax.plot(loss, label=label)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
@@ -1015,7 +946,7 @@ def plot_loss(
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
 
-    #  Add a legend
+    # Add a legend
     if add_legend:
         ax.legend(loc=legend_loc)
 
@@ -1025,6 +956,12 @@ def plot_loss(
 
 
 def show_or_save(filename: str = None):
+    """Either show or save the current figure.
+
+    Parameters
+    ----------
+    filename : str
+    """
     if filename is None:
         plt.show()
     else:

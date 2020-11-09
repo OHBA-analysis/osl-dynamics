@@ -3,12 +3,33 @@
 """
 
 import numpy as np
-from scipy.optimize import curve_fit
 
 
-def fourier_transform(data, sampling_frequency, nfft=None, args_range=None):
-    """Calculates a Fast Fourier Transform (FFT)."""
+def fourier_transform(
+    data: np.ndarray,
+    sampling_frequency: float,
+    nfft: int = None,
+    args_range: list = None,
+) -> np.ndarray:
+    """Calculates a Fast Fourier Transform (FFT).
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Data with shape (n_samples, n_channels) to FFT.
+    sampling_frequency : float
+        Frequency used to sample the data (Hz).
+    nfft : int
+        Number of points in the FFT
+    args_range : list
+        Minimum and maximum indices of the FFT to keep.
 
+    Returns
+    -------
+    np.ndarray
+        FFT data.
+
+    """
     # Number of data points
     n = data.shape[-1]
 
@@ -26,9 +47,20 @@ def fourier_transform(data, sampling_frequency, nfft=None, args_range=None):
     return X
 
 
-def nextpow2(x):
-    """Returns the smallest power of two that is greater than or equal to the
-    absolute value of x.
+def nextpow2(x: int) -> int:
+    """Next power of 2.
+
+    Parameters
+    ----------
+    x : int
+        Any integer.
+
+    Returns
+    -------
+    int
+        The smallest power of two that is greater than or equal to the absolute
+        value of x.
+
     """
     res = np.ceil(np.log2(x))
     return res.astype("int")
@@ -39,8 +71,27 @@ def validate_array(
     correct_dimensionality: int,
     allow_dimensions: list,
     error_message: str,
-):
-    """Checks if an array has been passed correctly."""
+) -> np.ndarray:
+    """Checks if an array has been passed correctly.
+
+    In particular this function checks the dimensionality of the array is correct.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        Array to be checked.
+    correct_dimensionality : int
+        The desired number of dimensions in the array.
+    allow_dimensions : int
+        The number of dimensions that is acceptable for the passed array to have.
+    error_message : str
+        Message to print if the array is not valid.
+
+    Returns:
+    np.ndarray
+        Array with the correct dimensionality.
+
+    """
     array = np.array(array)
 
     # Add dimensions to ensure array has the correct dimensionality

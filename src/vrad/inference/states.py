@@ -16,7 +16,17 @@ _logger = logging.getLogger("VRAD")
 def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
-    Hard classifies the state probabilities (alpha).
+    Hard classifies the states so that only one state is active.
+
+    Parameters
+    ----------
+    alpha : list, np.ndarray
+        State mixing factors with shape (n_samples, n_states).
+
+    Returns
+    -------
+    stcs : list, np.ndarray
+        State time courses.
     """
     if isinstance(alpha, list):
         n_states = alpha[0].shape[1]
@@ -53,6 +63,40 @@ def correlate_states(
         for j, state2 in enumerate(state_time_course_2.T):
             correlation[i, j] = np.corrcoef(state1, state2)[0, 1]
     return correlation
+
+
+def match_covariances(*covariances: np.ndarray) -> Tuple[np.ndarray]:
+    """Matches covariances based on Frobenius norm of the difference of the matrices.
+
+    Each matrix must be 3D: (n_states, n_channels, n_channels).
+
+    The Frobenius norm is F = [Sum_{i,j} abs(a_{ij}^2)]^0.5,
+    where A is the element-wise difference of two matrices.
+    """
+    # Check all matrices have the same shape
+    for matrix in covariances[1:]:
+        if matrix.shape != covariances[0].shape:
+            raise ValueError("Matrices must have the same shape.")
+
+    # Number of arguments and number of matrices in each argument passed
+    n_args = len(covariances)
+    n_matrices = covariances[0].shape[0]
+
+    # Calculate the similarity between matrices
+    F = np.empty([n_matrices, n_matrices])
+    matched_covariances = [covariances[0]]
+    for i in range(1, n_args):
+        for j in range(n_matrices):
+            # Find the matrix that is most similar to matrix j
+            for k in range(n_matrices):
+                A = abs(np.diagonal(covariances[i][k]) - np.diagonal(covariances[0][j]))
+                F[j, k] = np.linalg.norm(A)
+        order = linear_sum_assignment(F)[1]
+
+        # Add the ordered matrix to the list
+        matched_covariances.append(covariances[i][order])
+
+    return tuple(matched_covariances)
 
 
 @transpose
@@ -120,7 +164,6 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
         List containing state ends in the order they occur for each channel.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
-
     """
     channel_on = []
     channel_off = []
@@ -164,7 +207,6 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
     -------
     reduced_state_time_course: numpy.ndarray
         A state time course with no states with no activation.
-
     """
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
 
@@ -187,7 +229,6 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
         List containing an array of lifetimes in the order they occur for each channel.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
-
     """
     ons, offs = state_activation(state_time_course)
     channel_lifetimes = offs - ons

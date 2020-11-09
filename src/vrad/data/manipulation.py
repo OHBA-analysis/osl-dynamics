@@ -1,5 +1,3 @@
-from typing import Union
-
 import numpy as np
 
 
@@ -7,6 +5,14 @@ def standardize(time_series: np.ndarray, discontinuities: np.ndarray) -> np.ndar
     """Standardizes time series data.
 
     Returns a time series standardized over continuous segments of data.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    discontinuities : numpy.ndarray
+        A set of time points at which the time series is discontinuous (e.g. because
+        bad segments were removed in preprocessing).
     """
     for i in range(len(discontinuities)):
         start = sum(discontinuities[:i])
@@ -19,6 +25,13 @@ def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
     """Scales a time series.
 
     Returns a time series with zero mean and unit variance.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    axis : int
+        Axis on which to perform the transformation.
     """
     time_series -= time_series.mean(axis=axis)
     time_series /= time_series.std(axis=axis)
@@ -29,9 +42,21 @@ def time_embed(
     time_series: np.ndarray,
     discontinuities: np.ndarray,
     n_embeddings: int,
-    output_file=None,
+    output_file: str = None,
 ) -> np.ndarray:
-    """Performs time embedding."""
+    """Performs time embedding.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    discontinuities : numpy.ndarray
+        A set of time points at which the time series is discontinuous (e.g. because
+        bad segments were removed in preprocessing).
+    n_embeddings : int
+        Number of samples in which to shift the data.
+    output_file : str
+    """
 
     if n_embeddings % 2 == 0:
         raise ValueError("n_embeddings must be an odd number.")
@@ -44,7 +69,7 @@ def time_embed(
     if output_file is None:
         time_embedded_series = np.empty(
             [
-                n_samples - (n_embeddings + 1) * len(discontinuties),
+                n_samples - (n_embeddings + 1) * len(discontinuities),
                 n_channels * (n_embeddings + 2),
             ]
         )
@@ -77,6 +102,22 @@ def time_embed(
 
 
 def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
+    """Calculate the number of batches an array will be split into.
+
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        Time series data.
+    sequence_length : int
+        Length of sequences which the data will be segmented in to.
+    step_size : int
+        The number of samples by which to move the sliding window between sequences.
+
+    Returns
+    -------
+    num_batches : int
+
+    """
     step_size = step_size or sequence_length
     final_slice_start = arr.shape[0] - sequence_length + 1
     index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
@@ -86,12 +127,25 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
 
 
 def trim_time_series(
-    time_series, discontinuities, n_embeddings, sequence_length,
+    time_series: np.ndarray, discontinuities: np.ndarray, sequence_length,
 ):
-    """Trims a time series.
+    """Trims a time seris.
 
-    Removes data points lost to time embedding and separating a time series
-    into sequences.
+    Removes data points lost to separating a time series into sequences.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    discontinuities : numpy.ndarray
+        A set of time points at which the time series is discontinuous (e.g. because
+        bad segments were removed in preprocessing).
+    sequence_length : int
+
+    Returns
+    -------
+    np.ndarray
+        Trimmed time series.
     """
 
     # Separate the time series for each subject

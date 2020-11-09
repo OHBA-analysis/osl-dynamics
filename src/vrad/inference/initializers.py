@@ -1,48 +1,31 @@
-"""Initializers for TensorFlow layers
-
-A series of classes which inherit from `tensorflow.keras.initializers.Initializer`.
-They are used to initialize weights in custom layers.
+"""Initializers for TensorFlow layers.
 
 """
 import logging
 
+import numpy as np
 import tensorflow as tf
-from tensorflow.keras import Model, layers
+from tensorflow.keras import Model
 from tensorflow.keras.initializers import Initializer
+
 from vrad import models
 
 _logger = logging.getLogger("VRAD")
 
 
-class Identity3D(Initializer):
-    """Initializer to create stacked identity matrices.
-
-    """
-
-    def __call__(self, shape, dtype=None):
-        """Create stacked identity matrices with dimensions [M x N x N]
-
-        Parameters
-        ----------
-        shape : Iterable
-            Shape of the Tensor [M x N x N].
-
-        Returns
-        -------
-        stacked_identity_matrix : tf.Tensor
-        """
-        if len(shape) != 3 or shape[1] != shape[2]:
-            raise ValueError("Weight shape must be [M x N x N]")
-
-        return tf.eye(shape[1], shape[2], [shape[0]])
-
-
 class CholeskyCovariancesInitializer(Initializer):
-    """Initialize weights with provided variable, assuming dimensions are accepted.
+    """Initialize weights for cholesky factor of covariances.
 
+    Provided variables are used for initialization assuming dimensions are accepted.
+
+    Parameters
+    ----------
+    initial_cholesky_covariances : np.ndarray
+        Cholesky factors of the state covariance matrices used for initialization.
+        Shape must be (n_states, n_channels, n_channels).
     """
 
-    def __init__(self, initial_cholesky_covariances):
+    def __init__(self, initial_cholesky_covariances: np.ndarray):
         self.initial_cholesky_covariances = initial_cholesky_covariances
 
     def __call__(self, shape, dtype=None):
@@ -55,12 +38,31 @@ class CholeskyCovariancesInitializer(Initializer):
         return self.initial_cholesky_covariances
 
 
-class MeansInitializer(Initializer):
-    """Initialize weights with provided variable, assuming dimensions are accepted.
+class Identity3D(Initializer):
+    """Initializer to create stacked identity matrices.
 
     """
 
-    def __init__(self, initial_means):
+    def __call__(self, shape, dtype=None):
+        if len(shape) != 3 or shape[1] != shape[2]:
+            raise ValueError("Weight shape must be [M x N x N]")
+
+        return tf.eye(shape[1], shape[2], [shape[0]])
+
+
+class MeansInitializer(Initializer):
+    """Initialize weights for means.
+
+    Provided variables are used for initialization assuming dimensions are accepted.
+
+    Parameters
+    ----------
+    initial_means : np.ndarray
+        State mean vectors used for initialization.
+        Shape must be [n_states, n_channels].
+    """
+
+    def __init__(self, initial_means: np.ndarray):
         self.initial_means = initial_means
         _logger.info(
             f"Creating MeansInitializer with "
@@ -80,22 +82,32 @@ class MeansInitializer(Initializer):
 class UnchangedInitializer(Initializer):
     """Initializer which returns unchanged values when called.
 
+    Parameters
+    ----------
+    initial_values : np.ndarray
+        Values to initialize with.
     """
 
-    def __init__(self, initial_values):
+    def __init__(self, initial_values: np.ndarray):
         self.initial_values = initial_values
 
     def __call__(self, shape, dtype=None):
         return self.initial_values
 
 
-def reinitialize_layer_weights(layer):
-    """Re-initialises the weights in a particular layer.
+def reinitialize_layer_weights(layer: tf.keras.layers.Layer):
+    """Re-initializes the weights in a particular layer.
 
     This function relies on each layer having an initializer attribute.
     Therefore, you must specific a self.*_initializer attribute in custom
     layers, otherwise this function will break.
+
+    Parameters
+    ----------
+    layer: tensorflow.keras.layers.Layer
+        Layer to initialize weights for.
     """
+
     # Get the initialisation container
     if hasattr(layer, "cell"):
         init_container = layer.cell
@@ -113,8 +125,15 @@ def reinitialize_layer_weights(layer):
         var.assign(initializer(var.shape, var.dtype))
 
 
-def reinitialize_model_weights(model):
-    """Re-initialises the weights in the model."""
+def reinitialize_model_weights(model: tf.keras.Model):
+    """Re-initialize the weights in the model.
+
+    Parameters
+    ----------
+    model: tensorflow.keras.Model
+        Model to re-initialize weights for.
+    """
+
     for layer in model.layers:
         # If the layer consists and multiple layers pass the layer back
         # to this function

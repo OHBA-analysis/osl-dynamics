@@ -1,6 +1,6 @@
 """Example script for running inference on simulated HMM data.
 
-- Should achieve a dice coefficient of ~0.95.
+- Should achieve a dice coefficient of ~0.96.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -19,23 +19,24 @@ n_samples = 25000
 observation_error = 0.2
 
 n_states = 5
-sequence_length = 50
+sequence_length = 100
 batch_size = 32
 
 do_annealing = True
-annealing_sharpness = 5
+annealing_sharpness = 10
 
-n_epochs = 100
-n_epochs_annealing = 50
+n_epochs = 200
+n_epochs_annealing = 100
 
 rnn_type = "lstm"
-normalization_type = "layer"
+rnn_normalization = "layer"
+theta_normalization = "layer"
 
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 16
-n_units_model = 24
+n_units_inference = 32
+n_units_model = 48
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -57,10 +58,9 @@ cov = np.load("files/hmm_cov.npy")
 print("Simulating data")
 sim = HMMSimulation(
     n_samples=n_samples,
-    n_states=n_states,
-    sim_varying_means=learn_means,
-    covariances=cov,
     trans_prob=trans_prob,
+    zero_means=True,
+    covariances=cov,
     observation_error=observation_error,
     random_seed=123,
 )
@@ -98,13 +98,14 @@ model = RNNGaussian(
     initial_means=initial_means,
     initial_covariances=initial_covariances,
     rnn_type=rnn_type,
+    rnn_normalization=rnn_normalization,
     n_layers_inference=n_layers_inference,
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
     n_units_model=n_units_model,
     dropout_rate_inference=dropout_rate_inference,
     dropout_rate_model=dropout_rate_model,
-    normalization_type=normalization_type,
+    theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,

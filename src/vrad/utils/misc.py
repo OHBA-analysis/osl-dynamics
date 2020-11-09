@@ -1,6 +1,7 @@
 import inspect
 import logging
 from copy import copy
+from typing import Any, List, Union
 
 import numpy as np
 
@@ -8,6 +9,21 @@ _logger = logging.getLogger("VRAD")
 
 
 def override_dict_defaults(default_dict: dict, override_dict: dict = None) -> dict:
+    """Helper function to update default dictionary values with user values.
+
+    Parameters
+    ----------
+    default_dict : dict
+        Dictionary of default values.
+    override_dict : dict
+        Dictionary of user values.
+
+    Returns
+    -------
+    new_dict : dict
+        default_dict with values replaced by user values.
+
+    """
     if override_dict is None:
         override_dict = {}
 
@@ -15,6 +31,23 @@ def override_dict_defaults(default_dict: dict, override_dict: dict = None) -> di
 
 
 def listify(obj: object):
+    """Create a list from any input.
+
+    If None is passed, return an empty list.
+    If a list is passed, return the list.
+    If a tuple is passed, return it as a list.
+    If any other object is passed, return it as a single item list.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to be transformed to a list.
+
+    Returns
+    -------
+    Object as a list.
+
+    """
     if obj is None:
         return []
     if isinstance(obj, list):
@@ -25,7 +58,32 @@ def listify(obj: object):
         return [obj]
 
 
-def replace_argument(func, name, item, args, kwargs, append=False):
+def replace_argument(
+    func: callable, name: str, item: Any, args: list, kwargs: dict, append: bool = False
+):
+    """Replace arguments in function calls.
+
+    Parameters
+    ----------
+    func : callable
+        The function being called.
+    name : str
+        Name of the variable to be modified.
+    item
+        The value to be added.
+    args : dict
+        Original arguments.
+    kwargs : dict
+        Original keyword arguments.
+    append : bool
+        Whether the value should be appended or replace the existing argument.
+
+    Returns
+    -------
+    args : list
+    kwargs : dict
+
+    """
     args = copy(listify(args))
     kwargs = copy(kwargs)
     param_order = list(inspect.signature(func).parameters)
@@ -46,7 +104,28 @@ def replace_argument(func, name, item, args, kwargs, append=False):
 
 
 def check_arguments(args, kwargs, index, name, value, comparison_op):
-    """Checks the arguments passed to a function."""
+    """Checks the arguments passed to a function.
+
+    Parameters
+    ----------
+    args : list
+        Arguments.
+    kwargs : dict
+        Keyword arguments.
+    index : int
+        Index of argument.
+    name : str
+        Name of keyword argument.
+    value
+        Value to compare to given argument.
+    comparison_op : func
+        Comparison operation for checking the original.
+
+    Returns
+    _______
+    valid : bool
+        If the given value is valid as determined by the comparison operation.
+    """
 
     # Check if the argument we want to check is a normal argument
     args = listify(args)
@@ -63,7 +142,20 @@ def check_arguments(args, kwargs, index, name, value, comparison_op):
 
 
 def check_iterable_type(iterable, object_type: type):
-    """Check iterable is non-empty and contains only objects of specific type."""
+    """Check iterable is non-empty and contains only objects of specific type.
+
+    Parameters
+    ----------
+    iterable : iterable
+        Iterable to check the type of.
+    object_type : type
+        Type to check for.
+
+    Returns
+    _______
+    type_correct : bool
+        Whether the iterable only contains the specified type.
+    """
     if not hasattr(iterable, "__iter__") and not isinstance(iterable, str):
         return False
     if isinstance(iterable, np.ndarray):
@@ -72,6 +164,18 @@ def check_iterable_type(iterable, object_type: type):
 
 
 def time_axis_first(input_array: np.ndarray) -> np.ndarray:
+    """Make arrays have their longest dimension first.
+
+    Parameters
+    ----------
+    input_array : numpy.ndarray
+        The array to be transposed or returned.
+
+    Returns
+    -------
+    transposed_array : numpy.ndarray
+
+    """
     if input_array.ndim != 2:
         _logger.info("Non-2D array not transposed.")
         return input_array
@@ -84,7 +188,29 @@ def time_axis_first(input_array: np.ndarray) -> np.ndarray:
 
 
 class LoggingContext:
-    def __init__(self, logger, suppress_level="warning", handler=None, close=True):
+    """Context manager to temporarily change the logging level.
+
+    Parameters
+    ----------
+    logger : str or logging.Logger
+        The name of the logger (e.g. "VRAD" or "tensorflow")
+    suppress_level : str or int
+        The level of logs to suppress. String or integer matching a level from the
+        logging module.
+    handler
+        A handler for the logging module.
+    close : bool
+        Should the handler be closed with the context manager?
+    """
+
+    def __init__(
+        self,
+        logger: Union[str, logging.Logger],
+        suppress_level: Union[str, int] = "warning",
+        handler=None,
+        close: bool = True,
+    ):
+
         self.logger = logging.getLogger(logger)
         if isinstance(suppress_level, str):
             suppress_level = logging.getLevelName(suppress_level.upper())
@@ -109,18 +235,54 @@ class LoggingContext:
 
 
 def array_to_memmap(filename, array):
+    """Save an array and reopen it as a numpy.memmap.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the file to save to.
+    array : numpy.ndarray
+        The array to save.
+
+    Returns
+    -------
+    memmap : numpy.memmap
+
+    """
     np.save(filename, array)
     return np.load(filename, mmap_mode="r+")
 
 
 class MockFlags:
+    """Flags for memmap header construction.
+
+    Parameters
+    ----------
+    shape : list of int
+        The shape of the array being mapped.
+    c_contiguous : bool
+        Is the array C contiguous or F contiguous?
+    """
+
     def __init__(self, shape, c_contiguous=True):
         self.c_contiguous = c_contiguous
         self.f_contiguous = (not c_contiguous) or (c_contiguous and len(shape) == 1)
 
 
 class MockArray:
-    def __init__(self, shape, dtype=np.float64, c_contiguous=True):
+    """Create an empty array on disk without creating it in memory.
+
+    Parameters
+    ----------
+    shape : list of int
+        Dimensions or the array being created.
+    dtype
+        The data type of the array.
+    c_contiguous : bool
+        Is the array C contiguous or F contiguous?
+    """
+
+    def __init__(self, shape: List[int], dtype=np.float64, c_contiguous=True):
         self.shape = shape
         self.dtype = np.dtype(dtype)
         self.flags = MockFlags(shape, c_contiguous)
