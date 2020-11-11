@@ -20,9 +20,9 @@ def fourier_transform(
     sampling_frequency : float
         Frequency used to sample the data (Hz).
     nfft : int
-        Number of points in the FFT
+        Number of points in the FFT. (Optional.)
     args_range : list
-        Minimum and maximum indices of the FFT to keep.
+        Minimum and maximum indices of the FFT to keep. (Optional.)
 
     Returns
     -------
@@ -42,7 +42,7 @@ def fourier_transform(
 
     # Only keep the desired frequency range
     if args_range is not None:
-        X = X[:, :, args_range[0] : args_range[1]]
+        X = X[..., args_range[0] : args_range[1]]
 
     return X
 

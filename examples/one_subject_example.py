@@ -130,7 +130,7 @@ preprocessed_time_series = preprocessed_data.trim_raw_time_series(
 )[0]
 
 # Compute spectra for states
-f, psd, coh = spectral.state_spectra(
+f, psd, coh = spectral.multitaper_spectra(
     data=preprocessed_time_series,
     state_mixing_factors=alpha,
     sampling_frequency=250,
@@ -142,8 +142,8 @@ f, psd, coh = spectral.state_spectra(
 # Perform spectral decomposition (into 2 components) based on coherence spectra
 components = spectral.decompose_spectra(coh, n_components=2)
 
-# Calculate spatial maps
-p_map, c_map = maps.state_maps(psd, coh, components)
+# Calculate spatial power maps
+p_map = maps.state_power_maps(f, psd, components)
 
 # Save the power map for the first component as NIFTI file
 # (The second component is noise)
@@ -154,6 +154,8 @@ maps.save_nii_file(
     power_map=p_map,
     filename="power_map.nii.gz",
     component=0,
+    subtract_mean=True,
+    normalize=True,
 )
 
 # Delete the temporary folder holding the data
