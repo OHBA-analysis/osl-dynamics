@@ -160,6 +160,9 @@ def state_covariance_spectra(
     # Number of data points in the correlation function
     n_cf = 2 * (n_embeddings + 2) - 1
 
+    # Number of FFT data points
+    nfft = max(nfft, 2 ** nextpow2(n_cf))
+
     # Get auto/cross-correlation function from the state covariances
     correlation_function = np.empty([n_states, n_channels, n_channels, n_cf])
 
@@ -182,16 +185,13 @@ def state_covariance_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
     frequencies = frequencies[f_min_arg : f_max_arg + 1]
     args_range = [f_min_arg, f_max_arg + 1]
 
     if f_max_arg <= f_min_arg:
         raise ValueError("Cannot select requested frequency range.")
-
-    # Number of FFT data points
-    nfft = max(nfft, 2 ** nextpow2(n_cf))
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
@@ -408,8 +408,8 @@ def multitaper_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
     frequencies = frequencies[f_min_arg : f_max_arg + 1]
     args_range = [f_min_arg, f_max_arg + 1]
 
