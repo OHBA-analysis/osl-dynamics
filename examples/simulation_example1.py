@@ -45,6 +45,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
+alpha_temperature = None
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -107,6 +108,7 @@ model = RNNGaussian(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
+    alpha_temperature=alpha_temperature,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
