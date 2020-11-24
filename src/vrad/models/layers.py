@@ -137,9 +137,10 @@ class StateMixingFactorsLayer(layers.Layer):
         The functional form used to convert from theta_t to alpha_t.
     """
 
-    def __init__(self, alpha_xform: str, **kwargs):
+    def __init__(self, alpha_xform: str, alpha_temperature: float, **kwargs):
         super().__init__(**kwargs)
         self.alpha_xform = alpha_xform
+        self.alpha_temperature = alpha_temperature
 
     def call(self, theta_t, **kwargs):
 
@@ -152,7 +153,8 @@ class StateMixingFactorsLayer(layers.Layer):
             alpha_t = activations.softmax(theta_t, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=0.5, probs=activations.softmax(theta_t, axis=2)
+                temperature=self.alpha_temperature,
+                probs=activations.softmax(theta_t, axis=2),
             )
             alpha_t = gumbel_softmax_distribution.sample()
 
@@ -163,7 +165,12 @@ class StateMixingFactorsLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({"alpha_xform": self.alpha_xform})
+        config.update(
+            {
+                "alpha_xform": self.alpha_xform,
+                "alpha_temperature": self.alpha_temperature,
+            }
+        )
         return config
 
 

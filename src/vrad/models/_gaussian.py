@@ -71,6 +71,8 @@ class RNNGaussian(BaseModel):
     alpha_xform : str
         Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
         'relu'.
+    alpha_temperature : float
+        Temperature parameter for when alpha_xform = 'categorical'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -111,6 +113,7 @@ class RNNGaussian(BaseModel):
         dropout_rate_model: float,
         theta_normalization: str,
         alpha_xform: str,
+        alpha_temperature: float,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
         do_annealing: bool,
@@ -134,6 +137,7 @@ class RNNGaussian(BaseModel):
         self.initial_means = initial_means
         self.initial_covariances = initial_covariances
         self.alpha_xform = alpha_xform
+        self.alpha_temperature = alpha_temperature
         self.learn_alpha_scaling = learn_alpha_scaling
         self.normalize_covariances = normalize_covariances
 
@@ -180,6 +184,7 @@ class RNNGaussian(BaseModel):
             initial_means=self.initial_means,
             initial_covariances=self.initial_covariances,
             alpha_xform=self.alpha_xform,
+            alpha_temperature=self.alpha_temperature,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
         )
@@ -501,6 +506,7 @@ def _model_structure(
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     alpha_xform: str,
+    alpha_temperature: float,
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
 ):
@@ -546,6 +552,8 @@ def _model_structure(
     alpha_xform : str
         Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
         'relu'.
+    alpha_temperature : float
+        Temperature parameter for when alpha_xform = 'categorical'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -589,7 +597,9 @@ def _model_structure(
         theta_t_norm_layer = layers.BatchNormalization(name="theta_t_norm")
     else:
         theta_t_norm_layer = DummyLayer(name="theta_t_norm")
-    alpha_t_layer = StateMixingFactorsLayer(alpha_xform, name="alpha_t")
+    alpha_t_layer = StateMixingFactorsLayer(
+        alpha_xform, alpha_temperature, name="alpha_t"
+    )
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)
