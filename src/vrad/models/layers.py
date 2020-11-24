@@ -442,12 +442,12 @@ class KLDivergenceLayer(layers.Layer):
         model_mu = tf.roll(model_mu, shift=1, axis=1)
         model_log_sigma = tf.roll(model_log_sigma, shift=1, axis=1)
 
-        # We need to clip the first and last elements of each mu and sigma
+        # We need to clip the first and last element in the sequence of mu and sigma
         # because they don't correspond to the same time points
-        inference_mu = inference_mu[1:-1]
-        inference_sigma = tf.exp(inference_log_sigma)[1:-1]
-        model_mu = model_mu[1:-1]
-        model_sigma = tf.exp(model_log_sigma)[1:-1]
+        inference_mu = inference_mu[:, 1:-1]
+        inference_sigma = tf.exp(inference_log_sigma)[:, 1:-1]
+        model_mu = model_mu[:, 1:-1]
+        model_sigma = tf.exp(model_log_sigma)[:, 1:-1]
 
         # Calculate the KL diverence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
