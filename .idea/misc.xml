@@ -3,5 +3,5 @@
   <component name="JavaScriptSettings">
     <option name="languageLevel" value="ES6" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.7 (taser)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.7.7 (sftp://ozn760@rescomp1.well.ox.ac.uk:22/users/woolrich/ozn760/miniconda/envs/vrad/bin/python)" project-jdk-type="Python SDK" />
 </project>

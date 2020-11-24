@@ -5,7 +5,7 @@ import logging
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import Model
+from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
 
 from vrad import models
