@@ -7,7 +7,7 @@
 print("Setting up")
 import numpy as np
 from vrad import data
-from vrad.inference import gmm, states, tf_ops
+from vrad.inference import states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import MixedHSMMSimulation
 from vrad.utils import plotting
@@ -82,22 +82,6 @@ n_channels = meg_data.n_channels
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
-# Initialisation of means and covariances
-initial_means, initial_covariances = gmm.final_means_covariances(
-    meg_data.subjects[0],
-    n_states,
-    gmm_kwargs={
-        "n_init": 1,
-        "verbose": 2,
-        "verbose_interval": 50,
-        "max_iter": 10000,
-        "tol": 1e-6,
-    },
-    retry_attempts=1,
-    learn_means=False,
-    random_seed=124,
-)
-
 # Build model
 model = RNNGaussian(
     n_channels=n_channels,
@@ -105,8 +89,6 @@ model = RNNGaussian(
     sequence_length=sequence_length,
     learn_means=learn_means,
     learn_covariances=learn_covariances,
-    initial_means=initial_means,
-    initial_covariances=initial_covariances,
     rnn_type=rnn_type,
     rnn_normalization=rnn_normalization,
     n_layers_inference=n_layers_inference,
