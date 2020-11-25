@@ -48,7 +48,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = None
+alpha_temperature = 1.0
 learn_alpha_scaling = False
 normalize_covariances = False
 

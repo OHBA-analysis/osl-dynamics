@@ -72,7 +72,7 @@ class RNNGaussian(BaseModel):
         Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
         'relu'.
     alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'categorical'.
+        Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -553,7 +553,7 @@ def _model_structure(
         Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
         'relu'.
     alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'categorical'.
+        Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool

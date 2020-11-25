@@ -135,6 +135,8 @@ class StateMixingFactorsLayer(layers.Layer):
     ----------
     alpha_xform : str
         The functional form used to convert from theta_t to alpha_t.
+    alpha_temperature : float
+        Temperature parameter for the softmax or Gumbel-Softmax.
     """
 
     def __init__(self, alpha_xform: str, alpha_temperature: float, **kwargs):
@@ -150,7 +152,7 @@ class StateMixingFactorsLayer(layers.Layer):
         elif self.alpha_xform == "relu":
             alpha_t = activations.relu(theta_t)
         elif self.alpha_xform == "softmax":
-            alpha_t = activations.softmax(theta_t, axis=2)
+            alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
                 temperature=self.alpha_temperature,
@@ -569,9 +571,7 @@ class ModelRNNLayers(layers.Layer):
 
         self.layers = []
         for n in range(n_layers):
-            self.layers.append(
-                RNNLayer(n_units, return_sequences=True, stateful=False)
-            )
+            self.layers.append(RNNLayer(n_units, return_sequences=True, stateful=False))
             self.layers.append(NormalizationLayer())
             self.layers.append(layers.Dropout(dropout_rate))
 
