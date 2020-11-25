@@ -574,7 +574,7 @@ class ModelRNNLayers(layers.Layer):
         self.layers = []
         for n in range(n_layers):
             self.layers.append(
-                layers.LSTM(n_units, return_sequences=True, stateful=False)
+                RNNLayer(n_units, return_sequences=True, stateful=False)
             )
             self.layers.append(NormalizationLayer())
             self.layers.append(layers.Dropout(dropout_rate))
