@@ -46,7 +46,7 @@ learn_means = False
 learn_covariances = False
 
 alpha_xform = "categorical"
-alpha_temperature = 0.5
+alpha_temperature = 1.0
 learn_alpha_scaling = False
 normalize_covariances = False
 
