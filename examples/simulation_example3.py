@@ -33,7 +33,7 @@ n_epochs_annealing = 150
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
-theta_normalization = "layer"
+theta_normalization = None
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -48,7 +48,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 1.0
+alpha_temperature = 0.25
 learn_alpha_scaling = False
 normalize_covariances = False
 

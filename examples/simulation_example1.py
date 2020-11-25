@@ -30,7 +30,7 @@ n_epochs_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
-theta_normalization = "layer"
+theta_normalization = None
 
 n_layers_inference = 1
 n_layers_model = 1
