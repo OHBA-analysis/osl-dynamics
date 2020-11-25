@@ -201,6 +201,9 @@ def state_covariance_spectra(
         )
     )
 
+    # Normalise the power spectra
+    power_spectra /= nfft ** 2
+
     # Coherences for each state
     coherences = coherence_spectra(power_spectra)
 
