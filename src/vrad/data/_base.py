@@ -11,9 +11,9 @@ from vrad.data import io, manipulation
 class Data:
     """Base class for data.
 
-    The Data class enables the input and processing of data. When given a list of files,
-     it produces a set of numpy memory maps which contain their raw data. It also
-     provides methods for batching data and creating TensorFlow Datasets.
+    The Data class enables the input and processing of data. When given a list of
+    files, it produces a set of numpy memory maps which contain their raw data.
+    It also provides methods for batching data and creating TensorFlow Datasets.
 
     Parameters
     ----------
@@ -84,7 +84,23 @@ class Data:
             discontinuities.append(discontinuity_indices)
         return memmaps, discontinuities
 
-    def count_batches(self, sequence_length, step_size=None):
+    def count_batches(self, sequence_length: int, step_size: int = None) -> np.ndarray:
+        """Count batches.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        step_size : int
+            We can produce sequences with overlaping data. step_size=sequence_length
+            will give non-overlaping sequences, step_size=sequence_length/2 will give
+            sequences with 50% overlap. Default is no overlap.
+
+        Returns
+        -------
+        np.ndarray
+            Number of batches for each subject's data.
+        """
         return np.array(
             [
                 manipulation.num_batches(memmap, sequence_length, step_size)
@@ -96,8 +112,27 @@ class Data:
         """Deletes the directory that stores the memory maps."""
         rmtree(self.store_dir, ignore_errors=True)
 
-    def training_dataset(self, sequence_length, batch_size, step_size=None):
-        """Returns a tensorflow dataset for training."""
+    def training_dataset(
+        self, sequence_length: int, batch_size: int, step_size: int = None
+    ) -> tensorflow.data.Dataset:
+        """Create a tensorflow dataset for training.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+        step_size : int
+            We can produce sequences with overlaping data. step_size=sequence_length
+            will give non-overlaping sequences, step_size=sequence_length/2 will give
+            sequences with 50% overlap. Default is no overlap.
+        
+        Returns
+        -------
+        tensorflow.data.Dataset
+            Dataset for training the model.
+        """
         num_batches = self.count_batches(sequence_length, step_size)
 
         subject_datasets = []
@@ -117,8 +152,21 @@ class Data:
 
         return full_dataset.batch(batch_size).shuffle(100000).prefetch(-1)
 
-    def prediction_dataset(self, sequence_length, batch_size):
-        """Returns a tensorflow dataset for predicting the hidden state time course."""
+    def prediction_dataset(self, sequence_length: int, batch_size: int) -> list:
+        """Create a tensorflow dataset for predicting the hidden state time course.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+
+        Returns
+        -------
+        list of tensorflow.data.Datasets
+            Dataset for each subject.
+        """
         subject_datasets = [
             Dataset.from_tensor_slices(subject)
             .batch(sequence_length, drop_remainder=True)

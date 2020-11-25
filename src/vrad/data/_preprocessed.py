@@ -10,6 +10,15 @@ class PreprocessedData(Data):
 
     Contains methods which can be used to prepare the data for training a model.
     This includes methods to perform time embedding and PCA.
+
+    Parameters
+    ----------
+    inputs : list of str or str
+        Filenames to be read.
+    store_dir : str
+        Directory to save results and intermediate steps to.
+    output_file : str
+        Filename to save memory map to.
     """
 
     def __init__(self, inputs, store_dir="tmp", output_file=None):
@@ -45,6 +54,15 @@ class PreprocessedData(Data):
         """Prepares data to train the model with.
 
         Performs standardization, time embedding and principle component analysis.
+
+        Parameters
+        ----------
+        n_embeddings : int
+            Number of data points to embed the data.
+        n_pca_components : int
+            Number of PCA components to keep.
+        whiten : bool
+            Should we whiten the PCA'ed data? Optional, default is False.
         """
         self.prepare_memmap_filenames()
 
@@ -107,12 +125,26 @@ class PreprocessedData(Data):
         self.n_pca_components = n_pca_components
         self.whiten = whiten
 
-    def trim_raw_time_series(self, n_embeddings=None, sequence_length=None):
+    def trim_raw_time_series(
+        self, n_embeddings: int = None, sequence_length: int = None
+    ) -> np.ndarray:
         """Trims the raw preprocessed data time series.
 
         Removes the data points that are removed when the data is prepared,
         i.e. due to time embedding and separating into sequences, but does not
         perform time embedding or batching into sequences on the time series.
+
+        Parameters
+        ----------
+        n_embeddings : int
+            Number of data points to embed the data.
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+
+        Returns
+        -------
+        np.ndarray
+            Trimed time series.
         """
         trimmed_raw_time_series = []
         for memmap in self.raw_data_memmaps:
