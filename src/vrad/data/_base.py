@@ -3,6 +3,7 @@ from shutil import rmtree
 from typing import List
 
 import numpy as np
+import tensorflow
 from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from vrad.data import io, manipulation
