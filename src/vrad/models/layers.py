@@ -3,11 +3,9 @@
 """
 
 import numpy as np
-
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, layers
-
 from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
@@ -438,12 +436,12 @@ class KLDivergenceLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
-        
+
         # The Model RNN predicts one time step into the future compared to the inference RNN
         # We clip its last value, and first value of the inference RNN
         model_mu = model_mu[:, :-1]
         model_sigma = tf.exp(model_log_sigma)[:, :-1]
-        
+
         inference_mu = inference_mu[:, 1:]
         inference_sigma = tf.exp(inference_log_sigma)[:, 1:]
 

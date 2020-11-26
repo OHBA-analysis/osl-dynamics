@@ -5,7 +5,6 @@
 from abc import abstractmethod
 
 import numpy as np
-
 from tensorflow import Variable
 from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import TensorBoard
@@ -14,7 +13,6 @@ from tensorflow.python.distribute.distribution_strategy_context import get_strat
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
-
 from vrad.data import Data
 from vrad.inference import initializers
 from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
@@ -177,9 +175,9 @@ class BaseModel:
 
     def compile(self, optimizer=None):
         """Wrapper for the standard keras compile method.
-        
+
         Sets up the optimiser and loss functions.
-        
+
         Parameters
         ----------
         tensorflow.keras.optimizers
@@ -207,8 +205,8 @@ class BaseModel:
         save_best_after: int,
         save_filepath: str,
     ):
-        """"Create callbacks for training.
-        
+        """ "Create callbacks for training.
+
         Parameters
         ----------
         no_annealing_callback : bool

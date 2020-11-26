@@ -6,11 +6,9 @@ import logging
 from operator import lt
 
 import numpy as np
-
 from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
 from tqdm import trange
-
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
