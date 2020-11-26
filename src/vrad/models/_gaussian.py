@@ -438,7 +438,6 @@ class RNNGaussian(BaseModel):
         model_rnn_layer = self.model.get_layer("model_rnn")
         mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
         log_sigma_theta_jt_layer = self.model.get_layer("log_sigma_theta_jt")
-        theta_t_layer = self.model.get_layer("theta_t")
         theta_t_norm_layer = self.model.get_layer("theta_t_norm")
         alpha_t_layer = self.model.get_layer("alpha_t")
 

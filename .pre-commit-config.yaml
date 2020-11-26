@@ -12,10 +12,10 @@ repos:
     rev: 19.10b0
     hooks:
     - id: black
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.1.0
+-   repo: https://gitlab.com/PyCQA/flake8
+    rev: 3.8.3
     hooks:
-    - id: flake8
-      args:
+    -   id: flake8
+        args:
           - "--max-line-length=88"
-          - "--ignore=E203,W503"
+          - "--ignore=E203,W503,E402,W293"
