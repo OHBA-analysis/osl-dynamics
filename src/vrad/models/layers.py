@@ -249,9 +249,9 @@ class MeansCovsLayer(layers.Layer):
 
         # Initializer for covariances
         if self.initial_cholesky_covariances is None:
-            self.cholesky_covariances_initializer = initializers.Identity3D()
+            self.cholesky_initializer = initializers.Identity3D()
         else:
-            self.cholesky_covariances_initializer = initializers.CholeskyCovariancesInitializer(
+            self.cholesky_initializer = initializers.CholeskyCovariancesInitializer(
                 self.initial_cholesky_covariances
             )
 
@@ -260,7 +260,7 @@ class MeansCovsLayer(layers.Layer):
             "cholesky_covariances",
             shape=(self.n_states, self.n_channels, self.n_channels),
             dtype=tf.float32,
-            initializer=self.cholesky_covariances_initializer,
+            initializer=self.cholesky_initializer,
             trainable=self.learn_covariances,
         )
 
@@ -437,8 +437,8 @@ class KLDivergenceLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
-        # The Model RNN predicts one time step into the future compared to the inference RNN
-        # We clip its last value, and first value of the inference RNN
+        # The Model RNN predicts one time step into the future compared to the
+        # inference RNN. We clip its last value, and first value of the inference RNN.
         model_mu = model_mu[:, :-1]
         model_sigma = tf.exp(model_log_sigma)[:, :-1]
 

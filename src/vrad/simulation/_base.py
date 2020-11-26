@@ -5,9 +5,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-from matplotlib import pyplot as plt
 from vrad.utils import plotting
-from vrad.utils.decorators import timing
 
 
 class Simulation(ABC):
