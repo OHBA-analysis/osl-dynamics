@@ -3,11 +3,9 @@
 """
 
 import numpy as np
-
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, layers
-
 from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
@@ -135,11 +133,14 @@ class StateMixingFactorsLayer(layers.Layer):
     ----------
     alpha_xform : str
         The functional form used to convert from theta_t to alpha_t.
+    alpha_temperature : float
+        Temperature parameter for the softmax or Gumbel-Softmax.
     """
 
-    def __init__(self, alpha_xform: str, **kwargs):
+    def __init__(self, alpha_xform: str, alpha_temperature: float, **kwargs):
         super().__init__(**kwargs)
         self.alpha_xform = alpha_xform
+        self.alpha_temperature = alpha_temperature
 
     def call(self, theta_t, **kwargs):
 
@@ -149,10 +150,11 @@ class StateMixingFactorsLayer(layers.Layer):
         elif self.alpha_xform == "relu":
             alpha_t = activations.relu(theta_t)
         elif self.alpha_xform == "softmax":
-            alpha_t = activations.softmax(theta_t, axis=2)
+            alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=0.5, probs=activations.softmax(theta_t, axis=2)
+                temperature=self.alpha_temperature,
+                probs=activations.softmax(theta_t, axis=2),
             )
             alpha_t = gumbel_softmax_distribution.sample()
 
@@ -163,7 +165,12 @@ class StateMixingFactorsLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({"alpha_xform": self.alpha_xform})
+        config.update(
+            {
+                "alpha_xform": self.alpha_xform,
+                "alpha_temperature": self.alpha_temperature,
+            }
+        )
         return config
 
 
@@ -242,9 +249,9 @@ class MeansCovsLayer(layers.Layer):
 
         # Initializer for covariances
         if self.initial_cholesky_covariances is None:
-            self.cholesky_covariances_initializer = initializers.Identity3D()
+            self.cholesky_initializer = initializers.Identity3D()
         else:
-            self.cholesky_covariances_initializer = initializers.CholeskyCovariancesInitializer(
+            self.cholesky_initializer = initializers.CholeskyCovariancesInitializer(
                 self.initial_cholesky_covariances
             )
 
@@ -253,7 +260,7 @@ class MeansCovsLayer(layers.Layer):
             "cholesky_covariances",
             shape=(self.n_states, self.n_channels, self.n_channels),
             dtype=tf.float32,
-            initializer=self.cholesky_covariances_initializer,
+            initializer=self.cholesky_initializer,
             trainable=self.learn_covariances,
         )
 
@@ -430,17 +437,13 @@ class KLDivergenceLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
 
-        # The model predicts one time step in the future so we roll the mu and sigma
-        # one time point to the left
-        model_mu = tf.roll(model_mu, shift=1, axis=1)
-        model_log_sigma = tf.roll(model_log_sigma, shift=1, axis=1)
+        # The Model RNN predicts one time step into the future compared to the
+        # inference RNN. We clip its last value, and first value of the inference RNN.
+        model_mu = model_mu[:, :-1]
+        model_sigma = tf.exp(model_log_sigma)[:, :-1]
 
-        # We need to clip the first and last elements of each mu and sigma
-        # because they don't correspond to the same time points
-        inference_mu = inference_mu[1:-1]
-        inference_sigma = tf.exp(inference_log_sigma)[1:-1]
-        model_mu = model_mu[1:-1]
-        model_sigma = tf.exp(model_log_sigma)[1:-1]
+        inference_mu = inference_mu[:, 1:]
+        inference_sigma = tf.exp(inference_log_sigma)[:, 1:]
 
         # Calculate the KL diverence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
@@ -566,9 +569,7 @@ class ModelRNNLayers(layers.Layer):
 
         self.layers = []
         for n in range(n_layers):
-            self.layers.append(
-                layers.LSTM(n_units, return_sequences=True, stateful=False)
-            )
+            self.layers.append(RNNLayer(n_units, return_sequences=True, stateful=False))
             self.layers.append(NormalizationLayer())
             self.layers.append(layers.Dropout(dropout_rate))
 

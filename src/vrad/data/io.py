@@ -61,7 +61,7 @@ def load_matlab(
             time_series = mat["X"]
             if "T" in mat:
                 discontinuity_indices = mat["T"][0].astype(int)
-        except:
+        except KeyError:
             raise KeyError("data in MATLAB file must be contained in a field called X.")
 
     return time_series, discontinuity_indices, sampling_frequency

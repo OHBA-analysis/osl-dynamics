@@ -16,6 +16,200 @@ from vrad.data.manipulation import scale
 _logger = logging.getLogger("VRAD")
 
 
+def decompose_spectra(
+    coherences: np.ndarray,
+    n_components: int,
+    max_iter: int = 50000,
+    random_state: int = None,
+    verbose: int = 0,
+) -> np.ndarray:
+    """Performs spectral decomposition using coherences.
+
+    Uses non-negative matrix factorization to decompose spectra.
+    Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
+
+    Parameters
+    ----------
+    coherences : np.ndarray
+        Coherences with shape (n_states, n_channels, n_channels, n_f).
+    n_components : int
+        Number of spectral components to fit.
+    max_iter : int
+        Maximum number of iterations in sklearn's non_negative_factorization.
+    random_state : int
+        Seed for the random number generator.
+    verbose : int
+        Show verbose? (1) yes, (0) no.
+
+    Returns
+    -------
+    components : np.ndarray
+        Spectral components. Shape is (n_components, n_f).
+    """
+    print("Performing spectral decomposition")
+
+    # Validation
+    error_message = (
+        "coherences must be a numpy array with shape (n_channels, n_channels), "
+        + "(n_states, n_channels, n_channels) or (n_subjects, n_states, "
+        + "n_channels, n_channels)."
+    )
+    coherences = validate_array(
+        coherences,
+        correct_dimensionality=5,
+        allow_dimensions=[2, 3, 4],
+        error_message=error_message,
+    )
+
+    # Number of subjects, states, channels and frequency bins
+    n_subjects, n_states, n_channels, n_channels, n_f = coherences.shape
+
+    # Indices of the upper triangle of the [n_channels, n_channels, n_f] sub-array
+    i, j = np.triu_indices(n_channels, 1)
+
+    # Concatenate coherences for each subject and state and only keep the upper triangle
+    coherences = coherences[:, :, i, j].reshape(-1, n_f)
+
+    # Perform non-negative matrix factorisation
+    _, components, _ = non_negative_factorization(
+        coherences,
+        n_components=n_components,
+        init=None,
+        max_iter=max_iter,
+        random_state=random_state,
+        verbose=verbose,
+    )
+
+    # Order the weights and components in ascending frequency
+    order = np.argsort(components.argmax(axis=1))
+    components = components[order]
+
+    return components
+
+
+def state_covariance_spectra(
+    covariances: np.ndarray,
+    sampling_frequency: float,
+    n_embeddings: int = 1,
+    pca_weights: np.ndarray = None,
+    nfft: int = 64,
+    frequency_range: list = None,
+):
+    """Calculates spectra for inferred states using the covariances.
+
+    The auto-correlation function is taken from elements of the state covariances.
+    The power spectrum of each state is calculated as the Fourier transform of
+    the auto-correlation function. Coherences are calculated from the power spectra.
+
+    Parameters
+    ----------
+    covariances : np.ndarray
+        State covariances. Shape must be (n_states, n_channels, n_channels).
+    sampling_frequency : float
+        Frequency at which the data was sampled (Hz).
+    n_embeddings : int
+        Number of time embeddings.
+    pca_weights : np.ndarray
+        Weight matrix used to perform PCA during data preparation. (Optional.)
+    nfft : int
+        Number of data points in the FFT. The auto-correlation function will only
+        have 2 * (n_embeddings + 2) - 1 data points. We pad the auto-correlation
+        function with zeros to have nfft data points if the number of data points
+        in the auto-correlation function is less than nfft. Default is 64.
+    frequency_range : list
+        Minimum and maximum frequency to keep (Hz).
+    
+    Returns
+    -------
+    frequencies : np.ndarray
+        Frequencies of the power spectra and coherences. Shape is (n_f,).
+    power_spectra : np.ndarray
+        Power (or cross) spectra calculated for each state. Shape is (n_states,
+        n_channels, n_channels, n_f).
+    coherences : np.ndarray
+        Coherences calculated for each state. Shape is (n_states, n_channels,
+        n_channels, n_f).
+    """
+
+    # Validation
+    if n_embeddings < 1:
+        raise ValueError(
+            "Spectra can only be calculated if the training data was time embedded."
+        )
+
+    if frequency_range is None:
+        frequency_range = [0, sampling_frequency / 2]
+
+    # Number of states
+    n_states = covariances.shape[0]
+
+    if pca_weights is not None:
+        # Number of time embedded channels
+        n_te_channels = pca_weights.shape[0]
+
+        # Reverse PCA if pca_weights were passed
+        covariances = pca_weights @ covariances @ pca_weights.T
+
+    else:
+        # We assume no PCA was applied
+        n_te_channels = covariances.shape[1]
+
+    # Number of channels in the non-time embedded data
+    n_channels = n_te_channels // (n_embeddings + 2)
+
+    # Number of data points in the correlation function
+    n_cf = 2 * (n_embeddings + 2) - 1
+
+    # Number of FFT data points
+    nfft = max(nfft, 2 ** nextpow2(n_cf))
+
+    # Get auto/cross-correlation function from the state covariances
+    correlation_function = np.empty([n_states, n_channels, n_channels, n_cf])
+
+    print("Calculating power spectra")
+    for i in range(n_states):
+        for j in range(n_channels):
+            for k in range(n_channels):
+
+                # Auto/cross-correlation between channel j and channel k of state i
+                correlation_function_jk = covariances[
+                    i,
+                    j * (n_embeddings + 2) : (j + 1) * (n_embeddings + 2),
+                    k * (n_embeddings + 2) : (k + 1) * (n_embeddings + 2),
+                ]
+
+                # Take elements from the first row and column
+                correlation_function[i, j, k] = np.append(
+                    correlation_function_jk[0][::-1], correlation_function_jk[1:, 0]
+                )
+
+    # Calculate the argments to keep for the given frequency range
+    frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
+    frequencies = frequencies[f_min_arg : f_max_arg + 1]
+    args_range = [f_min_arg, f_max_arg + 1]
+
+    if f_max_arg <= f_min_arg:
+        raise ValueError("Cannot select requested frequency range.")
+
+    # Calculate cross power spectra as the Fourier transform of the
+    # auto/cross-correlation function
+    power_spectra = abs(
+        fourier_transform(
+            correlation_function, sampling_frequency, nfft=nfft, args_range=args_range
+        )
+    )
+
+    # Normalise the power spectra
+    power_spectra /= nfft ** 2
+
+    # Coherences for each state
+    coherences = coherence_spectra(power_spectra)
+
+    return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
+
+
 def multitaper(
     data: np.ndarray,
     sampling_frequency: float,
@@ -48,8 +242,8 @@ def multitaper(
     -------
     np.ndarray
         Power (or cross) spectral density with shape (n_channels, n_channels, n_f).
-
     """
+
     # Transpose the data so that it is [n_channels, n_samples]
     data = np.transpose(data)
 
@@ -96,7 +290,7 @@ def multitaper(
     return P
 
 
-def state_spectra(
+def multitaper_spectra(
     data: np.ndarray,
     state_mixing_factors: np.ndarray,
     sampling_frequency: float,
@@ -105,9 +299,9 @@ def state_spectra(
     segment_length: int = None,
     frequency_range: list = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Calculates spectra for inferred states.
+    """Calculates spectra for inferred states using a multitaper.
 
-    This includes power spectra and coherence.
+    This includes power and coherence spectra.
     Follows the same procedure as the OSL function HMM-MAR/spectral/hmmspectamt.m
 
     Parameters
@@ -138,8 +332,8 @@ def state_spectra(
     coherences : np.ndarray
         Coherences calculated for each state. Shape is (n_states, n_channels,
         n_channels, n_f).
-
     """
+
     # Validation
     if (isinstance(data, list) != isinstance(state_mixing_factors, list)) or (
         isinstance(data, np.ndarray) != isinstance(state_mixing_factors, np.ndarray)
@@ -217,8 +411,8 @@ def state_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
     frequencies = frequencies[f_min_arg : f_max_arg + 1]
     args_range = [f_min_arg, f_max_arg + 1]
 
@@ -271,9 +465,29 @@ def state_spectra(
     power_spectra *= n_samples / (sum_factors * n_tapers * n_segments)
 
     # Coherences for each state
-    coherences = np.empty([n_states, n_channels, n_channels, n_f])
+    coherences = coherence_spectra(power_spectra)
+
+    return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
+
+
+def coherence_spectra(power_spectra: np.ndarray):
+    """Calculates coherences from (cross) power spectral densities.
+
+    Parameters
+    ----------
+    power_spectra : np.ndarray
+        Power spectra. Shape is (n_states, n_channels, n_channels, n_f).
+
+    Returns
+    -------
+    np.ndarray
+        Coherence spectra for each state. Shape is (n_states, n_channels, n_channels,
+        n_f).
+    """
+    n_states, n_channels, n_channels, n_f = power_spectra.shape
 
     print("Calculating coherences")
+    coherences = np.empty([n_states, n_channels, n_channels, n_f])
     for i in range(n_states):
         for j in range(n_channels):
             for k in range(n_channels):
@@ -282,76 +496,4 @@ def state_spectra(
                     / np.sqrt(power_spectra[i, j, j] * power_spectra[i, k, k])
                 )
 
-    return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
-
-
-def decompose_spectra(
-    coherences: np.ndarray,
-    n_components: int,
-    max_iter: int = 50000,
-    random_state: int = None,
-    verbose: int = 0,
-) -> np.ndarray:
-    """Performs spectral decomposition using coherences.
-
-    Uses non-negative matrix factorization to decompose spectra.
-    Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
-
-    Parameters
-    ----------
-    coherences : np.ndarray
-        Coherences with shape (n_states, n_channels, n_channels, n_f).
-    n_components : int
-        Number of spectral components to fit.
-    max_iter : int
-        Maximum number of iterations in sklearn's non_negative_factorization.
-    random_state : int
-        Seed for the random number generator.
-    verbose : int
-        Show verbose? (1) yes, (0) no.
-
-    Returns
-    -------
-    components : np.ndarray
-        Spectral components. Shape is (n_components, n_f).
-
-    """
-    print("Performing spectral decomposition")
-
-    # Validation
-    error_message = (
-        "coherences must be a numpy array with shape (n_channels, n_channels), "
-        + "(n_states, n_channels, n_channels) or (n_subjects, n_states, "
-        + "n_channels, n_channels)."
-    )
-    coherences = validate_array(
-        coherences,
-        correct_dimensionality=5,
-        allow_dimensions=[2, 3, 4],
-        error_message=error_message,
-    )
-
-    # Number of subjects, states, channels and frequency bins
-    n_subjects, n_states, n_channels, n_channels, n_f = coherences.shape
-
-    # Indices of the upper triangle of the [n_channels, n_channels, n_f] sub-array
-    i, j = np.triu_indices(n_channels, 1)
-
-    # Concatenate coherences for each subject and state and only keep the upper triangle
-    coherences = coherences[:, :, i, j].reshape(-1, n_f)
-
-    # Perform non-negative matrix factorisation
-    _, components, _ = non_negative_factorization(
-        coherences,
-        n_components=n_components,
-        init=None,
-        max_iter=max_iter,
-        random_state=random_state,
-        verbose=verbose,
-    )
-
-    # Order the weights and components in ascending frequency
-    order = np.argsort(components.argmax(axis=1))
-    components = components[order]
-
-    return components
+    return coherences

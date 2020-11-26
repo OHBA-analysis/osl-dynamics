@@ -43,7 +43,7 @@ class AnnealingCallback(callbacks.Callback):
         epochs : int
             Integer, index of epoch.
         logs : dict
-            Results for this training epoch, and for the validation epoch if 
+            Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
         new_value = (
@@ -88,7 +88,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         epochs : int
             Integer, index of epoch.
         logs : dict
-            Results for this training epoch, and for the validation epoch if 
+            Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
         self.epochs_since_last_save += 1
@@ -102,7 +102,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         Parameters
         ----------
         logs : dict
-            Results for this training epoch, and for the validation epoch if 
+            Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
         self.model.load_weights(self.filepath)

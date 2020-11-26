@@ -55,7 +55,6 @@ class OSL_HMM:
 
     def plot_states(self, *args, **kwargs):
         """Wraps plotting.highlight_states for self.state_time_course."""
-
         plotting.state_barcode(self.state_time_course, *args, **kwargs)
 
     def __str__(self):

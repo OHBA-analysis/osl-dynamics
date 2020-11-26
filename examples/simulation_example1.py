@@ -1,13 +1,13 @@
 """Example script for running inference on simulated HMM data.
 
-- Should achieve a dice coefficient of ~0.96.
+- Should achieve a dice coefficient of ~0.97.
 - A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
 import numpy as np
 from vrad import data
-from vrad.inference import gmm, metrics, states, tf_ops
+from vrad.inference import metrics, states, tf_ops
 from vrad.models import RNNGaussian
 from vrad.simulation import HMMSimulation
 
@@ -30,7 +30,7 @@ n_epochs_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
-theta_normalization = "layer"
+theta_normalization = None
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -45,6 +45,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
+alpha_temperature = 1.0
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -72,22 +73,6 @@ n_channels = meg_data.n_channels
 training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
-# Initialsation of means and covariances
-initial_means, initial_covariances = gmm.final_means_covariances(
-    meg_data.subjects[0],
-    n_states,
-    gmm_kwargs={
-        "n_init": 1,
-        "verbose": 2,
-        "verbose_interval": 50,
-        "max_iter": 10000,
-        "tol": 1e-6,
-    },
-    retry_attempts=1,
-    learn_means=False,
-    random_seed=124,
-)
-
 # Build model
 model = RNNGaussian(
     n_channels=n_channels,
@@ -95,8 +80,6 @@ model = RNNGaussian(
     sequence_length=sequence_length,
     learn_means=learn_means,
     learn_covariances=learn_covariances,
-    initial_means=initial_means,
-    initial_covariances=initial_covariances,
     rnn_type=rnn_type,
     rnn_normalization=rnn_normalization,
     n_layers_inference=n_layers_inference,
@@ -107,6 +90,7 @@ model = RNNGaussian(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
+    alpha_temperature=alpha_temperature,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
@@ -117,12 +101,7 @@ model = RNNGaussian(
 model.summary()
 
 print("Training model")
-history = model.fit(
-    training_dataset,
-    epochs=n_epochs,
-    save_best_after=n_epochs_annealing,
-    save_filepath="/well/woolrich/shared/vrad/trained_models/simulation_example1/weights",
-)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)

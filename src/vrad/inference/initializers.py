@@ -5,9 +5,8 @@ import logging
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import Model
+from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
-
 from vrad import models
 
 _logger = logging.getLogger("VRAD")
@@ -142,15 +141,15 @@ def reinitialize_model_weights(model: tf.keras.Model):
             or isinstance(layer, models.InferenceRNNLayers)
             or isinstance(layer, models.ModelRNNLayers)
         ):
-            for l in layer.layers:
+            for rnn_or_model_layer in layer.layers:
                 # If the layer is bidirectional we need to re-initialise the
                 # forward and backward layers
-                if isinstance(l, layers.Bidirectional):
-                    reinitialize_layer_weights(l.forward_layer)
-                    reinitialize_layer_weights(l.backward_layer)
+                if isinstance(rnn_or_model_layer, layers.Bidirectional):
+                    reinitialize_layer_weights(rnn_or_model_layer.forward_layer)
+                    reinitialize_layer_weights(rnn_or_model_layer.backward_layer)
                 # Otherwise, just re-initialise as a normal layer
                 else:
-                    reinitialize_layer_weights(l)
+                    reinitialize_layer_weights(rnn_or_model_layer)
 
         # Otherwise, this is just a single layer
         else:

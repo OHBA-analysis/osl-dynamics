@@ -5,7 +5,6 @@
 import os
 import pathlib
 import subprocess
-from typing import Tuple
 
 import nibabel as nib
 import numpy as np
@@ -13,31 +12,34 @@ from vrad.analysis import std_masks
 from vrad.analysis.functions import validate_array
 
 
-def state_maps(
-    power_spectra: np.ndarray, coherences: np.ndarray, components: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Calculates spatial maps for each spectral component and state.
+def state_power_maps(
+    frequencies: np.ndarray,
+    power_spectra: np.ndarray,
+    components: np.ndarray = None,
+    frequency_range: list = None,
+) -> np.ndarray:
+    """Calculates spatial power maps from power spectra.
 
     Parameters
     ----------
+    frequencies : np.ndarray
+        Frequency axis of the PSDs. Only used if frequency_range is given.
     power_spectra : np.ndarray
         Power/cross spectra for each channel. Shape is (n_states, n_channels,
         n_channels, n_f).
-    coherences : np.ndarray
-        Coherences for each channel. Shape is (n_states, n_channels, n_channels, n_f).
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f).
+        Spectral components. Shape is (n_components, n_f). Optional.
+    frequency_range : list
+        Frequency range to integrate the PSD over (Hz). Optional: default is full
+        range.
     
     Returns
     -------
-    p : np.ndarray
-        Power spectra for each component of each state. Shape is (n_components,
+    np.ndarray
+        Power map for each component of each state. Shape is (n_components,
         n_states, n_channels, n_channels).
-    c : np.ndarray
-        Coherence for each component of each state. Shape is (n_components,
-        n_states, n_channels, n_channels).
-
     """
+
     # Validation
     error_message = (
         "a 3D numpy array (n_channels, n_channels, n_frequency_bins) "
@@ -50,18 +52,19 @@ def state_maps(
         allow_dimensions=[3, 4],
         error_message=error_message,
     )
-    coherences = validate_array(
-        coherences,
-        correct_dimensionality=5,
-        allow_dimensions=[3, 4],
-        error_message=error_message,
-    )
+
+    if components is not None and frequency_range is not None:
+        raise ValueError(
+            "Only one of the arguments components or frequency range can be passed."
+        )
+
+    if frequency_range is not None and frequencies is None:
+        raise ValueError(
+            "If frequency_range is passed, frequenices must also be passed."
+        )
 
     # Number of subjects, states, channels and frequency bins
     n_subjects, n_states, n_channels, n_channels, n_f = power_spectra.shape
-
-    # Number of components
-    n_components = components.shape[0]
 
     # Remove cross-spectral densities from the power spectra array and concatenate
     # over subjects and states
@@ -70,34 +73,68 @@ def state_maps(
     # PSDs are real valued so we can recast
     psd = psd.real
 
-    # Calculate PSDs for each spectral component
-    psd = components @ psd.T
+    if components is not None:
+        # Calculate PSD for each spectral component
+        psd = components @ psd.T
+        n_components = components.shape[0]
+    else:
+        # Integrate over the given frequency range
+        if frequency_range is None:
+            psd = np.sum(psd, axis=-1)
+        else:
+            f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
+            f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+            if f_max_arg < f_min_arg:
+                raise ValueError("Cannot select the specified frequency range.")
+            psd = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+        n_components = 1
     psd = psd.reshape(n_components, n_states, n_channels)
 
     # Power map
     p = np.zeros([n_components, n_states, n_channels, n_channels])
     p[:, :, range(n_channels), range(n_channels)] = psd
 
-    # Only keep the upper triangle of the coherences and concatenate over subjects
-    # and states
-    i, j = np.triu_indices(n_channels, 1)
-    coh = coherences[:, :, i, j].reshape(-1, n_f)
-
-    #  Calculate coherences for each spectral component
-    coh = components @ coh.T
-    coh = coh.reshape(n_components, n_states, n_channels * (n_channels - 1) // 2)
-
-    # Coherence map
-    c = np.zeros([n_components, n_states, n_channels, n_channels])
-    c[:, :, i, j] = coh
-    c[:, :, j, i] = coh
-    c[:, :, range(n_channels), range(n_channels)] = 1
-
-    return p, c
+    return np.squeeze(p)
 
 
-def save_nii_file(mask_file, parcellation_file, power_map, filename, component=0):
-    """Saves a NITFI file containing a map."""
+def save_nii_file(
+    mask_file: str,
+    parcellation_file: str,
+    power_map: np.ndarray,
+    filename: str,
+    component: int = 0,
+    subtract_mean: bool = False,
+    normalize: bool = True,
+):
+    """Saves a NITFI file containing a map.
+
+    Parameters
+    ----------
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcelate the training data.
+    power_map : np.ndarray
+        Power map to save.
+    filename : str
+        Output file name.
+    component : int
+        Spectral component to save. Optional.
+    subtract_mean : bool
+        Should we subtract the mean power across states? Optional: default is False.
+    normalize : bool
+        Should we normalize by dividing by the maximum power in a voxel?
+        Optional: default is True.
+    """
+
+    # Validation
+    error_message = f"Dimensionality of power_map must be 4, got ndim={power_map.ndim}."
+    power_map = validate_array(
+        power_map,
+        correct_dimensionality=4,
+        allow_dimensions=[3],
+        error_message=error_message,
+    )
 
     # Add extension if it's not already there
     if "nii" not in filename:
@@ -127,7 +164,8 @@ def save_nii_file(mask_file, parcellation_file, power_map, filename, component=0
     n_voxels = voxels.shape[0]
 
     # Normalise the voxels to have comparable weights
-    voxels /= voxels.max(axis=0)[np.newaxis, ...]
+    if normalize:
+        voxels /= voxels.max(axis=0)[np.newaxis, ...]
 
     # Number of components, states, channels
     n_components, n_states, n_channels, n_channels = power_map.shape
@@ -138,7 +176,8 @@ def save_nii_file(mask_file, parcellation_file, power_map, filename, component=0
         spatial_map[:, i] = voxels @ np.diag(np.squeeze(power_map[component, i]))
 
     # Subtract mean power across states
-    spatial_map -= np.mean(spatial_map, axis=1)[..., np.newaxis]
+    if subtract_mean:
+        spatial_map -= np.mean(spatial_map, axis=1)[..., np.newaxis]
 
     # Convert spatial map into a grid
     spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
@@ -171,7 +210,6 @@ def workbench_render(
         Interpolation type. Default is 'trilinear'.
     visualise : bool
         Should we display the rendered plots in workbench? Default is True.
-
     """
     nii = pathlib.Path(nii)
 

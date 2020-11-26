@@ -2,7 +2,6 @@
 
 """
 
-from tensorflow import Variable
 from tensorflow.keras.losses import Loss
 
 

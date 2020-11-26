@@ -46,6 +46,7 @@ learn_means = False
 learn_covariances = False
 
 alpha_xform = "categorical"
+alpha_temperature = 1.0
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -53,7 +54,9 @@ learning_rate = 0.01
 
 # Read MEG data
 print("Reading MEG data")
-prepared_data = data.Data("/well/woolrich/shared/vrad/prepared_data/subject1.mat")
+prepared_data = data.Data(
+    "/well/woolrich/shared/vrad/resting_state_data/prepared_data/subject1.mat"
+)
 n_channels = prepared_data.n_channels
 
 # Prepare dataset
@@ -61,7 +64,9 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with the final HMM covariances
-hmm = data.OSL_HMM("/well/woolrich/shared/vrad/hmm_fits/nSubjects-1_K-6/hmm.mat")
+hmm = data.OSL_HMM(
+    "/well/woolrich/shared/vrad/resting_state_data/hmm_fits/nSubjects-1_K-6/hmm.mat"
+)
 initial_covariances = hmm.covariances
 
 # Build model
@@ -82,6 +87,7 @@ model = RNNGaussian(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
+    alpha_temperature=alpha_temperature,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_annealing=do_annealing,
@@ -97,7 +103,8 @@ history = model.fit(
     training_dataset,
     epochs=n_epochs,
     save_best_after=n_epochs_annealing,
-    save_filepath="/well/woolrich/shared/vrad/trained_models/one_subject_example/weights",
+    save_filepath="/well/woolrich/shared/vrad/resting_state_data"
+    + "/trained_models/one_subject_example/weights",
 )
 
 # Free energy = Log Likelihood + KL Divergence
@@ -118,14 +125,14 @@ print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
 # Load preprocessed data to calculate spatial power maps
 preprocessed_data = data.PreprocessedData(
-    "/well/woolrich/shared/vrad/preprocessed_data/subject1.mat"
+    "/well/woolrich/shared/vrad/resting_state_data/preprocessed_data/subject1.mat"
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
     n_embeddings=13, sequence_length=sequence_length
 )[0]
 
 # Compute spectra for states
-f, psd, coh = spectral.state_spectra(
+f, psd, coh = spectral.multitaper_spectra(
     data=preprocessed_time_series,
     state_mixing_factors=alpha,
     sampling_frequency=250,
@@ -137,8 +144,8 @@ f, psd, coh = spectral.state_spectra(
 # Perform spectral decomposition (into 2 components) based on coherence spectra
 components = spectral.decompose_spectra(coh, n_components=2)
 
-# Calculate spatial maps
-p_map, c_map = maps.state_maps(psd, coh, components)
+# Calculate spatial power maps
+p_map = maps.state_power_maps(f, psd, components)
 
 # Save the power map for the first component as NIFTI file
 # (The second component is noise)
@@ -149,6 +156,8 @@ maps.save_nii_file(
     power_map=p_map,
     filename="power_map.nii.gz",
     component=0,
+    subtract_mean=True,
+    normalize=True,
 )
 
 # Delete the temporary folder holding the data

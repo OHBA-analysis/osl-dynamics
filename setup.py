@@ -13,7 +13,7 @@ from pkg_resources import VersionConflict, require
 from setuptools import setup
 
 try:
-    import tensorflow
+    import tensorflow  # noqa
 except ModuleNotFoundError:
     raise ModuleNotFoundError(
         "You must install tensorflow or tensorflow-gpu before VRAD."

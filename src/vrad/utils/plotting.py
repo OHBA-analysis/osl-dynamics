@@ -11,12 +11,7 @@ import vrad.inference.metrics
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
-from vrad.inference.states import (
-    correlate_states,
-    match_states,
-    state_activation,
-    state_lifetimes,
-)
+from vrad.inference.states import correlate_states, match_states, state_lifetimes
 from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
 
