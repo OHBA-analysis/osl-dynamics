@@ -759,6 +759,7 @@ def plot_state_lifetimes(
 def plot_state_time_courses(
     *state_time_courses: List[np.ndarray],
     n_samples: int = None,
+    sampling_frequency: float = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
@@ -769,6 +770,8 @@ def plot_state_time_courses(
     ----------
     state_time_courses : list of numpy.ndarray
         State time courses to be plotted  as time series.
+    f_sample: float
+        Sampling frequency of the input data, enabling us to label the x-axis(!)
     n_samples : int
         Number of samples to be shown on the x-axis.
     plot_kwargs : dict
@@ -785,6 +788,11 @@ def plot_state_time_courses(
     n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
     n_states = state_time_courses[0].shape[1]
 
+    if sampling_frequency is not None:
+      time_vector=np.linspace(0,n_samples/sampling_frequency,n_samples)
+    else:
+      time_vector=np.linspace(0,n_samples,n_samples)
+
     default_fig_kwargs = {"figsize": (20, 10)}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
     fig, axis = plt.subplots(n_states, **fig_kwargs)
@@ -794,7 +802,11 @@ def plot_state_time_courses(
 
     for i in range(n_lines):
         for j in range(n_states):
-            axis[j].plot(state_time_courses[i][:n_samples, j], **plot_kwargs)
+            axis[j].plot(time_vector,state_time_courses[i][:n_samples, j], **plot_kwargs)
+            if sampling_frequency is not None:
+                axis[j].set_xlabel('Time (s)')
+            else:
+                axis[j].set_xlabel('Samples')
 
     plt.tight_layout()
     show_or_save(filename)
