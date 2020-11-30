@@ -783,7 +783,6 @@ def plot_state_time_courses(
     """
 
     state_time_courses = np.asarray(state_time_courses)
-
     n_lines = len(state_time_courses)
     n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
     n_states = state_time_courses[0].shape[1]
