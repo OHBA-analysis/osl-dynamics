@@ -309,7 +309,7 @@ class MixMeansCovsLayer(layers.Layer):
     n_channels : int
         Number of channels.
     learn_alpha_scaling : bool
-        Should be learn an alpha scaling?
+        Should we learn an alpha scaling?
     """
 
     def __init__(
