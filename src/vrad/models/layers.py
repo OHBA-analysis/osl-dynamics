@@ -445,7 +445,7 @@ class KLDivergenceLayer(layers.Layer):
         inference_mu = inference_mu[:, 1:]
         inference_sigma = tf.exp(inference_log_sigma)[:, 1:]
 
-        # Calculate the KL diverence between the posterior and prior
+        # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
         kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
@@ -462,7 +462,7 @@ class InferenceRNNLayers(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'.
+        Either 'lstm' or 'gru'. Defaults to GRU.
     normalization_type : str
         Either 'layer', 'batch' or None.
     n_layers : int
@@ -530,7 +530,7 @@ class ModelRNNLayers(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'.
+        Either 'lstm' or 'gru'. Defaults to GRU.
     normalization_type : str
         Either 'layer', 'batch' or None.
     n_layers : int
