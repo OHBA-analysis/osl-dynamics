@@ -637,7 +637,7 @@ def _model_structure(
     # Model RNN:
     # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt), where
     #     - mu_theta_jt        ~ affine(RNN(theta_<t))
-    #     - log_sigma_theta_jt ~ affine(RNN(thetea_<t))
+    #     - log_sigma_theta_jt ~ affine(RNN(theta_<t))
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
