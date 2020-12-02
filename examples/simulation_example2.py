@@ -5,6 +5,8 @@
 """
 
 print("Setting up")
+from pathlib import Path
+
 import numpy as np
 from vrad import data
 from vrad.inference import metrics, states, tf_ops
@@ -55,7 +57,8 @@ normalize_covariances = False
 learning_rate = 0.01
 
 # Load covariances for each state
-cov = np.load("files/hmm_cov.npy")
+example_file_directory = Path(__file__).parent / "files"
+cov = np.load(example_file_directory / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
