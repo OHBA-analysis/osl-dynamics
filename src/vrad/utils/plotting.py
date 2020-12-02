@@ -788,9 +788,9 @@ def plot_state_time_courses(
     n_states = state_time_courses[0].shape[1]
 
     if sampling_frequency is not None:
-      time_vector=np.linspace(0,n_samples/sampling_frequency,n_samples)
+        time_vector = np.linspace(0, n_samples / sampling_frequency, n_samples)
     else:
-      time_vector=np.linspace(0,n_samples,n_samples)
+        time_vector = np.linspace(0, n_samples, n_samples)
 
     default_fig_kwargs = {"figsize": (20, 10)}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
@@ -801,11 +801,13 @@ def plot_state_time_courses(
 
     for i in range(n_lines):
         for j in range(n_states):
-            axis[j].plot(time_vector,state_time_courses[i][:n_samples, j], **plot_kwargs)
+            axis[j].plot(
+                time_vector, state_time_courses[i][:n_samples, j], **plot_kwargs
+            )
             if sampling_frequency is not None:
-                axis[j].set_xlabel('Time (s)')
+                axis[j].set_xlabel("Time (s)")
             else:
-                axis[j].set_xlabel('Samples')
+                axis[j].set_xlabel("Samples")
 
     plt.tight_layout()
     show_or_save(filename)
