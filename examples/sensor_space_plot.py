@@ -16,8 +16,8 @@ ctf275_channel_names = np.load(channel_file)
 # Layouts follow the naming of those in FieldTrip.
 plotting.topoplot(
     layout="CTF275_helmet",
-    data=np.load("ctf275_data.npy"),
-    channel_names=np.load("ctf275_channel_names.npy"),
+    data=ctf275_data,
+    channel_names=ctf275_channel_names,
     plot_boxes=False,
     show_deleted_sensors=True,
     show_names=False,
