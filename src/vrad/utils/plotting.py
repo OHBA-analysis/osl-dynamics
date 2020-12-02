@@ -14,6 +14,7 @@ from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
 from vrad.inference.states import correlate_states, match_states, state_lifetimes
 from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
+from vrad.utils.topoplots import Topology
 
 _logger = logging.getLogger("VRAD")
 
@@ -976,3 +977,26 @@ def show_or_save(filename: str = None):
         print(f"Saving {filename}")
         plt.savefig(filename, dpi=350)
         plt.close("all")
+
+
+def topoplot(
+    layout: str,
+    data: np.ndarray,
+    channel_names: List[str] = None,
+    plot_boxes: bool = False,
+    show_deleted_sensors: bool = False,
+    show_names: bool = False,
+    title: str = None,
+    colorbar: bool = True,
+):
+    topology = Topology(layout)
+    if channel_names is not None:
+        topology.keep_channels(channel_names)
+    topology.plot_data(
+        data,
+        plot_boxes=plot_boxes,
+        show_deleted_sensors=show_deleted_sensors,
+        show_names=show_names,
+        title=title,
+        colorbar=colorbar,
+    )
