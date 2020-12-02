@@ -128,7 +128,7 @@ class StateMixingFactorsLayer(layers.Layer):
     """Layer for calculating the mixing ratio of the states.
 
     This layer accepts the logits theta_t and outputs alpha_t.
-    
+
     Parameters
     ----------
     alpha_xform : str

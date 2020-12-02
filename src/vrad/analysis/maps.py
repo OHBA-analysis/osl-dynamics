@@ -32,7 +32,7 @@ def state_power_maps(
     frequency_range : list
         Frequency range to integrate the PSD over (Hz). Optional: default is full
         range.
-    
+
     Returns
     -------
     np.ndarray

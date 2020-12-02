@@ -118,7 +118,7 @@ def state_covariance_spectra(
         in the auto-correlation function is less than nfft. Default is 64.
     frequency_range : list
         Minimum and maximum frequency to keep (Hz).
-    
+
     Returns
     -------
     frequencies : np.ndarray

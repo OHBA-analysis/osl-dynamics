@@ -38,9 +38,7 @@ class CholeskyCovariancesInitializer(Initializer):
 
 
 class Identity3D(Initializer):
-    """Initializer to create stacked identity matrices.
-
-    """
+    """Initializer to create stacked identity matrices."""
 
     def __call__(self, shape, dtype=None):
         if len(shape) != 3 or shape[1] != shape[2]:

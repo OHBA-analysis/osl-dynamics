@@ -96,9 +96,7 @@ class Simulation(ABC):
 
     @abstractmethod
     def generate_states(self) -> np.ndarray:
-        """State generation must be implemented by subclasses.
-
-        """
+        """State generation must be implemented by subclasses."""
         pass
 
     def plot_alphas(self, n_points: int = 1000, filename: str = None):

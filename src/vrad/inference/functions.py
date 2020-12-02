@@ -31,7 +31,7 @@ def cholesky_factor_to_full_matrix(cholesky_factor: tf.Tensor):
     cholesky_factor : tf.Tensor
         Cholesky factor of the matrix. Only the upper triangle of this tensor is used.
         Shape is (None, n_states, n_channels, n_channels).
-    
+
     Returns
     -------
     tf.Tensor

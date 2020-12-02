@@ -202,7 +202,7 @@ class RNNGaussian(BaseModel):
 
     def predict_states(self, inputs, *args, **kwargs):
         """State mixing factors, alpha_t.
-        
+
         Parameters
         ----------
         inputs : tensorflow.data.Dataset
@@ -273,7 +273,7 @@ class RNNGaussian(BaseModel):
         tqdm_class=None,
     ):
         """Initialize the means and covariances.
-    
+
         The model is trained for a few epochs and the model with the best
         free energy is chosen.
 

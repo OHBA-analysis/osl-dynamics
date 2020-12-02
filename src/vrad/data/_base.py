@@ -128,7 +128,7 @@ class Data:
             We can produce sequences with overlaping data. step_size=sequence_length
             will give non-overlaping sequences, step_size=sequence_length/2 will give
             sequences with 50% overlap. Default is no overlap.
-        
+
         Returns
         -------
         tensorflow.data.Dataset
