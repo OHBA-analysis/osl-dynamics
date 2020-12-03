@@ -12,7 +12,8 @@ channel_file = str(files_dir / "ctf275_channel_names.npy")
 ctf275_data = np.load(data_file)
 ctf275_channel_names = np.load(channel_file)
 
-# Produce the figure using the "CTF275_helmet" layout provided by the FieldTrip toolbox (www.fieldtriptoolbox.org).
+# Produce the figure using the "CTF275_helmet" layout provided by the FieldTrip toolbox
+# www.fieldtriptoolbox.org.
 # Layouts follow the naming of those in FieldTrip.
 plotting.topoplot(
     layout="CTF275_helmet",

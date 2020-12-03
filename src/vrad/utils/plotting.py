@@ -188,7 +188,7 @@ def value_separation(
 
 
 def get_colors(
-    n_states: int, colormap: str = "gist_rainbow"
+    n_states: int, colormap: str = "magma"
 ) -> List[Tuple[float, float, float, float]]:
     """Produce equidistant colors from a matplotlib colormap.
 
@@ -220,7 +220,7 @@ def plot_state_highlighted_data(
     state_time_course: np.ndarray,
     events: np.ndarray = None,
     n_samples: int = None,
-    colormap: str = "gist_rainbow",
+    colormap: str = "magma",
     fig_kwargs: dict = None,
     highlight_kwargs: dict = None,
     plot_kwargs: dict = None,
@@ -381,7 +381,7 @@ def plot_time_series(
 def state_barcode(
     state_time_course: np.ndarray,
     axis: plt.Axes = None,
-    colormap: str = "gist_rainbow",
+    colormap: str = "magma",
     n_samples: int = None,
     sampling_frequency: float = 1,
     highlight_kwargs: dict = None,
