@@ -6,9 +6,11 @@ from itertools import zip_longest
 from typing import Any, Iterable, List, Tuple, Union
 
 import matplotlib
+import matplotlib.patches as patches
 import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
+from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
 from vrad.inference.states import correlate_states, match_states, state_lifetimes
@@ -989,6 +991,32 @@ def topoplot(
     title: str = None,
     colorbar: bool = True,
 ):
+    """Make a contour plot in sensor space.
+
+    Create a contour plot by interpolating a field from a set of values provided for
+    each sensor location in an MEG layout.
+
+    Parameters
+    ----------
+
+    layout: str
+        The name of an MEG layout (matching one from FieldTrip).
+    data: numpy.ndarray
+        The value of the field at each sensor.
+    channel_names: List[str]
+        A list of channel names which are present in the
+        data (removes missing channels).
+    plot_boxes: bool
+        Show boxes representing the height and width of sensors.
+    show_deleted_sensors: bool
+        Show sensors missing from `channel_names` in red.
+    show_names: bool
+        Show the names of channels (can get very cluttered).
+    title: str
+        A title for the figure.
+    colorbar: bool
+        Show a colorbar for the field.
+    """
     topology = Topology(layout)
     if channel_names is not None:
         topology.keep_channels(channel_names)
@@ -1000,3 +1028,178 @@ def topoplot(
         title=title,
         colorbar=colorbar,
     )
+
+
+def plot_connections(
+    weights: np.ndarray,
+    labels: List[str] = None,
+    ax: plt.Axes = None,
+    cmap: str = "hot",
+    text_color: str = None,
+) -> plt.Axes:
+    """Create a chord diagram representing the values of a matrix.
+
+    For a matrix of weights, create a chord diagram where the color of the line
+    connecting two nodes represents the value indexed by the position of the nodes in
+    the lower triangle of the matrix.
+
+    This is useful for showing things like co-activation between sensors/parcels or
+    relations between nodes in a network.
+
+    Parameters
+    ----------
+    weights: numpy.ndarray
+        An NxN matrix of weights.
+    labels: list of str
+        A name for each node in the weights matrix (e.g. parcel names)
+    ax: matplotlib.pyplot.Axes
+        A matplotlib axis on which to plot.
+    cmap: str
+        A string corresponding to a matplotlib colormap.
+    text_color: str
+        A string corresponding to a matplotlib color.
+
+    Returns
+    -------
+    ax: matplotlib.pyplot.Axes
+
+    Examples
+    --------
+    >>> rng = np.random.default_rng(seed=42)
+    >>> covariance = rng.normal(size=(38, 38))
+    >>> covariance[[24, 25, 26, 27], [12,13,14,15]] = 4
+    >>> plot_connections(
+    ...     covariance,
+    ...     (f"ROI {i + 1}" for i in range(covariance.shape[0])),
+    ...     cmap="magma",
+    ...     text_color="white"
+    ... )
+    >>> plt.show()
+    """
+    weights = np.abs(weights)
+    x, y = np.diag_indices_from(weights)
+    weights[x, y] = 0
+    weights /= weights.max()
+
+    inner = 0.9
+    outer = 1.0
+
+    cmap = matplotlib.cm.get_cmap(cmap)
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+
+    highest_color = cmap(norm(1)) if text_color is None else text_color
+    zero_color = cmap(norm(0))
+
+    text_color = {
+        "text.color": highest_color,
+        "axes.labelcolor": highest_color,
+        "xtick.color": highest_color,
+        "ytick.color": highest_color,
+    }
+
+    angle = np.radians(360 / weights.shape[0])
+    pad = np.radians(0.5)
+
+    starts = np.arange(0, 2 * np.pi, angle)
+    lefts = starts + pad
+    rights = starts + angle - pad
+    centers = 0.5 * (lefts + rights)
+
+    with matplotlib.rc_context(text_color):
+        if not ax:
+            fig = plt.figure(figsize=(10, 10))
+            ax = fig.add_subplot(111, projection="polar")
+
+        for left, right in zip(lefts, rights):
+            verts = [
+                (left, inner),
+                (left, outer),
+                (right, outer),
+                (right, inner),
+                (0.0, 0.0),
+            ]
+
+            codes = [
+                Path.MOVETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.CLOSEPOLY,
+            ]
+
+            path = Path(verts, codes)
+
+            patch = patches.PathPatch(path, facecolor="orange", lw=1)
+            ax.add_patch(patch)
+        ax.set_yticks([])
+        ax.grid(False)
+
+        bezier_codes = [
+            Path.MOVETO,
+            Path.CURVE4,
+            Path.CURVE4,
+            Path.CURVE4,
+        ]
+
+        rebound = 0.5
+
+        for i, j in zip(*np.tril_indices_from(weights)):
+            center_1 = centers[i]
+            center_2 = centers[j]
+
+            verts = [
+                (center_1, inner),
+                (center_1, rebound),
+                (center_2, rebound),
+                (center_2, inner),
+            ]
+
+            path = Path(verts, bezier_codes)
+
+            patch = patches.PathPatch(
+                path,
+                facecolor="none",
+                lw=2,
+                edgecolor=cmap(weights[i, j]),
+                alpha=weights[i, j] ** 2,
+            )
+            ax.add_patch(patch)
+
+        ax.set_xticks([])
+
+        ax.set_facecolor(zero_color)
+        fig.patch.set_facecolor(zero_color)
+
+        if labels is None:
+            labels = [""] * len(centers)
+        for center, label in zip(centers, labels):
+            rotation = np.degrees(center)
+
+            if 0 <= rotation < 90:
+                horizontal_alignment = "left"
+                vertical_alignment = "bottom"
+            elif 90 <= rotation < 180:
+                horizontal_alignment = "right"
+                vertical_alignment = "bottom"
+            elif 180 <= rotation < 270:
+                horizontal_alignment = "right"
+                vertical_alignment = "top"
+            else:
+                horizontal_alignment = "left"
+                vertical_alignment = "top"
+
+            if 90 <= rotation < 270:
+                rotation += 180
+
+            ax.annotate(
+                label,
+                (center, outer + 0.05),
+                rotation=rotation,
+                horizontalalignment=horizontal_alignment,
+                verticalalignment=vertical_alignment,
+            )
+
+        ax.autoscale_view()
+        plt.setp(ax.spines.values(), visible=False)
+
+    return ax
