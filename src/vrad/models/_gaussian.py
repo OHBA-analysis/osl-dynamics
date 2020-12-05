@@ -413,7 +413,7 @@ class RNNGaussian(BaseModel):
 
         Returns
         ----------
-        alpha_scaling : bool
+        bool
             Alpha scaling for each state.
         """
         mix_means_covs_layer = self.model.get_layer("mix_means_covs")
@@ -421,8 +421,8 @@ class RNNGaussian(BaseModel):
         alpha_scaling = softplus(alpha_scaling).numpy()
         return alpha_scaling
 
-    def sample_state_time_course(self, n_samples):
-        """Uses the model RNN to sample a state time course.
+    def sample_alpha(self, n_samples):
+        """Uses the model RNN to sample state mixing factors, alpha_t.
 
         Parameters
         ----------
@@ -431,8 +431,8 @@ class RNNGaussian(BaseModel):
 
         Returns
         -------
-        sampled_stc : np.ndarray
-            Sampled state time course.
+        np.ndarray
+            Sampled alpha_t.
         """
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
@@ -441,8 +441,7 @@ class RNNGaussian(BaseModel):
         theta_t_norm_layer = self.model.get_layer("theta_t_norm")
         alpha_t_layer = self.model.get_layer("alpha_t")
 
-        # State time course and sequence of the underlying logits theta_t
-        sampled_stc = np.zeros([n_samples, self.n_states])
+        # Sequence of the underlying logits theta_t
         theta_t_norm = np.zeros([self.sequence_length, self.n_states], dtype=np.float32)
 
         # Normally distributed random numbers used to sample the logits theta_t
@@ -453,7 +452,8 @@ class RNNGaussian(BaseModel):
         # Activate the first state for the first sample
         theta_t_norm[-1, 0] = 1
 
-        # Sample state time course
+        # Sample the state fixing factors
+        alpha_t = np.empty([n_samples, self.n_states], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
             # If there are leading zeros we trim theta_t so that we don't pass the zeros
@@ -477,12 +477,11 @@ class RNNGaussian(BaseModel):
             theta_t_norm[-1] = theta_t_norm_layer(theta_t[np.newaxis, np.newaxis, :])[0]
 
             # Calculate the state mixing factors
-            alpha_t = alpha_t_layer(theta_t_norm[-1][np.newaxis, np.newaxis, :])
+            alpha_t[i] = alpha_t_layer(theta_t_norm[-1][np.newaxis, np.newaxis, :])[
+                0, 0
+            ]
 
-            # Hard classify the state time course
-            sampled_stc[i, np.argmax(alpha_t)] = 1
-
-        return sampled_stc
+        return alpha_t
 
 
 def _model_structure(
