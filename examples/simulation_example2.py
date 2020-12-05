@@ -18,20 +18,20 @@ from vrad.utils import plotting
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25000
+n_samples = 25600
 observation_error = 0.2
 gamma_shape = 10
 gamma_scale = 5
 
 n_states = 5
-sequence_length = 200
+sequence_length = 400
 batch_size = 32
 
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 500
-n_epochs_annealing = 150
+n_epochs = 300
+n_epochs_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -40,8 +40,8 @@ theta_normalization = None
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 32
-n_units_model = 48
+n_units_inference = 64
+n_units_model = 96
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -50,7 +50,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 1.0
+alpha_temperature = 0.15
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -123,7 +123,8 @@ matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, in
 print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
 
 # Sample from the model RNN
-mod_stc = model.sample_state_time_course(n_samples=25000)
+mod_alpha = model.sample_alpha(n_samples=20000)
+mod_stc = states.time_courses(mod_alpha)
 
 # Plot lifetime distributions for the ground truth, inferred state time course
 # and sampled state time course

@@ -18,20 +18,20 @@ from vrad.utils import plotting
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25000
+n_samples = 25600
 observation_error = 0.2
 gamma_shape = 20
 gamma_scale = 10
 
 n_states = 5
-sequence_length = 400
+sequence_length = 100
 batch_size = 32
 
 do_annealing = True
 annealing_sharpness = 10
 
 n_epochs = 300
-n_epochs_annealing = 150
+n_epochs_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -40,8 +40,8 @@ theta_normalization = None
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 96
+n_units_inference = 32
+n_units_model = 48
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -50,7 +50,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 0.25
+alpha_temperature = 0.15
 learn_alpha_scaling = False
 normalize_covariances = False
 

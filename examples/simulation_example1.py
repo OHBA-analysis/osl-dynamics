@@ -1,6 +1,6 @@
 """Example script for running inference on simulated HMM data.
 
-- Should achieve a dice coefficient of ~0.97.
+- Should achieve a dice coefficient of ~0.98.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -17,7 +17,7 @@ from vrad.simulation import HMMSimulation
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25000
+n_samples = 25600
 observation_error = 0.2
 
 n_states = 5
@@ -27,7 +27,7 @@ batch_size = 32
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 200
+n_epochs = 300
 n_epochs_annealing = 100
 
 rnn_type = "lstm"
@@ -47,7 +47,7 @@ learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 1.0
+alpha_temperature = 0.15
 learn_alpha_scaling = False
 normalize_covariances = False
 
