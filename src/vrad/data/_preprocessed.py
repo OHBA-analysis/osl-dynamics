@@ -17,20 +17,20 @@ class PreprocessedData(Data):
         Filenames to be read.
     store_dir : str
         Directory to save results and intermediate steps to.
-    output_file : str
+    prepared_data_file : str
         Filename to save memory map to.
     """
 
-    def __init__(self, inputs, store_dir="tmp", output_file=None):
+    def __init__(self, inputs, store_dir="tmp", prepared_data_file=None):
         super().__init__(inputs, store_dir)
-        if output_file is None:
-            self.output_file = f"dataset_{self._identifier}.npy"
+        if prepared_data_file is None:
+            self.prepared_data_file = f"dataset_{self._identifier}.npy"
 
     def prepare_memmap_filenames(self):
         self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
         )
-        self.output_pattern = "output_data_{{i:0{width}d}}_{identifier}.npy".format(
+        self.prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
         )
 
@@ -42,11 +42,13 @@ class PreprocessedData(Data):
         ]
 
         # Prepared data memory maps (time embedded and pca'ed)
-        self.output_memmaps = []
-        self.output_filenames = [
-            str(self.store_dir / self.output_pattern.format(i=i))
+        self.prepared_data_memmaps = []
+        self.prepared_data_filenames = [
+            str(self.store_dir / self.prepared_data_pattern.format(i=i))
             for i, _ in enumerate(self.inputs)
         ]
+        self.prepared_data_mean = []
+        self.prepared_data_std = []
 
     def prepare(
         self, n_embeddings: int, n_pca_components: int, whiten: bool = False,
@@ -101,24 +103,26 @@ class PreprocessedData(Data):
             u = u @ np.diag(1.0 / np.sqrt(s))
 
         # Apply PCA to the data for each subject and standardise again
-        for te_memmap, discontinuities, output_file in zip(
+        for te_memmap, discontinuities, prepared_data_file in zip(
             tqdm(self.te_memmaps, desc="Applying PCA", ncols=98),
             self.discontinuities,
-            self.output_filenames,
+            self.prepared_data_filenames,
         ):
             pca_te_shape = (
                 te_memmap.shape[0] - (n_embeddings + 1) * len(discontinuities),
                 n_pca_components,
             )
             pca_te_memmap = MockArray.get_memmap(
-                output_file, pca_te_shape, dtype=np.float32
+                prepared_data_file, pca_te_shape, dtype=np.float32
             )
             pca_te_memmap = te_memmap @ u
+            self.prepared_data_mean.append(np.mean(pca_te_memmap, axis=0))
+            self.prepared_data_std.append(np.std(pca_te_memmap, axis=0))
             pca_te_memmap = manipulation.standardize(pca_te_memmap, discontinuities)
-            self.output_memmaps.append(pca_te_memmap)
+            self.prepared_data_memmaps.append(pca_te_memmap)
 
         # Update subjects to return the prepared data
-        self.subjects = self.output_memmaps
+        self.subjects = self.prepared_data_memmaps
 
         self.prepared = True
         self.n_embeddings = n_embeddings
