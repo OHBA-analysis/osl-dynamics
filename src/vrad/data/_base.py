@@ -159,7 +159,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
 

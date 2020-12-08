@@ -760,7 +760,7 @@ def plot_state_lifetimes(
 
 
 def plot_state_time_courses(
-    *state_time_courses: List[np.ndarray],
+    *state_time_courses,
     n_samples: int = None,
     sampling_frequency: float = None,
     plot_kwargs: dict = None,
@@ -786,7 +786,6 @@ def plot_state_time_courses(
     """
 
     state_time_courses = np.asarray(state_time_courses)
-    n_lines = len(state_time_courses)
     n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
     n_states = state_time_courses[0].shape[1]
 
@@ -795,22 +794,22 @@ def plot_state_time_courses(
     else:
         time_vector = np.linspace(0, n_samples, n_samples)
 
-    default_fig_kwargs = {"figsize": (20, 10)}
+    default_fig_kwargs = {"figsize": (20, 10), "sharex": "all"}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
-    fig, axis = plt.subplots(n_states, **fig_kwargs)
+    fig, axes = plt.subplots(n_states, **fig_kwargs)
 
     default_plot_kwargs = {"lw": 0.7}
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
-    for i in range(n_lines):
-        for j in range(n_states):
-            axis[j].plot(
-                time_vector, state_time_courses[i][:n_samples, j], **plot_kwargs
-            )
-            if sampling_frequency is not None:
-                axis[j].set_xlabel("Time (s)")
-            else:
-                axis[j].set_xlabel("Samples")
+    for group in state_time_courses:
+        for axis, state in zip(axes, group.T):
+            axis.plot(time_vector, state[:n_samples], **plot_kwargs)
+            axis.autoscale(axis="x", tight=True)
+
+    if sampling_frequency is not None:
+        axes[-1].set_xlabel("Time (s)")
+    else:
+        axes[-1].set_xlabel("Samples")
 
     plt.tight_layout()
     show_or_save(filename)
@@ -990,6 +989,9 @@ def topoplot(
     show_names: bool = False,
     title: str = None,
     colorbar: bool = True,
+    axis: plt.Axes = None,
+    max_value: float = None,
+    min_value: float = None,
 ):
     """Make a contour plot in sensor space.
 
@@ -1016,6 +1018,8 @@ def topoplot(
         A title for the figure.
     colorbar: bool
         Show a colorbar for the field.
+    axis: matplotlib.pyplot.Axes
+        matplotlib axis to plot on.
     """
     topology = Topology(layout)
     if channel_names is not None:
@@ -1027,6 +1031,7 @@ def topoplot(
         show_names=show_names,
         title=title,
         colorbar=colorbar,
+        axis=axis,
     )
 
 

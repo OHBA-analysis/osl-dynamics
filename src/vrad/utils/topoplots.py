@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import List, Union
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -153,6 +154,9 @@ class Topology:
         title: str = None,
         show_deleted_sensors: bool = False,
         colorbar: bool = True,
+        axis: plt.Axes = None,
+        max_value: float = None,
+        min_value: float = None,
     ):
         """Interpolate the data in sensor-space and plot it.
 
@@ -176,9 +180,18 @@ class Topology:
             Plot the sensors which have been deleted, in red.
         colorbar: bool
             Display colorbar
+        axis: matplotlib.pyplot.Axes
+            matplotlib axis to plot on.
         """
-        fig, axis = plt.subplots(figsize=(15, 15))
-        axis.set_aspect(1)
+        if axis is None:
+            fig, axis = plt.subplots(figsize=(15, 15))
+        else:
+            fig = axis.get_figure()
+        axis.set_aspect("equal")
+
+        norm = matplotlib.colors.Normalize(vmin=min_value, vmax=max_value)
+        cmap = matplotlib.cm.get_cmap("RdBu_r")
+        mappable = matplotlib.cm.ScalarMappable(norm, cmap)
 
         # Create a grid over the bounding area of the Topology.
         grid_x, grid_y = np.mgrid[
@@ -194,7 +207,7 @@ class Topology:
         )
 
         # Create a filled contour plot over the interpolated data.
-        contour = axis.contourf(grid_x, grid_y, grid_z, cmap="RdBu_r", alpha=0.7)
+        axis.contourf(grid_x, grid_y, grid_z, cmap="RdBu_r", alpha=0.7)
 
         if self.outline:
             for o in self.outline:
@@ -251,7 +264,7 @@ class Topology:
         if colorbar:
             divider = make_axes_locatable(axis)
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(contour, cax=cax)
+            plt.colorbar(mappable, cax=cax)
             cax.set_title("fT")
 
         if title:
@@ -270,4 +283,4 @@ class Topology:
 
         fig.patch.set_facecolor("white")
 
-        plt.show()
+        return fig
