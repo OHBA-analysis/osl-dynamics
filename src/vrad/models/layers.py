@@ -411,7 +411,10 @@ class LogLikelihoodLayer(layers.Layer):
 
         # Calculate the log likelihood
         # We ignore the first term which is a constant
-        ll_loss = tf.reduce_sum(second_term + third_term)
+        ll_loss = tf.reduce_sum(second_term + third_term, axis=1)
+
+        # Average over the batch dimension
+        ll_loss = tf.reduce_mean(ll_loss, axis=0)
 
         # We return the negative of the log likelihood
         nll_loss = -ll_loss
@@ -448,7 +451,14 @@ class KLDivergenceLayer(layers.Layer):
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
-        kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
+        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
+
+        # Sum the KL loss for state and time point
+        kl_loss = tf.reduce_sum(kl_loss, axis=2)
+        kl_loss = tf.reduce_sum(kl_loss, axis=1)
+
+        # Average over the batch dimension
+        kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
         return tf.expand_dims(kl_loss, axis=-1)
 
