@@ -101,6 +101,7 @@ class PreprocessedData(Data):
         s = s[:n_pca_components]
         if whiten:
             u = u @ np.diag(1.0 / np.sqrt(s))
+        self.pca_weights = u
 
         # Apply PCA to the data for each subject and standardise again
         for te_memmap, discontinuities, prepared_data_file in zip(
@@ -115,7 +116,7 @@ class PreprocessedData(Data):
             pca_te_memmap = MockArray.get_memmap(
                 prepared_data_file, pca_te_shape, dtype=np.float32
             )
-            pca_te_memmap = te_memmap @ u
+            pca_te_memmap = te_memmap @ self.pca_weights
             self.prepared_data_mean.append(np.mean(pca_te_memmap, axis=0))
             self.prepared_data_std.append(np.std(pca_te_memmap, axis=0))
             pca_te_memmap = manipulation.standardize(pca_te_memmap, discontinuities)
@@ -161,3 +162,60 @@ class PreprocessedData(Data):
                 memmap = memmap[: n_sequences * sequence_length]
             trimmed_raw_time_series.append(memmap)
         return trimmed_raw_time_series
+
+    def autocorrelation_function(self, covariances: np.ndarray) -> np.ndarray:
+        """Calculates autocorrelation functions from the state covariance.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            State covariances. Shape is (n_states, n_channels, n_channels).
+
+        Returns
+        -------
+        np.ndarray
+            Autocorrelation function.
+            Shape is (n_states, n_channels, n_channels, n_acf).
+        """
+        n_states = covariances.shape[0]
+        n_te_channels = self.pca_weights.shape[0]
+        n_embeddings = self.n_embeddings
+        n_channels = n_te_channels // (n_embeddings + 2)
+        n_acf = 2 * (n_embeddings + 2) - 1
+
+        # Reverse the PCA
+        covariances = self.pca_weights @ covariances @ self.pca_weights.T
+
+        # Calculate the standard deviation of each channel in the preprocessed data
+        raw_data_std = np.std(np.concatenate(self.raw_data, axis=0), axis=0)
+
+        # We need to repeat the standard deviations because the covariance matrix
+        # is of the time embedded data
+        raw_data_std = np.repeat(raw_data_std, n_embeddings + 2)
+
+        # Multiply each channel by the standard deviation of the preprocessed data
+        for i in range(n_states):
+            covariances[i] = (
+                np.diag(raw_data_std) @ covariances[i] @ np.diag(raw_data_std)
+            )
+
+        # Get autocorrelation function
+        autocorrelation_function = np.empty([n_states, n_channels, n_channels, n_acf])
+        for i in range(n_states):
+            for j in range(n_channels):
+                for k in range(n_channels):
+
+                    # Auto/cross-correlation between channel j and channel k of state i
+                    autocorrelation_function_jk = covariances[
+                        i,
+                        j * (n_embeddings + 2) : (j + 1) * (n_embeddings + 2),
+                        k * (n_embeddings + 2) : (k + 1) * (n_embeddings + 2),
+                    ]
+
+                    # Take elements from the first row and column
+                    autocorrelation_function[i, j, k] = np.append(
+                        autocorrelation_function_jk[0][::-1],
+                        autocorrelation_function_jk[1:, 0],
+                    )
+
+        return autocorrelation_function

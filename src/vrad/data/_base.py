@@ -47,10 +47,12 @@ class Data:
         self.subjects = self.raw_data_memmaps
 
         # Raw data statistics
-        self.raw_mean = [
+        self.raw_data_mean = [
             np.mean(raw_data, axis=0) for raw_data in self.raw_data_memmaps
         ]
-        self.raw_std = [np.std(raw_data, axis=0) for raw_data in self.raw_data_memmaps]
+        self.raw_data_std = [
+            np.std(raw_data, axis=0) for raw_data in self.raw_data_memmaps
+        ]
 
         # Validation
         self.validate_subjects()
