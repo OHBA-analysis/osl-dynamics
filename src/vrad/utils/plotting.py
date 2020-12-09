@@ -631,7 +631,7 @@ def add_axis_colorbar(axis: plt.Axes):
         pl = axis.get_images()[0]
         divider = make_axes_locatable(axis)
         cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(pl, cax=cax)
+        return plt.colorbar(pl, cax=cax)
     except IndexError:
         _logger.warning("No mappable image found on axis.")
 
@@ -650,7 +650,7 @@ def add_figure_colorbar(fig: plt.Figure, mappable):
     """
     fig.subplots_adjust(right=0.94)
     color_bar_axis = fig.add_axes([0.95, 0.15, 0.025, 0.7])
-    fig.colorbar(mappable, cax=color_bar_axis)
+    return fig.colorbar(mappable, cax=color_bar_axis)
 
 
 @transpose(0, "state_time_course")
