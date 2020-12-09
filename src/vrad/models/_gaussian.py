@@ -42,8 +42,6 @@ class RNNGaussian(BaseModel):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-    learn_means : bool
-        Should we learn the mean vector for each state?
     learn_covariances : bool
         Should we learn the covariance matrix for each state?
     rnn_type : str
@@ -99,7 +97,6 @@ class RNNGaussian(BaseModel):
         n_states: int,
         n_channels: int,
         sequence_length: int,
-        learn_means: bool,
         learn_covariances: bool,
         rnn_type: str,
         rnn_normalization: str,
@@ -130,7 +127,6 @@ class RNNGaussian(BaseModel):
             )
 
         # Parameters related to the observation model
-        self.learn_means = learn_means
         self.learn_covariances = learn_covariances
         self.initial_means = initial_means
         self.initial_covariances = initial_covariances
@@ -177,7 +173,7 @@ class RNNGaussian(BaseModel):
             dropout_rate_inference=self.dropout_rate_inference,
             dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
-            learn_means=self.learn_means,
+            learn_means=False,
             learn_covariances=self.learn_covariances,
             initial_means=self.initial_means,
             initial_covariances=self.initial_covariances,
@@ -347,8 +343,8 @@ class RNNGaussian(BaseModel):
         means_covs_layer.trainable = True
         self.compile()
 
-    def get_means_covariances(self, alpha_scale=True):
-        """Get the means and covariances of each state.
+    def get_covariances(self, alpha_scale=True):
+        """Get the covariances of each state.
 
         Parameters
         ----------
@@ -357,53 +353,40 @@ class RNNGaussian(BaseModel):
 
         Returns
         -------
-        means : np.ndarray
-            State means.
-        covariances : np.ndarary
+        np.ndarary
             State covariances.
         """
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
-        means = means_covs_layer.means.numpy()
         cholesky_covariances = means_covs_layer.cholesky_covariances
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
 
         # Normalise covariances
         if self.normalize_covariances:
-            covariances = trace_normalize(covariances)
+            covariances = trace_normalize(covariances).numpy()
 
         # Apply alpha scaling
         if alpha_scale:
             alpha_scaling = self.get_alpha_scaling()
-            means *= alpha_scaling[:, np.newaxis]
             covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
 
-        return means, covariances
+        return covariances
 
-    def set_means_covariances(self, means=None, covariances=None):
-        """Set the means and covariances of each state.
+    def set_covariances(self, covariances):
+        """Set the covariances of each state.
 
         Parameters
         ----------
-        means : np.ndarray
-            State means.
         covariances : np.ndarray
             State covariances.
         """
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.get_weights()
 
-        # Replace means in the layer weights
-        if means is not None:
-            for i in range(len(layer_weights)):
-                if layer_weights[i].shape == means.shape:
-                    layer_weights[i] = means
-
         # Replace covariances in the layer weights
-        if covariances is not None:
-            for i in range(len(layer_weights)):
-                if layer_weights[i].shape == covariances.shape:
-                    layer_weights[i] = cholesky_factor(covariances)
+        for i in range(len(layer_weights)):
+            if layer_weights[i].shape == covariances.shape:
+                layer_weights[i] = cholesky_factor(covariances)
 
         # Set the weights of the layer
         means_covs_layer.set_weights(layer_weights)

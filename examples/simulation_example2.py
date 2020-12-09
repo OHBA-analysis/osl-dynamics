@@ -46,7 +46,6 @@ n_units_model = 96
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
@@ -84,7 +83,6 @@ model = RNNGaussian(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
-    learn_means=learn_means,
     learn_covariances=learn_covariances,
     rnn_type=rnn_type,
     rnn_normalization=rnn_normalization,
