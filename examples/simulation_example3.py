@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 from vrad import data
-from vrad.inference import states, tf_ops
+from vrad.inference import states, tf_ops, metrics
 from vrad.models import RNNGaussian
 from vrad.simulation import MixedHSMMSimulation
 from vrad.utils import plotting
@@ -110,8 +110,11 @@ model = RNNGaussian(
 )
 model.summary()
 
+"""
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
+"""
+model.load_weights("weights")
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
@@ -123,6 +126,9 @@ matched_sim_stc, matched_alpha = states.match_states(sim.state_time_course, alph
 plotting.plot_state_time_courses(
     matched_alpha, matched_sim_stc, n_samples=10000, filename="stc.png"
 )
+
+corr = metrics.correlation(matched_alpha, matched_sim_stc)
+print("Correlation (VRAD vs Simulation):", corr)
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

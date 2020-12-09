@@ -7,6 +7,33 @@ from sklearn.metrics import confusion_matrix as sklearn_confusion
 from vrad.utils.decorators import transpose
 
 
+def correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
+    """Calculates the correlation between states of two alpha time series.
+
+    Parameters
+    ----------
+    alpha_1 : np.ndarray
+        First alpha time series. Shape is (n_samples, n_states).
+    alpha_2 : np.ndarray
+        Second alpha time series. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    np.ndarray
+        Correlation of each state in the corresponding alphas.
+        Shape is (n_states,).
+    """
+    if alpha_1.shape[1] != alpha_2.shape[1]:
+        raise ValueError(
+            "alpha_1 and alpha_2 shapes are incomptible. "
+            + f"alpha_1.shape={alpha_1.shape}, alpha_2.shape={alpha_2.shape}."
+        )
+    n_states = alpha_1.shape[1]
+    corr = np.corrcoef(alpha_1, alpha_2, rowvar=False)
+    corr = np.diagonal(corr[:n_states, n_states:])
+    return corr
+
+
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
 def confusion_matrix(
     state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
