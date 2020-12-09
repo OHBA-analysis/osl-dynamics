@@ -1208,3 +1208,63 @@ def plot_connections(
         plt.setp(ax.spines.values(), visible=False)
 
     return ax
+
+
+def state_stackplots(
+    *state_time_courses: np.ndarray,
+    cmap: str = "magma",
+    sampling_frequency: float = None,
+    fig_kwargs: dict = None,
+) -> plt.Figure:
+    """
+
+    Parameters
+    ----------
+    state_time_courses : numpy.ndarray
+        A selection of state time courses passed as separate arguments.
+    cmap : str
+        A matplotlib colormap string.
+    sampling_frequency : float
+        The sampling frequency of the data in Hertz.
+    fig_kwargs : dict
+        Any parameters to be passed to the matplotlib.pyplot.subplots constructor.
+
+    Returns
+    -------
+    plt.Figure
+    """
+    n_states = max(stc.shape[1] for stc in state_time_courses)
+    cmap = plt.cm.get_cmap(name=cmap, lut=n_states)
+    colors = cmap.colors
+
+    n_stcs = len(state_time_courses)
+
+    default_fig_kwargs = dict(
+        figsize=(12, 2.5 * n_stcs), sharex="all", facecolor="white"
+    )
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    fig, axes = plt.subplots(nrows=n_stcs, **fig_kwargs)
+
+    for stc, axis in zip(state_time_courses, axes):
+        time_vector = (
+            np.arange(len(stc)) / sampling_frequency
+            if sampling_frequency
+            else range(len(stc))
+        )
+        axis.stackplot(time_vector, stc.T, colors=colors)
+        axis.autoscale(tight=True)
+        axis.set_ylabel("State activation")
+
+    axes[-1].set_xlabel("Time (s)" if sampling_frequency else "Samples")
+
+    fig.tight_layout()
+
+    add_figure_colorbar(
+        fig,
+        plt.cm.ScalarMappable(
+            norm=matplotlib.colors.Normalize(vmin=-0.5, vmax=n_states - 0.5), cmap=cmap
+        ),
+    )
+
+    return fig
