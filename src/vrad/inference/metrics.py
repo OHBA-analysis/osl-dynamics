@@ -1,9 +1,11 @@
 """Metrics to analyse model performance.
 
 """
+from typing import Tuple
 
 import numpy as np
 from sklearn.metrics import confusion_matrix as sklearn_confusion
+from vrad.inference.states import state_lifetimes
 from vrad.utils.decorators import transpose
 
 
@@ -251,3 +253,24 @@ def log_likelihood(
         nll -= np.squeeze(second_term + third_term)
 
     return nll
+
+
+def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
+    """Calculate statistics of the lifetime distribution of each state.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    means
+        Mean lifetime of each state.
+    std
+        Standard deviation of each state.
+    """
+    lifetimes = state_lifetimes(state_time_course)
+    mean = np.array([np.mean(lt) for lt in lifetimes])
+    std = np.array([np.std(lt) for lt in lifetimes])
+    return mean, std

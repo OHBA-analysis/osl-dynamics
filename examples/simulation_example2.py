@@ -129,5 +129,14 @@ plotting.plot_state_lifetimes(sim_stc, filename="sim_lt.png")
 plotting.plot_state_lifetimes(inf_stc, filename="inf_lt.png")
 plotting.plot_state_lifetimes(mod_stc, filename="mod_lt.png")
 
+# Compare lifetime statistics
+sim_lt_mean, sim_lt_std = metrics.lifetime_statistics(sim_stc)
+inf_lt_mean, inf_lt_std = metrics.lifetime_statistics(inf_stc)
+mod_lt_mean, mod_lt_std = metrics.lifetime_statistics(mod_stc)
+
+print("Lifetime mean (Simulation):", sim_lt_mean)
+print("Lifetime mean (Inferred):  ", inf_lt_mean)
+print("Lifetime mean (Sample):    ", mod_lt_mean)
+
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
