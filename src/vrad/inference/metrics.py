@@ -57,7 +57,8 @@ def confusion_matrix(
 
     Returns
     -------
-    confusion_matrix: numpy.ndarray
+    numpy.ndarray
+        Confusion matrix
     """
     if state_time_course_1.ndim == 2:
         state_time_course_1 = state_time_course_1.argmax(axis=1)
@@ -87,7 +88,7 @@ def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float
 
     Returns
     -------
-    dice_coefficient : float
+    float
         The Dice coefficient of the two sequences.
 
     Raises
@@ -126,7 +127,7 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
 
     Returns
     -------
-    dice_coefficient : float
+    float
         The Dice coefficient of the two sequences.
 
     See Also
@@ -198,14 +199,14 @@ def log_likelihood(
     covariances: np.ndarray,
     means: np.ndarray = None,
 ) -> float:
-    """Calculates the log likelihood.
+    """Calculates the negative log likelihood.
 
-    The log likelihood is calculated as:
+    The negative log likelihood is calculated as:
 
-    c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+    0.5 * N * log(2*pi) - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
 
     where x is a single observation, mu is the mean vector, sigma is the
-    covariance matrix and c is a constant.
+    covariance matrix and N is the number of channels.
 
     Parameters
     ----------
@@ -214,13 +215,13 @@ def log_likelihood(
     state_mixing_factors : np.ndarary
         Times series containing the state mixing factors alpha_t.
     covariances : np.ndarray
-        Covariance matrix for each state.
+        Covariance matrix for each state. Shape is (n_states, n_channels, n_channels).
     means : np.ndarray
-        Mean vector for each state.
+        Mean vector for each state. Shape is (n_states, n_channels).
 
     Returns
     -------
-    nll: float
+    float
         The negative of the log likelihood.
     """
     if means is None:
@@ -228,6 +229,9 @@ def log_likelihood(
 
     # Negative log likelihood
     nll = 0
+
+    # Calculate first term
+    first_term = 0.5 * covariances.shape[1] * np.log(2.0 * np.pi)
 
     # Loop through the data
     for i in range(state_mixing_factors.shape[0]):
@@ -249,8 +253,7 @@ def log_likelihood(
         third_term = -0.5 * x_minus_mu_T @ inv_sigma @ x_minus_mu
 
         # Calculate the negative log likelihood
-        # We ignore the first term which is a constant
-        nll -= np.squeeze(second_term + third_term)
+        nll += np.squeeze(first_term - second_term - third_term)
 
     return nll
 
@@ -265,9 +268,9 @@ def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
 
     Returns
     -------
-    means
+    means : np.ndarray
         Mean lifetime of each state.
-    std
+    std : np.ndarray
         Standard deviation of each state.
     """
     lifetimes = state_lifetimes(state_time_course)

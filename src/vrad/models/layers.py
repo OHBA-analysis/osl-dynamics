@@ -380,10 +380,8 @@ class MixMeansCovsLayer(layers.Layer):
 class LogLikelihoodLayer(layers.Layer):
     """Layer to calculate the negative log likelihood.
 
-    The log-likelihood is calculated as:
-    c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-    where x is a single observation, mu is the mean vector, sigma is the
-    covariance matrix and c is a constant.
+    The negative log-likelihood is calculated assuming a multivariate normal
+    probability density.
     """
 
     def __init__(self, **kwargs):
@@ -395,24 +393,14 @@ class LogLikelihoodLayer(layers.Layer):
     def call(self, inputs):
         x, mu, sigma = inputs
 
-        x = tf.expand_dims(x, axis=2)
-        mu = tf.expand_dims(mu, axis=2)
+        # Calculate the log-likelihood
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=mu, scale_tril=tf.linalg.cholesky(sigma)
+        )
+        ll_loss = mvn.log_prob(x)
 
-        # Calculate second term: -0.5 * log(|sigma|)
-        second_term = -0.5 * tf.linalg.logdet(sigma)
-
-        # Calculate third term: -0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-        inv_sigma = tf.linalg.inv(sigma + 1e-8 * tf.eye(sigma.shape[-1]))
-        x_minus_mu = tf.subtract(x, mu)
-        x_minus_mu_T = tf.transpose(x_minus_mu, perm=[0, 1, 3, 2])
-        third_term = -0.5 * tf.matmul(tf.matmul(x_minus_mu, inv_sigma), x_minus_mu_T)
-        third_term = tf.squeeze(tf.squeeze(third_term, axis=3), axis=2)
-
-        # Calculate the log likelihood
-        # We ignore the first term which is a constant
-        ll_loss = tf.reduce_sum(second_term + third_term, axis=1)
-
-        # Average over the batch dimension
+        # Sum over time dimension and average over the batch dimension
+        ll_loss = tf.reduce_sum(ll_loss, axis=1)
         ll_loss = tf.reduce_mean(ll_loss, axis=0)
 
         # We return the negative of the log likelihood
