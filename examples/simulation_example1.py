@@ -109,13 +109,16 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time course
-alpha = model.predict_states(prediction_dataset)[0]
-inf_stc = states.time_courses(alpha)
+inf_alpha = model.predict_states(prediction_dataset)[0]
+inf_stc = states.time_courses(inf_alpha)
+sim_stc = sim.state_time_course
 
-# Find correspondance to ground truth state time courses
-matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
+sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
+print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
-print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
+# Fractional occupancies
+print("Fractional occupancies (Simulation):", metrics.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", metrics.fractional_occupancies(inf_stc))
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

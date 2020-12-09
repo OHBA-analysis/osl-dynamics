@@ -112,13 +112,12 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time course
-alpha = model.predict_states(prediction_dataset)[0]
-inf_stc = states.time_courses(alpha)
+inf_alpha = model.predict_states(prediction_dataset)[0]
+inf_stc = states.time_courses(inf_alpha)
+sim_stc = sim.state_time_course
 
-# Find correspondance to ground truth state time courses
-matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
-
-print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
+sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
+print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Sample from the model RNN
 mod_alpha = model.sample_alpha(n_samples=20000)
@@ -126,7 +125,7 @@ mod_stc = states.time_courses(mod_alpha)
 
 # Plot lifetime distributions for the ground truth, inferred state time course
 # and sampled state time course
-plotting.plot_state_lifetimes(sim.state_time_course, filename="sim_lt.png")
+plotting.plot_state_lifetimes(sim_stc, filename="sim_lt.png")
 plotting.plot_state_lifetimes(inf_stc, filename="inf_lt.png")
 plotting.plot_state_lifetimes(mod_stc, filename="mod_lt.png")
 
