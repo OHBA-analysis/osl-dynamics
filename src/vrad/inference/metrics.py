@@ -115,6 +115,38 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     return dice_coefficient_1d(sequence_1, sequence_2)
 
 
+def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
+    """Calculates the frobenius norm of the difference of two matrices.
+
+    The Frobenius norm is calculated as sqrt( Sum_ij abs(a_ij - b_ij)^2 ).
+
+    Parameters
+    ----------
+    A : np.ndarray
+        First matrix. Shape must be (n_states, n_channels, n_channels) or
+        (n_channels, n_channels).
+    B : np.ndarray
+        Second matrix. Shape must be (n_states, n_channels, n_channels) or
+        (n_channels, n_channels).
+
+    Returns
+    -------
+    float
+        The Frobenius norm of the difference of A and B. If A and B are
+        stacked matrices, we sum the Frobenius norm of each sub-matrix.
+    """
+    if A.ndim == 2 and B.ndim == 2:
+        norm = np.linalg.norm(A - B, ord="fro")
+    elif A.ndim == 3 and B.ndim == 3:
+        norm = np.linalg.norm(A - B, ord="fro", axis=(1, 2))
+        norm = np.sum(norm)
+    else:
+        raise ValueError(
+            f"Shape of A and/or B is incorrect. A.shape={A.shape}, B.shape={B.shape}."
+        )
+    return norm
+
+
 def log_likelihood(
     time_series: np.ndarray,
     state_mixing_factors: np.ndarray,
