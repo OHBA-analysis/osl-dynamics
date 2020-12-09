@@ -29,7 +29,7 @@ def cholesky_factor_to_full_matrix(cholesky_factor: tf.Tensor):
     Parameters
     ----------
     cholesky_factor : tf.Tensor
-        Cholesky factor of the matrix. Only the upper triangle of this tensor is used.
+        Cholesky factor of the matrix. Only the lower triangle of this tensor is used.
         Shape is (None, n_states, n_channels, n_channels).
 
     Returns
@@ -44,15 +44,7 @@ def cholesky_factor_to_full_matrix(cholesky_factor: tf.Tensor):
 
     # Calculate the full matrix
     full_matrix = tf.matmul(cholesky_factor, tf.transpose(cholesky_factor, (0, 2, 1)))
-    full_matrix = tf.add(
-        full_matrix,
-        1e-6
-        * tf.eye(
-            full_matrix.shape[1],
-            batch_shape=[cholesky_factor.shape[0]],
-            dtype=full_matrix.dtype,
-        ),
-    )
+
     return full_matrix
 
 
