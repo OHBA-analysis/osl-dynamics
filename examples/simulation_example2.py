@@ -24,13 +24,13 @@ gamma_shape = 10
 gamma_scale = 5
 
 n_states = 5
-sequence_length = 400
-batch_size = 32
+sequence_length = 200
+batch_size = 16
 
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 300
+n_epochs = 200
 n_epochs_annealing = 100
 
 rnn_type = "lstm"
@@ -41,7 +41,7 @@ n_layers_inference = 1
 n_layers_model = 1
 
 n_units_inference = 64
-n_units_model = 96
+n_units_model = 64
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -49,7 +49,7 @@ dropout_rate_model = 0.0
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 0.15
+alpha_temperature = 0.2
 learn_alpha_scaling = False
 normalize_covariances = False
 

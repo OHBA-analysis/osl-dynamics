@@ -4,8 +4,8 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.73 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~27,900,000.
+- Achieves a dice coefficient of ~0.74 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~1,800,000.
 """
 
 print("Setting up")
@@ -38,7 +38,7 @@ n_layers_inference = 1
 n_layers_model = 1
 
 n_units_inference = 64
-n_units_model = 96
+n_units_model = 64
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
