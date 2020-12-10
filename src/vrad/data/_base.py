@@ -187,3 +187,58 @@ class Data:
         ]
 
         return subject_datasets
+
+    def covariance_training_datasets(
+        self,
+        alpha_t: list,
+        sequence_length: int,
+        batch_size: int,
+        step_size: int = None,
+    ) -> tensorflow.data.Dataset:
+        """Dataset for training covariances with a fixed alpha_t.
+
+        Parameters
+        ----------
+        alpha_t : list of np.ndarray
+            List of state mixing factors for each subject.
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+        step_size : int
+            We can produce sequences with overlaping data. step_size=sequence_length
+            will give non-overlaping sequences, step_size=sequence_length/2 will give
+            sequences with 50% overlap. Default is no overlap.
+
+        Returns
+        -------
+        list of tensorflow.data.Dataset
+            Subject-specific datasets for training the covariances.
+        """
+        num_batches = self.count_batches(sequence_length, step_size)
+
+        subject_datasets = []
+        for i in range(len(self.subjects)):
+
+            subject = self.subjects[i]
+            subject_data = Dataset.from_tensor_slices(subject).batch(sequence_length)
+
+            alpha = alpha_t[i]
+            alpha_data = Dataset.from_tensor_slices(alpha).batch(sequence_length)
+
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(num_batches[i], dtype=np.float32) + i
+            )
+
+            subject_dataset = Dataset.zip(
+                ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
+            )
+            subject_dataset = (
+                subject_dataset.shuffle(100000)
+                .batch(batch_size)
+                .shuffle(100000)
+                .prefetch(-1)
+            )
+            subject_datasets.append(subject_dataset)
+
+        return subject_datasets

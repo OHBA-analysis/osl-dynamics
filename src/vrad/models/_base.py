@@ -7,7 +7,6 @@ from io import StringIO
 
 import numpy as np
 from tensorflow import Variable
-from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -17,7 +16,6 @@ from tqdm.keras import TqdmCallback
 from vrad.data import Data
 from vrad.inference import initializers
 from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
-from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
 from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.utils.misc import check_iterable_type, replace_argument
 from vrad.utils.model import HTMLTable, LatexTable
@@ -36,26 +34,6 @@ class BaseModel:
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-    rnn_type : str
-        RNN to use, either 'lstm' or 'gru'.
-    rnn_normalization : str
-        Type of normalization to use in the inference network and generative model.
-        Either 'layer', 'batch' or None.
-    n_layers_inference : int
-        Number of layers in the inference network.
-    n_layers_model : int
-        Number of layers in the generative model neural network.
-    n_units_inference : int
-        Number of units/neurons in the inference network.
-    n_units_model : int
-        Number of units/neurons in the generative model neural network.
-    dropout_rate_inference : float
-        Dropout rate in the inference network.
-    dropout_rate_model : float
-        Dropout rate in the generative model neural network.
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta_t.
-        Either 'layer', 'batch' or None.
     do_annealing : bool
         Should we use KL annealing during training?
     annealing_sharpness : float
@@ -75,15 +53,6 @@ class BaseModel:
         n_states: int,
         n_channels: int,
         sequence_length: int,
-        rnn_type: str,
-        rnn_normalization: str,
-        n_layers_inference: int,
-        n_layers_model: int,
-        n_units_inference: int,
-        n_units_model: int,
-        dropout_rate_inference: float,
-        dropout_rate_model: float,
-        theta_normalization: str,
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
@@ -94,25 +63,6 @@ class BaseModel:
         # Validation
         if sequence_length < 1:
             raise ValueError("sequence_length must be greater than zero.")
-
-        if rnn_type not in ["lstm", "gru"]:
-            raise ValueError("rnn_type must be 'lstm' or 'gru'.")
-
-        if n_layers_inference < 1 or n_layers_model < 1:
-            raise ValueError("n_layers must be greater than zero.")
-
-        if n_units_inference < 1 or n_units_model < 1:
-            raise ValueError("n_units must be greater than zero.")
-
-        if dropout_rate_inference < 0 or dropout_rate_model < 0:
-            raise ValueError("dropout_rate must be greater than or equal to zero.")
-
-        if rnn_normalization not in [
-            "layer",
-            "batch",
-            None,
-        ] or theta_normalization not in ["layer", "batch", None]:
-            raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
         if annealing_sharpness <= 0:
             raise ValueError("annealing_sharpness must be greater than zero.")
@@ -128,21 +78,10 @@ class BaseModel:
         # Identifier for the model
         self._identifier = np.random.randint(100000)
 
-        # Number of latent states and dimensionality of the data
+        # Number of latent states, dimensionality of the data and seequence length
         self.n_states = n_states
         self.n_channels = n_channels
-
-        # Model hyperparameters
         self.sequence_length = sequence_length
-        self.rnn_type = rnn_type
-        self.rnn_normalization = rnn_normalization
-        self.n_layers_inference = n_layers_inference
-        self.n_layers_model = n_layers_model
-        self.n_units_inference = n_units_inference
-        self.n_units_model = n_units_model
-        self.dropout_rate_inference = dropout_rate_inference
-        self.dropout_rate_model = dropout_rate_model
-        self.theta_normalization = theta_normalization
 
         # KL annealing
         self.do_annealing = do_annealing
@@ -175,27 +114,10 @@ class BaseModel:
         """Build a keras model."""
         pass
 
-    def compile(self, optimizer=None):
-        """Wrapper for the standard keras compile method.
-
-        Sets up the optimiser and loss functions.
-
-        Parameters
-        ----------
-        tensorflow.keras.optimizers
-            Optimizer to use for training. Default is Adam.
-        """
-        # Setup optimizer
-        if optimizer is None:
-            optimizer = optimizers.Adam(learning_rate=self.learning_rate)
-
-        # Loss functions
-        ll_loss = LogLikelihoodLoss()
-        kl_loss = KullbackLeiblerLoss(self.annealing_factor)
-        loss = [ll_loss, kl_loss]
-
-        # Compile
-        self.model.compile(optimizer=optimizer, loss=loss)
+    @abstractmethod
+    def compile(self):
+        """Wrapper for the standard keras compile method."""
+        pass
 
     def create_callbacks(
         self,

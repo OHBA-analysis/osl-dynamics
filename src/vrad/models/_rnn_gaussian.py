@@ -6,7 +6,7 @@ import logging
 from operator import lt
 
 import numpy as np
-from tensorflow.keras import Model, layers
+from tensorflow.keras import Model, layers, optimizers
 from tensorflow.nn import softplus
 from tqdm import trange
 from vrad.inference.functions import (
@@ -26,6 +26,7 @@ from vrad.models.layers import (
     SampleNormalDistributionLayer,
     StateMixingFactorsLayer,
 )
+from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
 from vrad.utils.misc import check_arguments
 
 _logger = logging.getLogger("VRAD")
@@ -118,10 +119,40 @@ class RNNGaussian(BaseModel):
         initial_covariances: np.ndarray = None,
     ):
         # Validation
+        if rnn_type not in ["lstm", "gru"]:
+            raise ValueError("rnn_type must be 'lstm' or 'gru'.")
+
+        if n_layers_inference < 1 or n_layers_model < 1:
+            raise ValueError("n_layers must be greater than zero.")
+
+        if n_units_inference < 1 or n_units_model < 1:
+            raise ValueError("n_units must be greater than zero.")
+
+        if dropout_rate_inference < 0 or dropout_rate_model < 0:
+            raise ValueError("dropout_rate must be greater than or equal to zero.")
+
+        if rnn_normalization not in [
+            "layer",
+            "batch",
+            None,
+        ] or theta_normalization not in ["layer", "batch", None]:
+            raise ValueError("normalization type must be 'layer', 'batch' or None.")
+
         if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:
             raise ValueError(
                 "alpha_xform must be 'categorical', 'softmax', 'softplus' or 'relu'."
             )
+
+        # RNN and inference hyperparameters
+        self.rnn_type = rnn_type
+        self.rnn_normalization = rnn_normalization
+        self.n_layers_inference = n_layers_inference
+        self.n_layers_model = n_layers_model
+        self.n_units_inference = n_units_inference
+        self.n_units_model = n_units_model
+        self.dropout_rate_inference = dropout_rate_inference
+        self.dropout_rate_model = dropout_rate_model
+        self.theta_normalization = theta_normalization
 
         # Parameters related to the observation model
         self.learn_covariances = learn_covariances
@@ -137,15 +168,6 @@ class RNNGaussian(BaseModel):
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            rnn_type=rnn_type,
-            rnn_normalization=rnn_normalization,
-            n_layers_inference=n_layers_inference,
-            n_layers_model=n_layers_model,
-            n_units_inference=n_units_inference,
-            n_units_model=n_units_model,
-            dropout_rate_inference=dropout_rate_inference,
-            dropout_rate_model=dropout_rate_model,
-            theta_normalization=theta_normalization,
             do_annealing=do_annealing,
             annealing_sharpness=annealing_sharpness,
             n_epochs_annealing=n_epochs_annealing,
@@ -178,6 +200,22 @@ class RNNGaussian(BaseModel):
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
         )
+
+    def compile(self):
+        """Wrapper for the standard keras compile method.
+
+        Sets up the optimizer and loss functions.
+        """
+        # Setup optimizer
+        optimizer = optimizers.Adam(learning_rate=self.learning_rate)
+
+        # Loss functions
+        ll_loss = LogLikelihoodLoss()
+        kl_loss = KullbackLeiblerLoss(self.annealing_factor)
+        loss = [ll_loss, kl_loss]
+
+        # Compile
+        self.model.compile(optimizer=optimizer, loss=loss)
 
     def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.
