@@ -233,8 +233,8 @@ def workbench_render(
     surf_right_vinf = std_masks.surf_right_vinf
     surf_left_vinf = std_masks.surf_left_vinf
 
-    output_right = out_file.parent / (str(out_file) + "_right.func.gii")
-    output_left = out_file.parent / (str(out_file) + "_left.func.gii")
+    output_right = str(out_file) + "_right.func.gii"
+    output_left = str(out_file) + "_left.func.gii"
 
     subprocess.run(
         [
