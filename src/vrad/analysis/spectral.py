@@ -16,6 +16,47 @@ from vrad.data.manipulation import scale
 _logger = logging.getLogger("VRAD")
 
 
+def autocorrelation_function(covariances: np.ndarray, n_embeddings: int) -> np.ndarray:
+    """Calculate the autocorrelation function from a covariance matrix.
+
+    Parameters
+    ----------
+    covariances : np.ndarray
+        State covariance matrices. Shape is (n_states, n_channels, n_channels).
+    n_embeddings : int
+        Number of embeddings.
+    
+    Returns
+    -------
+    np.ndarray
+        Autocorrelation function. Shape is (n_states, n_channels, n_channels, n_acf)
+    """
+    n_states = covariances.shape[0]
+    n_channels = covariances.shape[1]
+    n_acf = 2 * (n_embeddings + 2) - 1
+
+    # Get autocorrelation function
+    autocorrelation_function = np.empty([n_states, n_channels, n_channels, n_acf])
+    for i in range(n_states):
+        for j in range(n_channels):
+            for k in range(n_channels):
+
+                # Auto/cross-correlation between channel j and channel k of state i
+                autocorrelation_function_jk = covariances[
+                    i,
+                    j * (n_embeddings + 2) : (j + 1) * (n_embeddings + 2),
+                    k * (n_embeddings + 2) : (k + 1) * (n_embeddings + 2),
+                ]
+
+                # Take elements from the first row and column
+                autocorrelation_function[i, j, k] = np.append(
+                    autocorrelation_function_jk[0][::-1],
+                    autocorrelation_function_jk[1:, 0],
+                )
+
+    return autocorrelation_function
+
+
 def decompose_spectra(
     coherences: np.ndarray,
     n_components: int,
