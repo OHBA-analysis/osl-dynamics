@@ -42,9 +42,17 @@ class Data:
             for i, _ in enumerate(inputs)
         ]
 
-        # Load the preprocessed data
+        # Load the data
         self.raw_data_memmaps, self.discontinuities = self.load_data()
         self.subjects = self.raw_data_memmaps
+
+        # Raw data statistics
+        self.raw_data_mean = [
+            np.mean(raw_data, axis=0) for raw_data in self.raw_data_memmaps
+        ]
+        self.raw_data_std = [
+            np.std(raw_data, axis=0) for raw_data in self.raw_data_memmaps
+        ]
 
         # Validation
         self.validate_subjects()

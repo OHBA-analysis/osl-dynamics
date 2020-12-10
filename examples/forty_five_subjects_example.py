@@ -4,8 +4,8 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.76 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~124,000,000.
+- Achieves a dice coefficient of ~0.78 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~8,100,000.
 """
 
 print("Setting up")
@@ -38,7 +38,7 @@ n_layers_inference = 1
 n_layers_model = 1
 
 n_units_inference = 64
-n_units_model = 96
+n_units_model = 64
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -154,7 +154,7 @@ f, psd, coh = spectral.multitaper_spectra(
 components = spectral.decompose_spectra(coh, n_components=2)
 
 # Calculate spatial maps
-p_map, c_map = maps.state_power_maps(f, psd, coh, components)
+p_map, c_map = maps.state_power_maps(f, psd, components)
 
 # Save the power map for the first component as NIFTI file
 # (The second component is noise)
@@ -166,7 +166,6 @@ maps.save_nii_file(
     filename="power_map.nii.gz",
     component=0,
     subtract_mean=True,
-    normalize=True,
 )
 
 # Delete the temporary folder holding the data

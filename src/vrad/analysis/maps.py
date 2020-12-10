@@ -104,7 +104,6 @@ def save_nii_file(
     filename: str,
     component: int = 0,
     subtract_mean: bool = False,
-    normalize: bool = True,
 ):
     """Saves a NITFI file containing a map.
 
@@ -122,9 +121,6 @@ def save_nii_file(
         Spectral component to save. Optional.
     subtract_mean : bool
         Should we subtract the mean power across states? Optional: default is False.
-    normalize : bool
-        Should we normalize by dividing by the maximum power in a voxel?
-        Optional: default is True.
     """
 
     # Validation
@@ -164,8 +160,7 @@ def save_nii_file(
     n_voxels = voxels.shape[0]
 
     # Normalise the voxels to have comparable weights
-    if normalize:
-        voxels /= voxels.max(axis=0)[np.newaxis, ...]
+    voxels /= voxels.max(axis=0)[np.newaxis, ...]
 
     # Number of components, states, channels
     n_components, n_states, n_channels, n_channels = power_map.shape

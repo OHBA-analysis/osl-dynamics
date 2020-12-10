@@ -24,13 +24,13 @@ gamma_shape = 20
 gamma_scale = 10
 
 n_states = 5
-sequence_length = 100
-batch_size = 32
+sequence_length = 200
+batch_size = 16
 
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 300
+n_epochs = 200
 n_epochs_annealing = 100
 
 rnn_type = "lstm"
@@ -40,8 +40,8 @@ theta_normalization = None
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 32
-n_units_model = 48
+n_units_inference = 64
+n_units_model = 64
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
@@ -49,7 +49,7 @@ dropout_rate_model = 0.0
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 0.15
+alpha_temperature = 0.2
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -110,11 +110,13 @@ model = RNNGaussian(
 )
 model.summary()
 
-"""
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
-"""
-model.load_weights("weights")
+history = model.fit(
+    training_dataset,
+    epochs=n_epochs,
+    save_best_after=n_epochs_annealing,
+    save_filepath="tmp/weights",
+)
 
 # Free energy = Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
