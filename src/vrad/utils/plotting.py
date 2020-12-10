@@ -1215,6 +1215,7 @@ def state_stackplots(
     cmap: str = "magma",
     sampling_frequency: float = None,
     fig_kwargs: dict = None,
+    **stackplot_kwargs: dict,
 ) -> plt.Figure:
     """
 
@@ -1228,6 +1229,8 @@ def state_stackplots(
         The sampling frequency of the data in Hertz.
     fig_kwargs : dict
         Any parameters to be passed to the matplotlib.pyplot.subplots constructor.
+    stackplot_kwargs : dict
+        Any parameters to be passed to matplotlib.pyplot.stackplot.
 
     Returns
     -------
@@ -1244,7 +1247,14 @@ def state_stackplots(
     )
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
+    default_stackplot_kwargs = dict(colors=colors)
+    stackplot_kwargs = override_dict_defaults(
+        default_stackplot_kwargs, stackplot_kwargs
+    )
+
     fig, axes = plt.subplots(nrows=n_stcs, **fig_kwargs)
+    if isinstance(axes, plt.Axes):
+        axes = [axes]
 
     for stc, axis in zip(state_time_courses, axes):
         time_vector = (
@@ -1252,7 +1262,7 @@ def state_stackplots(
             if sampling_frequency
             else range(len(stc))
         )
-        axis.stackplot(time_vector, stc.T, colors=colors)
+        axis.stackplot(time_vector, stc.T, **stackplot_kwargs)
         axis.autoscale(tight=True)
         axis.set_ylabel("State activation")
 
