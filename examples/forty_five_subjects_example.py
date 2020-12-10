@@ -166,7 +166,6 @@ maps.save_nii_file(
     filename="power_map.nii.gz",
     component=0,
     subtract_mean=True,
-    normalize=True,
 )
 
 # Delete the temporary folder holding the data
