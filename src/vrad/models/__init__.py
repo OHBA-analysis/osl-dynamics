@@ -3,5 +3,4 @@
 """
 
 from vrad.models._base import *  # noqa
-from vrad.models._gaussian import *  # noqa
-from vrad.models.layers import *  # noqa
+from vrad.models._rnn_gaussian import *  # noqa
