@@ -1,8 +1,9 @@
 """Base class for models.
 
 """
-
+import re
 from abc import abstractmethod
+from io import StringIO
 
 import numpy as np
 from tensorflow import Variable
@@ -19,6 +20,7 @@ from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
 from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
 from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.utils.misc import check_iterable_type, replace_argument
+from vrad.utils.model import HTMLTable, LatexTable
 
 
 class BaseModel:
@@ -400,3 +402,43 @@ class BaseModel:
         """
         with self.strategy.scope():
             self.model.load_weights(filepath)
+
+    def summary_string(self):
+        stringio = StringIO()
+        self.model.summary(
+            print_fn=lambda s: stringio.write(s + "\n"), line_length=1000
+        )
+        return stringio.getvalue()
+
+    def summary_table(self, renderer):
+        summary = self.summary_string()
+
+        renderers = {"html": HTMLTable, "latex": LatexTable}
+
+        # Extract information
+        headers = [h for h in re.split(r"\s{2,}", summary.splitlines()[2]) if h != ""]
+        columns = [summary.splitlines()[2].find(title) for title in headers] + [-1]
+
+        # Create HTML table.
+        table = renderers.get(renderer, HTMLTable)(headers)
+        for line in summary.splitlines()[4:]:
+            if line.startswith("_") or line.startswith("=") or (":" in line):
+                continue
+            elements = [
+                line[start:stop].strip() for start, stop in zip(columns, columns[1:])
+            ]
+            if elements[:3] == ["", "", ""]:
+                table.append_last(elements[3])
+            else:
+                table += elements
+
+        return table.output()
+
+    def html_summary(self):
+        return self.summary_table(renderer="html")
+
+    def latex_summary(self):
+        return self.summary_table(renderer="latex")
+
+    def _repr_html_(self):
+        return self.html_summary()
