@@ -32,8 +32,8 @@ from vrad.utils.misc import check_arguments
 _logger = logging.getLogger("VRAD")
 
 
-class RNNGaussian(BaseModel):
-    """Inference RNN and generative model with Gaussian observations.
+class RIGO(BaseModel):
+    """RNN Inference/model network and Gaussian Observations (RIGO).
 
     Parameters
     ----------

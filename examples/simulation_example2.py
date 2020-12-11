@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RNNGaussian
+from vrad.models import RIGO
 from vrad.simulation import HSMMSimulation
 from vrad.utils import plotting
 
@@ -79,7 +79,7 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
-model = RNNGaussian(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,

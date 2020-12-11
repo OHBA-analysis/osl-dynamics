@@ -15,8 +15,8 @@ from vrad.models.layers import MeansCovsLayer, MixMeansCovsLayer, LogLikelihoodL
 from vrad.inference.losses import LogLikelihoodLoss
 
 
-class Gaussian(BaseModel):
-    """Generative model with Gaussian observations.
+class GO(BaseModel):
+    """Gaussian Observations (GO) model.
 
     Parameters
     ----------

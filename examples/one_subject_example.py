@@ -12,7 +12,7 @@ print("Setting up")
 from vrad import data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RNNGaussian
+from vrad.models import RIGO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -69,7 +69,7 @@ hmm = data.OSL_HMM(
 initial_covariances = hmm.covariances
 
 # Build model
-model = RNNGaussian(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
