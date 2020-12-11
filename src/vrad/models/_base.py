@@ -422,12 +422,20 @@ class BaseModel:
         # Create HTML table.
         table = renderers.get(renderer, HTMLTable)(headers)
         for line in summary.splitlines()[4:]:
-            if line.startswith("_") or line.startswith("=") or (":" in line):
+            if (
+                line.startswith("_")
+                or line.startswith("=")
+                or line.startswith('Model: "')
+            ):
                 continue
             elements = [
                 line[start:stop].strip() for start, stop in zip(columns, columns[1:])
             ]
-            if elements[:3] == ["", "", ""]:
+            if "params:" in elements[0]:
+                parts = re.search(r"(.*? params): (.*?)$", elements[0]).groups()
+                parts = [*parts, "", ""]
+                table += parts
+            elif elements[:3] == ["", "", ""]:
                 table.append_last(elements[3])
             else:
                 table += elements
