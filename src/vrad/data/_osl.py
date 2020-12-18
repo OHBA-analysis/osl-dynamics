@@ -44,8 +44,9 @@ class OSL_HMM:
         # State covariances
         self.covariances = np.array(
             [
-                state.Gam_rate / (state.Gam_shape - len(state.Gam_rate) - 1)
-                for state in self.state.Omega
+                state.Omega.Gam_rate
+                / (state.Omega.Gam_shape - len(state.Omega.Gam_rate) - 1)
+                for state in self.state
             ]
         )
 
