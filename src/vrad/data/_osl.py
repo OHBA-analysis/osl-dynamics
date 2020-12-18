@@ -26,12 +26,10 @@ class OSL_HMM:
         self.prior = self.hmm.prior
         self.train = self.hmm.train
 
-        hmm_fields = dir(self.hmm)
-
         # State probabilities
-        if "gamma" in hmm_fields:
+        if "gamma" in self.hmm:
             self.gamma = self.hmm.gamma
-        elif "Gamma" in hmm_fields:
+        elif "Gamma" in self.hmm:
             self.gamma = self.hmm.Gamma
         else:
             self.gamma = None
