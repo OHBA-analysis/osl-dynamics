@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
+from vrad.data.task import epoch_mean
 from vrad.inference.states import correlate_states, match_states, state_lifetimes
 from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
@@ -1277,4 +1278,60 @@ def state_stackplots(
         ),
     )
 
+    return fig
+
+
+def plot_epoched(
+    data: np.ndarray,
+    time_index: np.ndarray,
+    sampling_frequency: float = None,
+    pre: int = 125,
+    post: int = 1000,
+    title: str = None,
+    legend: bool = True,
+) -> plt.Figure:
+    """Plot continuous data, epoched and meaned over epochs.
+
+    Parameters
+    ----------
+
+    data: numpy.ndarray
+        A [time x channels] dataset to be epoched.
+    time_index: numpy.ndarray
+        The integer indices of the start of each epoch.
+    sampling_frequency
+        The sampling frequency of the data in Hertz.
+    pre: int
+        The integer number of samples to include before the trigger.
+    post: int
+        The integer number of samples to include after the trigger.
+    title: str
+        Title of the figure.
+    legend: bool
+        Should a legend be created (default: True).
+
+    Returns
+    -------
+    epoch_mean_figure: matplotlib.pyplot.Figure
+        A figure of data meaned over epochs.
+
+    """
+    epoched_1 = epoch_mean(data, time_index, pre, post)
+
+    x_label = "Samples"
+    time_index = np.arange(-pre, post)
+    if sampling_frequency:
+        time_index = time_index / sampling_frequency
+        x_label = "Time (s)"
+
+    fig, axis = plt.subplots(1, figsize=(20, 3))
+    for i, s in enumerate(epoched_1.T):
+        axis.plot(time_index, s, label=i)
+    axis.axvline(0, c="k")
+    axis.autoscale(axis="x", tight=True)
+    if title:
+        axis.title(title)
+    if legend:
+        axis.legend(loc="upper right")
+    axis.xlabel(x_label)
     return fig
