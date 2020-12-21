@@ -1,5 +1,7 @@
 import numpy as np
 from tqdm import tqdm
+import tensorflow
+from tensorflow.python.data import Dataset
 from vrad.data import Data, manipulation
 from vrad.utils.misc import MockArray
 
@@ -14,16 +16,29 @@ class PreprocessedData(Data):
     ----------
     inputs : list of str or str
         Filenames to be read.
+    sampling_frequency : float
+        Sampling frequency of the data in Hz. Optional, default is 1.0.
     store_dir : str
-        Directory to save results and intermediate steps to.
+        Directory to save results and intermediate steps to. Optional, default
+        is /tmp.
     prepared_data_file : str
-        Filename to save memory map to.
+        Filename to save memory map to. Optional.
     """
 
-    def __init__(self, inputs, store_dir="tmp", prepared_data_file=None):
-        super().__init__(inputs, store_dir)
+    def __init__(
+        self,
+        inputs: list,
+        sampling_frequency: float = 1.0,
+        store_dir: str = "tmp",
+        prepared_data_file: str = None,
+    ):
+        super().__init__(inputs, sampling_frequency, store_dir)
         if prepared_data_file is None:
             self.prepared_data_file = f"dataset_{self._identifier}.npy"
+        self.n_embeddings = 0
+        self.n_pca_components = None
+        self.whiten = None
+        self.prepared = False
 
     def prepare_memmap_filenames(self):
         self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
@@ -50,7 +65,7 @@ class PreprocessedData(Data):
         self.prepared_data_std = []
 
     def prepare(
-        self, n_embeddings: int, n_pca_components: int, whiten: bool = False,
+        self, n_embeddings: int, n_pca_components: int = None, whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
@@ -61,73 +76,79 @@ class PreprocessedData(Data):
         n_embeddings : int
             Number of data points to embed the data.
         n_pca_components : int
-            Number of PCA components to keep.
+            Number of PCA components to keep. Optional, default is no PCA.
         whiten : bool
             Should we whiten the PCA'ed data? Optional, default is False.
         """
         self.prepare_memmap_filenames()
 
         # Standardise and time embed the data for each subject
-        for memmap, discontinuities, new_file in zip(
+        for memmap, new_file in zip(
             tqdm(self.raw_data_memmaps, desc="Time embedding", ncols=98),
-            self.discontinuities,
             self.te_filenames,
         ):
-            memmap = manipulation.standardize(memmap, discontinuities)
+            memmap = manipulation.standardize(memmap, axis=0)
             te_shape = (
-                memmap.shape[0] - (n_embeddings + 1) * len(discontinuities),
+                memmap.shape[0] - (n_embeddings + 1),
                 memmap.shape[1] * (n_embeddings + 2),
             )
             te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
             te_memmap = manipulation.time_embed(
-                memmap, discontinuities, n_embeddings, output_file=te_memmap
+                memmap, n_embeddings, output_file=te_memmap
             )
             self.te_memmaps.append(te_memmap)
 
-        # Update discontinuity indices
-        for i in range(len(self.discontinuities)):
-            self.discontinuities[i] -= n_embeddings
-
         # Perform principle component analysis (PCA)
-        print("Calculating PCA")
-        covariance = np.zeros([te_memmap.shape[1], te_memmap.shape[1]])
-        for te_memmap in self.te_memmaps:
-            covariance += np.transpose(te_memmap - te_memmap.mean(axis=0)) @ (
-                te_memmap - te_memmap.mean(axis=0)
-            )
-        u, s, vh = np.linalg.svd(covariance)
-        u = u[:, :n_pca_components]
-        s = s[:n_pca_components]
-        if whiten:
-            u = u @ np.diag(1.0 / np.sqrt(s))
-        self.pca_weights = u
+        if n_pca_components is not None:
 
-        # Apply PCA to the data for each subject and standardise again
-        for te_memmap, discontinuities, prepared_data_file in zip(
-            tqdm(self.te_memmaps, desc="Applying PCA", ncols=98),
-            self.discontinuities,
-            self.prepared_data_filenames,
-        ):
-            pca_te_shape = (
-                te_memmap.shape[0] - (n_embeddings + 1) * len(discontinuities),
-                n_pca_components,
-            )
-            pca_te_memmap = MockArray.get_memmap(
-                prepared_data_file, pca_te_shape, dtype=np.float32
-            )
-            pca_te_memmap = te_memmap @ self.pca_weights
-            self.prepared_data_mean.append(np.mean(pca_te_memmap, axis=0))
-            self.prepared_data_std.append(np.std(pca_te_memmap, axis=0))
-            pca_te_memmap = manipulation.standardize(pca_te_memmap, discontinuities)
-            self.prepared_data_memmaps.append(pca_te_memmap)
+            print("Calculating PCA")
+            covariance = np.zeros([te_memmap.shape[1], te_memmap.shape[1]])
+            for te_memmap in self.te_memmaps:
+                covariance += np.transpose(te_memmap - te_memmap.mean(axis=0)) @ (
+                    te_memmap - te_memmap.mean(axis=0)
+                )
+            u, s, vh = np.linalg.svd(covariance)
+            u = u[:, :n_pca_components].astype(np.float32)
+            s = s[:n_pca_components].astype(np.float32)
+            if whiten:
+                u = u @ np.diag(1.0 / np.sqrt(s))
+            self.pca_weights = u
+
+            # Apply PCA to the data for each subject and standardise again
+            for te_memmap, prepared_data_file in zip(
+                tqdm(self.te_memmaps, desc="Applying PCA", ncols=98),
+                self.prepared_data_filenames,
+            ):
+                pca_te_shape = (
+                    te_memmap.shape[0] - (n_embeddings + 1),
+                    n_pca_components,
+                )
+                pca_te_memmap = MockArray.get_memmap(
+                    prepared_data_file, pca_te_shape, dtype=np.float32
+                )
+                pca_te_memmap = te_memmap @ self.pca_weights
+                self.prepared_data_mean.append(np.mean(pca_te_memmap, axis=0))
+                self.prepared_data_std.append(np.std(pca_te_memmap, axis=0))
+                pca_te_memmap = manipulation.standardize(pca_te_memmap, axis=0)
+                self.prepared_data_memmaps.append(pca_te_memmap)
+
+        # Otherwise, the time embedded data is the prepared data
+        else:
+            for te_memmap, prepared_data_file in zip(
+                self.te_memmaps, self.prepared_data_filenames,
+            ):
+                self.prepared_data_mean.append(np.mean(te_memmap, axis=0))
+                self.prepared_data_std.append(np.std(te_memmap, axis=0))
+                te_memmap = manipulation.standardize(te_memmap, axis=0)
+                self.prepared_data_memmaps.append(te_memmap)
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
 
-        self.prepared = True
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components
         self.whiten = whiten
+        self.prepared = True
 
     def trim_raw_time_series(
         self, n_embeddings: int = None, sequence_length: int = None
@@ -161,3 +182,63 @@ class PreprocessedData(Data):
                 memmap = memmap[: n_sequences * sequence_length]
             trimmed_raw_time_series.append(memmap)
         return trimmed_raw_time_series
+
+    def covariance_training_datasets(
+        self,
+        alpha_t: list,
+        sequence_length: int,
+        batch_size: int,
+        n_alpha_embeddings: int = 0,
+    ) -> tensorflow.data.Dataset:
+        """Dataset for training covariances with a fixed alpha_t.
+
+        Parameters
+        ----------
+        alpha_t : list of np.ndarray
+            List of state mixing factors for each subject.
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+        n_alpha_embeddings: int
+            Number of embeddings when inferring alpha_t. Optional.
+
+        Returns
+        -------
+        list of tensorflow.data.Dataset
+            Subject-specific datasets for training the covariances.
+        """
+        n_batches = self.count_batches(sequence_length)
+
+        subject_datasets = []
+        for i in range(self.n_subjects):
+
+            # We remove data points in alpha that are not in the new time embedded data
+            alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
+
+            # We have more subject data points than alpha values so we trim the data
+            subject = self.subjects[i][: alpha.shape[0]]
+
+            # Create datasets
+            alpha_data = Dataset.from_tensor_slices(alpha).batch(
+                sequence_length, drop_remainder=True
+            )
+            subject_data = Dataset.from_tensor_slices(subject).batch(
+                sequence_length, drop_remainder=True
+            )
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(n_batches[i], dtype=np.float32) + i
+            )
+
+            subject_dataset = Dataset.zip(
+                ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
+            )
+            subject_dataset = (
+                subject_dataset.shuffle(100000)
+                .batch(batch_size)
+                .shuffle(100000)
+                .prefetch(-1)
+            )
+            subject_datasets.append(subject_dataset)
+
+        return subject_datasets

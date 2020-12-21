@@ -1,28 +1,8 @@
 import numpy as np
 
 
-def standardize(time_series: np.ndarray, discontinuities: np.ndarray) -> np.ndarray:
-    """Standardizes time series data.
-
-    Returns a time series standardized over continuous segments of data.
-
-    Parameters
-    ----------
-    time_series : numpy.ndarray
-        Time series data.
-    discontinuities : numpy.ndarray
-        A set of time points at which the time series is discontinuous (e.g. because
-        bad segments were removed in preprocessing).
-    """
-    for i in range(len(discontinuities)):
-        start = sum(discontinuities[:i])
-        end = sum(discontinuities[: i + 1])
-        time_series[start:end] = scale(time_series[start:end], axis=0)
-    return time_series
-
-
-def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
-    """Scales a time series.
+def standardize(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
+    """Standardizes a time series.
 
     Returns a time series with zero mean and unit variance.
 
@@ -39,10 +19,7 @@ def scale(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
 
 
 def time_embed(
-    time_series: np.ndarray,
-    discontinuities: np.ndarray,
-    n_embeddings: int,
-    output_file: str = None,
+    time_series: np.ndarray, n_embeddings: int, output_file: str = None,
 ) -> np.ndarray:
     """Performs time embedding.
 
@@ -50,9 +27,6 @@ def time_embed(
     ----------
     time_series : numpy.ndarray
         Time series data.
-    discontinuities : numpy.ndarray
-        A set of time points at which the time series is discontinuous (e.g. because
-        bad segments were removed in preprocessing).
     n_embeddings : int
         Number of samples in which to shift the data.
     output_file : str
@@ -61,47 +35,29 @@ def time_embed(
     if n_embeddings % 2 == 0:
         raise ValueError("n_embeddings must be an odd number.")
 
-    # Unpack shape of the original data
     n_samples, n_channels = time_series.shape
 
     # If an output file hasn't been passed we create a numpy array for the
     # time embedded data
     if output_file is None:
         time_embedded_series = np.empty(
-            [
-                n_samples - (n_embeddings + 1) * len(discontinuities),
-                n_channels * (n_embeddings + 2),
-            ]
+            [n_samples - (n_embeddings + 1), n_channels * (n_embeddings + 2)],
+            dtype=np.float32,
         )
     else:
         time_embedded_series = output_file
 
-    # Loop through continuous segments of data
-    for i in range(len(discontinuities)):
-        n_segment = discontinuities[i]
-        start = sum(discontinuities[:i])
-        end = sum(discontinuities[: i + 1])
-        original_time_series = time_series[start:end]
-
-        # Generate time embedded data
-        time_embedded_segment = np.empty(
-            [n_segment - (n_embeddings + 1), n_channels * (n_embeddings + 2)]
-        )
-        for j in range(n_channels):
-            for k in range(n_embeddings + 2):
-                time_embedded_segment[
-                    :, j * (n_embeddings + 2) + k
-                ] = original_time_series[n_embeddings + 1 - k : n_segment - k, j]
-
-        # Fill the final time embedded series array
-        time_embedded_series[
-            start - (n_embeddings + 1) * i : end - (n_embeddings + 1) * (i + 1)
-        ] = time_embedded_segment
+    # Generate time embedded series
+    for i in range(n_channels):
+        for j in range(n_embeddings + 2):
+            time_embedded_series[:, i * (n_embeddings + 1) + j] = time_series[
+                n_embeddings + 1 - j : n_samples - j, i
+            ]
 
     return time_embedded_series
 
 
-def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
+def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> int:
     """Calculate the number of batches an array will be split into.
 
     Parameters
@@ -115,8 +71,8 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
 
     Returns
     -------
-    num_batches : int
-
+    int
+        Number of batches.
     """
     step_size = step_size or sequence_length
     final_slice_start = arr.shape[0] - sequence_length + 1
@@ -128,7 +84,7 @@ def num_batches(arr: np.ndarray, sequence_length: int, step_size: int = None):
 
 def trim_time_series(
     time_series: np.ndarray, discontinuities: np.ndarray, sequence_length,
-):
+) -> np.ndarray:
     """Trims a time seris.
 
     Removes data points lost to separating a time series into sequences.

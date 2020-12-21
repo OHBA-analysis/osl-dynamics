@@ -3,19 +3,22 @@
 """
 
 import numpy as np
+import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers, optimizers
 from tensorflow.nn import softplus
+from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
-from vrad.models import BaseModel
+from vrad import models
 from vrad.models.layers import MeansCovsLayer, MixMeansCovsLayer, LogLikelihoodLayer
 from vrad.inference.losses import LogLikelihoodLoss
+from vrad.utils.misc import check_arguments, replace_argument
 
 
-class GO(BaseModel):
+class GO(models.Base):
     """Gaussian Observations (GO) model.
 
     Parameters
@@ -30,12 +33,6 @@ class GO(BaseModel):
         Should we learn a scaling for alpha?
     normalize_covariances : bool
         Should we trace normalize the state covariances?
-    do_annealing : bool
-        Should we use KL annealing during training?
-    annealing_sharpness : float
-        Parameter to control the annealing curve.
-    n_epochs_annealing : int
-        Number of epochs to perform annealing.
     learning_rate : float
         Learning rate for updating model parameters/weights.
     multi_gpu : bool
@@ -54,9 +51,6 @@ class GO(BaseModel):
         sequence_length: int,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
-        do_annealing: bool,
-        annealing_sharpness: float,
-        n_epochs_annealing: int,
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
@@ -73,9 +67,6 @@ class GO(BaseModel):
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            do_annealing=do_annealing,
-            annealing_sharpness=annealing_sharpness,
-            n_epochs_annealing=n_epochs_annealing,
             learning_rate=learning_rate,
             multi_gpu=multi_gpu,
             strategy=strategy,
@@ -106,6 +97,73 @@ class GO(BaseModel):
         # Compile
         self.model.compile(optimizer=optimizer, loss=[ll_loss])
 
+    def fit(
+        self,
+        *args,
+        use_tqdm=False,
+        tqdm_class=None,
+        use_tensorboard=None,
+        tensorboard_dir=None,
+        save_best_after=None,
+        save_filepath=None,
+        **kwargs,
+    ):
+        """Wrapper for the standard keras fit method.
+
+        Adds callbacks and then trains the model.
+
+        Parameters
+        ----------
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual output from
+            tensorflow.
+        tqdm_class : tqdm
+            Class for the tqdm progress bar.
+        use_tensorboard : bool
+            Should we use TensorBoard?
+        tensorboard_dir : str
+            Path to the location to save the TensorBoard log files.
+        save_best_after : int
+            Epoch number after which we should save the best model. The best model is
+            that which achieves the lowest loss.
+        save_filepath : str
+            Path to save the best model to.
+
+        Returns
+        -------
+        history
+            The training history.
+        """
+        if use_tqdm:
+            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+
+        args, kwargs = replace_argument(
+            func=self.model.fit,
+            name="callbacks",
+            item=self.create_callbacks(
+                True,
+                use_tqdm,
+                tqdm_class,
+                use_tensorboard,
+                tensorboard_dir,
+                save_best_after,
+                save_filepath,
+            ),
+            args=args,
+            kwargs=kwargs,
+            append=True,
+        )
+
+        return self.model.fit(*args, **kwargs)
+
+    def reset_model(self):
+        """Reset the model as if you've built a new model.
+
+        Resets the model weights, optimizer and annealing factor.
+        """
+        self.compile()
+        initializers.reinitialize_model_weights(self.model)
+
     def get_covariances(self, alpha_scale=True):
         """Get the covariances of each state.
 
@@ -121,7 +179,9 @@ class GO(BaseModel):
         """
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
-        cholesky_covariances = means_covs_layer.cholesky_covariances
+        cholesky_covariances = tfp.math.fill_triangular(
+            means_covs_layer.flattened_cholesky_covariances
+        )
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
 
         # Normalise covariances
@@ -146,10 +206,19 @@ class GO(BaseModel):
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.get_weights()
 
+        flattened_covariances_shape = (
+            covariances.shape[0],
+            covariances.shape[1] * (covariances.shape[1] + 1) // 2,
+        )
+
         # Replace covariances in the layer weights
         for i in range(len(layer_weights)):
-            if layer_weights[i].shape == covariances.shape:
-                layer_weights[i] = cholesky_factor(covariances)
+            if layer_weights[i].shape == flattened_covariances_shape:
+                cholesky_covariances = cholesky_factor(covariances)
+                flattened_cholesky_covariances = tfp.math.fill_triangular_inverse(
+                    cholesky_covariances
+                )
+                layer_weights[i] = flattened_cholesky_covariances
 
         # Set the weights of the layer
         means_covs_layer.set_weights(layer_weights)

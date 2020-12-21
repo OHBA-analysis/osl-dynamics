@@ -6,22 +6,23 @@ from abc import abstractmethod
 from io import StringIO
 
 import numpy as np
-from tensorflow import Variable
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
+
+from tqdm import trange
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
+
 from vrad.data import Data
 from vrad.inference import initializers
 from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
-from vrad.inference.tf_ops import tensorboard_run_logdir
-from vrad.utils.misc import check_iterable_type, replace_argument
 from vrad.utils.model import HTMLTable, LatexTable
+from vrad.utils.misc import check_iterable_type
 
 
-class BaseModel:
+class Base:
     """Base class for models.
 
     Acts as a wrapper for a standard Keras model.
@@ -34,12 +35,6 @@ class BaseModel:
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-    do_annealing : bool
-        Should we use KL annealing during training?
-    annealing_sharpness : float
-        Parameter to control the annealing curve.
-    n_epochs_annealing : int
-        Number of epochs to perform annealing.
     learning_rate : float
         Learning rate for updating model parameters/weights.
     multi_gpu : bool
@@ -53,9 +48,6 @@ class BaseModel:
         n_states: int,
         n_channels: int,
         sequence_length: int,
-        do_annealing: bool,
-        annealing_sharpness: float,
-        n_epochs_annealing: int,
         learning_rate: float,
         multi_gpu: bool,
         strategy: str,
@@ -64,32 +56,13 @@ class BaseModel:
         if sequence_length < 1:
             raise ValueError("sequence_length must be greater than zero.")
 
-        if annealing_sharpness <= 0:
-            raise ValueError("annealing_sharpness must be greater than zero.")
-
-        if n_epochs_annealing < 0:
-            raise ValueError(
-                "n_epochs_annealing must be equal to or greater than zero."
-            )
-
         if learning_rate <= 0:
             raise ValueError("learning_rate must be greater than zero.")
 
-        # Identifier for the model
         self._identifier = np.random.randint(100000)
-
-        # Number of latent states, dimensionality of the data and seequence length
         self.n_states = n_states
         self.n_channels = n_channels
         self.sequence_length = sequence_length
-
-        # KL annealing
-        self.do_annealing = do_annealing
-        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
-        self.annealing_sharpness = annealing_sharpness
-        self.n_epochs_annealing = n_epochs_annealing
-
-        # Training Parameters
         self.learning_rate = learning_rate
 
         # Strategy for distributed learning
@@ -119,6 +92,42 @@ class BaseModel:
         """Wrapper for the standard keras compile method."""
         pass
 
+    def _make_dataset(self, inputs: Data):
+        """Make a dataset.
+
+        Parameters
+        ----------
+        inputs : vrad.data.Data
+            Data object.
+
+        Returns
+        -------
+        tensorflow.data.Dataset
+            Tensorflow dataset that can be used for training.
+        """
+        if isinstance(inputs, Data):
+            return inputs.prediction_dataset(self.sequence_length)
+        if isinstance(inputs, Dataset):
+            return [inputs]
+        if isinstance(inputs, str):
+            return [Data(inputs).prediction_dataset(self.sequence_length)]
+        if isinstance(inputs, np.ndarray):
+            if inputs.ndim == 2:
+                return [Data(inputs).prediction_dataset(self.sequence_length)]
+            if inputs.ndim == 3:
+                return [
+                    Data(subject).prediction_dataset(self.sequence_length)
+                    for subject in inputs
+                ]
+        if check_iterable_type(inputs, Dataset):
+            return inputs
+        if check_iterable_type(inputs, str):
+            datasets = [
+                Data(subject).prediction_dataset(self.sequence_length)
+                for subject in inputs
+            ]
+            return datasets
+
     def create_callbacks(
         self,
         no_annealing_callback: bool,
@@ -129,7 +138,7 @@ class BaseModel:
         save_best_after: int,
         save_filepath: str,
     ):
-        """ "Create callbacks for training.
+        """Create callbacks for training.
 
         Parameters
         ----------
@@ -205,114 +214,6 @@ class BaseModel:
             additional_callbacks.append(save_best_callback)
 
         return additional_callbacks
-
-    def fit(
-        self,
-        *args,
-        no_annealing_callback=False,
-        use_tqdm=False,
-        tqdm_class=None,
-        use_tensorboard=None,
-        tensorboard_dir=None,
-        save_best_after=None,
-        save_filepath=None,
-        **kwargs,
-    ):
-        """Wrapper for the standard keras fit method.
-
-        Adds callbacks and then trains the model.
-
-        Parameters
-        ----------
-        no_annealing_callback : bool
-            Should we NOT update the annealing factor during training?
-        use_tqdm : bool
-            Should we use a tqdm progress bar instead of the usual output from
-            tensorflow.
-        tqdm_class : tqdm
-            Class for the tqdm progress bar.
-        use_tensorboard : bool
-            Should we use TensorBoard?
-        tensorboard_dir : str
-            Path to the location to save the TensorBoard log files.
-        save_best_after : int
-            Epoch number after which we should save the best model. The best model is
-            that which achieves the lowest loss.
-        save_filepath : str
-            Path to save the best model to.
-
-        Returns
-        -------
-        history
-            The training history.
-        """
-        if use_tqdm:
-            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
-
-        args, kwargs = replace_argument(
-            func=self.model.fit,
-            name="callbacks",
-            item=self.create_callbacks(
-                no_annealing_callback,
-                use_tqdm,
-                tqdm_class,
-                use_tensorboard,
-                tensorboard_dir,
-                save_best_after,
-                save_filepath,
-            ),
-            args=args,
-            kwargs=kwargs,
-            append=True,
-        )
-
-        return self.model.fit(*args, **kwargs)
-
-    def _make_dataset(self, inputs: Data):
-        """Make a dataset.
-
-        Parameters
-        ----------
-        inputs : vrad.data.Data
-            Data object.
-
-        Returns
-        -------
-        tensorflow.data.Dataset
-            Tensorflow dataset that can be used for training.
-        """
-        if isinstance(inputs, Data):
-            return inputs.prediction_dataset(self.sequence_length)
-        if isinstance(inputs, Dataset):
-            return [inputs]
-        if isinstance(inputs, str):
-            return [Data(inputs).prediction_dataset(self.sequence_length)]
-        if isinstance(inputs, np.ndarray):
-            if inputs.ndim == 2:
-                return [Data(inputs).prediction_dataset(self.sequence_length)]
-            if inputs.ndim == 3:
-                return [
-                    Data(subject).prediction_dataset(self.sequence_length)
-                    for subject in inputs
-                ]
-        if check_iterable_type(inputs, Dataset):
-            return inputs
-        if check_iterable_type(inputs, str):
-            datasets = [
-                Data(subject).prediction_dataset(self.sequence_length)
-                for subject in inputs
-            ]
-            return datasets
-
-    def reset_model(self):
-        """Reset the model as if you've built a new model.
-
-        Resets the model weights, optimizer and annealing factor.
-        """
-        self.compile()
-        initializers.reinitialize_model_weights(self.model)
-        if self.do_annealing:
-            self.annealing_factor.assign(0.0)
 
     def load_weights(self, filepath: str):
         """Load weights of the model from a file.
