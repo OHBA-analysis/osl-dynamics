@@ -36,6 +36,12 @@ class OSL_HMM:
         else:
             self.gamma = None
 
+        # Discontinuities in the training data
+        if "T" in hmm_fields:
+            self.discontinuities = self.hmm.T
+        else:
+            self.discontinuities = None
+
         # State time course
         if self.gamma is not None:
             stc = self.gamma.argmax(axis=1)
