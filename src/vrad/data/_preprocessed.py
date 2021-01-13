@@ -35,10 +35,6 @@ class PreprocessedData(Data):
         super().__init__(inputs, sampling_frequency, store_dir)
         if prepared_data_file is None:
             self.prepared_data_file = f"dataset_{self._identifier}.npy"
-        self.n_embeddings = 0
-        self.n_pca_components = None
-        self.whiten = None
-        self.prepared = False
 
     def prepare_memmap_filenames(self):
         self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
@@ -182,63 +178,3 @@ class PreprocessedData(Data):
                 memmap = memmap[: n_sequences * sequence_length]
             trimmed_raw_time_series.append(memmap)
         return trimmed_raw_time_series
-
-    def covariance_training_datasets(
-        self,
-        alpha_t: list,
-        sequence_length: int,
-        batch_size: int,
-        n_alpha_embeddings: int = 0,
-    ) -> tensorflow.data.Dataset:
-        """Dataset for training covariances with a fixed alpha_t.
-
-        Parameters
-        ----------
-        alpha_t : list of np.ndarray
-            List of state mixing factors for each subject.
-        sequence_length : int
-            Length of the segement of data to feed into the model.
-        batch_size : int
-            Number sequences in each mini-batch which is used to train the model.
-        n_alpha_embeddings: int
-            Number of embeddings when inferring alpha_t. Optional.
-
-        Returns
-        -------
-        list of tensorflow.data.Dataset
-            Subject-specific datasets for training the covariances.
-        """
-        n_batches = self.count_batches(sequence_length)
-
-        subject_datasets = []
-        for i in range(self.n_subjects):
-
-            # We remove data points in alpha that are not in the new time embedded data
-            alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
-
-            # We have more subject data points than alpha values so we trim the data
-            subject = self.subjects[i][: alpha.shape[0]]
-
-            # Create datasets
-            alpha_data = Dataset.from_tensor_slices(alpha).batch(
-                sequence_length, drop_remainder=True
-            )
-            subject_data = Dataset.from_tensor_slices(subject).batch(
-                sequence_length, drop_remainder=True
-            )
-            subject_tracker = Dataset.from_tensor_slices(
-                np.zeros(n_batches[i], dtype=np.float32) + i
-            )
-
-            subject_dataset = Dataset.zip(
-                ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
-            )
-            subject_dataset = (
-                subject_dataset.shuffle(100000)
-                .batch(batch_size)
-                .shuffle(100000)
-                .prefetch(-1)
-            )
-            subject_datasets.append(subject_dataset)
-
-        return subject_datasets

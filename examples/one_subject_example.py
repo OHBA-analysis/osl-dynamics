@@ -114,9 +114,8 @@ alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
 hmm_stc = data.manipulation.trim_time_series(
     time_series=hmm.state_time_course,
-    discontinuities=prepared_data.discontinuities,
     sequence_length=sequence_length,
-)[0]
+)
 
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
