@@ -50,7 +50,7 @@ def time_embed(
     # Generate time embedded series
     for i in range(n_channels):
         for j in range(n_embeddings + 2):
-            time_embedded_series[:, i * (n_embeddings + 1) + j] = time_series[
+            time_embedded_series[:, i * (n_embeddings + 2) + j] = time_series[
                 n_embeddings + 1 - j : n_samples - j, i
             ]
 
