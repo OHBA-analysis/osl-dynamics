@@ -212,7 +212,7 @@ class Topology:
         )
 
         # Create a filled contour plot over the interpolated data.
-        axis.contourf(grid_x, grid_y, grid_z, cmap="plasma", alpha=0.7)
+        contour_plot = axis.contourf(grid_x, grid_y, grid_z, cmap="plasma", alpha=0.7)
 
         if self.outline:
             for o in self.outline:
@@ -269,7 +269,7 @@ class Topology:
         if colorbar:
             divider = make_axes_locatable(axis)
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(mappable, cax=cax)
+            plt.colorbar(contour_plot, cax=cax)
             cax.set_title("fT")
 
         if title:
