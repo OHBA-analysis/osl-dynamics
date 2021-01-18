@@ -189,8 +189,13 @@ class Topology:
             fig = axis.get_figure()
         axis.set_aspect("equal")
 
-        norm = matplotlib.colors.Normalize(vmin=min_value, vmax=max_value)
-        cmap = matplotlib.cm.get_cmap("RdBu_r")
+        # We shoudln't normalise the data by default!
+        #norm = matplotlib.colors.Normalize(vmin=min_value, vmax=max_value)
+
+        # We are most likely to use this function to display the diagonal of (co)variance matrices, so all values are
+        # positive. One should therefore be careful not to have a colourmap with a similar appearance to the scene
+        # background
+        cmap = matplotlib.cm.get_cmap("plasma")
         mappable = matplotlib.cm.ScalarMappable(norm, cmap)
 
         # Create a grid over the bounding area of the Topology.
@@ -207,7 +212,7 @@ class Topology:
         )
 
         # Create a filled contour plot over the interpolated data.
-        axis.contourf(grid_x, grid_y, grid_z, cmap="RdBu_r", alpha=0.7)
+        axis.contourf(grid_x, grid_y, grid_z, cmap="plasma", alpha=0.7)
 
         if self.outline:
             for o in self.outline:
