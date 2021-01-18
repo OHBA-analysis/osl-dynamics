@@ -997,7 +997,9 @@ def topoplot(
     """Make a contour plot in sensor space.
 
     Create a contour plot by interpolating a field from a set of values provided for
-    each sensor location in an MEG layout.
+    each sensor location in an MEG layout. Within the context of VRAD this is likely
+    to be an array of (all positive) values taken from the diagonal of a covariance
+    matrix, but one can also plot any sensor level M/EEG data.
 
     Parameters
     ----------
@@ -1021,6 +1023,10 @@ def topoplot(
         Show a colorbar for the field.
     axis: matplotlib.pyplot.Axes
         matplotlib axis to plot on.
+    cmap: str
+        matplotlib colourmap. Defaults to 'plasma'
+    n_contours: int
+        number of field isolines to show on the plot. Defaults to 10.
     """
     topology = Topology(layout)
     if channel_names is not None:
