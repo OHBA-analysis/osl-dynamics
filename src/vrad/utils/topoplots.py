@@ -196,7 +196,7 @@ class Topology:
         # positive. One should therefore be careful not to have a colourmap with a similar appearance to the scene
         # background
         cmap = matplotlib.cm.get_cmap("plasma")
-        mappable = matplotlib.cm.ScalarMappable(norm, cmap)
+        # mappable = matplotlib.cm.ScalarMappable(norm, cmap)
 
         # Create a grid over the bounding area of the Topology.
         grid_x, grid_y = np.mgrid[
@@ -269,7 +269,7 @@ class Topology:
         if colorbar:
             divider = make_axes_locatable(axis)
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(mappable, cax=cax)
+            plt.colorbar(cax=cax)
             cax.set_title("fT")
 
         if title:
