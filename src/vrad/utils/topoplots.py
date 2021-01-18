@@ -155,8 +155,8 @@ class Topology:
         show_deleted_sensors: bool = False,
         colorbar: bool = True,
         axis: plt.Axes = None,
-        max_value: float = None,
-        min_value: float = None,
+        cmap: str = 'plasma',
+        n_contours: int = 10,
     ):
         """Interpolate the data in sensor-space and plot it.
 
@@ -189,15 +189,6 @@ class Topology:
             fig = axis.get_figure()
         axis.set_aspect("equal")
 
-        # We shoudln't normalise the data by default!
-        #norm = matplotlib.colors.Normalize(vmin=min_value, vmax=max_value)
-
-        # We are most likely to use this function to display the diagonal of (co)variance matrices, so all values are
-        # positive. One should therefore be careful not to have a colourmap with a similar appearance to the scene
-        # background
-        cmap = matplotlib.cm.get_cmap("plasma")
-        mappable = matplotlib.cm.ScalarMappable(None, cmap)
-
         # Create a grid over the bounding area of the Topology.
         grid_x, grid_y = np.mgrid[
             self.min_x : self.max_x : 500j, self.min_y : self.max_y : 500j
@@ -212,7 +203,7 @@ class Topology:
         )
 
         # Create a filled contour plot over the interpolated data.
-        contour_plot = axis.contourf(grid_x, grid_y, grid_z, cmap="plasma", alpha=0.7)
+        contour_plot = axis.contourf(grid_x, grid_y, grid_z, cmap=cmap, alpha=0.7, levels=n_contours)
 
         if self.outline:
             for o in self.outline:

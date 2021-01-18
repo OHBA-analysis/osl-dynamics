@@ -991,8 +991,8 @@ def topoplot(
     title: str = None,
     colorbar: bool = True,
     axis: plt.Axes = None,
-    max_value: float = None,
-    min_value: float = None,
+    cmap: str = 'plasma',
+    n_contours: int = 10,
 ):
     """Make a contour plot in sensor space.
 
@@ -1033,6 +1033,8 @@ def topoplot(
         title=title,
         colorbar=colorbar,
         axis=axis,
+        cmap=cmap,
+        n_contours=n_contours,
     )
 
 
