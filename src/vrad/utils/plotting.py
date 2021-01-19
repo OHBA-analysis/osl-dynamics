@@ -1338,8 +1338,8 @@ def plot_epoched(
     axis.axvline(0, c="k")
     axis.autoscale(axis="x", tight=True)
     if title:
-        axis.title(title)
+        axis.set_title(title)
     if legend:
         axis.legend(loc="upper right")
-    axis.xlabel(x_label)
+    axis.set_xlabel(x_label)
     return fig
