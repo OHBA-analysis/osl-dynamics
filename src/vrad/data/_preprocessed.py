@@ -120,7 +120,7 @@ class PreprocessedData(Data):
                 self.prepared_data_filenames,
             ):
                 pca_te_shape = (
-                    te_memmap.shape[0] - (n_embeddings + 1),
+                    te_memmap.shape[0],
                     n_pca_components,
                 )
                 pca_te_memmap = MockArray.get_memmap(
