@@ -105,7 +105,7 @@ history = model.fit(
     + "/trained_models/one_subject_example/weights",
 )
 
-# Free energy = Log Likelihood + KL Divergence
+# Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 

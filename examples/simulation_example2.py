@@ -107,7 +107,7 @@ model.summary()
 print("Training model")
 history = model.fit(training_dataset, epochs=n_epochs)
 
-# Free energy = Log Likelihood + KL Divergence
+# Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
