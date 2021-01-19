@@ -991,7 +991,7 @@ def topoplot(
     title: str = None,
     colorbar: bool = True,
     axis: plt.Axes = None,
-    cmap: str = 'plasma',
+    cmap: str = "plasma",
     n_contours: int = 10,
 ):
     """Make a contour plot in sensor space.

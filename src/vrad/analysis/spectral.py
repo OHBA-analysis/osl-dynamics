@@ -25,7 +25,7 @@ def autocorrelation_function(covariances: np.ndarray, n_embeddings: int) -> np.n
         State covariance matrices. Shape is (n_states, n_channels, n_channels).
     n_embeddings : int
         Number of embeddings.
-    
+
     Returns
     -------
     np.ndarray

@@ -2,7 +2,11 @@ import numpy as np
 
 
 def epoch(
-    data: np.ndarray, time_index: np.ndarray, pre: int = 125, post: int = 1000
+    data: np.ndarray,
+    time_index: np.ndarray,
+    pre: int = 125,
+    post: int = 1000,
+    pad: bool = True,
 ) -> np.ndarray:
     """Transform [time x channel] data to [time x channel x epoch] data.
 
@@ -20,6 +24,8 @@ def epoch(
         The integer number of samples to include before the trigger.
     post: int
         The integer number of samples to include after the trigger.
+    pad: bool
+        Pad with NaNs so that initial epochs will always been included.
 
     Returns
     -------
@@ -27,9 +33,10 @@ def epoch(
         A [time x channels x epochs] dataset.
     """
     # If there are not enough time points before the first trigger, discard it.
-    # TODO: Use padding with NaNs instead of discarding.
-    #       Check interaction with plots and means.
-    if time_index[0] - pre < 0:
+    if pad:
+        data = np.pad(data, ((pre, post), (0, 0)), constant_values=np.nan)
+        time_index = time_index + pre
+    elif time_index[0] - pre < 0:
         time_index = time_index[1:]
 
     starts, stops = time_index - pre, time_index + post
@@ -38,7 +45,7 @@ def epoch(
 
 
 def epoch_mean(
-    data: np.ndarray, time_index: np.ndarray, pre: int = 125, post: int = 1000
+    data: np.ndarray, time_index: np.ndarray, pre: int = 125, post: int = 1000, pad=True
 ) -> np.ndarray:
     """Get the mean over epochs of a [time x channels] dataset.
 
@@ -55,10 +62,12 @@ def epoch_mean(
         The integer number of samples to include before the trigger.
     post: int
         The integer number of samples to include after the trigger.
+    pad: bool
+        Pad with NaNs so that initial epochs will always been included.
 
     Returns
     -------
     epoch_mean: numpy.ndarray
         [time x channels] data meaned over epochs.
     """
-    return epoch(data, time_index, pre, post).mean(axis=0)
+    return np.nanmean(epoch(data, time_index, pre, post, pad=pad), axis=0)

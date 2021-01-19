@@ -29,8 +29,12 @@ class PreprocessedData(Data):
         self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
         )
-        self.prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(self.inputs))), identifier=self._identifier
+        self.prepared_data_pattern = (
+            "prepared_data_"
+            "{{i:0{width}d}}_"
+            "{identifier}.npy".format(
+                width=len(str(len(self.inputs))), identifier=self._identifier
+            )
         )
 
         # Time embedded data memory maps

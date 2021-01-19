@@ -3,8 +3,8 @@ import re
 
 def tex_escape(text):
     """
-        :param text: a plain text message
-        :return: the message escaped to appear correctly in LaTeX
+    :param text: a plain text message
+    :return: the message escaped to appear correctly in LaTeX
     """
     conv = {
         "&": r"\&",

@@ -8,11 +8,12 @@ files_dir = Path(__file__).parent / "files"
 data_file = str(files_dir / "ctf275_data.npy")
 channel_file = str(files_dir / "ctf275_channel_names.npy")
 
-# N.b. that if you are reading in a cell array of file names from MATLAB, then you can use the following syntax to
-# achieve the requisite formatting for the topoplot to work:
-# chan_names = spio.loadmat('chan_names.mat') # file containing the [channels x 1] channel names
-# chan_names = chan_names['ans'][0]  # access the variables in the cell array (called "ans" here)
-# ctf275_channel_names = [chan_name[0] for chan_name in chan_names] # extract the channel names
+# N.b. that if you are reading in a cell array of file names from MATLAB, then you
+# can use the following syntax to achieve the requisite formatting for the topoplot
+# to work: chan_names = spio.loadmat('chan_names.mat') # file containing the
+# [channels x 1] channel names chan_names = chan_names['ans'][0]  # access the
+# variables in the cell array (called "ans" here) ctf275_channel_names = [chan_name[
+# 0] for chan_name in chan_names] # extract the channel names
 
 # Load example files
 ctf275_data = np.load(data_file)
@@ -30,6 +31,6 @@ plotting.topoplot(
     show_names=False,
     title="Example Plot",
     colorbar=True,
-    cmap='plasma',
+    cmap="plasma",
     n_contours=25,
 )

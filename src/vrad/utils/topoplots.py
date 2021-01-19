@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 from typing import List, Union
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -155,7 +154,7 @@ class Topology:
         show_deleted_sensors: bool = False,
         colorbar: bool = True,
         axis: plt.Axes = None,
-        cmap: str = 'plasma',
+        cmap: str = "plasma",
         n_contours: int = 10,
     ):
         """Interpolate the data in sensor-space and plot it.
@@ -203,7 +202,9 @@ class Topology:
         )
 
         # Create a filled contour plot over the interpolated data.
-        contour_plot = axis.contourf(grid_x, grid_y, grid_z, cmap=cmap, alpha=0.7, levels=n_contours)
+        contour_plot = axis.contourf(
+            grid_x, grid_y, grid_z, cmap=cmap, alpha=0.7, levels=n_contours
+        )
 
         if self.outline:
             for o in self.outline:

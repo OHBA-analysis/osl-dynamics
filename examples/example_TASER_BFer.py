@@ -1,5 +1,6 @@
 """
-Example use of VRAD on reduced sensor space data. The resulting C(t) matrix can be used for
+Example use of VRAD on reduced sensor space data.
+The resulting C(t) matrix can be used for
 TASER (Temporally Adaptive SourcE Reconstruction).
 
 Please also see make_default_settings.py to configure run-time defaults.
@@ -8,62 +9,63 @@ Ryan Timms, OHBA, 2021. @blobsonthebrain
 """
 print("Setting up")
 
-from vrad import data
-from vrad.analysis import maps, spectral
-from vrad.inference import metrics, states, tf_ops
-from vrad.models import RNNGaussian
-from vrad.inference import states, tf_ops
-from vrad.utils import plotting
-import tensorflow as tf
-import pickle
-import scipy.io as spio
-import numpy as np
-import matplotlib.pyplot as plt
 import pathlib
-from pathlib import Path
+import pickle
+
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.io as spio
+import tensorflow as tf
+from vrad import data
+from vrad.inference import tf_ops
+from vrad.models import RNNGaussian
+from vrad.utils import plotting
 
 tf.keras.backend.clear_session()
 
-results_folder_name = 'example_results'
+results_folder_name = "example_results"
 
 # GPU settings
 tf_ops.gpu_growth()
 multi_gpu = True
 
 # Load in run-time settings.
-with open('/users/woolrich/qnc193/VRAD/src/vrad/utils/default_inference_settings/default_TABFER_settings.pkl',
-          'rb') as pickle_file:
+with open(
+    "/users/woolrich/qnc193/VRAD/src/vrad/utils/"
+    "default_inference_settings/default_TABFER_settings.pkl",
+    "rb",
+) as pickle_file:
     settings = pickle.load(pickle_file)
 
 # Settings
-n_states = settings['n_states']
-sequence_length = settings['sequence_length']
-batch_size = settings['batch_size']
-n_layers_inference = settings['n_layers_inference']
-n_layers_model = settings['n_layers_model']
-n_units_inference = settings['n_units_inference']
-n_units_model = settings['n_units_model']
-do_annealing = settings['do_annealing']
-annealing_sharpness = settings['annealing_sharpness']
-n_epochs = settings['n_epochs']
-n_epochs_annealing = settings['n_epochs_annealing']
-rnn_type = settings['rnn_type']
-rnn_normalization = settings['rnn_normalization']
-theta_normalization = settings['theta_normalization']
-dropout_rate_inference = settings['dropout_rate_inference']
-dropout_rate_model = settings['dropout_rate_model']
-learn_means = settings['learn_means']
-learn_covariances = settings['learn_covariances']
-alpha_xform = settings['alpha_xform']
-learn_alpha_scaling = settings['learn_alpha_scaling']
-normalize_covariances = settings['normalize_covariances']
-learning_rate = settings['learning_rate']
-alpha_temperature = settings['alpha_temperature']
-cov_init_type = 'random'
+n_states = settings["n_states"]
+sequence_length = settings["sequence_length"]
+batch_size = settings["batch_size"]
+n_layers_inference = settings["n_layers_inference"]
+n_layers_model = settings["n_layers_model"]
+n_units_inference = settings["n_units_inference"]
+n_units_model = settings["n_units_model"]
+do_annealing = settings["do_annealing"]
+annealing_sharpness = settings["annealing_sharpness"]
+n_epochs = settings["n_epochs"]
+n_epochs_annealing = settings["n_epochs_annealing"]
+rnn_type = settings["rnn_type"]
+rnn_normalization = settings["rnn_normalization"]
+theta_normalization = settings["theta_normalization"]
+dropout_rate_inference = settings["dropout_rate_inference"]
+dropout_rate_model = settings["dropout_rate_model"]
+learn_means = settings["learn_means"]
+learn_covariances = settings["learn_covariances"]
+alpha_xform = settings["alpha_xform"]
+learn_alpha_scaling = settings["learn_alpha_scaling"]
+normalize_covariances = settings["normalize_covariances"]
+learning_rate = settings["learning_rate"]
+alpha_temperature = settings["alpha_temperature"]
+cov_init_type = "random"
 
 # Load functional data from a pre-processed MATLAB object
-Y = spio.loadmat('/well/woolrich/shared/TASER/example_data/filtered_motor_data.mat')
-Y = Y['reduced_data']  # needs to be channels (or PCs) by time
+Y = spio.loadmat("/well/woolrich/shared/TASER/example_data/filtered_motor_data.mat")
+Y = Y["reduced_data"]  # needs to be channels (or PCs) by time
 Y = Y[..., np.newaxis]
 
 # Prepare the data for VRAD, making a training and prediction dataset
@@ -73,14 +75,17 @@ n_channels = prepared_data.n_channels
 training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
-if cov_init_type == 'random':
-    # Use random covariances for the initialisation. Use the same initialisation from disk for reproducibility
-    rand_init = spio.loadmat('/well/woolrich/shared/TASER/example_data/rand_init.mat')
-    rand_init = rand_init['rand_init']  # needs to be channels or PCs by time
+if cov_init_type == "random":
+    # Use random covariances for the initialisation.
+    # Use the same initialisation from disk for reproducibility
+    rand_init = spio.loadmat("/well/woolrich/shared/TASER/example_data/rand_init.mat")
+    rand_init = rand_init["rand_init"]  # needs to be channels or PCs by time
 
     # Ensure data are PSD
     for i in range(n_states):
-        rand_init[i, :, :] = np.linalg.cholesky(rand_init[i, :, :] + (1e-5 * np.eye(n_channels)))
+        rand_init[i, :, :] = np.linalg.cholesky(
+            rand_init[i, :, :] + (1e-5 * np.eye(n_channels))
+        )
     initial_covariances = rand_init
 else:
     initial_covariances = np.tile(np.eye(n_channels), (n_states, 1, 1))
@@ -111,42 +116,40 @@ model = RNNGaussian(
     n_epochs_annealing=n_epochs_annealing,
     learning_rate=learning_rate,
     multi_gpu=multi_gpu,
-    alpha_temperature=alpha_temperature
+    alpha_temperature=alpha_temperature,
 )
 model.summary()
 
 # Train the model
-history = model.fit(
-    training_dataset,
-    epochs=n_epochs
-)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 # Get our inferred parameters
 alpha = model.predict_states(prediction_dataset)[0]
 covz = model.get_covariances()
-kl = history.history['kl_loss']
-ll = history.history['ll_loss']
+kl = history.history["kl_loss"]
+ll = history.history["ll_loss"]
 
-# Plot the learnt dynamics and covariances as a set of scalp topographies
-# Reshape the alphas s.t. they are trial-wise. The data is continuous and 3001 samples long per trial
+# Plot the learnt dynamics and covariances as a set of scalp topographies.
+# Reshape the alphas s.t. they are trial-wise.
+# The data is continuous and 3001 samples long per trial.
 trl_length = 3001
 n_trials = int(np.floor(np.asarray(np.shape(alpha[:, 0])) / trl_length))
-cropped_alphas = alpha[0:n_trials * trl_length, :]
+cropped_alphas = alpha[0 : n_trials * trl_length, :]
 tw_alphas = np.reshape(cropped_alphas, (n_trials, trl_length, n_states))
 plt.figure(figsize=(10, 20))
 for i in range(n_states):
     plt.subplot(n_states, 1, i + 1)
     plt.plot(np.mean(tw_alphas, 0)[:, i])
-    plt.title('State ' + str(i))
-plt.xlabel('Time (s)')
-plt.suptitle('Inferred trial-wise dynamics')
+    plt.title("State " + str(i))
+plt.xlabel("Time (s)")
+plt.suptitle("Inferred trial-wise dynamics")
 plt.tight_layout()
 
-U = spio.loadmat('/well/woolrich/shared/TASER/example_data/projector.mat')
-U = U['projector']  # needs to be channels or PCs by time
+U = spio.loadmat("/well/woolrich/shared/TASER/example_data/projector.mat")
+U = U["projector"]  # needs to be channels or PCs by time
 
-chan_names = spio.loadmat('chan_names.mat')  # Channels to include in plot
-chan_names = chan_names['ans'][0]
+chan_names = spio.loadmat("chan_names.mat")  # Channels to include in plot
+chan_names = chan_names["ans"][0]
 ctf275_channel_names = [chan_name[0] for chan_name in chan_names]
 
 for ii in range(n_states):
@@ -157,7 +160,8 @@ for ii in range(n_states):
     # Get the diagonal from the inferred covariance matrices
     ctf275_data = np.diag(res)
 
-    # Produce the figure using the "CTF275_helmet" layout provided by the FieldTrip toolbox
+    # Produce the figure using the "CTF275_helmet".
+    # Layout provided by the FieldTrip toolbox.
     plotting.topoplot(
         layout="CTF275_helmet",
         data=ctf275_data,
@@ -165,15 +169,16 @@ for ii in range(n_states):
         plot_boxes=False,
         show_deleted_sensors=True,
         show_names=False,
-        title='State ' + str(ii),
+        title="State " + str(ii),
         colorbar=True,
-        cmap='plasma',
+        cmap="plasma",
         n_contours=25,
     )
 
-# And save the results to disk. Also make a copy of the run-time settings in the same directory.
+# And save the results to disk.
+# Also make a copy of the run-time settings in the same directory.
 pathlib.Path(results_folder_name).mkdir(exist_ok=True)
-np.save(results_folder_name + '/alphas.npy', alpha)
-np.save(results_folder_name + '/covariances.npy', covz)
-np.save(results_folder_name + '/KL.npy', kl)
-np.save(results_folder_name + '/LL.npy', ll)
+np.save(results_folder_name + "/alphas.npy", alpha)
+np.save(results_folder_name + "/covariances.npy", covz)
+np.save(results_folder_name + "/KL.npy", kl)
+np.save(results_folder_name + "/LL.npy", ll)
