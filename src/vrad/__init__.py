@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from pathlib import Path
 
 from pkg_resources import DistributionNotFound, get_distribution
 
@@ -14,3 +15,5 @@ finally:
 
 logging.basicConfig(level=logging.WARNING, format=logging.BASIC_FORMAT)
 _logger = logging.getLogger("VRAD")
+
+example_files = str(Path(__file__).parent.parent.parent / "examples" / "files")
