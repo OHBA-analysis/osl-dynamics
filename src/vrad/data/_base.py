@@ -23,12 +23,27 @@ class Data:
     sampling_frequency : float
         Sampling frequency of the data in Hz. Optional, default is 1.0.
     store_dir : str
-        Directory to save results and intermediate steps to. Optional,
-        default is /tmp.
+        Directory to save results and intermediate steps to. Optional, default is /tmp.
+    n_embeddings : int
+        Number of embeddings. Optional. Can be passed if data has already been prepared.
+    n_pca_components : int
+        Number of PCA components. Optional. Can be passed if data has already been
+        prepared.
+    whiten : bool
+        Was whitening applied during the PCA? Optional.
+    prepared : bool
+        Flag indicating if data has already been prepared. Optional.
     """
 
     def __init__(
-        self, inputs: list, sampling_frequency: float = 1.0, store_dir: str = "tmp"
+        self,
+        inputs: list,
+        sampling_frequency: float = 1.0,
+        store_dir: str = "tmp",
+        n_embeddings=0,
+        n_pca_components=None,
+        whiten=None,
+        prepared=False,
     ):
         # Identifier for the data
         self._identifier = id(inputs)
@@ -62,6 +77,10 @@ class Data:
         # Other attributes
         self.n_raw_data_channels = self.n_channels
         self.sampling_frequency = sampling_frequency
+        self.n_embeddings = n_embeddings
+        self.n_pca_components = n_pca_components
+        self.whiten = whiten
+        self.prepared = prepared
 
         # Validation
         self.validate_subjects()
@@ -187,5 +206,69 @@ class Data:
             .prefetch(-1)
             for subject in self.subjects
         ]
+
+        return subject_datasets
+
+    def covariance_training_datasets(
+        self,
+        alpha_t: list,
+        sequence_length: int,
+        batch_size: int,
+        n_alpha_embeddings: int = 0,
+    ) -> tensorflow.data.Dataset:
+        """Dataset for training covariances with a fixed alpha_t.
+
+        Parameters
+        ----------
+        alpha_t : list of np.ndarray
+            List of state mixing factors for each subject.
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+        n_alpha_embeddings: int
+            Number of embeddings when inferring alpha_t. Optional.
+
+        Returns
+        -------
+        list of tensorflow.data.Dataset
+            Subject-specific datasets for training the covariances.
+        """
+        n_batches = self.count_batches(sequence_length)
+
+        # Validation
+        if not isinstance(alpha_t, list):
+            raise ValueError("alpha must be a list of numpy arrays.")
+
+        subject_datasets = []
+        for i in range(self.n_subjects):
+
+            # We remove data points in alpha that are not in the new time embedded data
+            alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
+
+            # We have more subject data points than alpha values so we trim the data
+            subject = self.subjects[i][: alpha.shape[0]]
+
+            # Create datasets
+            alpha_data = Dataset.from_tensor_slices(alpha).batch(
+                sequence_length, drop_remainder=True
+            )
+            subject_data = Dataset.from_tensor_slices(subject).batch(
+                sequence_length, drop_remainder=True
+            )
+            subject_tracker = Dataset.from_tensor_slices(
+                np.zeros(n_batches[i], dtype=np.float32) + i
+            )
+
+            subject_dataset = Dataset.zip(
+                ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
+            )
+            subject_dataset = (
+                subject_dataset.shuffle(100000)
+                .batch(batch_size)
+                .shuffle(100000)
+                .prefetch(-1)
+            )
+            subject_datasets.append(subject_dataset)
 
         return subject_datasets

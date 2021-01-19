@@ -119,8 +119,8 @@ inf_stc = np.concatenate(states.time_courses(alpha), axis=0)
 hmm_stc = np.concatenate(
     data.manipulation.trim_time_series(
         time_series=hmm.state_time_course,
-        discontinuities=prepared_data.discontinuities,
         sequence_length=sequence_length,
+        discontinuities=hmm.discontinuities,
     ),
     axis=0,
 )
