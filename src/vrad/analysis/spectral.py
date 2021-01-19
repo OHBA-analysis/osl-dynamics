@@ -87,27 +87,23 @@ def decompose_spectra(
 
 
 def state_covariance_spectra(
-    covariances: np.ndarray,
+    autocorrelation_function: np.ndarray,
     sampling_frequency: float,
-    n_embeddings: int = 1,
-    pca_weights: np.ndarray = None,
     nfft: int = 64,
     frequency_range: list = None,
 ):
-    """Calculates spectra for inferred states using the covariances.
-    The auto-correlation function is taken from elements of the state covariances.
+    """Calculates spectra from the autocorrelation function.
+
     The power spectrum of each state is calculated as the Fourier transform of
     the auto-correlation function. Coherences are calculated from the power spectra.
+
     Parameters
     ----------
-    covariances : np.ndarray
-        State covariances. Shape must be (n_states, n_channels, n_channels).
+    autocorrelation_function : np.ndarray
+        State autocorrelation functions.
+        Shape must be (n_states, n_channels, n_channels, n_acf).
     sampling_frequency : float
         Frequency at which the data was sampled (Hz).
-    n_embeddings : int
-        Number of time embeddings.
-    pca_weights : np.ndarray
-        Weight matrix used to perform PCA during data preparation. (Optional.)
     nfft : int
         Number of data points in the FFT. The auto-correlation function will only
         have 2 * (n_embeddings + 2) - 1 data points. We pad the auto-correlation
@@ -115,7 +111,7 @@ def state_covariance_spectra(
         in the auto-correlation function is less than nfft. Default is 64.
     frequency_range : list
         Minimum and maximum frequency to keep (Hz).
-    
+
     Returns
     -------
     frequencies : np.ndarray
@@ -129,74 +125,36 @@ def state_covariance_spectra(
     """
 
     # Validation
-    if n_embeddings < 1:
-        raise ValueError(
-            "Spectra can only be calculated if the training data was time embedded."
-        )
-
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Number of states
-    n_states = covariances.shape[0]
-
-    if pca_weights is not None:
-        # Number of time embedded channels
-        n_te_channels = pca_weights.shape[0]
-
-        # Reverse PCA if pca_weights were passed
-        covariances = pca_weights @ covariances @ pca_weights.T
-
-    else:
-        # We assume no PCA was applied
-        n_te_channels = covariances.shape[1]
-
-    # Number of channels in the non-time embedded data
-    n_channels = n_te_channels // (n_embeddings + 2)
-
-    # Number of data points in the correlation function
-    n_cf = 2 * (n_embeddings + 2) - 1
-
-    # Get auto/cross-correlation function from the state covariances
-    correlation_function = np.empty([n_states, n_channels, n_channels, n_cf])
-
-    print("Calculating power spectra")
-    for i in range(n_states):
-        for j in range(n_channels):
-            for k in range(n_channels):
-
-                # Auto/cross-correlation between channel j and channel k of state i
-                correlation_function_jk = covariances[
-                    i,
-                    j * (n_embeddings + 2) : (j + 1) * (n_embeddings + 2),
-                    k * (n_embeddings + 2) : (k + 1) * (n_embeddings + 2),
-                ]
-
-                # Take elements from the first row and column
-                correlation_function[i, j, k] = np.append(
-                    correlation_function_jk[0][::-1], correlation_function_jk[1:, 0]
-                )
+    # Number of data points in the autocorrelation function and FFT
+    n_acf = autocorrelation_function.shape[-1]
+    nfft = max(nfft, 2 ** nextpow2(n_acf))
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
     frequencies = frequencies[f_min_arg : f_max_arg + 1]
     args_range = [f_min_arg, f_max_arg + 1]
 
     if f_max_arg <= f_min_arg:
         raise ValueError("Cannot select requested frequency range.")
 
-    # Number of FFT data points
-    nfft = max(nfft, 2 ** nextpow2(n_cf))
-
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
     power_spectra = abs(
         fourier_transform(
-            correlation_function, sampling_frequency, nfft=nfft, args_range=args_range
+            autocorrelation_function,
+            sampling_frequency,
+            nfft=nfft,
+            args_range=args_range,
         )
     )
+
+    # Normalise the power spectra
+    power_spectra /= nfft ** 2
 
     # Coherences for each state
     coherences = coherence_spectra(power_spectra)
