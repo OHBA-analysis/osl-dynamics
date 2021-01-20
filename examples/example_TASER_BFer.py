@@ -1,5 +1,6 @@
 """
-Example use of VRAD on reduced sensor space data. The resulting C(t) matrix can be used for
+Example use of VRAD on reduced sensor space data.
+The resulting C(t) matrix can be used for
 TASER (Temporally Adaptive SourcE Reconstruction).
 
 Please also see make_default_settings.py to configure run-time defaults.
@@ -10,15 +11,13 @@ print("Setting up")
 
 import pathlib
 import pickle
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as spio
 import tensorflow as tf
 from vrad import data
-from vrad.analysis import maps, spectral
-from vrad.inference import metrics, states, tf_ops
+from vrad.inference import tf_ops
 from vrad.models import RIGO
 from vrad.utils import plotting
 
@@ -31,8 +30,10 @@ tf_ops.gpu_growth()
 multi_gpu = True
 
 # Load in run-time settings.
+# TODO: Make this file reference a pathlib object pointing to the pkl file.
 with open(
-    "/users/woolrich/qnc193/VRAD/src/vrad/utils/default_inference_settings/default_TABFER_settings.pkl",
+    "/users/woolrich/qnc193/VRAD/src/vrad/utils/"
+    "default_inference_settings/default_TABFER_settings.pkl",
     "rb",
 ) as pickle_file:
     settings = pickle.load(pickle_file)
@@ -76,7 +77,8 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 if cov_init_type == "random":
-    # Use random covariances for the initialisation. Use the same initialisation from disk for reproducibility
+    # Use random covariances for the initialisation.
+    # Use the same initialisation from disk for reproducibility
     rand_init = spio.loadmat("/well/woolrich/shared/TASER/example_data/rand_init.mat")
     rand_init = rand_init["rand_init"]  # needs to be channels or PCs by time
 
@@ -130,7 +132,8 @@ kl = history.history["kl_loss"]
 ll = history.history["ll_loss"]
 
 # Plot the learnt dynamics and covariances as a set of scalp topographies
-# Reshape the alphas s.t. they are trial-wise. The data is continuous and 3001 samples long per trial
+# Reshape the alphas s.t. they are trial-wise.
+# The data is continuous and 3001 samples long per trial
 trl_length = 3001
 n_trials = int(np.floor(np.asarray(np.shape(alpha[:, 0])) / trl_length))
 cropped_alphas = alpha[0 : n_trials * trl_length, :]
@@ -161,7 +164,8 @@ for ii in range(n_states):
     # Get the diagonal from the inferred covariance matrices
     ctf275_data = np.diag(res)
 
-    # Produce the figure using the "CTF275_helmet" layout provided by the FieldTrip toolbox
+    # Produce the figure using the "CTF275_helmet"
+    # layout provided by the FieldTrip toolbox
     plotting.topoplot(
         layout="CTF275_helmet",
         data=ctf275_data,
@@ -175,7 +179,8 @@ for ii in range(n_states):
         n_contours=25,
     )
 
-# And save the results to disk. Also make a copy of the run-time settings in the same directory.
+# And save the results to disk.
+# Also make a copy of the run-time settings in the same directory.
 pathlib.Path(results_folder_name).mkdir(exist_ok=True)
 np.save(results_folder_name + "/alphas.npy", alpha)
 np.save(results_folder_name + "/covariances.npy", covz)

@@ -245,7 +245,7 @@ class MeansCovsLayer(layers.Layer):
             else:
                 self.initial_cholesky_covariances = initial_covariances
 
-        self.flattened_cholesky_covariances_initializer = initializers.FlattenedCholeskyCovariancesInitializer(
+        self.flattened_cholesky_covariances_initializer = initializers.FlattenedCholeskyCovariancesInitializer(  # noqa: E501
             self.initial_cholesky_covariances
         )
 

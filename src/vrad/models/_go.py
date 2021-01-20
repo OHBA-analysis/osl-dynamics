@@ -15,7 +15,7 @@ from vrad.inference.functions import (
 )
 from vrad.inference.losses import LogLikelihoodLoss
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
-from vrad.utils.misc import check_arguments, replace_argument
+from vrad.utils.misc import replace_argument
 
 
 class GO(models.Base):

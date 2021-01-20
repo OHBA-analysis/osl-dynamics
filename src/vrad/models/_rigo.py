@@ -6,20 +6,12 @@ import logging
 from operator import lt
 
 import numpy as np
-import tensorflow_probability as tfp
 from tensorflow import Variable
 from tensorflow.keras import Model, layers, optimizers
-from tensorflow.nn import softplus
 from tqdm import trange
 from vrad import models
 from vrad.inference import initializers
-from vrad.inference.functions import (
-    cholesky_factor,
-    cholesky_factor_to_full_matrix,
-    trace_normalize,
-)
 from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
-from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.models.layers import (
     DummyLayer,
     InferenceRNNLayers,

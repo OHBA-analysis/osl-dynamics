@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from vrad import data
-from vrad.inference import metrics, states, tf_ops
+from vrad.inference import tf_ops
 from vrad.models import GO
 from vrad.simulation import MixedHSMMSimulation
 from vrad.utils import plotting

@@ -210,7 +210,6 @@ class Simulation(ABC):
         The time series data is z-transformed and the covariances are converted
         to correlation matrices.
         """
-        means = np.mean(self.time_series, axis=0)
         standard_deviations = np.std(self.time_series, axis=0)
 
         # Standardise (z-transform) the data

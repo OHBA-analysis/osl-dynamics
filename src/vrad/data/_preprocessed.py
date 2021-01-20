@@ -1,6 +1,4 @@
 import numpy as np
-import tensorflow
-from tensorflow.python.data import Dataset
 from tqdm import tqdm
 from vrad.data import Data, manipulation
 from vrad.utils.misc import MockArray
@@ -40,8 +38,12 @@ class PreprocessedData(Data):
         self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
         )
-        self.prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(self.inputs))), identifier=self._identifier
+        self.prepared_data_pattern = (
+            "prepared_data_"
+            "{{i:0{width}d}}_"
+            "{identifier}.npy".format(
+                width=len(str(len(self.inputs))), identifier=self._identifier
+            )
         )
 
         # Time embedded data memory maps
@@ -190,7 +192,7 @@ class PreprocessedData(Data):
             State covariance matrices.
             Shape is (n_subjects, n_states, n_channels, n_channels).
             These must be subject specific covariances.
-        
+
         Returns
         -------
         np.ndarray
