@@ -1,7 +1,7 @@
 import numpy as np
-from tqdm import tqdm
 import tensorflow
 from tensorflow.python.data import Dataset
+from tqdm import tqdm
 from vrad.data import Data, manipulation
 from vrad.utils.misc import MockArray
 

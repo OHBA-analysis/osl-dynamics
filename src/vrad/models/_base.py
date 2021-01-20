@@ -10,16 +10,14 @@ from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
-
 from tqdm import trange
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
-
 from vrad.data import Data
 from vrad.inference import initializers
 from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
-from vrad.utils.model import HTMLTable, LatexTable
 from vrad.utils.misc import check_iterable_type
+from vrad.utils.model import HTMLTable, LatexTable
 
 
 class Base:

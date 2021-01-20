@@ -229,6 +229,9 @@ class MeansCovsLayer(layers.Layer):
                 self.initial_covariances
             )
         else:
+            # Ensure data are single
+            initial_covariances = initial_covariances.astype("float32")
+
             # Normalise the covariances if required
             if normalize_covariances:
                 initial_covariances = trace_normalize(initial_covariances)
