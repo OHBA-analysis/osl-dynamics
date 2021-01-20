@@ -191,7 +191,7 @@ class MeansCovsLayer(layers.Layer):
     initial_means : np.ndarray
         Initial values for the mean of each state.
     initial_covariances : np.ndarray
-        Initial values for the covariance of each state.
+        Initial values for the covariance of each state. Must be dtype float32
     """
 
     def __init__(
