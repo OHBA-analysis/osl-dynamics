@@ -4,17 +4,21 @@
 
 import logging
 from operator import lt
+from tqdm import trange
 
 import numpy as np
-from tensorflow.keras import Model, layers
+import tensorflow_probability as tfp
+from tensorflow import Variable
+from tensorflow.keras import Model, layers, optimizers
 from tensorflow.nn import softplus
-from tqdm import trange
+
+from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
-from vrad.models import BaseModel
+from vrad import models
 from vrad.models.layers import (
     DummyLayer,
     InferenceRNNLayers,
@@ -26,13 +30,15 @@ from vrad.models.layers import (
     SampleNormalDistributionLayer,
     StateMixingFactorsLayer,
 )
-from vrad.utils.misc import check_arguments
+from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
+from vrad.inference.tf_ops import tensorboard_run_logdir
+from vrad.utils.misc import check_arguments, replace_argument
 
 _logger = logging.getLogger("VRAD")
 
 
-class RNNGaussian(BaseModel):
-    """Inference RNN and generative model with Gaussian observations.
+class RIGO(models.GO):
+    """RNN Inference/model network and Gaussian Observations (RIGO).
 
     Parameters
     ----------
@@ -85,8 +91,6 @@ class RNNGaussian(BaseModel):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
-    initial_means : np.ndarray
-        Initial values for the state means. Should have shape (n_states, n_channels).
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels).
@@ -117,45 +121,73 @@ class RNNGaussian(BaseModel):
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
-        initial_means: np.ndarray = None,
         initial_covariances: np.ndarray = None,
     ):
         # Validation
+        if rnn_type not in ["lstm", "gru"]:
+            raise ValueError("rnn_type must be 'lstm' or 'gru'.")
+
+        if n_layers_inference < 1 or n_layers_model < 1:
+            raise ValueError("n_layers must be greater than zero.")
+
+        if n_units_inference < 1 or n_units_model < 1:
+            raise ValueError("n_units must be greater than zero.")
+
+        if dropout_rate_inference < 0 or dropout_rate_model < 0:
+            raise ValueError("dropout_rate must be greater than or equal to zero.")
+
+        if rnn_normalization not in [
+            "layer",
+            "batch",
+            None,
+        ] or theta_normalization not in ["layer", "batch", None]:
+            raise ValueError("normalization type must be 'layer', 'batch' or None.")
+
         if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:
             raise ValueError(
                 "alpha_xform must be 'categorical', 'softmax', 'softplus' or 'relu'."
             )
 
-        # Parameters related to the observation model
-        self.learn_covariances = learn_covariances
-        self.initial_means = initial_means
-        self.initial_covariances = initial_covariances
+        if annealing_sharpness <= 0:
+            raise ValueError("annealing_sharpness must be greater than zero.")
+
+        if n_epochs_annealing < 0:
+            raise ValueError(
+                "n_epochs_annealing must be equal to or greater than zero."
+            )
+
+        # RNN and inference hyperparameters
+        self.rnn_type = rnn_type
+        self.rnn_normalization = rnn_normalization
+        self.n_layers_inference = n_layers_inference
+        self.n_layers_model = n_layers_model
+        self.n_units_inference = n_units_inference
+        self.n_units_model = n_units_model
+        self.dropout_rate_inference = dropout_rate_inference
+        self.dropout_rate_model = dropout_rate_model
+        self.theta_normalization = theta_normalization
         self.alpha_xform = alpha_xform
         self.alpha_temperature = alpha_temperature
-        self.learn_alpha_scaling = learn_alpha_scaling
-        self.normalize_covariances = normalize_covariances
+        self.learn_covariances = learn_covariances
 
-        # Initialise the model base class
-        # This will build and compile the keras model
+        # KL annealing
+        self.do_annealing = do_annealing
+        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
+        self.annealing_sharpness = annealing_sharpness
+        self.n_epochs_annealing = n_epochs_annealing
+
+        # Initialise the observation model
+        # This will inherit the base model, build and compile the model
         super().__init__(
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            rnn_type=rnn_type,
-            rnn_normalization=rnn_normalization,
-            n_layers_inference=n_layers_inference,
-            n_layers_model=n_layers_model,
-            n_units_inference=n_units_inference,
-            n_units_model=n_units_model,
-            dropout_rate_inference=dropout_rate_inference,
-            dropout_rate_model=dropout_rate_model,
-            theta_normalization=theta_normalization,
-            do_annealing=do_annealing,
-            annealing_sharpness=annealing_sharpness,
-            n_epochs_annealing=n_epochs_annealing,
+            learn_alpha_scaling=learn_alpha_scaling,
+            normalize_covariances=normalize_covariances,
             learning_rate=learning_rate,
             multi_gpu=multi_gpu,
             strategy=strategy,
+            initial_covariances=initial_covariances,
         )
 
     def build_model(self):
@@ -175,13 +207,101 @@ class RNNGaussian(BaseModel):
             theta_normalization=self.theta_normalization,
             learn_means=False,
             learn_covariances=self.learn_covariances,
-            initial_means=self.initial_means,
+            initial_means=None,
             initial_covariances=self.initial_covariances,
             alpha_xform=self.alpha_xform,
             alpha_temperature=self.alpha_temperature,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
         )
+
+    def compile(self):
+        """Wrapper for the standard keras compile method.
+
+        Sets up the optimizer and loss functions.
+        """
+        # Setup optimizer
+        optimizer = optimizers.Adam(learning_rate=self.learning_rate)
+
+        # Loss functions
+        ll_loss = LogLikelihoodLoss()
+        kl_loss = KullbackLeiblerLoss(self.annealing_factor)
+        loss = [ll_loss, kl_loss]
+
+        # Compile
+        self.model.compile(optimizer=optimizer, loss=loss)
+
+    def fit(
+        self,
+        *args,
+        no_annealing_callback=False,
+        use_tqdm=False,
+        tqdm_class=None,
+        use_tensorboard=None,
+        tensorboard_dir=None,
+        save_best_after=None,
+        save_filepath=None,
+        **kwargs,
+    ):
+        """Wrapper for the standard keras fit method.
+
+        Adds callbacks and then trains the model.
+
+        Parameters
+        ----------
+        no_annealing_callback : bool
+            Should we NOT update the annealing factor during training?
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual output from
+            tensorflow.
+        tqdm_class : tqdm
+            Class for the tqdm progress bar.
+        use_tensorboard : bool
+            Should we use TensorBoard?
+        tensorboard_dir : str
+            Path to the location to save the TensorBoard log files.
+        save_best_after : int
+            Epoch number after which we should save the best model. The best model is
+            that which achieves the lowest loss.
+        save_filepath : str
+            Path to save the best model to.
+
+        Returns
+        -------
+        history
+            The training history.
+        """
+        if use_tqdm:
+            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+
+        args, kwargs = replace_argument(
+            func=self.model.fit,
+            name="callbacks",
+            item=self.create_callbacks(
+                no_annealing_callback,
+                use_tqdm,
+                tqdm_class,
+                use_tensorboard,
+                tensorboard_dir,
+                save_best_after,
+                save_filepath,
+            ),
+            args=args,
+            kwargs=kwargs,
+            append=True,
+        )
+
+        return self.model.fit(*args, **kwargs)
+
+    def reset_model(self):
+        """Reset the model as if you've built a new model.
+
+        Resets the model weights, optimizer and annealing factor.
+        """
+        self.compile()
+        initializers.reinitialize_model_weights(self.model)
+        if self.do_annealing:
+            self.annealing_factor.assign(0.0)
 
     def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.
@@ -259,67 +379,6 @@ class RNNGaussian(BaseModel):
         free_energy = ll_loss + kl_loss
         return free_energy
 
-    def initialize_means_covariances(
-        self,
-        n_initializations,
-        n_epochs_initialization,
-        training_dataset,
-        verbose=1,
-        use_tqdm=False,
-        tqdm_class=None,
-    ):
-        """Initialize the means and covariances.
-
-        The model is trained for a few epochs and the model with the best
-        free energy is chosen.
-
-        Parameters
-        ----------
-        n_initializations : int
-            Number of initializations.
-        n_epochs_initialization : int
-            Number of epochs to train the model.
-        training_dataset : tensorflow.data.Dataset
-            Dataset to use for training.
-        verbose : int
-            Show verbose (1) or not (0).
-        use_tqdm : bool
-            Should we use a tqdm progress bar instead of the usual Tensorflow output?
-        tqdm_class : tqdm
-            Tqdm class for the progress bar.
-        """
-        if n_initializations is None or n_initializations == 0:
-            _logger.warning(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
-            )
-            return
-
-        # Pick the initialization with the lowest free energy
-        best_free_energy = np.Inf
-        for n in range(n_initializations):
-            print(f"Initialization {n}")
-            self.reset_model()
-            history = self.fit(
-                training_dataset,
-                epochs=n_epochs_initialization,
-                verbose=verbose,
-                use_tqdm=use_tqdm,
-                tqdm_class=tqdm_class,
-            )
-            free_energy = history.history["loss"][-1]
-            if free_energy < best_free_energy:
-                best_initialization = n
-                best_free_energy = free_energy
-                best_weights = self.model.get_weights()
-                best_optimizer = self.model.optimizer
-
-        print(f"Using initialization {best_initialization}")
-        self.compile(optimizer=best_optimizer)
-        self.model.set_weights(best_weights)
-        if self.do_annealing:
-            self.annealing_factor.assign(0.0)
-
     def burn_in(self, *args, **kwargs):
         """Burn-in training phase.
 
@@ -342,67 +401,6 @@ class RNNGaussian(BaseModel):
         # Make means and covariances trainable again and compile
         means_covs_layer.trainable = True
         self.compile()
-
-    def get_covariances(self, alpha_scale=True):
-        """Get the covariances of each state.
-
-        Parameters
-        ----------
-        alpah_scale : bool
-            Should we apply alpha scaling? Default is True.
-
-        Returns
-        -------
-        np.ndarary
-            State covariances.
-        """
-        # Get the means and covariances from the MeansCovsLayer
-        means_covs_layer = self.model.get_layer("means_covs")
-        cholesky_covariances = means_covs_layer.cholesky_covariances
-        covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
-
-        # Normalise covariances
-        if self.normalize_covariances:
-            covariances = trace_normalize(covariances).numpy()
-
-        # Apply alpha scaling
-        if alpha_scale:
-            alpha_scaling = self.get_alpha_scaling()
-            covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
-
-        return covariances
-
-    def set_covariances(self, covariances):
-        """Set the covariances of each state.
-
-        Parameters
-        ----------
-        covariances : np.ndarray
-            State covariances.
-        """
-        means_covs_layer = self.model.get_layer("means_covs")
-        layer_weights = means_covs_layer.get_weights()
-
-        # Replace covariances in the layer weights
-        for i in range(len(layer_weights)):
-            if layer_weights[i].shape == covariances.shape:
-                layer_weights[i] = cholesky_factor(covariances)
-
-        # Set the weights of the layer
-        means_covs_layer.set_weights(layer_weights)
-
-    def get_alpha_scaling(self):
-        """Get the alpha scaling of each state.
-
-        Returns
-        ----------
-        bool
-            Alpha scaling for each state.
-        """
-        mix_means_covs_layer = self.model.get_layer("mix_means_covs")
-        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
-        alpha_scaling = softplus(alpha_scaling).numpy()
-        return alpha_scaling
 
     def sample_alpha(self, n_samples):
         """Uses the model RNN to sample state mixing factors, alpha_t.

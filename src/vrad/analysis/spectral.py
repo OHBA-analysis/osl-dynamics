@@ -11,50 +11,8 @@ from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from vrad.analysis.functions import fourier_transform, nextpow2, validate_array
 from vrad.analysis.time_series import get_state_time_series
-from vrad.data.manipulation import scale
 
 _logger = logging.getLogger("VRAD")
-
-
-def autocorrelation_function(covariances: np.ndarray, n_embeddings: int) -> np.ndarray:
-    """Calculate the autocorrelation function from a covariance matrix.
-
-    Parameters
-    ----------
-    covariances : np.ndarray
-        State covariance matrices. Shape is (n_states, n_channels, n_channels).
-    n_embeddings : int
-        Number of embeddings.
-
-    Returns
-    -------
-    np.ndarray
-        Autocorrelation function. Shape is (n_states, n_channels, n_channels, n_acf)
-    """
-    n_states = covariances.shape[0]
-    n_channels = covariances.shape[1]
-    n_acf = 2 * (n_embeddings + 2) - 1
-
-    # Get autocorrelation function
-    autocorrelation_function = np.empty([n_states, n_channels, n_channels, n_acf])
-    for i in range(n_states):
-        for j in range(n_channels):
-            for k in range(n_channels):
-
-                # Auto/cross-correlation between channel j and channel k of state i
-                autocorrelation_function_jk = covariances[
-                    i,
-                    j * (n_embeddings + 2) : (j + 1) * (n_embeddings + 2),
-                    k * (n_embeddings + 2) : (k + 1) * (n_embeddings + 2),
-                ]
-
-                # Take elements from the first row and column
-                autocorrelation_function[i, j, k] = np.append(
-                    autocorrelation_function_jk[0][::-1],
-                    autocorrelation_function_jk[1:, 0],
-                )
-
-    return autocorrelation_function
 
 
 def decompose_spectra(
@@ -286,7 +244,7 @@ def multitaper(
 
 def multitaper_spectra(
     data: np.ndarray,
-    state_mixing_factors: np.ndarray,
+    alpha: np.ndarray,
     sampling_frequency: float,
     time_half_bandwidth: float,
     n_tapers: int,
@@ -302,7 +260,7 @@ def multitaper_spectra(
     ----------
     data : np.ndarray
         Raw time series data with shape (n_samples, n_channels).
-    state_mixing_factors : np.ndarray
+    alpha : np.ndarray
         Inferred state mixing factor alpha_t at each time point. Shape is (n_samples,
         n_states).
     sampling_frequency : float
@@ -329,46 +287,44 @@ def multitaper_spectra(
     """
 
     # Validation
-    if (isinstance(data, list) != isinstance(state_mixing_factors, list)) or (
-        isinstance(data, np.ndarray) != isinstance(state_mixing_factors, np.ndarray)
+    if (isinstance(data, list) != isinstance(alpha, list)) or (
+        isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
     ):
         raise ValueError(
-            f"data is type {type(data)} and state_mixing_factors is type "
-            + f"{type(state_mixing_factors)}. They must both be lists or numpy arrays."
+            f"data is type {type(data)} and alpha is type "
+            + f"{type(alpha)}. They must both be lists or numpy arrays."
         )
 
     if isinstance(data, np.ndarray):
-        if state_mixing_factors.shape[0] < data.shape[0]:
+        if alpha.shape[0] < data.shape[0]:
             # When we time embed we lose some data points so we trim the data
-            n_padding = (data.shape[0] - state_mixing_factors.shape[0]) // 2
+            n_padding = (data.shape[0] - alpha.shape[0]) // 2
             data = data[n_padding:-n_padding]
-        elif state_mixing_factors.shape[0] != data.shape[0]:
-            raise ValueError("data cannot have less samples than state_mixing_factors.")
+        elif alpha.shape[0] != data.shape[0]:
+            raise ValueError("data cannot have less samples than alpha.")
 
     if isinstance(data, list):
         # Check data and state mixing factors for the same number of subjects has
         # been passed
-        if len(data) != len(state_mixing_factors):
+        if len(data) != len(alpha):
             raise ValueError(
                 "A different number of subjects has been passed for "
-                + f"data and state_mixing_factors: len(data)={len(data)}, "
-                + f"len(state_mixing_factors)={len(state_mixing_factors)}."
+                + f"data and alpha: len(data)={len(data)}, "
+                + f"len(alpha)={len(alpha)}."
             )
 
-        # Check the number of samples in data and state_mixing_factors
-        for i in range(len(state_mixing_factors)):
-            if state_mixing_factors[i].shape[0] < data[i].shape[0]:
+        # Check the number of samples in data and alpha
+        for i in range(len(alpha)):
+            if alpha[i].shape[0] < data[i].shape[0]:
                 # When we time embed we lose some data points so we trim the data
-                n_padding = (data[i].shape[0] - state_mixing_factors[i].shape[0]) // 2
+                n_padding = (data[i].shape[0] - alpha[i].shape[0]) // 2
                 data = data[n_padding:-n_padding]
-            elif state_mixing_factors[i].shape[0] != data[i].shape[0]:
-                raise ValueError(
-                    "data cannot have less samples than state_mixing_factors."
-                )
+            elif alpha[i].shape[0] != data[i].shape[0]:
+                raise ValueError("data cannot have less samples than alpha.")
 
         # Concatenate the data and state mixing factors for each subject
         data = np.concatenate(data, axis=0)
-        state_mixing_factors = np.concatenate(state_mixing_factors, axis=0)
+        alpha = np.concatenate(alpha, axis=0)
 
     if data.ndim != 2:
         raise ValueError(
@@ -376,9 +332,9 @@ def multitaper_spectra(
             + "or (n_subjects, n_samples, n_states)."
         )
 
-    if state_mixing_factors.ndim != 2:
+    if alpha.ndim != 2:
         raise ValueError(
-            "state_mixing_factors must have shape (n_samples, n_states) "
+            "alpha must have shape (n_samples, n_states) "
             + "or (n_subjects, n_samples, n_states)."
         )
 
@@ -391,11 +347,8 @@ def multitaper_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Standardise (z-transform) the data
-    data = scale(data, axis=0)
-
     # Use the state mixing factors to get a time series for each state
-    state_time_series = get_state_time_series(data, state_mixing_factors)
+    state_time_series = get_state_time_series(data, alpha)
 
     # Number of subjects, states, samples and channels
     n_states, n_samples, n_channels = state_time_series.shape
@@ -453,10 +406,8 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    sum_factors = np.sum(state_mixing_factors ** 2, axis=0)[
-        ..., np.newaxis, np.newaxis, np.newaxis
-    ]
-    power_spectra *= n_samples / (sum_factors * n_tapers * n_segments)
+    sum_alpha = np.sum(alpha, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
     # Coherences for each state
     coherences = coherence_spectra(power_spectra)

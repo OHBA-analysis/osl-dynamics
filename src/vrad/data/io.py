@@ -9,14 +9,14 @@ from vrad.utils.misc import time_axis_first
 _logger = logging.getLogger("VRAD")
 
 
-def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
+def load_spm(filename: str) -> Tuple[np.ndarray, float]:
     """Load an SPM MEEG object.
 
     Highly untested function for reading SPM MEEG objects from MATLAB.
 
     Parameters
     ----------
-    file_name: str
+    filename: str
         Filename of an SPM MEEG object.
 
     Returns
@@ -27,7 +27,7 @@ def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
         The sampling frequency listed in the SPM MEEG object.
 
     """
-    spm = scipy.io.loadmat(file_name)
+    spm = scipy.io.loadmat(filename)
     data_file = spm["D"][0][0][6][0][0][0][0]
     n_channels = spm["D"][0][0][6][0][0][1][0][0]
     n_time_points = spm["D"][0][0][6][0][0][1][0][1]
@@ -43,56 +43,63 @@ def load_spm(file_name: str) -> Tuple[np.ndarray, float]:
     return data, sampling_frequency
 
 
-def load_matlab(
-    file_name: str, sampling_frequency: float = 1, ignored_keys=None
-) -> Tuple[np.ndarray, np.ndarray, float]:
-    try:
-        mat = scipy.io.loadmat(file_name)
-    except NotImplementedError:
-        mat = mat73.loadmat(file_name)
+def load_matlab(filename: str, ignored_keys=None) -> np.ndarray:
+    """Loads a MATLAB or SPM file.
+    
+    Parameters
+    ----------
+    filename : str
+        Filename of MATLAB file to read.
+    ignored_keys :  list of str
+        Keys in the MATLAB file to ignore.
 
-    discontinuity_indices = None
+    Returns
+    -------
+    time_series: np.ndarray
+        Data in the MATLAB/SPM file.
+    """
+    try:
+        mat = scipy.io.loadmat(filename)
+    except NotImplementedError:
+        mat = mat73.loadmat(filename)
 
     if "D" in mat:
         _logger.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
-        time_series, sampling_frequency = load_spm(file_name=file_name)
+        time_series, sampling_frequency = load_spm(filename=filename)
+        print(f"Sampling frequency of the data is {sampling_frequency} Hz.")
     else:
         try:
             time_series = mat["X"]
-            if "T" in mat:
-                discontinuity_indices = mat["T"][0].astype(int)
         except KeyError:
             raise KeyError("data in MATLAB file must be contained in a field called X.")
 
-    return time_series, discontinuity_indices, sampling_frequency
+    return time_series
 
 
 def load_data(
-    time_series: Union[str, np.ndarray],
-    sampling_frequency: float = 1,
-    mmap_location: str = None,
-) -> Tuple[np.ndarray, np.ndarray, float]:
+    time_series: Union[str, np.ndarray], mmap_location: str = None
+) -> np.ndarray:
     """Loads time series data.
 
     Parameters
     ----------
     time_series : numpy.ndarray or str
         An array or filename of a .npy or .mat file containing timeseries data.
-    sampling_frequency : float
-        Sampling frequency of the data.
     mmap_location : str
         Filename to save the data as a numpy memory map.
+
+    Returns
+    -------
+    np.ndarray
+        Time series data.
     """
-    discontinuity_indices = None
 
     # Read time series from a file
     if isinstance(time_series, str):
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
         elif time_series[-4:] == ".mat":
-            time_series, discontinuity_indices, sampling_frequency = load_matlab(
-                file_name=time_series, sampling_frequency=sampling_frequency,
-            )
+            time_series = load_matlab(filename=time_series)
 
     # If a python list has been passed, convert to a numpy array
     if isinstance(time_series, list):
@@ -112,9 +119,7 @@ def load_data(
         np.save(mmap_location, time_series)
         time_series = np.load(mmap_location, mmap_mode="r+")
 
-    # Indicate the entire time series is continuous if discontinuities have not
-    # been passed
-    if discontinuity_indices is None:
-        discontinuity_indices = [time_series.shape[0]]
+    # Make sure the time series is type float32
+    time_series = time_series.astype(np.float32)
 
-    return time_series, discontinuity_indices, sampling_frequency
+    return time_series

@@ -26,18 +26,20 @@ def gpu_growth():
             print(e)
 
 
-def select_gpu(gpu_number: int):
+def select_gpu(gpu_numbers: list):
     """Allows the user to pick a GPU to use.
 
     Parameters
     ----------
-    gpu_number : int
-        ID number for the GPU to use.
+    gpu_number : list or int
+        ID numbers for the GPU to use.
     """
-    if isinstance(gpu_number, int):
-        gpu_number = str(gpu_number)
-    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_number
-    print(f"Using GPU {gpu_number}")
+    if isinstance(gpu_numbers, int):
+        gpu_numbers = str(gpu_numbers)
+    else:
+        gpu_numbers = ",".join([str(gn) for gn in gpu_numbers])
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_numbers
+    print(f"Using GPU {gpu_numbers}")
 
 
 def suppress_messages(level: int = 3):

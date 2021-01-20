@@ -211,9 +211,24 @@ class MeansCovsLayer(layers.Layer):
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances
         self.normalize_covariances = normalize_covariances
-        self.initial_means = initial_means
 
-        if initial_covariances is not None:
+        # Initialisation of means
+        if initial_means is None:
+            self.initial_means = np.zeros([n_states, n_channels], dtype=np.float32)
+        else:
+            self.initial_means = initial_means
+
+        self.means_initializer = initializers.MeansInitializer(self.initial_means)
+
+        # Initialisation of covariances
+        if initial_covariances is None:
+            self.initial_covariances = np.stack(
+                [np.eye(n_channels, dtype=np.float32)] * n_states
+            )
+            self.initial_cholesky_covariances = cholesky_factor(
+                self.initial_covariances
+            )
+        else:
             # Normalise the covariances if required
             if normalize_covariances:
                 initial_covariances = trace_normalize(initial_covariances)
@@ -227,15 +242,11 @@ class MeansCovsLayer(layers.Layer):
             else:
                 self.initial_cholesky_covariances = initial_covariances
 
-        else:
-            self.initial_cholesky_covariances = None
+        self.flattened_cholesky_covariances_initializer = initializers.FlattenedCholeskyCovariancesInitializer(
+            self.initial_cholesky_covariances
+        )
 
     def build(self, input_shape):
-        # Initializer for means
-        if self.initial_means is None:
-            self.means_initializer = tf.keras.initializers.Zeros()
-        else:
-            self.means_initializer = initializers.MeansInitializer(self.initial_means)
 
         # Create weights the means
         self.means = self.add_weight(
@@ -246,20 +257,12 @@ class MeansCovsLayer(layers.Layer):
             trainable=self.learn_means,
         )
 
-        # Initializer for covariances
-        if self.initial_cholesky_covariances is None:
-            self.cholesky_initializer = initializers.Identity3D()
-        else:
-            self.cholesky_initializer = initializers.CholeskyCovariancesInitializer(
-                self.initial_cholesky_covariances
-            )
-
         # Create weights for the cholesky decomposition of the covariances
-        self.cholesky_covariances = self.add_weight(
-            "cholesky_covariances",
-            shape=(self.n_states, self.n_channels, self.n_channels),
+        self.flattened_cholesky_covariances = self.add_weight(
+            "flattened_cholesky_covariances",
+            shape=(self.n_states, self.n_channels * (self.n_channels + 1) // 2),
             dtype=tf.float32,
-            initializer=self.cholesky_initializer,
+            initializer=self.flattened_cholesky_covariances_initializer,
             trainable=self.learn_covariances,
         )
 
@@ -267,7 +270,10 @@ class MeansCovsLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         # Calculate the covariance matrix from the cholesky factor
-        self.covariances = cholesky_factor_to_full_matrix(self.cholesky_covariances)
+        cholesky_covariances = tfp.math.fill_triangular(
+            self.flattened_cholesky_covariances
+        )
+        self.covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
 
         # Normalise the covariance
         if self.normalize_covariances:
@@ -396,7 +402,7 @@ class LogLikelihoodLayer(layers.Layer):
         # Calculate the log-likelihood
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma + 1e-7 * tf.eye(sigma.shape[-1])),
+            scale_tril=tf.linalg.cholesky(sigma + 1e-6 * tf.eye(sigma.shape[-1])),
         )
         ll_loss = mvn.log_prob(x)
 

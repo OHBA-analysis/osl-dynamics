@@ -65,7 +65,7 @@ def cholesky_factor(full_matrix: np.ndarray):
     cholesky_factor = np.empty(full_matrix.shape)
     for i in range(full_matrix.shape[0]):
         cholesky_factor[i] = np.linalg.cholesky(full_matrix[i])
-    return cholesky_factor
+    return cholesky_factor.astype(np.float32)
 
 
 def trace_normalize(matrices):

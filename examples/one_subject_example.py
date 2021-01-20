@@ -12,7 +12,7 @@ print("Setting up")
 from vrad import data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RNNGaussian
+from vrad.models import RIGO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -69,7 +69,7 @@ hmm = data.OSL_HMM(
 initial_covariances = hmm.covariances
 
 # Build model
-model = RNNGaussian(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -114,9 +114,8 @@ alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
 hmm_stc = data.manipulation.trim_time_series(
     time_series=hmm.state_time_course,
-    discontinuities=prepared_data.discontinuities,
     sequence_length=sequence_length,
-)[0]
+)
 
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))

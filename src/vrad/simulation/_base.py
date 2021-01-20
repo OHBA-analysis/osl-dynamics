@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+from vrad.data.manipulation import standardize
 from vrad.utils import plotting
 
 
@@ -212,9 +213,8 @@ class Simulation(ABC):
         means = np.mean(self.time_series, axis=0)
         standard_deviations = np.std(self.time_series, axis=0)
 
-        # Z-transform
-        self.time_series -= means
-        self.time_series /= standard_deviations
+        # Standardise (z-transform) the data
+        self.time_series = standardize(self.time_series, axis=0)
 
         # Convert covariance matrices to correlation matrices
         self.covariances /= np.outer(standard_deviations, standard_deviations)[

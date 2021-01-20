@@ -27,17 +27,23 @@ class OSL_HMM:
         self.train = self.hmm.train
 
         # State probabilities
-        if "gamma" in self.hmm:
-            self.gamma = self.hmm.gamma
-        elif "Gamma" in self.hmm:
-            self.gamma = self.hmm.Gamma
+        if "gamma" in hmm_fields:
+            self.gamma = self.hmm.gamma.astype(np.float32)
+        elif "Gamma" in hmm_fields:
+            self.gamma = self.hmm.Gamma.astype(np.float32)
         else:
             self.gamma = None
+
+        # Discontinuities in the training data
+        if "T" in hmm_fields:
+            self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm.T]
+        else:
+            self.discontinuities = None
 
         # State time course
         if self.gamma is not None:
             stc = self.gamma.argmax(axis=1)
-            self.state_time_course = array_ops.get_one_hot(stc)
+            self.state_time_course = array_ops.get_one_hot(stc).astype(np.float32)
 
         # State covariances
         self.covariances = np.array(
