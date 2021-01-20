@@ -130,7 +130,7 @@ preprocessed_time_series = preprocessed_data.trim_raw_time_series(
 # Compute spectra for states
 f, psd, coh = spectral.multitaper_spectra(
     data=preprocessed_time_series,
-    state_mixing_factors=alpha,
+    alpha=alpha,
     sampling_frequency=250,
     time_half_bandwidth=4,
     n_tapers=7,
