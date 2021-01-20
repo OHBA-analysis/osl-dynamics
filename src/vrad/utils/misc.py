@@ -326,3 +326,29 @@ class MockArray:
     def get_memmap(cls, filename, shape, dtype=np.float64, c_contiguous=True):
         cls.to_disk(filename, shape, dtype, c_contiguous)
         return np.load(filename, mmap_mode="r+")
+
+
+def gen_dict_extract(key: str, dictionary: dict, current_key="root"):
+    """Search for a key in a nested dict and get the value and full path of a key.
+
+    Parameters
+    ----------
+    key: str
+        The key to search for.
+    dictionary: dict
+        The nested dictionary to search.
+    current_key: str
+        The current path (nesting level) in the dictionary.
+    """
+    if hasattr(dictionary, "items"):
+        for k, v in dictionary.items():
+            this_key = "".join([current_key, f'["{k}"]'])
+            if k == key:
+                yield {this_key: v}
+            if isinstance(v, dict):
+                for result in gen_dict_extract(key, v, this_key):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in gen_dict_extract(key, d, this_key):
+                        yield result
