@@ -26,18 +26,16 @@ class OSL_HMM:
         self.prior = self.hmm.prior
         self.train = self.hmm.train
 
-        hmm_fields = dir(self.hmm)
-
         # State probabilities
-        if "gamma" in hmm_fields:
+        if "gamma" in self.hmm:
             self.gamma = self.hmm.gamma.astype(np.float32)
-        elif "Gamma" in hmm_fields:
+        elif "Gamma" in self.hmm:
             self.gamma = self.hmm.Gamma.astype(np.float32)
         else:
             self.gamma = None
 
         # Discontinuities in the training data
-        if "T" in hmm_fields:
+        if "T" in self.hmm:
             self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm.T]
         else:
             self.discontinuities = None
@@ -50,8 +48,9 @@ class OSL_HMM:
         # State covariances
         self.covariances = np.array(
             [
-                state.Gam_rate / (state.Gam_shape - len(state.Gam_rate) - 1)
-                for state in self.state.Omega
+                state.Omega.Gam_rate
+                / (state.Omega.Gam_shape - len(state.Omega.Gam_rate) - 1)
+                for state in self.state
             ]
         )
 
