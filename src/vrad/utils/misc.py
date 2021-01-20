@@ -328,7 +328,7 @@ class MockArray:
         return np.load(filename, mmap_mode="r+")
 
 
-def gen_dict_extract(key: str, dictionary: dict, current_key="root"):
+def _gen_dict_extract(key: str, dictionary: dict, current_key="root"):
     """Search for a key in a nested dict and get the value and full path of a key.
 
     Parameters
@@ -346,9 +346,27 @@ def gen_dict_extract(key: str, dictionary: dict, current_key="root"):
             if k == key:
                 yield {this_key: v}
             if isinstance(v, dict):
-                for result in gen_dict_extract(key, v, this_key):
+                for result in _gen_dict_extract(key, v, this_key):
                     yield result
             elif isinstance(v, list):
                 for d in v:
-                    for result in gen_dict_extract(key, d, this_key):
+                    for result in _gen_dict_extract(key, d, this_key):
                         yield result
+
+
+def dict_extract(key: str, dictionary: dict):
+    """Wrapper for _gen_dict_extract
+
+    Parameters
+    ----------
+    key: str
+        The key to search for.
+    dictionary: dict
+        The nested dictionary to search.
+    """
+
+    full_dictionary = {}
+    for item in _gen_dict_extract(key, dictionary):
+        full_dictionary.update(item)
+
+    return full_dictionary
