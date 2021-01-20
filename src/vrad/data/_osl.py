@@ -26,6 +26,8 @@ class OSL_HMM:
         self.prior = self.hmm.prior
         self.train = self.hmm.train
 
+        hmm_fields = dir(self.hmm)
+
         # State probabilities
         if "gamma" in hmm_fields:
             self.gamma = self.hmm.gamma.astype(np.float32)
