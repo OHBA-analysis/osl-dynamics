@@ -11,6 +11,7 @@ from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from vrad.analysis.functions import fourier_transform, nextpow2, validate_array
 from vrad.analysis.time_series import get_state_time_series
+from vrad.data.manipulation import standardize
 
 _logger = logging.getLogger("VRAD")
 
@@ -250,6 +251,7 @@ def multitaper_spectra(
     n_tapers: int,
     segment_length: int = None,
     frequency_range: list = None,
+    standardize_data: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates spectra for inferred states using a multitaper.
 
@@ -273,6 +275,8 @@ def multitaper_spectra(
         Length of the data segement to use to calculate the multitaper.
     frequency_range : list
         Minimum and maximum frequency to keep.
+    standardize : bool
+        Should we standardize the data before calculating the PSDs? Default is True.
 
     Returns
     -------
@@ -347,6 +351,11 @@ def multitaper_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
+    # Standardise the data
+    if standardize_data:
+        # TODO: Maybe default behaviour should not be to standardize
+        data = standardize(data, axis=0)
+
     # Use the state mixing factors to get a time series for each state
     state_time_series = get_state_time_series(data, alpha)
 
@@ -406,7 +415,8 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    sum_alpha = np.sum(alpha, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    # TODO: Check if we should be normalising using sum alpha instead of sum alpha^2
+    sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
     # Coherences for each state
