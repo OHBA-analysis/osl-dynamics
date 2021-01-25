@@ -7,22 +7,25 @@ Please also see make_default_settings.py to configure run-time defaults.
 
 Ryan Timms, OHBA, 2021. @blobsonthebrain
 """
-print("Setting up")
-
 import pathlib
-import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as spio
 import tensorflow as tf
+import vrad
+import yaml
 from vrad import data
 from vrad.inference import tf_ops
 from vrad.models import RIGO
 from vrad.utils import plotting
 
+print("Setting up")
+
+
 tf.keras.backend.clear_session()
 
+default_settings = pathlib.Path(vrad.example_files) / "default_TABFER_settings.yaml"
 results_folder_name = "example_results"
 
 # GPU settings
@@ -30,13 +33,8 @@ tf_ops.gpu_growth()
 multi_gpu = True
 
 # Load in run-time settings.
-# TODO: Make this file reference a pathlib object pointing to the pkl file.
-with open(
-    "/users/woolrich/qnc193/VRAD/src/vrad/utils/"
-    "default_inference_settings/default_TABFER_settings.pkl",
-    "rb",
-) as pickle_file:
-    settings = pickle.load(pickle_file)
+settings = yaml.safe_load(default_settings.open())
+print(f"Loaded default settings from {default_settings}.")
 
 # Settings
 n_states = settings["n_states"]
@@ -67,11 +65,10 @@ cov_init_type = "random"
 # Load functional data from a pre-processed MATLAB object
 Y = spio.loadmat("/well/woolrich/shared/TASER/example_data/filtered_motor_data.mat")
 Y = Y["reduced_data"]  # needs to be channels (or PCs) by time
-Y = Y[..., np.newaxis]
 
 # Prepare the data for VRAD, making a training and prediction dataset
 print("Reading MEG data")
-prepared_data = data.Data(np.transpose(Y))
+prepared_data = data.Data(Y[np.newaxis])
 n_channels = prepared_data.n_channels
 training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
