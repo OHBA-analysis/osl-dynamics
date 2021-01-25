@@ -1031,7 +1031,7 @@ def topoplot(
     topology = Topology(layout)
     if channel_names is not None:
         topology.keep_channels(channel_names)
-    topology.plot_data(
+    return topology.plot_data(
         data,
         plot_boxes=plot_boxes,
         show_deleted_sensors=show_deleted_sensors,
