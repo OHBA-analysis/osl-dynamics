@@ -62,5 +62,12 @@ class OSL_HMM:
         """Wraps plotting.highlight_states for self.state_time_course."""
         plotting.state_barcode(self.state_time_course, *args, **kwargs)
 
+    def padded_gammas(self, n_embeddings):
+        split_gammas = np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
+        return [
+            np.pad(gamma, [[n_embeddings, n_embeddings], [0, 0]])
+            for gamma in split_gammas
+        ]
+
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"
