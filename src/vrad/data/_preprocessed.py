@@ -87,8 +87,8 @@ class PreprocessedData(Data):
         ):
             memmap = manipulation.standardize(memmap, axis=0)
             te_shape = (
-                memmap.shape[0] - (n_embeddings + 1),
-                memmap.shape[1] * (n_embeddings + 2),
+                memmap.shape[0] - (n_embeddings - 1),
+                memmap.shape[1] * n_embeddings,
             )
             te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
             te_memmap = manipulation.time_embed(

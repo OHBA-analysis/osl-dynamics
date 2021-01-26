@@ -41,17 +41,17 @@ def time_embed(
     # time embedded data
     if output_file is None:
         time_embedded_series = np.empty(
-            [n_samples - (n_embeddings + 1), n_channels * (n_embeddings + 2)],
+            [n_samples - (n_embeddings - 1), n_channels * n_embeddings],
             dtype=np.float32,
         )
     else:
         time_embedded_series = output_file
 
     # Generate time embedded series
-    for i in range(n_channels):
-        for j in range(n_embeddings + 2):
-            time_embedded_series[:, i * (n_embeddings + 2) + j] = time_series[
-                n_embeddings + 1 - j : n_samples - j, i
+    for channel in range(n_channels):
+        for embedding in range(n_embeddings):
+            time_embedded_series[:, channel * n_embeddings + embedding] = time_series[
+                n_embeddings - 1 - embedding : n_samples - embedding, channel
             ]
 
     return time_embedded_series
