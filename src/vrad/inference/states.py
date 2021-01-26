@@ -7,9 +7,7 @@ from typing import List, Tuple, Union
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from sklearn.cluster import KMeans
 from vrad import array_ops
-from vrad.utils import misc
 from vrad.utils.decorators import transpose
 
 _logger = logging.getLogger("VRAD")
@@ -236,69 +234,3 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
     ons, offs = state_activation(state_time_course)
     channel_lifetimes = offs - ons
     return channel_lifetimes
-
-
-def covariance_sample(
-    data: np.ndarray,
-    segment_length: Union[int, List[int]],
-    n_segments: Union[int, List[int]],
-    n_clusters: int = None,
-) -> np.ndarray:
-    """Get covariances of a random selection of a time series.
-
-    Given a time series, `data`, randomly select a set of samples of length(s)
-    `segment_length` with `n_segments` of each selected. If `n_clusters` is not
-    specified each of these covariances will be returned. Otherwise, a K-means
-    clustering algorithm is run to return that `n_clusters` covariances.
-
-    Parameters
-    ----------
-    data: np.ndarray
-        The time series to be analyzed.
-    segment_length: int or list of int
-        Either the integer number of samples for each covariance, or a list with a
-        range of values.
-    n_segments: int or list of int
-        Either the integer number of segments to select, or a list specifying the number
-        of each segment length to be sampled.
-    n_clusters: int
-        The number of K-means clusters to find (default is not to perform clustering).
-
-    Returns
-    -------
-    covariances: np.ndarray
-        The calculated covariance matrices of the samples.
-    """
-    segment_lengths = misc.listify(segment_length)
-    n_segments = misc.listify(n_segments)
-
-    if len(n_segments) == 1:
-        n_segments = n_segments * len(segment_lengths)
-
-    if len(segment_lengths) != len(n_segments):
-        raise ValueError(
-            "`segment_lengths` and `n_samples` should have the same lengths."
-        )
-
-    covariances = []
-    for segment_length, n_sample in zip(segment_lengths, n_segments):
-        starts = _rng.choice(data.shape[0] - segment_length, n_sample)
-        samples = data[np.asarray(starts)[:, None] + np.arange(segment_length)]
-
-        transposed = samples.transpose(0, 2, 1)
-        m1 = transposed - transposed.sum(2, keepdims=1) / segment_length
-        covariances.append(np.einsum("ijk,ilk->ijl", m1, m1) / (segment_length - 1))
-    covariances = np.concatenate(covariances)
-
-    if n_clusters is None:
-        return covariances
-
-    flat_covariances = covariances.reshape((covariances.shape[0], -1))
-
-    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat_covariances)
-
-    kmeans_covariances = kmeans.cluster_centers_.reshape(
-        (n_clusters, *covariances.shape[1:])
-    )
-
-    return kmeans_covariances

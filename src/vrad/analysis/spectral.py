@@ -416,7 +416,7 @@ def multitaper_spectra(
 
     # Normalise the power spectra
     # TODO: Check if we should be normalising using sum alpha instead of sum alpha^2
-    sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
     # Coherences for each state

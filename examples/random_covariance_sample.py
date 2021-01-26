@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import vrad
 from vrad.data import Data
-from vrad.inference.states import covariance_sample, match_covariances
+from vrad.inference.states import match_covariances
 from vrad.simulation import HSMMSimulation
 from vrad.utils import plotting
 
@@ -38,11 +38,8 @@ plt.suptitle("Data covariance (diagonal removed)")
 plt.show()
 
 
-sample_covs = covariance_sample(
-    data=prepared,
-    segment_length=[50 * i for i in range(1, 5)],
-    n_segments=100,
-    n_clusters=5,
+sample_covs = data.covariance_sample(
+    segment_length=[50 * i for i in range(1, 5)], n_segments=100, n_clusters=5,
 )
 
 covs, sample_covs = match_covariances(covs, sample_covs)
