@@ -56,7 +56,7 @@ learning_rate = 0.01
 print("Reading MEG data")
 prepared_data = data.Data(
     [
-        f"/well/woolrich/shared/vrad/resting_state_data/prepared_data/subject{i}.mat"
+        f"/well/woolrich/shared/uk_meg_notts/eo/prepared_data/subject{i}.mat"
         for i in range(1, 11)
     ]
 )
@@ -68,7 +68,7 @@ prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_siz
 
 # Initialise covariances with the final HMM covariances
 hmm = data.OSL_HMM(
-    "/well/woolrich/shared/vrad/resting_state_data/hmm_fits/nSubjects-10_K-6/hmm.mat"
+    "/well/woolrich/shared/uk_meg_notts/eo/results/nSubjects-10_K-6/hmm.mat"
 )
 initial_covariances = hmm.covariances
 
@@ -105,8 +105,7 @@ history = model.fit(
     training_dataset,
     epochs=n_epochs,
     save_best_after=n_epochs_annealing,
-    save_filepath="/well/woolrich/shared/vrad/resting_state_data"
-    + "/trained_models/ten_subjects_example/weights",
+    save_filepath="tmp/model",
 )
 
 # Free energy = Log Likelihood - KL Divergence
@@ -131,13 +130,12 @@ print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 # Load preprocessed data to calculate spatial power maps
 preprocessed_data = data.PreprocessedData(
     [
-        "/well/woolrich/shared/vrad/resting_state_data/preprocessed_data"
-        + f"/subject{i}.mat"
+        f"/well/woolrich/shared/uk_meg_notts/eo/preproc_data/subject{i}.mat"
         for i in range(1, 11)
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    n_embeddings=13, sequence_length=sequence_length
+    n_embeddings=15, sequence_length=sequence_length
 )
 
 # Compute spectra for states
@@ -163,7 +161,7 @@ maps.save_nii_file(
     parcellation_file="files"
     + "/fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     power_map=p_map,
-    filename="power_map.nii.gz",
+    filename="power_maps.nii.gz",
     component=0,
     subtract_mean=True,
 )
