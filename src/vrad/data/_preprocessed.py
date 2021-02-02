@@ -204,7 +204,7 @@ class PreprocessedData(Data):
 
         # Validation
         if self.n_embeddings > 0:
-            n_acf = 2 * (self.n_embeddings + 2) - 1
+            n_acf = 2 * self.n_embeddings - 1
         else:
             raise ValueError(
                 "To calculate an autocorrelation function we have to train on time "
@@ -238,9 +238,9 @@ class PreprocessedData(Data):
             # Reverse the first standardisation
             for i in range(n_states):
                 te_cov[i] = (
-                    np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings + 2))
+                    np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
                     @ te_cov[i]
-                    @ np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings + 2))
+                    @ np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
                 )
 
             # Calculate the autocorrelation function
@@ -251,12 +251,8 @@ class PreprocessedData(Data):
                         # of state i
                         autocorrelation_function_jk = te_cov[
                             i,
-                            j
-                            * (self.n_embeddings + 2) : (j + 1)
-                            * (self.n_embeddings + 2),
-                            k
-                            * (self.n_embeddings + 2) : (k + 1)
-                            * (self.n_embeddings + 2),
+                            j * (self.n_embeddings) : (j + 1) * (self.n_embeddings),
+                            k * (self.n_embeddings) : (k + 1) * (self.n_embeddings),
                         ]
 
                         # Take elements from the first row and column
