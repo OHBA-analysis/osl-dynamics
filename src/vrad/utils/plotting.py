@@ -774,7 +774,7 @@ def plot_state_time_courses(
     Parameters
     ----------
     state_time_courses : list of numpy.ndarray
-        State time courses to be plotted  as time series.
+        State time courses to be plotted  as time series. Should be time points by n_states
     sampling_frequency: float
         Sampling frequency of the input data, enabling us to label the x-axis(!)
     n_samples : int
