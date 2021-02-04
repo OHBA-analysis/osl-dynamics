@@ -181,6 +181,10 @@ class Topology:
             Display colorbar
         axis: matplotlib.pyplot.Axes
             matplotlib axis to plot on.
+        cmap: str
+            Colourmap to use in plot. Defaults to matplotlib's plasma
+        n_contours: int
+            Number of contours to use in plot.
         """
         if axis is None:
             fig, axis = plt.subplots(figsize=(15, 15))
@@ -190,7 +194,7 @@ class Topology:
 
         # Create a grid over the bounding area of the Topology.
         grid_x, grid_y = np.mgrid[
-            self.min_x : self.max_x : 500j, self.min_y : self.max_y : 500j
+            self.min_x: self.max_x: 500j, self.min_y: self.max_y: 500j
         ]
 
         # Interpolate the data over the new grid.
