@@ -535,7 +535,8 @@ def plot_matrices(
     matrix: list of np.ndarrays
         The matrices to plot.
     group_color_scale: bool
-        If True, all matrices will have the same colormap scale.
+        If True, all matrices will have the same colormap scale, where we use the minimum and maximum across all
+        matrices as the scale.
     titles: list of str
         Titles to give to each matrix axis.
     main_title: str
