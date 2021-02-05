@@ -1,5 +1,6 @@
 import numpy as np
 from tqdm import tqdm
+from vrad.analysis import spectral
 from vrad.data import Data, manipulation
 from vrad.utils.misc import MockArray
 
@@ -203,23 +204,13 @@ class PreprocessedData(Data):
         n_states = covariances[0].shape[0]
 
         # Validation
-        if self.n_embeddings > 0:
-            n_acf = 2 * self.n_embeddings - 1
-        else:
+        if self.n_embeddings <= 0:
             raise ValueError(
                 "To calculate an autocorrelation function we have to train on time "
                 + "embedded data."
             )
 
-        autocorrelation_function = np.empty(
-            [
-                n_subjects,
-                n_states,
-                self.n_raw_data_channels,
-                self.n_raw_data_channels,
-                n_acf,
-            ]
-        )
+        autocorrelation_function = []
         for n in range(n_subjects):
             # Reverse the final standardisation
             for i in range(n_states):
@@ -244,21 +235,10 @@ class PreprocessedData(Data):
                 )
 
             # Calculate the autocorrelation function
-            for i in range(n_states):
-                for j in range(self.n_raw_data_channels):
-                    for k in range(self.n_raw_data_channels):
-                        # Auto/cross-correlation between channel j and channel k
-                        # of state i
-                        autocorrelation_function_jk = te_cov[
-                            i,
-                            j * (self.n_embeddings) : (j + 1) * (self.n_embeddings),
-                            k * (self.n_embeddings) : (k + 1) * (self.n_embeddings),
-                        ]
-
-                        # Take elements from the first row and column
-                        autocorrelation_function[n, i, j, k] = np.append(
-                            autocorrelation_function_jk[0][::-1],
-                            autocorrelation_function_jk[1:, 0],
-                        )
+            autocorrelation_function.append(
+                spectral.autocorrelation_function(
+                    te_cov, self.n_embeddings, self.n_raw_data_channels
+                )
+            )
 
         return autocorrelation_function
