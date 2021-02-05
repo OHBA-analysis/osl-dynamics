@@ -69,5 +69,18 @@ class OSL_HMM:
             for gamma in split_gammas
         ]
 
+    def covariance_weights(self) -> np.ndarray:
+        """Calculate covariance weightings based on variance (trace).
+
+        Method to wrap `array_ops.trace_weights`.
+
+        Returns
+        -------
+        weights: np.ndarray
+            Statewise weights.
+
+        """
+        return array_ops.trace_weights(self.covariances)
+
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"

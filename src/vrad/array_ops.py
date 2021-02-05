@@ -2,7 +2,7 @@
 
 """
 import logging
-from typing import List
+from typing import List, Union
 
 import numpy as np
 from vrad.utils.decorators import transpose
@@ -149,3 +149,31 @@ def mean_diagonal(array: np.ndarray):
     new_array = array.copy()
     np.fill_diagonal(new_array, array[off_diagonals].mean())
     return new_array
+
+
+def trace_weights(covariance_matrices: Union[np.ndarray, List[np.ndarray]]):
+    """Calculate a weight for each state in a list of covariances, from their variance.
+
+    Parameters
+    ----------
+    covariance_matrices: np.ndarray or list of np.ndarray
+        A 3D matrix of dimensions [states x chans x chans] ([states x covariance]).
+
+    Returns
+    -------
+    weights: np.ndarray
+        The relative weights of each state, from its variance.
+
+    """
+    covariance_matrices = np.array(covariance_matrices)
+    if covariance_matrices.ndim == 2:
+        covariance_matrices = covariance_matrices[None, ...]
+    if np.not_equal(*covariance_matrices.shape[-2:]):
+        raise ValueError(
+            "Last two dimensions of matrix must be equal. Found {} and {}".format(
+                *covariance_matrices.shape[-2:]
+            )
+        )
+    weights = np.trace(covariance_matrices, axis1=1, axis2=2)
+    normalized_weights = weights / weights.max()
+    return normalized_weights
