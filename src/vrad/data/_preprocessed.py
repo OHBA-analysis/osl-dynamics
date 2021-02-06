@@ -100,12 +100,14 @@ class PreprocessedData(Data):
         # Perform principle component analysis (PCA)
         if n_pca_components is not None:
 
+            # NOTE: the approach used here only works for zero mean data
+            for te_memmap in self.te_memmaps:
+                te_memmap -= te_memmap.mean(axis=0)
+
             print("Calculating PCA")
             covariance = np.zeros([te_memmap.shape[1], te_memmap.shape[1]])
             for te_memmap in self.te_memmaps:
-                covariance += np.transpose(te_memmap - te_memmap.mean(axis=0)) @ (
-                    te_memmap - te_memmap.mean(axis=0)
-                )
+                covariance += np.transpose(te_memmap) @ te_memmap
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
             s = s[:n_pca_components].astype(np.float32)
