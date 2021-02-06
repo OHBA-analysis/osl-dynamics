@@ -535,8 +535,8 @@ def plot_matrices(
     matrix: list of np.ndarrays
         The matrices to plot.
     group_color_scale: bool
-        If True, all matrices will have the same colormap scale, where we use the minimum and maximum across all
-        matrices as the scale.
+        If True, all matrices will have the same colormap scale, where we use the
+        minimum and maximum across all matrices as the scale.
     titles: list of str
         Titles to give to each matrix axis.
     main_title: str
@@ -774,7 +774,8 @@ def plot_state_time_courses(
     Parameters
     ----------
     state_time_courses : list of numpy.ndarray
-        State time courses to be plotted  as time series. Should be time points by n_states
+        State time courses to be plotted  as time series.
+        Should be time points by n_states
     sampling_frequency: float
         Sampling frequency of the input data, enabling us to label the x-axis(!)
     n_samples : int

@@ -194,7 +194,7 @@ class Topology:
 
         # Create a grid over the bounding area of the Topology.
         grid_x, grid_y = np.mgrid[
-            self.min_x: self.max_x: 500j, self.min_y: self.max_y: 500j
+            self.min_x : self.max_x : 500j, self.min_y : self.max_y : 500j
         ]
 
         # Interpolate the data over the new grid.

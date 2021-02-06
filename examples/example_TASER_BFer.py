@@ -133,7 +133,7 @@ ll = history.history["ll_loss"]
 # The data is continuous and 3001 samples long per trial
 trl_length = 3001
 n_trials = int(np.floor(np.asarray(np.shape(alpha[:, 0])) / trl_length))
-cropped_alphas = alpha[0: n_trials * trl_length, :]
+cropped_alphas = alpha[0 : n_trials * trl_length, :]
 tw_alphas = np.reshape(cropped_alphas, (n_trials, trl_length, n_states))
 plt.figure(figsize=(10, 20))
 for i in range(n_states):
