@@ -4,6 +4,7 @@ from typing import List, Union
 
 import numpy as np
 import tensorflow
+import yaml
 from sklearn.cluster import KMeans
 from tensorflow.python.data import Dataset
 from tqdm import tqdm
@@ -346,3 +347,31 @@ class Data:
         )
 
         return kmeans_covariances
+
+    @classmethod
+    def from_yaml(cls, file, **kwargs):
+        instance = misc.class_from_yaml(cls, file, kwargs)
+
+        with open(file) as f:
+            settings = yaml.load(f, Loader=yaml.Loader)
+
+        if issubclass(cls, Data):
+            try:
+                cls._process_from_yaml(instance, file, **kwargs)
+            except AttributeError:
+                pass
+
+        training_dataset = instance.training_dataset(
+            sequence_length=settings["sequence_length"],
+            batch_size=settings["batch_size"],
+        )
+        prediction_dataset = instance.prediction_dataset(
+            sequence_length=settings["sequence_length"],
+            batch_size=settings["batch_size"],
+        )
+
+        return {
+            "data": instance,
+            "training_dataset": training_dataset,
+            "prediction_dataset": prediction_dataset,
+        }

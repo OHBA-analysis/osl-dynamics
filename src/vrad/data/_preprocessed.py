@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 from tqdm import tqdm
 from vrad.analysis import spectral
 from vrad.data import Data, manipulation
@@ -242,3 +243,15 @@ class PreprocessedData(Data):
             )
 
         return autocorrelation_function
+
+    def _process_from_yaml(self, file, **kwargs):
+        with open(file) as f:
+            settings = yaml.load(f, Loader=yaml.Loader)
+
+        prep_settings = settings.get("prepare", {})
+        if prep_settings.get("do", False):
+            self.prepare(
+                n_embeddings=prep_settings.get("n_embeddings"),
+                n_pca_components=prep_settings.get("n_pca_components", None),
+                whiten=prep_settings.get("whiten", False),
+            )

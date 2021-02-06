@@ -1,11 +1,13 @@
 """Base class for models.
 
 """
+import pickle
 import re
 from abc import abstractmethod
 from io import StringIO
 
 import numpy as np
+import yaml
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -15,7 +17,7 @@ from tqdm.keras import TqdmCallback
 from vrad.data import Data
 from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
 from vrad.inference.tf_ops import tensorboard_run_logdir
-from vrad.utils.misc import check_iterable_type
+from vrad.utils.misc import check_iterable_type, class_from_yaml
 from vrad.utils.model import HTMLTable, LatexTable
 
 
@@ -270,3 +272,39 @@ class Base:
 
     def _repr_html_(self):
         return self.html_summary()
+
+    def get_all_model_info(self, prediction_dataset, file=None):
+        # Inferred state mixing factors and state time courses
+        alpha = self.predict_states(prediction_dataset)[0]
+        history = self.history.history
+
+        info = dict(
+            free_energy=self.free_energy(prediction_dataset),
+            alpha=alpha,
+            covs=self.get_covariances(),
+            history=history,
+        )
+
+        if file:
+            with open(file, "wb") as f:
+                pickle.dump(info, f)
+
+        return info
+
+    @classmethod
+    def from_yaml(cls, file, **kwargs):
+        return class_from_yaml(cls, file, kwargs)
+
+    def fit_yaml(self, training_dataset, file):
+        with open(file) as f:
+            settings = yaml.load(f, Loader=yaml.Loader)
+
+        settings.pop("results_file", None)
+
+        history = self.fit(training_dataset, **settings,)
+
+        save_filepath = settings.get("save_filepath", None)
+        if save_filepath:
+            self.load_weights(save_filepath)
+
+        return history

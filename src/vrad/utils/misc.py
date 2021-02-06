@@ -1,9 +1,11 @@
 import inspect
 import logging
 from copy import copy
+from pathlib import Path
 from typing import Any, List, Union
 
 import numpy as np
+import yaml
 
 _logger = logging.getLogger("VRAD")
 
@@ -370,3 +372,34 @@ def dict_extract(key: str, dictionary: dict):
         full_dictionary.update(item)
 
     return full_dictionary
+
+
+def class_from_yaml(cls, file, kwargs):
+    file = Path(file)
+    with file.open() as f:
+        args = yaml.load(f, Loader=yaml.Loader)
+
+    args.update(kwargs)
+
+    signature = inspect.signature(cls)
+    parameters = np.array(list(signature.parameters.items()))
+
+    extra = [arg for arg in args if arg not in parameters]
+    missing = np.array([parameter[0] not in args for parameter in parameters])
+    has_default = np.array(
+        [parameter[1].default is not parameter[1].empty for parameter in parameters]
+    )
+    allowed = ~missing | has_default
+    using_default = missing & has_default
+
+    actually_missing = parameters[~allowed]
+    using_default = parameters[missing & has_default]
+
+    if actually_missing.size > 0:
+        raise ValueError(f"Missing arguments: {', '.join(actually_missing[:, 0])}")
+    if extra:
+        _logger.info(f"Extra arguments: {', '.join(extra)}")
+    if using_default.size > 0:
+        _logger.info(f"Using defaults for: {', '.join(using_default[:, 0])}")
+
+    return cls(**{key: value for key, value in args.items() if key not in extra})
