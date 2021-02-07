@@ -5,6 +5,7 @@ import pickle
 import re
 from abc import abstractmethod
 from io import StringIO
+from pathlib import Path
 
 import numpy as np
 import yaml
@@ -275,7 +276,7 @@ class Base:
 
     def get_all_model_info(self, prediction_dataset, file=None):
         # Inferred state mixing factors and state time courses
-        alpha = self.predict_states(prediction_dataset)[0]
+        alpha = self.predict_states(prediction_dataset)
         history = self.history.history
 
         info = dict(
@@ -286,7 +287,9 @@ class Base:
         )
 
         if file:
-            with open(file, "wb") as f:
+            path = Path(file)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("wb") as f:
                 pickle.dump(info, f)
 
         return info
@@ -295,16 +298,22 @@ class Base:
     def from_yaml(cls, file, **kwargs):
         return class_from_yaml(cls, file, kwargs)
 
-    def fit_yaml(self, training_dataset, file):
+    def fit_yaml(self, training_dataset, file, prediction_dataset=None):
         with open(file) as f:
             settings = yaml.load(f, Loader=yaml.Loader)
 
-        settings.pop("results_file", None)
+        results_file = settings.pop("results_file", None)
 
         history = self.fit(training_dataset, **settings,)
 
         save_filepath = settings.get("save_filepath", None)
         if save_filepath:
             self.load_weights(save_filepath)
+
+        if results_file and prediction_dataset:
+            try:
+                self.get_all_model_info(prediction_dataset, results_file)
+            except AttributeError:
+                pass
 
         return history
