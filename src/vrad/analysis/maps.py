@@ -4,10 +4,13 @@
 
 import os
 import pathlib
+import re
 import subprocess
 
 import nibabel as nib
 import numpy as np
+import vrad
+from tqdm import trange
 from vrad.analysis import std_masks
 from vrad.analysis.functions import validate_array
 
@@ -192,6 +195,8 @@ def workbench_render(
     save_dir: str = None,
     interptype: str = "trilinear",
     visualise: bool = True,
+    to_png: bool = False,
+    png_name_pattern: str = None,
 ):
     """Render map in workbench.
 
@@ -207,6 +212,13 @@ def workbench_render(
         Should we display the rendered plots in workbench? Default is True.
     """
     nii = pathlib.Path(nii)
+
+    if to_png and not png_name_pattern:
+        raise ValueError(
+            "If you want pngs, you must specify an output file name pattern."
+        )
+    if png_name_pattern:
+        to_png = True
 
     if not nii.exists() or ".nii" not in nii.suffixes:
         raise ValueError(f"nii should be a nii or nii.gz file." f"found {nii}.")
@@ -275,6 +287,42 @@ def workbench_render(
             output_left,
         ]
     )
+
+    if to_png:
+        scene_file = pathlib.Path("state_scene.scene")
+        temp_scene = pathlib.Path("temp_scene.scene")
+
+        scene = scene_file.read_text()
+        scene = re.sub("{left_series}", cifti_left, scene)
+        scene = re.sub("{right_series}", cifti_right, scene)
+        scene = re.sub(
+            "{parcellation_file_left}", vrad.analysis.std_masks.surf_left, scene
+        )
+        scene = re.sub(
+            "{parcellation_file_right}", vrad.analysis.std_masks.surf_right, scene
+        )
+        temp_scene.write_text(scene)
+
+        n_states = nib.load(nii).shape[-1]
+
+        for i in trange(n_states, desc="processing state"):
+            subprocess.run(
+                [
+                    "wb_command",
+                    "-show-scene",
+                    "temp_scene.scene",
+                    "ready",
+                    png_name_pattern.format(i),
+                    "0",
+                    "0",
+                    "-use-window-size",
+                    "-set-map-yoke",
+                    "I",
+                    f"{i + 1}",
+                ],
+            )
+
+        temp_scene.unlink()
 
     if visualise:
         subprocess.run(
