@@ -218,7 +218,7 @@ def workbench_render(
     save_dir.mkdir(parents=True, exist_ok=True)
 
     in_file = pathlib.Path(str(nii).replace(".gz", "").replace(".nii", ""))
-    out_file = save_dir / in_file
+    out_file = save_dir / in_file.name
 
     # Load surfaces
     surf_right = std_masks.surf_right
