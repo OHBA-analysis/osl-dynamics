@@ -215,11 +215,7 @@ class Data:
         return subject_datasets
 
     def covariance_training_datasets(
-        self,
-        alpha_t: list,
-        sequence_length: int,
-        batch_size: int,
-        n_alpha_embeddings: int = 0,
+        self, alpha_t: list, sequence_length: int, batch_size: int,
     ) -> tensorflow.data.Dataset:
         """Dataset for training covariances with a fixed alpha_t.
 
@@ -231,8 +227,6 @@ class Data:
             Length of the segement of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
-        n_alpha_embeddings: int
-            Number of embeddings when inferring alpha_t. Optional.
 
         Returns
         -------
@@ -248,8 +242,8 @@ class Data:
         subject_datasets = []
         for i in range(self.n_subjects):
 
-            # We remove data points in alpha that are not in the new time embedded data
-            alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
+            # Inferred alpha
+            alpha = alpha_t[i]
 
             # We have more subject data points than alpha values so we trim the data
             subject = self.subjects[i][: alpha.shape[0]]
