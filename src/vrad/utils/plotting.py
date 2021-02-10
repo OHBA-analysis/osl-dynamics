@@ -894,40 +894,47 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     plot_matrices([confusion, nan_diagonal], group_color_scale=False)
 
 
-def plot_loss(
-    losses: np.ndarray,
+def plot_line(
+    x: list,
+    y: list,
     labels: list = None,
     legend_loc: int = 1,
     x_range: list = None,
     y_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
     title: str = None,
     filename: str = None,
 ):
-    """Plot a training loss curve.
+    """Basic line plot.
 
     Parameters
     ----------
-    losses : numpy.ndarray
-        A 2D array of losses-by-epochs.
+    x : list of numpy arrays
+        x-ordinates.
+    y : list of numpy arrays
+        y-ordinates.
     labels : list of str
-        Legend labels for each loss.
+        Legend labels for each line.
     legend_loc : int
-        Matplotlib legend location identifier.
+        Matplotlib legend location identifier. Optional. Default is top right.
     x_range : list
-        Minimum and maximum for x-axis.
+        Minimum and maximum for x-axis. Optional.
     y_range : list
-        Minimum and maximum for y-axis.
+        Minimum and maximum for y-axis. Optional.
+    x_label : str
+        Label for x-axis. Optional.
+    y_label : str
+        Label for y-axis. Optional.
     title : str
-        Figure title
+        Figure title. Optional.
     filename : str
+        Output filename. Optional.
     """
     fig, ax = plt.subplots(figsize=(7, 4))
 
-    if isinstance(losses, list):
-        losses = np.array(losses)
-
-    if losses.ndim == 1:
-        losses = [losses]
+    if len(x) != len(y):
+        raise ValueError("Different number of x and y arrays given.")
 
     if x_range is None:
         x_range = [None, None]
@@ -939,16 +946,16 @@ def plot_loss(
         if isinstance(labels, str):
             labels = [labels]
         else:
-            if len(labels) != len(losses):
-                raise ValueError("Incorrect number of losses or labels passed.")
+            if len(labels) != len(x):
+                raise ValueError("Incorrect number of lines or labels passed.")
         add_legend = True
     else:
-        labels = [None] * len(losses)
+        labels = [None] * len(x)
         add_legend = False
 
-    # Plot the loss curves
-    for i, (loss, label) in enumerate(zip(losses, labels)):
-        ax.plot(loss, label=label)
+    # Plot lines
+    for (x_data, y_data, label) in zip(x, y, labels):
+        ax.plot(x_data, y_data, label=label)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
@@ -956,8 +963,8 @@ def plot_loss(
 
     # Set title and axis labels
     ax.set_title(title)
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
 
     # Add a legend
     if add_legend:
