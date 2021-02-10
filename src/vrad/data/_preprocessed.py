@@ -185,7 +185,9 @@ class PreprocessedData(Data):
             trimmed_raw_time_series.append(memmap)
         return trimmed_raw_time_series
 
-    def autocorrelation_functions(self, covariances: np.ndarray) -> np.ndarray:
+    def autocorrelation_functions(
+        self, covariances: np.ndarray, reverse_standardization: bool = False
+    ) -> np.ndarray:
         """Calculates the autocorrelation function the state covariance matrices.
 
         An autocorrelation function is calculated for each state for each subject.
@@ -196,6 +198,9 @@ class PreprocessedData(Data):
             State covariance matrices.
             Shape is (n_subjects, n_states, n_channels, n_channels).
             These must be subject specific covariances.
+        reverse_standardization : bool
+            Should we reverse the standardization performed on the dataset?
+            Optional, the default is False.
 
         Returns
         -------
@@ -215,13 +220,14 @@ class PreprocessedData(Data):
 
         autocorrelation_function = []
         for n in range(n_subjects):
-            # Reverse the final standardisation
-            for i in range(n_states):
-                covariances[n][i] = (
-                    np.diag(self.prepared_data_std[n])
-                    @ covariances[n][i]
-                    @ np.diag(self.prepared_data_std[n])
-                )
+            if reverse_standardization:
+                # Reverse the final standardisation of prepared data
+                for i in range(n_states):
+                    covariances[n][i] = (
+                        np.diag(self.prepared_data_std[n])
+                        @ covariances[n][i]
+                        @ np.diag(self.prepared_data_std[n])
+                    )
 
             # Reverse the PCA
             te_cov = []
@@ -229,13 +235,14 @@ class PreprocessedData(Data):
                 te_cov.append(self.pca_weights @ covariances[n][i] @ self.pca_weights.T)
             te_cov = np.array(te_cov)
 
-            # Reverse the first standardisation
-            for i in range(n_states):
-                te_cov[i] = (
-                    np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
-                    @ te_cov[i]
-                    @ np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
-                )
+            if reverse_standardization:
+                # Reverse the first standardisation of the raw data
+                for i in range(n_states):
+                    te_cov[i] = (
+                        np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
+                        @ te_cov[i]
+                        @ np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
+                    )
 
             # Calculate the autocorrelation function
             autocorrelation_function.append(
