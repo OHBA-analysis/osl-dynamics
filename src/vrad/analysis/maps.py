@@ -2,17 +2,14 @@
 
 """
 
-import os
-import pathlib
-import re
-import subprocess
+import logging
 
 import nibabel as nib
 import numpy as np
-import vrad
-from tqdm import trange
-from vrad.analysis import std_masks
+from vrad.analysis import workbench
 from vrad.analysis.functions import validate_array
+
+_logger = logging.getLogger("VRAD")
 
 
 def state_power_maps(
@@ -190,151 +187,6 @@ def save_nii_file(
     nib.save(nii_file, filename)
 
 
-def workbench_render(
-    nii: str,
-    save_dir: str = None,
-    interptype: str = "trilinear",
-    visualise: bool = True,
-    to_png: bool = False,
-    png_name_pattern: str = None,
-):
-    """Render map in workbench.
-
-    Parameters
-    ----------
-    nii : str
-        Path to nii image file.
-    save_dir : str
-        Path to save rendered surface plots.
-    interptype : str
-        Interpolation type. Default is 'trilinear'.
-    visualise : bool
-        Should we display the rendered plots in workbench? Default is True.
-    """
-    nii = pathlib.Path(nii)
-
-    if to_png and not png_name_pattern:
-        raise ValueError(
-            "If you want pngs, you must specify an output file name pattern."
-        )
-    if png_name_pattern:
-        to_png = True
-
-    if not nii.exists() or ".nii" not in nii.suffixes:
-        raise ValueError(f"nii should be a nii or nii.gz file." f"found {nii}.")
-
-    if save_dir is None:
-        save_dir = os.getcwd()
-
-    save_dir = pathlib.Path(save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-
-    in_file = pathlib.Path(str(nii).replace(".gz", "").replace(".nii", ""))
-    out_file = save_dir / in_file.name
-
-    # Load surfaces
-    surf_right = std_masks.surf_right
-    surf_left = std_masks.surf_left
-    surf_right_inf = std_masks.surf_right_inf
-    surf_left_inf = std_masks.surf_left_inf
-    surf_right_vinf = std_masks.surf_right_vinf
-    surf_left_vinf = std_masks.surf_left_vinf
-
-    output_right = str(out_file) + "_right.func.gii"
-    output_left = str(out_file) + "_left.func.gii"
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-volume-to-surface-mapping",
-            str(nii),
-            str(surf_right),
-            str(output_right),
-            f"-{interptype}",
-        ]
-    )
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-volume-to-surface-mapping",
-            str(nii),
-            str(surf_left),
-            str(output_left),
-            f"-{interptype}",
-        ]
-    )
-
-    cifti_right = str(output_right).replace(".func.gii", ".dtseries.nii")
-    cifti_left = str(output_left).replace(".func.gii", ".dtseries.nii")
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-cifti-create-dense-timeseries",
-            cifti_right,
-            "-right-metric",
-            output_right,
-        ]
-    )
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-cifti-create-dense-timeseries",
-            cifti_left,
-            "-left-metric",
-            output_left,
-        ]
-    )
-
-    if to_png:
-        scene_file = pathlib.Path("state_scene.scene")
-        temp_scene = pathlib.Path("temp_scene.scene")
-
-        scene = scene_file.read_text()
-        scene = re.sub("{left_series}", cifti_left, scene)
-        scene = re.sub("{right_series}", cifti_right, scene)
-        scene = re.sub(
-            "{parcellation_file_left}", vrad.analysis.std_masks.surf_left, scene
-        )
-        scene = re.sub(
-            "{parcellation_file_right}", vrad.analysis.std_masks.surf_right, scene
-        )
-        temp_scene.write_text(scene)
-
-        n_states = nib.load(nii).shape[-1]
-
-        for i in trange(n_states, desc="processing state"):
-            subprocess.run(
-                [
-                    "wb_command",
-                    "-show-scene",
-                    "temp_scene.scene",
-                    "ready",
-                    png_name_pattern.format(i),
-                    "0",
-                    "0",
-                    "-use-window-size",
-                    "-set-map-yoke",
-                    "I",
-                    f"{i + 1}",
-                ],
-            )
-
-        temp_scene.unlink()
-
-    if visualise:
-        subprocess.run(
-            [
-                "wb_view",
-                str(surf_left),
-                str(surf_right),
-                str(surf_left_inf),
-                str(surf_right_inf),
-                str(surf_left_vinf),
-                str(surf_right_vinf),
-                cifti_left,
-                cifti_right,
-            ]
-        )
+def workbench_render(*args, **kwargs):
+    _logger.warning("workbench_render is now in vrad.analysis.workbench.")
+    workbench.workbench_render(*args, **kwargs)
