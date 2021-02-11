@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 import yaml
 from tqdm import tqdm
@@ -186,7 +187,9 @@ class PreprocessedData(Data):
         return trimmed_raw_time_series
 
     def autocorrelation_functions(
-        self, covariances: np.ndarray, reverse_standardization: bool = False
+        self,
+        covariances: Union[list, np.ndarray],
+        reverse_standardization: bool = False,
     ) -> np.ndarray:
         """Calculates the autocorrelation function the state covariance matrices.
 
@@ -208,15 +211,28 @@ class PreprocessedData(Data):
             Autocorrelation function.
             Shape is (n_subjects, n_states, n_channels, n_channels, n_acf).
         """
-        n_subjects = len(covariances)
-        n_states = covariances[0].shape[0]
-
         # Validation
         if self.n_embeddings <= 0:
             raise ValueError(
                 "To calculate an autocorrelation function we have to train on time "
                 + "embedded data."
             )
+
+        if isinstance(covariances, np.ndarray):
+            if covariances.ndim != 3:
+                raise ValueError(
+                    "covariances must be shape (n_states, n_channels, n_channels) or"
+                    + " (n_subjects, n_states, n_channels, n_channels)."
+                )
+            covariances = [covariances]
+
+        if not isinstance(covariances, list):
+            raise ValueError(
+                "covariances must be a list of numpy arrays or a numpy array."
+            )
+
+        n_subjects = len(covariances)
+        n_states = covariances[0].shape[0]
 
         autocorrelation_function = []
         for n in range(n_subjects):
@@ -251,7 +267,7 @@ class PreprocessedData(Data):
                 )
             )
 
-        return autocorrelation_function
+        return np.squeeze(autocorrelation_function)
 
     def _process_from_yaml(self, file, **kwargs):
         with open(file) as f:
