@@ -215,7 +215,12 @@ class Data:
         return subject_datasets
 
     def covariance_training_datasets(
-        self, alpha_t: list, sequence_length: int, batch_size: int,
+        self,
+        alpha_t: list,
+        sequence_length: int,
+        batch_size: int,
+        n_alpha_embeddings: int = 0,
+        concatenate: bool = True,
     ) -> tensorflow.data.Dataset:
         """Dataset for training covariances with a fixed alpha_t.
 
@@ -227,6 +232,11 @@ class Data:
             Length of the segement of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
+        n_alpha_embeddings : int
+            Number of embeddings when inferring alpha_t. Optional.
+        concatenate : bool
+            Should we concatenate the datasets for each subject? Optional, the
+            default is True.
 
         Returns
         -------
@@ -239,13 +249,20 @@ class Data:
         if not isinstance(alpha_t, list):
             raise ValueError("alpha must be a list of numpy arrays.")
 
+        if self.n_embeddings < n_alpha_embeddings:
+            raise ValueError(
+                "n_embeddings used to prepare the data must be equal to "
+                + "or greater than n_embeddings used to infer alpha."
+            )
+
         subject_datasets = []
         for i in range(self.n_subjects):
 
             # Inferred alpha
-            alpha = alpha_t[i]
+            # We remove data points in alpha that are not in the new time embedded data
+            alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
 
-            # We have more subject data points than alpha values so we trim the data
+            # Subject data
             subject = self.subjects[i][: alpha.shape[0]]
 
             # Create datasets
@@ -259,18 +276,32 @@ class Data:
                 np.zeros(n_batches[i], dtype=np.float32) + i
             )
 
-            subject_dataset = Dataset.zip(
-                ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
+            subject_datasets.append(
+                Dataset.zip(
+                    ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
+                )
             )
-            subject_dataset = (
-                subject_dataset.shuffle(100000)
+
+        # Create a dataset from all the subjects concatenated
+        if concatenate:
+            full_datasets = subject_datasets[0]
+            for dataset in subject_datasets[1:]:
+                full_datasets = full_datasets.concatenate(dataset)
+            full_datasets = (
+                full_datasets.shuffle(100000)
                 .batch(batch_size)
                 .shuffle(100000)
                 .prefetch(-1)
             )
-            subject_datasets.append(subject_dataset)
 
-        return subject_datasets
+        # Otherwise create a dataset for each subject separately
+        else:
+            full_datasets = [
+                dataset.shuffle(100000).batch(batch_size).shuffle(100000).prefetch(-1)
+                for dataset in subject_datasets
+            ]
+
+        return full_datasets
 
     def covariance_sample(
         self,
