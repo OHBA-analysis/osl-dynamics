@@ -190,6 +190,7 @@ class PreprocessedData(Data):
         self,
         covariances: Union[list, np.ndarray],
         reverse_standardization: bool = False,
+        subject_index: int = None,
     ) -> np.ndarray:
         """Calculates the autocorrelation function the state covariance matrices.
 
@@ -204,12 +205,16 @@ class PreprocessedData(Data):
         reverse_standardization : bool
             Should we reverse the standardization performed on the dataset?
             Optional, the default is False.
+        subject_index : int
+            Index for the subject if the covariances corresponds to a single
+            subject. Optional. Only used if reverse_standardization is True.
 
         Returns
         -------
         np.ndarray
             Autocorrelation function.
-            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf).
+            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf) 
+            or (n_states, n_channels, n_channels, n_acf).
         """
         # Validation
         if self.n_embeddings <= 0:
@@ -237,12 +242,18 @@ class PreprocessedData(Data):
         autocorrelation_function = []
         for n in range(n_subjects):
             if reverse_standardization:
-                # Reverse the final standardisation of prepared data
                 for i in range(n_states):
+                    # Get the standard deviation of the prepared data
+                    if subject_index is None:
+                        prepared_data_std = self.prepared_data_std[n]
+                    else:
+                        prepared_data_std = self.prepared_data_std[subject_index]
+
+                    # Reverse the standardisation
                     covariances[n][i] = (
-                        np.diag(self.prepared_data_std[n])
+                        np.diag(prepared_data_std)
                         @ covariances[n][i]
-                        @ np.diag(self.prepared_data_std[n])
+                        @ np.diag(prepared_data_std)
                     )
 
             # Reverse the PCA
@@ -252,12 +263,18 @@ class PreprocessedData(Data):
             te_cov = np.array(te_cov)
 
             if reverse_standardization:
-                # Reverse the first standardisation of the raw data
                 for i in range(n_states):
+                    # Get the standard deviation of the raw data
+                    if subject_index is None:
+                        raw_data_std = self.raw_data_std[n]
+                    else:
+                        raw_data_std = self.raw_data_std[subject_index]
+
+                    # Reverse the standardisation
                     te_cov[i] = (
-                        np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
+                        np.diag(np.repeat(raw_data_std, self.n_embeddings))
                         @ te_cov[i]
-                        @ np.diag(np.repeat(self.raw_data_std[n], self.n_embeddings))
+                        @ np.diag(np.repeat(raw_data_std, self.n_embeddings))
                     )
 
             # Calculate the autocorrelation function
