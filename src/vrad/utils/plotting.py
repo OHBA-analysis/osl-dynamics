@@ -761,21 +761,20 @@ def plot_state_lifetimes(
     show_or_save(filename)
 
 
-def plot_state_time_courses(
-    *state_time_courses,
+def plot_separate_time_series(
+    *time_series,
     n_samples: int = None,
     sampling_frequency: float = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
 ):
-    """Plot state time courses as separate subplots.
+    """Plot time series as separate subplots.
 
     Parameters
     ----------
-    state_time_courses : list of numpy.ndarray
-        State time courses to be plotted  as time series.
-        Should be time points by n_states
+    time_series : list of numpy.ndarray
+        Time series to be plotted. Should be (n_samples, n_lines).
     sampling_frequency: float
         Sampling frequency of the input data, enabling us to label the x-axis(!)
     n_samples : int
@@ -788,9 +787,9 @@ def plot_state_time_courses(
         Filename to save figure to.
     """
 
-    state_time_courses = np.asarray(state_time_courses)
-    n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
-    n_states = state_time_courses[0].shape[1]
+    time_series = np.asarray(time_series)
+    n_samples = n_samples or min([stc.shape[0] for stc in time_series])
+    n_lines = time_series[0].shape[1]
 
     if sampling_frequency is not None:
         time_vector = np.linspace(0, n_samples / sampling_frequency, n_samples)
@@ -799,14 +798,14 @@ def plot_state_time_courses(
 
     default_fig_kwargs = {"figsize": (20, 10), "sharex": "all"}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
-    fig, axes = plt.subplots(n_states, **fig_kwargs)
+    fig, axes = plt.subplots(n_lines, **fig_kwargs)
 
     default_plot_kwargs = {"lw": 0.7}
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
-    for group in state_time_courses:
-        for axis, state in zip(axes, group.T):
-            axis.plot(time_vector, state[:n_samples], **plot_kwargs)
+    for group in time_series:
+        for axis, line in zip(axes, group.T):
+            axis.plot(time_vector, line[:n_samples], **plot_kwargs)
             axis.autoscale(axis="x", tight=True)
 
     if sampling_frequency is not None:
