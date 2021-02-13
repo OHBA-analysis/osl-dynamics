@@ -1,4 +1,9 @@
+import logging
+
 import numpy as np
+from vrad import array_ops
+
+_logger = logging.getLogger("VRAD")
 
 
 def standardize(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
@@ -18,7 +23,40 @@ def standardize(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
     return time_series
 
 
-def time_embed(
+# TODO: Remove *args and **kwargs once they've been dealt with.
+def time_embed(time_series: np.ndarray, n_embeddings: int, *args, **kwargs):
+    """Performs time embedding.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data.
+    n_embeddings : int
+        Number of samples in which to shift the data.
+    """
+
+    if "output_file" in kwargs or args:
+        _logger.warning("output_file is no longer a valid argument to time_embed.")
+
+    if n_embeddings % 2 == 0:
+        raise ValueError("n_embeddings must be an odd number.")
+
+    te_shape = (
+        time_series.shape[0] - (n_embeddings - 1),
+        time_series.shape[1] * n_embeddings,
+    )
+    return (
+        array_ops.sliding_window_view(x=time_series, window_shape=te_shape[0], axis=0)
+        .T[..., ::-1]
+        .reshape(te_shape)
+    )
+
+
+def time_embedded_covariance(time_series: np.ndarray, n_embeddings: int):
+    return np.cov(time_embed(time_series=time_series, n_embeddings=n_embeddings).T)
+
+
+def _old_time_embed(
     time_series: np.ndarray, n_embeddings: int, output_file: str = None,
 ) -> np.ndarray:
     """Performs time embedding.
