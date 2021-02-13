@@ -1,4 +1,5 @@
 from typing import Union
+
 import numpy as np
 import yaml
 from tqdm import tqdm
@@ -213,7 +214,7 @@ class PreprocessedData(Data):
         -------
         np.ndarray
             Autocorrelation function.
-            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf) 
+            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf)
             or (n_states, n_channels, n_channels, n_acf).
         """
         # Validation
