@@ -1,9 +1,5 @@
-import logging
-
 import numpy as np
 from vrad import array_ops
-
-_logger = logging.getLogger("VRAD")
 
 
 def standardize(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
@@ -34,9 +30,6 @@ def time_embed(time_series: np.ndarray, n_embeddings: int, *args, **kwargs):
     n_embeddings : int
         Number of samples in which to shift the data.
     """
-
-    if "output_file" in kwargs or args:
-        _logger.warning("output_file is no longer a valid argument to time_embed.")
 
     if n_embeddings % 2 == 0:
         raise ValueError("n_embeddings must be an odd number.")
