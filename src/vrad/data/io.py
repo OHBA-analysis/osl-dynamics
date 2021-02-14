@@ -45,7 +45,7 @@ def load_spm(filename: str) -> Tuple[np.ndarray, float]:
 
 def load_matlab(filename: str, ignored_keys=None) -> np.ndarray:
     """Loads a MATLAB or SPM file.
-    
+
     Parameters
     ----------
     filename : str

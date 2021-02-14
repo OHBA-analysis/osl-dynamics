@@ -50,13 +50,6 @@ class PreprocessedData(Data):
             )
         )
 
-        # Time embedded data memory maps
-        self.te_memmaps = []
-        self.te_filenames = [
-            str(self.store_dir / self.te_pattern.format(i=i))
-            for i, _ in enumerate(self.inputs)
-        ]
-
         # Prepared data memory maps (time embedded and pca'ed)
         self.prepared_data_memmaps = []
         self.prepared_data_filenames = [
@@ -67,7 +60,10 @@ class PreprocessedData(Data):
         self.prepared_data_std = []
 
     def prepare(
-        self, n_embeddings: int, n_pca_components: int = None, whiten: bool = False,
+        self,
+        n_embeddings: int,
+        n_pca_components: int = None,
+        whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
@@ -82,77 +78,81 @@ class PreprocessedData(Data):
         whiten : bool
             Should we whiten the PCA'ed data? Optional, default is False.
         """
+        # Class attributes related to data preparation
+        self.n_embeddings = n_embeddings
+        self.n_te_channels = self.n_raw_data_channels * n_embeddings
+        self.n_pca_components = n_pca_components
+        self.whiten = whiten
+
+        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
 
-        # Standardise and time embed the data for each subject
-        for memmap, new_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Time embedding", ncols=98),
-            self.te_filenames,
-        ):
-            memmap = manipulation.standardize(memmap, axis=0)
-            te_shape = (
-                memmap.shape[0] - (n_embeddings - 1),
-                memmap.shape[1] * n_embeddings,
-            )
-            te_memmap = MockArray.get_memmap(new_file, te_shape, dtype=np.float32)
-            te_memmap = manipulation.time_embed(
-                memmap, n_embeddings, output_file=te_memmap
-            )
-            self.te_memmaps.append(te_memmap)
-
-        # Perform principle component analysis (PCA)
+        # Principle component analysis (PCA)
+        # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
 
-            # NOTE: the approach used here only works for zero mean data
-            for te_memmap in self.te_memmaps:
-                te_memmap -= te_memmap.mean(axis=0)
+            # Calculate the PCA components by performing SVD on the covariance
+            # of the data
+            covariance = np.zeros([self.n_te_channels, self.n_te_channels])
+            for raw_data_memmap in tqdm(
+                self.raw_data_memmaps, desc="Calculating PCA components", ncols=98
+            ):
+                # Standardise the data and time embed
+                std_data = manipulation.standardize(raw_data_memmap)
+                te_data = manipulation.time_embed(std_data, n_embeddings)
 
-            print("Calculating PCA")
-            covariance = np.zeros([te_memmap.shape[1], te_memmap.shape[1]])
-            for te_memmap in self.te_memmaps:
-                covariance += np.transpose(te_memmap) @ te_memmap
+                # Calculate the covariance of the entire dataset
+                covariance += np.transpose(te_data) @ te_data
+
+                # Clear intermediate data
+                del std_data, te_data
+
+            # Use SVD to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_weights = u
-
-            # Apply PCA to the data for each subject and standardise again
-            for te_memmap, prepared_data_file in zip(
-                tqdm(self.te_memmaps, desc="Applying PCA", ncols=98),
-                self.prepared_data_filenames,
-            ):
-                pca_te_shape = (
-                    te_memmap.shape[0],
-                    n_pca_components,
-                )
-                pca_te_memmap = MockArray.get_memmap(
-                    prepared_data_file, pca_te_shape, dtype=np.float32
-                )
-                pca_te_memmap = te_memmap @ self.pca_weights
-                self.prepared_data_mean.append(np.mean(pca_te_memmap, axis=0))
-                self.prepared_data_std.append(np.std(pca_te_memmap, axis=0))
-                pca_te_memmap = manipulation.standardize(pca_te_memmap, axis=0)
-                self.prepared_data_memmaps.append(pca_te_memmap)
-
-        # Otherwise, the time embedded data is the prepared data
         else:
-            for te_memmap, prepared_data_file in zip(
-                self.te_memmaps, self.prepared_data_filenames,
-            ):
-                self.prepared_data_mean.append(np.mean(te_memmap, axis=0))
-                self.prepared_data_std.append(np.std(te_memmap, axis=0))
-                te_memmap = manipulation.standardize(te_memmap, axis=0)
-                self.prepared_data_memmaps.append(te_memmap)
+            self.pca_weights = None
+
+        # Prepare the data
+        for raw_data_memmap, prepared_data_file in zip(
+            tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
+            self.prepared_data_filenames,
+        ):
+            # Standardise the data and time embed
+            std_data = manipulation.standardize(raw_data_memmap)
+            te_data = manipulation.time_embed(std_data, n_embeddings)
+
+            # Apply PCA to get the prepared data
+            if self.pca_weights is not None:
+                prepared_data = te_data @ self.pca_weights
+
+            # Otherwise, the time embedded data is the prepared data
+            else:
+                prepared_data = te_data
+
+            # Create a memory map for the prepared data
+            prepared_data_memmap = MockArray.get_memmap(
+                prepared_data_file, prepared_data.shape, dtype=np.float32
+            )
+
+            # Record the mean and standard deviation of the prepared
+            # data and standardise to get the final data
+            self.prepared_data_mean.append(np.mean(prepared_data, axis=0))
+            self.prepared_data_std.append(np.std(prepared_data, axis=0))
+            prepared_data_memmap = manipulation.standardize(
+                prepared_data, create_copy=False
+            )
+            self.prepared_data_memmaps.append(prepared_data_memmap)
+
+            # Clear intermediate data
+            del std_data, te_data, prepared_data
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
-
-        self.n_embeddings = n_embeddings
-        self.n_pca_components = n_pca_components
-        self.whiten = whiten
-        self.prepared = True
 
     def trim_raw_time_series(
         self, n_embeddings: int = None, sequence_length: int = None

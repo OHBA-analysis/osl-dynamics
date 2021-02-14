@@ -2,7 +2,11 @@ import numpy as np
 from vrad import array_ops
 
 
-def standardize(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
+def standardize(
+    time_series: np.ndarray,
+    axis: int = 0,
+    create_copy: bool = True,
+) -> np.ndarray:
     """Standardizes a time series.
 
     Returns a time series with zero mean and unit variance.
@@ -13,14 +17,20 @@ def standardize(time_series: np.ndarray, axis: int = 0) -> np.ndarray:
         Time series data.
     axis : int
         Axis on which to perform the transformation.
+    create_copy : bool
+        Should we return a new array containing the standardized data or modify
+        the original time series array? Optional, default is True.
     """
-    time_series -= time_series.mean(axis=axis)
-    time_series /= time_series.std(axis=axis)
-    return time_series
+    if create_copy:
+        std_time_series = np.copy(time_series)
+    else:
+        std_time_series = time_series
+    std_time_series -= np.mean(std_time_series, axis=axis)
+    std_time_series /= np.std(std_time_series, axis=axis)
+    return std_time_series
 
 
-# TODO: Remove *args and **kwargs once they've been dealt with.
-def time_embed(time_series: np.ndarray, n_embeddings: int, *args, **kwargs):
+def time_embed(time_series: np.ndarray, n_embeddings: int):
     """Performs time embedding.
 
     Parameters
@@ -29,6 +39,11 @@ def time_embed(time_series: np.ndarray, n_embeddings: int, *args, **kwargs):
         Time series data.
     n_embeddings : int
         Number of samples in which to shift the data.
+
+    Returns
+    -------
+    sliding_window_view
+        Time embedded data.
     """
 
     if n_embeddings % 2 == 0:
@@ -43,48 +58,6 @@ def time_embed(time_series: np.ndarray, n_embeddings: int, *args, **kwargs):
         .T[..., ::-1]
         .reshape(te_shape)
     )
-
-
-def time_embedded_covariance(time_series: np.ndarray, n_embeddings: int):
-    return np.cov(time_embed(time_series=time_series, n_embeddings=n_embeddings).T)
-
-
-def _old_time_embed(
-    time_series: np.ndarray, n_embeddings: int, output_file: str = None,
-) -> np.ndarray:
-    """Performs time embedding.
-
-    Parameters
-    ----------
-    time_series : numpy.ndarray
-        Time series data.
-    n_embeddings : int
-        Number of samples in which to shift the data.
-    output_file : str
-    """
-
-    if n_embeddings % 2 == 0:
-        raise ValueError("n_embeddings must be an odd number.")
-
-    n_samples, n_channels = time_series.shape
-
-    # If an output file hasn't been passed we create a numpy array for the
-    # time embedded data
-    if output_file is None:
-        time_embedded_series = np.empty(
-            [n_samples - n_embeddings - 1, n_channels * n_embeddings], dtype=np.float32,
-        )
-    else:
-        time_embedded_series = output_file
-
-    # Generate time embedded series
-    for channel in range(n_channels):
-        for embedding in range(n_embeddings):
-            time_embedded_series[:, channel * n_embeddings + embedding] = time_series[
-                n_embeddings - 1 - embedding : n_samples - embedding, channel
-            ]
-
-    return time_embedded_series
 
 
 def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> int:
@@ -113,7 +86,9 @@ def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> i
 
 
 def trim_time_series(
-    time_series: np.ndarray, sequence_length: int, discontinuities: list = None,
+    time_series: np.ndarray,
+    sequence_length: int,
+    discontinuities: list = None,
 ) -> np.ndarray:
     """Trims a time seris.
 
