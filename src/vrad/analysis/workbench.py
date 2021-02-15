@@ -42,7 +42,10 @@ def render(
     if not nii.exists() or ".nii" not in nii.suffixes:
         raise ValueError(f"nii should be a nii or nii.gz file." f"found {nii}.")
 
-    save_dir = pathlib.Path(save_dir) or pathlib.Path.cwd()
+    if save_dir is None:
+        save_dir = pathlib.Path.cwd()
+    else:
+        save_dir = pathlib.Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
     out_file = save_dir / nii.stem
