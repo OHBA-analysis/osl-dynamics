@@ -16,11 +16,11 @@ surfs = {
 }
 
 
-def workbench_render(
+def render(
     nii: str,
     save_dir: str = None,
     interptype: str = "trilinear",
-    visualise: bool = True,
+    gui: bool = True,
     inflation: int = 0,
     image_name: str = None,
 ):
@@ -34,7 +34,7 @@ def workbench_render(
         Path to save rendered surface plots.
     interptype : str
         Interpolation type. Default is 'trilinear'.
-    visualise : bool
+    gui : bool
         Should we display the rendered plots in workbench? Default is True.
     """
     nii = pathlib.Path(nii)
@@ -65,20 +65,18 @@ def workbench_render(
     dense_timeseries(cifti=cifti_left, output=output_left, left_or_right="left")
 
     if image_name:
-        workbench_image(
+        image(
             cifti_left=cifti_left,
             cifti_right=cifti_right,
             file_name=image_name,
             inflation=inflation,
         )
 
-    if visualise:
-        workbench_visualise(
-            cifti_left=cifti_left, cifti_right=cifti_right, inflation=inflation
-        )
+    if gui:
+        visualise(cifti_left=cifti_left, cifti_right=cifti_right, inflation=inflation)
 
 
-def workbench_visualise(cifti_left, cifti_right, inflation=0):
+def visualise(cifti_left, cifti_right, inflation=0):
     surface = surfs.get(inflation, None)
     if surface is None:
         _logger.warning(
@@ -88,7 +86,7 @@ def workbench_visualise(cifti_left, cifti_right, inflation=0):
     subprocess.run(["wb_view", *surface, cifti_left, cifti_right])
 
 
-def workbench_image(cifti_left, cifti_right, file_name: str, inflation=0):
+def image(cifti_left, cifti_right, file_name: str, inflation=0):
     file_path = pathlib.Path(file_name)
     suffix = file_path.suffix or ".png"
     file_path = file_path.with_suffix("")
