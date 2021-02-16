@@ -1,6 +1,6 @@
 """Example script for running inference on resting-state MEG data (forty five subjects).
 
-- The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- The data is stored on the BMRC cluster: /well/woolrich/projects/uk_meg_notts
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
@@ -56,7 +56,7 @@ learning_rate = 0.01
 print("Reading MEG data")
 prepared_data = data.Data(
     [
-        f"/well/woolrich/shared/uk_meg_notts/eo/prepared_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject{i}.mat"
         for i in range(1, 46)
     ]
 )
@@ -67,7 +67,7 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with final HMM covariances
-hmm = data.OSL_HMM("/well/woolrich/shared/uk_meg_notts/eo/nSubjects-45_K-6/hmm.mat")
+hmm = data.OSL_HMM("/well/woolrich/projects/uk_meg_notts/eo/nSubjects-45_K-6/hmm.mat")
 initial_covariances = hmm.covariances
 
 # Build model
@@ -128,7 +128,7 @@ print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 # Load preprocessed data to calculate spatial power maps
 preprocessed_data = data.PreprocessedData(
     [
-        f"/well/woolrich/shared/uk_meg_notts/eo/preproc_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject{i}.mat"
         for i in range(1, 46)
     ]
 )

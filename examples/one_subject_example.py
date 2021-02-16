@@ -1,6 +1,6 @@
 """Example script for running inference on resting-state MEG data for one subject.
 
-- The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- The data is stored on the BMRC cluster: /well/woolrich/projects/uk_meg_notts
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
@@ -54,7 +54,7 @@ learning_rate = 0.01
 # Read MEG data
 print("Reading MEG data")
 prepared_data = data.Data(
-    "/well/woolrich/shared/uk_meg_notts/eo/prepared_data/subject1.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject1.mat"
 )
 n_channels = prepared_data.n_channels
 
@@ -64,7 +64,7 @@ prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_siz
 
 # Initialise covariances with the final HMM covariances
 hmm = data.OSL_HMM(
-    "/well/woolrich/shared/uk_meg_notts/eo/results/nSubjects-1_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-1_K-6/hmm.mat"
 )
 initial_covariances = hmm.covariances
 
@@ -112,7 +112,8 @@ print(f"Free energy: {free_energy}")
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
 hmm_stc = data.manipulation.trim_time_series(
-    time_series=hmm.state_time_course, sequence_length=sequence_length,
+    time_series=hmm.state_time_course,
+    sequence_length=sequence_length,
 )
 
 # Dice coefficient
@@ -120,7 +121,7 @@ print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
 # Load preprocessed data to calculate spatial power maps
 preprocessed_data = data.PreprocessedData(
-    "/well/woolrich/shared/uk_meg_notts/eo/preproc_data/subject1.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject1.mat"
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
     n_embeddings=15, sequence_length=sequence_length
