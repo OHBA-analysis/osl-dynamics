@@ -128,7 +128,7 @@ class StateMixingFactorsLayer(layers.Layer):
     """Layer for calculating the mixing ratio of the states.
 
     This layer accepts the logits theta_t and outputs alpha_t.
-    
+
     Parameters
     ----------
     alpha_xform : str
@@ -153,8 +153,7 @@ class StateMixingFactorsLayer(layers.Layer):
             alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature,
-                probs=activations.softmax(theta_t, axis=2),
+                temperature=self.alpha_temperature, logits=theta_t,
             )
             alpha_t = gumbel_softmax_distribution.sample()
 
@@ -192,7 +191,7 @@ class MeansCovsLayer(layers.Layer):
     initial_means : np.ndarray
         Initial values for the mean of each state.
     initial_covariances : np.ndarray
-        Initial values for the covariance of each state.
+        Initial values for the covariance of each state. Must be dtype float32
     """
 
     def __init__(
@@ -212,9 +211,27 @@ class MeansCovsLayer(layers.Layer):
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances
         self.normalize_covariances = normalize_covariances
-        self.initial_means = initial_means
 
-        if initial_covariances is not None:
+        # Initialisation of means
+        if initial_means is None:
+            self.initial_means = np.zeros([n_states, n_channels], dtype=np.float32)
+        else:
+            self.initial_means = initial_means
+
+        self.means_initializer = initializers.MeansInitializer(self.initial_means)
+
+        # Initialisation of covariances
+        if initial_covariances is None:
+            self.initial_covariances = np.stack(
+                [np.eye(n_channels, dtype=np.float32)] * n_states
+            )
+            self.initial_cholesky_covariances = cholesky_factor(
+                self.initial_covariances
+            )
+        else:
+            # Ensure data are single
+            initial_covariances = initial_covariances.astype("float32")
+
             # Normalise the covariances if required
             if normalize_covariances:
                 initial_covariances = trace_normalize(initial_covariances)
@@ -228,15 +245,11 @@ class MeansCovsLayer(layers.Layer):
             else:
                 self.initial_cholesky_covariances = initial_covariances
 
-        else:
-            self.initial_cholesky_covariances = None
+        self.flattened_cholesky_covariances_initializer = initializers.FlattenedCholeskyCovariancesInitializer(  # noqa: E501
+            self.initial_cholesky_covariances
+        )
 
     def build(self, input_shape):
-        # Initializer for means
-        if self.initial_means is None:
-            self.means_initializer = tf.keras.initializers.Zeros()
-        else:
-            self.means_initializer = initializers.MeansInitializer(self.initial_means)
 
         # Create weights the means
         self.means = self.add_weight(
@@ -247,20 +260,12 @@ class MeansCovsLayer(layers.Layer):
             trainable=self.learn_means,
         )
 
-        # Initializer for covariances
-        if self.initial_cholesky_covariances is None:
-            self.cholesky_initializer = initializers.Identity3D()
-        else:
-            self.cholesky_initializer = initializers.CholeskyCovariancesInitializer(
-                self.initial_cholesky_covariances
-            )
-
         # Create weights for the cholesky decomposition of the covariances
-        self.cholesky_covariances = self.add_weight(
-            "cholesky_covariances",
-            shape=(self.n_states, self.n_channels, self.n_channels),
+        self.flattened_cholesky_covariances = self.add_weight(
+            "flattened_cholesky_covariances",
+            shape=(self.n_states, self.n_channels * (self.n_channels + 1) // 2),
             dtype=tf.float32,
-            initializer=self.cholesky_initializer,
+            initializer=self.flattened_cholesky_covariances_initializer,
             trainable=self.learn_covariances,
         )
 
@@ -268,7 +273,10 @@ class MeansCovsLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         # Calculate the covariance matrix from the cholesky factor
-        self.covariances = cholesky_factor_to_full_matrix(self.cholesky_covariances)
+        cholesky_covariances = tfp.math.fill_triangular(
+            self.flattened_cholesky_covariances
+        )
+        self.covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
 
         # Normalise the covariance
         if self.normalize_covariances:
@@ -309,7 +317,7 @@ class MixMeansCovsLayer(layers.Layer):
     n_channels : int
         Number of channels.
     learn_alpha_scaling : bool
-        Should be learn an alpha scaling?
+        Should we learn an alpha scaling?
     """
 
     def __init__(
@@ -381,10 +389,8 @@ class MixMeansCovsLayer(layers.Layer):
 class LogLikelihoodLayer(layers.Layer):
     """Layer to calculate the negative log likelihood.
 
-    The log-likelihood is calculated as:
-    c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-    where x is a single observation, mu is the mean vector, sigma is the
-    covariance matrix and c is a constant.
+    The negative log-likelihood is calculated assuming a multivariate normal
+    probability density.
     """
 
     def __init__(self, **kwargs):
@@ -396,22 +402,16 @@ class LogLikelihoodLayer(layers.Layer):
     def call(self, inputs):
         x, mu, sigma = inputs
 
-        x = tf.expand_dims(x, axis=2)
-        mu = tf.expand_dims(mu, axis=2)
+        # Calculate the log-likelihood
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma + 1e-6 * tf.eye(sigma.shape[-1])),
+        )
+        ll_loss = mvn.log_prob(x)
 
-        # Calculate second term: -0.5 * log(|sigma|)
-        second_term = -0.5 * tf.linalg.logdet(sigma)
-
-        # Calculate third term: -0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-        inv_sigma = tf.linalg.inv(sigma + 1e-8 * tf.eye(sigma.shape[-1]))
-        x_minus_mu = tf.subtract(x, mu)
-        x_minus_mu_T = tf.transpose(x_minus_mu, perm=[0, 1, 3, 2])
-        third_term = -0.5 * tf.matmul(tf.matmul(x_minus_mu, inv_sigma), x_minus_mu_T)
-        third_term = tf.squeeze(tf.squeeze(third_term, axis=3), axis=2)
-
-        # Calculate the log likelihood
-        # We ignore the first term which is a constant
-        ll_loss = tf.reduce_sum(second_term + third_term)
+        # Sum over time dimension and average over the batch dimension
+        ll_loss = tf.reduce_sum(ll_loss, axis=1)
+        ll_loss = tf.reduce_mean(ll_loss, axis=0)
 
         # We return the negative of the log likelihood
         nll_loss = -ll_loss
@@ -445,10 +445,17 @@ class KLDivergenceLayer(layers.Layer):
         inference_mu = inference_mu[:, 1:]
         inference_sigma = tf.exp(inference_log_sigma)[:, 1:]
 
-        # Calculate the KL diverence between the posterior and prior
+        # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
-        kl_loss = tf.reduce_sum(tfp.distributions.kl_divergence(posterior, prior))
+        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
+
+        # Sum the KL loss for state and time point
+        kl_loss = tf.reduce_sum(kl_loss, axis=2)
+        kl_loss = tf.reduce_sum(kl_loss, axis=1)
+
+        # Average over the batch dimension
+        kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
         return tf.expand_dims(kl_loss, axis=-1)
 
@@ -462,7 +469,7 @@ class InferenceRNNLayers(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'.
+        Either 'lstm' or 'gru'. Defaults to GRU.
     normalization_type : str
         Either 'layer', 'batch' or None.
     n_layers : int
@@ -530,7 +537,7 @@ class ModelRNNLayers(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'.
+        Either 'lstm' or 'gru'. Defaults to GRU.
     normalization_type : str
         Either 'layer', 'batch' or None.
     n_layers : int

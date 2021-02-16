@@ -11,6 +11,7 @@ from vrad import array_ops
 from vrad.utils.decorators import transpose
 
 _logger = logging.getLogger("VRAD")
+_rng = np.random.default_rng()
 
 
 def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:

@@ -5,6 +5,7 @@ import logging
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
 from vrad import models
@@ -12,8 +13,8 @@ from vrad import models
 _logger = logging.getLogger("VRAD")
 
 
-class CholeskyCovariancesInitializer(Initializer):
-    """Initialize weights for cholesky factor of covariances.
+class FlattenedCholeskyCovariancesInitializer(Initializer):
+    """Initialize weights for flattened cholesky factor of covariances.
 
     Provided variables are used for initialization assuming dimensions are accepted.
 
@@ -28,25 +29,7 @@ class CholeskyCovariancesInitializer(Initializer):
         self.initial_cholesky_covariances = initial_cholesky_covariances
 
     def __call__(self, shape, dtype=None):
-        if not (len(shape) == 3 and shape == self.initial_cholesky_covariances.shape):
-            raise ValueError(
-                f"shape must be 3D and be equal to initial_cholesky_covariances.shape. "
-                f"shape == {[*shape]}, "
-                f"initial_means.shape = {[*self.initial_cholesky_covariances.shape]} "
-            )
-        return self.initial_cholesky_covariances
-
-
-class Identity3D(Initializer):
-    """Initializer to create stacked identity matrices.
-
-    """
-
-    def __call__(self, shape, dtype=None):
-        if len(shape) != 3 or shape[1] != shape[2]:
-            raise ValueError("Weight shape must be [M x N x N]")
-
-        return tf.eye(shape[1], shape[2], [shape[0]])
+        return tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
 
 
 class MeansInitializer(Initializer):
@@ -63,35 +46,9 @@ class MeansInitializer(Initializer):
 
     def __init__(self, initial_means: np.ndarray):
         self.initial_means = initial_means
-        _logger.info(
-            f"Creating MeansInitializer with "
-            f"initial_means.shape = {initial_means.shape}"
-        )
 
     def __call__(self, shape, dtype=None):
-        if not (len(shape) == 2 and shape == self.initial_means.shape):
-            raise ValueError(
-                f"shape must be 2D and be equal to initial_means.shape. "
-                f"shape == {[*shape]}, "
-                f"initial_means.shape = {[*self.initial_means.shape]} "
-            )
         return self.initial_means
-
-
-class UnchangedInitializer(Initializer):
-    """Initializer which returns unchanged values when called.
-
-    Parameters
-    ----------
-    initial_values : np.ndarray
-        Values to initialize with.
-    """
-
-    def __init__(self, initial_values: np.ndarray):
-        self.initial_values = initial_values
-
-    def __call__(self, shape, dtype=None):
-        return self.initial_values
 
 
 def reinitialize_layer_weights(layer: tf.keras.layers.Layer):

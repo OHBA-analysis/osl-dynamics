@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+from vrad.data.manipulation import standardize
 from vrad.utils import plotting
 
 
@@ -96,9 +97,7 @@ class Simulation(ABC):
 
     @abstractmethod
     def generate_states(self) -> np.ndarray:
-        """State generation must be implemented by subclasses.
-
-        """
+        """State generation must be implemented by subclasses."""
         pass
 
     def plot_alphas(self, n_points: int = 1000, filename: str = None):
@@ -211,12 +210,10 @@ class Simulation(ABC):
         The time series data is z-transformed and the covariances are converted
         to correlation matrices.
         """
-        means = np.mean(self.time_series, axis=0)
         standard_deviations = np.std(self.time_series, axis=0)
 
-        # Z-transform
-        self.time_series -= means
-        self.time_series /= standard_deviations
+        # Standardise (z-transform) the data
+        self.time_series = standardize(self.time_series, axis=0)
 
         # Convert covariance matrices to correlation matrices
         self.covariances /= np.outer(standard_deviations, standard_deviations)[

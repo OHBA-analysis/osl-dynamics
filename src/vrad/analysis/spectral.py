@@ -11,9 +11,59 @@ from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from vrad.analysis.functions import fourier_transform, nextpow2, validate_array
 from vrad.analysis.time_series import get_state_time_series
-from vrad.data.manipulation import scale
+from vrad.data.manipulation import standardize
 
 _logger = logging.getLogger("VRAD")
+
+
+def autocorrelation_function(
+    covariances: np.ndarray, n_embeddings: int, n_raw_data_channels: int
+) -> np.ndarray:
+    """Calculates the autocorrelation function from the covariance matrix of time
+    embedded data.
+
+    Parameters
+    ----------
+    covariances : np.ndarray
+        State covariance matrices. Shape is (n_states, n_te_channels, n_te_channels).
+    n_embeddings : int
+        Number of time embeddings.
+    n_raw_data_channels : int
+        Number of channels in the non-time-embedded data.
+
+    Returns
+    -------
+    np.ndarray
+        Autocorrelation function. Shape is (n_states, n_acf)
+    """
+    # Number of data points in the autocorrelation function
+    n_acf = 2 * n_embeddings - 1
+
+    # Number of states
+    n_states = len(covariances)
+
+    # Get the autocorrelation function
+    autocorrelation_function = np.empty(
+        [n_states, n_raw_data_channels, n_raw_data_channels, n_acf]
+    )
+    for i in range(n_states):
+        for j in range(n_raw_data_channels):
+            for k in range(n_raw_data_channels):
+                # Auto/cross-correlation between channel j and channel k
+                # of state i
+                autocorrelation_function_jk = covariances[
+                    i,
+                    j * n_embeddings : (j + 1) * n_embeddings,
+                    k * n_embeddings : (k + 1) * n_embeddings,
+                ]
+
+                # Take elements from the first row and column
+                autocorrelation_function[i, j, k] = np.append(
+                    autocorrelation_function_jk[0][::-1],
+                    autocorrelation_function_jk[1:, 0],
+                )
+
+    return autocorrelation_function
 
 
 def decompose_spectra(
@@ -88,29 +138,23 @@ def decompose_spectra(
 
 
 def state_covariance_spectra(
-    covariances: np.ndarray,
+    autocorrelation_function: np.ndarray,
     sampling_frequency: float,
-    n_embeddings: int = 1,
-    pca_weights: np.ndarray = None,
     nfft: int = 64,
     frequency_range: list = None,
 ):
-    """Calculates spectra for inferred states using the covariances.
+    """Calculates spectra from the autocorrelation function.
 
-    The auto-correlation function is taken from elements of the state covariances.
     The power spectrum of each state is calculated as the Fourier transform of
     the auto-correlation function. Coherences are calculated from the power spectra.
 
     Parameters
     ----------
-    covariances : np.ndarray
-        State covariances. Shape must be (n_states, n_channels, n_channels).
+    autocorrelation_function : np.ndarray
+        State autocorrelation functions.
+        Shape must be (n_states, n_channels, n_channels, n_acf).
     sampling_frequency : float
         Frequency at which the data was sampled (Hz).
-    n_embeddings : int
-        Number of time embeddings.
-    pca_weights : np.ndarray
-        Weight matrix used to perform PCA during data preparation. (Optional.)
     nfft : int
         Number of data points in the FFT. The auto-correlation function will only
         have 2 * (n_embeddings + 2) - 1 data points. We pad the auto-correlation
@@ -118,7 +162,7 @@ def state_covariance_spectra(
         in the auto-correlation function is less than nfft. Default is 64.
     frequency_range : list
         Minimum and maximum frequency to keep (Hz).
-    
+
     Returns
     -------
     frequencies : np.ndarray
@@ -132,56 +176,12 @@ def state_covariance_spectra(
     """
 
     # Validation
-    if n_embeddings < 1:
-        raise ValueError(
-            "Spectra can only be calculated if the training data was time embedded."
-        )
-
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Number of states
-    n_states = covariances.shape[0]
-
-    if pca_weights is not None:
-        # Number of time embedded channels
-        n_te_channels = pca_weights.shape[0]
-
-        # Reverse PCA if pca_weights were passed
-        covariances = pca_weights @ covariances @ pca_weights.T
-
-    else:
-        # We assume no PCA was applied
-        n_te_channels = covariances.shape[1]
-
-    # Number of channels in the non-time embedded data
-    n_channels = n_te_channels // (n_embeddings + 2)
-
-    # Number of data points in the correlation function
-    n_cf = 2 * (n_embeddings + 2) - 1
-
-    # Number of FFT data points
-    nfft = max(nfft, 2 ** nextpow2(n_cf))
-
-    # Get auto/cross-correlation function from the state covariances
-    correlation_function = np.empty([n_states, n_channels, n_channels, n_cf])
-
-    print("Calculating power spectra")
-    for i in range(n_states):
-        for j in range(n_channels):
-            for k in range(n_channels):
-
-                # Auto/cross-correlation between channel j and channel k of state i
-                correlation_function_jk = covariances[
-                    i,
-                    j * (n_embeddings + 2) : (j + 1) * (n_embeddings + 2),
-                    k * (n_embeddings + 2) : (k + 1) * (n_embeddings + 2),
-                ]
-
-                # Take elements from the first row and column
-                correlation_function[i, j, k] = np.append(
-                    correlation_function_jk[0][::-1], correlation_function_jk[1:, 0]
-                )
+    # Number of data points in the autocorrelation function and FFT
+    n_acf = autocorrelation_function.shape[-1]
+    nfft = max(nfft, 2 ** nextpow2(n_acf))
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
@@ -197,7 +197,10 @@ def state_covariance_spectra(
     # auto/cross-correlation function
     power_spectra = abs(
         fourier_transform(
-            correlation_function, sampling_frequency, nfft=nfft, args_range=args_range
+            autocorrelation_function,
+            sampling_frequency,
+            nfft=nfft,
+            args_range=args_range,
         )
     )
 
@@ -292,12 +295,13 @@ def multitaper(
 
 def multitaper_spectra(
     data: np.ndarray,
-    state_mixing_factors: np.ndarray,
+    alpha: np.ndarray,
     sampling_frequency: float,
     time_half_bandwidth: float,
     n_tapers: int,
     segment_length: int = None,
     frequency_range: list = None,
+    standardize_data: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates spectra for inferred states using a multitaper.
 
@@ -308,7 +312,7 @@ def multitaper_spectra(
     ----------
     data : np.ndarray
         Raw time series data with shape (n_samples, n_channels).
-    state_mixing_factors : np.ndarray
+    alpha : np.ndarray
         Inferred state mixing factor alpha_t at each time point. Shape is (n_samples,
         n_states).
     sampling_frequency : float
@@ -321,6 +325,8 @@ def multitaper_spectra(
         Length of the data segement to use to calculate the multitaper.
     frequency_range : list
         Minimum and maximum frequency to keep.
+    standardize : bool
+        Should we standardize the data before calculating the PSDs? Default is True.
 
     Returns
     -------
@@ -335,46 +341,44 @@ def multitaper_spectra(
     """
 
     # Validation
-    if (isinstance(data, list) != isinstance(state_mixing_factors, list)) or (
-        isinstance(data, np.ndarray) != isinstance(state_mixing_factors, np.ndarray)
+    if (isinstance(data, list) != isinstance(alpha, list)) or (
+        isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
     ):
         raise ValueError(
-            f"data is type {type(data)} and state_mixing_factors is type "
-            + f"{type(state_mixing_factors)}. They must both be lists or numpy arrays."
+            f"data is type {type(data)} and alpha is type "
+            + f"{type(alpha)}. They must both be lists or numpy arrays."
         )
 
     if isinstance(data, np.ndarray):
-        if state_mixing_factors.shape[0] < data.shape[0]:
+        if alpha.shape[0] < data.shape[0]:
             # When we time embed we lose some data points so we trim the data
-            n_padding = (data.shape[0] - state_mixing_factors.shape[0]) // 2
+            n_padding = (data.shape[0] - alpha.shape[0]) // 2
             data = data[n_padding:-n_padding]
-        elif state_mixing_factors.shape[0] != data.shape[0]:
-            raise ValueError("data cannot have less samples than state_mixing_factors.")
+        elif alpha.shape[0] != data.shape[0]:
+            raise ValueError("data cannot have less samples than alpha.")
 
     if isinstance(data, list):
         # Check data and state mixing factors for the same number of subjects has
         # been passed
-        if len(data) != len(state_mixing_factors):
+        if len(data) != len(alpha):
             raise ValueError(
                 "A different number of subjects has been passed for "
-                + f"data and state_mixing_factors: len(data)={len(data)}, "
-                + f"len(state_mixing_factors)={len(state_mixing_factors)}."
+                + f"data and alpha: len(data)={len(data)}, "
+                + f"len(alpha)={len(alpha)}."
             )
 
-        # Check the number of samples in data and state_mixing_factors
-        for i in range(len(state_mixing_factors)):
-            if state_mixing_factors[i].shape[0] < data[i].shape[0]:
+        # Check the number of samples in data and alpha
+        for i in range(len(alpha)):
+            if alpha[i].shape[0] < data[i].shape[0]:
                 # When we time embed we lose some data points so we trim the data
-                n_padding = (data[i].shape[0] - state_mixing_factors[i].shape[0]) // 2
+                n_padding = (data[i].shape[0] - alpha[i].shape[0]) // 2
                 data = data[n_padding:-n_padding]
-            elif state_mixing_factors[i].shape[0] != data[i].shape[0]:
-                raise ValueError(
-                    "data cannot have less samples than state_mixing_factors."
-                )
+            elif alpha[i].shape[0] != data[i].shape[0]:
+                raise ValueError("data cannot have less samples than alpha.")
 
         # Concatenate the data and state mixing factors for each subject
         data = np.concatenate(data, axis=0)
-        state_mixing_factors = np.concatenate(state_mixing_factors, axis=0)
+        alpha = np.concatenate(alpha, axis=0)
 
     if data.ndim != 2:
         raise ValueError(
@@ -382,9 +386,9 @@ def multitaper_spectra(
             + "or (n_subjects, n_samples, n_states)."
         )
 
-    if state_mixing_factors.ndim != 2:
+    if alpha.ndim != 2:
         raise ValueError(
-            "state_mixing_factors must have shape (n_samples, n_states) "
+            "alpha must have shape (n_samples, n_states) "
             + "or (n_subjects, n_samples, n_states)."
         )
 
@@ -397,11 +401,13 @@ def multitaper_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Standardise (z-transform) the data
-    data = scale(data, axis=0)
+    # Standardise the data
+    if standardize_data:
+        # TODO: Maybe default behaviour should not be to standardize
+        data = standardize(data, axis=0)
 
     # Use the state mixing factors to get a time series for each state
-    state_time_series = get_state_time_series(data, state_mixing_factors)
+    state_time_series = get_state_time_series(data, alpha)
 
     # Number of subjects, states, samples and channels
     n_states, n_samples, n_channels = state_time_series.shape
@@ -459,10 +465,9 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    sum_factors = np.sum(state_mixing_factors ** 2, axis=0)[
-        ..., np.newaxis, np.newaxis, np.newaxis
-    ]
-    power_spectra *= n_samples / (sum_factors * n_tapers * n_segments)
+    # TODO: Check if we should be normalising using sum alpha instead of sum alpha^2
+    sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
     # Coherences for each state
     coherences = coherence_spectra(power_spectra)

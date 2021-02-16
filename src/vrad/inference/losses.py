@@ -33,7 +33,7 @@ class KullbackLeiblerLoss(Loss):
 
     def call(self, y_true, kl_loss):
         """KL divergence loss.
-        
+
         The KL divergence is the second output of the model.
 
         Returns

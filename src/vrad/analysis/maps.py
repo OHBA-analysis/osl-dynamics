@@ -2,14 +2,14 @@
 
 """
 
-import os
-import pathlib
-import subprocess
+import logging
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import std_masks
+from vrad.analysis import workbench
 from vrad.analysis.functions import validate_array
+
+_logger = logging.getLogger("VRAD")
 
 
 def state_power_maps(
@@ -32,7 +32,7 @@ def state_power_maps(
     frequency_range : list
         Frequency range to integrate the PSD over (Hz). Optional: default is full
         range.
-    
+
     Returns
     -------
     np.ndarray
@@ -104,7 +104,6 @@ def save_nii_file(
     filename: str,
     component: int = 0,
     subtract_mean: bool = False,
-    normalize: bool = True,
 ):
     """Saves a NITFI file containing a map.
 
@@ -122,9 +121,6 @@ def save_nii_file(
         Spectral component to save. Optional.
     subtract_mean : bool
         Should we subtract the mean power across states? Optional: default is False.
-    normalize : bool
-        Should we normalize by dividing by the maximum power in a voxel?
-        Optional: default is True.
     """
 
     # Validation
@@ -164,8 +160,7 @@ def save_nii_file(
     n_voxels = voxels.shape[0]
 
     # Normalise the voxels to have comparable weights
-    if normalize:
-        voxels /= voxels.max(axis=0)[np.newaxis, ...]
+    voxels /= voxels.max(axis=0)[np.newaxis, ...]
 
     # Number of components, states, channels
     n_components, n_states, n_channels, n_channels = power_map.shape
@@ -192,106 +187,6 @@ def save_nii_file(
     nib.save(nii_file, filename)
 
 
-def workbench_render(
-    nii: str,
-    save_dir: str = None,
-    interptype: str = "trilinear",
-    visualise: bool = True,
-):
-    """Render map in workbench.
-
-    Parameters
-    ----------
-    nii : str
-        Path to nii image file.
-    save_dir : str
-        Path to save rendered surface plots.
-    interptype : str
-        Interpolation type. Default is 'trilinear'.
-    visualise : bool
-        Should we display the rendered plots in workbench? Default is True.
-    """
-    nii = pathlib.Path(nii)
-
-    if not nii.exists() or ".nii" not in nii.suffixes:
-        raise ValueError(f"nii should be a nii or nii.gz file." f"found {nii}.")
-
-    if save_dir is None:
-        save_dir = os.getcwd()
-
-    save_dir = pathlib.Path(save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-
-    in_file = pathlib.Path(str(nii).replace(".gz", "").replace(".nii", ""))
-    out_file = save_dir / in_file
-
-    # Load surfaces
-    surf_right = std_masks.surf_right
-    surf_left = std_masks.surf_left
-    surf_right_inf = std_masks.surf_right_inf
-    surf_left_inf = std_masks.surf_left_inf
-    surf_right_vinf = std_masks.surf_right_vinf
-    surf_left_vinf = std_masks.surf_left_vinf
-
-    output_right = out_file.parent / (str(out_file) + "_right.func.gii")
-    output_left = out_file.parent / (str(out_file) + "_left.func.gii")
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-volume-to-surface-mapping",
-            str(nii),
-            str(surf_right),
-            str(output_right),
-            f"-{interptype}",
-        ]
-    )
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-volume-to-surface-mapping",
-            str(nii),
-            str(surf_left),
-            str(output_left),
-            f"-{interptype}",
-        ]
-    )
-
-    cifti_right = str(output_right).replace(".func.gii", ".dtseries.nii")
-    cifti_left = str(output_left).replace(".func.gii", ".dtseries.nii")
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-cifti-create-dense-timeseries",
-            cifti_right,
-            "-right-metric",
-            output_right,
-        ]
-    )
-
-    subprocess.run(
-        [
-            "wb_command",
-            "-cifti-create-dense-timeseries",
-            cifti_left,
-            "-left-metric",
-            output_left,
-        ]
-    )
-
-    if visualise:
-        subprocess.run(
-            [
-                "wb_view",
-                str(surf_left),
-                str(surf_right),
-                str(surf_left_inf),
-                str(surf_right_inf),
-                str(surf_left_vinf),
-                str(surf_right_vinf),
-                cifti_left,
-                cifti_right,
-            ]
-        )
+def workbench_render(*args, **kwargs):
+    _logger.warning("workbench_render is now in vrad.analysis.workbench.")
+    workbench.workbench_render(*args, **kwargs)

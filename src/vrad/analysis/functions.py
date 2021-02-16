@@ -12,7 +12,7 @@ def fourier_transform(
     args_range: list = None,
 ) -> np.ndarray:
     """Calculates a Fast Fourier Transform (FFT).
-    
+
     Parameters
     ----------
     data : np.ndarray

@@ -1,32 +1,34 @@
 """Example script for running inference on simulated HMM data.
 
-- Should achieve a dice coefficient of ~0.97.
+- Should achieve a dice coefficient of ~0.98.
 - A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
+from pathlib import Path
+
 import numpy as np
 from vrad import data
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RNNGaussian
+from vrad.models import RIGO
 from vrad.simulation import HMMSimulation
 
 # GPU settings
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25000
+n_samples = 25600
 observation_error = 0.2
 
 n_states = 5
-sequence_length = 100
-batch_size = 32
+sequence_length = 200
+batch_size = 16
 
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 200
-n_epochs_annealing = 100
+n_epochs = 100
+n_epochs_annealing = 50
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -35,25 +37,25 @@ theta_normalization = None
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 32
-n_units_model = 48
+n_units_inference = 64
+n_units_model = 64
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-learn_means = False
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 1.0
+alpha_temperature = 0.2
 learn_alpha_scaling = False
 normalize_covariances = False
 
 learning_rate = 0.01
 
 # Load state transition probability matrix and covariances of each state
-trans_prob = np.load("files/hmm_trans_prob.npy")
-cov = np.load("files/hmm_cov.npy")
+example_file_directory = Path(__file__).parent / "files"
+trans_prob = np.load(str(example_file_directory / "hmm_trans_prob.npy"))
+cov = np.load(example_file_directory / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
@@ -74,11 +76,10 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
-model = RNNGaussian(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
-    learn_means=learn_means,
     learn_covariances=learn_covariances,
     rnn_type=rnn_type,
     rnn_normalization=rnn_normalization,
@@ -101,20 +102,28 @@ model = RNNGaussian(
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
+history = model.fit(
+    training_dataset,
+    epochs=n_epochs,
+    save_best_after=n_epochs_annealing,
+    save_filepath="tmp/weights",
+)
 
-# Free energy = Log Likelihood + KL Divergence
+# Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time course
-alpha = model.predict_states(prediction_dataset)[0]
-inf_stc = states.time_courses(alpha)
+inf_alpha = model.predict_states(prediction_dataset)[0]
+inf_stc = states.time_courses(inf_alpha)
+sim_stc = sim.state_time_course
 
-# Find correspondance to ground truth state time courses
-matched_sim_stc, matched_inf_stc = states.match_states(sim.state_time_course, inf_stc)
+sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
+print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
-print("Dice coefficient:", metrics.dice_coefficient(matched_sim_stc, matched_inf_stc))
+# Fractional occupancies
+print("Fractional occupancies (Simulation):", metrics.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", metrics.fractional_occupancies(inf_stc))
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

@@ -26,26 +26,31 @@ class OSL_HMM:
         self.prior = self.hmm.prior
         self.train = self.hmm.train
 
-        hmm_fields = dir(self.hmm)
-
         # State probabilities
-        if "gamma" in hmm_fields:
-            self.gamma = self.hmm.gamma
-        elif "Gamma" in hmm_fields:
-            self.gamma = self.hmm.Gamma
+        if "gamma" in self.hmm:
+            self.gamma = self.hmm.gamma.astype(np.float32)
+        elif "Gamma" in self.hmm:
+            self.gamma = self.hmm.Gamma.astype(np.float32)
         else:
             self.gamma = None
+
+        # Discontinuities in the training data
+        if "T" in self.hmm:
+            self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm.T]
+        else:
+            self.discontinuities = None
 
         # State time course
         if self.gamma is not None:
             stc = self.gamma.argmax(axis=1)
-            self.state_time_course = array_ops.get_one_hot(stc)
+            self.state_time_course = array_ops.get_one_hot(stc).astype(np.float32)
 
         # State covariances
         self.covariances = np.array(
             [
-                state.Gam_rate / (state.Gam_shape - len(state.Gam_rate) - 1)
-                for state in self.state.Omega
+                state.Omega.Gam_rate
+                / (state.Omega.Gam_shape - len(state.Omega.Gam_rate) - 1)
+                for state in self.state
             ]
         )
 
@@ -56,6 +61,26 @@ class OSL_HMM:
     def plot_states(self, *args, **kwargs):
         """Wraps plotting.highlight_states for self.state_time_course."""
         plotting.state_barcode(self.state_time_course, *args, **kwargs)
+
+    def padded_gammas(self, n_embeddings):
+        split_gammas = np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
+        return [
+            np.pad(gamma, [[n_embeddings, n_embeddings], [0, 0]])
+            for gamma in split_gammas
+        ]
+
+    def covariance_weights(self) -> np.ndarray:
+        """Calculate covariance weightings based on variance (trace).
+
+        Method to wrap `array_ops.trace_weights`.
+
+        Returns
+        -------
+        weights: np.ndarray
+            Statewise weights.
+
+        """
+        return array_ops.trace_weights(self.covariances)
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"

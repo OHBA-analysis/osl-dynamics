@@ -1,10 +1,39 @@
 """Metrics to analyse model performance.
 
 """
+from typing import Tuple
 
 import numpy as np
 from sklearn.metrics import confusion_matrix as sklearn_confusion
+from vrad.inference.states import state_lifetimes
 from vrad.utils.decorators import transpose
+
+
+def correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
+    """Calculates the correlation between states of two alpha time series.
+
+    Parameters
+    ----------
+    alpha_1 : np.ndarray
+        First alpha time series. Shape is (n_samples, n_states).
+    alpha_2 : np.ndarray
+        Second alpha time series. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    np.ndarray
+        Correlation of each state in the corresponding alphas.
+        Shape is (n_states,).
+    """
+    if alpha_1.shape[1] != alpha_2.shape[1]:
+        raise ValueError(
+            "alpha_1 and alpha_2 shapes are incomptible. "
+            + f"alpha_1.shape={alpha_1.shape}, alpha_2.shape={alpha_2.shape}."
+        )
+    n_states = alpha_1.shape[1]
+    corr = np.corrcoef(alpha_1, alpha_2, rowvar=False)
+    corr = np.diagonal(corr[:n_states, n_states:])
+    return corr
 
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
@@ -28,7 +57,8 @@ def confusion_matrix(
 
     Returns
     -------
-    confusion_matrix: numpy.ndarray
+    numpy.ndarray
+        Confusion matrix
     """
     if state_time_course_1.ndim == 2:
         state_time_course_1 = state_time_course_1.argmax(axis=1)
@@ -58,7 +88,7 @@ def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float
 
     Returns
     -------
-    dice_coefficient : float
+    float
         The Dice coefficient of the two sequences.
 
     Raises
@@ -97,7 +127,7 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
 
     Returns
     -------
-    dice_coefficient : float
+    float
         The Dice coefficient of the two sequences.
 
     See Also
@@ -115,20 +145,68 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     return dice_coefficient_1d(sequence_1, sequence_2)
 
 
+def fractional_occupancies(state_time_course: np.ndarray) -> np.ndarray:
+    """Calculates the fractional occupancy.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    np.ndarray
+        The fractional occupancy of each state.
+    """
+    return np.sum(state_time_course, axis=0) / state_time_course.shape[0]
+
+
+def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
+    """Calculates the frobenius norm of the difference of two matrices.
+
+    The Frobenius norm is calculated as sqrt( Sum_ij abs(a_ij - b_ij)^2 ).
+
+    Parameters
+    ----------
+    A : np.ndarray
+        First matrix. Shape must be (n_states, n_channels, n_channels) or
+        (n_channels, n_channels).
+    B : np.ndarray
+        Second matrix. Shape must be (n_states, n_channels, n_channels) or
+        (n_channels, n_channels).
+
+    Returns
+    -------
+    float
+        The Frobenius norm of the difference of A and B. If A and B are
+        stacked matrices, we sum the Frobenius norm of each sub-matrix.
+    """
+    if A.ndim == 2 and B.ndim == 2:
+        norm = np.linalg.norm(A - B, ord="fro")
+    elif A.ndim == 3 and B.ndim == 3:
+        norm = np.linalg.norm(A - B, ord="fro", axis=(1, 2))
+        norm = np.sum(norm)
+    else:
+        raise ValueError(
+            f"Shape of A and/or B is incorrect. A.shape={A.shape}, B.shape={B.shape}."
+        )
+    return norm
+
+
 def log_likelihood(
     time_series: np.ndarray,
     state_mixing_factors: np.ndarray,
     covariances: np.ndarray,
     means: np.ndarray = None,
 ) -> float:
-    """Calculates the log likelihood.
+    """Calculates the negative log likelihood.
 
-    The log likelihood is calculated as:
+    The negative log likelihood is calculated as:
 
-    c - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
+    0.5 * N * log(2*pi) - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
 
     where x is a single observation, mu is the mean vector, sigma is the
-    covariance matrix and c is a constant.
+    covariance matrix and N is the number of channels.
 
     Parameters
     ----------
@@ -137,13 +215,13 @@ def log_likelihood(
     state_mixing_factors : np.ndarary
         Times series containing the state mixing factors alpha_t.
     covariances : np.ndarray
-        Covariance matrix for each state.
+        Covariance matrix for each state. Shape is (n_states, n_channels, n_channels).
     means : np.ndarray
-        Mean vector for each state.
+        Mean vector for each state. Shape is (n_states, n_channels).
 
     Returns
     -------
-    nll: float
+    float
         The negative of the log likelihood.
     """
     if means is None:
@@ -151,6 +229,9 @@ def log_likelihood(
 
     # Negative log likelihood
     nll = 0
+
+    # Calculate first term
+    first_term = 0.5 * covariances.shape[1] * np.log(2.0 * np.pi)
 
     # Loop through the data
     for i in range(state_mixing_factors.shape[0]):
@@ -172,7 +253,27 @@ def log_likelihood(
         third_term = -0.5 * x_minus_mu_T @ inv_sigma @ x_minus_mu
 
         # Calculate the negative log likelihood
-        # We ignore the first term which is a constant
-        nll -= np.squeeze(second_term + third_term)
+        nll += np.squeeze(first_term - second_term - third_term)
 
     return nll
+
+
+def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
+    """Calculate statistics of the lifetime distribution of each state.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    means : np.ndarray
+        Mean lifetime of each state.
+    std : np.ndarray
+        Standard deviation of each state.
+    """
+    lifetimes = state_lifetimes(state_time_course)
+    mean = np.array([np.mean(lt) for lt in lifetimes])
+    std = np.array([np.std(lt) for lt in lifetimes])
+    return mean, std

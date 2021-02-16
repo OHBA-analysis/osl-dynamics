@@ -6,14 +6,18 @@ from itertools import zip_longest
 from typing import Any, Iterable, List, Tuple, Union
 
 import matplotlib
+import matplotlib.patches as patches
 import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
+from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
+from vrad.data.task import epoch_mean
 from vrad.inference.states import correlate_states, match_states, state_lifetimes
 from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
+from vrad.utils.topoplots import Topology
 
 _logger = logging.getLogger("VRAD")
 
@@ -187,7 +191,7 @@ def value_separation(
 
 
 def get_colors(
-    n_states: int, colormap: str = "gist_rainbow"
+    n_states: int, colormap: str = "magma"
 ) -> List[Tuple[float, float, float, float]]:
     """Produce equidistant colors from a matplotlib colormap.
 
@@ -219,7 +223,7 @@ def plot_state_highlighted_data(
     state_time_course: np.ndarray,
     events: np.ndarray = None,
     n_samples: int = None,
-    colormap: str = "gist_rainbow",
+    colormap: str = "magma",
     fig_kwargs: dict = None,
     highlight_kwargs: dict = None,
     plot_kwargs: dict = None,
@@ -380,7 +384,7 @@ def plot_time_series(
 def state_barcode(
     state_time_course: np.ndarray,
     axis: plt.Axes = None,
-    colormap: str = "gist_rainbow",
+    colormap: str = "magma",
     n_samples: int = None,
     sampling_frequency: float = 1,
     highlight_kwargs: dict = None,
@@ -531,7 +535,8 @@ def plot_matrices(
     matrix: list of np.ndarrays
         The matrices to plot.
     group_color_scale: bool
-        If True, all matrices will have the same colormap scale.
+        If True, all matrices will have the same colormap scale, where we use the
+        minimum and maximum across all matrices as the scale.
     titles: list of str
         Titles to give to each matrix axis.
     main_title: str
@@ -628,7 +633,7 @@ def add_axis_colorbar(axis: plt.Axes):
         pl = axis.get_images()[0]
         divider = make_axes_locatable(axis)
         cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(pl, cax=cax)
+        return plt.colorbar(pl, cax=cax)
     except IndexError:
         _logger.warning("No mappable image found on axis.")
 
@@ -647,7 +652,7 @@ def add_figure_colorbar(fig: plt.Figure, mappable):
     """
     fig.subplots_adjust(right=0.94)
     color_bar_axis = fig.add_axes([0.95, 0.15, 0.025, 0.7])
-    fig.colorbar(mappable, cax=color_bar_axis)
+    return fig.colorbar(mappable, cax=color_bar_axis)
 
 
 @transpose(0, "state_time_course")
@@ -756,19 +761,22 @@ def plot_state_lifetimes(
     show_or_save(filename)
 
 
-def plot_state_time_courses(
-    *state_time_courses: List[np.ndarray],
+def plot_separate_time_series(
+    *time_series,
     n_samples: int = None,
+    sampling_frequency: float = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
 ):
-    """Plot state time courses as separate subplots.
+    """Plot time series as separate subplots.
 
     Parameters
     ----------
-    state_time_courses : list of numpy.ndarray
-        State time courses to be plotted  as time series.
+    time_series : list of numpy.ndarray
+        Time series to be plotted. Should be (n_samples, n_lines).
+    sampling_frequency: float
+        Sampling frequency of the input data, enabling us to label the x-axis(!)
     n_samples : int
         Number of samples to be shown on the x-axis.
     plot_kwargs : dict
@@ -779,22 +787,31 @@ def plot_state_time_courses(
         Filename to save figure to.
     """
 
-    state_time_courses = np.asarray(state_time_courses)
+    time_series = np.asarray(time_series)
+    n_samples = n_samples or min([stc.shape[0] for stc in time_series])
+    n_lines = time_series[0].shape[1]
 
-    n_lines = len(state_time_courses)
-    n_samples = n_samples or min([stc.shape[0] for stc in state_time_courses])
-    n_states = state_time_courses[0].shape[1]
+    if sampling_frequency is not None:
+        time_vector = np.linspace(0, n_samples / sampling_frequency, n_samples)
+    else:
+        time_vector = np.linspace(0, n_samples, n_samples)
 
-    default_fig_kwargs = {"figsize": (20, 10)}
+    default_fig_kwargs = {"figsize": (20, 10), "sharex": "all"}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
-    fig, axis = plt.subplots(n_states, **fig_kwargs)
+    fig, axes = plt.subplots(n_lines, **fig_kwargs)
 
     default_plot_kwargs = {"lw": 0.7}
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
-    for i in range(n_lines):
-        for j in range(n_states):
-            axis[j].plot(state_time_courses[i][:n_samples, j], **plot_kwargs)
+    for group in time_series:
+        for axis, line in zip(axes, group.T):
+            axis.plot(time_vector, line[:n_samples], **plot_kwargs)
+            axis.autoscale(axis="x", tight=True)
+
+    if sampling_frequency is not None:
+        axes[-1].set_xlabel("Time (s)")
+    else:
+        axes[-1].set_xlabel("Samples")
 
     plt.tight_layout()
     show_or_save(filename)
@@ -876,40 +893,47 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
     plot_matrices([confusion, nan_diagonal], group_color_scale=False)
 
 
-def plot_loss(
-    losses: np.ndarray,
+def plot_line(
+    x: list,
+    y: list,
     labels: list = None,
     legend_loc: int = 1,
     x_range: list = None,
     y_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
     title: str = None,
     filename: str = None,
 ):
-    """Plot a training loss curve.
+    """Basic line plot.
 
     Parameters
     ----------
-    losses : numpy.ndarray
-        A 2D array of losses-by-epochs.
+    x : list of numpy arrays
+        x-ordinates.
+    y : list of numpy arrays
+        y-ordinates.
     labels : list of str
-        Legend labels for each loss.
+        Legend labels for each line.
     legend_loc : int
-        Matplotlib legend location identifier.
+        Matplotlib legend location identifier. Optional. Default is top right.
     x_range : list
-        Minimum and maximum for x-axis.
+        Minimum and maximum for x-axis. Optional.
     y_range : list
-        Minimum and maximum for y-axis.
+        Minimum and maximum for y-axis. Optional.
+    x_label : str
+        Label for x-axis. Optional.
+    y_label : str
+        Label for y-axis. Optional.
     title : str
-        Figure title
+        Figure title. Optional.
     filename : str
+        Output filename. Optional.
     """
     fig, ax = plt.subplots(figsize=(7, 4))
 
-    if isinstance(losses, list):
-        losses = np.array(losses)
-
-    if losses.ndim == 1:
-        losses = [losses]
+    if len(x) != len(y):
+        raise ValueError("Different number of x and y arrays given.")
 
     if x_range is None:
         x_range = [None, None]
@@ -921,16 +945,16 @@ def plot_loss(
         if isinstance(labels, str):
             labels = [labels]
         else:
-            if len(labels) != len(losses):
-                raise ValueError("Incorrect number of losses or labels passed.")
+            if len(labels) != len(x):
+                raise ValueError("Incorrect number of lines or labels passed.")
         add_legend = True
     else:
-        labels = [None] * len(losses)
+        labels = [None] * len(x)
         add_legend = False
 
-    # Plot the loss curves
-    for i, (loss, label) in enumerate(zip(losses, labels)):
-        ax.plot(loss, label=label)
+    # Plot lines
+    for (x_data, y_data, label) in zip(x, y, labels):
+        ax.plot(x_data, y_data, label=label)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
@@ -938,8 +962,8 @@ def plot_loss(
 
     # Set title and axis labels
     ax.set_title(title)
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
 
     # Add a legend
     if add_legend:
@@ -963,3 +987,367 @@ def show_or_save(filename: str = None):
         print(f"Saving {filename}")
         plt.savefig(filename, dpi=350)
         plt.close("all")
+
+
+def topoplot(
+    layout: str,
+    data: np.ndarray,
+    channel_names: List[str] = None,
+    plot_boxes: bool = False,
+    show_deleted_sensors: bool = False,
+    show_names: bool = False,
+    title: str = None,
+    colorbar: bool = True,
+    axis: plt.Axes = None,
+    cmap: str = "plasma",
+    n_contours: int = 10,
+):
+    """Make a contour plot in sensor space.
+
+    Create a contour plot by interpolating a field from a set of values provided for
+    each sensor location in an MEG layout. Within the context of VRAD this is likely
+    to be an array of (all positive) values taken from the diagonal of a covariance
+    matrix, but one can also plot any sensor level M/EEG data.
+
+    Parameters
+    ----------
+
+    layout: str
+        The name of an MEG layout (matching one from FieldTrip).
+    data: numpy.ndarray
+        The value of the field at each sensor.
+    channel_names: List[str]
+        A list of channel names which are present in the
+        data (removes missing channels).
+    plot_boxes: bool
+        Show boxes representing the height and width of sensors.
+    show_deleted_sensors: bool
+        Show sensors missing from `channel_names` in red.
+    show_names: bool
+        Show the names of channels (can get very cluttered).
+    title: str
+        A title for the figure.
+    colorbar: bool
+        Show a colorbar for the field.
+    axis: matplotlib.pyplot.Axes
+        matplotlib axis to plot on.
+    cmap: str
+        matplotlib colourmap. Defaults to 'plasma'
+    n_contours: int
+        number of field isolines to show on the plot. Defaults to 10.
+    """
+    topology = Topology(layout)
+    if channel_names is not None:
+        topology.keep_channels(channel_names)
+    return topology.plot_data(
+        data,
+        plot_boxes=plot_boxes,
+        show_deleted_sensors=show_deleted_sensors,
+        show_names=show_names,
+        title=title,
+        colorbar=colorbar,
+        axis=axis,
+        cmap=cmap,
+        n_contours=n_contours,
+    )
+
+
+def plot_connections(
+    weights: np.ndarray,
+    labels: List[str] = None,
+    ax: plt.Axes = None,
+    cmap: str = "hot",
+    text_color: str = None,
+) -> plt.Axes:
+    """Create a chord diagram representing the values of a matrix.
+
+    For a matrix of weights, create a chord diagram where the color of the line
+    connecting two nodes represents the value indexed by the position of the nodes in
+    the lower triangle of the matrix.
+
+    This is useful for showing things like co-activation between sensors/parcels or
+    relations between nodes in a network.
+
+    Parameters
+    ----------
+    weights: numpy.ndarray
+        An NxN matrix of weights.
+    labels: list of str
+        A name for each node in the weights matrix (e.g. parcel names)
+    ax: matplotlib.pyplot.Axes
+        A matplotlib axis on which to plot.
+    cmap: str
+        A string corresponding to a matplotlib colormap.
+    text_color: str
+        A string corresponding to a matplotlib color.
+
+    Returns
+    -------
+    ax: matplotlib.pyplot.Axes
+
+    Examples
+    --------
+    >>> rng = np.random.default_rng(seed=42)
+    >>> covariance = rng.normal(size=(38, 38))
+    >>> covariance[[24, 25, 26, 27], [12,13,14,15]] = 4
+    >>> plot_connections(
+    ...     covariance,
+    ...     (f"ROI {i + 1}" for i in range(covariance.shape[0])),
+    ...     cmap="magma",
+    ...     text_color="white"
+    ... )
+    >>> plt.show()
+    """
+    weights = np.abs(weights)
+    x, y = np.diag_indices_from(weights)
+    weights[x, y] = 0
+    weights /= weights.max()
+
+    inner = 0.9
+    outer = 1.0
+
+    cmap = matplotlib.cm.get_cmap(cmap)
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+
+    highest_color = cmap(norm(1)) if text_color is None else text_color
+    zero_color = cmap(norm(0))
+
+    text_color = {
+        "text.color": highest_color,
+        "axes.labelcolor": highest_color,
+        "xtick.color": highest_color,
+        "ytick.color": highest_color,
+    }
+
+    angle = np.radians(360 / weights.shape[0])
+    pad = np.radians(0.5)
+
+    starts = np.arange(0, 2 * np.pi, angle)
+    lefts = starts + pad
+    rights = starts + angle - pad
+    centers = 0.5 * (lefts + rights)
+
+    with matplotlib.rc_context(text_color):
+        if not ax:
+            fig = plt.figure(figsize=(10, 10))
+            ax = fig.add_subplot(111, projection="polar")
+
+        for left, right in zip(lefts, rights):
+            verts = [
+                (left, inner),
+                (left, outer),
+                (right, outer),
+                (right, inner),
+                (0.0, 0.0),
+            ]
+
+            codes = [
+                Path.MOVETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.LINETO,
+                Path.CLOSEPOLY,
+            ]
+
+            path = Path(verts, codes)
+
+            patch = patches.PathPatch(path, facecolor="orange", lw=1)
+            ax.add_patch(patch)
+        ax.set_yticks([])
+        ax.grid(False)
+
+        bezier_codes = [
+            Path.MOVETO,
+            Path.CURVE4,
+            Path.CURVE4,
+            Path.CURVE4,
+        ]
+
+        rebound = 0.5
+
+        for i, j in zip(*np.tril_indices_from(weights)):
+            center_1 = centers[i]
+            center_2 = centers[j]
+
+            verts = [
+                (center_1, inner),
+                (center_1, rebound),
+                (center_2, rebound),
+                (center_2, inner),
+            ]
+
+            path = Path(verts, bezier_codes)
+
+            patch = patches.PathPatch(
+                path,
+                facecolor="none",
+                lw=2,
+                edgecolor=cmap(weights[i, j]),
+                alpha=weights[i, j] ** 2,
+            )
+            ax.add_patch(patch)
+
+        ax.set_xticks([])
+
+        ax.set_facecolor(zero_color)
+        fig.patch.set_facecolor(zero_color)
+
+        if labels is None:
+            labels = [""] * len(centers)
+        for center, label in zip(centers, labels):
+            rotation = np.degrees(center)
+
+            if 0 <= rotation < 90:
+                horizontal_alignment = "left"
+                vertical_alignment = "bottom"
+            elif 90 <= rotation < 180:
+                horizontal_alignment = "right"
+                vertical_alignment = "bottom"
+            elif 180 <= rotation < 270:
+                horizontal_alignment = "right"
+                vertical_alignment = "top"
+            else:
+                horizontal_alignment = "left"
+                vertical_alignment = "top"
+
+            if 90 <= rotation < 270:
+                rotation += 180
+
+            ax.annotate(
+                label,
+                (center, outer + 0.05),
+                rotation=rotation,
+                horizontalalignment=horizontal_alignment,
+                verticalalignment=vertical_alignment,
+            )
+
+        ax.autoscale_view()
+        plt.setp(ax.spines.values(), visible=False)
+
+    return ax
+
+
+def state_stackplots(
+    *state_time_courses: np.ndarray,
+    cmap: str = "magma",
+    sampling_frequency: float = None,
+    fig_kwargs: dict = None,
+    **stackplot_kwargs: dict,
+) -> plt.Figure:
+    """
+
+    Parameters
+    ----------
+    state_time_courses : numpy.ndarray
+        A selection of state time courses passed as separate arguments.
+    cmap : str
+        A matplotlib colormap string.
+    sampling_frequency : float
+        The sampling frequency of the data in Hertz.
+    fig_kwargs : dict
+        Any parameters to be passed to the matplotlib.pyplot.subplots constructor.
+    stackplot_kwargs : dict
+        Any parameters to be passed to matplotlib.pyplot.stackplot.
+
+    Returns
+    -------
+    plt.Figure
+    """
+    n_states = max(stc.shape[1] for stc in state_time_courses)
+    cmap = plt.cm.get_cmap(name=cmap, lut=n_states)
+    colors = cmap.colors
+
+    n_stcs = len(state_time_courses)
+
+    default_fig_kwargs = dict(
+        figsize=(12, 2.5 * n_stcs), sharex="all", facecolor="white"
+    )
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    default_stackplot_kwargs = dict(colors=colors)
+    stackplot_kwargs = override_dict_defaults(
+        default_stackplot_kwargs, stackplot_kwargs
+    )
+
+    fig, axes = plt.subplots(nrows=n_stcs, **fig_kwargs)
+    if isinstance(axes, plt.Axes):
+        axes = [axes]
+
+    for stc, axis in zip(state_time_courses, axes):
+        time_vector = (
+            np.arange(len(stc)) / sampling_frequency
+            if sampling_frequency
+            else range(len(stc))
+        )
+        axis.stackplot(time_vector, stc.T, **stackplot_kwargs)
+        axis.autoscale(tight=True)
+        axis.set_ylabel("State activation")
+
+    axes[-1].set_xlabel("Time (s)" if sampling_frequency else "Samples")
+
+    fig.tight_layout()
+
+    add_figure_colorbar(
+        fig,
+        plt.cm.ScalarMappable(
+            norm=matplotlib.colors.Normalize(vmin=-0.5, vmax=n_states - 0.5), cmap=cmap
+        ),
+    )
+
+    return fig
+
+
+def plot_epoched(
+    data: np.ndarray,
+    time_index: np.ndarray,
+    sampling_frequency: float = None,
+    pre: int = 125,
+    post: int = 1000,
+    title: str = None,
+    legend: bool = True,
+) -> plt.Figure:
+    """Plot continuous data, epoched and meaned over epochs.
+
+    Parameters
+    ----------
+
+    data: numpy.ndarray
+        A [time x channels] dataset to be epoched.
+    time_index: numpy.ndarray
+        The integer indices of the start of each epoch.
+    sampling_frequency
+        The sampling frequency of the data in Hertz.
+    pre: int
+        The integer number of samples to include before the trigger.
+    post: int
+        The integer number of samples to include after the trigger.
+    title: str
+        Title of the figure.
+    legend: bool
+        Should a legend be created (default: True).
+
+    Returns
+    -------
+    epoch_mean_figure: matplotlib.pyplot.Figure
+        A figure of data meaned over epochs.
+
+    """
+    epoched_1 = epoch_mean(data, time_index, pre, post)
+
+    x_label = "Samples"
+    time_index = np.arange(-pre, post)
+    if sampling_frequency:
+        time_index = time_index / sampling_frequency
+        x_label = "Time (s)"
+
+    fig, axis = plt.subplots(1, figsize=(20, 3))
+    for i, s in enumerate(epoched_1.T):
+        axis.plot(time_index, s, label=i)
+    axis.axvline(0, c="k")
+    axis.autoscale(axis="x", tight=True)
+    if title:
+        axis.set_title(title)
+    if legend:
+        axis.legend(loc="upper right")
+    axis.set_xlabel(x_label)
+    return fig
