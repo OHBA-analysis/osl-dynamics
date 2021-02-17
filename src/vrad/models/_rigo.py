@@ -127,11 +127,15 @@ class RIGO(models.GO):
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if rnn_normalization not in [
-            "layer",
-            "batch",
-            None,
-        ] or theta_normalization not in ["layer", "batch", None]:
+        if (
+            rnn_normalization
+            not in [
+                "layer",
+                "batch",
+                None,
+            ]
+            or theta_normalization not in ["layer", "batch", None]
+        ):
             raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
         if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:
@@ -328,13 +332,16 @@ class RIGO(models.GO):
             outputs.append(alpha_t)
         return outputs
 
-    def losses(self, dataset):
+    def losses(self, dataset, return_mean=False):
         """Calculates the log-likelihood and KL loss for a dataset.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
             Dataset to calculate losses for.
+        return_mean : bool
+            Should we return the mean loss over batches? Otherwise we return
+            the sum. Optional, default is False.
 
         Returns
         -------
@@ -343,30 +350,37 @@ class RIGO(models.GO):
         kl_loss : float
             KL divergence loss.
         """
+        if return_mean:
+            mean_or_sum = np.mean
+        else:
+            mean_or_sum = np.sum
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
-            ll_loss = np.sum([np.sum(p["ll_loss"]) for p in predictions])
-            kl_loss = np.sum([np.sum(p["kl_loss"]) for p in predictions])
+            ll_loss = mean_or_sum([mean_or_sum(p["ll_loss"]) for p in predictions])
+            kl_loss = mean_or_sum([mean_or_sum(p["kl_loss"]) for p in predictions])
         else:
             predictions = self.predict(dataset)
-            ll_loss = np.sum(predictions["ll_loss"])
-            kl_loss = np.sum(predictions["kl_loss"])
+            ll_loss = mean_or_sum(predictions["ll_loss"])
+            kl_loss = mean_or_sum(predictions["kl_loss"])
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset):
+    def free_energy(self, dataset, return_mean=False):
         """Calculates the variational free energy of a dataset.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
             Dataset to calculate the variational free energy for.
+        return_mean : bool
+            Should we return the mean free energy over batches? Otherwise
+            we return the sum. Optional, default is False.
 
         Returns
         -------
         float
             Variational free energy for the dataset.
         """
-        ll_loss, kl_loss = self.losses(dataset)
+        ll_loss, kl_loss = self.losses(dataset, return_mean=return_mean)
         free_energy = ll_loss + kl_loss
         return free_energy
 
