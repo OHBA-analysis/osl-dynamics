@@ -1,4 +1,4 @@
-"""Classes for simulation Hidden Markov Models (HMMs).
+"""Classes for simulating Hidden Markov Models (HMMs).
 
 """
 
@@ -255,3 +255,128 @@ class UniformHMMSimulation(HMMSimulation):
         trans_prob = np.ones((n_states, n_states)) * single_trans_prob
         trans_prob[np.diag_indices(n_states)] = stay_prob
         return trans_prob
+
+
+class HierarchicalHMMSimulation(Simulation):
+    """Hierarchical two-level HMM simulation.
+
+    The bottom level HMMs share the same states, i.e. have the same
+    observation model. Only the transition probability matrix changes.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    top_level_trans_prob : np.ndarray
+        Transition probability matrix of the top level HMM, which
+        selects the bottom level HMM at each time point.
+    bottom_level_trans_prob : list of np.ndarray
+        Transitions probability matrices for the bottom level HMMs,
+        which generate the observed data.
+    n_channels : int
+        Number of channels in the observation model. Inferred from
+        covariances if None.
+    means : np.ndarray
+        Mean vector for each state, shape should be (n_states, n_channels).
+    covariances : np.ndarray
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels).
+    zero_means : bool
+        If True, means will be set to zero.
+    random_covariances : bool
+        Should we simulate random covariances? False gives structured covariances.
+    observation_error : float
+        Standard deviation of random noise to be added to the observations.
+    simulate : bool
+        Should data be simulated? Can be called using .simulate later.
+    top_level_random_seed : int
+        Random seed for generating the state time course of the top level HMM.
+    bottom_level_random_seeds : list of int
+        Random seeds for the bottom level HMMs.
+    data_random_seed : int
+        Random seed for generating the observed data.
+    """
+
+    @auto_yaml
+    @auto_repr
+    def __init__(
+        self,
+        n_samples: int,
+        top_level_trans_prob: np.ndarray,
+        bottom_level_trans_probs: list,
+        n_channels: int = None,
+        means: np.ndarray = None,
+        covariances: np.ndarray = None,
+        zero_means: bool = None,
+        random_covariances: bool = None,
+        observation_error: float = 0.0,
+        simulate: bool = True,
+        top_level_random_seed: int = None,
+        bottom_level_random_seeds: list = None,
+        data_random_seed: int = None,
+    ):
+
+        if bottom_level_random_seeds is None:
+            bottom_level_random_seeds = [None] * len(bottom_level_trans_probs)
+
+        # Top level HMM
+        # This will select the bottom level HMM at each time point
+        self.top_level_hmm = HMMSimulation(
+            n_samples=n_samples,
+            trans_prob=top_level_trans_prob,
+            n_channels=n_channels,
+            means=means,
+            covariances=covariances,
+            zero_means=zero_means,
+            random_covariances=random_covariances,
+            observation_error=None,
+            simulate=False,
+            random_seed=top_level_random_seed,
+        )
+
+        # The bottom level HMMs
+        # These will generate the data
+        self.n_bottom_level_hmms = len(bottom_level_trans_probs)
+        self.bottom_level_hmms = [
+            HMMSimulation(
+                n_samples=n_samples,
+                trans_prob=bottom_level_trans_probs[i].T,
+                n_channels=n_channels,
+                means=means,
+                covariances=covariances,
+                zero_means=zero_means,
+                random_covariances=random_covariances,
+                observation_error=None,
+                simulate=False,
+                random_seed=bottom_level_random_seeds[i],
+            )
+            for i in range(self.n_bottom_level_hmms)
+        ]
+
+        super().__init__(
+            n_samples=n_samples,
+            n_channels=n_channels,
+            n_states=bottom_level_trans_probs[0].shape[0],
+            means=means,
+            covariances=covariances,
+            zero_means=zero_means,
+            random_covariances=random_covariances,
+            observation_error=observation_error,
+            simulate=simulate,
+            random_seed=data_random_seed,
+        )
+
+    def generate_states(self) -> np.ndarray:
+        stc = np.empty([self.n_samples, self.n_states])
+
+        # Top level HMM to select the bottom level HMM at each time point
+        top_level_stc = self.top_level_hmm.generate_states()
+
+        # Generate state time courses when each bottom level HMM is activate
+        for i in range(self.n_bottom_level_hmms):
+            time_points_active = np.argwhere(top_level_stc[:, i] == 1)[:, 0]
+            stc[time_points_active] = self.bottom_level_hmms[i].generate_states()[
+                : len(time_points_active)
+            ]
+
+        return stc
