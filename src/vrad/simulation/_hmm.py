@@ -65,6 +65,11 @@ class HMMSimulation(Simulation):
                     "Mismatch in the number of states in trans_prob and covariances."
                 )
 
+        if trans_prob.shape[0] != trans_prob.shape[1]:
+            raise ValueError(
+                f"trans_prob must be a square matrix, got {trans_prob.shape}."
+            )
+
         super().__init__(
             n_samples=n_samples,
             n_channels=n_channels,
@@ -324,11 +329,11 @@ class HierarchicalHMMSimulation(Simulation):
         self.top_level_hmm = HMMSimulation(
             n_samples=n_samples,
             trans_prob=top_level_trans_prob,
-            n_channels=n_channels,
-            means=means,
-            covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
+            n_channels=1,
+            means=None,
+            covariances=None,
+            zero_means=True,
+            random_covariances=True,
             observation_error=None,
             simulate=False,
             random_seed=top_level_random_seed,
@@ -341,11 +346,11 @@ class HierarchicalHMMSimulation(Simulation):
             HMMSimulation(
                 n_samples=n_samples,
                 trans_prob=bottom_level_trans_probs[i].T,
-                n_channels=n_channels,
-                means=means,
-                covariances=covariances,
-                zero_means=zero_means,
-                random_covariances=random_covariances,
+                n_channels=1,
+                means=None,
+                covariances=None,
+                zero_means=True,
+                random_covariances=True,
                 observation_error=None,
                 simulate=False,
                 random_seed=bottom_level_random_seeds[i],
