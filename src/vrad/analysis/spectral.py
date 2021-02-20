@@ -9,6 +9,7 @@ import numpy as np
 from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
+from vrad.analysis import spectrum
 from vrad.analysis.functions import fourier_transform, nextpow2, validate_array
 from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import standardize
@@ -34,13 +35,13 @@ def autocorrelation_function(
     Returns
     -------
     np.ndarray
-        Autocorrelation function. Shape is (n_states, n_acf)
+        Autocorrelation function. Shape is (n_states, n_embeddings)
     """
-    # Number of data points in the autocorrelation function
-    n_acf = 2 * n_embeddings - 1
-
     # Number of states
     n_states = len(covariances)
+
+    # Number of data points in the autocorrelation function
+    n_acf = n_embeddings // 2
 
     # Get the autocorrelation function
     autocorrelation_function = np.empty(
@@ -57,11 +58,10 @@ def autocorrelation_function(
                     k * n_embeddings : (k + 1) * n_embeddings,
                 ]
 
-                # Take elements from the first row and column
-                autocorrelation_function[i, j, k] = np.append(
-                    autocorrelation_function_jk[0][::-1],
-                    autocorrelation_function_jk[1:, 0],
-                )
+                # Take the first columns of the submatrix
+                autocorrelation_function[i, j, k] = autocorrelation_function_jk[
+                    :n_acf, 0
+                ]
 
     return autocorrelation_function
 
@@ -140,7 +140,7 @@ def decompose_spectra(
 def state_covariance_spectra(
     autocorrelation_function: np.ndarray,
     sampling_frequency: float,
-    nfft: int = 64,
+    nfft: int = 256,
     frequency_range: list = None,
 ):
     """Calculates spectra from the autocorrelation function.
@@ -179,10 +179,6 @@ def state_covariance_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Number of data points in the autocorrelation function and FFT
-    n_acf = autocorrelation_function.shape[-1]
-    nfft = max(nfft, 2 ** nextpow2(n_acf))
-
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
     f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
@@ -193,19 +189,35 @@ def state_covariance_spectra(
     if f_max_arg <= f_min_arg:
         raise ValueError("Cannot select requested frequency range.")
 
+    # Number of states, channels and data points in the autocorrelation function
+    n_states, n_channels, n_channels, n_acf = autocorrelation_function.shape
+
+    # Use the autocorrelation function to estimate the autocorrelation coefficients
+    autoregressive_coefficients = np.empty(
+        [n_states, n_channels, n_channels, n_acf - 1]
+    )
+    for i in range(n_states):
+        for j in range(n_channels):
+            for k in range(n_channels):
+                autoregressive_coefficients[i, j, k], _, _ = spectrum.LEVINSON(
+                    autocorrelation_function[i, j, k], allow_singularity=True
+                )
+
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
-    power_spectra = abs(
-        fourier_transform(
-            autocorrelation_function,
-            sampling_frequency,
-            nfft=nfft,
-            args_range=args_range,
-        )
+    power_spectra = np.empty(
+        [n_states, n_channels, n_channels, f_max_arg + 1 - f_min_arg]
     )
+    for i in range(n_states):
+        for j in range(n_channels):
+            for k in range(n_channels):
+                psd = spectrum.arma2psd(autoregressive_coefficients[i, j, k], NFFT=nfft)
 
-    # Normalise the power spectra
-    power_spectra /= nfft ** 2
+                # A two-sided PSD is returned, only keep the first half
+                # and the desired range
+                power_spectra[i, j, k] = psd[: nfft // 2][
+                    range(args_range[0], args_range[1])
+                ]
 
     # Coherences for each state
     coherences = coherence_spectra(power_spectra)
