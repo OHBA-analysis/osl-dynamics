@@ -6,6 +6,7 @@ import subprocess
 import nibabel as nib
 from tqdm import trange
 from vrad.analysis import std_masks
+from vrad.analysis.scenes import state_scene
 
 _logger = logging.getLogger("VRAD")
 
@@ -94,7 +95,7 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
     suffix = file_path.suffix or ".png"
     file_path = file_path.with_suffix("")
 
-    scene_file = pathlib.Path("state_scene.scene")
+    scene_file = state_scene
     temp_scene = pathlib.Path("temp_scene.scene")
 
     surf_left, surf_right = surfs.get(inflation, surfs[0])
