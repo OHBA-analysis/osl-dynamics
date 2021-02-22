@@ -183,11 +183,12 @@ def state_covariance_spectra(
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
     f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
     f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
-    frequencies = frequencies[f_min_arg : f_max_arg + 1]
-    args_range = [f_min_arg, f_max_arg + 1]
 
     if f_max_arg <= f_min_arg:
         raise ValueError("Cannot select requested frequency range.")
+
+    args_range = [f_min_arg, f_max_arg + 1]
+    frequencies = frequencies[args_range[0] : args_ranges[1]]
 
     # Number of states, channels and data points in the autocorrelation function
     n_states, n_channels, n_channels, n_acf = autocorrelation_function.shape
@@ -206,7 +207,7 @@ def state_covariance_spectra(
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
     power_spectra = np.empty(
-        [n_states, n_channels, n_channels, f_max_arg + 1 - f_min_arg]
+        [n_states, n_channels, n_channels, args_range[1] - args_range[0]]
     )
     for i in range(n_states):
         for j in range(n_channels):
