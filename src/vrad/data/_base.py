@@ -249,21 +249,27 @@ class Data:
         if not isinstance(alpha_t, list):
             raise ValueError("alpha must be a list of numpy arrays.")
 
-        if self.n_embeddings < n_alpha_embeddings:
-            raise ValueError(
-                "n_embeddings used to prepare the data must be equal to "
-                + "or greater than n_embeddings used to infer alpha."
-            )
-
         subject_datasets = []
         for i in range(self.n_subjects):
 
-            # Inferred alpha
-            # We remove data points in alpha that are not in the new time embedded data
-            alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
+            if self.n_embeddings > n_alpha_embeddings:
+                # Inferred alpha
+                # We remove data points in alpha that are not in the new time
+                # embedded data
+                alpha = alpha_t[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
 
-            # Subject data
-            subject = self.subjects[i][: alpha.shape[0]]
+                # Subject data
+                subject = self.subjects[i][: alpha.shape[0]]
+
+            else:
+                # Inferred alpha
+                alpha = alpha_t[i]
+
+                # Subject data
+                # We remove the data points that are not in alpha
+                subject = self.subjects[i][
+                    (n_alpha_embeddings - self.n_embeddings) // 2 : alpha.shape[0]
+                ]
 
             # Create datasets
             alpha_data = Dataset.from_tensor_slices(alpha).batch(
