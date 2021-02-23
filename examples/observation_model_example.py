@@ -60,9 +60,7 @@ n_channels = meg_data.n_channels
 
 # Prepare dataset
 training_datasets = meg_data.covariance_training_datasets(
-    [sim.state_time_course],
-    sequence_length,
-    batch_size,
+    [sim.state_time_course], sequence_length, batch_size,
 )
 
 # Build model

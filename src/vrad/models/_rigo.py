@@ -127,15 +127,11 @@ class RIGO(models.GO):
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if (
-            rnn_normalization
-            not in [
-                "layer",
-                "batch",
-                None,
-            ]
-            or theta_normalization not in ["layer", "batch", None]
-        ):
+        if rnn_normalization not in [
+            "layer",
+            "batch",
+            None,
+        ] or theta_normalization not in ["layer", "batch", None]:
             raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
         if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:

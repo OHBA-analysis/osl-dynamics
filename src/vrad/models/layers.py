@@ -153,8 +153,7 @@ class StateMixingFactorsLayer(layers.Layer):
             alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature,
-                logits=theta_t,
+                temperature=self.alpha_temperature, logits=theta_t,
             )
             alpha_t = gumbel_softmax_distribution.sample()
 
@@ -246,10 +245,8 @@ class MeansCovsLayer(layers.Layer):
             else:
                 self.initial_cholesky_covariances = initial_covariances
 
-        self.flattened_cholesky_covariances_initializer = (
-            initializers.FlattenedCholeskyCovariancesInitializer(  # noqa: E501
-                self.initial_cholesky_covariances
-            )
+        self.flattened_cholesky_covariances_initializer = initializers.FlattenedCholeskyCovariancesInitializer(  # noqa: E501
+            self.initial_cholesky_covariances
         )
 
     def build(self, input_shape):

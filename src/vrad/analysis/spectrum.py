@@ -41,7 +41,7 @@ def LEVINSON(r, order=None, allow_singularity=False):
             P = P * (1.0 - temp ** 2.0)
         else:
             P = P * (1.0 - (temp.real ** 2 + temp.imag ** 2))
-        if P <= 0 and allow_singularity == False:
+        if P <= 0 and not allow_singularity:
             raise ValueError("singular matrix")
         A[k] = temp
         ref[k] = temp  # save reflection coeff at each step
@@ -78,7 +78,7 @@ def rlevinson(a, efinal):
     if p < 2:
         raise ValueError("Polynomial should have at least two coefficients")
 
-    if realdata == True:
+    if realdata:
         U = np.zeros((p, p))  # This matrix will have the prediction
         # polynomials of orders 1:p
     else:
@@ -100,16 +100,16 @@ def rlevinson(a, efinal):
         [a, e[k - 1]] = levdown(a, e[k])
         U[:, k] = np.concatenate((np.conj(a[-1::-1].transpose()), [0] * (p - k)))
 
-    e0 = e[0] / (1.0 - abs(a[1] ** 2))  #% Because a[1]=1 (true polynomial)
-    U[0, 0] = 1  #% Prediction coefficient of zeroth order
-    kr = np.conj(U[0, 1:])  #% The reflection coefficients
-    kr = kr.transpose()  #% To make it into a column vector
+    e0 = e[0] / (1.0 - abs(a[1] ** 2))  # Because a[1]=1 (true polynomial)
+    U[0, 0] = 1  # Prediction coefficient of zeroth order
+    kr = np.conj(U[0, 1:])  # The reflection coefficients
+    kr = kr.transpose()  # To make it into a column vector
 
-    #   % Once we have the matrix U and the prediction error at various orders, we can
-    #  % use this information to find the autocorrelation coefficients.
+    # Once we have the matrix U and the prediction error at various orders, we can
+    #   use this information to find the autocorrelation coefficients.
 
     R = np.zeros(1, dtype=complex)
-    #% Initialize recursion
+    # Initialize recursion
     k = 1
     R0 = e0  # To take care of the zero indexing problem
     R[0] = -np.conj(U[0, 1]) * R0  # R[1]=-a1[1]*R[0]
@@ -127,12 +127,12 @@ def rlevinson(a, efinal):
 
 
 def levdown(anxt, enxt=None):
-    #% Some preliminaries first
+    # Some preliminaries first
     # if nargout>=2 & nargin<2
     #    raise ValueError('Insufficient number of input arguments');
     if anxt[0] != 1:
         raise ValueError("At least one of the reflection coefficients is equal to one.")
-    anxt = anxt[1:]  #  Drop the leading 1, it is not needed
+    anxt = anxt[1:]  # Drop the leading 1, it is not needed
     #  in the step down
 
     # Extract the k+1'th reflection coefficient
@@ -154,7 +154,7 @@ def levdown(anxt, enxt=None):
 def levup(acur, knxt, ecur=None):
     if acur[0] != 1:
         raise ValueError("At least one of the reflection coefficients is equal to one.")
-    acur = acur[1:]  #  Drop the leading 1, it is not needed
+    acur = acur[1:]  # Drop the leading 1, it is not needed
 
     # Matrix formulation from Stoica is used to avoid looping
     anxt = np.concatenate((acur, [0])) + knxt * np.concatenate(

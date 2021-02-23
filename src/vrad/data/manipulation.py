@@ -3,9 +3,7 @@ from vrad import array_ops
 
 
 def standardize(
-    time_series: np.ndarray,
-    axis: int = 0,
-    create_copy: bool = True,
+    time_series: np.ndarray, axis: int = 0, create_copy: bool = True,
 ) -> np.ndarray:
     """Standardizes a time series.
 
@@ -86,9 +84,7 @@ def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> i
 
 
 def trim_time_series(
-    time_series: np.ndarray,
-    sequence_length: int,
-    discontinuities: list = None,
+    time_series: np.ndarray, sequence_length: int, discontinuities: list = None,
 ) -> np.ndarray:
     """Trims a time seris.
 

@@ -188,7 +188,7 @@ def state_covariance_spectra(
         raise ValueError("Cannot select requested frequency range.")
 
     args_range = [f_min_arg, f_max_arg + 1]
-    frequencies = frequencies[args_range[0] : args_ranges[1]]
+    frequencies = frequencies[args_range[0] : args_range[1]]
 
     # Number of states, channels and data points in the autocorrelation function
     n_states, n_channels, n_channels, n_acf = autocorrelation_function.shape
