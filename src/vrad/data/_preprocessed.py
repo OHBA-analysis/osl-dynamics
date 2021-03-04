@@ -60,7 +60,10 @@ class PreprocessedData(Data):
         self.prepared_data_std = []
 
     def prepare(
-        self, n_embeddings: int, n_pca_components: int = None, whiten: bool = False,
+        self,
+        n_embeddings: int = 1,
+        n_pca_components: int = None,
+        whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
@@ -69,7 +72,7 @@ class PreprocessedData(Data):
         Parameters
         ----------
         n_embeddings : int
-            Number of data points to embed the data.
+            Number of data points to embed the data. Optional, default is 1.
         n_pca_components : int
             Number of PCA components to keep. Optional, default is no PCA.
         whiten : bool

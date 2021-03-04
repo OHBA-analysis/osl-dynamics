@@ -221,6 +221,7 @@ class Data:
         batch_size: int,
         n_alpha_embeddings: int = 0,
         concatenate: bool = True,
+        channels=None,
     ) -> tensorflow.data.Dataset:
         """Dataset for training covariances with a fixed alpha_t.
 

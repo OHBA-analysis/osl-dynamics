@@ -3,7 +3,9 @@ from vrad import array_ops
 
 
 def standardize(
-    time_series: np.ndarray, axis: int = 0, create_copy: bool = True,
+    time_series: np.ndarray,
+    axis: int = 0,
+    create_copy: bool = True,
 ) -> np.ndarray:
     """Standardizes a time series.
 
@@ -19,12 +21,12 @@ def standardize(
         Should we return a new array containing the standardized data or modify
         the original time series array? Optional, default is True.
     """
+    mean = np.mean(time_series, axis=axis)
+    std = np.std(time_series, axis=axis)
     if create_copy:
-        std_time_series = np.copy(time_series)
+        std_time_series = (np.copy(time_series) - mean) / std
     else:
-        std_time_series = time_series
-    std_time_series -= np.mean(std_time_series, axis=axis)
-    std_time_series /= np.std(std_time_series, axis=axis)
+        std_time_series = (time_series - mean) / std
     return std_time_series
 
 
@@ -84,7 +86,9 @@ def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> i
 
 
 def trim_time_series(
-    time_series: np.ndarray, sequence_length: int, discontinuities: list = None,
+    time_series: np.ndarray,
+    sequence_length: int,
+    discontinuities: list = None,
 ) -> np.ndarray:
     """Trims a time seris.
 
