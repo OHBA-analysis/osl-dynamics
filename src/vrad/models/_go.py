@@ -41,7 +41,7 @@ class GO(models.Base):
         Strategy for distributed learning.
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
+        n_channels, n_channels). Optional.
     """
 
     def __init__(

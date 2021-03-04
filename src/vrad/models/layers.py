@@ -5,7 +5,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, layers
+from tensorflow.keras import activations, constraints, layers
 from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
@@ -153,7 +153,8 @@ class StateMixingFactorsLayer(layers.Layer):
             alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature, logits=theta_t,
+                temperature=self.alpha_temperature,
+                logits=theta_t,
             )
             alpha_t = gumbel_softmax_distribution.sample()
 
@@ -218,7 +219,7 @@ class MeansCovsLayer(layers.Layer):
         else:
             self.initial_means = initial_means
 
-        self.means_initializer = initializers.MeansInitializer(self.initial_means)
+        self.means_initializer = initializers.WeightInitializer(self.initial_means)
 
         # Initialisation of covariances
         if initial_covariances is None:
@@ -229,7 +230,7 @@ class MeansCovsLayer(layers.Layer):
                 self.initial_covariances
             )
         else:
-            # Ensure data are single
+            # Ensure data is float32
             initial_covariances = initial_covariances.astype("float32")
 
             # Normalise the covariances if required
@@ -245,8 +246,10 @@ class MeansCovsLayer(layers.Layer):
             else:
                 self.initial_cholesky_covariances = initial_covariances
 
-        self.flattened_cholesky_covariances_initializer = initializers.FlattenedCholeskyCovariancesInitializer(  # noqa: E501
-            self.initial_cholesky_covariances
+        self.flattened_cholesky_covariances_initializer = (
+            initializers.WeightInitializer(
+                tfp.math.full_triangular_inverse(self.initial_cholesky_covariances)
+            )
         )
 
     def build(self, input_shape):
@@ -591,4 +594,206 @@ class ModelRNNLayers(layers.Layer):
     def get_config(self):
         config = super().get_config()
         config.update({"n_units": self.n_units})
+        return config
+
+
+class MARParametersLayer(layers.Layer):
+    """Layer to learn parameters of a multivariate autoregressive (MAR) model.
+
+    Outputs the MAR parameters:
+    - Matrix of MAR coefficients for lag l and state j, W_jl.
+    - Covariance matrix, S, which is the same for all states.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
+    n_lags : int
+        Number of lags.
+    """
+
+    def __init__(
+        self,
+        n_states: int,
+        n_channels: int,
+        n_lags: int,
+        initial_coeffs: np.ndarray = None,
+        initial_cov: np.ndarray = None,
+        learn_coeffs: bool = True,
+        learn_cov: bool = True,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+        self.n_channels = n_channels
+        self.n_lags = n_lags
+        self.learn_coeffs = learn_coeffs
+        self.learn_cov = learn_cov
+
+        # Initialisation for MAR coefficients
+        if initial_coeffs is None:
+            self.initial_coeffs = np.zeros(
+                [n_states, n_lags, n_channels, n_channels], dtype=np.float32
+            )
+        else:
+            self.initial_coeffs = initial_coeffs
+        self.coeffs_initializer = initializers.WeightInitializer(self.initial_coeffs)
+
+        # Initialisation for MAR covariance
+        if initial_cov is None:
+            self.initial_cov = np.ones([n_states, n_channels], dtype=np.float32)
+        else:
+            self.initial_cov = initial_cov
+        self.cov_initializer = initializers.WeightInitializer(self.initial_cov)
+
+    def build(self, input_shape):
+
+        # Create weights for the MAR coefficients
+        self.coeffs = self.add_weight(
+            "coeffs",
+            shape=(self.n_states, self.n_lags, self.n_channels, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.coeffs_initializer,
+            trainable=self.learn_coeffs,
+        )
+
+        # Create weights for the MAR covariance
+        self.cov = self.add_weight(
+            "cov",
+            shape=(self.n_states, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.cov_initializer,
+            trainable=self.learn_cov,
+            constraint=constraints.NonNeg(),
+        )
+
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        return [self.coeffs, tf.linalg.diag(self.cov)]
+
+    def compute_output_shape(self, input_shape):
+        return [
+            tf.TensorShape(
+                [self.n_states, self.n_lags, self.n_channels, self.n_channels]
+            ),
+            tf.TensorShape([self.n_states, self.n_channels, self.n_channels]),
+        ]
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_states": self.n_states,
+                "n_channels": self.n_channels,
+                "n_lags": self.n_lags,
+                "learn_coeffs": self.learn_coeffs,
+                "learn_cov": self.learn_cov,
+            }
+        )
+        return config
+
+
+class MARMeanCovLayer(layers.Layer):
+    def __init__(
+        self,
+        n_states: int,
+        n_channels: int,
+        sequence_length: int,
+        n_lags: int,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+        self.n_channels = n_channels
+        self.sequence_length = sequence_length
+        self.n_lags = n_lags
+        self.slice_fn = lambda elems: tf.convert_to_tensor(
+            [elems[i : i + n_lags] for i in range(elems.shape[0] - n_lags)]
+        )
+
+    def call(self, inputs, **kwargs):
+
+        # Input data:
+        # - alpha_jt.shape = (None, sequence_length, n_states)
+        # - data.shape = (None, sequence_length, n_channels)
+        # - W_j.shape = (n_states, n_lags, n_channels, n_channels)
+        # - sigma_j.shape = (n_states, n_channels, n_channels)
+        alpha_jt, data, W_j, sigma_j = inputs
+
+        # Reshape data: (None, sequence_length, n_channels)
+        # -> (None, 1, sequence_length - n_lags, n_lags, n_channels, 1)
+        lagged_data = tf.map_fn(self.slice_fn, elems=data)
+        lagged_data = tf.expand_dims(tf.expand_dims(lagged_data, axis=1), axis=-1)
+
+        # Reshape W_j for multiplication with data lags
+        # (n_states, n_lags, n_channels, n_channels)
+        # -> (1, n_states, 1, n_lags, n_channels, n_channels)
+        W_j = tf.expand_dims(tf.expand_dims(W_j, axis=0), axis=2)
+
+        # Calculate the mean for each state:
+        # mu_jt = Sum_l W_j x_{t-l}
+        mu_jt = tf.reduce_sum(tf.matmul(W_j, lagged_data), axis=3)
+
+        # mu_jt.shape is
+        # (None, n_states, sequence_length - n_lags, n_channels, 1)
+        # reshape to (None, sequence_length - n_lags, n_states, n_channels)
+        # for multiplication with alpha_jt
+        mu_jt = tf.squeeze(tf.transpose(mu_jt, perm=[0, 2, 1, 3, 4]), axis=-1)
+
+        # Remove alpha_jt value we don't have all lags for and
+        # reshape for multiplication with mu_jt
+        # (None, sequence_length, n_states)
+        # -> (None, sequence_length - n_lags, n_states, 1)
+        alpha_jt = tf.expand_dims(alpha_jt[:, self.n_lags :], axis=-1)
+
+        # Calculate the mean at each point in time:
+        # mu_t = Sum_j alpha_jt mu_jt
+        mu_t = tf.reduce_sum(tf.multiply(alpha_jt, mu_jt), axis=2)
+
+        # Reshape sigma_j and alpha_jt for multiplication
+        # alpha_jt: (None, sequence_length - n_lags, n_states, 1)
+        # -> (None, sequence_length - n_lags, n_states, 1, 1)
+        alpha_jt = tf.expand_dims(alpha_jt, axis=-1)
+
+        # sigma_j: (n_states, n_channels, n_channels)
+        # -> (1, 1, n_states, n_channels, n_channels)
+        sigma_j = tf.expand_dims(tf.expand_dims(sigma_j, axis=0), axis=0)
+
+        # Calculate the covariance at each time point
+        # sigma_t = Sum_j alpha^2_jt sigma_j
+        alpha2_jt = tf.square(alpha_jt)
+        sigma_t = tf.reduce_sum(tf.multiply(alpha2_jt, sigma_j), axis=2)
+
+        # Return data for the log-likelihood calculation
+        clipped_data = data[:, : -self.n_lags]
+
+        return clipped_data, mu_t, sigma_t
+
+    def compute_output_shape(self, input_shape):
+        return [
+            tf.TensorShape([None, self.sequence_length - self.n_lags, self.n_channels]),
+            tf.TensorShape([None, self.sequence_length - self.n_lags, self.n_channels]),
+            tf.TensorShape(
+                [
+                    None,
+                    self.sequence_length - self.n_lags,
+                    self.n_channels,
+                    self.n_channels,
+                ]
+            ),
+        ]
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_states": self.n_states,
+                "n_channels": self.n_channels,
+                "sequence_length": self.sequence_length,
+                "n_lags": self.n_lags,
+            }
+        )
         return config
