@@ -9,3 +9,4 @@ which can be analysed.
 from vrad.simulation._base import *  # noqa
 from vrad.simulation._hmm import *  # noqa
 from vrad.simulation._hsmm import *  # noqa
+from vrad.simulation._mvn import *  # noqa
