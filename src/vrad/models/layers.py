@@ -248,7 +248,7 @@ class MeansCovsLayer(layers.Layer):
 
         self.flattened_cholesky_covariances_initializer = (
             initializers.WeightInitializer(
-                tfp.math.full_triangular_inverse(self.initial_cholesky_covariances)
+                tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
             )
         )
 

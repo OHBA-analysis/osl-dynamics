@@ -2,267 +2,226 @@
 
 """
 
+import logging
+from typing import Union
+
 import numpy as np
 from vrad.array_ops import get_one_hot
-from vrad.simulation import Simulation
-from vrad.utils.decorators import auto_repr, auto_yaml
+from vrad.data.manipulation import standardize
+from vrad.simulation import Simulation, MVN
+
+_logger = logging.getLogger("VRAD")
 
 
-class HMMSimulation(Simulation):
-    """Class providing methods to simulate an HMM.
+class HMM:
+    """HMM base class.
 
-    Parameters
-    ----------
-    n_samples : int
-        Number of samples to draw from the model.
-    trans_prob : numpy.ndarray
-        Transition probability matrix.
-    n_channels : int
-        Number of channels in the observation model. Inferred from covariances if None.
-    means : np.ndarray
-        Mean vector for each state, shape should be (n_states, n_channels).
-    covariances : np.ndarray
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels).
-    zero_means : bool
-        If True, means will be set to zero.
-    random_covariances : bool
-        Should we simulate random covariances? False gives structured covariances.
-    observation_error : float
-        Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
-    random_seed : int
-        Seed for reproducibility.
-    """
-
-    @auto_yaml
-    @auto_repr
-    def __init__(
-        self,
-        n_samples: int,
-        trans_prob: np.ndarray,
-        n_channels: int = None,
-        means: np.ndarray = None,
-        covariances: np.ndarray = None,
-        zero_means: bool = None,
-        random_covariances: bool = None,
-        observation_error: float = 0.0,
-        simulate: bool = True,
-        random_seed: int = None,
-    ):
-        self.trans_prob = trans_prob
-
-        if means is not None:
-            if trans_prob.shape[0] != means.shape[0]:
-                raise ValueError(
-                    "Mismatch in the number of states in trans_prob and means."
-                )
-
-        if covariances is not None:
-            if trans_prob.shape[0] != covariances.shape[0]:
-                raise ValueError(
-                    "Mismatch in the number of states in trans_prob and covariances."
-                )
-
-        if trans_prob.shape[0] != trans_prob.shape[1]:
-            raise ValueError(
-                f"trans_prob must be a square matrix, got {trans_prob.shape}."
-            )
-
-        super().__init__(
-            n_samples=n_samples,
-            n_channels=n_channels,
-            n_states=trans_prob.shape[0],
-            means=means,
-            covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
-            observation_error=observation_error,
-            simulate=simulate,
-            random_seed=random_seed,
-        )
-
-    def generate_states(self) -> np.ndarray:
-        rands = [
-            iter(
-                self._rng.choice(
-                    self.n_states, size=self.n_samples, p=self.trans_prob[:, i]
-                )
-            )
-            for i in range(self.n_states)
-        ]
-        states = np.zeros(self.n_samples, int)
-        for sample in range(1, self.n_samples):
-            states[sample] = next(rands[states[sample - 1]])
-        return get_one_hot(states, n_states=self.n_states)
-
-
-class SequenceHMMSimulation(HMMSimulation):
-    """Class providing methods to simulate a sequential HMM.
-
-    In a sequential HMM, each transition can only move to the next state numerically.
-    So, 1 -> 2, 2 -> 3, 3 -> 4, etc.
+    Contains the transition probability matrix.
 
     Parameters
     ----------
-    n_samples : int
-        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
     stay_prob : float
-        Probability of staying in the current state (diagonals of transition matrix).
-    n_channels : int
-        Number of channels in the observation model. Inferred from covariances if None.
-    means : np.ndarray
-        Mean vector for each state, shape should be (n_states, n_channels).
-    covariances : np.ndarray
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels).
-    zero_means : bool
-        If True, means will be set to zero.
-    random_covariances : bool
-        Should we simulate random covariances? False gives structured covariances.
-    observation_error : float
-        Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
+        Used to generate the transition probability matrix is trans_prob is a str.
+        Optional.
+    n_states : int
+        Number of states. Needed when trans_prob is a str to construct the
+        transition probability matrix. Optional.
     random_seed : int
-        Seed for reproducibility.
+        Seed for random number generator. Optional.
     """
 
     def __init__(
         self,
-        n_samples: int,
-        stay_prob: float,
+        trans_prob: Union[np.ndarray, str],
+        stay_prob: float = None,
         n_states: int = None,
-        n_channels: int = None,
-        means: np.ndarray = None,
-        covariances: np.ndarray = None,
-        zero_means: bool = None,
-        random_covariances: bool = None,
-        observation_error: float = 0.0,
-        simulate: bool = True,
         random_seed: int = None,
     ):
-        if n_states is None:
-            # Get the number of states from the means or covariances
-            if means is not None:
-                n_states = means.shape[0]
-            elif covariances is not None:
-                n_states = covariances.shape[0]
-            else:
+
+        if isinstance(trans_prob, list):
+            trans_prob = np.ndarray(trans_prob)
+
+        if isinstance(trans_prob, np.ndarray):
+            # Don't need to generate the transition probability matrix
+
+            if trans_prob.ndim != 2:
+                raise ValueError("trans_prob must be a 2D array.")
+
+            if trans_prob.shape[0] != trans_prob.shape[1]:
+                raise ValueError("trans_prob must be a square matrix.")
+
+            # Check the rows of the transition probability matrix sum to one
+            # We allow a small error (1e-12) because of rounding errors
+            row_sums = trans_prob.sum(axis=1)
+            col_sums = trans_prob.sum(axis=0)
+            ones = np.ones(trans_prob.shape[0])
+            if np.any(abs(row_sums - ones) > 1e-12):
+                if np.all(abs(col_sums - ones) < 1e-12):
+                    trans_prob = trans_prob.T
+                    _logger.warning(
+                        "Rows of trans_prob matrix must sum to 1. Transpose taken."
+                    )
+                else:
+                    raise ValueError("Rows of trans_prob must sum to 1.")
+
+            self.trans_prob = trans_prob
+
+        elif isinstance(trans_prob, str):
+            # We generate the transition probability matrix
+
+            if trans_prob not in ["sequence", "uniform"]:
                 raise ValueError(
-                    "If n_states is not passed, means or covariances must be passed."
+                    "trans_prob must be a np.array, 'sequence' or 'uniform'."
                 )
 
-        self.stay_prob = stay_prob
-        trans_prob = self.construct_trans_prob(n_states, stay_prob)
+            # Sequential transition probability matrix
+            if trans_prob == "sequence":
+                if stay_prob is None or n_states is None:
+                    raise ValueError(
+                        "If trans_prob is 'sequence', stay_prob and n_states must be passed."
+                    )
+                self.trans_prob = self.construct_sequence_trans_prob(
+                    stay_prob, n_states
+                )
 
-        super().__init__(
-            n_samples=n_samples,
-            trans_prob=trans_prob,
-            n_channels=n_channels,
-            means=means,
-            covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
-            observation_error=observation_error,
-            simulate=simulate,
-            random_seed=random_seed,
-        )
+            # Uniform transition probability matrix
+            elif trans_prob == "uniform":
+                if n_states is None:
+                    raise ValueError(
+                        "If trans_prob is 'uniform', n_states must be passed."
+                    )
+                if stay_prob is None:
+                    stay_prob = 1.0 / n_states
+                self.trans_prob = self.construct_uniform_trans_prob(stay_prob, n_states)
+
+        # Infer number of states from the transition probability matrix
+        self.n_states = trans_prob.shape[0]
+
+        # Setup random number generator
+        self._rng = np.random.default_rng(random_seed)
 
     @staticmethod
-    def construct_trans_prob(n_states: int, stay_prob: float) -> np.ndarray:
+    def construct_sequence_trans_prob(stay_prob, n_states):
         trans_prob = np.zeros([n_states, n_states])
         np.fill_diagonal(trans_prob, stay_prob)
         np.fill_diagonal(trans_prob[:, 1:], 1 - stay_prob)
         trans_prob[-1, 0] = 1 - stay_prob
         return trans_prob
 
-
-class UniformHMMSimulation(HMMSimulation):
-    """Class providing methods to simulate a uniform HMM.
-
-    In a uniform HMM, the chance of moving to any state other than the current one is
-    equal. So there is a diagonal term and an off-diagonal term for the transition
-    probability matrix.
-
-    Parameters
-    ----------
-    n_samples : int
-        Number of samples to draw from the model.
-    stay_prob : float
-        Probability of staying in the current state (diagonals of transition matrix).
-    n_channels : int
-        Number of channels in the observation model. Inferred from covariances if None.
-    means : np.ndarray
-        Mean vector for each state, shape should be (n_states, n_channels).
-    covariances : np.ndarray
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels).
-    zero_means : bool
-        If True, means will be set to zero.
-    random_covariances : bool
-        Should we simulate random covariances? False gives structured covariances.
-    observation_error : float
-        Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
-    random_seed : int
-        Seed for reproducibility.
-    """
-
-    @auto_yaml
-    @auto_repr
-    def __init__(
-        self,
-        n_samples: int,
-        stay_prob: float,
-        n_states: int = None,
-        n_channels: int = None,
-        means: np.ndarray = None,
-        covariances: np.ndarray = None,
-        zero_means: bool = None,
-        random_covariances: bool = None,
-        observation_error: float = 0.0,
-        simulate: bool = True,
-        random_seed: int = None,
-    ):
-        if n_states is None:
-            # Get the number of states from the means or covariances
-            if means is not None:
-                n_states = means.shape[0]
-            elif covariances is not None:
-                n_states = covariances.shape[0]
-            else:
-                raise ValueError(
-                    "If n_states is not passed, means or covariances must be passed."
-                )
-
-        self.stay_prob = stay_prob
-        trans_prob = self.construct_trans_prob(n_states, stay_prob)
-
-        super().__init__(
-            n_samples=n_samples,
-            trans_prob=trans_prob,
-            n_channels=n_channels,
-            means=means,
-            covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
-            observation_error=observation_error,
-            simulate=simulate,
-            random_seed=random_seed,
-        )
-
     @staticmethod
-    def construct_trans_prob(n_states: int, stay_prob: float):
+    def construct_uniform_trans_prob(stay_prob, n_states):
         single_trans_prob = (1 - stay_prob) / (n_states - 1)
         trans_prob = np.ones((n_states, n_states)) * single_trans_prob
         trans_prob[np.diag_indices(n_states)] = stay_prob
         return trans_prob
 
+    def generate_states(self, n_samples):
+        rands = [
+            iter(self._rng.choice(self.n_states, size=n_samples, p=self.trans_prob[i]))
+            for i in range(self.n_states)
+        ]
+        states = np.zeros(n_samples, int)
+        for sample in range(1, n_samples):
+            states[sample] = next(rands[states[sample - 1]])
+        return get_one_hot(states, n_states=self.n_states)
 
-class HierarchicalHMMSimulation(Simulation):
+
+class HMM_MVN(Simulation):
+    """Simulate an HMM with a mulitvariate normal observation model.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    means : np.ndarray or str
+        Mean vector for each state, shape should be (n_states, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Covariance matrix for each state, shape should be (n_states,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+        Optional.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for random number generator. Optional.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_states: int = None,
+        n_channels: int = None,
+        stay_prob: float = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+    ):
+        # HMM object
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_states=n_states,
+            random_seed=random_seed,
+        )
+
+        # Observation model
+        # N.b. we use a different random seed to the HMM
+        self.obs_mod = MVN(
+            means=means,
+            covariances=covariances,
+            n_states=n_states,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
+
+        # Check number of states in the means/covariances match the transition
+        # probability matrix
+        if self.hmm.n_states != self.obs_mod.n_states:
+            raise ValueError(
+                "Mismatch in the number states in the means/covariances and tran_prob."
+            )
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = self.hmm.generate_states(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hmm):
+            return getattr(self.hmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+    def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
+        self.time_series = standardize(self.time_series, axis=0)
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]
+
+
+class HierarchicalHMM_MVN(Simulation):
     """Hierarchical two-level HMM simulation.
 
     The bottom level HMMs share the same states, i.e. have the same
@@ -278,22 +237,18 @@ class HierarchicalHMMSimulation(Simulation):
     bottom_level_trans_prob : list of np.ndarray
         Transitions probability matrices for the bottom level HMMs,
         which generate the observed data.
-    n_channels : int
-        Number of channels in the observation model. Inferred from
-        covariances if None.
-    means : np.ndarray
+    means : np.ndarray or str
         Mean vector for each state, shape should be (n_states, n_channels).
-    covariances : np.ndarray
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels).
-    zero_means : bool
-        If True, means will be set to zero.
-    random_covariances : bool
-        Should we simulate random covariances? False gives structured covariances.
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Covariance matrix for each state, shape should be (n_states,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
     observation_error : float
         Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
     top_level_random_seed : int
         Random seed for generating the state time course of the top level HMM.
     bottom_level_random_seeds : list of int
@@ -302,20 +257,16 @@ class HierarchicalHMMSimulation(Simulation):
         Random seed for generating the observed data.
     """
 
-    @auto_yaml
-    @auto_repr
     def __init__(
         self,
         n_samples: int,
         top_level_trans_prob: np.ndarray,
         bottom_level_trans_probs: list,
-        n_channels: int = None,
         means: np.ndarray = None,
         covariances: np.ndarray = None,
-        zero_means: bool = None,
-        random_covariances: bool = None,
+        n_states: int = None,
+        n_channels: int = None,
         observation_error: float = 0.0,
-        simulate: bool = True,
         top_level_random_seed: int = None,
         bottom_level_random_seeds: list = None,
         data_random_seed: int = None,
@@ -326,16 +277,8 @@ class HierarchicalHMMSimulation(Simulation):
 
         # Top level HMM
         # This will select the bottom level HMM at each time point
-        self.top_level_hmm = HMMSimulation(
-            n_samples=n_samples,
+        self.top_level_hmm = HMM(
             trans_prob=top_level_trans_prob,
-            n_channels=1,
-            means=None,
-            covariances=None,
-            zero_means=True,
-            random_covariances=True,
-            observation_error=None,
-            simulate=False,
             random_seed=top_level_random_seed,
         )
 
@@ -343,45 +286,66 @@ class HierarchicalHMMSimulation(Simulation):
         # These will generate the data
         self.n_bottom_level_hmms = len(bottom_level_trans_probs)
         self.bottom_level_hmms = [
-            HMMSimulation(
-                n_samples=n_samples,
-                trans_prob=bottom_level_trans_probs[i].T,
-                n_channels=1,
-                means=None,
-                covariances=None,
-                zero_means=True,
-                random_covariances=True,
-                observation_error=None,
-                simulate=False,
+            HMM(
+                trans_prob=bottom_level_trans_probs[i],
                 random_seed=bottom_level_random_seeds[i],
             )
             for i in range(self.n_bottom_level_hmms)
         ]
 
-        super().__init__(
-            n_samples=n_samples,
-            n_channels=n_channels,
-            n_states=bottom_level_trans_probs[0].shape[0],
+        # Observation model
+        self.obs_mod = MVN(
             means=means,
             covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
+            n_states=n_states,
+            n_channels=n_channels,
             observation_error=observation_error,
-            simulate=simulate,
             random_seed=data_random_seed,
         )
 
-    def generate_states(self) -> np.ndarray:
-        stc = np.empty([self.n_samples, self.n_states])
+        # Check number of states in the means/covariances match the transition
+        # probability matrix of the lower level HMMs
+        for i in range(self.n_bottom_level_hmms):
+            if self.bottom_level_hmms[i].n_states != self.obs_mod.n_states:
+                raise ValueError(
+                    "Mismatch in the number states in the means/covariances and tran_prob."
+                )
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = self.generate_states(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hmm):
+            return getattr(self.hmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+    def generate_states(self, n_samples):
+        stc = np.empty([n_samples, self.n_states])
 
         # Top level HMM to select the bottom level HMM at each time point
-        top_level_stc = self.top_level_hmm.generate_states()
+        top_level_stc = self.top_level_hmm.generate_states(n_samples)
 
         # Generate state time courses when each bottom level HMM is activate
         for i in range(self.n_bottom_level_hmms):
             time_points_active = np.argwhere(top_level_stc[:, i] == 1)[:, 0]
-            stc[time_points_active] = self.bottom_level_hmms[i].generate_states()[
-                : len(time_points_active)
-            ]
+            stc[time_points_active] = self.bottom_level_hmms[i].generate_states(
+                n_samples
+            )[: len(time_points_active)]
 
         return stc
+
+    def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
+        self.time_series = standardize(self.time_series, axis=0)
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]

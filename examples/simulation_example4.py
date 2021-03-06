@@ -9,7 +9,7 @@ import numpy as np
 from vrad import data
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
-from vrad.simulation import HierarchicalHMMSimulation
+from vrad.simulation import HierarchicalHMM_MVN
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -86,11 +86,11 @@ bottom_level_trans_probs = [
 ]
 # Simulate data
 print("Simulating data")
-sim = HierarchicalHMMSimulation(
+sim = HierarchicalHMM_MVN(
     n_samples=n_samples,
     top_level_trans_prob=top_level_trans_prob,
     bottom_level_trans_probs=bottom_level_trans_probs,
-    zero_means=True,
+    means="zero",
     covariances=cov,
     observation_error=observation_error,
     top_level_random_seed=123,

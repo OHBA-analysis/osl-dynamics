@@ -1,4 +1,4 @@
-"""Multivariate normal observation model.
+"""Observation models.
 
 """
 
@@ -6,7 +6,7 @@ from typing import Union
 import numpy as np
 
 
-class MultivariateNormal:
+class MVN:
     """Class that generates data from a multivariate normal distribution.
 
     Parameters
@@ -33,7 +33,7 @@ class MultivariateNormal:
         covariances: Union[np.ndarray, str],
         n_states: int = None,
         n_channels: int = None,
-        observation_error: float = None,
+        observation_error: float = 0.0,
         random_seed: int = None,
     ):
         self._rng = np.random.default_rng(random_seed)
@@ -86,20 +86,15 @@ class MultivariateNormal:
             raise ValueError("means and covariance arugments not passed correctly.")
 
     def create_means(self, option):
-
         if option == "zero":
             means = np.zeros([self.n_states, self.n_channels])
-
         elif option == "random":
             means = self._rng.normal(size=[self.n_states, self.n_channels])
-
         else:
             raise ValueError("means must be a np.array or 'zero' or 'random'.")
-
         return means
 
     def create_covariances(self, option, eps=1e-6):
-
         if option == "random":
             # Randomly select the elements of W from a normal distribution
             W = self._rng.normal(size=[self.n_states, self.n_channels, self.n_channels])
@@ -115,8 +110,34 @@ class MultivariateNormal:
             covariances /= np.trace(covariances, axis1=1, axis2=2)[
                 ..., np.newaxis, np.newaxis
             ]
-
         else:
             raise ValueError("covariances must be a np.array or 'random'.")
-
         return covariances
+
+    def simulate_data(self, state_time_course):
+        n_samples = state_time_course.shape[0]
+
+        # Initialise array to hold data
+        data = np.zeros((n_samples, self.n_channels))
+
+        # Loop through all unique combinations of states
+        for alpha in np.unique(state_time_course, axis=0):
+
+            # Mean and covariance for this combination of states
+            mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
+            sigma = np.sum(self.covariances * alpha[:, np.newaxis, np.newaxis], axis=0)
+
+            # Generate data for the time points that this combination of states is
+            # active
+            data[
+                np.all(state_time_course == alpha, axis=1)
+            ] = self._rng.multivariate_normal(
+                mu,
+                sigma,
+                size=np.count_nonzero(np.all(state_time_course == alpha, axis=1)),
+            )
+
+        # Add an error to the data at all time points
+        data += self._rng.normal(scale=self.observation_error, size=data.shape)
+
+        return data.astype(np.float32)
