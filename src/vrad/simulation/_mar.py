@@ -8,22 +8,22 @@ import numpy as np
 class MAR:
     """Class that generates data from a multivariate autoregressive (MAR) model.
 
-    This model is also known as VAR, MVAR.
-
     A p-order MAR model can be written as
 
-        x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + eps_t
+        x_t = coeffs_1 x_{t-1} + ... + coeffs_p x_{t-p} + eps_t
 
-    where eps_t ~ N(0, v). The MAR model is therefore parameterized by the MAR
-    coefficients, A_i, and variance, v.
+    where eps_t ~ N(0, cov). The MAR model is therefore parameterized by the MAR
+    coefficients, coeffs_i, and covariance, cov.
+
+    This model is also known as VAR or MVAR.
 
     Paramters
     ---------
     coeffs : np.ndarray
         Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
         n_channels).
-    var : np.ndarray
-        Variance of eps_t. Shape must be (n_states, n_channels)
+    cov : np.ndarray
+        Coariance of eps_t. Shape must be (n_states, n_channels, n_channels)
     random_seed: int
         Seed for the random number generator.
     """
@@ -31,25 +31,27 @@ class MAR:
     def __init__(
         self,
         coeffs: np.ndarray,
-        var: float,
+        cov: float,
         random_seed: int = None,
     ):
         # Validation
         if coeffs.ndim != 4:
-            raise ValueError("coeffs must be a 4D array.")
+            raise ValueError(
+                "coeffs must be a (n_states, n_lags, n_channels, n_channels) array."
+            )
 
-        if var.ndim != 2:
-            raise ValueError("var must be a 2D array.")
+        if cov.ndim != 3:
+            raise ValueError("cov must be a (n_states, n_channels, n_channels) array.")
 
-        if coeffs.shape[0] != var.shape[0]:
-            raise ValueError("Different number of states in coeffs and var passed.")
+        if coeffs.shape[0] != cov.shape[0]:
+            raise ValueError("Different number of states in coeffs and cov passed.")
 
-        if coeffs.shape[-1] != var.shape[-1]:
-            raise ValueError("Different number of channels in coeffs and var passed.")
+        if coeffs.shape[-1] != cov.shape[-1]:
+            raise ValueError("Different number of channels in coeffs and cov passed.")
 
         # Model parameters
-        self.A = coeffs
-        self.v = var
+        self.coeffs = coeffs
+        self.cov = cov
         self.order = coeffs.shape[1]
 
         # Number of states and channels
@@ -63,28 +65,22 @@ class MAR:
         # NOTE: We assume mutually exclusive states when generating the data
 
         n_samples = state_time_course.shape[0]
+        data = np.empty([n_samples, self.n_channels])
 
-        # Noise term
-        eps = np.empty([n_samples, self.n_channels])
+        # Generate the noise term first
         for i in range(self.n_states):
             time_points_active = state_time_course[:, i] == 1
             n_time_points_active = np.count_nonzero(time_points_active)
-            eps[time_points_active] = self._rng.normal(
+            data[time_points_active] = self._rng.multivariate_normal(
                 np.zeros(self.n_channels),
-                self.v[i],
-                size=(n_time_points_active, self.n_channels),
+                self.cov[i],
+                size=n_time_points_active,
             )
 
-        # Generate data
-        data = np.empty([n_samples, self.n_channels])
-        data[: self.order] = eps[: self.order]
-        for i in range(self.order, n_samples):
+        # Generate the MAR process
+        for i in range(n_samples):
             state = state_time_course[i].argmax()
-            data[i] = (
-                np.sum(
-                    [self.A[state, j] @ data[i - j] for j in range(self.order)], axis=0
-                )
-                + eps[i]
-            )
+            for lag in range(min(i, self.order)):
+                data[i, :] += np.dot(self.coeffs[state, lag], data[i - lag - 1])
 
         return data.astype(np.float32)

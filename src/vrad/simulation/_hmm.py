@@ -72,38 +72,41 @@ class HMM:
         elif isinstance(trans_prob, str):
             # We generate the transition probability matrix
 
-            if n_states == 1:
-                # Special case
-                self.trans_prob = np.ones([1, 1])
+            # Validation
+            if trans_prob not in ["sequence", "uniform"]:
+                raise ValueError(
+                    "trans_prob must be a np.array, 'sequence' or 'uniform'."
+                )
 
-            else:
-                # Validation
-                if trans_prob not in ["sequence", "uniform"]:
+            if n_states < 2:
+                raise ValueError(
+                    "n_states must be greater than one if we are constructing "
+                    + "a transition probability matrix."
+                )
+
+            # Sequential transition probability matrix
+            if trans_prob == "sequence":
+                if stay_prob is None or n_states is None:
                     raise ValueError(
-                        "trans_prob must be a np.array, 'sequence' or 'uniform'."
+                        "If trans_prob is 'sequence', stay_prob and n_states "
+                        + "must be passed."
                     )
+                self.trans_prob = self.construct_sequence_trans_prob(
+                    stay_prob, n_states
+                )
 
-                # Sequential transition probability matrix
-                if trans_prob == "sequence":
-                    if stay_prob is None or n_states is None:
-                        raise ValueError(
-                            "If trans_prob is 'sequence', stay_prob and n_states must be passed."
-                        )
-                    self.trans_prob = self.construct_sequence_trans_prob(
-                        stay_prob, n_states
+            # Uniform transition probability matrix
+            elif trans_prob == "uniform":
+                if n_states is None:
+                    raise ValueError(
+                        "If trans_prob is 'uniform', n_states must be passed."
                     )
+                if stay_prob is None:
+                    stay_prob = 1.0 / n_states
+                self.trans_prob = self.construct_uniform_trans_prob(stay_prob, n_states)
 
-                # Uniform transition probability matrix
-                elif trans_prob == "uniform":
-                    if n_states is None:
-                        raise ValueError(
-                            "If trans_prob is 'uniform', n_states must be passed."
-                        )
-                    if stay_prob is None:
-                        stay_prob = 1.0 / n_states
-                    self.trans_prob = self.construct_uniform_trans_prob(
-                        stay_prob, n_states
-                    )
+        elif trans_prob is None and n_states == 1:
+            self.trans_prob = np.ones([1, 1])
 
         # Infer number of states from the transition probability matrix
         self.n_states = self.trans_prob.shape[0]
@@ -162,16 +165,16 @@ class HMM_MAR(Simulation):
     def __init__(
         self,
         n_samples: int,
-        trans_prob: Union[np.ndarray, str],
+        trans_prob: Union[np.ndarray, str, None],
         coeffs: np.ndarray,
-        var: np.ndarray,
+        cov: np.ndarray,
         stay_prob: float = None,
         random_seed: int = None,
     ):
         # Observation model
         self.obs_mod = MAR(
             coeffs=coeffs,
-            var=var,
+            cov=cov,
             random_seed=random_seed,
         )
 
@@ -235,7 +238,7 @@ class HMM_MVN(Simulation):
     def __init__(
         self,
         n_samples: int,
-        trans_prob: Union[np.ndarray, str],
+        trans_prob: Union[np.ndarray, str, None],
         means: Union[np.ndarray, str],
         covariances: Union[np.ndarray, str],
         n_states: int = None,
