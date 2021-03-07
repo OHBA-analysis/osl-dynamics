@@ -8,7 +8,7 @@ from typing import Union
 import numpy as np
 from vrad.array_ops import get_one_hot
 from vrad.data.manipulation import standardize
-from vrad.simulation import Simulation, MVN
+from vrad.simulation import Simulation, MVN, MAR
 
 _logger = logging.getLogger("VRAD")
 
@@ -72,30 +72,38 @@ class HMM:
         elif isinstance(trans_prob, str):
             # We generate the transition probability matrix
 
-            if trans_prob not in ["sequence", "uniform"]:
-                raise ValueError(
-                    "trans_prob must be a np.array, 'sequence' or 'uniform'."
-                )
+            if n_states == 1:
+                # Special case
+                self.trans_prob = np.ones([1, 1])
 
-            # Sequential transition probability matrix
-            if trans_prob == "sequence":
-                if stay_prob is None or n_states is None:
+            else:
+                # Validation
+                if trans_prob not in ["sequence", "uniform"]:
                     raise ValueError(
-                        "If trans_prob is 'sequence', stay_prob and n_states must be passed."
+                        "trans_prob must be a np.array, 'sequence' or 'uniform'."
                     )
-                self.trans_prob = self.construct_sequence_trans_prob(
-                    stay_prob, n_states
-                )
 
-            # Uniform transition probability matrix
-            elif trans_prob == "uniform":
-                if n_states is None:
-                    raise ValueError(
-                        "If trans_prob is 'uniform', n_states must be passed."
+                # Sequential transition probability matrix
+                if trans_prob == "sequence":
+                    if stay_prob is None or n_states is None:
+                        raise ValueError(
+                            "If trans_prob is 'sequence', stay_prob and n_states must be passed."
+                        )
+                    self.trans_prob = self.construct_sequence_trans_prob(
+                        stay_prob, n_states
                     )
-                if stay_prob is None:
-                    stay_prob = 1.0 / n_states
-                self.trans_prob = self.construct_uniform_trans_prob(stay_prob, n_states)
+
+                # Uniform transition probability matrix
+                elif trans_prob == "uniform":
+                    if n_states is None:
+                        raise ValueError(
+                            "If trans_prob is 'uniform', n_states must be passed."
+                        )
+                    if stay_prob is None:
+                        stay_prob = 1.0 / n_states
+                    self.trans_prob = self.construct_uniform_trans_prob(
+                        stay_prob, n_states
+                    )
 
         # Infer number of states from the transition probability matrix
         self.n_states = self.trans_prob.shape[0]
@@ -129,6 +137,72 @@ class HMM:
         return get_one_hot(states, n_states=self.n_states)
 
 
+class HMM_MAR(Simulation):
+    """Simulate an HMM with a multivariate autoregressive observation model.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    coeffs : np.ndarray
+        Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
+        n_channels).
+    var : np.ndarray
+        Variance of eps_t. Shape must be (n_states, n_channels).
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+        Optional.
+    random_seed : int
+        Seed for random number generator. Optional.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        coeffs: np.ndarray,
+        var: np.ndarray,
+        stay_prob: float = None,
+        random_seed: int = None,
+    ):
+        # Observation model
+        self.obs_mod = MAR(
+            coeffs=coeffs,
+            var=var,
+            random_seed=random_seed,
+        )
+
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
+
+        # HMM object
+        # N.b. we use a different random seed to the observation model
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_states=self.n_states,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = self.hmm.generate_states(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hmm):
+            return getattr(self.hmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+
 class HMM_MVN(Simulation):
     """Simulate an HMM with a mulitvariate normal observation model.
 
@@ -136,7 +210,7 @@ class HMM_MVN(Simulation):
     ----------
     n_samples : int
         Number of samples to draw from the model.
-    trans_prob : np.ndarray
+    trans_prob : np.ndarray or str
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
     means : np.ndarray or str
