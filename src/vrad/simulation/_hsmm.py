@@ -6,23 +6,20 @@ import logging
 
 import numpy as np
 from vrad.array_ops import get_one_hot
-from vrad.simulation import Simulation
+from vrad.simulation import Simulation, MVN
 from vrad.utils.decorators import auto_repr, auto_yaml
 
 _logger = logging.getLogger("VRAD")
 
 
-class HSMMSimulation(Simulation):
-    """Hidden Semi-Markov Model Simulation.
+class HSMM:
+    """HSMM base class.
 
-    We sample the state using a transition probability matrix with zero
-    probability for self-transitions. The lifetime of each state is sampled
-    from a Gamma distribution.
+    Contains the probability distribution function for sampling state lifetimes.
+    Uses a gamma distribution for the probability distribution function.
 
     Parameters
     ----------
-    n_samples : int
-        Number of samples to draw from the model.
     gamma_shape : float
         Shape parameter for the gamma distribution of state lifetimes.
     gamma_scale : float
@@ -32,46 +29,23 @@ class HSMMSimulation(Simulation):
     full_trans_prob : np.ndarray
         A transition probability matrix, the diagonal of which will be ignored.
     n_states : int
-        Number of states. Inferred from the transition probability matrix
-        or means/covariances if None.
-    n_channels : int
-        Number of channels in the observation model.
-        Inferred from means or covariances if None.
-    means : np.ndarray
-        Mean vector for each state, shape should be (n_states, n_channels).
-    covariances : numpy.ndarray
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels).
-    zero_means : bool
-        If True, means are set to zero, otherwise they are sampled from a normal
-        distribution.
-    random_covariances : bool
-        Should we simulate random covariances? False gives structured covariances.
-    observation_error : float
-        Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
+        Number of states.
+    state_vectors : np.ndarray
+        State vectors define the activation of each components for a state.
+        E.g. state_vectors=[[1,0,0],[0,1,0],[0,0,1]] are mutually exclusive
+        states. state_vector.shape[0] must be more than n_states.
     random_seed : int
-        Seed for reproducibility.
+        Seed for random number generator.
     """
 
-    @auto_yaml
-    @auto_repr
     def __init__(
         self,
-        n_samples: int,
         gamma_shape: float,
         gamma_scale: float,
         off_diagonal_trans_prob: np.ndarray = None,
         full_trans_prob: np.ndarray = None,
+        state_vectors: np.ndarray = None,
         n_states: int = None,
-        n_channels: int = None,
-        means: np.ndarray = None,
-        covariances: np.ndarray = None,
-        zero_means: bool = None,
-        random_covariances: bool = None,
-        observation_error: float = 0.0,
-        simulate: bool = True,
         random_seed: int = None,
     ):
         # Validation
@@ -81,36 +55,41 @@ class HSMMSimulation(Simulation):
                 "must be specified."
             )
 
-        # Get the number of states
-        if n_states is None:
-            for arg in [off_diagonal_trans_prob, full_trans_prob, means, covariances]:
-                if arg is not None:
-                    n_states = arg.shape[0]
-                    break
-            if n_states is None:
-                raise ValueError(
-                    "If n_states is not passed, either off_diagonal_trans_prob, "
-                    + "full_trans_prob, means or covariances must be passed."
-                )
+        # Get the number of states from trans_prob
+        if off_diagonal_trans_prob is not None:
+            self.n_states = off_diagonal_trans_prob.shape[0]
+        elif full_trans_prob is not None:
+            self.n_states = full_trans_prob.shape[0]
+
+        # Both off_diagonal_trans_prob and full_trans_prob are None
+        elif n_states is None:
+            raise ValueError(
+                "If off_diagonal_trans_prob and full_trans_prob are not given, n_states must be passed."
+            )
+        else:
+            self.n_states = n_states
 
         self.off_diagonal_trans_prob = off_diagonal_trans_prob
         self.full_trans_prob = full_trans_prob
 
+        self.construct_off_diagonal_trans_prob()
+
+        # Define state vectors
+        if state_vectors is None:
+            self.state_vectors = np.eye(self.n_states)
+        elif state_vectors.shape[0] < self.n_states:
+            raise ValueError(
+                "Less state vectors than the number of states were provided."
+            )
+        else:
+            self.state_vectors = state_vectors
+
+        # Parameters of the lifetime distribution
         self.gamma_shape = gamma_shape
         self.gamma_scale = gamma_scale
 
-        super().__init__(
-            n_samples=n_samples,
-            n_channels=n_channels,
-            n_states=n_states,
-            means=means,
-            covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
-            observation_error=observation_error,
-            simulate=simulate,
-            random_seed=random_seed,
-        )
+        # Setup random number generator
+        self._rng = np.random.default_rng(random_seed)
 
     def construct_off_diagonal_trans_prob(self):
         if (self.off_diagonal_trans_prob is None) and (self.full_trans_prob is None):
@@ -132,10 +111,9 @@ class HSMMSimulation(Simulation):
                 f"off_diagonal_trans_prob is:\n{str(self.off_diagonal_trans_prob)}"
             )
 
-    def generate_states(self):
-        self.construct_off_diagonal_trans_prob()
+    def generate_states(self, n_samples):
         cumsum_off_diagonal_trans_prob = np.cumsum(self.off_diagonal_trans_prob, axis=1)
-        alpha = np.zeros(self.n_samples, dtype=np.int)
+        alpha = np.zeros([n_samples, self.state_vectors.shape[1]])
 
         gamma_sample = self._rng.gamma
         random_sample = self._rng.uniform
@@ -146,7 +124,10 @@ class HSMMSimulation(Simulation):
             state_lifetime = np.round(
                 gamma_sample(shape=self.gamma_shape, scale=self.gamma_scale)
             ).astype(np.int)
-            alpha[current_position : current_position + state_lifetime] = current_state
+
+            alpha[
+                current_position : current_position + state_lifetime
+            ] = self.state_vectors[current_state]
 
             rand = random_sample()
             current_state = np.argmin(
@@ -154,12 +135,101 @@ class HSMMSimulation(Simulation):
             )
             current_position += state_lifetime
 
-        one_hot_alpha = get_one_hot(alpha, n_states=self.n_states)
-
-        return one_hot_alpha
+        return alpha
 
 
-class MixedHSMMSimulation(HSMMSimulation):
+class HSMM_MVN(Simulation):
+    """Hidden Semi-Markov Model Simulation.
+
+    We sample the state using a transition probability matrix with zero
+    probability for self-transitions. The lifetime of each state is sampled
+    from a Gamma distribution.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    gamma_shape : float
+        Shape parameter for the gamma distribution of state lifetimes.
+    gamma_scale : float
+        Scale parameter for the gamma distribution of state lifetimes.
+    off_diagonal_trans_prob : np.ndarray
+        Transition probabilities for out of state transitions.
+    full_trans_prob : np.ndarray
+        A transition probability matrix, the diagonal of which will be ignored.
+    means : np.ndarray or str
+        Mean vector for each state, shape should be (n_states, n_channels).
+        Or 'zero' or 'random'.
+    covariances : numpy.ndarray or str
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Or 'random'.
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels in the observation model.
+    observation_error : float
+        Standard deviation of random noise to be added to the observations.
+    simulate : bool
+        Should data be simulated? Can be called using .simulate later.
+    random_seed : int
+        Seed for reproducibility.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        gamma_shape: float,
+        gamma_scale: float,
+        off_diagonal_trans_prob: np.ndarray = None,
+        full_trans_prob: np.ndarray = None,
+        means: np.ndarray = None,
+        covariances: np.ndarray = None,
+        n_states: int = None,
+        n_channels: int = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+    ):
+        # Observation model object
+        self.obs_mod = MVN(
+            means=means,
+            covariances=covariances,
+            n_states=n_states,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
+
+        # HSMM object
+        # N.b. we use a different random seed to the observation model
+        self.hsmm = HSMM(
+            gamma_shape=gamma_shape,
+            gamma_scale=gamma_scale,
+            off_diagonal_trans_prob=off_diagonal_trans_prob,
+            full_trans_prob=full_trans_prob,
+            n_states=self.n_states,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = self.hsmm.generate_states(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hsmm):
+            return getattr(self.hsmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+
+class MixedHSMM_MVN(Simulation):
     """Hidden Semi-Markov Model Simulation with a mixture of states at each time point.
 
     Each mixture of states has it's own row/column in the transition probability matrix.
@@ -183,21 +253,16 @@ class MixedHSMMSimulation(HSMMSimulation):
         Transition probabilities for out of state transitions.
     full_trans_prob : np.ndarray
         A transition probability matrix, the diagonal of which will be ignored.
+    means : np.ndarray or str
+        Mean vector for each state, shape should be (n_states, n_channels).
+        Or 'zero' or 'random'.
+    covariances : numpy.ndarray or str
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Or 'random'.
     n_states : int
-        Number of states. Inferred from the mixed_state_vectors if None.
+        Number of states.
     n_channels : int
         Number of channels in the observation model.
-        Inferred from means or covariances if None.
-    means : np.ndarray
-        Mean vector for each state, shape should be (n_states, n_channels).
-    covariances : numpy.ndarray
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels).
-    zero_means : bool
-        If True, means are set to zero, otherwise they are sampled from a normal
-        distribution.
-    random_covariances : bool
-        Should we simulate random covariances? False gives structured covariances.
     observation_error : float
         Standard deviation of random noise to be added to the observations.
     simulate : bool
@@ -206,8 +271,6 @@ class MixedHSMMSimulation(HSMMSimulation):
         Seed for reproducibility.
     """
 
-    @auto_yaml
-    @auto_repr
     def __init__(
         self,
         n_samples: int,
@@ -216,91 +279,65 @@ class MixedHSMMSimulation(HSMMSimulation):
         gamma_scale: float,
         off_diagonal_trans_prob: np.ndarray = None,
         full_trans_prob: np.ndarray = None,
-        n_states: int = None,
-        n_channels: int = None,
         means: np.ndarray = None,
         covariances: np.ndarray = None,
-        zero_means: bool = None,
-        random_covariances: bool = None,
+        n_channels: int = None,
         observation_error: float = 0.0,
-        simulate: bool = True,
         random_seed: int = None,
     ):
-        self.mixed_state_vectors = mixed_state_vectors
+        # Get the number of single activation states and mixed states
+        self.n_states = mixed_state_vectors.shape[1]
         self.n_mixed_states = mixed_state_vectors.shape[0]
 
-        if n_states is None:
-            # Get the number of states from the mixed state vectors
-            n_states = mixed_state_vectors.shape[1]
+        # State vectors of mixed states
+        self.mixed_state_vectors = mixed_state_vectors
 
-        self.construct_state_vectors(n_states)
+        # Assign self.state_vectors
+        self.construct_state_vectors(self.n_states)
 
-        super().__init__(
-            n_samples=n_samples,
+        # Observation model object
+        self.obs_mod = MVN(
+            means=means,
+            covariances=covariances,
+            n_states=self.n_states,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+        self.n_channels = self.obs_mod.n_channels
+
+        # HSMM object
+        # - hsmm.n_states is the total of n_states + n_mixed_states because
+        #   we pretend each mixed state is a state in its own right in the
+        #   transition probability matrix.
+        # - we use a different random seed to the observation model
+        self.hsmm = HSMM(
             gamma_shape=gamma_shape,
             gamma_scale=gamma_scale,
             off_diagonal_trans_prob=off_diagonal_trans_prob,
             full_trans_prob=full_trans_prob,
-            n_states=n_states,
-            n_channels=n_channels,
-            means=means,
-            covariances=covariances,
-            zero_means=zero_means,
-            random_covariances=random_covariances,
-            observation_error=observation_error,
-            simulate=simulate,
-            random_seed=random_seed,
+            state_vectors=self.state_vectors,
+            n_states=self.n_states + self.n_mixed_states,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = self.hsmm.generate_states(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hsmm):
+            return getattr(self.hsmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
 
     def construct_state_vectors(self, n_states):
         non_mixed_state_vectors = get_one_hot(np.arange(n_states))
         self.state_vectors = np.append(
             non_mixed_state_vectors, self.mixed_state_vectors, axis=0
         )
-
-    def construct_off_diagonal_trans_prob(self):
-        if self.off_diagonal_trans_prob is None:
-            self.off_diagonal_trans_prob = np.ones(
-                [
-                    self.n_states + self.n_mixed_states,
-                    self.n_states + self.n_mixed_states,
-                ]
-            )
-
-        np.fill_diagonal(self.off_diagonal_trans_prob, 0)
-        self.off_diagonal_trans_prob = (
-            self.off_diagonal_trans_prob
-            / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
-        )
-
-        with np.printoptions(linewidth=np.nan):
-            _logger.info(
-                f"off_diagonal_trans_prob is:\n{str(self.off_diagonal_trans_prob)}"
-            )
-
-    def generate_states(self):
-        self.construct_off_diagonal_trans_prob()
-        cumsum_off_diagonal_trans_prob = np.cumsum(self.off_diagonal_trans_prob, axis=1)
-        alpha = np.zeros([self.n_samples, self.n_states])
-
-        gamma_sample = self._rng.gamma
-        random_sample = self._rng.uniform
-        current_state = self._rng.integers(0, self.n_states)
-        current_position = 0
-
-        while current_position < len(alpha):
-            state_lifetime = np.round(
-                gamma_sample(shape=self.gamma_shape, scale=self.gamma_scale)
-            ).astype(np.int)
-
-            alpha[
-                current_position : current_position + state_lifetime
-            ] = self.state_vectors[current_state]
-
-            rand = random_sample()
-            current_state = np.argmin(
-                cumsum_off_diagonal_trans_prob[current_state] < rand
-            )
-            current_position += state_lifetime
-
-        return alpha

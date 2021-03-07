@@ -112,7 +112,8 @@ print(f"Free energy: {free_energy}")
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
 hmm_stc = data.manipulation.trim_time_series(
-    time_series=hmm.state_time_course, sequence_length=sequence_length,
+    time_series=hmm.state_time_course,
+    sequence_length=sequence_length,
 )
 
 # Dice coefficient

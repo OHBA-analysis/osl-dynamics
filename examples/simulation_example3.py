@@ -11,7 +11,7 @@ import numpy as np
 from vrad import data
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
-from vrad.simulation import MixedHSMMSimulation
+from vrad.simulation import MixedHSMM_MVN
 from vrad.utils import plotting
 
 # GPU settings
@@ -66,12 +66,12 @@ mixed_state_vectors = np.array(
 
 # Simulate data
 print("Simulating data")
-sim = MixedHSMMSimulation(
+sim = MixedHSMM_MVN(
     n_samples=n_samples,
     mixed_state_vectors=mixed_state_vectors,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
-    zero_means=True,
+    means="zero",
     covariances=cov,
     observation_error=observation_error,
     random_seed=123,
@@ -125,7 +125,7 @@ print(f"Free energy: {free_energy}")
 # Compare the inferred state time course to the ground truth
 alpha = model.predict_states(prediction_dataset)[0]
 matched_sim_stc, matched_alpha = states.match_states(sim.state_time_course, alpha)
-plotting.plot_state_time_courses(
+plotting.plot_separate_time_series(
     matched_alpha, matched_sim_stc, n_samples=10000, filename="stc.png"
 )
 

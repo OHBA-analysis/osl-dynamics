@@ -1,4 +1,4 @@
-"""Observation models.
+"""Multivariate normal observation model.
 
 """
 

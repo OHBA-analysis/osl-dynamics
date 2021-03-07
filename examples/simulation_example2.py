@@ -11,7 +11,7 @@ import numpy as np
 from vrad import data
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
-from vrad.simulation import HSMMSimulation
+from vrad.simulation import HSMM_MVN
 from vrad.utils import plotting
 
 # GPU settings
@@ -61,11 +61,11 @@ cov = np.load(example_file_directory / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
-sim = HSMMSimulation(
+sim = HSMM_MVN(
     n_samples=n_samples,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
-    zero_means=True,
+    means="zero",
     covariances=cov,
     observation_error=observation_error,
     random_seed=123,

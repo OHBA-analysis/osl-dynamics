@@ -98,7 +98,7 @@ class HMM:
                 self.trans_prob = self.construct_uniform_trans_prob(stay_prob, n_states)
 
         # Infer number of states from the transition probability matrix
-        self.n_states = trans_prob.shape[0]
+        self.n_states = self.trans_prob.shape[0]
 
         # Setup random number generator
         self._rng = np.random.default_rng(random_seed)
@@ -170,33 +170,27 @@ class HMM_MVN(Simulation):
         observation_error: float = 0.0,
         random_seed: int = None,
     ):
-        # HMM object
-        self.hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=n_states,
-            random_seed=random_seed,
-        )
-
         # Observation model
-        # N.b. we use a different random seed to the HMM
         self.obs_mod = MVN(
             means=means,
             covariances=covariances,
             n_states=n_states,
             n_channels=n_channels,
             observation_error=observation_error,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
+            random_seed=random_seed,
         )
 
-        # Check number of states in the means/covariances match the transition
-        # probability matrix
-        if self.hmm.n_states != self.obs_mod.n_states:
-            raise ValueError(
-                "Mismatch in the number states in the means/covariances and tran_prob."
-            )
         self.n_states = self.obs_mod.n_states
         self.n_channels = self.obs_mod.n_channels
+
+        # HMM object
+        # N.b. we use a different random seed to the observation model
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_states=self.n_states,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
@@ -271,6 +265,18 @@ class HierarchicalHMM_MVN(Simulation):
         bottom_level_random_seeds: list = None,
         data_random_seed: int = None,
     ):
+        # Observation model
+        self.obs_mod = MVN(
+            means=means,
+            covariances=covariances,
+            n_states=n_states,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=data_random_seed,
+        )
+
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
 
         if bottom_level_random_seeds is None:
             bottom_level_random_seeds = [None] * len(bottom_level_trans_probs)
@@ -292,26 +298,6 @@ class HierarchicalHMM_MVN(Simulation):
             )
             for i in range(self.n_bottom_level_hmms)
         ]
-
-        # Observation model
-        self.obs_mod = MVN(
-            means=means,
-            covariances=covariances,
-            n_states=n_states,
-            n_channels=n_channels,
-            observation_error=observation_error,
-            random_seed=data_random_seed,
-        )
-
-        # Check number of states in the means/covariances match the transition
-        # probability matrix of the lower level HMMs
-        for i in range(self.n_bottom_level_hmms):
-            if self.bottom_level_hmms[i].n_states != self.obs_mod.n_states:
-                raise ValueError(
-                    "Mismatch in the number states in the means/covariances and tran_prob."
-                )
-        self.n_states = self.obs_mod.n_states
-        self.n_channels = self.obs_mod.n_channels
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
