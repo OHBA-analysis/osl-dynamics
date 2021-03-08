@@ -42,6 +42,9 @@ class GO(models.Base):
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels). Optional.
+    learn_covariances : bool
+        Should we learn the covariance matrix for each state?
+        Optional, default is True.
     """
 
     def __init__(
@@ -55,11 +58,13 @@ class GO(models.Base):
         multi_gpu: bool = False,
         strategy: str = None,
         initial_covariances: np.ndarray = None,
+        learn_covariances: bool = True,
     ):
         # Parameters related to the observation model
         self.learn_alpha_scaling = learn_alpha_scaling
         self.normalize_covariances = normalize_covariances
         self.initial_covariances = initial_covariances
+        self.learn_covariances = learn_covariances
 
         # Initialise the model base class
         # This will build and compile the keras model
@@ -81,6 +86,7 @@ class GO(models.Base):
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
             initial_covariances=self.initial_covariances,
+            learn_covariances=self.learn_covariances,
         )
 
     def compile(self):
@@ -244,6 +250,7 @@ def _model_structure(
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
     initial_covariances: np.ndarray,
+    learn_covariances: bool,
 ):
     """Model structure.
 
@@ -262,6 +269,8 @@ def _model_structure(
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels).
+    learn_covariances : bool
+        Should we learn the covariances?
 
     Returns
     -------
@@ -284,7 +293,7 @@ def _model_structure(
         n_states,
         n_channels,
         learn_means=False,
-        learn_covariances=True,
+        learn_covariances=learn_covariances,
         normalize_covariances=normalize_covariances,
         initial_means=None,
         initial_covariances=initial_covariances,

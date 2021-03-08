@@ -613,13 +613,13 @@ class MARParametersLayer(layers.Layer):
     n_lags : int
         Number of lags.
     initial_coeffs : np.ndarray
-        Initial values for the MAR coefficients. Optional.
+        Initial values for the MAR coefficients.
     initial_cov : np.ndarray
-        Initial values for the covariances. Optional.
+        Initial values for the covariances.
     learn_coeffs : bool
-        Should we learn the MAR coefficients? Optional, default is True.
+        Should we learn the MAR coefficients?
     learn_cov : bool
-        Should we learn the covariances? Optional, default is True.
+        Should we learn the covariances?
     """
 
     def __init__(
@@ -627,10 +627,10 @@ class MARParametersLayer(layers.Layer):
         n_states: int,
         n_channels: int,
         n_lags: int,
-        initial_coeffs: np.ndarray = None,
-        initial_cov: np.ndarray = None,
-        learn_coeffs: bool = True,
-        learn_cov: bool = True,
+        initial_coeffs: np.ndarray,
+        initial_cov: np.ndarray,
+        learn_coeffs: bool,
+        learn_cov: bool,
         **kwargs
     ):
         super().__init__(**kwargs)

@@ -163,7 +163,6 @@ class RIGO(models.GO):
         self.theta_normalization = theta_normalization
         self.alpha_xform = alpha_xform
         self.alpha_temperature = alpha_temperature
-        self.learn_covariances = learn_covariances
 
         # KL annealing
         self.do_annealing = do_annealing
@@ -183,6 +182,7 @@ class RIGO(models.GO):
             multi_gpu=multi_gpu,
             strategy=strategy,
             initial_covariances=initial_covariances,
+            learn_covariances=learn_covariances,
         )
 
     def build_model(self):
@@ -200,12 +200,12 @@ class RIGO(models.GO):
             dropout_rate_inference=self.dropout_rate_inference,
             dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
-            learn_means=False,
-            learn_covariances=self.learn_covariances,
-            initial_means=None,
-            initial_covariances=self.initial_covariances,
             alpha_xform=self.alpha_xform,
             alpha_temperature=self.alpha_temperature,
+            initial_means=None,
+            initial_covariances=self.initial_covariances,
+            learn_means=False,
+            learn_covariances=self.learn_covariances,
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
         )
@@ -483,12 +483,12 @@ def _model_structure(
     dropout_rate_inference: float,
     dropout_rate_model: float,
     theta_normalization: str,
-    learn_means: bool,
-    learn_covariances: bool,
-    initial_means: np.ndarray,
-    initial_covariances: np.ndarray,
     alpha_xform: str,
     alpha_temperature: float,
+    initial_means: np.ndarray,
+    initial_covariances: np.ndarray,
+    learn_means: bool,
+    learn_covariances: bool,
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
 ):

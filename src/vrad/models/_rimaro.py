@@ -80,6 +80,14 @@ class RIMARO(models.MARO):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients. Optional.
+    initial_cov : np.ndarray
+        Initial values for the covariances. Optional.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients? Optional, default is True.
+    learn_cov : bool
+        Should we learn the covariances. Optional, default is True.
     """
 
     def __init__(
@@ -105,6 +113,10 @@ class RIMARO(models.MARO):
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
+        initial_coeffs: np.ndarray = None,
+        initial_cov: np.ndarray = None,
+        learn_coeffs: bool = True,
+        learn_cov: bool = True,
     ):
         # Validation
         if rnn_type not in ["lstm", "gru"]:
@@ -172,6 +184,10 @@ class RIMARO(models.MARO):
             learning_rate=learning_rate,
             multi_gpu=multi_gpu,
             strategy=strategy,
+            initial_coeffs=initial_coeffs,
+            initial_cov=initial_cov,
+            learn_coeffs=learn_coeffs,
+            learn_cov=learn_cov,
         )
 
     def build_model(self):
@@ -192,6 +208,10 @@ class RIMARO(models.MARO):
             theta_normalization=self.theta_normalization,
             alpha_xform=self.alpha_xform,
             alpha_temperature=self.alpha_temperature,
+            initial_coeffs=self.initial_coeffs,
+            initial_cov=self.initial_cov,
+            learn_coeffs=self.learn_coeffs,
+            learn_cov=self.learn_cov,
         )
 
     def compile(self):
@@ -470,6 +490,10 @@ def _model_structure(
     theta_normalization: str,
     alpha_xform: str,
     alpha_temperature: float,
+    initial_coeffs: np.ndarray,
+    initial_cov: np.ndarray,
+    learn_coeffs: bool,
+    learn_cov: bool,
 ):
     """Model structure.
 
@@ -508,6 +532,14 @@ def _model_structure(
         'relu'.
     alpha_temperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients.
+    initial_cov : np.ndarray
+        Initial values for the covariances.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients?
+    learn_cov : bool
+        Should we learn the covariances.
 
     Returns
     -------
@@ -568,7 +600,14 @@ def _model_structure(
 
     # Definition of layers
     mar_params_layer = MARParametersLayer(
-        n_states, n_channels, n_lags, name="mar_params"
+        n_states,
+        n_channels,
+        n_lags,
+        initial_coeffs,
+        initial_cov,
+        learn_coeffs,
+        learn_cov,
+        name="mar_params",
     )
     mean_cov_layer = MARMeanCovLayer(
         n_states, n_channels, sequence_length, n_lags, name="mean_cov"

@@ -2,6 +2,7 @@
 
 """
 
+import numpy as np
 from tensorflow.keras import Model, layers, optimizers
 from vrad import models
 from vrad.inference.losses import LogLikelihoodLoss
@@ -28,6 +29,14 @@ class MARO(models.Base):
         Should be use multiple GPUs for training? Optional.
     strategy : str
         Strategy for distributed learning. Optional.
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients. Optional.
+    initial_cov : np.ndarray
+        Initial values for the covariances. Optional.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients? Optional, default is True.
+    learn_cov : bool
+        Should we learn the covariances. Optional, default is True.
     """
 
     def __init__(
@@ -39,9 +48,17 @@ class MARO(models.Base):
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
+        initial_coeffs: np.ndarray = None,
+        initial_cov: np.ndarray = None,
+        learn_coeffs: bool = True,
+        learn_cov: bool = True,
     ):
         # Parameters related to the observation model
         self.n_lags = n_lags
+        self.initial_coeffs = initial_coeffs
+        self.initial_cov = initial_cov
+        self.learn_coeffs = learn_coeffs
+        self.learn_cov = learn_cov
 
         # Initialise the model base class
         # This will build and compile the keras model
@@ -61,6 +78,10 @@ class MARO(models.Base):
             n_channels=self.n_channels,
             sequence_length=self.sequence_length,
             n_lags=self.n_lags,
+            initial_coeffs=self.initial_coeffs,
+            initial_cov=self.initial_cov,
+            learn_coeffs=self.learn_coeffs,
+            learn_cov=self.learn_cov,
         )
 
     def compile(self):
@@ -150,6 +171,10 @@ def _model_structure(
     n_channels: int,
     sequence_length: int,
     n_lags: int,
+    initial_coeffs: np.ndarray,
+    initial_cov: np.ndarray,
+    learn_coeffs: bool,
+    learn_cov: bool,
 ):
     """Model structure.
 
@@ -163,6 +188,14 @@ def _model_structure(
         Length of sequence passed to the inference network and generative model.
     n_lags : int
         Order of the multivariate autoregressive observation model.
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients.
+    initial_cov : np.ndarray
+        Initial values for the covariances.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients?
+    learn_cov : bool
+        Should we learn the covariances.
 
     Returns
     -------
@@ -184,7 +217,14 @@ def _model_structure(
 
     # Definition of layers
     mar_params_layer = MARParametersLayer(
-        n_states, n_channels, n_lags, name="mar_params"
+        n_states,
+        n_channels,
+        n_lags,
+        initial_coeffs,
+        initial_cov,
+        learn_coeffs,
+        learn_cov,
+        name="mar_params",
     )
     mean_cov_layer = MARMeanCovLayer(
         n_states, n_channels, sequence_length, n_lags, name="mean_cov"
