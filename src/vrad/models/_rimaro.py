@@ -22,7 +22,7 @@ from vrad.models.layers import (
     MARMeanCovLayer,
     ModelRNNLayers,
     SampleNormalDistributionLayer,
-    StateMixingFactorsLayer,
+    AlphaLayer,
 )
 from vrad.utils.misc import check_arguments, replace_argument
 
@@ -547,9 +547,7 @@ def _model_structure(
         theta_t_norm_layer = layers.BatchNormalization(name="theta_t_norm")
     else:
         theta_t_norm_layer = DummyLayer(name="theta_t_norm")
-    alpha_t_layer = StateMixingFactorsLayer(
-        alpha_xform, alpha_temperature, name="alpha_t"
-    )
+    alpha_t_layer = AlphaLayer(alpha_xform, alpha_temperature, name="alpha_t")
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)

@@ -124,7 +124,7 @@ class SampleNormalDistributionLayer(layers.Layer):
         return mu_shape
 
 
-class StateMixingFactorsLayer(layers.Layer):
+class AlphaLayer(layers.Layer):
     """Layer for calculating the mixing ratio of the states.
 
     This layer accepts the logits theta_t and outputs alpha_t.
@@ -601,8 +601,8 @@ class MARParametersLayer(layers.Layer):
     """Layer to learn parameters of a multivariate autoregressive (MAR) model.
 
     Outputs the MAR parameters:
-    - Matrix of MAR coefficients for lag l and state j, W_jl.
-    - Covariance matrix, S, which is the same for all states.
+    - Matrix of MAR coefficients for each state and lag.
+    - Covariance matrix for each state.
 
     Parameters
     ----------
@@ -612,6 +612,14 @@ class MARParametersLayer(layers.Layer):
         Number of channels.
     n_lags : int
         Number of lags.
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients. Optional.
+    initial_cov : np.ndarray
+        Initial values for the covariances. Optional.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients? Optional, default is True.
+    learn_cov : bool
+        Should we learn the covariances? Optional, default is True.
     """
 
     def __init__(
@@ -641,7 +649,7 @@ class MARParametersLayer(layers.Layer):
             self.initial_coeffs = initial_coeffs
         self.coeffs_initializer = initializers.WeightInitializer(self.initial_coeffs)
 
-        # Initialisation for MAR covariance
+        # Initialisation for covariances
         if initial_cov is None:
             self.initial_cov = np.ones([n_states, n_channels], dtype=np.float32)
         else:
@@ -710,9 +718,6 @@ class MARMeanCovLayer(layers.Layer):
         self.n_channels = n_channels
         self.sequence_length = sequence_length
         self.n_lags = n_lags
-        self.slice_fn = lambda elems: tf.convert_to_tensor(
-            [elems[i : i + n_lags] for i in range(elems.shape[0] - n_lags)]
-        )
 
     def call(self, inputs, **kwargs):
 
