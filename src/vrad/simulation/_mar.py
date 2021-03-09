@@ -78,9 +78,9 @@ class MAR:
             )
 
         # Generate the MAR process
-        for i in range(n_samples):
-            state = state_time_course[i].argmax()
-            for lag in range(min(i, self.order)):
-                data[i, :] += np.dot(self.coeffs[state, lag], data[i - lag - 1])
+        for t in range(n_samples):
+            state = state_time_course[t].argmax()
+            for lag in range(min(t, self.order)):
+                data[t, :] += np.dot(self.coeffs[state, lag], data[t - lag - 1])
 
         return data.astype(np.float32)

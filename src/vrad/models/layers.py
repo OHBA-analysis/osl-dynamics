@@ -723,59 +723,54 @@ class MARMeanCovLayer(layers.Layer):
 
         # Input data:
         # - alpha_jt.shape = (None, sequence_length, n_states)
-        # - data.shape = (None, sequence_length, n_channels)
-        # - W_j.shape = (n_states, n_lags, n_channels, n_channels)
-        # - sigma_j.shape = (n_states, n_channels, n_channels)
-        alpha_jt, data, W_j, sigma_j = inputs
+        # - data_t.shape = (None, sequence_length, n_channels)
+        # - coeffs_jl.shape = (n_states, n_lags, n_channels, n_channels)
+        # - cov_j.shape = (n_states, n_channels, n_channels)
+        alpha_jt, data_t, coeffs_jl, cov_j = inputs
 
-        # Reshape data: (None, sequence_length, n_channels)
-        # -> (None, 1, sequence_length - n_lags, n_lags, n_channels, 1)
-        lagged_data = tf.map_fn(self.slice_fn, elems=data)
-        lagged_data = tf.expand_dims(tf.expand_dims(lagged_data, axis=1), axis=-1)
+        # Data for the log-likelihood calculation
+        clipped_data_t = data_t[:, : -self.n_lags]
 
-        # Reshape W_j for multiplication with data lags
-        # (n_states, n_lags, n_channels, n_channels)
-        # -> (1, n_states, 1, n_lags, n_channels, n_channels)
-        W_j = tf.expand_dims(tf.expand_dims(W_j, axis=0), axis=2)
+        # Reshape data and coeffs for multiplication
+        # data_t -> (None, sequence_length, 1, 1, n_channels, 1)
+        data_t = tf.expand_dims(
+            tf.expand_dims(tf.expand_dims(data_t, axis=2), axis=3), axis=-1
+        )
+        # coeffs -> (1, 1, n_states, n_lags, n_channels, n_channels)
+        coeffs_jl = tf.expand_dims(tf.expand_dims(coeffs_jl, axis=0), axis=0)
 
-        # Calculate the mean for each state:
-        # mu_jt = Sum_l W_j x_{t-l}
-        mu_jt = tf.reduce_sum(tf.matmul(W_j, lagged_data), axis=3)
+        # Multiply the data by the coefficients for each state and lag
+        # lagged_data_jlt.shape = (None, sequence_length, n_states, n_lags, n_channels)
+        lagged_data_jlt = tf.squeeze(tf.matmul(coeffs_jl, data_t), axis=-1)
 
-        # mu_jt.shape is
-        # (None, n_states, sequence_length - n_lags, n_channels, 1)
-        # reshape to (None, sequence_length - n_lags, n_states, n_channels)
-        # for multiplication with alpha_jt
-        mu_jt = tf.squeeze(tf.transpose(mu_jt, perm=[0, 2, 1, 3, 4]), axis=-1)
+        # Calculate the mean for each state: mu_jt = Sum_l coeffs_j data_{t-l}
+        # mu.shape = (None, sequence_length - n_lags, n_states, n_channels)
+        mu_jt = lagged_data_jlt[:, self.n_lags :, :, 0]
+        for l in range(1, self.n_lags):
+            mu_jt = tf.add(
+                mu_jt, tf.roll(lagged_data_jlt[:, self.n_lags :, :, l], shift=l, axis=1)
+            )
 
         # Remove alpha_jt value we don't have all lags for and
         # reshape for multiplication with mu_jt
-        # (None, sequence_length, n_states)
-        # -> (None, sequence_length - n_lags, n_states, 1)
+        # alpha_jt -> (None, sequence_length - n_lags, n_states, 1)
         alpha_jt = tf.expand_dims(alpha_jt[:, self.n_lags :], axis=-1)
 
-        # Calculate the mean at each point in time:
-        # mu_t = Sum_j alpha_jt mu_jt
+        # Calculate the mean at each point in time: mu_t = Sum_j alpha_jt mu_jt
         mu_t = tf.reduce_sum(tf.multiply(alpha_jt, mu_jt), axis=2)
 
-        # Reshape sigma_j and alpha_jt for multiplication
-        # alpha_jt: (None, sequence_length - n_lags, n_states, 1)
-        # -> (None, sequence_length - n_lags, n_states, 1, 1)
+        # Reshape cov_j and alpha_jt for multiplication
+        # alpha_jt -> (None, sequence_length - n_lags, n_states, 1, 1)
         alpha_jt = tf.expand_dims(alpha_jt, axis=-1)
 
-        # sigma_j: (n_states, n_channels, n_channels)
-        # -> (1, 1, n_states, n_channels, n_channels)
-        sigma_j = tf.expand_dims(tf.expand_dims(sigma_j, axis=0), axis=0)
+        # cov_j -> (1, 1, n_states, n_channels, n_channels)
+        cov_j = tf.expand_dims(tf.expand_dims(cov_j, axis=0), axis=0)
 
-        # Calculate the covariance at each time point
-        # sigma_t = Sum_j alpha^2_jt sigma_j
+        # Calculate the covariance at each time point: cov_t = Sum_j alpha^2_jt cov_j
         alpha2_jt = tf.square(alpha_jt)
-        sigma_t = tf.reduce_sum(tf.multiply(alpha2_jt, sigma_j), axis=2)
+        cov_t = tf.reduce_sum(tf.multiply(alpha2_jt, cov_j), axis=2)
 
-        # Return data for the log-likelihood calculation
-        clipped_data = data[:, : -self.n_lags]
-
-        return clipped_data, mu_t, sigma_t
+        return clipped_data_t, mu_t, cov_t
 
     def compute_output_shape(self, input_shape):
         return [
