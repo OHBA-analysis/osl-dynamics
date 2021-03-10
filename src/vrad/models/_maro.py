@@ -204,15 +204,15 @@ def _model_structure(
     """
 
     # Layers for inputs
-    data = layers.Input(shape=(sequence_length, n_channels), name="data")
-    alpha_t = layers.Input(shape=(sequence_length, n_states), name="alpha_t")
+    data_t = layers.Input(shape=(sequence_length, n_channels), name="data_t")
+    alpha_jt = layers.Input(shape=(sequence_length, n_states), name="alpha_jt")
 
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
-    #      - mu_t = Sum_j Sum_l alpha_jt W_jt x_{t-l}.
-    #      - sigma_t = Sum_j alpha^2_jt sigma_jt, where sigma_jt is a learnable
+    #      - mu_t = Sum_j Sum_l alpha_jt coeffs_jt data_{t-l}.
+    #      - sigma_t = Sum_j alpha^2_jt cov_j, where cov_j is a learnable
     #        diagonal covariance matrix.
-    # - We calculate the likelihood of generating the training data with alpha_t
+    # - We calculate the likelihood of generating the training data with alpha_jt
     #   and the observation model.
 
     # Definition of layers
@@ -232,8 +232,8 @@ def _model_structure(
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    W_jt, sigma_j = mar_params_layer(data)  # data not used
-    clipped_data, mu_t, sigma_t = mean_cov_layer([alpha_t, data, W_jt, sigma_j])
-    ll_loss = ll_loss_layer([clipped_data, mu_t, sigma_t])
+    coeffs_jl, cov_j = mar_params_layer(data)  # data not used
+    clipped_data_t, mu_t, sigma_t = mean_cov_layer([data_t, alpha_jt, coeffs_jl, cov_j])
+    ll_loss = ll_loss_layer([clipped_data_t, mu_t, sigma_t])
 
-    return Model(inputs=[data, alpha_t], outputs=[ll_loss])
+    return Model(inputs=[data_t, alpha_t], outputs=[ll_loss])

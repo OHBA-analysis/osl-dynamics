@@ -615,9 +615,9 @@ def _model_structure(
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    W_jt, sigma_j = mar_params_layer(inputs)  # inputs not used
-    clipped_data, mu_t, sigma_t = mean_cov_layer([alpha_t, inputs, W_jt, sigma_j])
-    ll_loss = ll_loss_layer([clipped_data, mu_t, sigma_t])
+    coeffs_jl, cov_j = mar_params_layer(inputs)  # inputs not used
+    clipped_data_t, mu_t, sigma_t = mean_cov_layer([inputs, alpha_t, coeffs_jl, cov_j])
+    ll_loss = ll_loss_layer([clipped_data_t, mu_t, sigma_t])
 
     # Model RNN:
     # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt), where

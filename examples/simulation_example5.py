@@ -1,6 +1,5 @@
 """Example script for running inference on simulated HMM-MAR data.
 
-- Should achieve a dice coefficient of ~...
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -19,14 +18,14 @@ n_samples = 25600
 n_lags = 2
 
 n_states = 3
-sequence_length = 200
+sequence_length = 400
 batch_size = 16
 
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 100
-n_epochs_annealing = 50
+n_epochs = 400
+n_epochs_annealing = 200
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -41,12 +40,8 @@ n_units_model = 64
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-learn_covariances = True
-
 alpha_xform = "softmax"
 alpha_temperature = 0.2
-learn_alpha_scaling = False
-normalize_covariances = False
 
 learning_rate = 0.01
 
@@ -106,8 +101,10 @@ model = RIMARO(
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
     learning_rate=learning_rate,
-    initial_cov=np.array([C1, C2, C3]),
-    learn_cov=False,
+    # initial_coeffs=coeffs,
+    # initial_cov=np.array([C1, C2, C3]),
+    # learn_coeffs=False,
+    # learn_cov=True,
 )
 model.summary()
 

@@ -722,11 +722,11 @@ class MARMeanCovLayer(layers.Layer):
     def call(self, inputs, **kwargs):
 
         # Input data:
-        # - alpha_jt.shape = (None, sequence_length, n_states)
         # - data_t.shape = (None, sequence_length, n_channels)
+        # - alpha_jt.shape = (None, sequence_length, n_states)
         # - coeffs_jl.shape = (n_states, n_lags, n_channels, n_channels)
         # - cov_j.shape = (n_states, n_channels, n_channels)
-        alpha_jt, data_t, coeffs_jl, cov_j = inputs
+        data_t, alpha_jt, coeffs_jl, cov_j = inputs
 
         # Data for the log-likelihood calculation
         clipped_data_t = data_t[:, : -self.n_lags]
@@ -745,11 +745,10 @@ class MARMeanCovLayer(layers.Layer):
 
         # Calculate the mean for each state: mu_jt = Sum_l coeffs_j data_{t-l}
         # mu.shape = (None, sequence_length - n_lags, n_states, n_channels)
-        mu_jt = lagged_data_jlt[:, self.n_lags :, :, 0]
+        mu_jt = lagged_data_jlt[:, :, :, 0]
         for l in range(1, self.n_lags):
-            mu_jt = tf.add(
-                mu_jt, tf.roll(lagged_data_jlt[:, self.n_lags :, :, l], shift=l, axis=1)
-            )
+            mu_jt = tf.add(mu_jt, tf.roll(lagged_data_jlt[:, :, :, l], shift=l, axis=1))
+        mu_jt = mu_jt[:, self.n_lags :]
 
         # Remove alpha_jt value we don't have all lags for and
         # reshape for multiplication with mu_jt
@@ -768,9 +767,9 @@ class MARMeanCovLayer(layers.Layer):
 
         # Calculate the covariance at each time point: cov_t = Sum_j alpha^2_jt cov_j
         alpha2_jt = tf.square(alpha_jt)
-        cov_t = tf.reduce_sum(tf.multiply(alpha2_jt, cov_j), axis=2)
+        sigma_t = tf.reduce_sum(tf.multiply(alpha2_jt, cov_j), axis=2)
 
-        return clipped_data_t, mu_t, cov_t
+        return clipped_data_t, mu_t, sigma_t
 
     def compute_output_shape(self, input_shape):
         return [
