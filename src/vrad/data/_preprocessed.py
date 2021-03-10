@@ -218,7 +218,7 @@ class PreprocessedData(Data):
             or (n_states, n_channels, n_channels, n_acf).
         """
         # Validation
-        if self.n_embeddings <= 0:
+        if self.n_embeddings <= 1:
             raise ValueError(
                 "To calculate an autocorrelation function we have to train on time "
                 + "embedded data."
@@ -286,6 +286,108 @@ class PreprocessedData(Data):
             )
 
         return np.squeeze(autocorrelation_function)
+
+    def raw_covariances(
+        self,
+        state_covariances: Union[list, np.ndarray],
+        reverse_standardization: bool = False,
+        subject_index: int = None,
+    ) -> np.ndarray:
+        """Variance of each channel based on the inferred state covariances.
+
+        Parameters
+        ----------
+        state_covariances : np.ndarray
+            State covariance matrices.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
+            These must be subject specific covariances.
+        reverse_standardization : bool
+            Should we reverse the standardization performed on the dataset?
+            Optional, the default is False.
+        subject_index : int
+            Index for the subject if the covariances corresponds to a single
+            subject. Optional. Only used if reverse_standardization is True.
+
+        Returns
+        -------
+        np.ndarray
+            The variance for each channel, state and subject.
+            Shape is (n_subjects, n_states, n_channels, n_channels) or
+            (n_states, n_channels, n_channels).
+        """
+        # Validation
+        if self.n_embeddings <= 1:
+            raise ValueError(
+                "To calculate an autocorrelation function we have to train on time "
+                + "embedded data."
+            )
+
+        if isinstance(state_covariances, np.ndarray):
+            if state_covariances.ndim != 3:
+                raise ValueError(
+                    "state_covariances must be shape (n_states, n_channels, n_channels) or"
+                    + " (n_subjects, n_states, n_channels, n_channels)."
+                )
+            state_covariances = [state_covariances]
+
+        if not isinstance(state_covariances, list):
+            raise ValueError(
+                "state_covariances must be a list of numpy arrays or a numpy array."
+            )
+
+        n_subjects = len(state_covariances)
+        n_states = state_covariances[0].shape[0]
+
+        raw_covariances = []
+        for n in range(n_subjects):
+            if reverse_standardization:
+                for i in range(n_states):
+                    # Get the standard deviation of the prepared data
+                    if subject_index is None:
+                        prepared_data_std = self.prepared_data_std[n]
+                    else:
+                        prepared_data_std = self.prepared_data_std[subject_index]
+
+                    # Reverse the standardisation
+                    state_covariances[n][i] = (
+                        np.diag(prepared_data_std)
+                        @ state_covariances[n][i]
+                        @ np.diag(prepared_data_std)
+                    )
+
+            # Reverse the PCA
+            te_cov = []
+            for i in range(n_states):
+                te_cov.append(
+                    self.pca_weights @ state_covariances[n][i] @ self.pca_weights.T
+                )
+            te_cov = np.array(te_cov)
+
+            if reverse_standardization:
+                for i in range(n_states):
+                    # Get the standard deviation of the raw data
+                    if subject_index is None:
+                        raw_data_std = self.raw_data_std[n]
+                    else:
+                        raw_data_std = self.raw_data_std[subject_index]
+
+                    # Reverse the standardisation
+                    te_cov[i] = (
+                        np.diag(np.repeat(raw_data_std, self.n_embeddings))
+                        @ te_cov[i]
+                        @ np.diag(np.repeat(raw_data_std, self.n_embeddings))
+                    )
+
+            # Get the raw data covariance
+            raw_covariances.append(
+                te_cov[
+                    :,
+                    self.n_embeddings // 2 :: self.n_embeddings,
+                    self.n_embeddings // 2 :: self.n_embeddings,
+                ]
+            )
+
+        return np.squeeze(raw_covariances)
 
     def _process_from_yaml(self, file, **kwargs):
         with open(file) as f:

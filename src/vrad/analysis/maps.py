@@ -115,6 +115,7 @@ def save_nii_file(
         Parcellation file used to parcelate the training data.
     power_map : np.ndarray
         Power map to save.
+        Shape must be (n_components, n_states, n_channels, n_channels).
     filename : str
         Output file name.
     component : int

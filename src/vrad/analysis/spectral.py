@@ -174,6 +174,7 @@ def state_covariance_spectra(
         Coherences calculated for each state. Shape is (n_states, n_channels,
         n_channels, n_f).
     """
+    print("Calculating power spectra")
 
     # Validation
     if frequency_range is None:
@@ -466,7 +467,7 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    # TODO: Check if we should be normalising using sum alpha instead of sum alpha^2
+    # TODO: We should be normalising using sum alpha instead of sum alpha^2
     sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
