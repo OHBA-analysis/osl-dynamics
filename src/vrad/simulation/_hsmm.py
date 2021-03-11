@@ -64,7 +64,8 @@ class HSMM:
         # Both off_diagonal_trans_prob and full_trans_prob are None
         elif n_states is None:
             raise ValueError(
-                "If off_diagonal_trans_prob and full_trans_prob are not given, n_states must be passed."
+                "If off_diagonal_trans_prob and full_trans_prob are not given, "
+                + "n_states must be passed."
             )
         else:
             self.n_states = n_states
@@ -228,6 +229,13 @@ class HSMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
+    def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
+        super().standardize()
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]
+
 
 class MixedHSMM_MVN(Simulation):
     """Hidden Semi-Markov Model Simulation with a mixture of states at each time point.
@@ -341,3 +349,10 @@ class MixedHSMM_MVN(Simulation):
         self.state_vectors = np.append(
             non_mixed_state_vectors, self.mixed_state_vectors, axis=0
         )
+
+    def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
+        super().standardize()
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]

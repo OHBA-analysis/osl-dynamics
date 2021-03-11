@@ -7,7 +7,6 @@ from typing import Union
 
 import numpy as np
 from vrad.array_ops import get_one_hot
-from vrad.data.manipulation import standardize
 from vrad.simulation import Simulation, MVN, MAR
 
 _logger = logging.getLogger("VRAD")
@@ -286,7 +285,7 @@ class HMM_MVN(Simulation):
 
     def standardize(self):
         standard_deviations = np.std(self.time_series, axis=0)
-        self.time_series = standardize(self.time_series, axis=0)
+        super().standardize()
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...
         ]
@@ -408,7 +407,7 @@ class HierarchicalHMM_MVN(Simulation):
 
     def standardize(self):
         standard_deviations = np.std(self.time_series, axis=0)
-        self.time_series = standardize(self.time_series, axis=0)
+        super().standardize()
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...
         ]
