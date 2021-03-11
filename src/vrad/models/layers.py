@@ -729,7 +729,8 @@ class MARMeanCovLayer(layers.Layer):
         data_t, alpha_jt, coeffs_jl, cov_j = inputs
 
         # Data for the log-likelihood calculation
-        clipped_data_t = data_t[:, : -self.n_lags]
+        clipped_data_t = tf.roll(data_t, shift=-1, axis=1)
+        clipped_data_t = clipped_data_t[:, self.n_lags : -1]
 
         # Reshape data and coeffs for multiplication
         # data_t -> (None, sequence_length, 1, 1, n_channels, 1)
@@ -744,16 +745,16 @@ class MARMeanCovLayer(layers.Layer):
         lagged_data_jlt = tf.squeeze(tf.matmul(coeffs_jl, data_t), axis=-1)
 
         # Calculate the mean for each state: mu_jt = Sum_l coeffs_j data_{t-l}
-        # mu.shape = (None, sequence_length - n_lags, n_states, n_channels)
+        # mu_jt.shape = (None, sequence_length - n_lags, n_states, n_channels)
         mu_jt = lagged_data_jlt[:, :, :, 0]
         for l in range(1, self.n_lags):
             mu_jt = tf.add(mu_jt, tf.roll(lagged_data_jlt[:, :, :, l], shift=l, axis=1))
-        mu_jt = mu_jt[:, self.n_lags :]
+        mu_jt = mu_jt[:, self.n_lags : -1]
 
         # Remove alpha_jt value we don't have all lags for and
         # reshape for multiplication with mu_jt
         # alpha_jt -> (None, sequence_length - n_lags, n_states, 1)
-        alpha_jt = tf.expand_dims(alpha_jt[:, self.n_lags :], axis=-1)
+        alpha_jt = tf.expand_dims(alpha_jt[:, self.n_lags : -1], axis=-1)
 
         # Calculate the mean at each point in time: mu_t = Sum_j alpha_jt mu_jt
         mu_t = tf.reduce_sum(tf.multiply(alpha_jt, mu_jt), axis=2)
@@ -765,7 +766,7 @@ class MARMeanCovLayer(layers.Layer):
         # cov_j -> (1, 1, n_states, n_channels, n_channels)
         cov_j = tf.expand_dims(tf.expand_dims(cov_j, axis=0), axis=0)
 
-        # Calculate the covariance at each time point: cov_t = Sum_j alpha^2_jt cov_j
+        # Calculate the covariance at each time point: sigma_t = Sum_j alpha^2_jt cov_j
         alpha2_jt = tf.square(alpha_jt)
         sigma_t = tf.reduce_sum(tf.multiply(alpha2_jt, cov_j), axis=2)
 
