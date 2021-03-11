@@ -165,6 +165,41 @@ class MARO(models.Base):
         self.compile()
         initializers.reinitialize_model_weights(self.model)
 
+    def get_params(self):
+        """Get the parameters of the MAR model.
+
+        Returns
+        -------
+        coeffs : np.ndarray
+            MAR coefficients. Shape is (n_states, n_lags, n_channels, n_channels).
+        cov : np.ndarray
+            Mar covariance. Shape is (n_states, n_channels, n_channels).
+        """
+        mar_params_layer = self.model.get_layer("mar_params")
+        coeffs = mar_params_layer.coeffs.numpy()
+        cov = np.array([np.diag(c) for c in mar_params_layer.cov.numpy()])
+        return coeffs, cov
+
+    def set_params(self):
+        """Set the parameters of the MAR model.
+
+        Parameters
+        ----------
+        coeffs : np.ndarray
+            MAR coefficients. Shape is (n_states, n_lags, n_channels, n_channels).
+        cov : np.ndarray
+            Mar covariance. Shape is (n_states, n_channels, n_channels).
+        """
+        mar_params_layer = self.model.get_layer("mar_params")
+        layer_weights = mar_params_layer.get_weights()
+        cov = np.array([np.diag(c) for c in cov])
+        for i in range(len(layer_weights)):
+            if layer_weights[i].shape == coeffs.shape:
+                layer_weights[i] = coeffs
+            if layer_weights[i].shape == cov.shape:
+                layer_weights[i] = cov
+        mar_params_layer.set_weights(layer_weights)
+
 
 def _model_structure(
     n_states: int,
@@ -204,8 +239,8 @@ def _model_structure(
     """
 
     # Layers for inputs
-    data_t = layers.Input(shape=(sequence_length, n_channels), name="data_t")
-    alpha_jt = layers.Input(shape=(sequence_length, n_states), name="alpha_jt")
+    data_t = layers.Input(shape=(sequence_length, n_channels), name="data")
+    alpha_jt = layers.Input(shape=(sequence_length, n_states), name="alpha_t")
 
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
@@ -232,8 +267,8 @@ def _model_structure(
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    coeffs_jl, cov_j = mar_params_layer(data)  # data not used
+    coeffs_jl, cov_j = mar_params_layer(data_t)  # data_t not used
     clipped_data_t, mu_t, sigma_t = mean_cov_layer([data_t, alpha_jt, coeffs_jl, cov_j])
     ll_loss = ll_loss_layer([clipped_data_t, mu_t, sigma_t])
 
-    return Model(inputs=[data_t, alpha_t], outputs=[ll_loss])
+    return Model(inputs=[data_t, alpha_jt], outputs=[ll_loss])
