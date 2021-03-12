@@ -293,7 +293,10 @@ class PreprocessedData(Data):
         reverse_standardization: bool = False,
         subject_index: int = None,
     ) -> np.ndarray:
-        """Variance of each channel based on the inferred state covariances.
+        """Covariance matrix of the raw channels.
+
+        PCA and standardization is reversed to give you to the covariance
+        matrix for the raw channels.
 
         Parameters
         ----------
