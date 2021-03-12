@@ -2,6 +2,7 @@ import logging
 import pathlib
 import re
 import subprocess
+import os
 
 import nibabel as nib
 from tqdm import trange
@@ -15,6 +16,21 @@ surfs = {
     1: [std_masks.surf_left_inf, std_masks.surf_right_inf],
     2: [std_masks.surf_left_vinf, std_masks.surf_right_vinf],
 }
+
+
+def setup(path):
+    """Sets up workbench.
+
+    Adds workbench to the PATH environmental variable.
+
+    Parameters
+    ----------
+    path : str
+        Path to workbench installation.
+    """
+    # Check if workbench is already in PATH and if it's not add it
+    if path not in os.environ["PATH"]:
+        os.environ["PATH"] = f"{path}:{os.environ['PATH']}"
 
 
 def render(
