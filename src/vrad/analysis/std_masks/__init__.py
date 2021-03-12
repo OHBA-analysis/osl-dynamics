@@ -18,3 +18,5 @@ surf_right_vinf = str(
 surf_left_vinf = str(
     Path(__file__).parent / "ParcellationPilot.L.very_inflated.32k_fs_LR.surf.gii"
 )
+
+directory = str(Path(__file__).parent)

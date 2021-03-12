@@ -146,9 +146,8 @@ p_map = maps.state_power_maps(f, psd, components)
 # Save the power map for the first component as NIFTI file
 # (The second component is noise)
 maps.save_nii_file(
-    mask_file="files/MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="files"
-    + "/fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     power_map=p_map,
     filename="power_maps.nii.gz",
     component=0,
