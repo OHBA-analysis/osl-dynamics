@@ -14,18 +14,18 @@ from vrad.simulation import HMM_MAR
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25600
+n_samples = 51200
 n_lags = 2
 
 n_states = 3
-sequence_length = 400
-batch_size = 16
+sequence_length = 200
+batch_size = 64
 
 do_annealing = True
-annealing_sharpness = 10
+annealing_sharpness = 15
 
-n_epochs = 400
-n_epochs_annealing = 200
+n_epochs = 800
+n_epochs_annealing = 600
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -34,16 +34,16 @@ theta_normalization = None
 n_layers_inference = 1
 n_layers_model = 1
 
-n_units_inference = 64
-n_units_model = 64
+n_units_inference = 32
+n_units_model = 32
 
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
 alpha_xform = "softmax"
-alpha_temperature = 0.2
+alpha_temperature = 2.0
 
-learning_rate = 0.01
+learning_rate = 0.001
 
 # MAR parameters
 A11 = [[0.9, 0], [0.16, 0.8]]
@@ -101,10 +101,6 @@ model = RIMARO(
     annealing_sharpness=annealing_sharpness,
     n_epochs_annealing=n_epochs_annealing,
     learning_rate=learning_rate,
-    # initial_coeffs=coeffs,
-    # initial_cov=np.array([C1, C2, C3]),
-    # learn_coeffs=False,
-    # learn_cov=True,
 )
 model.summary()
 

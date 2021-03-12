@@ -8,33 +8,42 @@ from vrad.models import MARO
 
 # GPU settings
 tf_ops.gpu_growth()
-multi_gpu = True
 
 # Settings
-n_samples = 25600
+n_samples = 51200
 sequence_length = 100
 batch_size = 16
-n_epochs = 20
+n_epochs = 200
 learning_rate = 0.01
 
 # MAR parameters
-A1 = [[0.9, 0], [0.16, 0.8]]
-A2 = [[-0.5, 0], [-0.2, -0.5]]
-C = [0.2, 0.5]
+A11 = [[0.9, 0], [0.16, 0.8]]
+A12 = [[-0.5, 0], [-0.2, -0.5]]
 
-coeffs = np.array([[A1, A2]])
-cov = np.array([np.diag(C)])
+A21 = [[0.6, 0.1], [0.1, -0.2]]
+A22 = [[0.4, 0], [-0.1, 0.1]]
+
+A31 = [[1, -0.15], [0, 0.7]]
+A32 = [[-0.3, -0.2], [0.5, 0.5]]
+
+C1 = [1, 1]
+C2 = [0.1, 0.1]
+C3 = [10, 10]
+
+coeffs = np.array([[A11, A12], [A21, A22], [A31, A32]])
+cov = np.array([np.diag(C1), np.diag(C2), np.diag(C3)])
 
 # Simulate data
 print("Simulating data")
 sim = HMM_MAR(
     n_samples=n_samples,
-    trans_prob=None,
+    trans_prob="sequence",
+    stay_prob=0.95,
     coeffs=coeffs,
     cov=cov,
     random_seed=123,
 )
-# sim.standardize()
+sim.standardize()
 meg_data = data.Data(sim)
 
 n_states = sim.n_states
@@ -55,7 +64,6 @@ model = MARO(
     sequence_length=sequence_length,
     n_lags=n_lags,
     learning_rate=learning_rate,
-    multi_gpu=multi_gpu,
 )
 model.summary()
 
@@ -66,12 +74,10 @@ inf_coeffs, inf_cov = model.get_params()
 
 print("Ground truth:")
 print(np.squeeze(coeffs))
-print(np.squeeze(cov))
 print()
 
 print("Inferred:")
 print(np.squeeze(inf_coeffs))
-print(np.squeeze(inf_cov))
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
