@@ -139,14 +139,14 @@ def save_nii_file(
         if os.path.exists(f"{std_masks.directory}/{mask_file}"):
             mask_file = f"{std_masks.directory}/{mask_file}"
         else:
-            raise ValueError(f"{mask_file} not found.")
+            raise FileNotFoundError(mask_file)
 
     # If the parcellation file doesn't exist, check if  it's in parc_files
     if not os.path.exists(parcellation_file):
         if os.path.exists(f"{parc_files.directory}/{parcellation_file}"):
             parcellation_file = f"{parc_files.directory}/{parcellation_file}"
         else:
-            raise ValueError(f"{parcellation_file} not found.")
+            raise FileNoteFoundError(parcellation_file)
 
     # Load the mask
     mask = nib.load(mask_file)

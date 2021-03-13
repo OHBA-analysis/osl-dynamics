@@ -1,5 +1,6 @@
 import logging
 from typing import Tuple, Union
+from os import path
 
 import mat73
 import numpy as np
@@ -77,7 +78,7 @@ def load_matlab(filename: str, ignored_keys=None) -> np.ndarray:
 
 
 def load_data(
-    time_series: Union[str, np.ndarray], mmap_location: str = None
+    time_series: Union[str, list, np.ndarray], mmap_location: str = None
 ) -> np.ndarray:
     """Loads time series data.
 
@@ -96,6 +97,8 @@ def load_data(
 
     # Read time series from a file
     if isinstance(time_series, str):
+        if not path.exists(time_series):
+            raise FileNotFoundError(time_series)
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
         elif time_series[-4:] == ".mat":
