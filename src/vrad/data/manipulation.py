@@ -1,5 +1,40 @@
 import numpy as np
 from vrad import array_ops
+from scipy.signal import butter, lfilter
+
+
+def bandpass_filter(
+    time_series: np.ndarray,
+    filter_range: list,
+    filter_order: int,
+    sampling_frequency: float,
+):
+    """Filters a time series.
+
+    Applies a butterworth filter to a time series.
+
+    Parameters
+    ----------
+    time_series : np.ndarray
+        Time series data.
+    filter_range : list
+        Min and max frequency to keep.
+    filter_order : int
+        Order of the butterworth filter.
+    sampling_frequency : float
+        Sampling frequency of the time series.
+
+    Returns
+    -------
+    np.ndarray
+        Filtered time series.
+    """
+    nyq = 0.5 * sampling_frequency
+    filter_range[0] /= nyq
+    filter_range[1] /= nyq
+    b, a = butter(filter_order, filter_range, btype="band")
+    filtered_time_series = lfilter(b, a, time_series)
+    return filtered_time_series
 
 
 def standardize(

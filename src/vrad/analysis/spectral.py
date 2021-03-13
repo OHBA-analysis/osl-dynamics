@@ -400,6 +400,8 @@ def multitaper_spectra(
     elif segment_length != 2 * sampling_frequency:
         _logger.warning("segment_length is recommended to be 2*sampling_frequency.")
 
+    segment_length = int(segment_length)
+
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 

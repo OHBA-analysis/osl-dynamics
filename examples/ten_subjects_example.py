@@ -58,7 +58,11 @@ prepared_data = data.Data(
     [
         f"/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject{i}.mat"
         for i in range(1, 11)
-    ]
+    ],
+    sampling_frequency=250,
+    n_pca_components=80,
+    whiten=False,
+    prepared=True,
 )
 n_channels = prepared_data.n_channels
 
@@ -135,14 +139,15 @@ preprocessed_data = data.PreprocessedData(
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    n_embeddings=15, sequence_length=sequence_length
+    sequence_length=sequence_length,
+    n_embeddings=prepared_data.n_embeddings,
 )
 
 # Compute spectra for states
 f, psd, coh = spectral.multitaper_spectra(
     data=preprocessed_time_series,
     alpha=alpha,
-    sampling_frequency=250,
+    sampling_frequency=prepared_data.sampling_frequency,
     time_half_bandwidth=4,
     n_tapers=7,
     frequency_range=[1, 45],

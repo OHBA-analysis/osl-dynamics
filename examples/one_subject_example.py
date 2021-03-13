@@ -54,7 +54,11 @@ learning_rate = 0.01
 # Read MEG data
 print("Reading MEG data")
 prepared_data = data.Data(
-    "/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject1.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject1.mat",
+    sampling_frequency=250,
+    n_embeddings=15,
+    n_pca_components=80,
+    prepared=True,
 )
 n_channels = prepared_data.n_channels
 
@@ -124,14 +128,15 @@ preprocessed_data = data.PreprocessedData(
     "/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject1.mat"
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    n_embeddings=15, sequence_length=sequence_length
+    sequence_length=sequence_length,
+    n_embeddings=prepared_data.n_embeddings,
 )[0]
 
 # Compute spectra for states
 f, psd, coh = spectral.multitaper_spectra(
     data=preprocessed_time_series,
     alpha=alpha,
-    sampling_frequency=250,
+    sampling_frequency=prepared_data.sampling_frequency,
     time_half_bandwidth=4,
     n_tapers=7,
     frequency_range=[1, 45],

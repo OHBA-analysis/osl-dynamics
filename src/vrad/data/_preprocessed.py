@@ -37,6 +37,14 @@ class PreprocessedData(Data):
         super().__init__(inputs, sampling_frequency, store_dir)
         self.prepared = False
 
+    def _pre_pca(self, raw_data, filter_range, filter_order, n_embeddings):
+        std_data = manipulation.standardize(raw_data)
+        f_std_data = manipulation.bandpass_filter(
+            std_data, filter_range, filter_order, self.sampling_frequency
+        )
+        te_f_std_data = manipulation.time_embed(f_std_data, n_embeddings)
+        return te_f_std_data
+
     def prepare_memmap_filenames(self):
         self.prepared_data_pattern = (
             "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
@@ -48,13 +56,15 @@ class PreprocessedData(Data):
         self.prepared_data_memmaps = []
         self.prepared_data_filenames = [
             str(self.store_dir / self.prepared_data_pattern.format(i=i))
-            for i, _ in enumerate(self.inputs)
+            for i in range(self.n_subjects)
         ]
         self.prepared_data_mean = []
         self.prepared_data_std = []
 
     def prepare(
         self,
+        filter_range: list = None,
+        filter_order: int = None,
         n_embeddings: int = 1,
         n_pca_components: int = None,
         whiten: bool = False,
@@ -65,6 +75,12 @@ class PreprocessedData(Data):
 
         Parameters
         ----------
+        filter_range : list
+            Min and max frequencies to bandpass filter. Optional, default is
+            no filtering. A butterworth filter is applied.
+        filter_order : int
+            Order of the butterworth filter. Optional. Required is filter_range
+            is passed.
         n_embeddings : int
             Number of data points to embed the data. Optional, default is 1.
         n_pca_components : int
@@ -76,6 +92,8 @@ class PreprocessedData(Data):
             _logger.warning("Previously prepared data will be overwritten.")
 
         # Class attributes related to data preparation
+        self.filter_range = filter_range
+        self.filter_order = filter_order
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
@@ -95,15 +113,17 @@ class PreprocessedData(Data):
             for raw_data_memmap in tqdm(
                 self.raw_data_memmaps, desc="Calculating PCA components", ncols=98
             ):
-                # Standardise the data and time embed
-                std_data = manipulation.standardize(raw_data_memmap)
-                te_data = manipulation.time_embed(std_data, n_embeddings)
+                # Standardise, filter and time embed the data, this function
+                # returns a copy of the data that is held in memory
+                te_f_std_data = self._pre_pca(
+                    raw_data_memmap, filter_range, filter_order, n_embeddings
+                )
 
                 # Calculate the covariance of the entire dataset
-                covariance += np.transpose(te_data) @ te_data
+                covariance += np.transpose(te_f_std_data) @ te_f_std_data
 
-                # Clear intermediate data
-                del std_data, te_data
+                # Clear data in memory
+                del te_f_std_data
 
             # Use SVD to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
@@ -120,17 +140,19 @@ class PreprocessedData(Data):
             tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
             self.prepared_data_filenames,
         ):
-            # Standardise the data and time embed
-            std_data = manipulation.standardize(raw_data_memmap)
-            te_data = manipulation.time_embed(std_data, n_embeddings)
+            # Standardise, filter and time embed the data, this function returns a
+            # copy of the data that is held in memory
+            te_f_std_data = self._pre_pca(
+                raw_data_memmap, filter_range, filter_order, n_embeddings
+            )
 
             # Apply PCA to get the prepared data
             if self.pca_weights is not None:
-                prepared_data = te_data @ self.pca_weights
+                prepared_data = te_f_std_data @ self.pca_weights
 
             # Otherwise, the time embedded data is the prepared data
             else:
-                prepared_data = te_data
+                prepared_data = te_f_std_data
 
             # Create a memory map for the prepared data
             prepared_data_memmap = MockArray.get_memmap(
@@ -147,13 +169,15 @@ class PreprocessedData(Data):
             self.prepared_data_memmaps.append(prepared_data_memmap)
 
             # Clear intermediate data
-            del std_data, te_data, prepared_data
+            del te_f_std_data, prepared_data
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
 
     def trim_raw_time_series(
-        self, n_embeddings: int = None, sequence_length: int = None
+        self,
+        sequence_length: int = None,
+        n_embeddings: int = None,
     ) -> np.ndarray:
         """Trims the raw preprocessed data time series.
 
@@ -163,26 +187,33 @@ class PreprocessedData(Data):
 
         Parameters
         ----------
-        n_embeddings : int
-            Number of data points to embed the data.
         sequence_length : int
             Length of the segement of data to feed into the model.
+        n_embeddings : int
+            Number of data points to embed the data.
 
         Returns
         -------
         np.ndarray
             Trimed time series.
         """
+        if self.prepared:
+            n_embddings = self.n_embeddings
+
         trimmed_raw_time_series = []
         for memmap in self.raw_data_memmaps:
+
+            # Remove data points which are removed due to time embedding
             if n_embeddings is not None:
-                # Remove data points which are removed due to time embedding
                 memmap = memmap[n_embeddings // 2 : -n_embeddings // 2]
+
+            # Remove data points which are removed due to separating into sequences
             if sequence_length is not None:
-                # Remove data points which are removed due to separating into sequences
                 n_sequences = memmap.shape[0] // sequence_length
                 memmap = memmap[: n_sequences * sequence_length]
+
             trimmed_raw_time_series.append(memmap)
+
         return trimmed_raw_time_series
 
     def autocorrelation_functions(
