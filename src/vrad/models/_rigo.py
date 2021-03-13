@@ -288,7 +288,7 @@ class RIGO(models.GO):
 
         return self.model.fit(*args, **kwargs)
 
-    def reset_model(self):
+    def reset_weight(self):
         """Reset the model as if you've built a new model.
 
         Resets the model weights, optimizer and annealing factor.

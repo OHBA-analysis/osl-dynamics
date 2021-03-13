@@ -157,11 +157,8 @@ class MARO(models.Base):
 
         return self.model.fit(*args, **kwargs)
 
-    def reset_model(self):
-        """Reset the model as if you've built a new model.
-
-        Resets the model weights, optimizer and annealing factor.
-        """
+    def reset_weights(self):
+        """Reset the model as if you've built a new model."""
         self.compile()
         initializers.reinitialize_model_weights(self.model)
 
