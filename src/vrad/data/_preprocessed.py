@@ -39,9 +39,12 @@ class PreprocessedData(Data):
 
     def _pre_pca(self, raw_data, filter_range, filter_order, n_embeddings):
         std_data = manipulation.standardize(raw_data)
-        f_std_data = manipulation.bandpass_filter(
-            std_data, filter_range, filter_order, self.sampling_frequency
-        )
+        if filter_range is not None:
+            f_std_data = manipulation.bandpass_filter(
+                std_data, filter_range, filter_order, self.sampling_frequency
+            )
+        else:
+            f_std_data = std_data
         te_f_std_data = manipulation.time_embed(f_std_data, n_embeddings)
         return te_f_std_data
 
