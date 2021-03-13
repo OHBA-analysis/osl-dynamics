@@ -45,10 +45,10 @@ class Data:
         inputs: list,
         sampling_frequency: float = 1.0,
         store_dir: str = "tmp",
-        n_embeddings=0,
-        n_pca_components=None,
-        whiten=None,
-        prepared=False,
+        n_embeddings: int = 0,
+        n_pca_components: int = None,
+        whiten: bool = None,
+        prepared: bool = False,
     ):
         # Unique identifier for the data object
         self._identifier = id(inputs)
@@ -70,7 +70,7 @@ class Data:
 
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
-        self.raw_data_pattern = "input_data_{{i:0{width}d}}_{identifier}.npy".format(
+        self.raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(inputs))), identifier=self._identifier
         )
 
@@ -94,7 +94,7 @@ class Data:
 
         # Other attributes
         self.n_raw_data_channels = self.n_channels
-        self.sampling_frequency = sampling_frequency
+        self.sampling_frequency = float(sampling_frequency)
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components
         self.whiten = whiten
@@ -108,6 +108,16 @@ class Data:
 
     def __getitem__(self, item):
         return self.subjects[item]
+
+    def __str__(self):
+        info = [
+            f"{self.__class__.__name__}",
+            f"id: {self._identifier}",
+            f"n_subjects: {self.n_subjects}",
+            f"n_samples: {self.n_samples}",
+            f"n_channels: {self.n_channels}",
+        ]
+        return "\n ".join(info)
 
     def validate_subjects(self):
         """Validate data files."""
@@ -124,6 +134,11 @@ class Data:
     def n_channels(self) -> int:
         """Number of channels in the data files."""
         return self.subjects[0].shape[1]
+
+    @property
+    def n_samples(self) -> list:
+        """Number of samples for each subject"""
+        return [subject.shape[0] for subject in self.subjects]
 
     @property
     def n_subjects(self) -> int:

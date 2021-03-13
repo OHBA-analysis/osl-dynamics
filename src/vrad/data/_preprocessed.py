@@ -1,3 +1,4 @@
+import logging
 from typing import Union
 
 import numpy as np
@@ -6,6 +7,8 @@ from tqdm import tqdm
 from vrad.analysis import spectral
 from vrad.data import Data, manipulation
 from vrad.utils.misc import MockArray
+
+_logger = logging.getLogger("VRAD")
 
 
 class PreprocessedData(Data):
@@ -23,8 +26,6 @@ class PreprocessedData(Data):
     store_dir : str
         Directory to save results and intermediate steps to. Optional, default
         is /tmp.
-    prepared_data_file : str
-        Filename to save memory map to. Optional.
     """
 
     def __init__(
@@ -32,21 +33,14 @@ class PreprocessedData(Data):
         inputs: list,
         sampling_frequency: float = 1.0,
         store_dir: str = "tmp",
-        prepared_data_file: str = None,
     ):
         super().__init__(inputs, sampling_frequency, store_dir)
-        if prepared_data_file is None:
-            self.prepared_data_file = f"dataset_{self._identifier}.npy"
+        self.prepared = False
 
     def prepare_memmap_filenames(self):
-        self.te_pattern = "te_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(self.inputs))), identifier=self._identifier
-        )
         self.prepared_data_pattern = (
-            "prepared_data_"
-            "{{i:0{width}d}}_"
-            "{identifier}.npy".format(
-                width=len(str(len(self.inputs))), identifier=self._identifier
+            "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
+                width=len(str(self.n_subjects)), identifier=self._identifier
             )
         )
 
@@ -78,11 +72,15 @@ class PreprocessedData(Data):
         whiten : bool
             Should we whiten the PCA'ed data? Optional, default is False.
         """
+        if self.prepared:
+            _logger.warning("Previously prepared data will be overwritten.")
+
         # Class attributes related to data preparation
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
         self.whiten = whiten
+        self.prepared = True
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
