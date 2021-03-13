@@ -1,4 +1,5 @@
 import pathlib
+import logging
 from shutil import rmtree
 from typing import List, Union
 
@@ -11,6 +12,7 @@ from tqdm import tqdm
 from vrad.data import io, manipulation
 from vrad.utils import misc
 
+_logger = logging.getLogger("VRAD")
 _rng = np.random.default_rng()
 
 
@@ -26,7 +28,7 @@ class Data:
     inputs : list of str or str
         Filenames to be read.
     sampling_frequency : float
-        Sampling frequency of the data in Hz. Optional, default is 1.0.
+        Sampling frequency of the data in Hz. Optional.
     store_dir : str
         Directory to save results and intermediate steps to. Optional, default is /tmp.
     n_embeddings : int
@@ -43,7 +45,7 @@ class Data:
     def __init__(
         self,
         inputs: list,
-        sampling_frequency: float = 1.0,
+        sampling_frequency: float = None,
         store_dir: str = "tmp",
         n_embeddings: int = 0,
         n_pca_components: int = None,
@@ -93,8 +95,8 @@ class Data:
         ]
 
         # Other attributes
+        self.sampling_frequency = sampling_frequency
         self.n_raw_data_channels = self.n_channels
-        self.sampling_frequency = float(sampling_frequency)
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components
         self.whiten = whiten

@@ -31,7 +31,7 @@ class PreprocessedData(Data):
     def __init__(
         self,
         inputs: list,
-        sampling_frequency: float = 1.0,
+        sampling_frequency: float = None,
         store_dir: str = "tmp",
     ):
         super().__init__(inputs, sampling_frequency, store_dir)
@@ -90,6 +90,16 @@ class PreprocessedData(Data):
         """
         if self.prepared:
             _logger.warning("Previously prepared data will be overwritten.")
+
+        if filter_range is not None:
+            if filter_order is None:
+                raise ValueError(
+                    "If we are filtering the data, filter_order must be passed."
+                )
+            if self.sampling_frequency is None:
+                raise ValueError(
+                    "If we are filtering the data, sampling_frequency must be passed."
+                )
 
         # Class attributes related to data preparation
         self.filter_range = filter_range
