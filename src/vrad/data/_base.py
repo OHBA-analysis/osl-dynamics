@@ -50,11 +50,24 @@ class Data:
         whiten=None,
         prepared=False,
     ):
-        # Identifier for the data
+        # Unique identifier for the data object
         self._identifier = id(inputs)
 
-        # Input files
-        self.inputs = [inputs] if isinstance(inputs, str) else inputs
+        # Validate inputs
+        if isinstance(inputs, str):
+            self.inputs = [inputs]
+        elif isinstance(inputs, np.ndarray):
+            if inputs.ndim == 2:
+                self.inputs = [inputs]
+            else:
+                self.inputs = inputs
+        elif isinstance(inputs, list):
+            self.inputs = inputs
+        else:
+            raise ValueError(
+                f"inputs must be str, np.ndarray or list, got {type(inputs)}."
+            )
+
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
         self.raw_data_pattern = "input_data_{{i:0{width}d}}_{identifier}.npy".format(
