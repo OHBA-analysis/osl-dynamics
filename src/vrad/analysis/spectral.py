@@ -60,7 +60,7 @@ def autocorrelation_function(
                 # Take elements from the first row and column
                 autocorrelation_function[i, j, k] = np.concatenate(
                     [
-                        autocorrelation_function_jk[0, n_embeddings // 2 :][::-1],
+                        autocorrelation_function_jk[0, n_embeddings // 2 + 1:][::-1],
                         autocorrelation_function_jk[:, n_embeddings // 2],
                         autocorrelation_function_jk[-1, : n_embeddings // 2][::-1],
                     ]
