@@ -427,8 +427,8 @@ class PreprocessedData(Data):
             raw_covariances.append(
                 te_cov[
                     :,
-                    :: self.n_embeddings,
-                    :: self.n_embeddings,
+                    self.n_embeddings // 2 :: self.n_embeddings,
+                    self.n_embeddings // 2 :: self.n_embeddings,
                 ]
             )
 
