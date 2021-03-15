@@ -74,19 +74,22 @@ class Data:
 
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
-        self.raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(inputs))), identifier=self._identifier
-        )
 
         # Raw data memory maps
+        raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(inputs))), identifier=self._identifier
+        )
         self.raw_data_filenames = [
-            str(self.store_dir / self.raw_data_pattern.format(i=i))
-            for i, _ in enumerate(inputs)
+            str(self.store_dir / raw_data_pattern.format(i=i))
+            for i in range(len(inputs))
         ]
 
         # Load the data
         self.raw_data_memmaps = self.load_data()
         self.subjects = self.raw_data_memmaps
+
+        # Validate subject data
+        self.validate_subjects()
 
         # Raw data statistics
         self.raw_data_mean = [
@@ -103,9 +106,6 @@ class Data:
         self.n_pca_components = n_pca_components
         self.whiten = whiten
         self.prepared = prepared
-
-        # Validation
-        self.validate_subjects()
 
     def __iter__(self):
         return iter(self.subjects)
@@ -195,41 +195,12 @@ class Data:
                 whiten=prep_settings.get("whiten", False),
             )
 
-    def autocorrelation_functions(
-        self,
-        covariances: Union[list, np.ndarray],
-        reverse_standardization: bool = False,
-        subject_index: int = None,
-    ) -> np.ndarray:
-        """Calculates the autocorrelation function the state covariance matrices.
+    def _reverse_std_pca(self, covariances, reverse_standardization, subject_index):
 
-        An autocorrelation function is calculated for each state for each subject.
-
-        Parameters
-        ----------
-        covariances : np.ndarray
-            State covariance matrices.
-            Shape is (n_subjects, n_states, n_channels, n_channels).
-            These must be subject specific covariances.
-        reverse_standardization : bool
-            Should we reverse the standardization performed on the dataset?
-            Optional, the default is False.
-        subject_index : int
-            Index for the subject if the covariances corresponds to a single
-            subject. Optional. Only used if reverse_standardization is True.
-
-        Returns
-        -------
-        np.ndarray
-            Autocorrelation function.
-            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf)
-            or (n_states, n_channels, n_channels, n_acf).
-        """
         # Validation
-        if self.n_embeddings <= 1:
+        if not self.prepared:
             raise ValueError(
-                "To calculate an autocorrelation function we have to train on time "
-                + "embedded data."
+                "Data must have been prepared in VRAD if this method is called."
             )
 
         if isinstance(covariances, np.ndarray):
@@ -248,7 +219,7 @@ class Data:
         n_subjects = len(covariances)
         n_states = covariances[0].shape[0]
 
-        autocorrelation_function = []
+        te_covs = []
         for n in range(n_subjects):
             if reverse_standardization:
                 for i in range(n_states):
@@ -286,10 +257,52 @@ class Data:
                         @ np.diag(np.repeat(raw_data_std, self.n_embeddings))
                     )
 
-            # Calculate the autocorrelation function
+            te_covs.append(te_cov)
+
+        return te_covs
+
+    def autocorrelation_functions(
+        self,
+        covariances: Union[list, np.ndarray],
+        reverse_standardization: bool = False,
+        subject_index: int = None,
+    ) -> np.ndarray:
+        """Calculates the autocorrelation function the state covariance matrices.
+
+        An autocorrelation function is calculated for each state for each subject.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            State covariance matrices.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
+            These must be subject specific covariances.
+        reverse_standardization : bool
+            Should we reverse the standardization performed on the dataset?
+            Optional, the default is False.
+        subject_index : int
+            Index for the subject if the covariances corresponds to a single
+            subject. Optional. Only used if reverse_standardization is True.
+
+        Returns
+        -------
+        np.ndarray
+            Autocorrelation function.
+            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf)
+            or (n_states, n_channels, n_channels, n_acf).
+        """
+        # Get covariance of time embedded data
+        te_covs = self._reverse_std_pca(
+            covariances, reverse_standardization, subject_index
+        )
+
+        # Take elements from the time embedded covariances that
+        # correspond to the autocorrelation function
+        autocorrelation_functions = []
+        for n in range(len(te_covs)):
             autocorrelation_function.append(
                 spectral.autocorrelation_function(
-                    te_cov, self.n_embeddings, self.n_raw_data_channels
+                    te_covs[n], self.n_embeddings, self.n_raw_data_channels
                 )
             )
 
@@ -562,7 +575,7 @@ class Data:
             Trimed time series.
         """
         if self.prepared:
-            n_embddings = self.n_embeddings
+            n_embeddings = self.n_embeddings or n_embeddings
 
         trimmed_raw_time_series = []
         for memmap in self.raw_data_memmaps:
@@ -611,72 +624,17 @@ class Data:
             Shape is (n_subjects, n_states, n_channels, n_channels) or
             (n_states, n_channels, n_channels).
         """
-        # Validation
-        if self.n_embeddings <= 1:
-            raise ValueError(
-                "To calculate an autocorrelation function we have to train on "
-                + "time embedded data."
-            )
+        # Get covariance of time embedded data
+        te_covs = self._reverse_std_pca(
+            state_covariances, reverse_standardization, subject_index
+        )
 
-        if isinstance(state_covariances, np.ndarray):
-            if state_covariances.ndim != 3:
-                raise ValueError(
-                    "state_covariances must be shape (n_states, n_channels, n_channels)"
-                    + " or (n_subjects, n_states, n_channels, n_channels)."
-                )
-            state_covariances = [state_covariances]
-
-        if not isinstance(state_covariances, list):
-            raise ValueError(
-                "state_covariances must be a list of numpy arrays or a numpy array."
-            )
-
-        n_subjects = len(state_covariances)
-        n_states = state_covariances[0].shape[0]
-
+        # Take elements from the time embedded covariances that
+        # correspond to the raw channel covariances
         raw_covariances = []
-        for n in range(n_subjects):
-            if reverse_standardization:
-                for i in range(n_states):
-                    # Get the standard deviation of the prepared data
-                    if subject_index is None:
-                        prepared_data_std = self.prepared_data_std[n]
-                    else:
-                        prepared_data_std = self.prepared_data_std[subject_index]
-
-                    # Reverse the standardisation
-                    state_covariances[n][i] = (
-                        np.diag(prepared_data_std)
-                        @ state_covariances[n][i]
-                        @ np.diag(prepared_data_std)
-                    )
-
-            # Reverse the PCA
-            te_cov = []
-            for i in range(n_states):
-                te_cov.append(
-                    self.pca_weights @ state_covariances[n][i] @ self.pca_weights.T
-                )
-            te_cov = np.array(te_cov)
-
-            if reverse_standardization:
-                for i in range(n_states):
-                    # Get the standard deviation of the raw data
-                    if subject_index is None:
-                        raw_data_std = self.raw_data_std[n]
-                    else:
-                        raw_data_std = self.raw_data_std[subject_index]
-
-                    # Reverse the standardisation
-                    te_cov[i] = (
-                        np.diag(np.repeat(raw_data_std, self.n_embeddings))
-                        @ te_cov[i]
-                        @ np.diag(np.repeat(raw_data_std, self.n_embeddings))
-                    )
-
-            # Get the raw data covariance
+        for n in range(len(te_covs)):
             raw_covariances.append(
-                te_cov[
+                te_covs[n][
                     :,
                     self.n_embeddings // 2 :: self.n_embeddings,
                     self.n_embeddings // 2 :: self.n_embeddings,
