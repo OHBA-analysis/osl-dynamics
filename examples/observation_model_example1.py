@@ -7,7 +7,7 @@ print("Setting up")
 from pathlib import Path
 
 import numpy as np
-from vrad import data
+from vrad.data import Data
 from vrad.inference import tf_ops
 from vrad.models import GO
 from vrad.simulation import MixedHSMM_MVN
@@ -55,7 +55,7 @@ sim = MixedHSMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.PreprocessedData(sim)
+meg_data = Data(sim)
 n_channels = meg_data.n_channels
 
 # Prepare dataset

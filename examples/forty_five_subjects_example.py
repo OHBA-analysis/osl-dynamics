@@ -10,7 +10,7 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data
+from vrad.data import Data
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
@@ -54,7 +54,7 @@ learning_rate = 0.01
 
 # Read MEG data
 print("Reading MEG data")
-prepared_data = data.Data(
+prepared_data = Data(
     [
         f"/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject{i}.mat"
         for i in range(1, 46)
@@ -131,7 +131,7 @@ hmm_stc = np.concatenate(
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
 # Load preprocessed data to calculate spatial power maps
-preprocessed_data = data.PreprocessedData(
+preprocessed_data = Data(
     [
         f"/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject{i}.mat"
         for i in range(1, 46)

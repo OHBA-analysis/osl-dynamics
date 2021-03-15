@@ -9,6 +9,8 @@ import yaml
 from sklearn.cluster import KMeans
 from tensorflow.python.data import Dataset
 from tqdm import tqdm
+
+from vrad.analysis import spectral
 from vrad.data import io, manipulation
 from vrad.utils import misc
 
@@ -17,7 +19,7 @@ _rng = np.random.default_rng()
 
 
 class Data:
-    """Base class for data.
+    """Data Class.
 
     The Data class enables the input and processing of data. When given a list of
     files, it produces a set of numpy memory maps which contain their raw data.
@@ -118,14 +120,9 @@ class Data:
             f"n_subjects: {self.n_subjects}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
+            f"prepared: {self.prepared}",
         ]
         return "\n ".join(info)
-
-    def validate_subjects(self):
-        """Validate data files."""
-        n_channels = [subject.shape[1] for subject in self.subjects]
-        if not np.equal(n_channels, n_channels[0]).all():
-            raise ValueError("All subjects should have the same number of channels.")
 
     @property
     def raw_data(self) -> List:
@@ -147,15 +144,156 @@ class Data:
         """Number of subjects."""
         return len(self.subjects)
 
-    def load_data(self):
-        """Import data into a list of memory maps."""
-        memmaps = []
-        for in_file, out_file in zip(
-            tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
-        ):
-            data = io.load_data(in_file, mmap_location=out_file)
-            memmaps.append(data)
-        return memmaps
+    @classmethod
+    def from_yaml(cls, file, **kwargs):
+        instance = misc.class_from_yaml(cls, file, kwargs)
+
+        with open(file) as f:
+            settings = yaml.load(f, Loader=yaml.Loader)
+
+        if issubclass(cls, Data):
+            try:
+                cls._process_from_yaml(instance, file, **kwargs)
+            except AttributeError:
+                pass
+
+        training_dataset = instance.training_dataset(
+            sequence_length=settings["sequence_length"],
+            batch_size=settings["batch_size"],
+        )
+        prediction_dataset = instance.prediction_dataset(
+            sequence_length=settings["sequence_length"],
+            batch_size=settings["batch_size"],
+        )
+
+        return {
+            "data": instance,
+            "training_dataset": training_dataset,
+            "prediction_dataset": prediction_dataset,
+        }
+
+    def _pre_pca(self, raw_data, filter_range, filter_order, n_embeddings):
+        std_data = manipulation.standardize(raw_data)
+        if filter_range is not None:
+            f_std_data = manipulation.bandpass_filter(
+                std_data, filter_range, filter_order, self.sampling_frequency
+            )
+        else:
+            f_std_data = std_data
+        te_f_std_data = manipulation.time_embed(f_std_data, n_embeddings)
+        return te_f_std_data
+
+    def _process_from_yaml(self, file, **kwargs):
+        with open(file) as f:
+            settings = yaml.load(f, Loader=yaml.Loader)
+
+        prep_settings = settings.get("prepare", {})
+        if prep_settings.get("do", False):
+            self.prepare(
+                n_embeddings=prep_settings.get("n_embeddings"),
+                n_pca_components=prep_settings.get("n_pca_components", None),
+                whiten=prep_settings.get("whiten", False),
+            )
+
+    def autocorrelation_functions(
+        self,
+        covariances: Union[list, np.ndarray],
+        reverse_standardization: bool = False,
+        subject_index: int = None,
+    ) -> np.ndarray:
+        """Calculates the autocorrelation function the state covariance matrices.
+
+        An autocorrelation function is calculated for each state for each subject.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            State covariance matrices.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
+            These must be subject specific covariances.
+        reverse_standardization : bool
+            Should we reverse the standardization performed on the dataset?
+            Optional, the default is False.
+        subject_index : int
+            Index for the subject if the covariances corresponds to a single
+            subject. Optional. Only used if reverse_standardization is True.
+
+        Returns
+        -------
+        np.ndarray
+            Autocorrelation function.
+            Shape is (n_subjects, n_states, n_channels, n_channels, n_acf)
+            or (n_states, n_channels, n_channels, n_acf).
+        """
+        # Validation
+        if self.n_embeddings <= 1:
+            raise ValueError(
+                "To calculate an autocorrelation function we have to train on time "
+                + "embedded data."
+            )
+
+        if isinstance(covariances, np.ndarray):
+            if covariances.ndim != 3:
+                raise ValueError(
+                    "covariances must be shape (n_states, n_channels, n_channels) or"
+                    + " (n_subjects, n_states, n_channels, n_channels)."
+                )
+            covariances = [covariances]
+
+        if not isinstance(covariances, list):
+            raise ValueError(
+                "covariances must be a list of numpy arrays or a numpy array."
+            )
+
+        n_subjects = len(covariances)
+        n_states = covariances[0].shape[0]
+
+        autocorrelation_function = []
+        for n in range(n_subjects):
+            if reverse_standardization:
+                for i in range(n_states):
+                    # Get the standard deviation of the prepared data
+                    if subject_index is None:
+                        prepared_data_std = self.prepared_data_std[n]
+                    else:
+                        prepared_data_std = self.prepared_data_std[subject_index]
+
+                    # Reverse the standardisation
+                    covariances[n][i] = (
+                        np.diag(prepared_data_std)
+                        @ covariances[n][i]
+                        @ np.diag(prepared_data_std)
+                    )
+
+            # Reverse the PCA
+            te_cov = []
+            for i in range(n_states):
+                te_cov.append(self.pca_weights @ covariances[n][i] @ self.pca_weights.T)
+            te_cov = np.array(te_cov)
+
+            if reverse_standardization:
+                for i in range(n_states):
+                    # Get the standard deviation of the raw data
+                    if subject_index is None:
+                        raw_data_std = self.raw_data_std[n]
+                    else:
+                        raw_data_std = self.raw_data_std[subject_index]
+
+                    # Reverse the standardisation
+                    te_cov[i] = (
+                        np.diag(np.repeat(raw_data_std, self.n_embeddings))
+                        @ te_cov[i]
+                        @ np.diag(np.repeat(raw_data_std, self.n_embeddings))
+                    )
+
+            # Calculate the autocorrelation function
+            autocorrelation_function.append(
+                spectral.autocorrelation_function(
+                    te_cov, self.n_embeddings, self.n_raw_data_channels
+                )
+            )
+
+        return np.squeeze(autocorrelation_function)
 
     def count_batches(self, sequence_length: int) -> np.ndarray:
         """Count batches.
@@ -177,9 +315,375 @@ class Data:
             ]
         )
 
+    def covariance_sample(
+        self,
+        segment_length: Union[int, List[int]],
+        n_segments: Union[int, List[int]],
+        n_clusters: int = None,
+    ) -> np.ndarray:
+        """Get covariances of a random selection of a time series.
+
+        Given a time series, `data`, randomly select a set of samples of length(s)
+        `segment_length` with `n_segments` of each selected. If `n_clusters` is not
+        specified each of these covariances will be returned. Otherwise, a K-means
+        clustering algorithm is run to return that `n_clusters` covariances.
+
+        Lack of overlap between samples is *not* guaranteed.
+
+        Parameters
+        ----------
+        data: np.ndarray
+            The time series to be analyzed.
+        segment_length: int or list of int
+            Either the integer number of samples for each covariance, or a list with a
+            range of values.
+        n_segments: int or list of int
+            Either the integer number of segments to select,
+             or a list specifying the number
+            of each segment length to be sampled.
+        n_clusters: int
+            The number of K-means clusters to find
+            (default is not to perform clustering).
+
+        Returns
+        -------
+        covariances: np.ndarray
+            The calculated covariance matrices of the samples.
+        """
+        segment_lengths = misc.listify(segment_length)
+        n_segments = misc.listify(n_segments)
+
+        if len(n_segments) == 1:
+            n_segments = n_segments * len(segment_lengths)
+
+        if len(segment_lengths) != len(n_segments):
+            raise ValueError(
+                "`segment_lengths` and `n_samples` should have the same lengths."
+            )
+
+        covariances = []
+        for segment_length, n_sample in zip(segment_lengths, n_segments):
+            data = self.subjects[_rng.choice(self.n_subjects)]
+            starts = _rng.choice(data.shape[0] - segment_length, n_sample)
+            samples = data[np.asarray(starts)[:, None] + np.arange(segment_length)]
+
+            transposed = samples.transpose(0, 2, 1)
+            m1 = transposed - transposed.sum(2, keepdims=1) / segment_length
+            covariances.append(np.einsum("ijk,ilk->ijl", m1, m1) / (segment_length - 1))
+        covariances = np.concatenate(covariances)
+
+        if n_clusters is None:
+            return covariances
+
+        flat_covariances = covariances.reshape((covariances.shape[0], -1))
+
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat_covariances)
+
+        kmeans_covariances = kmeans.cluster_centers_.reshape(
+            (n_clusters, *covariances.shape[1:])
+        )
+
+        return kmeans_covariances
+
     def delete_dir(self):
         """Deletes the directory that stores the memory maps."""
         rmtree(self.store_dir, ignore_errors=True)
+
+    def load_data(self):
+        """Import data into a list of memory maps."""
+        memmaps = []
+        for in_file, out_file in zip(
+            tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
+        ):
+            data = io.load_data(in_file, mmap_location=out_file)
+            memmaps.append(data)
+        return memmaps
+
+    def prepare(
+        self,
+        filter_range: list = None,
+        filter_order: int = None,
+        n_embeddings: int = 1,
+        n_pca_components: int = None,
+        whiten: bool = False,
+    ):
+        """Prepares data to train the model with.
+
+        Performs standardization, time embedding and principle component analysis.
+
+        Parameters
+        ----------
+        filter_range : list
+            Min and max frequencies to bandpass filter. Optional, default is
+            no filtering. A butterworth filter is applied.
+        filter_order : int
+            Order of the butterworth filter. Optional. Required is filter_range
+            is passed.
+        n_embeddings : int
+            Number of data points to embed the data. Optional, default is 1.
+        n_pca_components : int
+            Number of PCA components to keep. Optional, default is no PCA.
+        whiten : bool
+            Should we whiten the PCA'ed data? Optional, default is False.
+        """
+        if self.prepared:
+            _logger.warning("Previously prepared data will be overwritten.")
+
+        if filter_range is not None:
+            if filter_order is None:
+                raise ValueError(
+                    "If we are filtering the data, filter_order must be passed."
+                )
+            if self.sampling_frequency is None:
+                raise ValueError(
+                    "If we are filtering the data, sampling_frequency must be passed."
+                )
+
+        # Class attributes related to data preparation
+        self.filter_range = filter_range
+        self.filter_order = filter_order
+        self.n_embeddings = n_embeddings
+        self.n_te_channels = self.n_raw_data_channels * n_embeddings
+        self.n_pca_components = n_pca_components
+        self.whiten = whiten
+        self.prepared = True
+
+        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
+        self.prepare_memmap_filenames()
+
+        # Principle component analysis (PCA)
+        # NOTE: the approach used here only works for zero mean data
+        if n_pca_components is not None:
+
+            # Calculate the PCA components by performing SVD on the covariance
+            # of the data
+            covariance = np.zeros([self.n_te_channels, self.n_te_channels])
+            for raw_data_memmap in tqdm(
+                self.raw_data_memmaps, desc="Calculating PCA components", ncols=98
+            ):
+                # Standardise, filter and time embed the data, this function
+                # returns a copy of the data that is held in memory
+                te_f_std_data = self._pre_pca(
+                    raw_data_memmap, filter_range, filter_order, n_embeddings
+                )
+
+                # Calculate the covariance of the entire dataset
+                covariance += np.transpose(te_f_std_data) @ te_f_std_data
+
+                # Clear data in memory
+                del te_f_std_data
+
+            # Use SVD to calculate PCA components
+            u, s, vh = np.linalg.svd(covariance)
+            u = u[:, :n_pca_components].astype(np.float32)
+            s = s[:n_pca_components].astype(np.float32)
+            if whiten:
+                u = u @ np.diag(1.0 / np.sqrt(s))
+            self.pca_weights = u
+        else:
+            self.pca_weights = None
+
+        # Prepare the data
+        for raw_data_memmap, prepared_data_file in zip(
+            tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
+            self.prepared_data_filenames,
+        ):
+            # Standardise, filter and time embed the data, this function returns a
+            # copy of the data that is held in memory
+            te_f_std_data = self._pre_pca(
+                raw_data_memmap, filter_range, filter_order, n_embeddings
+            )
+
+            # Apply PCA to get the prepared data
+            if self.pca_weights is not None:
+                prepared_data = te_f_std_data @ self.pca_weights
+
+            # Otherwise, the time embedded data is the prepared data
+            else:
+                prepared_data = te_f_std_data
+
+            # Create a memory map for the prepared data
+            prepared_data_memmap = misc.MockArray.get_memmap(
+                prepared_data_file, prepared_data.shape, dtype=np.float32
+            )
+
+            # Record the mean and standard deviation of the prepared
+            # data and standardise to get the final data
+            self.prepared_data_mean.append(np.mean(prepared_data, axis=0))
+            self.prepared_data_std.append(np.std(prepared_data, axis=0))
+            prepared_data_memmap = manipulation.standardize(
+                prepared_data, create_copy=False
+            )
+            self.prepared_data_memmaps.append(prepared_data_memmap)
+
+            # Clear intermediate data
+            del te_f_std_data, prepared_data
+
+        # Update subjects to return the prepared data
+        self.subjects = self.prepared_data_memmaps
+
+    def prepare_memmap_filenames(self):
+        self.prepared_data_pattern = (
+            "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
+                width=len(str(self.n_subjects)), identifier=self._identifier
+            )
+        )
+
+        # Prepared data memory maps (time embedded and pca'ed)
+        self.prepared_data_memmaps = []
+        self.prepared_data_filenames = [
+            str(self.store_dir / self.prepared_data_pattern.format(i=i))
+            for i in range(self.n_subjects)
+        ]
+        self.prepared_data_mean = []
+        self.prepared_data_std = []
+
+    def trim_raw_time_series(
+        self,
+        sequence_length: int = None,
+        n_embeddings: int = None,
+    ) -> np.ndarray:
+        """Trims the raw preprocessed data time series.
+
+        Removes the data points that are removed when the data is prepared,
+        i.e. due to time embedding and separating into sequences, but does not
+        perform time embedding or batching into sequences on the time series.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        n_embeddings : int
+            Number of data points to embed the data.
+
+        Returns
+        -------
+        np.ndarray
+            Trimed time series.
+        """
+        if self.prepared:
+            n_embddings = self.n_embeddings
+
+        trimmed_raw_time_series = []
+        for memmap in self.raw_data_memmaps:
+
+            # Remove data points which are removed due to time embedding
+            if n_embeddings is not None:
+                memmap = memmap[n_embeddings // 2 : -n_embeddings // 2]
+
+            # Remove data points which are removed due to separating into sequences
+            if sequence_length is not None:
+                n_sequences = memmap.shape[0] // sequence_length
+                memmap = memmap[: n_sequences * sequence_length]
+
+            trimmed_raw_time_series.append(memmap)
+
+        return trimmed_raw_time_series
+
+    def raw_covariances(
+        self,
+        state_covariances: Union[list, np.ndarray],
+        reverse_standardization: bool = False,
+        subject_index: int = None,
+    ) -> np.ndarray:
+        """Covariance matrix of the raw channels.
+
+        PCA and standardization is reversed to give you to the covariance
+        matrix for the raw channels.
+
+        Parameters
+        ----------
+        state_covariances : np.ndarray
+            State covariance matrices.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
+            These must be subject specific covariances.
+        reverse_standardization : bool
+            Should we reverse the standardization performed on the dataset?
+            Optional, the default is False.
+        subject_index : int
+            Index for the subject if the covariances corresponds to a single
+            subject. Optional. Only used if reverse_standardization is True.
+
+        Returns
+        -------
+        np.ndarray
+            The variance for each channel, state and subject.
+            Shape is (n_subjects, n_states, n_channels, n_channels) or
+            (n_states, n_channels, n_channels).
+        """
+        # Validation
+        if self.n_embeddings <= 1:
+            raise ValueError(
+                "To calculate an autocorrelation function we have to train on "
+                + "time embedded data."
+            )
+
+        if isinstance(state_covariances, np.ndarray):
+            if state_covariances.ndim != 3:
+                raise ValueError(
+                    "state_covariances must be shape (n_states, n_channels, n_channels)"
+                    + " or (n_subjects, n_states, n_channels, n_channels)."
+                )
+            state_covariances = [state_covariances]
+
+        if not isinstance(state_covariances, list):
+            raise ValueError(
+                "state_covariances must be a list of numpy arrays or a numpy array."
+            )
+
+        n_subjects = len(state_covariances)
+        n_states = state_covariances[0].shape[0]
+
+        raw_covariances = []
+        for n in range(n_subjects):
+            if reverse_standardization:
+                for i in range(n_states):
+                    # Get the standard deviation of the prepared data
+                    if subject_index is None:
+                        prepared_data_std = self.prepared_data_std[n]
+                    else:
+                        prepared_data_std = self.prepared_data_std[subject_index]
+
+                    # Reverse the standardisation
+                    state_covariances[n][i] = (
+                        np.diag(prepared_data_std)
+                        @ state_covariances[n][i]
+                        @ np.diag(prepared_data_std)
+                    )
+
+            # Reverse the PCA
+            te_cov = []
+            for i in range(n_states):
+                te_cov.append(
+                    self.pca_weights @ state_covariances[n][i] @ self.pca_weights.T
+                )
+            te_cov = np.array(te_cov)
+
+            if reverse_standardization:
+                for i in range(n_states):
+                    # Get the standard deviation of the raw data
+                    if subject_index is None:
+                        raw_data_std = self.raw_data_std[n]
+                    else:
+                        raw_data_std = self.raw_data_std[subject_index]
+
+                    # Reverse the standardisation
+                    te_cov[i] = (
+                        np.diag(np.repeat(raw_data_std, self.n_embeddings))
+                        @ te_cov[i]
+                        @ np.diag(np.repeat(raw_data_std, self.n_embeddings))
+                    )
+
+            # Get the raw data covariance
+            raw_covariances.append(
+                te_cov[
+                    :,
+                    self.n_embeddings // 2 :: self.n_embeddings,
+                    self.n_embeddings // 2 :: self.n_embeddings,
+                ]
+            )
+
+        return np.squeeze(raw_covariances)
 
     def training_dataset(
         self,
@@ -313,100 +817,8 @@ class Data:
 
         return subject_datasets
 
-    def covariance_sample(
-        self,
-        segment_length: Union[int, List[int]],
-        n_segments: Union[int, List[int]],
-        n_clusters: int = None,
-    ) -> np.ndarray:
-        """Get covariances of a random selection of a time series.
-
-        Given a time series, `data`, randomly select a set of samples of length(s)
-        `segment_length` with `n_segments` of each selected. If `n_clusters` is not
-        specified each of these covariances will be returned. Otherwise, a K-means
-        clustering algorithm is run to return that `n_clusters` covariances.
-
-        Lack of overlap between samples is *not* guaranteed.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            The time series to be analyzed.
-        segment_length: int or list of int
-            Either the integer number of samples for each covariance, or a list with a
-            range of values.
-        n_segments: int or list of int
-            Either the integer number of segments to select,
-             or a list specifying the number
-            of each segment length to be sampled.
-        n_clusters: int
-            The number of K-means clusters to find
-            (default is not to perform clustering).
-
-        Returns
-        -------
-        covariances: np.ndarray
-            The calculated covariance matrices of the samples.
-        """
-        segment_lengths = misc.listify(segment_length)
-        n_segments = misc.listify(n_segments)
-
-        if len(n_segments) == 1:
-            n_segments = n_segments * len(segment_lengths)
-
-        if len(segment_lengths) != len(n_segments):
-            raise ValueError(
-                "`segment_lengths` and `n_samples` should have the same lengths."
-            )
-
-        covariances = []
-        for segment_length, n_sample in zip(segment_lengths, n_segments):
-            data = self.subjects[_rng.choice(self.n_subjects)]
-            starts = _rng.choice(data.shape[0] - segment_length, n_sample)
-            samples = data[np.asarray(starts)[:, None] + np.arange(segment_length)]
-
-            transposed = samples.transpose(0, 2, 1)
-            m1 = transposed - transposed.sum(2, keepdims=1) / segment_length
-            covariances.append(np.einsum("ijk,ilk->ijl", m1, m1) / (segment_length - 1))
-        covariances = np.concatenate(covariances)
-
-        if n_clusters is None:
-            return covariances
-
-        flat_covariances = covariances.reshape((covariances.shape[0], -1))
-
-        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat_covariances)
-
-        kmeans_covariances = kmeans.cluster_centers_.reshape(
-            (n_clusters, *covariances.shape[1:])
-        )
-
-        return kmeans_covariances
-
-    @classmethod
-    def from_yaml(cls, file, **kwargs):
-        instance = misc.class_from_yaml(cls, file, kwargs)
-
-        with open(file) as f:
-            settings = yaml.load(f, Loader=yaml.Loader)
-
-        if issubclass(cls, Data):
-            try:
-                cls._process_from_yaml(instance, file, **kwargs)
-            except AttributeError:
-                pass
-
-        training_dataset = instance.training_dataset(
-            sequence_length=settings["sequence_length"],
-            batch_size=settings["batch_size"],
-        )
-        prediction_dataset = instance.prediction_dataset(
-            sequence_length=settings["sequence_length"],
-            batch_size=settings["batch_size"],
-        )
-
-        return {
-            "data": instance,
-            "training_dataset": training_dataset,
-            "prediction_dataset": prediction_dataset,
-        }
+    def validate_subjects(self):
+        """Validate data files."""
+        n_channels = [subject.shape[1] for subject in self.subjects]
+        if not np.equal(n_channels, n_channels[0]).all():
+            raise ValueError("All subjects should have the same number of channels.")
