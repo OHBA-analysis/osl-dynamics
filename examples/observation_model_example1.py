@@ -7,10 +7,9 @@ print("Setting up")
 from pathlib import Path
 
 import numpy as np
-from vrad.data import Data
+from vrad import data, simulation
 from vrad.inference import tf_ops
 from vrad.models import GO
-from vrad.simulation import MixedHSMM_MVN
 from vrad.utils import plotting
 
 # GPU settings
@@ -44,7 +43,7 @@ mixed_state_vectors = np.array(
 
 # Simulate data
 print("Simulating data")
-sim = MixedHSMM_MVN(
+sim = simulation.MixedHSMM_MVN(
     n_samples=n_samples,
     mixed_state_vectors=mixed_state_vectors,
     gamma_shape=gamma_shape,
@@ -55,7 +54,7 @@ sim = MixedHSMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = Data(sim)
+meg_data = data.Data(sim.time_series)
 n_channels = meg_data.n_channels
 
 # Prepare dataset

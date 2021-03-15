@@ -5,10 +5,9 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data
+from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIMARO
-from vrad.simulation import HMM_MAR
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -64,7 +63,7 @@ cov = np.array([np.diag(C1), np.diag(C2), np.diag(C3)])
 
 # Simulate data
 print("Simulating data")
-sim = HMM_MAR(
+sim = simulation.HMM_MAR(
     n_samples=n_samples,
     trans_prob="sequence",
     stay_prob=0.95,
@@ -73,7 +72,7 @@ sim = HMM_MAR(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim)
+meg_data = data.Data(sim.time_series)
 n_channels = meg_data.n_channels
 
 # Prepare dataset

@@ -6,10 +6,9 @@ print("Setting up")
 from pathlib import Path
 
 import numpy as np
-from vrad import data
+from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
-from vrad.simulation import HierarchicalHMM_MVN
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -86,7 +85,7 @@ bottom_level_trans_probs = [
 ]
 # Simulate data
 print("Simulating data")
-sim = HierarchicalHMM_MVN(
+sim = simulation.HierarchicalHMM_MVN(
     n_samples=n_samples,
     top_level_trans_prob=top_level_trans_prob,
     bottom_level_trans_probs=bottom_level_trans_probs,
@@ -98,7 +97,7 @@ sim = HierarchicalHMM_MVN(
     data_random_seed=555,
 )
 sim.standardize()
-meg_data = data.Data(sim)
+meg_data = data.Data(sim.time_series)
 n_channels = meg_data.n_channels
 
 # Prepare dataset

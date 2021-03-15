@@ -1,9 +1,8 @@
 print("Setting up")
 import pickle
 import numpy as np
-from vrad import data
+from vrad import data, simulation
 from vrad.inference import tf_ops
-from vrad.simulation import HMM_MAR
 from vrad.models import MARO
 
 # GPU settings
@@ -35,7 +34,7 @@ cov = np.array([np.diag(C1), np.diag(C2), np.diag(C3)])
 
 # Simulate data
 print("Simulating data")
-sim = HMM_MAR(
+sim = simulation.HMM_MAR(
     n_samples=n_samples,
     trans_prob="sequence",
     stay_prob=0.95,
@@ -44,7 +43,7 @@ sim = HMM_MAR(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim)
+meg_data = data.Data(sim.time_series)
 
 n_states = sim.n_states
 n_lags = sim.order

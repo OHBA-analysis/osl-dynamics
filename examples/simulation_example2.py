@@ -8,10 +8,9 @@ print("Setting up")
 from pathlib import Path
 
 import numpy as np
-from vrad import data
+from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
-from vrad.simulation import HSMM_MVN
 from vrad.utils import plotting
 
 # GPU settings
@@ -61,7 +60,7 @@ cov = np.load(example_file_directory / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
-sim = HSMM_MVN(
+sim = simulation.HSMM_MVN(
     n_samples=n_samples,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
@@ -71,7 +70,7 @@ sim = HSMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim)
+meg_data = data.Data(sim.time_series)
 n_channels = meg_data.n_channels
 
 # Prepare dataset

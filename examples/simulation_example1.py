@@ -8,10 +8,9 @@ print("Setting up")
 from pathlib import Path
 
 import numpy as np
-from vrad import data
+from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
-from vrad.simulation import HMM_MVN
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -59,7 +58,7 @@ cov = np.load(example_file_directory / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
-sim = HMM_MVN(
+sim = simulation.HMM_MVN(
     n_samples=n_samples,
     trans_prob=trans_prob,
     means="zero",
@@ -68,7 +67,7 @@ sim = HMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim)
+meg_data = data.Data(sim.time_series)
 n_channels = meg_data.n_channels
 
 # Prepare dataset
