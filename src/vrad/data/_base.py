@@ -29,6 +29,9 @@ class Data:
     ----------
     inputs : list of str or str
         Filenames to be read.
+    matlab_field : str
+        If a MATLAB filename is passed, this is the field that corresponds to the data.
+        Optional. By default we read the field 'X'.
     sampling_frequency : float
         Sampling frequency of the data in Hz. Optional.
     store_dir : str
@@ -47,6 +50,7 @@ class Data:
     def __init__(
         self,
         inputs: list,
+        matlab_field: str = "X",
         sampling_frequency: float = None,
         store_dir: str = "tmp",
         n_embeddings: int = 0,
@@ -85,7 +89,7 @@ class Data:
         ]
 
         # Load the data
-        self.raw_data_memmaps = self.load_data()
+        self.raw_data_memmaps = self.load_data(matlab_field)
         self.subjects = self.raw_data_memmaps
 
         # Validate subject data
@@ -402,13 +406,20 @@ class Data:
         """Deletes the directory that stores the memory maps."""
         rmtree(self.store_dir, ignore_errors=True)
 
-    def load_data(self):
-        """Import data into a list of memory maps."""
+    def load_data(self, matlab_field: str):
+        """Import data into a list of memory maps.
+
+        Parameters
+        ----------
+        matlab_field : str
+            If a MATLAB filename is passed, this is the field that corresponds
+            to the data. By default we read the field 'X'.
+        """
         memmaps = []
         for in_file, out_file in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
-            data = io.load_data(in_file, mmap_location=out_file)
+            data = io.load_data(in_file, matlab_field, mmap_location=out_file)
             memmaps.append(data)
         return memmaps
 

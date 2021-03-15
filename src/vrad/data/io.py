@@ -44,13 +44,15 @@ def load_spm(filename: str) -> Tuple[np.ndarray, float]:
     return data, sampling_frequency
 
 
-def load_matlab(filename: str, ignored_keys=None) -> np.ndarray:
+def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
     """Loads a MATLAB or SPM file.
 
     Parameters
     ----------
     filename : str
         Filename of MATLAB file to read.
+    field : str
+        Field that corresponds to the data.
     ignored_keys :  list of str
         Keys in the MATLAB file to ignore.
 
@@ -65,20 +67,22 @@ def load_matlab(filename: str, ignored_keys=None) -> np.ndarray:
         mat = mat73.loadmat(filename)
 
     if "D" in mat:
-        _logger.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
+        _logger.warning("Assuming that key 'D' corresponds to an SPM MEEG object.")
         time_series, sampling_frequency = load_spm(filename=filename)
         print(f"Sampling frequency of the data is {sampling_frequency} Hz.")
     else:
         try:
-            time_series = mat["X"]
+            time_series = mat[field]
         except KeyError:
-            raise KeyError("data in MATLAB file must be contained in a field called X.")
+            raise KeyError(f"field '{field}' missing from MATLAB file.")
 
     return time_series
 
 
 def load_data(
-    time_series: Union[str, list, np.ndarray], mmap_location: str = None
+    time_series: Union[str, list, np.ndarray],
+    matlab_field: str = "X",
+    mmap_location: str = None,
 ) -> np.ndarray:
     """Loads time series data.
 
@@ -86,6 +90,8 @@ def load_data(
     ----------
     time_series : numpy.ndarray or str
         An array or filename of a .npy or .mat file containing timeseries data.
+    matlab_field : str
+        If a MATLAB filename is passed, this is the field that corresponds to the data.
     mmap_location : str
         Filename to save the data as a numpy memory map.
 
@@ -102,7 +108,7 @@ def load_data(
         if time_series[-4:] == ".npy":
             time_series = np.load(time_series)
         elif time_series[-4:] == ".mat":
-            time_series = load_matlab(filename=time_series)
+            time_series = load_matlab(filename=time_series, field=matlab_field)
 
     # If a python list has been passed, convert to a numpy array
     if isinstance(time_series, list):
