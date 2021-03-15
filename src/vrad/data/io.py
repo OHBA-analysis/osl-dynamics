@@ -82,16 +82,19 @@ def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
 def load_data(
     time_series: Union[str, list, np.ndarray],
     matlab_field: str = "X",
+    epoched: bool = False,
     mmap_location: str = None,
 ) -> np.ndarray:
     """Loads time series data.
 
     Parameters
     ----------
-    time_series : numpy.ndarray or str
+    time_series : numpy.ndarray or str or list
         An array or filename of a .npy or .mat file containing timeseries data.
     matlab_field : str
         If a MATLAB filename is passed, this is the field that corresponds to the data.
+    epoched : bool
+        Is the data epoched? Optional, default is False.
     mmap_location : str
         Filename to save the data as a numpy memory map.
 
@@ -101,34 +104,82 @@ def load_data(
         Time series data.
     """
 
-    # Read time series from a file
+    # Read time series data from a file
     if isinstance(time_series, str):
-        if not path.exists(time_series):
-            raise FileNotFoundError(time_series)
-        if time_series[-4:] == ".npy":
-            time_series = np.load(time_series)
-        elif time_series[-4:] == ".mat":
-            time_series = load_matlab(filename=time_series, field=matlab_field)
+        time_series = read_from_file(time_series, matlab_field)
 
-    # If a python list has been passed, convert to a numpy array
     if isinstance(time_series, list):
-        time_series = np.array(time_series)
 
-    # Check the time series has the appropriate shape
-    if time_series.ndim != 2:
+        # If list of filenames, read data from file
+        if isinstance(time_series[0], str):
+            time_series = np.array(
+                [read_from_file(fname, matlab_field) for fname in time_series]
+            )
+
+        # Otherwise we assume it's a list of numpy arrays
+        else:
+            time_series = np.array(time_series)
+
+    # Check the time series has the appropriate dimensionality
+    if epoched and time_series.ndim != 3:
         raise ValueError(
-            f"{time_series.shape} detected. Time series must be a 2D array."
+            f"Shape {time_series.shape} detected for time series. "
+            + "epoched data must be 3D."
         )
 
-    # Check time is the first axis, channels are the second axis
-    time_series = time_axis_first(time_series)
+    if (not epoched) and time_series.ndim != 2:
+        if time_series.ndim == 3:
+            raise ValueError(
+                f"Shape {time_series.shape} detected for time series. "
+                + "Try epoched=True."
+            )
+        else:
+            raise ValueError(
+                f"Shape {time_series.shape} detected. Time series must be 2D."
+            )
+
+    # Check time is the first axis and channels are the second axis
+    if epoched:
+        time_series = np.array([time_axis_first(ts) for ts in time_series])
+    else:
+        time_series = time_axis_first(time_series)
+
+    # Make sure the time series is type float32
+    time_series = time_series.astype(np.float32)
 
     # Load from memmap
     if mmap_location is not None:
         np.save(mmap_location, time_series)
         time_series = np.load(mmap_location, mmap_mode="r+")
 
-    # Make sure the time series is type float32
-    time_series = time_series.astype(np.float32)
+    return time_series
+
+
+def read_from_file(filename: str, matlab_field: str = None) -> np.ndarray:
+    """Loads time series data.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of a .npy or .mat file containing time series data.
+    matlab_field : str
+        If a MATLAB filename is passed, this is the field that corresponds to the data.
+
+    Returns
+    -------
+    np.ndarray
+        Time series data.
+    """
+
+    # Check if file exists
+    if not path.exists(filename):
+        raise FileNotFoundError(filename)
+
+    # Read data from the file
+    if filename[-4:] == ".npy":
+        time_series = np.load(filename)
+
+    elif filename[-4:] == ".mat":
+        time_series = load_matlab(filename=filename, field=matlab_field)
 
     return time_series

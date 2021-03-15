@@ -45,6 +45,9 @@ class Data:
         Was whitening applied during the PCA? Optional.
     prepared : bool
         Flag indicating if data has already been prepared. Optional.
+    epoched : bool
+        Flag indicating if the data has been epoched. Optional, default is False.
+        If True, inputs must be a list of lists.
     """
 
     def __init__(
@@ -57,6 +60,7 @@ class Data:
         n_pca_components: int = None,
         whiten: bool = None,
         prepared: bool = False,
+        epoched: bool = False,
     ):
         # Unique identifier for the data object
         self._identifier = id(inputs)
@@ -64,17 +68,21 @@ class Data:
         # Validate inputs
         if isinstance(inputs, str):
             self.inputs = [inputs]
+
         elif isinstance(inputs, np.ndarray):
-            if inputs.ndim == 2:
+            if (inputs.ndim == 2 and not epoched) or (inputs.ndim == 3 and epoched):
                 self.inputs = [inputs]
             else:
                 self.inputs = inputs
+
         elif isinstance(inputs, list):
-            self.inputs = inputs
+            if epoched and not isinstance(inputs[0], list):
+                raise ValueError("If data is epoched, inputs must be a list of lists.")
+            else:
+                self.inputs = inputs
+
         else:
-            raise ValueError(
-                f"inputs must be str, np.ndarray or list, got {type(inputs)}."
-            )
+            raise ValueError("inputs must be str, np.ndarray or list.")
 
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
@@ -89,6 +97,7 @@ class Data:
         ]
 
         # Load the data
+        self.epoched = epoched
         self.raw_data_memmaps = self.load_data(matlab_field)
         self.subjects = self.raw_data_memmaps
 
@@ -122,6 +131,7 @@ class Data:
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
             f"n_subjects: {self.n_subjects}",
+            f"n_epochs: {self.n_epochs}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
             f"prepared: {self.prepared}",
@@ -136,12 +146,25 @@ class Data:
     @property
     def n_channels(self) -> int:
         """Number of channels in the data files."""
-        return self.subjects[0].shape[1]
+        return self.subjects[0].shape[-1]
 
     @property
-    def n_samples(self) -> list:
-        """Number of samples for each subject"""
-        return [subject.shape[0] for subject in self.subjects]
+    def n_epochs(self) -> Union[list, int]:
+        """Number of epochs."""
+        if self.epoched:
+            n_epochs = [subject.shape[0] for subject in self.subjects]
+            if len(set(n_epochs)) == 1:
+                return n_epochs[0]
+            else:
+                return n_epochs
+
+    @property
+    def n_samples(self) -> int:
+        """Number of samples for each subject."""
+        if self.epoched:
+            return self.subjects[0].shape[-2]
+        else:
+            return sum([subject.shape[-2] for subject in self.subjects])
 
     @property
     def n_subjects(self) -> int:
@@ -419,7 +442,9 @@ class Data:
         for in_file, out_file in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
-            data = io.load_data(in_file, matlab_field, mmap_location=out_file)
+            data = io.load_data(
+                in_file, matlab_field, self.epoched, mmap_location=out_file
+            )
             memmaps.append(data)
         return memmaps
 
@@ -788,6 +813,6 @@ class Data:
 
     def validate_subjects(self):
         """Validate data files."""
-        n_channels = [subject.shape[1] for subject in self.subjects]
+        n_channels = [subject.shape[-1] for subject in self.subjects]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All subjects should have the same number of channels.")
