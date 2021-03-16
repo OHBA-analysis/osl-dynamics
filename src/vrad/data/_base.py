@@ -1,6 +1,4 @@
-import pathlib
 import logging
-from shutil import rmtree
 from typing import List, Union
 
 import numpy as np
@@ -11,14 +9,14 @@ from tensorflow.python.data import Dataset
 from tqdm import tqdm
 
 from vrad.analysis import spectral
-from vrad.data import io, manipulation
+from vrad.data.io import IO
 from vrad.utils import misc
 
 _logger = logging.getLogger("VRAD")
 _rng = np.random.default_rng()
 
 
-class Data:
+class Data(IO):
     """Data Class.
 
     The Data class enables the input and processing of data. When given a list of
@@ -36,6 +34,9 @@ class Data:
         Sampling frequency of the data in Hz. Optional.
     store_dir : str
         Directory to save results and intermediate steps to. Optional, default is /tmp.
+    epoched : bool
+        Flag indicating if the data has been epoched. Optional, default is False.
+        If True, inputs must be a list of lists.
     n_embeddings : int
         Number of embeddings. Optional. Can be passed if data has already been prepared.
     n_pca_components : int
@@ -45,9 +46,6 @@ class Data:
         Was whitening applied during the PCA? Optional.
     prepared : bool
         Flag indicating if data has already been prepared. Optional.
-    epoched : bool
-        Flag indicating if the data has been epoched. Optional, default is False.
-        If True, inputs must be a list of lists.
     """
 
     def __init__(
@@ -56,65 +54,22 @@ class Data:
         matlab_field: str = "X",
         sampling_frequency: float = None,
         store_dir: str = "tmp",
+        epoched: bool = False,
         n_embeddings: int = 0,
         n_pca_components: int = None,
         whiten: bool = None,
         prepared: bool = False,
-        epoched: bool = False,
     ):
         # Unique identifier for the data object
         self._identifier = id(inputs)
 
-        # Validate inputs
-        if isinstance(inputs, str):
-            self.inputs = [inputs]
+        # Load data by initialising an IO object
+        IO.__init__(self, inputs, matlab_field, sampling_frequency, store_dir, epoched)
 
-        elif isinstance(inputs, np.ndarray):
-            if (inputs.ndim == 2 and not epoched) or (inputs.ndim == 3 and epoched):
-                self.inputs = [inputs]
-            else:
-                self.inputs = inputs
-
-        elif isinstance(inputs, list):
-            if epoched and not isinstance(inputs[0], list):
-                raise ValueError("If data is epoched, inputs must be a list of lists.")
-            else:
-                self.inputs = inputs
-
-        else:
-            raise ValueError("inputs must be str, np.ndarray or list.")
-
-        self.store_dir = pathlib.Path(store_dir)
-        self.store_dir.mkdir(parents=True, exist_ok=True)
-
-        # Raw data memory maps
-        raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(inputs))), identifier=self._identifier
-        )
-        self.raw_data_filenames = [
-            str(self.store_dir / raw_data_pattern.format(i=i))
-            for i in range(len(inputs))
-        ]
-
-        # Load the data
-        self.epoched = epoched
-        self.raw_data_memmaps = self.load_data(matlab_field)
+        # Use raw data for the subject data
         self.subjects = self.raw_data_memmaps
 
-        # Validate subject data
-        self.validate_subjects()
-
-        # Raw data statistics
-        self.raw_data_mean = [
-            np.mean(raw_data, axis=0) for raw_data in self.raw_data_memmaps
-        ]
-        self.raw_data_std = [
-            np.std(raw_data, axis=0) for raw_data in self.raw_data_memmaps
-        ]
-
         # Other attributes
-        self.sampling_frequency = sampling_frequency
-        self.n_raw_data_channels = self.n_channels
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components
         self.whiten = whiten
@@ -424,29 +379,6 @@ class Data:
         )
 
         return kmeans_covariances
-
-    def delete_dir(self):
-        """Deletes the directory that stores the memory maps."""
-        rmtree(self.store_dir, ignore_errors=True)
-
-    def load_data(self, matlab_field: str):
-        """Import data into a list of memory maps.
-
-        Parameters
-        ----------
-        matlab_field : str
-            If a MATLAB filename is passed, this is the field that corresponds
-            to the data. By default we read the field 'X'.
-        """
-        memmaps = []
-        for in_file, out_file in zip(
-            tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
-        ):
-            data = io.load_data(
-                in_file, matlab_field, self.epoched, mmap_location=out_file
-            )
-            memmaps.append(data)
-        return memmaps
 
     def prepare(
         self,
@@ -810,9 +742,3 @@ class Data:
         ]
 
         return subject_datasets
-
-    def validate_subjects(self):
-        """Validate data files."""
-        n_channels = [subject.shape[-1] for subject in self.subjects]
-        if not np.equal(n_channels, n_channels[0]).all():
-            raise ValueError("All subjects should have the same number of channels.")
