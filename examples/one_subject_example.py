@@ -9,7 +9,7 @@
 """
 
 print("Setting up")
-from vrad.data import Data
+from vrad.data import Data, OSL_HMM, manipulation
 from vrad.analysis import maps, spectral
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
@@ -57,7 +57,6 @@ prepared_data = Data(
     "/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject1.mat",
     sampling_frequency=250,
     n_embeddings=15,
-    n_pca_components=80,
     prepared=True,
 )
 n_channels = prepared_data.n_channels
@@ -67,9 +66,7 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with the final HMM covariances
-hmm = data.OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-1_K-6/hmm.mat"
-)
+hmm = OSL_HMM("/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-1_K-6/hmm.mat")
 initial_covariances = hmm.covariances
 
 # Build model
@@ -115,7 +112,7 @@ print(f"Free energy: {free_energy}")
 # Inferred state mixing factors and state time courses
 alpha = model.predict_states(prediction_dataset)[0]
 inf_stc = states.time_courses(alpha)
-hmm_stc = data.manipulation.trim_time_series(
+hmm_stc = manipulation.trim_time_series(
     time_series=hmm.state_time_course,
     sequence_length=sequence_length,
 )
