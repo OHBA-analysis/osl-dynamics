@@ -36,13 +36,13 @@ class Analysis:
         # correspond to the autocorrelation function
         autocorrelation_functions = []
         for n in range(len(te_covs)):
-            autocorrelation_function.append(
+            autocorrelation_functions.append(
                 spectral.autocorrelation_function(
                     te_covs[n], self.n_embeddings, self.n_raw_data_channels
                 )
             )
 
-        return np.squeeze(autocorrelation_function)
+        return np.squeeze(autocorrelation_functions)
 
     def raw_covariances(
         self,
@@ -84,7 +84,7 @@ class Analysis:
 
         return np.squeeze(raw_covariances)
 
-    def reverse_pca(self, covariances):
+    def reverse_pca(self, covariances: Union[list, np.ndarray]):
         """Reverses the effect of PCA on a covariance matrix.
 
         Parameters
