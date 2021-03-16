@@ -60,10 +60,7 @@ class PreprocessedData(Data):
         self.prepared_data_std = []
 
     def prepare(
-        self,
-        n_embeddings: int,
-        n_pca_components: int = None,
-        whiten: bool = False,
+        self, n_embeddings: int, n_pca_components: int = None, whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
