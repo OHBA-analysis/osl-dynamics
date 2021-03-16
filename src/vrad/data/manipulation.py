@@ -1,3 +1,4 @@
+import logging
 from tqdm import tqdm
 
 import numpy as np
@@ -5,6 +6,8 @@ from scipy.signal import butter, lfilter
 
 from vrad import array_ops
 from vrad.utils.misc import MockArray
+
+_logger = logging.getLogger("VRAD")
 
 
 class Manipulation:
@@ -98,7 +101,6 @@ class Manipulation:
                     "If we are filtering the data, sampling_frequency must be passed."
                 )
 
-        # Class attributes related to data preparation
         self.filter_range = filter_range
         self.filter_order = filter_order
         self.n_embeddings = n_embeddings
