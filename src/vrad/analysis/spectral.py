@@ -16,9 +16,7 @@ from vrad.data.manipulation import standardize
 _logger = logging.getLogger("VRAD")
 
 
-def autocorrelation_function(
-    covariances: np.ndarray, n_embeddings: int, n_raw_data_channels: int
-) -> np.ndarray:
+def autocorrelation_function(covariances: np.ndarray, n_embeddings: int) -> np.ndarray:
     """Calculates the autocorrelation function from the covariance matrix of time
     embedded data.
 
@@ -28,8 +26,6 @@ def autocorrelation_function(
         State covariance matrices. Shape is (n_states, n_te_channels, n_te_channels).
     n_embeddings : int
         Number of time embeddings.
-    n_raw_data_channels : int
-        Number of channels in the non-time-embedded data.
 
     Returns
     -------
@@ -41,6 +37,9 @@ def autocorrelation_function(
 
     # Number of states
     n_states = len(covariances)
+
+    # Number of channels in the original covariance matrix
+    n_raw_data_channels = covariances[0].shape[-1] // n_embeddings
 
     # Get the autocorrelation function
     autocorrelation_function = np.empty(
@@ -60,7 +59,7 @@ def autocorrelation_function(
                 # Take elements from the first row and column
                 autocorrelation_function[i, j, k] = np.concatenate(
                     [
-                        autocorrelation_function_jk[0, n_embeddings // 2 + 1:][::-1],
+                        autocorrelation_function_jk[0, n_embeddings // 2 + 1 :][::-1],
                         autocorrelation_function_jk[:, n_embeddings // 2],
                         autocorrelation_function_jk[-1, : n_embeddings // 2][::-1],
                     ]

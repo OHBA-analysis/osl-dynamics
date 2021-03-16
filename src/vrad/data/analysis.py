@@ -37,9 +37,7 @@ class Analysis:
         autocorrelation_functions = []
         for n in range(len(te_covs)):
             autocorrelation_functions.append(
-                spectral.autocorrelation_function(
-                    te_covs[n], self.n_embeddings, self.n_raw_data_channels
-                )
+                spectral.autocorrelation_function(te_covs[n], self.n_embeddings)
             )
 
         return np.squeeze(autocorrelation_functions)
