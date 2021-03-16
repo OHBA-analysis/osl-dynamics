@@ -16,26 +16,16 @@ class Manipulation:
     Parameters
     ----------
     n_embeddings : int
-        Number of embeddings. Optional. Can be passed if data has already been prepared.
-    n_pca_components : int
-        Number of PCA components. Optional. Can be passed if data has already been
-        prepared.
-    whiten : bool
-        Was whitening applied during the PCA? Optional.
+        Number of embeddings.
+    pca_weights : np.ndarray
+        PCA components used for dimensionality reduction.
     prepared : bool
-        Flag indicating if data has already been prepared. Optional.
+        Flag indicating if data has been prepared.
     """
 
-    def __init__(
-        self,
-        n_embeddings: int,
-        n_pca_components: int,
-        whiten: bool,
-        prepared: bool,
-    ):
+    def __init__(self, n_embeddings: int, pca_weights: np.ndarray, prepared: bool):
         self.n_embeddings = n_embeddings
-        self.n_pca_components = n_pca_components
-        self.whiten = whiten
+        self.pca_weights = pca_weights
         self.prepared = prepared
 
     def _process_from_yaml(self, file, **kwargs):
@@ -141,8 +131,6 @@ class Manipulation:
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_weights = u
-        else:
-            self.pca_weights = None
 
         # Prepare the data
         for raw_data_memmap, prepared_data_file in zip(
@@ -221,7 +209,10 @@ class Manipulation:
             Trimed time series.
         """
         if self.prepared:
-            n_embeddings = self.n_embeddings or n_embeddings
+            n_embeddings = self.n_embeddings
+
+        if hasattr(self, "sequence_length"):
+            sequence_length = self.sequence_length
 
         trimmed_raw_time_series = []
         for memmap in self.raw_data_memmaps:

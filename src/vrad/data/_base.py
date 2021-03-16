@@ -37,13 +37,11 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
         If True, inputs must be a list of lists.
     n_embeddings : int
         Number of embeddings. Optional. Can be passed if data has already been prepared.
-    n_pca_components : int
-        Number of PCA components. Optional. Can be passed if data has already been
-        prepared.
-    whiten : bool
-        Was whitening applied during the PCA? Optional.
+    pca_weights : np.ndarray
+        PCA components used for dimensionality reduction. Optional. Can be passed if
+        the data has already been prepared.
     prepared : bool
-        Flag indicating if data has already been prepared. Optional.
+        Flag indicating if data has been prepared. Optional.
     """
 
     def __init__(
@@ -54,22 +52,18 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
         store_dir: str = "tmp",
         epoched: bool = False,
         n_embeddings: int = 0,
-        n_pca_components: int = None,
-        whiten: bool = None,
+        pca_weights: np.ndarray = None,
         prepared: bool = False,
     ):
-        # Unique identifier for the data object
+        # Unique identifier for the Data object
         self._identifier = id(inputs)
 
         # Load data by initialising an IO object
-        # This assigns self.raw_data_memmaps as well as other attributes
         IO.__init__(self, inputs, matlab_field, sampling_frequency, store_dir, epoched)
 
-        # Use raw data for the subject data
-        self.subjects = self.raw_data_memmaps
-
-        # Initialise a Manipulation object so we can prepare the data
-        Manipulation.__init__(self, n_embeddings, n_pca_components, whiten, prepared)
+        # Initialise a Manipulation object so we have method we can use to prepare
+        # the data
+        Manipulation.__init__(self, n_embeddings, pca_weights, prepared)
 
         # Initialise a TensorFlowDataset object so we have methods to create
         # training/prediction datasets

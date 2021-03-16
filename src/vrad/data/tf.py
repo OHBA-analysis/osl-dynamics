@@ -54,6 +54,9 @@ class TensorFlowDataset:
         tensorflow.data.Dataset
             Dataset for training the model.
         """
+        self.sequence_length = sequence_length
+        self.batch_size = batch_size
+
         n_batches = self.count_batches(sequence_length)
 
         # Dataset for learning alpha and the observation model

@@ -88,6 +88,9 @@ class IO:
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
         self.sampling_frequency = sampling_frequency
 
+        # Use raw data for the subject data
+        self.subjects = self.raw_data_memmaps
+
     def delete_dir(self):
         """Deletes the directory that stores the memory maps."""
         rmtree(self.store_dir, ignore_errors=True)
