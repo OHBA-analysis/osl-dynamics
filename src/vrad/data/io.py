@@ -79,12 +79,6 @@ class IO:
         self.validate_data()
 
         # Attributes describing the raw data
-        self.raw_data_mean = [
-            np.mean(raw_data, axis=0) for raw_data in self.raw_data_memmaps
-        ]
-        self.raw_data_std = [
-            np.std(raw_data, axis=0) for raw_data in self.raw_data_memmaps
-        ]
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
         self.sampling_frequency = sampling_frequency
 
@@ -233,6 +227,36 @@ def read_from_file(filename: str, matlab_field: str = None) -> np.ndarray:
     return time_series
 
 
+def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]:
+    """Loads a MATLAB field.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of MATLAB file to read.
+    return_dict : bool
+        If there's only one field should we return a dictionary. Optional.
+        Default is to return a numpy array if there is only one field.
+        If there are multiple fields, a dictionary is always returned.
+
+    Returns
+    -------
+    dict or np.ndarray
+        Data in the MATLAB file.
+    """
+    try:
+        mat = scipy.io.loadmat(filename)
+    except NotImplementedError:
+        mat = mat73.loadmat(filename)
+
+    if not return_dict:
+        # Check if there's only one key in the MATLAB file
+        if len([field for field in mat if "__" not in field]) == 1:
+            _, mat = list(mat.items())[0]
+
+    return mat
+
+
 def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
     """Loads a MATLAB or SPM file.
 
@@ -250,10 +274,7 @@ def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
     time_series: np.ndarray
         Data in the MATLAB/SPM file.
     """
-    try:
-        mat = scipy.io.loadmat(filename)
-    except NotImplementedError:
-        mat = mat73.loadmat(filename)
+    mat = loadmat(filename, return_dict=True)
 
     if "D" in mat:
         _logger.warning("Assuming that key 'D' corresponds to an SPM MEEG object.")

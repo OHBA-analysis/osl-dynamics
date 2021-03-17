@@ -3,9 +3,7 @@ from typing import List, Union
 
 import numpy as np
 import yaml
-from sklearn.cluster import KMeans
 
-from vrad.data.analysis import Analysis
 from vrad.data.io import IO
 from vrad.data.manipulation import Manipulation
 from vrad.data.tf import TensorFlowDataset
@@ -14,7 +12,7 @@ from vrad.utils import misc
 _rng = np.random.default_rng()
 
 
-class Data(IO, Manipulation, TensorFlowDataset, Analysis):
+class Data(IO, Manipulation, TensorFlowDataset):
     """Data Class.
 
     The Data class enables the input and processing of data. When given a list of
@@ -37,11 +35,6 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
         If True, inputs must be a list of lists.
     n_embeddings : int
         Number of embeddings. Optional. Can be passed if data has already been prepared.
-    pca_weights : np.ndarray
-        PCA components used for dimensionality reduction. Optional. Can be passed if
-        the data has already been prepared.
-    prepared : bool
-        Flag indicating if data has been prepared. Optional.
     """
 
     def __init__(
@@ -51,9 +44,7 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
         sampling_frequency: float = None,
         store_dir: str = "tmp",
         epoched: bool = False,
-        n_embeddings: int = 0,
-        pca_weights: np.ndarray = None,
-        prepared: bool = False,
+        n_embeddings: int = None,
     ):
         # Unique identifier for the Data object
         self._identifier = id(inputs)
@@ -63,15 +54,11 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
 
         # Initialise a Manipulation object so we have method we can use to prepare
         # the data
-        Manipulation.__init__(self, n_embeddings, pca_weights, prepared)
+        Manipulation.__init__(self, n_embeddings)
 
         # Initialise a TensorFlowDataset object so we have methods to create
         # training/prediction datasets
         TensorFlowDataset.__init__(self)
-
-        # Initialise an Analysis object so we have methods to analyse the training
-        # data after fitting a model
-        Analysis.__init__(self)
 
     def __iter__(self):
         return iter(self.subjects)
@@ -87,7 +74,6 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
             f"n_epochs: {self.n_epochs}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
-            f"prepared: {self.prepared}",
         ]
         return "\n ".join(info)
 
@@ -151,73 +137,3 @@ class Data(IO, Manipulation, TensorFlowDataset, Analysis):
             "training_dataset": training_dataset,
             "prediction_dataset": prediction_dataset,
         }
-
-    def covariance_sample(
-        self,
-        segment_length: Union[int, List[int]],
-        n_segments: Union[int, List[int]],
-        n_clusters: int = None,
-    ) -> np.ndarray:
-        """Get covariances of a random selection of a time series.
-
-        Given a time series, `data`, randomly select a set of samples of length(s)
-        `segment_length` with `n_segments` of each selected. If `n_clusters` is not
-        specified each of these covariances will be returned. Otherwise, a K-means
-        clustering algorithm is run to return that `n_clusters` covariances.
-
-        Lack of overlap between samples is *not* guaranteed.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            The time series to be analyzed.
-        segment_length: int or list of int
-            Either the integer number of samples for each covariance, or a list with a
-            range of values.
-        n_segments: int or list of int
-            Either the integer number of segments to select,
-             or a list specifying the number
-            of each segment length to be sampled.
-        n_clusters: int
-            The number of K-means clusters to find
-            (default is not to perform clustering).
-
-        Returns
-        -------
-        covariances: np.ndarray
-            The calculated covariance matrices of the samples.
-        """
-        segment_lengths = misc.listify(segment_length)
-        n_segments = misc.listify(n_segments)
-
-        if len(n_segments) == 1:
-            n_segments = n_segments * len(segment_lengths)
-
-        if len(segment_lengths) != len(n_segments):
-            raise ValueError(
-                "`segment_lengths` and `n_samples` should have the same lengths."
-            )
-
-        covariances = []
-        for segment_length, n_sample in zip(segment_lengths, n_segments):
-            data = self.subjects[_rng.choice(self.n_subjects)]
-            starts = _rng.choice(data.shape[0] - segment_length, n_sample)
-            samples = data[np.asarray(starts)[:, None] + np.arange(segment_length)]
-
-            transposed = samples.transpose(0, 2, 1)
-            m1 = transposed - transposed.sum(2, keepdims=1) / segment_length
-            covariances.append(np.einsum("ijk,ilk->ijl", m1, m1) / (segment_length - 1))
-        covariances = np.concatenate(covariances)
-
-        if n_clusters is None:
-            return covariances
-
-        flat_covariances = covariances.reshape((covariances.shape[0], -1))
-
-        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat_covariances)
-
-        kmeans_covariances = kmeans.cluster_centers_.reshape(
-            (n_clusters, *covariances.shape[1:])
-        )
-
-        return kmeans_covariances
