@@ -7,7 +7,7 @@ from typing import Union
 
 import numpy as np
 from vrad.array_ops import get_one_hot
-from vrad.simulation import Simulation, MVN, MAR
+from vrad.simulation import MAR, MVN, Simulation
 
 _logger = logging.getLogger("VRAD")
 
@@ -171,11 +171,7 @@ class HMM_MAR(Simulation):
         random_seed: int = None,
     ):
         # Observation model
-        self.obs_mod = MAR(
-            coeffs=coeffs,
-            cov=cov,
-            random_seed=random_seed,
-        )
+        self.obs_mod = MAR(coeffs=coeffs, cov=cov, random_seed=random_seed,)
 
         self.n_states = self.obs_mod.n_states
         self.n_channels = self.obs_mod.n_channels
@@ -360,8 +356,7 @@ class HierarchicalHMM_MVN(Simulation):
         # Top level HMM
         # This will select the bottom level HMM at each time point
         self.top_level_hmm = HMM(
-            trans_prob=top_level_trans_prob,
-            random_seed=top_level_random_seed,
+            trans_prob=top_level_trans_prob, random_seed=top_level_random_seed,
         )
 
         # The bottom level HMMs

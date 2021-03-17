@@ -1,9 +1,9 @@
 import logging
-from tqdm import tqdm
 
 import numpy as np
+import yaml
 from scipy.signal import butter, lfilter
-
+from tqdm import tqdm
 from vrad import array_ops
 from vrad.utils.misc import MockArray
 
@@ -171,10 +171,8 @@ class Manipulation:
 
     def prepare_memmap_filenames(self):
         self.prepared_data_pattern = (
-            "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-                width=len(str(self.n_subjects)), identifier=self._identifier
-            )
-        )
+            "prepared_data_{{i:0{width}d}}_{identifier}.npy"
+        ).format(width=len(str(self.n_subjects)), identifier=self._identifier)
 
         # Prepared data memory maps (time embedded and pca'ed)
         self.prepared_data_memmaps = []
@@ -186,9 +184,7 @@ class Manipulation:
         self.prepared_data_std = []
 
     def trim_raw_time_series(
-        self,
-        sequence_length: int = None,
-        n_embeddings: int = None,
+        self, sequence_length: int = None, n_embeddings: int = None,
     ) -> np.ndarray:
         """Trims the raw preprocessed data time series.
 
@@ -266,9 +262,7 @@ def bandpass_filter(
 
 
 def standardize(
-    time_series: np.ndarray,
-    axis: int = 0,
-    create_copy: bool = True,
+    time_series: np.ndarray, axis: int = 0, create_copy: bool = True,
 ) -> np.ndarray:
     """Standardizes a time series.
 
@@ -324,9 +318,7 @@ def time_embed(time_series: np.ndarray, n_embeddings: int):
 
 
 def trim_time_series(
-    time_series: np.ndarray,
-    sequence_length: int,
-    discontinuities: list = None,
+    time_series: np.ndarray, sequence_length: int, discontinuities: list = None,
 ) -> np.ndarray:
     """Trims a time seris.
 

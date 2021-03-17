@@ -1,13 +1,13 @@
-import pathlib
 import logging
+import pathlib
+from os import path
 from shutil import rmtree
 from typing import Tuple, Union
-from tqdm import tqdm
-from os import path
 
 import mat73
 import numpy as np
 import scipy.io
+from tqdm import tqdm
 from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")

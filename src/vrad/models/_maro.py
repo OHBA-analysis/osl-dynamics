@@ -5,8 +5,9 @@
 import numpy as np
 from tensorflow.keras import Model, layers, optimizers
 from vrad import models
+from vrad.inference import initializers
 from vrad.inference.losses import LogLikelihoodLoss
-from vrad.models.layers import LogLikelihoodLayer, MARParametersLayer, MARMeanCovLayer
+from vrad.models.layers import LogLikelihoodLayer, MARMeanCovLayer, MARParametersLayer
 from vrad.utils.misc import replace_argument
 
 
@@ -177,7 +178,7 @@ class MARO(models.Base):
         cov = np.array([np.diag(c) for c in mar_params_layer.cov.numpy()])
         return coeffs, cov
 
-    def set_params(self):
+    def set_params(self, coeffs, cov):
         """Set the parameters of the MAR model.
 
         Parameters

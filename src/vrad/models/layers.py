@@ -6,13 +6,13 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, constraints, layers
-from vrad.inference import initializers
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     is_symmetric,
     trace_normalize,
 )
+from vrad.inference.initializers import WeightInitializer
 
 
 class DummyLayer(layers.Layer):
@@ -153,8 +153,7 @@ class AlphaLayer(layers.Layer):
             alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature,
-                logits=theta_t,
+                temperature=self.alpha_temperature, logits=theta_t,
             )
             alpha_t = gumbel_softmax_distribution.sample()
 
@@ -219,7 +218,7 @@ class MeansCovsLayer(layers.Layer):
         else:
             self.initial_means = initial_means
 
-        self.means_initializer = initializers.WeightInitializer(self.initial_means)
+        self.means_initializer = WeightInitializer(self.initial_means)
 
         # Initialisation of covariances
         if initial_covariances is None:
@@ -246,10 +245,8 @@ class MeansCovsLayer(layers.Layer):
             else:
                 self.initial_cholesky_covariances = initial_covariances
 
-        self.flattened_cholesky_covariances_initializer = (
-            initializers.WeightInitializer(
-                tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
-            )
+        self.flattened_cholesky_covariances_initializer = WeightInitializer(
+            tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
         )
 
     def build(self, input_shape):
@@ -647,14 +644,14 @@ class MARParametersLayer(layers.Layer):
             )
         else:
             self.initial_coeffs = initial_coeffs
-        self.coeffs_initializer = initializers.WeightInitializer(self.initial_coeffs)
+        self.coeffs_initializer = WeightInitializer(self.initial_coeffs)
 
         # Initialisation for covariances
         if initial_cov is None:
             self.initial_cov = np.ones([n_states, n_channels], dtype=np.float32)
         else:
             self.initial_cov = initial_cov
-        self.cov_initializer = initializers.WeightInitializer(self.initial_cov)
+        self.cov_initializer = WeightInitializer(self.initial_cov)
 
     def build(self, input_shape):
 
@@ -747,8 +744,10 @@ class MARMeanCovLayer(layers.Layer):
         # Calculate the mean for each state: mu_jt = Sum_l coeffs_j data_{t-l}
         # mu_jt.shape = (None, sequence_length - n_lags, n_states, n_channels)
         mu_jt = lagged_data_jlt[:, :, :, 0]
-        for l in range(1, self.n_lags):
-            mu_jt = tf.add(mu_jt, tf.roll(lagged_data_jlt[:, :, :, l], shift=l, axis=1))
+        for lag in range(1, self.n_lags):
+            mu_jt = tf.add(
+                mu_jt, tf.roll(lagged_data_jlt[:, :, :, lag], shift=lag, axis=1)
+            )
         mu_jt = mu_jt[:, self.n_lags : -1]
 
         # Remove alpha_jt value we don't have all lags for and

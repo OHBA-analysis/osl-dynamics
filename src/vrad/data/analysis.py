@@ -1,6 +1,6 @@
-import numpy as np
 from typing import Union
 
+import numpy as np
 from vrad.analysis import spectral
 
 
@@ -8,8 +8,7 @@ class Analysis:
     """Class for analysing data after fitting."""
 
     def autocorrelation_functions(
-        self,
-        covariances: Union[list, np.ndarray],
+        self, covariances: Union[list, np.ndarray],
     ) -> np.ndarray:
         """Calculates the autocorrelation function the state covariance matrices.
 
@@ -45,8 +44,7 @@ class Analysis:
         return np.squeeze(autocorrelation_functions)
 
     def raw_covariances(
-        self,
-        state_covariances: Union[list, np.ndarray],
+        self, state_covariances: Union[list, np.ndarray],
     ) -> np.ndarray:
         """Covariance matrix of the raw channels.
 

@@ -10,8 +10,8 @@
 
 print("Setting up")
 import numpy as np
-from vrad.data import Data, OSL_HMM, manipulation
 from vrad.analysis import maps, spectral
+from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
 
@@ -138,8 +138,7 @@ preprocessed_data = Data(
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=sequence_length,
-    n_embeddings=prepared_data.n_embeddings,
+    sequence_length=sequence_length, n_embeddings=prepared_data.n_embeddings,
 )
 
 # Compute spectra for states

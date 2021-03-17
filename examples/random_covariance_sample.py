@@ -39,9 +39,7 @@ plt.show()
 
 
 sample_covs = data.covariance_sample(
-    segment_length=[50 * i for i in range(1, 5)],
-    n_segments=100,
-    n_clusters=5,
+    segment_length=[50 * i for i in range(1, 5)], n_segments=100, n_clusters=5,
 )
 
 covs, sample_covs = match_covariances(covs, sample_covs)

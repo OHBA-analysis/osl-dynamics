@@ -6,8 +6,7 @@ import logging
 
 import numpy as np
 from vrad.array_ops import get_one_hot
-from vrad.simulation import Simulation, MVN
-from vrad.utils.decorators import auto_repr, auto_yaml
+from vrad.simulation import MVN, Simulation
 
 _logger = logging.getLogger("VRAD")
 

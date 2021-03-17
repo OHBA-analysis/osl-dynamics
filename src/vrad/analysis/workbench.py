@@ -1,8 +1,8 @@
 import logging
+import os
 import pathlib
 import re
 import subprocess
-import os
 
 import nibabel as nib
 from tqdm import trange

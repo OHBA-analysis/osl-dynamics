@@ -1,10 +1,8 @@
-import logging
 from typing import List, Union
 
 import numpy as np
 import yaml
 from sklearn.cluster import KMeans
-
 from vrad.data.analysis import Analysis
 from vrad.data.io import IO
 from vrad.data.manipulation import Manipulation
