@@ -61,7 +61,6 @@ prepared_data = Data(
     ],
     sampling_frequency=250,
     n_embeddings=15,
-    prepared=True,
 )
 n_channels = prepared_data.n_channels
 

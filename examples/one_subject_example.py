@@ -57,7 +57,6 @@ prepared_data = Data(
     "/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject1.mat",
     sampling_frequency=250,
     n_embeddings=15,
-    prepared=True,
 )
 n_channels = prepared_data.n_channels
 

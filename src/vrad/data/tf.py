@@ -6,6 +6,11 @@ from tensorflow.python.data import Dataset
 class TensorFlowDataset:
     """Class for creating TensorFlow datasets."""
 
+    def __init__(self):
+        # Check Data has inherited the Manipulation class as well as this class
+        if not hasattr(self, "n_embeddings"):
+            raise AttributeError("Data class must include a n_embeddings attribute.")
+
     def count_batches(self, sequence_length: int) -> np.ndarray:
         """Count batches.
 
@@ -28,7 +33,7 @@ class TensorFlowDataset:
         sequence_length: int,
         batch_size: int,
         alpha: list = None,
-        n_alpha_embeddings: int = 0,
+        n_alpha_embeddings: int = 1,
         concatenate: bool = True,
     ) -> tensorflow.data.Dataset:
         """Create a tensorflow dataset for training.
@@ -44,7 +49,7 @@ class TensorFlowDataset:
             If passed, we create a dataset that includes alpha at each time point.
             Such a dataset can be used to train the observation model.
         n_alpha_embeddings : int
-            Number of embeddings when inferring alpha_t. Optional.
+            Number of embeddings used when inferring alpha. Optional.
         concatenate : bool
             Should we concatenate the datasets for each subject? Optional, the
             default is True.
@@ -58,6 +63,7 @@ class TensorFlowDataset:
         self.batch_size = batch_size
 
         n_batches = self.count_batches(sequence_length)
+        n_embeddings = self.n_embeddings or 1
 
         # Dataset for learning alpha and the observation model
         if alpha is None:
@@ -81,16 +87,16 @@ class TensorFlowDataset:
 
             subject_datasets = []
             for i in range(self.n_subjects):
-                if self.n_embeddings > n_alpha_embeddings:
+                if n_embeddings > n_alpha_embeddings:
                     # We remove data points in alpha that are not in the new time
                     # embedded data
-                    alp = alpha[i][(self.n_embeddings - n_alpha_embeddings) // 2 :]
+                    alp = alpha[i][(n_embeddings - n_alpha_embeddings) // 2 :]
                     subject = self.subjects[i][: alp.shape[0]]
                 else:
                     # We remove the data points that are not in alpha
                     alp = alpha[i]
                     subject = self.subjects[i][
-                        (n_alpha_embeddings - self.n_embeddings) // 2 : alp.shape[0]
+                        (n_alpha_embeddings - n_embeddings) // 2 : alp.shape[0]
                     ]
 
                 # Create datasets
