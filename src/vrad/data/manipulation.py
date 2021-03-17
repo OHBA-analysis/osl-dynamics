@@ -215,7 +215,7 @@ class Manipulation:
         self,
         sequence_length: int = None,
         n_embeddings: int = None,
-        concatenate: bool = True,
+        concatenate: bool = False,
     ) -> list:
         """Trims the raw preprocessed data time series.
 
@@ -231,7 +231,7 @@ class Manipulation:
             Number of data points to embed the data.
         concatenate : bool
             Should we concatenate the data for each subject? Optional, default
-            is True.
+            is False.
 
         Returns
         -------
@@ -334,7 +334,7 @@ def trim_time_series(
     time_series: np.ndarray,
     sequence_length: int,
     discontinuities: list = None,
-    concatenate: bool = True,
+    concatenate: bool = False,
 ) -> np.ndarray:
     """Trims a time seris.
 
@@ -351,7 +351,7 @@ def trim_time_series(
         assume the entire time series is continuous.
     concatenate : bool
         Should we concatenate the data for segment? Optional, default
-        is True.
+        is False.
 
     Returns
     -------
