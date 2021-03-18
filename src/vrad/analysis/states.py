@@ -124,20 +124,15 @@ def raw_covariances(
         Shape is (n_subjects, n_states, n_channels, n_channels) or
         (n_states, n_channels, n_channels).
     """
-    # Get covariance of time embedded data
+    # Get covariance of time embedded data.
     te_covs = reverse_pca(state_covariances, pca_components)
 
-    # Take elements from the time embedded covariances that
-    # correspond to the raw channel covariances
-    raw_covariances = []
-    for n in range(len(te_covs)):
-        raw_covariances.append(
-            te_covs[n][
-                :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings,
-            ]
-        )
+    # Get elements corresponding to zero-lag.
+    raw_covs = te_covs[
+        :, :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings
+    ]
 
-    return np.squeeze(raw_covariances)
+    return np.squeeze(raw_covs)
 
 
 def reverse_pca(covariances: np.ndarray, pca_components: np.ndarray) -> np.ndarray:
