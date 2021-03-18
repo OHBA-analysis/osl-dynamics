@@ -140,9 +140,7 @@ def raw_covariances(
     return np.squeeze(raw_covariances)
 
 
-def reverse_pca(
-    covariances: Union[list, np.ndarray], pca_components: np.ndarray
-) -> np.ndarray:
+def reverse_pca(covariances: np.ndarray, pca_components: np.ndarray) -> np.ndarray:
     """Reverses the effect of PCA on a covariance matrix.
 
     Parameters
@@ -162,29 +160,16 @@ def reverse_pca(
     """
 
     # Validation
-    if isinstance(covariances, np.ndarray):
-        if covariances.ndim != 3:
-            raise ValueError(
-                "covariances must be shape (n_states, n_channels, n_channels) or"
-                + " (n_subjects, n_states, n_channels, n_channels)."
-            )
-        covariances = [covariances]
-
-    if not isinstance(covariances, list):
-        raise ValueError("covariances must be a list of numpy arrays or a numpy array.")
-
-    n_subjects = len(covariances)
-    n_states = covariances[0].shape[0]
-
-    # Reverse the PCA
-    te_covs = []
-    for n in range(n_subjects):
-        te_cov = np.array(
-            [
-                pca_components @ covariances[n][i] @ pca_components.T
-                for i in range(n_states)
-            ]
+    covariances = np.array(covariances)
+    if covariances.ndim == 3:
+        covariances = covariances[None]
+    if covariances.ndim != 4:
+        raise ValueError(
+            "covariances must be shape (n_states, n_channels, n_channels) or"
+            + " (n_subjects, n_states, n_channels, n_channels)."
         )
-        te_covs.append(te_cov)
+
+    n_subjects, n_states = covariances.shape[:2]
+    te_covs = pca_components @ covariances @ pca_components.T
 
     return te_covs
