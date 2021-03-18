@@ -1,14 +1,16 @@
 import logging
 from typing import List, Union
-from tqdm import tqdm
 
 import numpy as np
+import yaml
 from sklearn.cluster import KMeans
-
+from tqdm import tqdm
 from vrad import array_ops
+from vrad.utils import misc
 from vrad.utils.misc import MockArray
 
 _logger = logging.getLogger("VRAD")
+_rng = np.random.default_rng()
 
 
 class Manipulation:
@@ -107,10 +109,7 @@ class Manipulation:
         return kmeans_covariances
 
     def prepare(
-        self,
-        n_embeddings: int = 1,
-        n_pca_components: int = None,
-        whiten: bool = False,
+        self, n_embeddings: int = 1, n_pca_components: int = None, whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
@@ -273,9 +272,7 @@ class Manipulation:
 
 
 def standardize(
-    time_series: np.ndarray,
-    axis: int = 0,
-    create_copy: bool = True,
+    time_series: np.ndarray, axis: int = 0, create_copy: bool = True,
 ) -> np.ndarray:
     """Standardizes a time series.
 

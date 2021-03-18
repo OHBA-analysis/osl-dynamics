@@ -1,5 +1,6 @@
-import numpy as np
 from typing import Union
+
+import numpy as np
 
 
 def _acf_from_te_cov(te_covariances: np.ndarray, n_embeddings: int) -> np.ndarray:
@@ -132,9 +133,7 @@ def raw_covariances(
     for n in range(len(te_covs)):
         raw_covariances.append(
             te_covs[n][
-                :,
-                n_embeddings // 2 :: n_embeddings,
-                n_embeddings // 2 :: n_embeddings,
+                :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings,
             ]
         )
 

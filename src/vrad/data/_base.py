@@ -2,7 +2,6 @@ from typing import List, Union
 
 import numpy as np
 import yaml
-
 from vrad.data.io import IO
 from vrad.data.manipulation import Manipulation
 from vrad.data.tf import TensorFlowDataset
