@@ -6,11 +6,6 @@ from tensorflow.python.data import Dataset
 class TensorFlowDataset:
     """Class for creating TensorFlow datasets."""
 
-    def __init__(self):
-        # Check Data has inherited the Manipulation class as well as this class
-        if not hasattr(self, "n_embeddings"):
-            raise AttributeError("Data class must include a n_embeddings attribute.")
-
     def count_batches(self, sequence_length: int) -> np.ndarray:
         """Count batches.
 
