@@ -11,7 +11,7 @@ from tensorflow.keras import Model, layers, optimizers
 from tqdm import trange
 from vrad import models
 from vrad.inference import initializers
-from vrad.inference.losses import KullbackLeiblerLoss, LogLikelihoodLoss
+from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import (
     AlphaLayer,
     DummyLayer,
@@ -215,8 +215,8 @@ class RIGO(models.GO):
         optimizer = optimizers.Adam(learning_rate=self.learning_rate)
 
         # Loss functions
-        ll_loss = LogLikelihoodLoss()
-        kl_loss = KullbackLeiblerLoss(self.annealing_factor)
+        ll_loss = ModelOutputLoss()
+        kl_loss = ModelOutputLoss(self.annealing_factor)
         loss = [ll_loss, kl_loss]
 
         # Compile

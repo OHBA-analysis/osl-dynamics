@@ -13,7 +13,7 @@ from vrad.inference.functions import (
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
-from vrad.inference.losses import LogLikelihoodLoss
+from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
 from vrad.utils.misc import replace_argument
 
@@ -97,8 +97,8 @@ class GO(models.Base):
         # Setup optimizer
         optimizer = optimizers.Adam(learning_rate=self.learning_rate)
 
-        # Loss functions
-        ll_loss = LogLikelihoodLoss()
+        # Loss function
+        ll_loss = ModelOutputLoss()
 
         # Compile
         self.model.compile(optimizer=optimizer, loss=[ll_loss])

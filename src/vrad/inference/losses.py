@@ -2,46 +2,33 @@
 
 """
 
+import tensorflow as tf
 from tensorflow.keras.losses import Loss
 
 
-class LogLikelihoodLoss(Loss):
-    """Negative log-likelihood loss."""
+class ModelOutputLoss(Loss):
+    """Class to use a model output as a loss function.
 
-    def __init__(self, **kwargs):
+    Parameters
+    ----------
+    annealing_factor : tf.Variable
+        Factor to multiply the model output by. Optional, default is 1.0.
+
+    Returns
+    -------
+    float
+        Loss value.
+    """
+
+    def __init__(self, annealing_factor: tf.Variable = None, **kwargs):
+        if annealing_factor is None:
+            self.annealing_factor = tf.Variable(1.0)
+        else:
+            self.annealing_factor = annealing_factor
         super().__init__(**kwargs)
 
-    def call(self, y_true, ll_loss):
-        """Negative log-likelihood loss.
-
-        The negative log-likelihood is the first output of the model.
-
-        Returns
-        -------
-        float
-            Negative log-likelihood.
-        """
-        return ll_loss
-
-
-class KullbackLeiblerLoss(Loss):
-    """Kullback-Leibler (KL) loss."""
-
-    def __init__(self, annealing_factor, **kwargs):
-        self.annealing_factor = annealing_factor
-        super().__init__(**kwargs)
-
-    def call(self, y_true, kl_loss):
-        """KL divergence loss.
-
-        The KL divergence is the second output of the model.
-
-        Returns
-        -------
-        float
-            KL divergence.
-        """
-        return self.annealing_factor * kl_loss
+    def call(self, target, model_output):
+        return self.annealing_factor * model_output
 
     def get_config(self):
         config = super().get_config()

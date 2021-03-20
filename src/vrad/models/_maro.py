@@ -6,7 +6,7 @@ import numpy as np
 from tensorflow.keras import Model, layers, optimizers
 from vrad import models
 from vrad.inference import initializers
-from vrad.inference.losses import LogLikelihoodLoss
+from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import LogLikelihoodLayer, MARMeanCovLayer, MARParametersLayer
 from vrad.utils.misc import replace_argument
 
@@ -93,8 +93,8 @@ class MARO(models.Base):
         # Setup optimizer
         optimizer = optimizers.Adam(learning_rate=self.learning_rate)
 
-        # Loss functions
-        ll_loss = LogLikelihoodLoss()
+        # Loss function
+        ll_loss = ModelOutputLoss()
 
         # Compile
         self.model.compile(optimizer=optimizer, loss=[ll_loss])
