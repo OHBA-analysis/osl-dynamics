@@ -105,6 +105,7 @@ def save_nii_file(
     filename: str,
     component: int = 0,
     subtract_mean: bool = False,
+    mean_weights: np.ndarray = None,
 ):
     """Saves a NITFI file containing a map.
 
@@ -123,6 +124,9 @@ def save_nii_file(
         Spectral component to save. Optional.
     subtract_mean : bool
         Should we subtract the mean power across states? Optional: default is False.
+    mean_weights: np.ndarray
+        Numpy array with weightings for each state to use to calculate the mean.
+        Optional, default is equal weighting.
     """
 
     # Validation
@@ -182,9 +186,13 @@ def save_nii_file(
     for i in range(n_states):
         spatial_map[:, i] = voxels @ np.diag(np.squeeze(power_map[component, i]))
 
-    # Subtract mean power across states
+    # Subtract weighted mean
     if subtract_mean:
-        spatial_map -= np.mean(spatial_map, axis=1)[..., np.newaxis]
+        spatial_map -= np.average(
+            spatial_map,
+            axis=1,
+            weights=mean_weights,
+        )[..., np.newaxis]
 
     # Convert spatial map into a grid
     spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
