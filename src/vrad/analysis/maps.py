@@ -207,8 +207,3 @@ def save_nii_file(
     print(f"Saving {filename}")
     nii_file = nib.Nifti1Image(spatial_map_grid, mask.affine, mask.header)
     nib.save(nii_file, filename)
-
-
-def workbench_render(*args, **kwargs):
-    _logger.warning("workbench_render is now in vrad.analysis.workbench.")
-    workbench.workbench_render(*args, **kwargs)
