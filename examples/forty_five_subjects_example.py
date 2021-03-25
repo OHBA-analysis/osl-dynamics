@@ -69,7 +69,9 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with final HMM covariances
-hmm = OSL_HMM("/well/woolrich/projects/uk_meg_notts/eo/nSubjects-45_K-6/hmm.mat")
+hmm = OSL_HMM(
+    "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-45_K-6/hmm.mat"
+)
 initial_covariances = hmm.covariances
 
 # Build model
@@ -114,14 +116,12 @@ print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time courses
 alpha = model.predict_states(prediction_dataset)
-inf_stc = np.concatenate(states.time_courses(alpha), axis=0)
-hmm_stc = np.concatenate(
-    manipulation.trim_time_series(
-        time_series=hmm.state_time_course,
-        sequence_length=sequence_length,
-        discontinuities=hmm.discontinuities,
-    ),
-    axis=0,
+inf_stc = states.time_courses(alpha, concatenate=True)
+hmm_stc = manipulation.trim_time_series(
+    time_series=hmm.state_time_course,
+    sequence_length=sequence_length,
+    discontinuities=hmm.discontinuities,
+    concatenate=True,
 )
 
 # Dice coefficient
@@ -135,7 +135,8 @@ preprocessed_data = Data(
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=sequence_length, n_embeddings=prepared_data.n_emebddings,
+    sequence_length=sequence_length,
+    n_embeddings=prepared_data.n_emebddings,
 )
 
 # Compute spectra for states
