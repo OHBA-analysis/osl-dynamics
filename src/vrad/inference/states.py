@@ -15,7 +15,7 @@ _rng = np.random.default_rng()
 
 
 def time_courses(
-    alpha: Union[list, np.ndarray], concatenate: bool = True
+    alpha: Union[list, np.ndarray], concatenate: bool = False
 ) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
