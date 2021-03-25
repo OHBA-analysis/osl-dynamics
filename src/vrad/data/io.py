@@ -1,6 +1,6 @@
 import logging
 import pathlib
-from os import path
+from os import path, listdir
 from shutil import rmtree
 from typing import Tuple, Union
 
@@ -42,7 +42,10 @@ class IO:
     ):
         # Validate inputs
         if isinstance(inputs, str):
-            self.inputs = [inputs]
+            if path.isdir(inputs):
+                self.inputs = [f"{inputs}/{file}" for file in sorted(listdir(inputs))]
+            else:
+                self.inputs = [inputs]
 
         elif isinstance(inputs, np.ndarray):
             if (inputs.ndim == 2 and not epoched) or (inputs.ndim == 3 and epoched):
@@ -53,6 +56,15 @@ class IO:
         elif isinstance(inputs, list):
             if epoched and not isinstance(inputs[0], list):
                 raise ValueError("If data is epoched, inputs must be a list of lists.")
+
+            if isinstance(inputs[0], str):
+                self.inputs = []
+                for inp in inputs:
+                    if path.isdir(inp):
+                        for file in sorted(listdir(inp)):
+                            self.inputs.append(f"{inp}/{file}")
+                    else:
+                        self.inputs.append(inp)
             else:
                 self.inputs = inputs
 
@@ -68,7 +80,7 @@ class IO:
         )
         self.raw_data_filenames = [
             str(self.store_dir / raw_data_pattern.format(i=i))
-            for i in range(len(inputs))
+            for i in range(len(self.inputs))
         ]
 
         # Load the data
