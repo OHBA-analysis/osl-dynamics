@@ -89,7 +89,7 @@ class IO:
         self.raw_data_memmaps = self.load_data(data_field)
 
         # Validate the data
-        self.validate_data()
+        # self.validate_data()
 
         # Attributes describing the raw data
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
@@ -373,13 +373,14 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
         Data in the MATLAB file.
     """
     try:
-        mat = scipy.io.loadmat(filename)
+        mat = scipy.io.loadmat(filename, simplify_cells=True)
     except NotImplementedError:
         mat = mat73.loadmat(filename)
 
     if not return_dict:
         # Check if there's only one key in the MATLAB file
-        if len([field for field in mat if "__" not in field]) == 1:
-            _, mat = list(mat.items())[0]
+        fields = [field for field in mat if "__" not in field]
+        if len(fields) == 1:
+            mat = mat[fields[0]]
 
     return mat
