@@ -9,6 +9,7 @@ import mat73
 import numpy as np
 import scipy.io
 from tqdm import tqdm
+from vrad.data import spm
 from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")
@@ -309,50 +310,19 @@ def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
     mat = loadmat(filename, return_dict=True)
 
     if "D" in mat:
+        # Read an SPM file
         _logger.warning("Assuming that key 'D' corresponds to an SPM MEEG object.")
-        time_series, sampling_frequency = load_spm(filename=filename)
-        print(f"Sampling frequency of the data is {sampling_frequency} Hz.")
+        D = spm.SPM(filename)
+        time_series = D.data
+
     else:
+        # Read a normal MATLAB file
         try:
             time_series = mat[field]
         except KeyError:
             raise KeyError(f"field '{field}' missing from MATLAB file.")
 
     return time_series
-
-
-def load_spm(filename: str) -> Tuple[np.ndarray, float]:
-    """Load an SPM MEEG object.
-
-    Highly untested function for reading SPM MEEG objects from MATLAB.
-
-    Parameters
-    ----------
-    filename: str
-        Filename of an SPM MEEG object.
-
-    Returns
-    -------
-    data: numpy.ndarray
-        The time series referenced in the SPM MEEG object.
-    sampling_frequency: float
-        The sampling frequency listed in the SPM MEEG object.
-
-    """
-    spm = scipy.io.loadmat(filename)
-    data_file = spm["D"][0][0][6][0][0][0][0]
-    n_channels = spm["D"][0][0][6][0][0][1][0][0]
-    n_time_points = spm["D"][0][0][6][0][0][1][0][1]
-    sampling_frequency = spm["D"][0][0][2][0][0]
-    try:
-        data = np.fromfile(data_file, dtype=np.float64).reshape(
-            n_time_points, n_channels
-        )
-    except ValueError:
-        data = np.fromfile(data_file, dtype=np.float32).reshape(
-            n_time_points, n_channels
-        )
-    return data, sampling_frequency
 
 
 def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]:
