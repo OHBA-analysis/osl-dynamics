@@ -211,32 +211,6 @@ def load_time_series(
     return time_series
 
 
-def convert_mat_to_h5(in_file: str, out_file: str = None):
-    """Converts a .mat file to a h5 file.
-
-    Parameters
-    ----------
-    in_file : str
-        Filename of MATLAB file to convert.
-    out_file : str
-        Output filename. Optional.
-    """
-    if in_file[-4:] != ".mat":
-        raise ValueError("a MATLAB file must be passed.")
-
-    if out_file is None:
-        out_file = in_file.split(".")[0] + ".h5"
-
-    # Read MATLAB file
-    mat = loadmat(in_file, return_dict=True)
-
-    # Write data to a h5 file
-    with h5py.File(out_file, "w") as file:
-        for field in mat:
-            if "__" not in field:
-                file.create_dataset(field, data=mat[field])
-
-
 def read_from_file(filename: str, data_field: str = None) -> np.ndarray:
     """Loads time series data.
 
@@ -354,3 +328,18 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
             mat = mat[fields[0]]
 
     return mat
+
+
+def write_h5_file(data: dict, filename: str):
+    """Writes a h5 file.
+
+    Parameters
+    ----------
+    data : dict
+        Data to be written to file.
+    filename : str
+        Output filename.
+    """
+    with h5py.File(filename, "w") as file:
+        for field in data:
+            file.create_dataset(field, data=data[field])
