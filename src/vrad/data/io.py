@@ -1,5 +1,6 @@
 import logging
 import pathlib
+import pickle
 from os import path, listdir
 from shutil import rmtree
 from typing import Tuple, Union
@@ -28,9 +29,6 @@ class IO:
         Sampling frequency of the data in Hz. Optional.
     store_dir : str
         Directory to save results and intermediate steps to. Optional, default is /tmp.
-    epoched : bool
-        Flag indicating if the data has been epoched. Optional, default is False.
-        If True, inputs must be a list of lists.
     """
 
     def __init__(
@@ -39,55 +37,42 @@ class IO:
         data_field: str,
         sampling_frequency: float,
         store_dir: str,
-        epoched: bool,
     ):
         # Validate inputs
         if isinstance(inputs, str):
             if path.isdir(inputs):
-                self.inputs = []
-                for file in sorted(listdir(inputs)):
-                    if file_ext(file) in [".npy", ".mat"]:
-                        self.inputs.append(f"{inputs}/{file}")
-                if len(self.inputs) == 0:
-                    raise ValueError(
-                        f"{inputs} does not contain any .npy or .mat files."
-                    )
+                self.inputs = list_dir(inputs, keep_ext=[".npy", ".mat"])
             else:
                 self.inputs = [inputs]
 
         elif isinstance(inputs, np.ndarray):
-            if (inputs.ndim == 2 and not epoched) or (inputs.ndim == 3 and epoched):
+            if inputs.ndim == 2:
                 self.inputs = [inputs]
             else:
                 self.inputs = inputs
 
         elif isinstance(inputs, list):
-            if epoched and not isinstance(inputs[0], list):
-                raise ValueError("If data is epoched, inputs must be a list of lists.")
-
             if isinstance(inputs[0], str):
                 self.inputs = []
                 for inp in inputs:
                     if path.isdir(inp):
-                        for file in sorted(listdir(inp)):
-                            if file_ext(file) in [".npy", ".mat"]:
-                                self.inputs.append(f"{inp}/{file}")
+                        self.inputs += list_dir(inp, keep_ext=[".npy", ".mat"])
                     else:
                         self.inputs.append(inp)
-                if len(self.inputs) == 0:
-                    raise ValueError("Folders do not contain .npy or .mat files.")
             else:
                 self.inputs = inputs
 
         else:
             raise ValueError("inputs must be str, np.ndarray or list.")
 
+        if len(self.inputs) == 0:
+            raise ValueError("No valid inputs were passed.")
+
         # Directory to store memory maps
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load the raw data
-        self.epoched = epoched
         self.raw_data_memmaps = self.load_raw_data(data_field)
 
         # Validate the data
@@ -116,7 +101,7 @@ class IO:
         Returns
         -------
         list
-            list of numpy memmaps.
+            list of np.memmap.
         """
         raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
@@ -125,15 +110,41 @@ class IO:
             str(self.store_dir / raw_data_pattern.format(i=i))
             for i in range(len(self.inputs))
         ]
+        # self.raw_data_filenames is not used if self.inputs is a list of strings,
+        # where the strings are paths to .npy files
 
         memmaps = []
         for raw_data, mmap_location in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
-            raw_data_mmap = load_data(raw_data, data_field, self.epoched, mmap_location)
+            raw_data_mmap = load_data(raw_data, data_field, mmap_location)
             memmaps.append(raw_data_mmap)
 
         return memmaps
+
+    def save(self, output_dir: str = "."):
+        """Saves data to numpy files.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Optional, default is the current working
+            directory.
+        """
+        output_dir = pathlib.Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save time series data
+        for i in tqdm(range(self.n_subjects), desc="Saving data", ncols=98):
+            np.save(f"{output_dir}/subject{i}.npy", self.subjects[i])
+
+        # Save preparation info if .prepared has been called
+        if self.prepared:
+            preparation = {
+                "n_embeddings": self.n_embeddings,
+                "pca_components": self.pca_components,
+            }
+            pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
 
     def validate_data(self):
         """Validate data files."""
@@ -156,114 +167,98 @@ def file_ext(filename: str) -> str:
     return ext
 
 
+def list_dir(path: str, keep_ext: Union[str, list] = None) -> list:
+    """Lists a directory.
+
+    Parameters
+    ----------
+    path : str
+        Directory to list.
+    keep_ext : str or list
+        Extensions of files to include in the returned list. Optional, default
+        is to include add files.
+
+    Returns
+    -------
+    list
+        Full path to files with the correct extension.
+    """
+    files = []
+    if keep_ext is None:
+        for file in sorted(listdir(path)):
+            files.append(path + "/" + file)
+    else:
+        if isinstance(keep_ext, str):
+            keep_ext = [keep_ext]
+        for file in sorted(listdir(path)):
+            if file_ext(file) in keep_ext:
+                files.append(path + "/" + file)
+    return files
+
+
 def load_data(
-    time_series: Union[str, list, np.ndarray],
+    data: Union[str, list, np.ndarray],
     data_field: str = "X",
-    epoched: bool = False,
     mmap_location: str = None,
 ) -> Union[np.ndarray, np.memmap]:
     """Loads time series data.
 
-    Checks the shape is time by channel and that the data is float32.
+    Checks the data shape is time by channel and that the data is float32.
 
     Parameters
     ----------
-    time_series : numpy.ndarray or str or list
-        An array or filename of a .npy or .mat file containing timeseries data.
+    data : numpy.ndarray or str or list
+        An array or filename of a .npy or .mat file containing the data.
     data_field : str
         If a MATLAB filename is passed, this is the field that corresponds to
         the data.
-    epoched : bool
-        Is the data epoched? Optional, default is False.
     mmap_location : str
         Filename to save the data as a numpy memory map.
 
     Returns
     -------
     np.memmap or np.ndarray
-        Time series data.
+        Data.
     """
-
-    # Read time series data from a file
-    if isinstance(time_series, str):
-        time_series = read_from_file(time_series, data_field)
-
-    if isinstance(time_series, list):
-
-        # If list of filenames, read data from file
-        if isinstance(time_series[0], str):
-            time_series = np.array(
-                [read_from_file(fname, data_field) for fname in time_series]
-            )
-
-        # Otherwise we assume it's a list of numpy arrays
+    if isinstance(data, np.ndarray):
+        data = validate_time_series(data)
+        if mmap_location is None:
+            return data
         else:
-            time_series = np.array(time_series)
+            # Save to a file so we can load data as a memory map
+            np.save(mmap_location, data)
+            data = mmap_location
 
-    # Check the time series has the appropriate dimensionality
-    if epoched and time_series.ndim != 3:
-        raise ValueError(
-            f"Shape {time_series.shape} detected for time series. "
-            + "epoched data must be 3D."
-        )
+    if isinstance(data, str):
+        # Check extension
+        ext = file_ext(data)
+        if ext not in [".npy", ".mat"]:
+            raise ValueError("Data file must be .npy or .mat.")
 
-    if (not epoched) and time_series.ndim != 2:
-        if time_series.ndim == 3:
-            raise ValueError(
-                f"Shape {time_series.shape} detected for time series. "
-                + "Try epoched=True."
-            )
-        else:
-            raise ValueError(
-                f"Shape {time_series.shape} detected. Time series must be 2D."
-            )
+        # Load a MATLAB file
+        if ext == ".mat":
+            data = load_matlab(data, data_field)
+            data = validate_time_series(data)
+            if mmap_location is None:
+                return data
+            else:
+                # Save to a file so we can load data as a memory map
+                np.save(mmap_location, data)
+                data = mmap_location
 
-    # Check time is the first axis and channels are the second axis
-    if epoched:
-        time_series = np.array([time_axis_first(ts) for ts in time_series])
-    else:
-        time_series = time_axis_first(time_series)
+        # Load a numpy file
+        elif ext == ".npy":
+            if mmap_location is None:
+                data = np.load(data)
+                data = validate_time_series(data)
+                return data
+            else:
+                mmap_location = data
 
-    # Make sure the time series is type float32
-    time_series = time_series.astype(np.float32)
+    # Load data as memmap
+    data = np.load(mmap_location, mmap_mode="r+")
 
-    # Load from memmap
-    if mmap_location is not None:
-        np.save(mmap_location, time_series)
-        time_series = np.load(mmap_location, mmap_mode="r+")
-
-    return time_series
-
-
-def read_from_file(filename: str, data_field: str = None) -> np.ndarray:
-    """Loads time series data.
-
-    Parameters
-    ----------
-    filename : str
-        Filename of a .npy or .mat file containing time series data.
-    data_field : str
-        If a MATLAB filename is passed, this is the field that corresponds to
-        the data.
-
-    Returns
-    -------
-    np.ndarray
-        Time series data.
-    """
-
-    # Check if file exists
-    if not path.exists(filename):
-        raise FileNotFoundError(filename)
-
-    # Read data from the file
-    if filename[-4:] == ".npy":
-        time_series = np.load(filename)
-
-    elif filename[-4:] == ".mat":
-        time_series = load_matlab(filename=filename, field=data_field)
-
-    return time_series
+    return data
 
 
 def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
@@ -280,29 +275,32 @@ def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
 
     Returns
     -------
-    time_series: np.ndarray
+    np.ndarray
         Data in the MATLAB/SPM file.
     """
+    # Check if file exists
+    if not path.exists(filename):
+        raise FileNotFoundError(filename)
+
+    # Load file
     mat = loadmat(filename, return_dict=True)
 
+    # Get data
     if "D" in mat:
-        # Read an SPM file
         _logger.warning("Assuming that key 'D' corresponds to an SPM MEEG object.")
         D = spm.SPM(filename)
-        time_series = D.data
-
+        data = D.data
     else:
-        # Read a normal MATLAB file
         try:
-            time_series = mat[field]
+            data = mat[field]
         except KeyError:
             raise KeyError(f"field '{field}' missing from MATLAB file.")
 
-    return time_series
+    return data
 
 
 def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]:
-    """Loads a MATLAB field.
+    """Wrapper for scipy.io.loadmat or mat73.loadmat.
 
     Parameters
     ----------
@@ -330,3 +328,23 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
             mat = mat[fields[0]]
 
     return mat
+
+
+def validate_time_series(data: np.ndarray) -> np.ndarray:
+    """Validate time series data.
+
+    Enforces shape to be time by channels and a float32 data type.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series data.
+
+    Returns
+    -------
+    np.ndarray
+        Valid data.
+    """
+    data = time_axis_first(data)
+    data = data.astype(np.float32)
+    return data

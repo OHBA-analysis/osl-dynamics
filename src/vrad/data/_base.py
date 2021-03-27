@@ -28,9 +28,6 @@ class Data(IO, Manipulation, TensorFlowDataset):
         Sampling frequency of the data in Hz. Optional.
     store_dir : str
         Directory to save results and intermediate steps to. Optional, default is /tmp.
-    epoched : bool
-        Flag indicating if the data has been epoched. Optional, default is False.
-        If True, inputs must be a list of lists.
     n_embeddings : int
         Number of embeddings. Optional. Can be passed if data has already been prepared.
     """
@@ -41,14 +38,13 @@ class Data(IO, Manipulation, TensorFlowDataset):
         matlab_field: str = "X",
         sampling_frequency: float = None,
         store_dir: str = "tmp",
-        epoched: bool = False,
         n_embeddings: int = None,
     ):
         # Unique identifier for the Data object
         self._identifier = id(inputs)
 
         # Load data by initialising an IO object
-        IO.__init__(self, inputs, matlab_field, sampling_frequency, store_dir, epoched)
+        IO.__init__(self, inputs, matlab_field, sampling_frequency, store_dir)
 
         # Initialise a Manipulation object so we have method we can use to prepare
         # the data
@@ -69,7 +65,6 @@ class Data(IO, Manipulation, TensorFlowDataset):
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
             f"n_subjects: {self.n_subjects}",
-            f"n_epochs: {self.n_epochs}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
         ]
@@ -86,22 +81,9 @@ class Data(IO, Manipulation, TensorFlowDataset):
         return self.subjects[0].shape[-1]
 
     @property
-    def n_epochs(self) -> Union[list, int]:
-        """Number of epochs."""
-        if self.epoched:
-            n_epochs = [subject.shape[0] for subject in self.subjects]
-            if len(set(n_epochs)) == 1:
-                return n_epochs[0]
-            else:
-                return n_epochs
-
-    @property
     def n_samples(self) -> int:
         """Number of samples for each subject."""
-        if self.epoched:
-            return self.subjects[0].shape[-2]
-        else:
-            return sum([subject.shape[-2] for subject in self.subjects])
+        return sum([subject.shape[-2] for subject in self.subjects])
 
     @property
     def n_subjects(self) -> int:
