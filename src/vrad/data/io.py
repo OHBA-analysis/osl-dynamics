@@ -1,4 +1,3 @@
-import h5py
 import logging
 import pathlib
 from os import path, listdir
@@ -23,7 +22,7 @@ class IO:
     inputs : list of str or str
         Filenames to be read.
     data_field : str
-        If a MATLAB/h5df filename is passed, this is the field that corresponds to the
+        If a MATLAB filename is passed, this is the field that corresponds to the
         data. Optional. By default we read the field 'X'.
     sampling_frequency : float
         Sampling frequency of the data in Hz. Optional.
@@ -45,7 +44,14 @@ class IO:
         # Validate inputs
         if isinstance(inputs, str):
             if path.isdir(inputs):
-                self.inputs = [f"{inputs}/{file}" for file in sorted(listdir(inputs))]
+                self.inputs = []
+                for file in sorted(listdir(inputs)):
+                    if file_ext(file) in [".npy", ".mat"]:
+                        self.inputs.append(f"{inputs}/{file}")
+                if len(self.inputs) == 0:
+                    raise ValueError(
+                        f"{inputs} does not contain any .npy or .mat files."
+                    )
             else:
                 self.inputs = [inputs]
 
@@ -64,33 +70,28 @@ class IO:
                 for inp in inputs:
                     if path.isdir(inp):
                         for file in sorted(listdir(inp)):
-                            self.inputs.append(f"{inp}/{file}")
+                            if file_ext(file) in [".npy", ".mat"]:
+                                self.inputs.append(f"{inp}/{file}")
                     else:
                         self.inputs.append(inp)
+                if len(self.inputs) == 0:
+                    raise ValueError("Folders do not contain .npy or .mat files.")
             else:
                 self.inputs = inputs
 
         else:
             raise ValueError("inputs must be str, np.ndarray or list.")
 
+        # Directory to store memory maps
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
-        # Raw data memory maps
-        raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(len(inputs))), identifier=self._identifier
-        )
-        self.raw_data_filenames = [
-            str(self.store_dir / raw_data_pattern.format(i=i))
-            for i in range(len(self.inputs))
-        ]
-
-        # Load the data
+        # Load the raw data
         self.epoched = epoched
-        self.raw_data_memmaps = self.load_data(data_field)
+        self.raw_data_memmaps = self.load_raw_data(data_field)
 
         # Validate the data
-        # self.validate_data()
+        self.validate_data()
 
         # Attributes describing the raw data
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
@@ -103,13 +104,13 @@ class IO:
         """Deletes the directory that stores the memory maps."""
         rmtree(self.store_dir, ignore_errors=True)
 
-    def load_data(self, data_field: str) -> list:
+    def load_raw_data(self, data_field: str) -> list:
         """Import data into a list of memory maps.
 
         Parameters
         ----------
         data_field : str
-            If a MATLAB/hdf5 filename is passed, this is the field that corresponds
+            If a MATLAB filename is passed, this is the field that corresponds
             to the data. By default we read the field 'X'.
 
         Returns
@@ -117,14 +118,21 @@ class IO:
         list
             list of numpy memmaps.
         """
+        raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(self.inputs))), identifier=self._identifier
+        )
+        self.raw_data_filenames = [
+            str(self.store_dir / raw_data_pattern.format(i=i))
+            for i in range(len(self.inputs))
+        ]
+
         memmaps = []
-        for in_file, out_file in zip(
+        for raw_data, mmap_location in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
-            data = load_time_series(
-                in_file, data_field, self.epoched, mmap_location=out_file
-            )
-            memmaps.append(data)
+            raw_data_mmap = load_data(raw_data, data_field, self.epoched, mmap_location)
+            memmaps.append(raw_data_mmap)
+
         return memmaps
 
     def validate_data(self):
@@ -134,20 +142,36 @@ class IO:
             raise ValueError("All inputs should have the same number of channels.")
 
 
-def load_time_series(
+def file_ext(filename: str) -> str:
+    """Returns the extension of a file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to file.
+    """
+    if not isinstance(filename, str):
+        return None
+    _, ext = path.splitext(filename)
+    return ext
+
+
+def load_data(
     time_series: Union[str, list, np.ndarray],
     data_field: str = "X",
     epoched: bool = False,
     mmap_location: str = None,
-) -> np.ndarray:
+) -> Union[np.ndarray, np.memmap]:
     """Loads time series data.
+
+    Checks the shape is time by channel and that the data is float32.
 
     Parameters
     ----------
     time_series : numpy.ndarray or str or list
         An array or filename of a .npy or .mat file containing timeseries data.
     data_field : str
-        If a MATLAB/hdf5 filename is passed, this is the field that corresponds to
+        If a MATLAB filename is passed, this is the field that corresponds to
         the data.
     epoched : bool
         Is the data epoched? Optional, default is False.
@@ -156,7 +180,7 @@ def load_time_series(
 
     Returns
     -------
-    np.ndarray
+    np.memmap or np.ndarray
         Time series data.
     """
 
@@ -219,7 +243,7 @@ def read_from_file(filename: str, data_field: str = None) -> np.ndarray:
     filename : str
         Filename of a .npy or .mat file containing time series data.
     data_field : str
-        If a MATLAB/hdf5 filename is passed, this is the field that corresponds to
+        If a MATLAB filename is passed, this is the field that corresponds to
         the data.
 
     Returns
@@ -238,28 +262,6 @@ def read_from_file(filename: str, data_field: str = None) -> np.ndarray:
 
     elif filename[-4:] == ".mat":
         time_series = load_matlab(filename=filename, field=data_field)
-
-    elif filename[-3:] == ".h5" or filename[-5:] == ".hdf5":
-        time_series = load_h5(filename=filename, field=data_field)
-
-    return time_series
-
-
-def load_h5(filename: str, field: str) -> np.ndarray:
-    """Loads a h5/hdf5 file.
-
-    Parameters
-    ----------
-    filename : str
-        Filename of the h5/hdf5 file to read.
-    field : str
-        Field that corresponds to the data.
-    """
-    with h5py.File(filename, "r") as file:
-        try:
-            time_series = np.array(file.get(field))
-        except:
-            raise ValueError(f"field '{field}' from file.")
 
     return time_series
 
@@ -328,18 +330,3 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
             mat = mat[fields[0]]
 
     return mat
-
-
-def write_h5_file(data: dict, filename: str):
-    """Writes a h5 file.
-
-    Parameters
-    ----------
-    data : dict
-        Data to be written to file.
-    filename : str
-        Output filename.
-    """
-    with h5py.File(filename, "w") as file:
-        for field in data:
-            file.create_dataset(field, data=data[field])
