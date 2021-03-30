@@ -68,15 +68,17 @@ class IO:
         if len(self.inputs) == 0:
             raise ValueError("No valid inputs were passed.")
 
-        # Directory to store memory maps
+        # Directory to store memory maps created by this class
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
-        # Load the raw data
+        # Load and validate the raw data
         self.raw_data_memmaps = self.load_raw_data(data_field)
-
-        # Validate the data
         self.validate_data()
+
+        # Get data prepration attributes if the raw data has been prepared
+        if not isinstance(inputs, list):
+            self.load_preparation(inputs)
 
         # Attributes describing the raw data
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
@@ -88,6 +90,23 @@ class IO:
     def delete_dir(self):
         """Deletes the directory that stores the memory maps."""
         rmtree(self.store_dir, ignore_errors=True)
+
+    def load_preparation(self, inputs: str):
+        """Loads a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        inputs : str
+            Path to directory containing the pickle file with preparation settings.
+        """
+        if path.isdir(inputs):
+            for file in list_dir(inputs):
+                if "preparation.pkl" in file:
+                    preparation = pickle.load(open(inputs + "/preparation.pkl", "rb"))
+                    self.n_embeddings = preparation["n_embeddings"]
+                    self.pca_components = preparation["pca_components"]
+                    self.n_pca_components = preparation["pca_components"].shape[1]
+                    self.prepared = True
 
     def load_raw_data(self, data_field: str) -> list:
         """Import data into a list of memory maps.
