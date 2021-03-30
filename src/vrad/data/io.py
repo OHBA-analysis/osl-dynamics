@@ -249,6 +249,10 @@ def load_data(
             data = mmap_location
 
     if isinstance(data, str):
+        # Check if file/folder exists
+        if not path.exists(data):
+            raise FileNotFoundError(data)
+
         # Check extension
         ext = file_ext(data)
         if ext not in [".npy", ".mat"]:
@@ -297,10 +301,6 @@ def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
     np.ndarray
         Data in the MATLAB/SPM file.
     """
-    # Check if file exists
-    if not path.exists(filename):
-        raise FileNotFoundError(filename)
-
     # Load file
     mat = loadmat(filename, return_dict=True)
 
