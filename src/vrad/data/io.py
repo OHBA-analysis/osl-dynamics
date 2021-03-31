@@ -52,7 +52,9 @@ class IO:
                 self.inputs = inputs
 
         elif isinstance(inputs, list):
-            if isinstance(inputs[0], str):
+            if len(inputs) == 0:
+                raise ValueError("Empty list passed.")
+            elif isinstance(inputs[0], str):
                 self.inputs = []
                 for inp in inputs:
                     if path.isdir(inp):
