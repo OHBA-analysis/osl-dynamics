@@ -63,7 +63,7 @@ class OSL_HMM:
         plotting.state_barcode(self.state_time_course, *args, **kwargs)
 
     def padded_gammas(self, n_embeddings):
-        split_gammas = np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
+        split_gammas = self.split_gamma()
         return [
             np.pad(gamma, [[n_embeddings, n_embeddings], [0, 0]])
             for gamma in split_gammas
@@ -81,6 +81,14 @@ class OSL_HMM:
 
         """
         return array_ops.trace_weights(self.covariances)
+
+    def split_gamma(self) -> list:
+        """Gamma for each subject."""
+        return np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
+
+    def split_stc(self) -> list:
+        """State time course for each subject."""
+        return np.split(self.state_time_course, np.cumsum(self.discontinuities[:-1]))
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"
