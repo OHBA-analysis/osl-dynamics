@@ -90,6 +90,11 @@ class Data(IO, Manipulation, TensorFlowDataset):
         """Number of subjects."""
         return len(self.subjects)
 
+    @property
+    def time_series(self) -> np.ndarray:
+        """Concatenated time series data for all subjects."""
+        return np.concatenate(self.subjects)
+
     @classmethod
     def from_yaml(cls, file, **kwargs):
         instance = misc.class_from_yaml(cls, file, kwargs)
