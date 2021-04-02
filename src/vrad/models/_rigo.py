@@ -13,7 +13,7 @@ from vrad import models
 from vrad.inference import initializers
 from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import (
-    AlphaLayer,
+    StateMixingFactorLayer,
     DummyLayer,
     InferenceRNNLayers,
     KLDivergenceLayer,
@@ -127,11 +127,15 @@ class RIGO(models.GO):
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if rnn_normalization not in [
-            "layer",
-            "batch",
-            None,
-        ] or theta_normalization not in ["layer", "batch", None]:
+        if (
+            rnn_normalization
+            not in [
+                "layer",
+                "batch",
+                None,
+            ]
+            or theta_normalization not in ["layer", "batch", None]
+        ):
             raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
         if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:
@@ -575,7 +579,9 @@ def _model_structure(
         theta_t_norm_layer = layers.BatchNormalization(name="theta_t_norm")
     else:
         theta_t_norm_layer = DummyLayer(name="theta_t_norm")
-    alpha_t_layer = AlphaLayer(alpha_xform, alpha_temperature, name="alpha_t")
+    alpha_t_layer = StateMixingFactorLayer(
+        alpha_xform, alpha_temperature, name="alpha_t"
+    )
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)

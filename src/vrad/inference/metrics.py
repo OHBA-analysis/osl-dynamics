@@ -245,7 +245,7 @@ def log_likelihood(
     n_calls = time_series.shape[0] // sequence_length
 
     nll = []
-    for i in trange(n_calls, desc="Calculate log-likelihood", ncols=98):
+    for i in trange(n_calls, desc="Calculating log-likelihood", ncols=98):
 
         # Convert data to tensors
         x = tf.constant(time_series[i * sequence_length : (i + 1) * sequence_length])

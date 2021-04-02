@@ -124,7 +124,7 @@ class SampleNormalDistributionLayer(layers.Layer):
         return mu_shape
 
 
-class AlphaLayer(layers.Layer):
+class StateMixingFactorLayer(layers.Layer):
     """Layer for calculating the mixing ratio of the states.
 
     This layer accepts the logits theta_t and outputs alpha_t.
@@ -153,7 +153,8 @@ class AlphaLayer(layers.Layer):
             alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "categorical":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature, logits=theta_t,
+                temperature=self.alpha_temperature,
+                logits=theta_t,
             )
             alpha_t = gumbel_softmax_distribution.sample()
 

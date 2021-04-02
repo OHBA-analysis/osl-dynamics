@@ -208,7 +208,8 @@ class Base:
             if save_filepath is None:
                 save_filepath = f"/tmp/model_weights/best_{self._identifier}"
             save_best_callback = SaveBestCallback(
-                save_best_after=save_best_after, filepath=save_filepath,
+                save_best_after=save_best_after,
+                filepath=save_filepath,
             )
 
             additional_callbacks.append(save_best_callback)
@@ -304,7 +305,10 @@ class Base:
 
         results_file = settings.pop("results_file", None)
 
-        history = self.fit(training_dataset, **settings,)
+        history = self.fit(
+            training_dataset,
+            **settings,
+        )
 
         save_filepath = settings.get("save_filepath", None)
         if save_filepath:
