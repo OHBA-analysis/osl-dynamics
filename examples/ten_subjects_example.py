@@ -45,7 +45,7 @@ dropout_rate_model = 0.0
 
 learn_covariances = False
 
-alpha_xform = "categorical"
+alpha_xform = "gumbel-softmax"
 alpha_temperature = 1.0
 learn_alpha_scaling = False
 normalize_covariances = False
@@ -118,9 +118,8 @@ print(f"Free energy: {free_energy}")
 alpha = model.predict_states(prediction_dataset)
 inf_stc = states.time_courses(alpha, concatenate=True)
 hmm_stc = manipulation.trim_time_series(
-    time_series=hmm.state_time_course,
+    time_series=hmm.state_time_course(),
     sequence_length=sequence_length,
-    discontinuities=hmm.discontinuities,
     concatenate=True,
 )
 

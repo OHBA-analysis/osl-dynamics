@@ -39,7 +39,9 @@ def time_courses(
         n_states = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
         stcs = [array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs]
-        if concatenate:
+        if len(stcs) == 1:
+            stcs = stcs[0]
+        elif concatenate:
             stcs = np.concatenate(stcs)
     else:
         n_states = alpha.shape[1]

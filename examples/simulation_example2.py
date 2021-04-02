@@ -48,7 +48,7 @@ dropout_rate_model = 0.0
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 0.2
+alpha_temperature = 0.25
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -111,7 +111,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time course
-inf_alpha = model.predict_states(prediction_dataset)[0]
+inf_alpha = model.predict_states(prediction_dataset)
 inf_stc = states.time_courses(inf_alpha)
 sim_stc = sim.state_time_course
 

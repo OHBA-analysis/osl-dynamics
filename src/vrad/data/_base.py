@@ -90,10 +90,24 @@ class Data(IO, Manipulation, TensorFlowDataset):
         """Number of subjects."""
         return len(self.subjects)
 
-    @property
-    def time_series(self) -> np.ndarray:
-        """Concatenated time series data for all subjects."""
-        return np.concatenate(self.subjects)
+    def time_series(self, concatenate: bool = False) -> Union[list, np.ndarray]:
+        """Time series data for all subjects.
+
+        Parameters
+        ----------
+        concatenate : bool
+            Should we return the time series for each subject concatenated?
+            Optional, default is False.
+
+        Returns
+        -------
+        list or np.ndarray
+            Time series data for each subject.
+        """
+        if concatenate:
+            return np.concatenate(self.subjects)
+        else:
+            return self.subjects
 
     @classmethod
     def from_yaml(cls, file, **kwargs):

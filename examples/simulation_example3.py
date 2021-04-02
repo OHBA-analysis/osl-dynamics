@@ -48,7 +48,7 @@ dropout_rate_model = 0.0
 learn_covariances = True
 
 alpha_xform = "softmax"
-alpha_temperature = 0.2
+alpha_temperature = 0.25
 learn_alpha_scaling = False
 normalize_covariances = False
 
@@ -122,7 +122,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Compare the inferred state time course to the ground truth
-alpha = model.predict_states(prediction_dataset)[0]
+alpha = model.predict_states(prediction_dataset)
 matched_sim_stc, matched_alpha = states.match_states(sim.state_time_course, alpha)
 plotting.plot_separate_time_series(
     matched_alpha, matched_sim_stc, n_samples=10000, filename="stc.png"

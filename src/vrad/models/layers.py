@@ -151,7 +151,7 @@ class StateMixingFactorLayer(layers.Layer):
             alpha_t = activations.relu(theta_t)
         elif self.alpha_xform == "softmax":
             alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
-        elif self.alpha_xform == "categorical":
+        elif self.alpha_xform == "gumbel-softmax":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
                 temperature=self.alpha_temperature,
                 logits=theta_t,

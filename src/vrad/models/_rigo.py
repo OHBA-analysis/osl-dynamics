@@ -3,6 +3,7 @@
 """
 
 import logging
+from typing import Tuple, Union
 from operator import lt
 
 import numpy as np
@@ -62,10 +63,10 @@ class RIGO(models.GO):
         Type of normalization to apply to the posterior samples, theta_t.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
+        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
         'relu'.
     alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
+        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -138,9 +139,9 @@ class RIGO(models.GO):
         ):
             raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
-        if alpha_xform not in ["categorical", "softmax", "softplus", "relu"]:
+        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus", "relu"]:
             raise ValueError(
-                "alpha_xform must be 'categorical', 'softmax', 'softplus' or 'relu'."
+                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
             )
 
         if annealing_sharpness <= 0:
@@ -298,7 +299,7 @@ class RIGO(models.GO):
         if self.do_annealing:
             self.annealing_factor.assign(0.0)
 
-    def predict(self, *args, **kwargs):
+    def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
 
         Returns
@@ -311,18 +312,24 @@ class RIGO(models.GO):
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
-    def predict_states(self, inputs, *args, **kwargs):
+    def predict_states(
+        self, inputs, *args, concatenate: bool = False, **kwargs
+    ) -> Union[list, np.ndarray]:
         """State mixing factors, alpha_t.
 
         Parameters
         ----------
         inputs : tensorflow.data.Dataset
             Prediction dataset.
+        concatenate : bool
+            Should we concatenate alpha for each subject? Optional, default
+            is False.
 
         Returns
         -------
         np.ndarray
-            State mixing factors with shape (n_samples, n_states).
+            State mixing factors with shape (n_subjects, n_samples, n_states) or
+            (n_samples, n_states).
         """
         inputs = self._make_dataset(inputs)
         outputs = []
@@ -330,9 +337,13 @@ class RIGO(models.GO):
             alpha_t = self.predict(dataset, *args, **kwargs)["alpha_t"]
             alpha_t = np.concatenate(alpha_t)
             outputs.append(alpha_t)
+        if len(outputs) == 1:
+            outputs = outputs[0]
+        elif concatenate:
+            outputs = np.concatenate(outputs)
         return outputs
 
-    def losses(self, dataset, return_mean=False):
+    def losses(self, dataset, return_mean: bool = False) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.
 
         Parameters
@@ -364,7 +375,7 @@ class RIGO(models.GO):
             kl_loss = mean_or_sum(predictions["kl_loss"])
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset, return_mean=False):
+    def free_energy(self, dataset, return_mean: bool = False) -> float:
         """Calculates the variational free energy of a dataset.
 
         Parameters
@@ -532,10 +543,10 @@ def _model_structure(
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels).
     alpha_xform : str
-        Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
+        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
         'relu'.
     alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
+        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool

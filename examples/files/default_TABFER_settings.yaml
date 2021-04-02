@@ -1,5 +1,5 @@
 alpha_temperature: 2
-alpha_xform: categorical
+alpha_xform: gumbel-softmax
 annealing_sharpness: 10
 batch_size: 64
 do_annealing: true

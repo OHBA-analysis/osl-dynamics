@@ -333,7 +333,7 @@ def time_embed(time_series: np.ndarray, n_embeddings: int):
 
 
 def trim_time_series(
-    time_series: np.ndarray,
+    time_series: Union[list, np.ndarray],
     sequence_length: int,
     discontinuities: list = None,
     concatenate: bool = False,
@@ -360,16 +360,21 @@ def trim_time_series(
     list of np.ndarray
         Trimmed time series.
     """
-    if discontinuities is None:
-        # Assume entire time series corresponds to a single subject
-        ts = [time_series]
+    if isinstance(time_series, np.ndarray):
+        if discontinuities is None:
+            # Assume entire time series corresponds to a single subject
+            ts = [time_series]
+        else:
+            # Separate the time series for each subject
+            ts = []
+            for i in range(len(discontinuities)):
+                start = sum(discontinuities[:i])
+                end = sum(discontinuities[: i + 1])
+                ts.append(time_series[start:end])
+    elif isinstance(time_series, list):
+        ts = time_series
     else:
-        # Separate the time series for each subject
-        ts = []
-        for i in range(len(discontinuities)):
-            start = sum(discontinuities[:i])
-            end = sum(discontinuities[: i + 1])
-            ts.append(time_series[start:end])
+        raise ValueError("time_series must be a list or numpy array.")
 
     # Remove data points lost to separating into sequences
     for i in range(len(ts)):
