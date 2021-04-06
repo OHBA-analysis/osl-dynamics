@@ -21,12 +21,13 @@ multi_gpu = True
 # Settings
 n_states = 6
 sequence_length = 400
+
 batch_size = 64
+learning_rate = 0.01
+n_epochs = 200
 
 do_annealing = True
 annealing_sharpness = 10
-
-n_epochs = 200
 n_epochs_annealing = 100
 
 rnn_type = "lstm"
@@ -42,14 +43,12 @@ n_units_model = 64
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-learn_covariances = False
-
 alpha_xform = "gumbel-softmax"
 alpha_temperature = 1.0
 learn_alpha_scaling = False
-normalize_covariances = False
 
-learning_rate = 0.01
+learn_covariances = False
+normalize_covariances = False
 
 # Read MEG data
 print("Reading MEG data")

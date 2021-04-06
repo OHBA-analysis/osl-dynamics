@@ -24,12 +24,13 @@ gamma_scale = 10
 
 n_states = 5
 sequence_length = 200
+
 batch_size = 16
+learning_rate = 0.01
+n_epochs = 200
 
 do_annealing = True
 annealing_sharpness = 10
-
-n_epochs = 200
 n_epochs_annealing = 100
 
 rnn_type = "lstm"
@@ -45,14 +46,12 @@ n_units_model = 64
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-learn_covariances = True
-
 alpha_xform = "softmax"
 alpha_temperature = 0.25
 learn_alpha_scaling = False
-normalize_covariances = False
 
-learning_rate = 0.01
+learn_covariances = True
+normalize_covariances = False
 
 # Load covariances for each state
 example_file_directory = Path(__file__).parent / "files"

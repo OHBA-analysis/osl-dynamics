@@ -7,6 +7,7 @@ Please also see make_default_settings.py to configure run-time defaults.
 
 Ryan Timms, OHBA, 2021. @blobsonthebrain
 """
+print("Setting up")
 import pathlib
 
 import matplotlib.pyplot as plt
@@ -19,8 +20,6 @@ from vrad import data
 from vrad.inference import tf_ops
 from vrad.models import RIGO
 from vrad.utils import plotting
-
-print("Setting up")
 
 
 tf.keras.backend.clear_session()

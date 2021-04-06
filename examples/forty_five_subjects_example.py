@@ -4,8 +4,8 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.78 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~8,100,000.
+- Achieves a dice coefficient of ~0.72 (when compared to the OSL HMM state time course).
+- Achieves a free energy of ~8,040,000.
 """
 
 print("Setting up")
@@ -22,12 +22,13 @@ multi_gpu = True
 # Settings
 n_states = 6
 sequence_length = 400
+
 batch_size = 128
+learning_rate = 0.01
+n_epochs = 50
 
 do_annealing = True
 annealing_sharpness = 10
-
-n_epochs = 50
 n_epochs_annealing = 20
 
 rnn_type = "lstm"
@@ -43,14 +44,12 @@ n_units_model = 64
 dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
-learn_covariances = False
-
 alpha_xform = "gumbel-softmax"
 alpha_temperature = 1.0
 learn_alpha_scaling = False
-normalize_covariances = False
 
-learning_rate = 0.01
+learn_covariances = False
+normalize_covariances = False
 
 # Read MEG data
 print("Reading MEG data")
@@ -72,7 +71,11 @@ prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_siz
 hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-45_K-6/hmm.mat"
 )
-initial_covariances = hmm.covariances
+initial_covariances = np.empty([n_states, n_channels, n_channels])
+ts = prepared_data.time_series(concatenate=True)
+stc = hmm.state_time_course(concatenate=True)
+for i in range(n_states):
+    initial_covariances[i] = np.cov(ts[stc[:, i] == 1], rowvar=False)
 
 # Build model
 model = RIGO(

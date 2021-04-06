@@ -18,12 +18,13 @@ n_lags = 2
 
 n_states = 3
 sequence_length = 200
+
 batch_size = 64
+learning_rate = 0.001
+n_epochs = 800
 
 do_annealing = True
 annealing_sharpness = 15
-
-n_epochs = 800
 n_epochs_annealing = 600
 
 rnn_type = "lstm"
@@ -41,8 +42,6 @@ dropout_rate_model = 0.0
 
 alpha_xform = "softmax"
 alpha_temperature = 2.0
-
-learning_rate = 0.001
 
 # MAR parameters
 A11 = [[0.9, 0], [0.16, 0.8]]

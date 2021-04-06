@@ -11,9 +11,10 @@ tf_ops.gpu_growth()
 # Settings
 n_samples = 51200
 sequence_length = 100
+
 batch_size = 16
-n_epochs = 200
 learning_rate = 0.01
+n_epochs = 200
 
 # MAR parameters
 A11 = [[0.9, 0], [0.16, 0.8]]

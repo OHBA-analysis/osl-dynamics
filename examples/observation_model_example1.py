@@ -23,14 +23,13 @@ gamma_scale = 10
 
 n_states = 5
 sequence_length = 200
-batch_size = 16
 
+batch_size = 16
+learning_rate = 0.01
 n_epochs = 20
 
 learn_alpha_scaling = False
 normalize_covariances = False
-
-learning_rate = 0.01
 
 # Load state transition probability matrix and covariances of each state
 example_file_directory = Path(__file__).parent / "files"
