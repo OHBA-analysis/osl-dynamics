@@ -13,7 +13,7 @@ import numpy as np
 from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIGO
+from vrad.models import RIGAGO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -78,7 +78,7 @@ for i in range(n_states):
     initial_covariances[i] = np.cov(ts[stc[:, i] == 1], rowvar=False)
 
 # Build model
-model = RIGO(
+model = RIGAGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,

@@ -17,11 +17,11 @@ from vrad.models.layers import (
     StateMixingFactorLayer,
     DummyLayer,
     InferenceRNNLayers,
-    KLDivergenceLayer,
     LogLikelihoodLayer,
     MeansCovsLayer,
     MixMeansCovsLayer,
     ModelRNNLayers,
+    NormalKLDivergenceLayer,
     SampleNormalDistributionLayer,
 )
 from vrad.utils.misc import check_arguments, replace_argument
@@ -29,8 +29,9 @@ from vrad.utils.misc import check_arguments, replace_argument
 _logger = logging.getLogger("VRAD")
 
 
-class RIGO(models.GO):
-    """RNN Inference/model network and Gaussian Observations (RIGO).
+class RIGAGO(models.GO):
+    """RNN Inference/model network, Gaussian Alpha and Gaussian Observations
+    (RIGAGO).
 
     Parameters
     ----------
@@ -649,7 +650,7 @@ def _model_structure(
     )
     mu_theta_jt_layer = layers.Dense(n_states, name="mu_theta_jt")
     log_sigma_theta_jt_layer = layers.Dense(n_states, name="log_sigma_theta_jt")
-    kl_loss_layer = KLDivergenceLayer(name="kl")
+    kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_t_norm)

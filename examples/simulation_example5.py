@@ -7,7 +7,7 @@ print("Setting up")
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIMARO
+from vrad.models import RIGAMARO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -79,7 +79,7 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
-model = RIMARO(
+model = RIGAMARO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,

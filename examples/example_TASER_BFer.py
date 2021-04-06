@@ -18,7 +18,7 @@ import vrad
 import yaml
 from vrad import data
 from vrad.inference import tf_ops
-from vrad.models import RIGO
+from vrad.models import RIGAGO
 from vrad.utils import plotting
 
 
@@ -91,7 +91,7 @@ initial_means = np.zeros((n_states, n_channels))
 
 
 # Build model
-model = RIGO(
+model = RIGAGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,

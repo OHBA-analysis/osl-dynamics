@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIGO
+from vrad.models import RIGAGO
 from vrad.utils import plotting
 
 # GPU settings
@@ -83,7 +83,7 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
-model = RIGO(
+model = RIGAGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
