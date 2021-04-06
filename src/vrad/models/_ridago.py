@@ -14,7 +14,6 @@ from vrad import models
 from vrad.inference import initializers
 from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import (
-    StateMixingFactorLayer,
     DirichletKLDivergenceLayer,
     DummyLayer,
     InferenceRNNLayers,
@@ -23,6 +22,7 @@ from vrad.models.layers import (
     MixMeansCovsLayer,
     ModelRNNLayers,
     SampleDirichletDistributionLayer,
+    ThetaActivationLayer,
 )
 from vrad.utils.misc import check_arguments, replace_argument
 
@@ -56,13 +56,16 @@ class RIDAGO(models.GO):
         Number of units/neurons in the inference network.
     n_units_model : int
         Number of units/neurons in the generative model neural network.
-    dropout_rate_inference : float
-        Dropout rate in the inference network.
-    dropout_rate_model : float
-        Dropout rate in the generative model neural network.
     theta_normalization : str
-        Type of normalization to apply to the Dirichlet parameters, theta_t.
+        Type of normalization to apply to the RNN outputs, theta.
         Either 'layer', 'batch' or None.
+    alpha_xform : str
+        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
+        'relu'.
+    alpha_temperature : float
+        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
+    alpha_normalization : str
+        Type of normalization to apply to the samples. Either 'layer', 'batch' or None.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -96,9 +99,10 @@ class RIDAGO(models.GO):
         n_layers_model: int,
         n_units_inference: int,
         n_units_model: int,
-        dropout_rate_inference: float,
-        dropout_rate_model: float,
         theta_normalization: str,
+        alpha_xform: str,
+        alpha_temperature: float,
+        alpha_normalization: str,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
         do_annealing: bool,
@@ -119,9 +123,6 @@ class RIDAGO(models.GO):
         if n_units_inference < 1 or n_units_model < 1:
             raise ValueError("n_units must be greater than zero.")
 
-        if dropout_rate_inference < 0 or dropout_rate_model < 0:
-            raise ValueError("dropout_rate must be greater than or equal to zero.")
-
         if (
             rnn_normalization
             not in [
@@ -129,9 +130,15 @@ class RIDAGO(models.GO):
                 "batch",
                 None,
             ]
+            or alpha_normalization not in ["layer", "batch", None]
             or theta_normalization not in ["layer", "batch", None]
         ):
             raise ValueError("normalization type must be 'layer', 'batch' or None.")
+
+        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus", "relu"]:
+            raise ValueError(
+                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
+            )
 
         if annealing_sharpness <= 0:
             raise ValueError("annealing_sharpness must be greater than zero.")
@@ -148,9 +155,10 @@ class RIDAGO(models.GO):
         self.n_layers_model = n_layers_model
         self.n_units_inference = n_units_inference
         self.n_units_model = n_units_model
-        self.dropout_rate_inference = dropout_rate_inference
-        self.dropout_rate_model = dropout_rate_model
         self.theta_normalization = theta_normalization
+        self.alpha_xform = alpha_xform
+        self.alpha_temperature = alpha_temperature
+        self.alpha_normalization = alpha_normalization
 
         # KL annealing
         self.do_annealing = do_annealing
@@ -185,9 +193,10 @@ class RIDAGO(models.GO):
             n_layers_model=self.n_layers_model,
             n_units_inference=self.n_units_inference,
             n_units_model=self.n_units_model,
-            dropout_rate_inference=self.dropout_rate_inference,
-            dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
+            alpha_xform=self.alpha_xform,
+            alpha_temperature=self.alpha_temperature,
+            alpha_normalization=self.alpha_normalization,
             initial_means=None,
             initial_covariances=self.initial_covariances,
             learn_means=False,
@@ -403,6 +412,51 @@ class RIDAGO(models.GO):
         means_covs_layer.trainable = True
         self.compile()
 
+    def sample(self, n_samples: int) -> np.ndarray:
+        """Uses the model RNN to sample a state time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to take.
+
+        Returns
+        -------
+        np.ndarray
+            Sampled state time course.
+        """
+        # Get layers
+        sample_norm_layer = self.model.get_layer("samples_norm")
+        rnn_layer = self.model.get_layer("mod_rnn")
+        theta_layer = self.model.get_layer("mod_theta")
+        theta_norm_layer = self.model.get_layer("mod_theta_norm")
+        alpha_layer = self.model.get_layer("mod_alpha")
+
+        # State time course
+        stc = np.zeros([n_samples, self.n_states], dtype=np.float32)
+
+        # Activate the first state for the first sample
+        stc[0, 0] = 1
+
+        # Sample from the model RNN
+        for i in trange(1, n_samples, desc="Sampling state time course", ncols=98):
+
+            # Predict the next theta
+            samples_norm = sample_norm_layer(
+                stc[max(0, i - self.sequence_length) : i][np.newaxis, ...]
+            )
+            model_rnn_output = rnn_layer(samples_norm)
+            theta = theta_layer(model_rnn_output)
+
+            # Calculate alpha from theta
+            theta_norm = theta_norm_layer(theta)
+            alpha = alpha_layer(theta_norm)[0, -1]
+
+            # Sample from probability distribution function
+            stc[i] = np.random.dirichlet(alpha)
+
+        return stc
+
 
 def _model_structure(
     n_states: int,
@@ -414,9 +468,10 @@ def _model_structure(
     n_layers_model: int,
     n_units_inference: int,
     n_units_model: int,
-    dropout_rate_inference: float,
-    dropout_rate_model: float,
     theta_normalization: str,
+    alpha_xform: str,
+    alpha_temperature: float,
+    alpha_normalization: str,
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     learn_means: bool,
@@ -447,13 +502,16 @@ def _model_structure(
         Number of units/neurons in the inference network.
     n_units_model : int
         Number of units/neurons in the generative model neural network.
-    dropout_rate_inference : float
-        Dropout rate in the inference network.
-    dropout_rate_model : float
-        Dropout rate in the generative model neural network.
     theta_normalization : str
-        Type of normalization to apply to the Dirichlet parameters, theta_t.
+        Type of normalization to apply to the RNN outputs, theta.
         Either 'layer', 'batch' or None.
+    alpha_xform : str
+        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
+        'relu'.
+    alpha_temperature : float
+        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
+    alpha_normalization : str
+        Type of normalization to apply to the samples. Either 'layer', 'batch' or None.
     learn_means : bool
         Should we learn the mean vector for each state?
     learn_covariances : bool
@@ -474,51 +532,57 @@ def _model_structure(
         Keras model built using the functional API.
     """
 
+    # Normalization layers
+    if theta_normalization == "layer":
+        ThetaNormalizationLayer = layers.LayerNormalization
+    elif theta_normalization == "batch":
+        ThetaNormalizationLayer = layers.BatchNormalization
+    else:
+        ThetaNormalizationLayer = DummyLayer
+
+    if alpha_normalization == "layer":
+        AlphaNormalizationLayer = layers.LayerNormalization
+    elif alpha_normalization == "batch":
+        AlphaNormalizationLayer = layers.BatchNormalization
+    else:
+        AlphaNormalizationLayer = DummyLayer
+
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
     # Inference RNN:
-    # - Learns q(alpha_t) ~ Dir(theta_t), where
-    #     - theta_t = affine(RNN(inputs_<=t))
+    # - Learns q(samples) ~ Dir(samples | inference_alpha), where
+    #     - inference_alpha = alpha_xform(RNN(inputs_<=t))
 
     # Definition of layers
-    inference_input_dropout_layer = layers.Dropout(
-        dropout_rate_inference, name="data_drop"
-    )
-    inference_output_layers = InferenceRNNLayers(
+    inference_rnn_output_layers = InferenceRNNLayers(
         rnn_type,
         rnn_normalization,
         n_layers_inference,
         n_units_inference,
-        dropout_rate_inference,
+        dropout_rate=0.0,
         name="inf_rnn",
     )
-    inference_theta_t_layer = layers.Dense(n_states, name="inf_theta_t")
-    if theta_normalization == "layer":
-        inference_theta_t_norm_layer = layers.LayerNormalization(
-            name="inf_theta_t_norm"
-        )
-    elif theta_normalization == "batch":
-        inference_theta_t_norm_layer = layers.BatchNormalization(
-            name="inf_theta_t_norm"
-        )
-    else:
-        inference_theta_t_norm_layer = DummyLayer(name="inf_theta_t_norm")
-
-    # Layer to sample alpha_t from q(alpha_t)
-    alpha_t_layer = SampleDirichletDistributionLayer(name="alpha_t")
+    inference_theta_layer = layers.Dense(n_states, name="inf_theta")
+    inference_theta_norm_layer = ThetaNormalizationLayer(name="inf_theta_norm")
+    inference_alpha_layer = ThetaActivationLayer(
+        alpha_xform,
+        alpha_temperature,
+        name="inf_alpha",
+    )
+    sample_layer = SampleDirichletDistributionLayer(name="samples")
 
     # Data flow
-    inference_input_dropout = inference_input_dropout_layer(inputs)
-    inference_output = inference_output_layers(inference_input_dropout)
-    inference_theta_t = inference_theta_t_layer(inference_output)
-    inference_theta_t_norm = inference_theta_t_norm_layer(inference_theta_t)
-    alpha_t = alpha_t_layer(inference_theta_t_norm)
+    inference_rnn_output = inference_rnn_output_layers(inputs)
+    inference_theta = inference_theta_layer(inference_rnn_output)
+    inference_theta_norm = inference_theta_norm_layer(inference_theta)
+    inference_alpha = inference_alpha_layer(inference_theta_norm)
+    samples = sample_layer(inference_alpha)
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
     #   each state as the observation model.
-    # - We calculate the likelihood of generating the training data with alpha_t
+    # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
@@ -538,40 +602,37 @@ def _model_structure(
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    mu_j, D_j = means_covs_layer(inputs)  # inputs not used
-    m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
-    ll_loss = ll_loss_layer([inputs, m_t, C_t])
+    mu, D = means_covs_layer(inputs)  # inputs not used
+    m, C = mix_means_covs_layer([samples, mu, D])
+    ll_loss = ll_loss_layer([inputs, m, C])
 
     # Model RNN:
-    # - Learns p(alpha_t|theta_<t) ~ Dir(theta_t), where
-    #     - theta_t = affine(RNN(theta_<t))
+    # - Learns p(samples | alpha_<t) ~ Dir(samples | model_alpha), where
+    #     - model_alpha = alpha_xform(RNN(alpha_<t))
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(
-        dropout_rate_model, name="inf_theta_t_drop"
-    )
-    model_output_layers = ModelRNNLayers(
+    sample_norm_layer = AlphaNormalizationLayer(name="samples_norm")
+    model_rnn_output_layers = ModelRNNLayers(
         rnn_type,
         rnn_normalization,
         n_layers_model,
         n_units_model,
-        dropout_rate_model,
+        dropout_rate=0.0,
         name="mod_rnn",
     )
-    model_theta_t_layer = layers.Dense(n_states, name="mod_theta_t")
-    if theta_normalization == "layer":
-        model_theta_t_norm_layer = layers.LayerNormalization(name="mod_theta_t_norm")
-    elif theta_normalization == "batch":
-        model_theta_t_norm_layer = layers.BatchNormalization(name="mod_theta_t_norm")
-    else:
-        model_theta_t_norm_layer = DummyLayer(name="mod_theta_t_norm")
+    model_theta_layer = layers.Dense(n_states, name="mod_theta")
+    model_theta_norm_layer = ThetaNormalizationLayer(name="mod_theta_norm")
+    model_alpha_layer = ThetaActivationLayer(
+        alpha_xform, alpha_temperature, name="mod_alpha"
+    )
     kl_loss_layer = DirichletKLDivergenceLayer(name="kl")
 
     # Data flow
-    model_input_dropout = model_input_dropout_layer(inference_theta_t_norm)
-    model_output = model_output_layers(model_input_dropout)
-    model_theta_t = model_theta_t_layer(model_output)
-    model_theta_t_norm = model_theta_t_norm_layer(model_theta_t)
-    kl_loss = kl_loss_layer([inference_theta_t_norm, model_theta_t_norm])
+    samples_norm = sample_norm_layer(samples)
+    model_rnn_output = model_rnn_output_layers(samples_norm)
+    model_theta = model_theta_layer(model_rnn_output)
+    model_theta_norm = model_theta_norm_layer(model_theta)
+    model_alpha = model_alpha_layer(model_theta_norm)
+    kl_loss = kl_loss_layer([inference_alpha, model_alpha])
 
-    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha_t])
+    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, samples])

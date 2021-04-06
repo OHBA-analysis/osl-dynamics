@@ -134,11 +134,7 @@ class SampleDirichletDistributionLayer(layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def call(self, inputs, training=None, **kwargs):
-
-        # Parameters of the Dirichlet distribution must be positive
-        concentration = activations.softplus(inputs)
-
+    def call(self, concentration, training=None, **kwargs):
         if training:
             D = tfp.distributions.Dirichlet(concentration)
             return D.sample()
@@ -151,10 +147,10 @@ class SampleDirichletDistributionLayer(layers.Layer):
         return input_shape
 
 
-class StateMixingFactorLayer(layers.Layer):
-    """Layer for calculating the mixing ratio of the states.
+class ThetaActivationLayer(layers.Layer):
+    """Layer for applying an activation function to theta_t.
 
-    This layer accepts the logits theta_t and outputs alpha_t.
+    This layer accepts theta_t and outputs alpha_t.
 
     Parameters
     ----------
@@ -502,16 +498,12 @@ class DirichletKLDivergenceLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        inference_theta, model_theta = inputs
+        inference_concentration, model_concentration = inputs
 
         # The Model RNN predicts one time step into the future compared to the
         # inference RNN. We clip its last value, and first value of the inference RNN.
-        model_theta = model_theta[:, :-1]
-        inference_theta = inference_theta[:, 1:]
-
-        # Parameters of the Dirichlet distribution must be positive
-        inference_concentration = activations.softplus(inference_theta)
-        model_concentration = activations.softplus(model_theta)
+        model_concentration = model_concentration[:, :-1]
+        inference_concentration = inference_concentration[:, 1:]
 
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Dirichlet(model_concentration)
