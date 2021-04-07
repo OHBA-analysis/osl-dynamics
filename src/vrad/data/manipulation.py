@@ -109,7 +109,10 @@ class Manipulation:
         return kmeans_covariances
 
     def prepare(
-        self, n_embeddings: int = 1, n_pca_components: int = None, whiten: bool = False,
+        self,
+        n_embeddings: int = 1,
+        n_pca_components: int = None,
+        whiten: bool = False,
     ):
         """Prepares data to train the model with.
 
@@ -272,7 +275,9 @@ class Manipulation:
 
 
 def standardize(
-    time_series: np.ndarray, axis: int = 0, create_copy: bool = True,
+    time_series: np.ndarray,
+    axis: int = 0,
+    create_copy: bool = True,
 ) -> np.ndarray:
     """Standardizes a time series.
 

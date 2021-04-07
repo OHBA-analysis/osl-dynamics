@@ -55,7 +55,8 @@ class OSL_HMM:
         if "T" in self.hmm:
             self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm.T]
         else:
-            raise AttributeError("OSL HMM object does not contain T.")
+            # Assume gamma has no discontinuities
+            self.discontinuities = [self.gamma.shape[0]]
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"
