@@ -1,9 +1,9 @@
 import logging
 import pathlib
 import pickle
-from os import path, listdir
+from os import listdir, path
 from shutil import rmtree
-from typing import Tuple, Union
+from typing import Union
 
 import mat73
 import numpy as np

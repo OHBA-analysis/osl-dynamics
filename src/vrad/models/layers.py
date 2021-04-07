@@ -30,7 +30,7 @@ def NormalizationLayer(norm_type: str, *args, **kwargs):
     elif norm_type is None:
         return DummyLayer(*args, **kwargs)
     else:
-        raise NotImplemented(norm_type)
+        raise NotImplementedError(norm_type)
 
 
 def RNNLayer(rnn_type: str, *args, **kwargs):
@@ -46,7 +46,7 @@ def RNNLayer(rnn_type: str, *args, **kwargs):
     elif rnn_type == "gru":
         return layers.GRU(*args, **kwargs)
     else:
-        raise NotImplemented(rnn_type)
+        raise NotImplementedError(rnn_type)
 
 
 class DummyLayer(layers.Layer):
@@ -210,8 +210,7 @@ class ThetaActivationLayer(layers.Layer):
             alpha = activations.softmax(theta / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "gumbel-softmax":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature,
-                logits=theta,
+                temperature=self.alpha_temperature, logits=theta,
             )
             alpha = gumbel_softmax_distribution.sample()
 

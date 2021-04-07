@@ -111,8 +111,7 @@ print(f"Free energy: {free_energy}")
 alpha = model.predict_states(prediction_dataset)
 inf_stc = states.time_courses(alpha)
 hmm_stc = manipulation.trim_time_series(
-    time_series=hmm.state_time_course(),
-    sequence_length=sequence_length,
+    time_series=hmm.state_time_course(), sequence_length=sequence_length,
 )
 
 # Dice coefficient
@@ -123,8 +122,7 @@ preprocessed_data = Data(
     "/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject1.mat",
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=sequence_length,
-    n_embeddings=prepared_data.n_embeddings,
+    sequence_length=sequence_length, n_embeddings=prepared_data.n_embeddings,
 )
 
 # Compute spectra for states

@@ -18,9 +18,8 @@ import vrad
 import yaml
 from vrad import data
 from vrad.inference import tf_ops
-from vrad.models import RIGAGO
+from vrad.models import RIGO
 from vrad.utils import plotting
-
 
 tf.keras.backend.clear_session()
 
@@ -91,7 +90,7 @@ initial_means = np.zeros((n_states, n_channels))
 
 
 # Build model
-model = RIGAGO(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,

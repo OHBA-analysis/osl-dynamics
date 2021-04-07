@@ -4,8 +4,8 @@
 """
 
 import logging
-from typing import Tuple, Union
 from operator import lt
+from typing import Tuple, Union
 
 import numpy as np
 from tensorflow import Variable
@@ -15,7 +15,6 @@ from vrad import models
 from vrad.inference import initializers
 from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import (
-    DummyLayer,
     InferenceRNNLayers,
     LogLikelihoodLayer,
     MARMeanCovLayer,

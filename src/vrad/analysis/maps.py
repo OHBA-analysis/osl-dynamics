@@ -7,7 +7,7 @@ import os
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import parc_files, std_masks, workbench
+from vrad.analysis import parc_files, std_masks
 from vrad.analysis.functions import validate_array
 
 _logger = logging.getLogger("VRAD")
@@ -188,11 +188,9 @@ def save_nii_file(
 
     # Subtract weighted mean
     if subtract_mean:
-        spatial_map -= np.average(
-            spatial_map,
-            axis=1,
-            weights=mean_weights,
-        )[..., np.newaxis]
+        spatial_map -= np.average(spatial_map, axis=1, weights=mean_weights,)[
+            ..., np.newaxis
+        ]
 
     # Convert spatial map into a grid
     spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
