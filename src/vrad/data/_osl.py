@@ -78,15 +78,19 @@ class OSL_HMM:
             by performing n_embeddings. Optional, default is no padding.
         """
         if pad_n_embeddings is None:
-            if concatenate:
+            if concatenate or len(self.discontinuities) == 1:
                 return self.gamma
             else:
                 return np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
         else:
-            return [
+            padded_alpha = [
                 np.pad(alpha, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
                 for alpha in np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
             ]
+            if concatenate:
+                return np.concatenate(padded_alpha)
+            else:
+                return padded_alpha
 
     def state_time_course(
         self, concatenate: bool = False, pad_n_embeddings: int = None
@@ -103,15 +107,19 @@ class OSL_HMM:
             points lost by performing n_embeddings. Optional, default is no padding.
         """
         if pad_n_embeddings is None:
-            if concatenate:
+            if concatenate or len(self.discontinuities) == 1:
                 return self.stc
             else:
                 return np.split(self.stc, np.cumsum(self.discontinuities[:-1]))
         else:
-            return [
+            padded_stc = [
                 np.pad(stc, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
                 for stc in np.split(self.stc, np.cumsum(self.discontinuities[:-1]))
             ]
+            if concatenate:
+                return np.concatenate(padded_stc)
+            else:
+                return padded_stc
 
     def plot_covariances(self, *args, **kwargs):
         """Wraps plotting.plot_matrices for self.covariances."""
