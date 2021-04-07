@@ -285,7 +285,8 @@ def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
 
     # Calculate the log-likelihood at each time point
     mvn = tfp.distributions.MultivariateNormalTriL(
-        loc=m, scale_tril=tf.linalg.cholesky(C + 1e-6 * tf.eye(C.shape[-1])),
+        loc=m,
+        scale_tril=tf.linalg.cholesky(C + 1e-6 * tf.eye(C.shape[-1])),
     )
     ll = mvn.log_prob(x)
 
