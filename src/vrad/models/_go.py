@@ -277,12 +277,12 @@ def _model_structure(
 
     # Layers for inputs
     data = layers.Input(shape=(sequence_length, n_channels), name="data")
-    alpha_t = layers.Input(shape=(sequence_length, n_states), name="alpha_t")
+    alpha = layers.Input(shape=(sequence_length, n_states), name="alpha")
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
     #   each state as the observation model.
-    # - We calculate the likelihood of generating the training data with alpha_t
+    # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
@@ -302,8 +302,8 @@ def _model_structure(
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    mu_j, D_j = means_covs_layer(data)  # data not used
-    m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
-    ll_loss = ll_loss_layer([data, m_t, C_t])
+    mu, D = means_covs_layer(data)  # data not used
+    m, C = mix_means_covs_layer([alpha, mu, D])
+    ll_loss = ll_loss_layer([data, m, C])
 
-    return Model(inputs=[data, alpha_t], outputs=[ll_loss])
+    return Model(inputs=[data, alpha], outputs=[ll_loss])

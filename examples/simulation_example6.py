@@ -1,7 +1,7 @@
 """Example script for running inference on simulated HMM-MVN data.
 
 - Uses a Dirichlet distribution to sample the state time course.
-- Should achieve a dice coefficient of ~0.97.
+- Should achieve a dice coefficient of ~0.95.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIDAGO
+from vrad.models import RIDGO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -33,6 +33,7 @@ n_epochs_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
+sample_normalization = None
 
 n_layers_inference = 1
 n_layers_model = 1
@@ -40,11 +41,7 @@ n_layers_model = 1
 n_units_inference = 64
 n_units_model = 64
 
-theta_normalization = None
-
-alpha_xform = "softmax"
-alpha_temperature = 1.0
-alpha_normalization = "layer"
+alpha_xform = "softplus"
 learn_alpha_scaling = False
 
 learn_covariances = True
@@ -74,7 +71,7 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
-model = RIDAGO(
+model = RIDGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -85,10 +82,8 @@ model = RIDAGO(
     n_layers_model=n_layers_model,
     n_units_inference=n_units_inference,
     n_units_model=n_units_model,
-    theta_normalization=theta_normalization,
+    sample_normalization=sample_normalization,
     alpha_xform=alpha_xform,
-    alpha_temperature=alpha_temperature,
-    alpha_normalization=alpha_normalization,
     normalize_covariances=normalize_covariances,
     learn_alpha_scaling=learn_alpha_scaling,
     do_annealing=do_annealing,

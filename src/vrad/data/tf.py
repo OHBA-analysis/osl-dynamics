@@ -105,11 +105,11 @@ class TensorFlowDataset:
                     np.zeros(n_batches[i], dtype=np.float32) + i
                 )
 
-                # The dataset has returns two inputs to the model: data and alpha_t
+                # The dataset has returns two inputs to the model: data and alpha
                 # It also returns the subject id as the target
                 subject_datasets.append(
                     Dataset.zip(
-                        ({"data": subject_data, "alpha_t": alpha_data}, subject_tracker)
+                        ({"data": subject_data, "alpha": alpha_data}, subject_tracker)
                     )
                 )
 

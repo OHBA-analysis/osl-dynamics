@@ -21,17 +21,16 @@ from vrad.models.layers import (
     MeansCovsLayer,
     MixMeansCovsLayer,
     ModelRNNLayers,
+    NormalizationLayer,
     SampleDirichletDistributionLayer,
-    ThetaActivationLayer,
 )
 from vrad.utils.misc import check_arguments, replace_argument
 
 _logger = logging.getLogger("VRAD")
 
 
-class RIDAGO(models.GO):
-    """RNN Inference/model network, Dirichlet Alpha and Gaussian Observations
-    (RIDAGO).
+class RIDGO(models.GO):
+    """RNN Inference/model network, Dirichlet samples and Gaussian Observations (RIDGO).
 
     Parameters
     ----------
@@ -56,16 +55,11 @@ class RIDAGO(models.GO):
         Number of units/neurons in the inference network.
     n_units_model : int
         Number of units/neurons in the generative model neural network.
-    theta_normalization : str
-        Type of normalization to apply to the RNN outputs, theta.
+    sample_normalization : str
+        Normalization for samples from the posterior.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
-        'relu'.
-    alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
-    alpha_normalization : str
-        Type of normalization to apply to the samples. Either 'layer', 'batch' or None.
+        Activation function for Dense layers. Either 'softplus' or 'softmax'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -99,10 +93,8 @@ class RIDAGO(models.GO):
         n_layers_model: int,
         n_units_inference: int,
         n_units_model: int,
-        theta_normalization: str,
+        sample_normalization: str,
         alpha_xform: str,
-        alpha_temperature: float,
-        alpha_normalization: str,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
         do_annealing: bool,
@@ -123,22 +115,8 @@ class RIDAGO(models.GO):
         if n_units_inference < 1 or n_units_model < 1:
             raise ValueError("n_units must be greater than zero.")
 
-        if (
-            rnn_normalization
-            not in [
-                "layer",
-                "batch",
-                None,
-            ]
-            or alpha_normalization not in ["layer", "batch", None]
-            or theta_normalization not in ["layer", "batch", None]
-        ):
-            raise ValueError("normalization type must be 'layer', 'batch' or None.")
-
-        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus", "relu"]:
-            raise ValueError(
-                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
-            )
+        if alpha_xform not in ["softplus", "softmax"]:
+            raise ValueError("alpha_xform must be 'softplus' or 'softmax'.")
 
         if annealing_sharpness <= 0:
             raise ValueError("annealing_sharpness must be greater than zero.")
@@ -155,10 +133,8 @@ class RIDAGO(models.GO):
         self.n_layers_model = n_layers_model
         self.n_units_inference = n_units_inference
         self.n_units_model = n_units_model
-        self.theta_normalization = theta_normalization
+        self.sample_normalization = sample_normalization
         self.alpha_xform = alpha_xform
-        self.alpha_temperature = alpha_temperature
-        self.alpha_normalization = alpha_normalization
 
         # KL annealing
         self.do_annealing = do_annealing
@@ -193,10 +169,8 @@ class RIDAGO(models.GO):
             n_layers_model=self.n_layers_model,
             n_units_inference=self.n_units_inference,
             n_units_model=self.n_units_model,
-            theta_normalization=self.theta_normalization,
+            sample_normalization=self.sample_normalization,
             alpha_xform=self.alpha_xform,
-            alpha_temperature=self.alpha_temperature,
-            alpha_normalization=self.alpha_normalization,
             initial_means=None,
             initial_covariances=self.initial_covariances,
             learn_means=False,
@@ -302,14 +276,14 @@ class RIDAGO(models.GO):
             Dictionary with labels for each prediction.
         """
         predictions = self.model.predict(*args, *kwargs)
-        return_names = ["ll_loss", "kl_loss", "alpha_t"]
+        return_names = ["ll_loss", "kl_loss", "alpha"]
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
     def predict_states(
         self, inputs, *args, concatenate: bool = False, **kwargs
     ) -> Union[list, np.ndarray]:
-        """State mixing factors, alpha_t.
+        """State mixing factors, alpha.
 
         Parameters
         ----------
@@ -328,9 +302,9 @@ class RIDAGO(models.GO):
         inputs = self._make_dataset(inputs)
         outputs = []
         for dataset in inputs:
-            alpha_t = self.predict(dataset, *args, **kwargs)["alpha_t"]
-            alpha_t = np.concatenate(alpha_t)
-            outputs.append(alpha_t)
+            alpha = self.predict(dataset, *args, **kwargs)["alpha"]
+            alpha = np.concatenate(alpha)
+            outputs.append(alpha)
         if len(outputs) == 1:
             outputs = outputs[0]
         elif concatenate:
@@ -426,33 +400,18 @@ class RIDAGO(models.GO):
             Sampled state time course.
         """
         # Get layers
-        sample_norm_layer = self.model.get_layer("samples_norm")
+        samples_norm_layer = self.model.get_layer("samples_norm")
         rnn_layer = self.model.get_layer("mod_rnn")
-        theta_layer = self.model.get_layer("mod_theta")
-        theta_norm_layer = self.model.get_layer("mod_theta_norm")
         alpha_layer = self.model.get_layer("mod_alpha")
 
-        # State time course
+        # Activate the first state and sample from the model RNN
         stc = np.zeros([n_samples, self.n_states], dtype=np.float32)
-
-        # Activate the first state for the first sample
         stc[0, 0] = 1
-
-        # Sample from the model RNN
         for i in trange(1, n_samples, desc="Sampling state time course", ncols=98):
-
-            # Predict the next theta
-            samples_norm = sample_norm_layer(
-                stc[max(0, i - self.sequence_length) : i][np.newaxis, ...]
-            )
+            samples = stc[np.newaxis, max(0, i - self.sequence_length) : i]
+            samples_norm = samples_norm_layer(samples)
             model_rnn_output = rnn_layer(samples_norm)
-            theta = theta_layer(model_rnn_output)
-
-            # Calculate alpha from theta
-            theta_norm = theta_norm_layer(theta)
-            alpha = alpha_layer(theta_norm)[0, -1]
-
-            # Sample from probability distribution function
+            alpha = alpha_layer(model_rnn_output)[0, -1]
             stc[i] = np.random.dirichlet(alpha)
 
         return stc
@@ -468,10 +427,8 @@ def _model_structure(
     n_layers_model: int,
     n_units_inference: int,
     n_units_model: int,
-    theta_normalization: str,
+    sample_normalization: str,
     alpha_xform: str,
-    alpha_temperature: float,
-    alpha_normalization: str,
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     learn_means: bool,
@@ -502,16 +459,11 @@ def _model_structure(
         Number of units/neurons in the inference network.
     n_units_model : int
         Number of units/neurons in the generative model neural network.
-    theta_normalization : str
-        Type of normalization to apply to the RNN outputs, theta.
+    sample_normalization : str
+        Normalization for samples from the posterior.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
-        'relu'.
-    alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
-    alpha_normalization : str
-        Type of normalization to apply to the samples. Either 'layer', 'batch' or None.
+        Activation function for Dense layers. Either 'softplus' or 'softmax'.
     learn_means : bool
         Should we learn the mean vector for each state?
     learn_covariances : bool
@@ -532,27 +484,12 @@ def _model_structure(
         Keras model built using the functional API.
     """
 
-    # Normalization layers
-    if theta_normalization == "layer":
-        ThetaNormalizationLayer = layers.LayerNormalization
-    elif theta_normalization == "batch":
-        ThetaNormalizationLayer = layers.BatchNormalization
-    else:
-        ThetaNormalizationLayer = DummyLayer
-
-    if alpha_normalization == "layer":
-        AlphaNormalizationLayer = layers.LayerNormalization
-    elif alpha_normalization == "batch":
-        AlphaNormalizationLayer = layers.BatchNormalization
-    else:
-        AlphaNormalizationLayer = DummyLayer
-
     # Layer for input
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
     # Inference RNN:
     # - Learns q(samples) ~ Dir(samples | inference_alpha), where
-    #     - inference_alpha = alpha_xform(RNN(inputs_<=t))
+    #     - inference_alpha = softplus(RNN(inputs_<=t))
 
     # Definition of layers
     inference_rnn_output_layers = InferenceRNNLayers(
@@ -563,21 +500,15 @@ def _model_structure(
         dropout_rate=0.0,
         name="inf_rnn",
     )
-    inference_theta_layer = layers.Dense(n_states, name="inf_theta")
-    inference_theta_norm_layer = ThetaNormalizationLayer(name="inf_theta_norm")
-    inference_alpha_layer = ThetaActivationLayer(
-        alpha_xform,
-        alpha_temperature,
-        name="inf_alpha",
+    inference_alpha_layer = layers.Dense(
+        n_states, activation=alpha_xform, name="inf_alpha"
     )
-    sample_layer = SampleDirichletDistributionLayer(name="samples")
+    samples_layer = SampleDirichletDistributionLayer(name="samples")
 
     # Data flow
     inference_rnn_output = inference_rnn_output_layers(inputs)
-    inference_theta = inference_theta_layer(inference_rnn_output)
-    inference_theta_norm = inference_theta_norm_layer(inference_theta)
-    inference_alpha = inference_alpha_layer(inference_theta_norm)
-    samples = sample_layer(inference_alpha)
+    inference_alpha = inference_alpha_layer(inference_rnn_output)
+    samples = samples_layer(inference_alpha)
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
@@ -607,11 +538,11 @@ def _model_structure(
     ll_loss = ll_loss_layer([inputs, m, C])
 
     # Model RNN:
-    # - Learns p(samples | alpha_<t) ~ Dir(samples | model_alpha), where
-    #     - model_alpha = alpha_xform(RNN(alpha_<t))
+    # - Learns p(sample | samples_<t) ~ Dir(sample | model_alpha), where
+    #     - model_alpha = softplus(RNN(samples_<t))
 
     # Definition of layers
-    sample_norm_layer = AlphaNormalizationLayer(name="samples_norm")
+    samples_norm_layer = NormalizationLayer(sample_normalization, name="samples_norm")
     model_rnn_output_layers = ModelRNNLayers(
         rnn_type,
         rnn_normalization,
@@ -620,19 +551,13 @@ def _model_structure(
         dropout_rate=0.0,
         name="mod_rnn",
     )
-    model_theta_layer = layers.Dense(n_states, name="mod_theta")
-    model_theta_norm_layer = ThetaNormalizationLayer(name="mod_theta_norm")
-    model_alpha_layer = ThetaActivationLayer(
-        alpha_xform, alpha_temperature, name="mod_alpha"
-    )
+    model_alpha_layer = layers.Dense(n_states, activation=alpha_xform, name="mod_alpha")
     kl_loss_layer = DirichletKLDivergenceLayer(name="kl")
 
     # Data flow
-    samples_norm = sample_norm_layer(samples)
+    samples_norm = samples_norm_layer(samples)
     model_rnn_output = model_rnn_output_layers(samples_norm)
-    model_theta = model_theta_layer(model_rnn_output)
-    model_theta_norm = model_theta_norm_layer(model_theta)
-    model_alpha = model_alpha_layer(model_theta_norm)
+    model_alpha = model_alpha_layer(model_rnn_output)
     kl_loss = kl_loss_layer([inference_alpha, model_alpha])
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, samples])

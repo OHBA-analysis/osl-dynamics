@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIGAGO
+from vrad.models import RIGO
 from vrad.utils import plotting
 
 # GPU settings
@@ -77,7 +77,7 @@ training_dataset = meg_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = meg_data.prediction_dataset(sequence_length, batch_size)
 
 # Build model
-model = RIGAGO(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,
@@ -103,7 +103,12 @@ model = RIGAGO(
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
+history = model.fit(
+    training_dataset,
+    epochs=n_epochs,
+    save_best_after=n_epochs_annealing,
+    save_filepath="tmp/model",
+)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)

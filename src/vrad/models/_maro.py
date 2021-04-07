@@ -237,8 +237,8 @@ def _model_structure(
     """
 
     # Layers for inputs
-    data_t = layers.Input(shape=(sequence_length, n_channels), name="data")
-    alpha_jt = layers.Input(shape=(sequence_length, n_states), name="alpha_t")
+    data = layers.Input(shape=(sequence_length, n_channels), name="data")
+    alpha = layers.Input(shape=(sequence_length, n_states), name="alpha")
 
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
@@ -265,8 +265,8 @@ def _model_structure(
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    coeffs_jl, cov_j = mar_params_layer(data_t)  # data_t not used
-    clipped_data_t, mu_t, sigma_t = mean_cov_layer([data_t, alpha_jt, coeffs_jl, cov_j])
-    ll_loss = ll_loss_layer([clipped_data_t, mu_t, sigma_t])
+    coeffs, cov = mar_params_layer(data)  # data not used
+    clipped_data, mu, sigma = mean_cov_layer([data, alpha, coeffs, cov])
+    ll_loss = ll_loss_layer([clipped_data, mu, sigma])
 
-    return Model(inputs=[data_t, alpha_jt], outputs=[ll_loss])
+    return Model(inputs=[data, alpha], outputs=[ll_loss])

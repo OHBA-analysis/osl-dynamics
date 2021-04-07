@@ -12,7 +12,7 @@ print("Setting up")
 from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIGAGO
+from vrad.models import RIGO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -68,7 +68,7 @@ hmm = OSL_HMM("/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-1_K-6/h
 initial_covariances = hmm.covariances
 
 # Build model
-model = RIGAGO(
+model = RIGO(
     n_channels=n_channels,
     n_states=n_states,
     sequence_length=sequence_length,

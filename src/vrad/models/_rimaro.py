@@ -1,4 +1,5 @@
-"""Model class for a generative model with Gaussian observations.
+"""Model class for a generative model with multivariate autoregressive
+(MAR) observations.
 
 """
 
@@ -17,9 +18,10 @@ from vrad.models.layers import (
     DummyLayer,
     InferenceRNNLayers,
     LogLikelihoodLayer,
-    MeansCovsLayer,
-    MixMeansCovsLayer,
+    MARMeanCovLayer,
+    MARParametersLayer,
     ModelRNNLayers,
+    NormalizationLayer,
     NormalKLDivergenceLayer,
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
@@ -29,9 +31,8 @@ from vrad.utils.misc import check_arguments, replace_argument
 _logger = logging.getLogger("VRAD")
 
 
-class RIGAGO(models.GO):
-    """RNN Inference/model network, Gaussian Alpha and Gaussian Observations
-    (RIGAGO).
+class RIMARO(models.MARO):
+    """RNN Inference/model network and Multivariate AutoRegressive Observations (RIMARO).
 
     Parameters
     ----------
@@ -41,8 +42,8 @@ class RIGAGO(models.GO):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
+    n_lags : int
+        Order of the multivariate autoregressive observation model.
     rnn_type : str
         RNN to use, either 'lstm' or 'gru'.
     rnn_normalization : str
@@ -61,17 +62,13 @@ class RIGAGO(models.GO):
     dropout_rate_model : float
         Dropout rate in the generative model neural network.
     theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta_t.
+        Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
         'relu'.
-    alpha_temperature : float
+    alphaemperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
     do_annealing : bool
         Should we use KL annealing during training?
     annealing_sharpness : float
@@ -84,9 +81,14 @@ class RIGAGO(models.GO):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients. Optional.
+    initial_cov : np.ndarray
+        Initial values for the covariances. Optional.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients? Optional, default is True.
+    learn_cov : bool
+        Should we learn the covariances. Optional, default is True.
     """
 
     def __init__(
@@ -94,7 +96,7 @@ class RIGAGO(models.GO):
         n_states: int,
         n_channels: int,
         sequence_length: int,
-        learn_covariances: bool,
+        n_lags: int,
         rnn_type: str,
         rnn_normalization: str,
         n_layers_inference: int,
@@ -105,21 +107,19 @@ class RIGAGO(models.GO):
         dropout_rate_model: float,
         theta_normalization: str,
         alpha_xform: str,
-        alpha_temperature: float,
-        learn_alpha_scaling: bool,
-        normalize_covariances: bool,
+        alphaemperature: float,
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
-        initial_covariances: np.ndarray = None,
+        initial_coeffs: np.ndarray = None,
+        initial_cov: np.ndarray = None,
+        learn_coeffs: bool = True,
+        learn_cov: bool = True,
     ):
         # Validation
-        if rnn_type not in ["lstm", "gru"]:
-            raise ValueError("rnn_type must be 'lstm' or 'gru'.")
-
         if n_layers_inference < 1 or n_layers_model < 1:
             raise ValueError("n_layers must be greater than zero.")
 
@@ -128,17 +128,6 @@ class RIGAGO(models.GO):
 
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
-
-        if (
-            rnn_normalization
-            not in [
-                "layer",
-                "batch",
-                None,
-            ]
-            or theta_normalization not in ["layer", "batch", None]
-        ):
-            raise ValueError("normalization type must be 'layer', 'batch' or None.")
 
         if alpha_xform not in ["gumbel-softmax", "softmax", "softplus", "relu"]:
             raise ValueError(
@@ -164,7 +153,7 @@ class RIGAGO(models.GO):
         self.dropout_rate_model = dropout_rate_model
         self.theta_normalization = theta_normalization
         self.alpha_xform = alpha_xform
-        self.alpha_temperature = alpha_temperature
+        self.alphaemperature = alphaemperature
 
         # KL annealing
         self.do_annealing = do_annealing
@@ -178,13 +167,14 @@ class RIGAGO(models.GO):
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            learn_alpha_scaling=learn_alpha_scaling,
-            normalize_covariances=normalize_covariances,
+            n_lags=n_lags,
             learning_rate=learning_rate,
             multi_gpu=multi_gpu,
             strategy=strategy,
-            initial_covariances=initial_covariances,
-            learn_covariances=learn_covariances,
+            initial_coeffs=initial_coeffs,
+            initial_cov=initial_cov,
+            learn_coeffs=learn_coeffs,
+            learn_cov=learn_cov,
         )
 
     def build_model(self):
@@ -193,6 +183,7 @@ class RIGAGO(models.GO):
             n_states=self.n_states,
             n_channels=self.n_channels,
             sequence_length=self.sequence_length,
+            n_lags=self.n_lags,
             rnn_type=self.rnn_type,
             rnn_normalization=self.rnn_normalization,
             n_layers_inference=self.n_layers_inference,
@@ -203,13 +194,11 @@ class RIGAGO(models.GO):
             dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
             alpha_xform=self.alpha_xform,
-            alpha_temperature=self.alpha_temperature,
-            initial_means=None,
-            initial_covariances=self.initial_covariances,
-            learn_means=False,
-            learn_covariances=self.learn_covariances,
-            learn_alpha_scaling=self.learn_alpha_scaling,
-            normalize_covariances=self.normalize_covariances,
+            alphaemperature=self.alphaemperature,
+            initial_coeffs=self.initial_coeffs,
+            initial_cov=self.initial_cov,
+            learn_coeffs=self.learn_coeffs,
+            learn_cov=self.learn_cov,
         )
 
     def compile(self):
@@ -290,7 +279,7 @@ class RIGAGO(models.GO):
 
         return self.model.fit(*args, **kwargs)
 
-    def reset_weight(self):
+    def reset_weights(self):
         """Reset the model as if you've built a new model.
 
         Resets the model weights, optimizer and annealing factor.
@@ -309,14 +298,14 @@ class RIGAGO(models.GO):
             Dictionary with labels for each prediction.
         """
         predictions = self.model.predict(*args, *kwargs)
-        return_names = ["ll_loss", "kl_loss", "alpha_t"]
+        return_names = ["ll_loss", "kl_loss", "alpha"]
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
     def predict_states(
         self, inputs, *args, concatenate: bool = False, **kwargs
     ) -> Union[list, np.ndarray]:
-        """State mixing factors, alpha_t.
+        """State mixing factors, alpha.
 
         Parameters
         ----------
@@ -335,9 +324,9 @@ class RIGAGO(models.GO):
         inputs = self._make_dataset(inputs)
         outputs = []
         for dataset in inputs:
-            alpha_t = self.predict(dataset, *args, **kwargs)["alpha_t"]
-            alpha_t = np.concatenate(alpha_t)
-            outputs.append(alpha_t)
+            alpha = self.predict(dataset, *args, **kwargs)["alpha"]
+            alpha = np.concatenate(alpha)
+            outputs.append(alpha)
         if len(outputs) == 1:
             outputs = outputs[0]
         elif concatenate:
@@ -420,7 +409,7 @@ class RIGAGO(models.GO):
         self.compile()
 
     def sample_alpha(self, n_samples: int) -> np.ndarray:
-        """Uses the model RNN to sample state mixing factors, alpha_t.
+        """Uses the model RNN to sample state mixing factors, alpha.
 
         Parameters
         ----------
@@ -430,62 +419,61 @@ class RIGAGO(models.GO):
         Returns
         -------
         np.ndarray
-            Sampled alpha_t.
+            Sampled alpha.
         """
         # Get layers
         model_rnn_layer = self.model.get_layer("model_rnn")
-        mu_theta_jt_layer = self.model.get_layer("mu_theta_jt")
-        log_sigma_theta_jt_layer = self.model.get_layer("log_sigma_theta_jt")
-        theta_t_norm_layer = self.model.get_layer("theta_t_norm")
-        alpha_t_layer = self.model.get_layer("alpha_t")
+        mod_mu_layer = self.model.get_layer("mod_mu")
+        log_mod_sigma_layer = self.model.get_layer("log_mod_sigma")
+        theta_norm_layer = self.model.get_layer("theta_norm")
+        alpha_layer = self.model.get_layer("alpha")
 
-        # Sequence of the underlying logits theta_t
-        theta_t_norm = np.zeros([self.sequence_length, self.n_states], dtype=np.float32)
+        # Sequence of the underlying logits theta
+        theta_norm = np.zeros([self.sequence_length, self.n_states], dtype=np.float32)
 
-        # Normally distributed random numbers used to sample the logits theta_t
+        # Normally distributed random numbers used to sample the logits theta
         epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states]).astype(
             np.float32
         )
 
         # Activate the first state for the first sample
-        theta_t_norm[-1, 0] = 1
+        theta_norm[-1, 0] = 1
 
         # Sample the state fixing factors
-        alpha_t = np.empty([n_samples, self.n_states], dtype=np.float32)
+        alpha = np.empty([n_samples, self.n_states], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
-            # If there are leading zeros we trim theta_t so that we don't pass the zeros
-            trimmed_theta_t = theta_t_norm[~np.all(theta_t_norm == 0, axis=1)][
+            # If there are leading zeros we trim theta so that we don't pass the zeros
+            trimmed_theta = theta_norm[~np.all(theta_norm == 0, axis=1)][
                 np.newaxis, :, :
             ]
 
-            # Predict the probability distribution function for theta_t one time step
+            # Predict the probability distribution function for theta one time step
             # in the future,
-            # p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt)
-            model_rnn = model_rnn_layer(trimmed_theta_t)
-            mu_theta_jt = mu_theta_jt_layer(model_rnn)[0, -1]
-            log_sigma_theta_jt = log_sigma_theta_jt_layer(model_rnn)[0, -1]
-            sigma_theta_jt = np.exp(log_sigma_theta_jt)
+            # p(theta|theta_<t) ~ N(mod_mu, sigmaheta_jt)
+            model_rnn = model_rnn_layer(trimmed_theta)
+            mod_mu = mod_mu_layer(model_rnn)[0, -1]
+            log_mod_sigma = log_mod_sigma_layer(model_rnn)[0, -1]
+            sigmaheta_jt = np.exp(log_mod_sigma)
 
-            # Shift theta_t one time step to the left
-            theta_t_norm = np.roll(theta_t_norm, -1, axis=0)
+            # Shift theta one time step to the left
+            theta_norm = np.roll(theta_norm, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta_t = mu_theta_jt + sigma_theta_jt * epsilon[i]
-            theta_t_norm[-1] = theta_t_norm_layer(theta_t[np.newaxis, np.newaxis, :])[0]
+            theta = mod_mu + sigmaheta_jt * epsilon[i]
+            theta_norm[-1] = theta_norm_layer(theta[np.newaxis, np.newaxis, :])[0]
 
             # Calculate the state mixing factors
-            alpha_t[i] = alpha_t_layer(theta_t_norm[-1][np.newaxis, np.newaxis, :])[
-                0, 0
-            ]
+            alpha[i] = alpha_layer(theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
 
-        return alpha_t
+        return alpha
 
 
 def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
+    n_lags: int,
     rnn_type: str,
     rnn_normalization: str,
     n_layers_inference: int,
@@ -496,13 +484,11 @@ def _model_structure(
     dropout_rate_model: float,
     theta_normalization: str,
     alpha_xform: str,
-    alpha_temperature: float,
-    initial_means: np.ndarray,
-    initial_covariances: np.ndarray,
-    learn_means: bool,
-    learn_covariances: bool,
-    learn_alpha_scaling: bool,
-    normalize_covariances: bool,
+    alphaemperature: float,
+    initial_coeffs: np.ndarray,
+    initial_cov: np.ndarray,
+    learn_coeffs: bool,
+    learn_cov: bool,
 ):
     """Model structure.
 
@@ -514,6 +500,8 @@ def _model_structure(
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
+    n_lags : int
+        Order of the multivariate autoregressive observation model.
     rnn_type : int
         RNN to use, either 'lstm' or 'gru'.
     rnn_normalization : str
@@ -532,26 +520,21 @@ def _model_structure(
     dropout_rate_model : float
         Dropout rate in the generative model neural network.
     theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta_t.
+        Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
-    learn_means : bool
-        Should we learn the mean vector for each state?
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-    initial_means : np.ndarray
-        Initial values for the state means. Should have shape (n_states, n_channels).
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
     alpha_xform : str
-        Functional form of alpha_t. Either 'gumbel-softmax', 'softmax', 'softplus' or
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
         'relu'.
-    alpha_temperature : float
+    alphaemperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients.
+    initial_cov : np.ndarray
+        Initial values for the covariances.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients?
+    learn_cov : bool
+        Should we learn the covariances.
 
     Returns
     -------
@@ -563,9 +546,9 @@ def _model_structure(
     inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
 
     # Inference RNN:
-    # - Learns q(theta_t) ~ N(m_theta_t, s_theta_t), where
-    #     - m_theta_t     ~ affine(RNN(inputs_<=t))
-    #     - log_s_theta_t ~ affine(RNN(inputs_<=t))
+    # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
+    #     - inf_mu        ~ affine(RNN(inputs_<=t))
+    #     - log_inf_sigma ~ affine(RNN(inputs_<=t))
 
     # Definition of layers
     inference_input_dropout_layer = layers.Dropout(
@@ -577,66 +560,63 @@ def _model_structure(
         n_layers_inference,
         n_units_inference,
         dropout_rate_inference,
-        name="inference_rnn",
+        name="inf_rnn",
     )
-    m_theta_t_layer = layers.Dense(n_states, name="m_theta_t")
-    log_s_theta_t_layer = layers.Dense(n_states, name="log_s_theta_t")
+    inf_mu_layer = layers.Dense(n_states, name="inf_mu")
+    log_inf_sigma_layer = layers.Dense(n_states, name="log_inf_sigma")
 
-    # Layers to sample theta_t from q(theta_t) and to convert to state mixing
-    # factors alpha_t
-    theta_t_layer = SampleNormalDistributionLayer(name="theta_t")
-    if theta_normalization == "layer":
-        theta_t_norm_layer = layers.LayerNormalization(name="theta_t_norm")
-    elif theta_normalization == "batch":
-        theta_t_norm_layer = layers.BatchNormalization(name="theta_t_norm")
-    else:
-        theta_t_norm_layer = DummyLayer(name="theta_t_norm")
-    alpha_t_layer = ThetaActivationLayer(alpha_xform, alpha_temperature, name="alpha_t")
+    # Layers to sample theta from q(theta) and to convert to state mixing
+    # factors alpha
+    theta_layer = SampleNormalDistributionLayer(name="theta")
+    theta_norm_layer = NormalizationLayer(theta_normalization, name="theta_norm")
+    alpha_layer = ThetaActivationLayer(alpha_xform, alphaemperature, name="alpha")
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)
     inference_output = inference_output_layers(inference_input_dropout)
-    m_theta_t = m_theta_t_layer(inference_output)
-    log_s_theta_t = log_s_theta_t_layer(inference_output)
-    theta_t = theta_t_layer([m_theta_t, log_s_theta_t])
-    theta_t_norm = theta_t_norm_layer(theta_t)
-    alpha_t = alpha_t_layer(theta_t_norm)
+    inf_mu = inf_mu_layer(inference_output)
+    log_inf_sigma = log_inf_sigma_layer(inference_output)
+    theta = theta_layer([inf_mu, log_inf_sigma])
+    theta_norm = theta_norm_layer(theta)
+    alpha = alpha_layer(theta_norm)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each state as the observation model.
-    # - We calculate the likelihood of generating the training data with alpha_t
+    # - We use x_t ~ N(mu, sigma), where
+    #      - mu = Sum_j Sum_l alpha_jt W_jt x_{t-l}.
+    #      - sigma = Sum_j alpha^2_jt sigma_jt, where sigma_jt is a learnable
+    #        diagonal covariance matrix.
+    # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
-    means_covs_layer = MeansCovsLayer(
+    mar_params_layer = MARParametersLayer(
         n_states,
         n_channels,
-        learn_means=learn_means,
-        learn_covariances=learn_covariances,
-        normalize_covariances=normalize_covariances,
-        initial_means=initial_means,
-        initial_covariances=initial_covariances,
-        name="means_covs",
+        n_lags,
+        initial_coeffs,
+        initial_cov,
+        learn_coeffs,
+        learn_cov,
+        name="mar_params",
     )
-    mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, learn_alpha_scaling, name="mix_means_covs"
+    mean_cov_layer = MARMeanCovLayer(
+        n_states, n_channels, sequence_length, n_lags, name="mean_cov"
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    mu_j, D_j = means_covs_layer(inputs)  # inputs not used
-    m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
-    ll_loss = ll_loss_layer([inputs, m_t, C_t])
+    coeffs, cov = mar_params_layer(inputs)  # inputs not used
+    clipped_data, mu, sigma = mean_cov_layer([inputs, alpha, coeffs, cov])
+    ll_loss = ll_loss_layer([clipped_data, mu, sigma])
 
     # Model RNN:
-    # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt), where
-    #     - mu_theta_jt        ~ affine(RNN(theta_<t))
-    #     - log_sigma_theta_jt ~ affine(RNN(theta_<t))
+    # - Learns p(theta|theta_<t) ~ N(theta | mod_mu, mod_sigma), where
+    #     - mod_mu        ~ affine(RNN(theta_<t))
+    #     - log_mod_sigma ~ affine(RNN(theta_<t))
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
-        dropout_rate_model, name="theta_t_norm_drop"
+        dropout_rate_model, name="theta_norm_drop"
     )
     model_output_layers = ModelRNNLayers(
         rnn_type,
@@ -644,17 +624,17 @@ def _model_structure(
         n_layers_model,
         n_units_model,
         dropout_rate_model,
-        name="model_rnn",
+        name="mod_rnn",
     )
-    mu_theta_jt_layer = layers.Dense(n_states, name="mu_theta_jt")
-    log_sigma_theta_jt_layer = layers.Dense(n_states, name="log_sigma_theta_jt")
+    mod_mu_layer = layers.Dense(n_states, name="mod_mu")
+    log_mod_sigma_layer = layers.Dense(n_states, name="log_mod_sigma")
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 
     # Data flow
-    model_input_dropout = model_input_dropout_layer(theta_t_norm)
+    model_input_dropout = model_input_dropout_layer(theta_norm)
     model_output = model_output_layers(model_input_dropout)
-    mu_theta_jt = mu_theta_jt_layer(model_output)
-    log_sigma_theta_jt = log_sigma_theta_jt_layer(model_output)
-    kl_loss = kl_loss_layer([m_theta_t, log_s_theta_t, mu_theta_jt, log_sigma_theta_jt])
+    mod_mu = mod_mu_layer(model_output)
+    log_mod_sigma = log_mod_sigma_layer(model_output)
+    kl_loss = kl_loss_layer([inf_mu, log_inf_sigma, mod_mu, log_mod_sigma])
 
-    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha_t])
+    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha])
