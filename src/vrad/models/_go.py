@@ -13,7 +13,7 @@ from vrad.inference.functions import (
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
-from vrad.inference.losses import LogLikelihoodLoss
+from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
 from vrad.utils.misc import replace_argument
 
@@ -41,7 +41,10 @@ class GO(models.Base):
         Strategy for distributed learning.
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
+        n_channels, n_channels). Optional.
+    learn_covariances : bool
+        Should we learn the covariance matrix for each state?
+        Optional, default is True.
     """
 
     def __init__(
@@ -55,11 +58,13 @@ class GO(models.Base):
         multi_gpu: bool = False,
         strategy: str = None,
         initial_covariances: np.ndarray = None,
+        learn_covariances: bool = True,
     ):
         # Parameters related to the observation model
         self.learn_alpha_scaling = learn_alpha_scaling
         self.normalize_covariances = normalize_covariances
         self.initial_covariances = initial_covariances
+        self.learn_covariances = learn_covariances
 
         # Initialise the model base class
         # This will build and compile the keras model
@@ -81,6 +86,7 @@ class GO(models.Base):
             learn_alpha_scaling=self.learn_alpha_scaling,
             normalize_covariances=self.normalize_covariances,
             initial_covariances=self.initial_covariances,
+            learn_covariances=self.learn_covariances,
         )
 
     def compile(self):
@@ -91,8 +97,8 @@ class GO(models.Base):
         # Setup optimizer
         optimizer = optimizers.Adam(learning_rate=self.learning_rate)
 
-        # Loss functions
-        ll_loss = LogLikelihoodLoss()
+        # Loss function
+        ll_loss = ModelOutputLoss()
 
         # Compile
         self.model.compile(optimizer=optimizer, loss=[ll_loss])
@@ -156,11 +162,8 @@ class GO(models.Base):
 
         return self.model.fit(*args, **kwargs)
 
-    def reset_model(self):
-        """Reset the model as if you've built a new model.
-
-        Resets the model weights, optimizer and annealing factor.
-        """
+    def reset_weights(self):
+        """Reset the model as if you've built a new model."""
         self.compile()
         initializers.reinitialize_model_weights(self.model)
 
@@ -244,6 +247,7 @@ def _model_structure(
     learn_alpha_scaling: bool,
     normalize_covariances: bool,
     initial_covariances: np.ndarray,
+    learn_covariances: bool,
 ):
     """Model structure.
 
@@ -262,6 +266,8 @@ def _model_structure(
     initial_covariances : np.ndarray
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels).
+    learn_covariances : bool
+        Should we learn the covariances?
 
     Returns
     -------
@@ -284,7 +290,7 @@ def _model_structure(
         n_states,
         n_channels,
         learn_means=False,
-        learn_covariances=True,
+        learn_covariances=learn_covariances,
         normalize_covariances=normalize_covariances,
         initial_means=None,
         initial_covariances=initial_covariances,

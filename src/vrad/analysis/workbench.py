@@ -1,4 +1,5 @@
 import logging
+import os
 import pathlib
 import re
 import subprocess
@@ -15,6 +16,21 @@ surfs = {
     1: [std_masks.surf_left_inf, std_masks.surf_right_inf],
     2: [std_masks.surf_left_vinf, std_masks.surf_right_vinf],
 }
+
+
+def setup(path):
+    """Sets up workbench.
+
+    Adds workbench to the PATH environmental variable.
+
+    Parameters
+    ----------
+    path : str
+        Path to workbench installation.
+    """
+    # Check if workbench is already in PATH and if it's not add it
+    if path not in os.environ["PATH"]:
+        os.environ["PATH"] = f"{path}:{os.environ['PATH']}"
 
 
 def render(
@@ -41,7 +57,7 @@ def render(
     nii = pathlib.Path(nii)
 
     if not nii.exists() or ".nii" not in nii.suffixes:
-        raise ValueError(f"nii should be a nii or nii.gz file." f"found {nii}.")
+        raise ValueError(f"nii should be a nii or nii.gz file, got {nii}.")
 
     if save_dir is None:
         save_dir = pathlib.Path.cwd()
@@ -80,23 +96,11 @@ def render(
         visualise(cifti_left=cifti_left, cifti_right=cifti_right, inflation=inflation)
 
 
-def visualise(cifti_left, cifti_right, inflation=0):
-    surface = surfs.get(inflation, None)
-    if surface is None:
-        _logger.warning(
-            f"Inflation of {inflation} is not a valid selection. Using '0' instead."
-        )
-
-    subprocess.run(["wb_view", *surface, cifti_left, cifti_right])
-
-
-def image(cifti_left, cifti_right, file_name: str, inflation=0):
-    file_path = pathlib.Path(file_name)
-    suffix = file_path.suffix or ".png"
-    file_path = file_path.with_suffix("")
-
+def create_scene(
+    cifti_left, cifti_right, inflation, temp_scene=pathlib.Path("temp_scene.scene")
+):
     scene_file = state_scene
-    temp_scene = pathlib.Path("temp_scene.scene")
+    temp_scene = pathlib.Path(temp_scene)
 
     surf_left, surf_right = surfs.get(inflation, surfs[0])
 
@@ -106,6 +110,35 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
     scene = re.sub("{parcellation_file_left}", surf_left, scene)
     scene = re.sub("{parcellation_file_right}", surf_right, scene)
     temp_scene.write_text(scene)
+
+
+def visualise(cifti_left, cifti_right, inflation=0):
+    surface = surfs.get(inflation, None)
+    create_scene(cifti_left, cifti_right, inflation)
+    if surface is None:
+        _logger.warning(
+            f"Inflation of {inflation} is not a valid selection. Using '0' instead."
+        )
+
+    subprocess.run(
+        [
+            "wb_view",
+            "-scene-load-hd",
+            "temp_scene.scene",
+            "ready",
+            *surface,
+            cifti_left,
+            cifti_right,
+        ]
+    )
+
+
+def image(cifti_left, cifti_right, file_name: str, inflation=0):
+    file_path = pathlib.Path(file_name)
+    suffix = file_path.suffix or ".png"
+    file_path = file_path.with_suffix("")
+
+    create_scene(cifti_left, cifti_right, inflation)
 
     n_states = nib.load(cifti_left).shape[0]
     max_int_length = len(str(n_states))
@@ -130,7 +163,7 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
             ],
         )
 
-    temp_scene.unlink()
+    pathlib.Path("temp_scene.scene").unlink()
 
 
 def volume_to_surface(nii, surf, output, interptype="trilinear"):

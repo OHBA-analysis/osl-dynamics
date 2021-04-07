@@ -7,10 +7,9 @@ print("Setting up")
 from pathlib import Path
 
 import numpy as np
-from vrad import data
+from vrad import data, simulation
 from vrad.inference import tf_ops
 from vrad.models import GO
-from vrad.simulation import MixedHSMMSimulation
 from vrad.utils import plotting
 
 # GPU settings
@@ -44,23 +43,23 @@ mixed_state_vectors = np.array(
 
 # Simulate data
 print("Simulating data")
-sim = MixedHSMMSimulation(
+sim = simulation.MixedHSMM_MVN(
     n_samples=n_samples,
     mixed_state_vectors=mixed_state_vectors,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
-    zero_means=True,
+    means="zero",
     covariances=cov,
     observation_error=observation_error,
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.PreprocessedData(sim)
+meg_data = data.Data(sim.time_series)
 n_channels = meg_data.n_channels
 
 # Prepare dataset
-training_datasets = meg_data.covariance_training_datasets(
-    [sim.state_time_course], sequence_length, batch_size,
+training_dataset = meg_data.training_dataset(
+    sequence_length, batch_size, alpha=[sim.state_time_course],
 )
 
 # Build model
@@ -75,7 +74,7 @@ model = GO(
 model.summary()
 
 print("Training model")
-history = model.fit(training_datasets[0], epochs=n_epochs)
+history = model.fit(training_dataset, epochs=n_epochs)
 
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")

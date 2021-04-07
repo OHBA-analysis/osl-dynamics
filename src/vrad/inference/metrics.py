@@ -4,7 +4,10 @@
 from typing import Tuple
 
 import numpy as np
+import tensorflow as tf
+import tensorflow_probability as tfp
 from sklearn.metrics import confusion_matrix as sklearn_confusion
+from tqdm import trange
 from vrad.inference.states import state_lifetimes
 from vrad.utils.decorators import transpose
 
@@ -195,67 +198,99 @@ def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
 
 def log_likelihood(
     time_series: np.ndarray,
-    state_mixing_factors: np.ndarray,
+    alpha: np.ndarray,
     covariances: np.ndarray,
+    sequence_length: int,
     means: np.ndarray = None,
-) -> float:
-    """Calculates the negative log likelihood.
+):
+    """Calculate the negative log-likelihood.
 
-    The negative log likelihood is calculated as:
-
-    0.5 * N * log(2*pi) - 0.5 * log(det(sigma)) - 0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-
-    where x is a single observation, mu is the mean vector, sigma is the
-    covariance matrix and N is the number of channels.
+    We calculate the negative log-likelihood using a tensorflow implementation by
+    recursively calling tf_nll because it's quicker.
 
     Parameters
     ----------
     time_series : np.ndarray
-        Data time series.
-    state_mixing_factors : np.ndarary
-        Times series containing the state mixing factors alpha_t.
+        Time series data. Shape must be (n_samples, n_channels).
+    alpha : np.ndarray
+        Inferred state mixing factors. Shape must be (n_samples, n_states).
     covariances : np.ndarray
-        Covariance matrix for each state. Shape is (n_states, n_channels, n_channels).
+        Inferred state covariances. Shape must be (n_states, n_channels, n_channels).
     means : np.ndarray
-        Mean vector for each state. Shape is (n_states, n_channels).
-
-    Returns
-    -------
-    float
-        The negative of the log likelihood.
+        Inferred mean vectors. Shape must be (n_states, n_channels).
+    sequence_length : int
+        Length of time series to recursively pass to tf_nll.
     """
+    # Validation
+    if time_series.shape[0] != alpha.shape[0]:
+        raise ValueError("time_series and alpha must have the same length.")
+
+    if time_series.shape[0] % sequence_length != 0:
+        raise ValueError("time_series and alpha must be divisible by sequence_length.")
+
+    time_series = time_series.astype(np.float32)
+    alpha = alpha.astype(np.float32)
+    covariances = covariances.astype(np.float32)
+    if means is not None:
+        means = means.astype(np.float32)
+
+    #  Convert means and covariances to tensors
     if means is None:
-        means = np.zeros([covariances.shape[0], covariances.shape[1]])
+        m = tf.zeros([covariances.shape[0], covariances.shape[1]])
+    else:
+        m = tf.constant(means)
+    C = tf.constant(covariances)
 
-    # Negative log likelihood
-    nll = 0
+    # Number times to call tf_nll
+    n_calls = time_series.shape[0] // sequence_length
 
-    # Calculate first term
-    first_term = 0.5 * covariances.shape[1] * np.log(2.0 * np.pi)
+    nll = []
+    for i in trange(n_calls, desc="Calculate log-likelihood", ncols=98):
 
-    # Loop through the data
-    for i in range(state_mixing_factors.shape[0]):
-        x = time_series[i]
-        alpha = state_mixing_factors[i]
+        # Convert data to tensors
+        x = tf.constant(time_series[i * sequence_length : (i + 1) * sequence_length])
+        a = tf.constant(alpha[i * sequence_length : (i + 1) * sequence_length])
 
-        # State mixing
-        mu = np.sum(alpha[..., np.newaxis] * means, axis=0)
-        sigma = np.sum(alpha[..., np.newaxis, np.newaxis] * covariances, axis=0)
+        # Calculate the negative log-likelihood for each sequence
+        nll.append(tf_nll(x, a, m, C))
 
-        # Calculate second term: -0.5 * log(|sigma|)
-        sign, logdet = np.linalg.slogdet(sigma)
-        second_term = -0.5 * sign * logdet
+    # Return the sum for all sequences
+    return np.sum(nll)
 
-        # Calculate third term: -0.5 * [(x - mu)^T sigma^-1 (x - mu)]
-        inv_sigma = np.linalg.inv(sigma + 1e-8 * np.eye(sigma.shape[-1]))
-        x_minus_mu = x[..., np.newaxis] - mu[..., np.newaxis]
-        x_minus_mu_T = np.transpose(x_minus_mu)
-        third_term = -0.5 * x_minus_mu_T @ inv_sigma @ x_minus_mu
 
-        # Calculate the negative log likelihood
-        nll += np.squeeze(first_term - second_term - third_term)
+@tf.function
+def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
+    """Calculates the negative log likelihood using a tensorflow implementation.
 
-    return nll
+    Parameters
+    ----------
+    x : tf.constant
+        Time series data. Shape must be (sequence_length, n_channels).
+    alpha : tf.constant
+        State mixing factors. Shape must be (sequence_length, n_states).
+    mu : tf.constant
+        State mean vectors. Shape must be (n_states, n_channels).
+    D : tf.constant
+        State covariances. Shape must be (n_states, n_channels, n_channels).
+    """
+    # Calculate the mean: m = Sum_j alpha_jt mu_j
+    alpha = tf.expand_dims(alpha, axis=-1)
+    mu = tf.expand_dims(mu, axis=0)
+    m = tf.reduce_sum(tf.multiply(alpha, mu), axis=1)
+
+    # Calculate the covariance: C = Sum_j alpha_jt D_j
+    alpha = tf.expand_dims(alpha, axis=-1)
+    D = tf.expand_dims(D, axis=0)
+    C = tf.reduce_sum(tf.multiply(alpha, D), axis=1)
+
+    # Calculate the log-likelihood at each time point
+    mvn = tfp.distributions.MultivariateNormalTriL(
+        loc=m, scale_tril=tf.linalg.cholesky(C + 1e-6 * tf.eye(C.shape[-1])),
+    )
+    ll = mvn.log_prob(x)
+
+    # Sum over time and return the negative log-likelihood
+    return -tf.reduce_sum(ll, axis=0)
 
 
 def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:

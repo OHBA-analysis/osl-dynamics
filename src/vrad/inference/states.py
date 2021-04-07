@@ -14,7 +14,9 @@ _logger = logging.getLogger("VRAD")
 _rng = np.random.default_rng()
 
 
-def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
+def time_courses(
+    alpha: Union[list, np.ndarray], concatenate: bool = False
+) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
     Hard classifies the states so that only one state is active.
@@ -22,7 +24,11 @@ def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
     Parameters
     ----------
     alpha : list, np.ndarray
-        State mixing factors with shape (n_samples, n_states).
+        State mixing factors with shape (n_subjects, n_samples, n_states)
+        or (n_samples, n_states).
+    concatenate : bool
+    If alpha is a list, should we concatenate the state time course?
+    Optional, default is True.
 
     Returns
     -------
@@ -33,6 +39,8 @@ def time_courses(alpha: Union[list, np.ndarray]) -> Union[list, np.ndarray]:
         n_states = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
         stcs = [array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs]
+        if concatenate:
+            stcs = np.concatenate(stcs)
     else:
         n_states = alpha.shape[1]
         stcs = alpha.argmax(axis=1)

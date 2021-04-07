@@ -16,56 +16,6 @@ from vrad.data.manipulation import standardize
 _logger = logging.getLogger("VRAD")
 
 
-def autocorrelation_function(
-    covariances: np.ndarray, n_embeddings: int, n_raw_data_channels: int
-) -> np.ndarray:
-    """Calculates the autocorrelation function from the covariance matrix of time
-    embedded data.
-
-    Parameters
-    ----------
-    covariances : np.ndarray
-        State covariance matrices. Shape is (n_states, n_te_channels, n_te_channels).
-    n_embeddings : int
-        Number of time embeddings.
-    n_raw_data_channels : int
-        Number of channels in the non-time-embedded data.
-
-    Returns
-    -------
-    np.ndarray
-        Autocorrelation function. Shape is (n_states, n_acf)
-    """
-    # Number of data points in the autocorrelation function
-    n_acf = 2 * n_embeddings - 1
-
-    # Number of states
-    n_states = len(covariances)
-
-    # Get the autocorrelation function
-    autocorrelation_function = np.empty(
-        [n_states, n_raw_data_channels, n_raw_data_channels, n_acf]
-    )
-    for i in range(n_states):
-        for j in range(n_raw_data_channels):
-            for k in range(n_raw_data_channels):
-                # Auto/cross-correlation between channel j and channel k
-                # of state i
-                autocorrelation_function_jk = covariances[
-                    i,
-                    j * n_embeddings : (j + 1) * n_embeddings,
-                    k * n_embeddings : (k + 1) * n_embeddings,
-                ]
-
-                # Take elements from the first row and column
-                autocorrelation_function[i, j, k] = np.append(
-                    autocorrelation_function_jk[0][::-1],
-                    autocorrelation_function_jk[1:, 0],
-                )
-
-    return autocorrelation_function
-
-
 def decompose_spectra(
     coherences: np.ndarray,
     n_components: int,
@@ -174,6 +124,7 @@ def state_covariance_spectra(
         Coherences calculated for each state. Shape is (n_states, n_channels,
         n_channels, n_f).
     """
+    print("Calculating power spectra")
 
     # Validation
     if frequency_range is None:
@@ -187,11 +138,12 @@ def state_covariance_spectra(
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
     f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
     f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
-    frequencies = frequencies[f_min_arg : f_max_arg + 1]
-    args_range = [f_min_arg, f_max_arg + 1]
 
     if f_max_arg <= f_min_arg:
         raise ValueError("Cannot select requested frequency range.")
+
+    args_range = [f_min_arg, f_max_arg + 1]
+    frequencies = frequencies[args_range[0] : args_range[1]]
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
@@ -398,6 +350,8 @@ def multitaper_spectra(
     elif segment_length != 2 * sampling_frequency:
         _logger.warning("segment_length is recommended to be 2*sampling_frequency.")
 
+    segment_length = int(segment_length)
+
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
@@ -465,7 +419,7 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    # TODO: Check if we should be normalising using sum alpha instead of sum alpha^2
+    # TODO: We should be normalising using sum alpha instead of sum alpha^2
     sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 

@@ -1,7 +1,5 @@
-"""Example script for running inference on simulated HMM-MVN data.
+"""Example script for running inference on a hierarchical HMM simulation.
 
-- Should achieve a dice coefficient of ~0.98.
-- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
@@ -26,8 +24,8 @@ batch_size = 16
 do_annealing = True
 annealing_sharpness = 10
 
-n_epochs = 100
-n_epochs_annealing = 50
+n_epochs = 200
+n_epochs_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -53,18 +51,50 @@ learning_rate = 0.01
 
 # Load state transition probability matrix and covariances of each state
 example_file_directory = Path(__file__).parent / "files"
-trans_prob = np.load(str(example_file_directory / "hmm_trans_prob.npy"))
 cov = np.load(example_file_directory / "hmm_cov.npy")
 
+top_level_trans_prob = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
+bottom_level_trans_probs = [
+    np.array(
+        [
+            [0.6, 0.1, 0.1, 0.1, 0.1],
+            [0.1, 0.6, 0.1, 0.1, 0.1],
+            [0.1, 0.1, 0.6, 0.1, 0.1],
+            [0.1, 0.1, 0.1, 0.6, 0.1],
+            [0.1, 0.1, 0.1, 0.1, 0.6],
+        ]
+    ),
+    np.array(
+        [
+            [0.9, 0.1, 0, 0, 0],
+            [0, 0.9, 0.1, 0, 0],
+            [0, 0, 0.9, 0.1, 0],
+            [0, 0, 0, 0.9, 0.1],
+            [0.1, 0, 0, 0, 0.9],
+        ]
+    ),
+    np.array(
+        [
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+        ]
+    ),
+]
 # Simulate data
 print("Simulating data")
-sim = simulation.HMM_MVN(
+sim = simulation.HierarchicalHMM_MVN(
     n_samples=n_samples,
-    trans_prob=trans_prob,
+    top_level_trans_prob=top_level_trans_prob,
+    bottom_level_trans_probs=bottom_level_trans_probs,
     means="zero",
     covariances=cov,
     observation_error=observation_error,
-    random_seed=123,
+    top_level_random_seed=123,
+    bottom_level_random_seeds=[124, 126, 127],
+    data_random_seed=555,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)

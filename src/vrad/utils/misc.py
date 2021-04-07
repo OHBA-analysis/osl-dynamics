@@ -183,9 +183,11 @@ def time_axis_first(input_array: np.ndarray) -> np.ndarray:
         return input_array
     if input_array.shape[1] > input_array.shape[0]:
         input_array = np.transpose(input_array)
-        _logger.warning(
-            "More channels than time points detected. Time series has been transposed."
-        )
+        # NOTE: hidden the warning because it doesn't play nice with the tqdm
+        # progress bar.
+        # _logger.warning(
+        #    "More channels than time points detected. Time series has been transposed."
+        # )
     return input_array
 
 

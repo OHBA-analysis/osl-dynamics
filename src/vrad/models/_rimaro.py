@@ -1,4 +1,5 @@
-"""Model class for a generative model with Gaussian observations.
+"""Model class for a generative model with multivariate autoregressive
+(MAR) observations.
 
 """
 
@@ -18,8 +19,8 @@ from vrad.models.layers import (
     InferenceRNNLayers,
     KLDivergenceLayer,
     LogLikelihoodLayer,
-    MeansCovsLayer,
-    MixMeansCovsLayer,
+    MARMeanCovLayer,
+    MARParametersLayer,
     ModelRNNLayers,
     SampleNormalDistributionLayer,
 )
@@ -28,8 +29,9 @@ from vrad.utils.misc import check_arguments, replace_argument
 _logger = logging.getLogger("VRAD")
 
 
-class RIGO(models.GO):
-    """RNN Inference/model network and Gaussian Observations (RIGO).
+class RIMARO(models.MARO):
+    """RNN Inference/model network and Multivariate AutoRegressive Observations
+    (RIMARO).
 
     Parameters
     ----------
@@ -39,8 +41,8 @@ class RIGO(models.GO):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
+    n_lags : int
+        Order of the multivariate autoregressive observation model.
     rnn_type : str
         RNN to use, either 'lstm' or 'gru'.
     rnn_normalization : str
@@ -66,10 +68,6 @@ class RIGO(models.GO):
         'relu'.
     alpha_temperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
     do_annealing : bool
         Should we use KL annealing during training?
     annealing_sharpness : float
@@ -82,9 +80,14 @@ class RIGO(models.GO):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients. Optional.
+    initial_cov : np.ndarray
+        Initial values for the covariances. Optional.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients? Optional, default is True.
+    learn_cov : bool
+        Should we learn the covariances. Optional, default is True.
     """
 
     def __init__(
@@ -92,7 +95,7 @@ class RIGO(models.GO):
         n_states: int,
         n_channels: int,
         sequence_length: int,
-        learn_covariances: bool,
+        n_lags: int,
         rnn_type: str,
         rnn_normalization: str,
         n_layers_inference: int,
@@ -104,15 +107,16 @@ class RIGO(models.GO):
         theta_normalization: str,
         alpha_xform: str,
         alpha_temperature: float,
-        learn_alpha_scaling: bool,
-        normalize_covariances: bool,
         do_annealing: bool,
         annealing_sharpness: float,
         n_epochs_annealing: int,
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
-        initial_covariances: np.ndarray = None,
+        initial_coeffs: np.ndarray = None,
+        initial_cov: np.ndarray = None,
+        learn_coeffs: bool = True,
+        learn_cov: bool = True,
     ):
         # Validation
         if rnn_type not in ["lstm", "gru"]:
@@ -172,13 +176,14 @@ class RIGO(models.GO):
             n_states=n_states,
             n_channels=n_channels,
             sequence_length=sequence_length,
-            learn_alpha_scaling=learn_alpha_scaling,
-            normalize_covariances=normalize_covariances,
+            n_lags=n_lags,
             learning_rate=learning_rate,
             multi_gpu=multi_gpu,
             strategy=strategy,
-            initial_covariances=initial_covariances,
-            learn_covariances=learn_covariances,
+            initial_coeffs=initial_coeffs,
+            initial_cov=initial_cov,
+            learn_coeffs=learn_coeffs,
+            learn_cov=learn_cov,
         )
 
     def build_model(self):
@@ -187,6 +192,7 @@ class RIGO(models.GO):
             n_states=self.n_states,
             n_channels=self.n_channels,
             sequence_length=self.sequence_length,
+            n_lags=self.n_lags,
             rnn_type=self.rnn_type,
             rnn_normalization=self.rnn_normalization,
             n_layers_inference=self.n_layers_inference,
@@ -198,12 +204,10 @@ class RIGO(models.GO):
             theta_normalization=self.theta_normalization,
             alpha_xform=self.alpha_xform,
             alpha_temperature=self.alpha_temperature,
-            initial_means=None,
-            initial_covariances=self.initial_covariances,
-            learn_means=False,
-            learn_covariances=self.learn_covariances,
-            learn_alpha_scaling=self.learn_alpha_scaling,
-            normalize_covariances=self.normalize_covariances,
+            initial_coeffs=self.initial_coeffs,
+            initial_cov=self.initial_cov,
+            learn_coeffs=self.learn_coeffs,
+            learn_cov=self.learn_cov,
         )
 
     def compile(self):
@@ -284,7 +288,7 @@ class RIGO(models.GO):
 
         return self.model.fit(*args, **kwargs)
 
-    def reset_weight(self):
+    def reset_weights(self):
         """Reset the model as if you've built a new model.
 
         Resets the model weights, optimizer and annealing factor.
@@ -470,6 +474,7 @@ def _model_structure(
     n_states: int,
     n_channels: int,
     sequence_length: int,
+    n_lags: int,
     rnn_type: str,
     rnn_normalization: str,
     n_layers_inference: int,
@@ -481,12 +486,10 @@ def _model_structure(
     theta_normalization: str,
     alpha_xform: str,
     alpha_temperature: float,
-    initial_means: np.ndarray,
-    initial_covariances: np.ndarray,
-    learn_means: bool,
-    learn_covariances: bool,
-    learn_alpha_scaling: bool,
-    normalize_covariances: bool,
+    initial_coeffs: np.ndarray,
+    initial_cov: np.ndarray,
+    learn_coeffs: bool,
+    learn_cov: bool,
 ):
     """Model structure.
 
@@ -498,6 +501,8 @@ def _model_structure(
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
+    n_lags : int
+        Order of the multivariate autoregressive observation model.
     rnn_type : int
         RNN to use, either 'lstm' or 'gru'.
     rnn_normalization : str
@@ -518,24 +523,19 @@ def _model_structure(
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta_t.
         Either 'layer', 'batch' or None.
-    learn_means : bool
-        Should we learn the mean vector for each state?
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-    initial_means : np.ndarray
-        Initial values for the state means. Should have shape (n_states, n_channels).
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
     alpha_xform : str
         Functional form of alpha_t. Either 'categorical', 'softmax', 'softplus' or
         'relu'.
     alpha_temperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'categorical'.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
+    initial_coeffs : np.ndarray
+        Initial values for the MAR coefficients.
+    initial_cov : np.ndarray
+        Initial values for the covariances.
+    learn_coeffs : bool
+        Should we learn the MAR coefficients?
+    learn_cov : bool
+        Should we learn the covariances.
 
     Returns
     -------
@@ -587,31 +587,33 @@ def _model_structure(
     alpha_t = alpha_t_layer(theta_t_norm)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each state as the observation model.
+    # - We use x_t ~ N(mu_t, sigma_t), where
+    #      - mu_t = Sum_j Sum_l alpha_jt W_jt x_{t-l}.
+    #      - sigma_t = Sum_j alpha^2_jt sigma_jt, where sigma_jt is a learnable
+    #        diagonal covariance matrix.
     # - We calculate the likelihood of generating the training data with alpha_t
     #   and the observation model.
 
     # Definition of layers
-    means_covs_layer = MeansCovsLayer(
+    mar_params_layer = MARParametersLayer(
         n_states,
         n_channels,
-        learn_means=learn_means,
-        learn_covariances=learn_covariances,
-        normalize_covariances=normalize_covariances,
-        initial_means=initial_means,
-        initial_covariances=initial_covariances,
-        name="means_covs",
+        n_lags,
+        initial_coeffs,
+        initial_cov,
+        learn_coeffs,
+        learn_cov,
+        name="mar_params",
     )
-    mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, learn_alpha_scaling, name="mix_means_covs"
+    mean_cov_layer = MARMeanCovLayer(
+        n_states, n_channels, sequence_length, n_lags, name="mean_cov"
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    mu_j, D_j = means_covs_layer(inputs)  # inputs not used
-    m_t, C_t = mix_means_covs_layer([alpha_t, mu_j, D_j])
-    ll_loss = ll_loss_layer([inputs, m_t, C_t])
+    coeffs_jl, cov_j = mar_params_layer(inputs)  # inputs not used
+    clipped_data_t, mu_t, sigma_t = mean_cov_layer([inputs, alpha_t, coeffs_jl, cov_j])
+    ll_loss = ll_loss_layer([clipped_data_t, mu_t, sigma_t])
 
     # Model RNN:
     # - Learns p(theta_t|theta_<t) ~ N(mu_theta_jt, sigma_theta_jt), where

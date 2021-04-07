@@ -1,6 +1,6 @@
 """Example script for running inference on resting-state MEG data (forty five subjects).
 
-- The data is stored on the BMRC cluster: /well/woolrich/shared/vrad
+- The data is stored on the BMRC cluster: /well/woolrich/projects/uk_meg_notts
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
@@ -9,9 +9,8 @@
 """
 
 print("Setting up")
-import numpy as np
-from vrad import data
 from vrad.analysis import maps, spectral
+from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import RIGO
 
@@ -54,11 +53,13 @@ learning_rate = 0.01
 
 # Read MEG data
 print("Reading MEG data")
-prepared_data = data.Data(
+prepared_data = Data(
     [
-        f"/well/woolrich/shared/uk_meg_notts/eo/prepared_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject{i}.mat"
         for i in range(1, 46)
-    ]
+    ],
+    sampling_frequency=250,
+    n_embeddings=15,
 )
 n_channels = prepared_data.n_channels
 
@@ -67,7 +68,9 @@ training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
 prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
 
 # Initialise covariances with final HMM covariances
-hmm = data.OSL_HMM("/well/woolrich/shared/uk_meg_notts/eo/nSubjects-45_K-6/hmm.mat")
+hmm = OSL_HMM(
+    "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-45_K-6/hmm.mat"
+)
 initial_covariances = hmm.covariances
 
 # Build model
@@ -112,35 +115,33 @@ print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time courses
 alpha = model.predict_states(prediction_dataset)
-inf_stc = np.concatenate(states.time_courses(alpha), axis=0)
-hmm_stc = np.concatenate(
-    data.manipulation.trim_time_series(
-        time_series=hmm.state_time_course,
-        sequence_length=sequence_length,
-        discontinuities=hmm.discontinuities,
-    ),
-    axis=0,
+inf_stc = states.time_courses(alpha, concatenate=True)
+hmm_stc = manipulation.trim_time_series(
+    time_series=hmm.state_time_course,
+    sequence_length=sequence_length,
+    discontinuities=hmm.discontinuities,
+    concatenate=True,
 )
 
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
 # Load preprocessed data to calculate spatial power maps
-preprocessed_data = data.PreprocessedData(
+preprocessed_data = Data(
     [
-        f"/well/woolrich/shared/uk_meg_notts/eo/preproc_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject{i}.mat"
         for i in range(1, 46)
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    n_embeddings=15, sequence_length=sequence_length
+    sequence_length=sequence_length, n_embeddings=prepared_data.n_emebddings,
 )
 
 # Compute spectra for states
 f, psd, coh = spectral.multitaper_spectra(
     data=preprocessed_time_series,
     alpha=alpha,
-    sampling_frequency=250,
+    sampling_frequency=prepared_data.sampling_frequency,
     time_half_bandwidth=4,
     n_tapers=7,
     frequency_range=[1, 45],
@@ -155,9 +156,8 @@ p_map, c_map = maps.state_power_maps(f, psd, components)
 # Save the power map for the first component as NIFTI file
 # (The second component is noise)
 maps.save_nii_file(
-    mask_file="files/MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="files"
-    + "/fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     power_map=p_map,
     filename="power_maps.nii.gz",
     component=0,

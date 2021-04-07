@@ -1,54 +1,29 @@
 """Initializers for TensorFlow layers.
 
 """
-import logging
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
 from vrad import models
 
-_logger = logging.getLogger("VRAD")
 
-
-class FlattenedCholeskyCovariancesInitializer(Initializer):
-    """Initialize weights for flattened cholesky factor of covariances.
-
-    Provided variables are used for initialization assuming dimensions are accepted.
+class WeightInitializer(Initializer):
+    """Initialize weights to given value.
 
     Parameters
     ----------
-    initial_cholesky_covariances : np.ndarray
-        Cholesky factors of the state covariance matrices used for initialization.
-        Shape must be (n_states, n_channels, n_channels).
+    initial_value : np.ndarray
+        Value to initialise weights to.
+        Note, the shape is not checked.
     """
 
-    def __init__(self, initial_cholesky_covariances: np.ndarray):
-        self.initial_cholesky_covariances = initial_cholesky_covariances
+    def __init__(self, initial_value: np.ndarray):
+        self.initial_value = initial_value
 
     def __call__(self, shape, dtype=None):
-        return tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
-
-
-class MeansInitializer(Initializer):
-    """Initialize weights for means.
-
-    Provided variables are used for initialization assuming dimensions are accepted.
-
-    Parameters
-    ----------
-    initial_means : np.ndarray
-        State mean vectors used for initialization.
-        Shape must be [n_states, n_channels].
-    """
-
-    def __init__(self, initial_means: np.ndarray):
-        self.initial_means = initial_means
-
-    def __call__(self, shape, dtype=None):
-        return self.initial_means
+        return self.initial_value
 
 
 def reinitialize_layer_weights(layer: tf.keras.layers.Layer):

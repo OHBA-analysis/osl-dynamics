@@ -1,125 +1,371 @@
 import logging
-from typing import Tuple, Union
+import pathlib
+import pickle
+from os import listdir, path
+from shutil import rmtree
+from typing import Union
 
 import mat73
 import numpy as np
 import scipy.io
+from tqdm import tqdm
+from vrad.data import spm
 from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")
 
 
-def load_spm(filename: str) -> Tuple[np.ndarray, float]:
-    """Load an SPM MEEG object.
-
-    Highly untested function for reading SPM MEEG objects from MATLAB.
+class IO:
+    """Class for reading/writing data.
 
     Parameters
     ----------
-    filename: str
-        Filename of an SPM MEEG object.
+    inputs : list of str or str
+        Filenames to be read.
+    data_field : str
+        If a MATLAB filename is passed, this is the field that corresponds to the
+        data. Optional. By default we read the field 'X'.
+    sampling_frequency : float
+        Sampling frequency of the data in Hz. Optional.
+    store_dir : str
+        Directory to save results and intermediate steps to. Optional, default is /tmp.
+    """
+
+    def __init__(
+        self,
+        inputs: Union[list, str, np.ndarray],
+        data_field: str,
+        sampling_frequency: float,
+        store_dir: str,
+    ):
+        # Validate inputs
+        if isinstance(inputs, str):
+            if path.isdir(inputs):
+                self.inputs = list_dir(inputs, keep_ext=[".npy", ".mat"])
+            else:
+                self.inputs = [inputs]
+
+        elif isinstance(inputs, np.ndarray):
+            if inputs.ndim == 2:
+                self.inputs = [inputs]
+            else:
+                self.inputs = inputs
+
+        elif isinstance(inputs, list):
+            if len(inputs) == 0:
+                raise ValueError("Empty list passed.")
+            elif isinstance(inputs[0], str):
+                self.inputs = []
+                for inp in inputs:
+                    if path.isdir(inp):
+                        self.inputs += list_dir(inp, keep_ext=[".npy", ".mat"])
+                    else:
+                        self.inputs.append(inp)
+            else:
+                self.inputs = inputs
+
+        else:
+            raise ValueError("inputs must be str, np.ndarray or list.")
+
+        if len(self.inputs) == 0:
+            raise ValueError("No valid inputs were passed.")
+
+        # Directory to store memory maps created by this class
+        self.store_dir = pathlib.Path(store_dir)
+        self.store_dir.mkdir(parents=True, exist_ok=True)
+
+        # Load and validate the raw data
+        self.raw_data_memmaps = self.load_raw_data(data_field)
+        self.validate_data()
+
+        # Get data prepration attributes if the raw data has been prepared
+        if not isinstance(inputs, list):
+            self.load_preparation(inputs)
+
+        # Attributes describing the raw data
+        self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
+        self.sampling_frequency = sampling_frequency
+
+        # Use raw data for the subject data
+        self.subjects = self.raw_data_memmaps
+
+    def delete_dir(self):
+        """Deletes the directory that stores the memory maps."""
+        rmtree(self.store_dir, ignore_errors=True)
+
+    def load_preparation(self, inputs: str):
+        """Loads a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        inputs : str
+            Path to directory containing the pickle file with preparation settings.
+        """
+        if path.isdir(inputs):
+            for file in list_dir(inputs):
+                if "preparation.pkl" in file:
+                    preparation = pickle.load(open(inputs + "/preparation.pkl", "rb"))
+                    self.n_embeddings = preparation["n_embeddings"]
+                    self.pca_components = preparation["pca_components"]
+                    self.n_pca_components = preparation["pca_components"].shape[1]
+                    self.prepared = True
+
+    def load_raw_data(self, data_field: str) -> list:
+        """Import data into a list of memory maps.
+
+        Parameters
+        ----------
+        data_field : str
+            If a MATLAB filename is passed, this is the field that corresponds
+            to the data. By default we read the field 'X'.
+
+        Returns
+        -------
+        list
+            list of np.memmap.
+        """
+        raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(len(self.inputs))), identifier=self._identifier
+        )
+        self.raw_data_filenames = [
+            str(self.store_dir / raw_data_pattern.format(i=i))
+            for i in range(len(self.inputs))
+        ]
+        # self.raw_data_filenames is not used if self.inputs is a list of strings,
+        # where the strings are paths to .npy files
+
+        memmaps = []
+        for raw_data, mmap_location in zip(
+            tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
+        ):
+            raw_data_mmap = load_data(raw_data, data_field, mmap_location)
+            memmaps.append(raw_data_mmap)
+
+        return memmaps
+
+    def save(self, output_dir: str = "."):
+        """Saves data to numpy files.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Optional, default is the current working
+            directory.
+        """
+        output_dir = pathlib.Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save time series data
+        for i in tqdm(range(self.n_subjects), desc="Saving data", ncols=98):
+            np.save(f"{output_dir}/subject{i}.npy", self.subjects[i])
+
+        # Save preparation info if .prepared has been called
+        if self.prepared:
+            preparation = {
+                "n_embeddings": self.n_embeddings,
+                "pca_components": self.pca_components,
+            }
+            pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
+
+    def validate_data(self):
+        """Validate data files."""
+        n_channels = [memmap.shape[-1] for memmap in self.raw_data_memmaps]
+        if not np.equal(n_channels, n_channels[0]).all():
+            raise ValueError("All inputs should have the same number of channels.")
+
+
+def file_ext(filename: str) -> str:
+    """Returns the extension of a file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to file.
+    """
+    if not isinstance(filename, str):
+        return None
+    _, ext = path.splitext(filename)
+    return ext
+
+
+def list_dir(path: str, keep_ext: Union[str, list] = None) -> list:
+    """Lists a directory.
+
+    Parameters
+    ----------
+    path : str
+        Directory to list.
+    keep_ext : str or list
+        Extensions of files to include in the returned list. Optional, default
+        is to include add files.
 
     Returns
     -------
-    data: numpy.ndarray
-        The time series referenced in the SPM MEEG object.
-    sampling_frequency: float
-        The sampling frequency listed in the SPM MEEG object.
-
+    list
+        Full path to files with the correct extension.
     """
-    spm = scipy.io.loadmat(filename)
-    data_file = spm["D"][0][0][6][0][0][0][0]
-    n_channels = spm["D"][0][0][6][0][0][1][0][0]
-    n_time_points = spm["D"][0][0][6][0][0][1][0][1]
-    sampling_frequency = spm["D"][0][0][2][0][0]
-    try:
-        data = np.fromfile(data_file, dtype=np.float64).reshape(
-            n_time_points, n_channels
-        )
-    except ValueError:
-        data = np.fromfile(data_file, dtype=np.float32).reshape(
-            n_time_points, n_channels
-        )
-    return data, sampling_frequency
+    files = []
+    if keep_ext is None:
+        for file in sorted(listdir(path)):
+            files.append(path + "/" + file)
+    else:
+        if isinstance(keep_ext, str):
+            keep_ext = [keep_ext]
+        for file in sorted(listdir(path)):
+            if file_ext(file) in keep_ext:
+                files.append(path + "/" + file)
+    return files
 
 
-def load_matlab(filename: str, ignored_keys=None) -> np.ndarray:
+def load_data(
+    data: Union[str, list, np.ndarray],
+    data_field: str = "X",
+    mmap_location: str = None,
+) -> Union[np.ndarray, np.memmap]:
+    """Loads time series data.
+
+    Checks the data shape is time by channel and that the data is float32.
+
+    Parameters
+    ----------
+    data : numpy.ndarray or str or list
+        An array or filename of a .npy or .mat file containing the data.
+    data_field : str
+        If a MATLAB filename is passed, this is the field that corresponds to
+        the data.
+    mmap_location : str
+        Filename to save the data as a numpy memory map.
+
+    Returns
+    -------
+    np.memmap or np.ndarray
+        Data.
+    """
+    if isinstance(data, np.ndarray):
+        data = validate_time_series(data)
+        if mmap_location is None:
+            return data
+        else:
+            # Save to a file so we can load data as a memory map
+            np.save(mmap_location, data)
+            data = mmap_location
+
+    if isinstance(data, str):
+        # Check if file/folder exists
+        if not path.exists(data):
+            raise FileNotFoundError(data)
+
+        # Check extension
+        ext = file_ext(data)
+        if ext not in [".npy", ".mat"]:
+            raise ValueError("Data file must be .npy or .mat.")
+
+        # Load a MATLAB file
+        if ext == ".mat":
+            data = load_matlab(data, data_field)
+            data = validate_time_series(data)
+            if mmap_location is None:
+                return data
+            else:
+                # Save to a file so we can load data as a memory map
+                np.save(mmap_location, data)
+                data = mmap_location
+
+        # Load a numpy file
+        elif ext == ".npy":
+            if mmap_location is None:
+                data = np.load(data)
+                data = validate_time_series(data)
+                return data
+            else:
+                mmap_location = data
+
+    # Load data as memmap
+    data = np.load(mmap_location, mmap_mode="r+")
+
+    return data
+
+
+def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
     """Loads a MATLAB or SPM file.
 
     Parameters
     ----------
     filename : str
         Filename of MATLAB file to read.
+    field : str
+        Field that corresponds to the data.
     ignored_keys :  list of str
         Keys in the MATLAB file to ignore.
 
     Returns
     -------
-    time_series: np.ndarray
+    np.ndarray
         Data in the MATLAB/SPM file.
     """
-    try:
-        mat = scipy.io.loadmat(filename)
-    except NotImplementedError:
-        mat = mat73.loadmat(filename)
+    # Load file
+    mat = loadmat(filename, return_dict=True)
 
+    # Get data
     if "D" in mat:
-        _logger.info("Assuming that key 'D' corresponds to an SPM MEEG object.")
-        time_series, sampling_frequency = load_spm(filename=filename)
-        print(f"Sampling frequency of the data is {sampling_frequency} Hz.")
+        _logger.warning("Assuming that key 'D' corresponds to an SPM MEEG object.")
+        D = spm.SPM(filename)
+        data = D.data
     else:
         try:
-            time_series = mat["X"]
+            data = mat[field]
         except KeyError:
-            raise KeyError("data in MATLAB file must be contained in a field called X.")
+            raise KeyError(f"field '{field}' missing from MATLAB file.")
 
-    return time_series
+    return data
 
 
-def load_data(
-    time_series: Union[str, np.ndarray], mmap_location: str = None
-) -> np.ndarray:
-    """Loads time series data.
+def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]:
+    """Wrapper for scipy.io.loadmat or mat73.loadmat.
 
     Parameters
     ----------
-    time_series : numpy.ndarray or str
-        An array or filename of a .npy or .mat file containing timeseries data.
-    mmap_location : str
-        Filename to save the data as a numpy memory map.
+    filename : str
+        Filename of MATLAB file to read.
+    return_dict : bool
+        If there's only one field should we return a dictionary. Optional.
+        Default is to return a numpy array if there is only one field.
+        If there are multiple fields, a dictionary is always returned.
+
+    Returns
+    -------
+    dict or np.ndarray
+        Data in the MATLAB file.
+    """
+    try:
+        mat = scipy.io.loadmat(filename, simplify_cells=True)
+    except NotImplementedError:
+        mat = mat73.loadmat(filename)
+
+    if not return_dict:
+        # Check if there's only one key in the MATLAB file
+        fields = [field for field in mat if "__" not in field]
+        if len(fields) == 1:
+            mat = mat[fields[0]]
+
+    return mat
+
+
+def validate_time_series(data: np.ndarray) -> np.ndarray:
+    """Validate time series data.
+
+    Enforces shape to be time by channels and a float32 data type.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series data.
 
     Returns
     -------
     np.ndarray
-        Time series data.
+        Valid data.
     """
-
-    # Read time series from a file
-    if isinstance(time_series, str):
-        if time_series[-4:] == ".npy":
-            time_series = np.load(time_series)
-        elif time_series[-4:] == ".mat":
-            time_series = load_matlab(filename=time_series)
-
-    # If a python list has been passed, convert to a numpy array
-    if isinstance(time_series, list):
-        time_series = np.array(time_series)
-
-    # Check the time series has the appropriate shape
-    if time_series.ndim != 2:
-        raise ValueError(
-            f"{time_series.shape} detected. Time series must be a 2D array."
-        )
-
-    # Check time is the first axis, channels are the second axis
-    time_series = time_axis_first(time_series)
-
-    # Load from memmap
-    if mmap_location is not None:
-        np.save(mmap_location, time_series)
-        time_series = np.load(mmap_location, mmap_mode="r+")
-
-    # Make sure the time series is type float32
-    time_series = time_series.astype(np.float32)
-
-    return time_series
+    data = time_axis_first(data)
+    data = data.astype(np.float32)
+    return data

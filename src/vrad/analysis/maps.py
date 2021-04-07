@@ -3,10 +3,11 @@
 """
 
 import logging
+import os
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import workbench
+from vrad.analysis import parc_files, std_masks
 from vrad.analysis.functions import validate_array
 
 _logger = logging.getLogger("VRAD")
@@ -104,6 +105,7 @@ def save_nii_file(
     filename: str,
     component: int = 0,
     subtract_mean: bool = False,
+    mean_weights: np.ndarray = None,
 ):
     """Saves a NITFI file containing a map.
 
@@ -115,12 +117,16 @@ def save_nii_file(
         Parcellation file used to parcelate the training data.
     power_map : np.ndarray
         Power map to save.
+        Shape must be (n_components, n_states, n_channels, n_channels).
     filename : str
         Output file name.
     component : int
         Spectral component to save. Optional.
     subtract_mean : bool
         Should we subtract the mean power across states? Optional: default is False.
+    mean_weights: np.ndarray
+        Numpy array with weightings for each state to use to calculate the mean.
+        Optional, default is equal weighting.
     """
 
     # Validation
@@ -132,9 +138,19 @@ def save_nii_file(
         error_message=error_message,
     )
 
-    # Add extension if it's not already there
-    if "nii" not in filename:
-        filename += ".nii.gz"
+    # If the mask file doesn't exist, check if it's in std_masks
+    if not os.path.exists(mask_file):
+        if os.path.exists(f"{std_masks.directory}/{mask_file}"):
+            mask_file = f"{std_masks.directory}/{mask_file}"
+        else:
+            raise FileNotFoundError(mask_file)
+
+    # If the parcellation file doesn't exist, check if  it's in parc_files
+    if not os.path.exists(parcellation_file):
+        if os.path.exists(f"{parc_files.directory}/{parcellation_file}"):
+            parcellation_file = f"{parc_files.directory}/{parcellation_file}"
+        else:
+            raise FileNotFoundError(parcellation_file)
 
     # Load the mask
     mask = nib.load(mask_file)
@@ -170,9 +186,11 @@ def save_nii_file(
     for i in range(n_states):
         spatial_map[:, i] = voxels @ np.diag(np.squeeze(power_map[component, i]))
 
-    # Subtract mean power across states
+    # Subtract weighted mean
     if subtract_mean:
-        spatial_map -= np.mean(spatial_map, axis=1)[..., np.newaxis]
+        spatial_map -= np.average(spatial_map, axis=1, weights=mean_weights,)[
+            ..., np.newaxis
+        ]
 
     # Convert spatial map into a grid
     spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
@@ -182,11 +200,8 @@ def save_nii_file(
     )
 
     # Save as nii file
+    if "nii" not in filename:
+        filename += ".nii.gz"
     print(f"Saving {filename}")
     nii_file = nib.Nifti1Image(spatial_map_grid, mask.affine, mask.header)
     nib.save(nii_file, filename)
-
-
-def workbench_render(*args, **kwargs):
-    _logger.warning("workbench_render is now in vrad.analysis.workbench.")
-    workbench.workbench_render(*args, **kwargs)
