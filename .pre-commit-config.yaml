@@ -4,16 +4,16 @@ repos:
     hooks:
     - id: seed-isort-config
 -   repo: https://github.com/timothycrosley/isort
-    rev: 4.3.21
+    rev: 5.8.0
     hooks:
     - id: isort
       entry: isort
 -   repo: https://github.com/ambv/black
-    rev: 19.10b0
+    rev: 20.8b1
     hooks:
     - id: black
 -   repo: https://gitlab.com/PyCQA/flake8
-    rev: 3.8.3
+    rev: 3.9.0
     hooks:
     -   id: flake8
         args:

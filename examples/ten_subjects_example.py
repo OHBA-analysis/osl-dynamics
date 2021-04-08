@@ -137,7 +137,8 @@ preprocessed_data = Data(
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=sequence_length, n_embeddings=prepared_data.n_embeddings,
+    sequence_length=sequence_length,
+    n_embeddings=prepared_data.n_embeddings,
 )
 
 # Compute spectra for states

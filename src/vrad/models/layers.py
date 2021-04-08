@@ -210,7 +210,8 @@ class ThetaActivationLayer(layers.Layer):
             alpha = activations.softmax(theta / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "gumbel-softmax":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature, logits=theta,
+                temperature=self.alpha_temperature,
+                logits=theta,
             )
             alpha = gumbel_softmax_distribution.sample()
 
