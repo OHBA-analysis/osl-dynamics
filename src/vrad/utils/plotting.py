@@ -665,6 +665,8 @@ def plot_state_lifetimes(
     match_scale_x: bool = False,
     match_scale_y: bool = False,
     x_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
     hist_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
@@ -689,6 +691,10 @@ def plot_state_lifetimes(
         If True, all histograms will share the same y-axis scale.
     x_range : list
         The limits on the values presented on the x-axis.
+    x_label : str
+        x-axis label.
+    y_label : str
+        y-axis label.
     hist_kwargs : dict
         Keyword arguments to pass to matplotlib.pyplot.hist.
     fig_kwargs : dict
@@ -749,6 +755,7 @@ def plot_state_lifetimes(
         )
         axis.xaxis.set_tick_params(labelbottom=True, labelleft=True)
         t.set_bbox({"facecolor": "white", "alpha": 0.7, "boxstyle": "round"})
+
     for axis in axes.ravel():
         if match_scale_x:
             axis.set_xlim(0, furthest_value * 1.1)
@@ -758,8 +765,10 @@ def plot_state_lifetimes(
             if len(x_range) != 2:
                 raise ValueError("x_range must be [x_min, x_max].")
             axis.set_xlim(x_range[0], x_range[1])
-    plt.tight_layout()
+        axis.set_xlabel(x_label)
+        axis.set_ylabel(y_label)
 
+    plt.tight_layout()
     show_or_save(filename)
 
 
@@ -824,6 +833,7 @@ def compare_state_data(
     n_samples: int = None,
     sampling_frequency: float = 1.0,
     titles: list = None,
+    x_label: str = None,
     filename: str = None,
     **kwargs: dict,
 ):
@@ -842,6 +852,8 @@ def compare_state_data(
         If given the y-axis will contain timestamps rather than sample numbers.
     titles: list of str
         Titles to give to each axis.
+    x_label : str
+        x-axis label.
     filename: str
         Filename to save figure to.
     kwargs: dict
@@ -869,10 +881,9 @@ def compare_state_data(
         )
         axis.set_title(title)
 
+    axes[-1].set_xlabel(x_label)
     plt.tight_layout()
-
     add_figure_colorbar(fig=fig, mappable=fig.axes[0].get_images()[0])
-
     show_or_save(filename)
 
 
