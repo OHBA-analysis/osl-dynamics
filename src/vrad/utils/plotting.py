@@ -441,7 +441,7 @@ def state_barcode(
         fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
         fig, axis = plt.subplots(1, **fig_kwargs)
 
-    highlight_defaults = {"alpha": 0.2}
+    highlight_defaults = {}
     highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
 
     n_states = np.max(np.unique(state_time_course)) + 1
@@ -705,7 +705,7 @@ def plot_state_lifetimes(
 
     colors = get_colors(n_plots)
 
-    default_hist_kwargs = {"alpha": 0.5}
+    default_hist_kwargs = {}
     hist_kwargs = override_dict_defaults(default_hist_kwargs, hist_kwargs)
 
     default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
