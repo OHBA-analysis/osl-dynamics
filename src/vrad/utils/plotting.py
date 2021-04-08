@@ -823,11 +823,12 @@ def compare_state_data(
     sampling_frequency: float = 1.0,
     titles: list = None,
     filename: str = None,
+    **kwargs: dict,
 ):
     """Plot multiple states time courses.
 
     For a list of state time courses, plot the state diagrams produced by
-    vrad.plotting.highlight_states.
+    vrad.utils.plotting.state_barcode.
 
     Parameters
     ----------
@@ -841,6 +842,8 @@ def compare_state_data(
         Titles to give to each axis.
     filename: str
         Filename to save figure to.
+    kwargs: dict
+        Keyword arguments passed to state_barcode.
     """
     n_samples = min(n_samples or np.inf, *[len(stc) for stc in state_time_courses])
 
@@ -860,6 +863,7 @@ def compare_state_data(
             n_samples=n_samples,
             legend=False,
             sampling_frequency=sampling_frequency,
+            **kwargs,
         )
         axis.set_title(title)
 
