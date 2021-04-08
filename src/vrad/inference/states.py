@@ -197,8 +197,8 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             channel_on.append(np.array([]))
             channel_off.append(np.array([]))
 
-    channel_on = np.array(channel_on)
-    channel_off = np.array(channel_off)
+    channel_on = np.array(channel_on, dtype=object)
+    channel_off = np.array(channel_off, dtype=object)
 
     return channel_on, channel_off
 
