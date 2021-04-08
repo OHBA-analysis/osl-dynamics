@@ -56,9 +56,7 @@ def plot_correlation(
 
 
 def plot_state_sums(
-    state_time_course: np.ndarray,
-    color: str = "tab:gray",
-    filename: str = None,
+    state_time_course: np.ndarray, color: str = "tab:gray", filename: str = None,
 ):
     """Bar chart of total state durations.
 

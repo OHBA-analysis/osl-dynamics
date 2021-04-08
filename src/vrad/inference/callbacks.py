@@ -74,10 +74,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
 
         kwargs.update(
             dict(
-                save_weights_only=True,
-                monitor="loss",
-                mode="min",
-                save_best_only=True,
+                save_weights_only=True, monitor="loss", mode="min", save_best_only=True,
             )
         )
 
