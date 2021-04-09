@@ -104,7 +104,7 @@ class Data(IO, Manipulation, TensorFlowDataset):
         list or np.ndarray
             Time series data for each subject.
         """
-        if concatenate:
+        if concatenate or self.n_subjects == 1:
             return np.concatenate(self.subjects)
         else:
             return self.subjects
