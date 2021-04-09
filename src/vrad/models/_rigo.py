@@ -420,7 +420,7 @@ class RIGO(models.GO):
         # Get layers
         model_rnn_layer = self.model.get_layer("mod_rnn")
         mod_mu_layer = self.model.get_layer("mod_mu")
-        log_mod_sigma_layer = self.model.get_layer("log_mod_sigma")
+        mod_sigma_layer = self.model.get_layer("mod_sigma")
         theta_norm_layer = self.model.get_layer("theta_norm")
         alpha_layer = self.model.get_layer("alpha")
 
@@ -449,8 +449,8 @@ class RIGO(models.GO):
             # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta)
             mod_mu = mod_mu_layer(model_rnn)[0, -1]
-            log_mod_sigma = log_mod_sigma_layer(model_rnn)[0, -1]
-            mod_sigma = np.exp(log_mod_sigma)
+            mod_sigma = mod_sigma_layer(model_rnn)[0, -1]
+            mod_sigma = np.exp(mod_sigma)
 
             # Shift theta one time step to the left
             theta_norm = np.roll(theta_norm, -1, axis=0)
@@ -547,8 +547,8 @@ def _model_structure(
 
     # Inference RNN:
     # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
-    #     - inf_mu        ~ affine(RNN(inputs_<=t))
-    #     - log_inf_sigma ~ affine(RNN(inputs_<=t))
+    #     - inf_mu    ~ affine(RNN(inputs_<=t))
+    #     - inf_sigma ~ softplus(RNN(inputs_<=t))
 
     # Definition of layers
     inference_input_dropout_layer = layers.Dropout(
@@ -563,7 +563,7 @@ def _model_structure(
         name="inf_rnn",
     )
     inf_mu_layer = layers.Dense(n_states, name="inf_mu")
-    log_inf_sigma_layer = layers.Dense(n_states, name="log_inf_sigma")
+    inf_sigma_layer = layers.Dense(n_states, activation="softplus", name="inf_sigma")
 
     # Layers to sample theta from q(theta) and to convert to state mixing
     # factors alpha
@@ -575,8 +575,8 @@ def _model_structure(
     inference_input_dropout = inference_input_dropout_layer(inputs)
     inference_output = inference_output_layers(inference_input_dropout)
     inf_mu = inf_mu_layer(inference_output)
-    log_inf_sigma = log_inf_sigma_layer(inference_output)
-    theta = theta_layer([inf_mu, log_inf_sigma])
+    inf_sigma = inf_sigma_layer(inference_output)
+    theta = theta_layer([inf_mu, inf_sigma])
     theta_norm = theta_norm_layer(theta)
     alpha = alpha_layer(theta_norm)
 
@@ -609,8 +609,8 @@ def _model_structure(
 
     # Model RNN:
     # - Learns p(theta_t |theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
-    #     - mod_mu        ~ affine(RNN(theta_<t))
-    #     - log_mod_sigma ~ affine(RNN(theta_<t))
+    #     - mod_mu    ~ affine(RNN(theta_<t))
+    #     - mod_sigma ~ softplus(RNN(theta_<t))
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
@@ -625,14 +625,14 @@ def _model_structure(
         name="mod_rnn",
     )
     mod_mu_layer = layers.Dense(n_states, name="mod_mu")
-    log_mod_sigma_layer = layers.Dense(n_states, name="log_mod_sigma")
+    mod_sigma_layer = layers.Dense(n_states, activation="softplus", name="mod_sigma")
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
     model_output = model_output_layers(model_input_dropout)
     mod_mu = mod_mu_layer(model_output)
-    log_mod_sigma = log_mod_sigma_layer(model_output)
-    kl_loss = kl_loss_layer([inf_mu, log_inf_sigma, mod_mu, log_mod_sigma])
+    mod_sigma = mod_sigma_layer(model_output)
+    kl_loss = kl_loss_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha])

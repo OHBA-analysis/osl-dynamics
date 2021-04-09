@@ -146,15 +146,15 @@ class SampleNormalDistributionLayer(layers.Layer):
         super().__init__(**kwargs)
 
     def call(self, inputs, training=None, **kwargs):
-        mu, log_sigma = inputs
+        mu, sigma = inputs
         if training:
-            N = tfp.distributions.Normal(loc=mu, scale=tf.exp(log_sigma))
+            N = tfp.distributions.Normal(loc=mu, scale=sigma)
             return N.sample()
         else:
             return mu
 
     def compute_output_shape(self, input_shape):
-        mu_shape, log_sigma_shape = input_shape
+        mu_shape, sigma_shape = input_shape
         return mu_shape
 
 
@@ -490,15 +490,15 @@ class NormalKLDivergenceLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
+        inference_mu, inference_sigma, model_mu, model_sigma = inputs
 
         # The Model RNN predicts one time step into the future compared to the
         # inference RNN. We clip its last value, and first value of the inference RNN.
         model_mu = model_mu[:, :-1]
-        model_sigma = tf.exp(model_log_sigma)[:, :-1]
+        model_sigma = model_sigma[:, :-1]
 
         inference_mu = inference_mu[:, 1:]
-        inference_sigma = tf.exp(inference_log_sigma)[:, 1:]
+        inference_sigma = inference_sigma[:, 1:]
 
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
