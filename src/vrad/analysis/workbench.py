@@ -146,7 +146,7 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
     pathlib.Path(file_path).parent.mkdir(exist_ok=True, parents=True)
     file_pattern = f"{file_path}{{:0{max_int_length}d}}{suffix}"
 
-    for i in trange(n_states, desc="processing state"):
+    for i in trange(n_states, desc="Saving images", ncols=98):
         subprocess.run(
             [
                 "wb_command",
@@ -161,6 +161,7 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
                 "I",
                 f"{i + 1}",
             ],
+            capture_output=True,
         )
 
     pathlib.Path("temp_scene.scene").unlink()
