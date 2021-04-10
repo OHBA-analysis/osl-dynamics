@@ -4,8 +4,7 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.72 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~8,040,000.
+- Achieves a dice coefficient of ~0.82 (when compared to the OSL HMM state time course).
 """
 
 print("Setting up")
@@ -71,11 +70,7 @@ prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_siz
 hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-45_K-6/hmm.mat"
 )
-initial_covariances = np.empty([n_states, n_channels, n_channels])
-ts = prepared_data.time_series(concatenate=True)
-stc = hmm.state_time_course(concatenate=True)
-for i in range(n_states):
-    initial_covariances[i] = np.cov(ts[stc[:, i] == 1], rowvar=False)
+initial_covariances = hmm.covariances
 
 # Build model
 model = RIGO(

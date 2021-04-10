@@ -5,7 +5,6 @@
   state.
 - Covariances are NOT trainable.
 - Achieves a dice coefficient of ~0.92 (when compared to the OSL HMM state time course).
-- Achieves a free energy of ~264,000.
 """
 
 print("Setting up")
