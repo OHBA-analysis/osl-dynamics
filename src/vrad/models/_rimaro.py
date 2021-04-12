@@ -108,9 +108,9 @@ class RIMARO(models.MARO):
         alpha_xform: str,
         alpha_temperature: float,
         do_kl_annealing: bool,
-        kl_annealing_sharpness: float,
-        n_epochs_kl_annealing: int,
         learning_rate: float,
+        kl_annealing_sharpness: float = None,
+        n_epochs_kl_annealing: int = None,
         multi_gpu: bool = False,
         strategy: str = None,
         initial_coeffs: np.ndarray = None,
@@ -133,13 +133,20 @@ class RIMARO(models.MARO):
                 "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
             )
 
-        if kl_annealing_sharpness <= 0:
-            raise ValueError("kl_annealing_sharpness must be greater than zero.")
+        if do_kl_annealing:
+            if kl_annealing_sharpness is None or n_epochs_kl_annealing is None:
+                raise ValueError(
+                    "If we are performing KL annealing kl_annealing_sharpness and "
+                    + "n_epochs_kl_annealing must be passed."
+                )
 
-        if n_epochs_kl_annealing < 0:
-            raise ValueError(
-                "n_epochs_kl_annealing must be equal to or greater than zero."
-            )
+            if kl_annealing_sharpness <= 0:
+                raise ValueError("kl_annealing_sharpness must be greater than zero.")
+
+            if n_epochs_kl_annealing < 0:
+                raise ValueError(
+                    "n_epochs_kl_annealing must be equal to or greater than zero."
+                )
 
         # RNN and inference hyperparameters
         self.rnn_type = rnn_type

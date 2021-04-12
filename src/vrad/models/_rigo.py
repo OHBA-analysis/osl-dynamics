@@ -135,6 +135,12 @@ class RIGO(models.GO):
             )
 
         if do_kl_annealing:
+            if kl_annealing_sharpness is None or n_epochs_kl_annealing is None:
+                raise ValueError(
+                    "If we are performing KL annealing kl_annealing_sharpness and "
+                    + "n_epochs_kl_annealing must be passed."
+                )
+
             if kl_annealing_sharpness <= 0:
                 raise ValueError("kl_annealing_sharpness must be greater than zero.")
 
@@ -152,7 +158,8 @@ class RIGO(models.GO):
 
             if n_epochs_alpha_temperature_annealing < 0:
                 raise ValueError(
-                    "n_epochs_alpha_temperature_annealing must be equal to or greater than zero."
+                    "n_epochs_alpha_temperature_annealing must be equal to or greater "
+                    + "than zero."
                 )
         elif alpha_temperature is None:
             if initial_alpha_temperature is not None:
