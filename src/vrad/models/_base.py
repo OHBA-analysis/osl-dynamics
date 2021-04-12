@@ -16,7 +16,7 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
-from vrad.inference.callbacks import AnnealingCallback, SaveBestCallback
+from vrad.inference.callbacks import KLAnnealingCallback, SaveBestCallback
 from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.utils.misc import check_iterable_type, class_from_yaml
 from vrad.utils.model import HTMLTable, LatexTable
@@ -130,7 +130,7 @@ class Base:
 
     def create_callbacks(
         self,
-        no_annealing_callback: bool,
+        no_kl_annealing_callback: bool,
         use_tqdm: bool,
         tqdm_class,
         use_tensorboard: bool,
@@ -142,8 +142,8 @@ class Base:
 
         Parameters
         ----------
-        no_annealing_callback : bool
-            Should we NOT update the annealing factor during training?
+        no_kl_annealing_callback : bool
+            Should we NOT update the kl_annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -166,14 +166,14 @@ class Base:
         """
         additional_callbacks = []
 
-        # Callback for KL annealing
-        if not no_annealing_callback:
-            annealing_callback = AnnealingCallback(
-                annealing_factor=self.annealing_factor,
-                annealing_sharpness=self.annealing_sharpness,
-                n_epochs_annealing=self.n_epochs_annealing,
+        # Callback for KL kl_annealing
+        if not no_kl_annealing_callback:
+            kl_annealing_callback = KLAnnealingCallback(
+                kl_annealing_factor=self.kl_annealing_factor,
+                kl_annealing_sharpness=self.kl_annealing_sharpness,
+                n_epochs_kl_annealing=self.n_epochs_kl_annealing,
             )
-            additional_callbacks.append(annealing_callback)
+            additional_callbacks.append(kl_annealing_callback)
 
         # Callback to display a progress bar with tqdm
         if use_tqdm:

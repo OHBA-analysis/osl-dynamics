@@ -23,9 +23,9 @@ batch_size = 64
 learning_rate = 0.001
 n_epochs = 800
 
-do_annealing = True
-annealing_sharpness = 15
-n_epochs_annealing = 600
+do_kl_annealing = True
+kl_annealing_sharpness = 15
+n_epochs_kl_annealing = 600
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -95,9 +95,9 @@ model = RIMARO(
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
     alpha_temperature=alpha_temperature,
-    do_annealing=do_annealing,
-    annealing_sharpness=annealing_sharpness,
-    n_epochs_annealing=n_epochs_annealing,
+    do_kl_annealing=do_kl_annealing,
+    kl_annealing_sharpness=kl_annealing_sharpness,
+    n_epochs_kl_annealing=n_epochs_kl_annealing,
     learning_rate=learning_rate,
 )
 model.summary()

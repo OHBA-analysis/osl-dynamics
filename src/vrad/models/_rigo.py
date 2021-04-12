@@ -71,11 +71,11 @@ class RIGO(models.GO):
         Should we learn a scaling for alpha?
     normalize_covariances : bool
         Should we trace normalize the state covariances?
-    do_annealing : bool
+    do_kl_annealing : bool
         Should we use KL annealing during training?
-    annealing_sharpness : float
+    kl_annealing_sharpness : float
         Parameter to control the annealing curve.
-    n_epochs_annealing : int
+    n_epochs_kl_annealing : int
         Number of epochs to perform annealing.
     learning_rate : float
         Learning rate for updating model parameters/weights.
@@ -107,9 +107,9 @@ class RIGO(models.GO):
         alpha_temperature: float,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
-        do_annealing: bool,
-        annealing_sharpness: float,
-        n_epochs_annealing: int,
+        do_kl_annealing: bool,
+        kl_annealing_sharpness: float,
+        n_epochs_kl_annealing: int,
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
@@ -130,12 +130,12 @@ class RIGO(models.GO):
                 "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
             )
 
-        if annealing_sharpness <= 0:
-            raise ValueError("annealing_sharpness must be greater than zero.")
+        if kl_annealing_sharpness <= 0:
+            raise ValueError("kl_annealing_sharpness must be greater than zero.")
 
-        if n_epochs_annealing < 0:
+        if n_epochs_kl_annealing < 0:
             raise ValueError(
-                "n_epochs_annealing must be equal to or greater than zero."
+                "n_epochs_kl_annealing must be equal to or greater than zero."
             )
 
         # RNN and inference hyperparameters
@@ -152,10 +152,10 @@ class RIGO(models.GO):
         self.alpha_temperature = alpha_temperature
 
         # KL annealing
-        self.do_annealing = do_annealing
-        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
-        self.annealing_sharpness = annealing_sharpness
-        self.n_epochs_annealing = n_epochs_annealing
+        self.do_kl_annealing = do_kl_annealing
+        self.kl_annealing_factor = Variable(0.0) if do_kl_annealing else Variable(1.0)
+        self.kl_annealing_sharpness = kl_annealing_sharpness
+        self.n_epochs_kl_annealing = n_epochs_kl_annealing
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
@@ -207,7 +207,7 @@ class RIGO(models.GO):
 
         # Loss functions
         ll_loss = ModelOutputLoss()
-        kl_loss = ModelOutputLoss(self.annealing_factor)
+        kl_loss = ModelOutputLoss(self.kl_annealing_factor)
         loss = [ll_loss, kl_loss]
 
         # Compile
@@ -282,8 +282,8 @@ class RIGO(models.GO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.do_annealing:
-            self.annealing_factor.assign(0.0)
+        if self.do_kl_annealing:
+            self.kl_annealing_factor.assign(0.0)
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.

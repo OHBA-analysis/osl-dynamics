@@ -27,9 +27,9 @@ batch_size = 16
 learning_rate = 0.01
 n_epochs = 200
 
-do_annealing = True
-annealing_sharpness = 10
-n_epochs_annealing = 100
+do_kl_annealing = True
+kl_annealing_sharpness = 10
+n_epochs_kl_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -86,9 +86,9 @@ model = RIDGO(
     alpha_xform=alpha_xform,
     normalize_covariances=normalize_covariances,
     learn_alpha_scaling=learn_alpha_scaling,
-    do_annealing=do_annealing,
-    annealing_sharpness=annealing_sharpness,
-    n_epochs_annealing=n_epochs_annealing,
+    do_kl_annealing=do_kl_annealing,
+    kl_annealing_sharpness=kl_annealing_sharpness,
+    n_epochs_kl_annealing=n_epochs_kl_annealing,
     learning_rate=learning_rate,
 )
 model.summary()
@@ -97,7 +97,7 @@ print("Training model")
 history = model.fit(
     training_dataset,
     epochs=n_epochs,
-    save_best_after=n_epochs_annealing,
+    save_best_after=n_epochs_kl_annealing,
     save_filepath="tmp/weights",
 )
 

@@ -66,13 +66,13 @@ class RIMARO(models.MARO):
     alpha_xform : str
         Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
         'relu'.
-    alphaemperature : float
+    alpha_temperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
-    do_annealing : bool
+    do_kl_annealing : bool
         Should we use KL annealing during training?
-    annealing_sharpness : float
+    kl_annealing_sharpness : float
         Parameter to control the annealing curve.
-    n_epochs_annealing : int
+    n_epochs_kl_annealing : int
         Number of epochs to perform annealing.
     learning_rate : float
         Learning rate for updating model parameters/weights.
@@ -106,10 +106,10 @@ class RIMARO(models.MARO):
         dropout_rate_model: float,
         theta_normalization: str,
         alpha_xform: str,
-        alphaemperature: float,
-        do_annealing: bool,
-        annealing_sharpness: float,
-        n_epochs_annealing: int,
+        alpha_temperature: float,
+        do_kl_annealing: bool,
+        kl_annealing_sharpness: float,
+        n_epochs_kl_annealing: int,
         learning_rate: float,
         multi_gpu: bool = False,
         strategy: str = None,
@@ -133,12 +133,12 @@ class RIMARO(models.MARO):
                 "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
             )
 
-        if annealing_sharpness <= 0:
-            raise ValueError("annealing_sharpness must be greater than zero.")
+        if kl_annealing_sharpness <= 0:
+            raise ValueError("kl_annealing_sharpness must be greater than zero.")
 
-        if n_epochs_annealing < 0:
+        if n_epochs_kl_annealing < 0:
             raise ValueError(
-                "n_epochs_annealing must be equal to or greater than zero."
+                "n_epochs_kl_annealing must be equal to or greater than zero."
             )
 
         # RNN and inference hyperparameters
@@ -152,13 +152,13 @@ class RIMARO(models.MARO):
         self.dropout_rate_model = dropout_rate_model
         self.theta_normalization = theta_normalization
         self.alpha_xform = alpha_xform
-        self.alphaemperature = alphaemperature
+        self.alpha_temperature = alpha_temperature
 
         # KL annealing
-        self.do_annealing = do_annealing
-        self.annealing_factor = Variable(0.0) if do_annealing else Variable(1.0)
-        self.annealing_sharpness = annealing_sharpness
-        self.n_epochs_annealing = n_epochs_annealing
+        self.do_kl_annealing = do_kl_annealing
+        self.kl_annealing_factor = Variable(0.0) if do_kl_annealing else Variable(1.0)
+        self.kl_annealing_sharpness = kl_annealing_sharpness
+        self.n_epochs_kl_annealing = n_epochs_kl_annealing
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
@@ -193,7 +193,7 @@ class RIMARO(models.MARO):
             dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
             alpha_xform=self.alpha_xform,
-            alphaemperature=self.alphaemperature,
+            alpha_temperature=self.alpha_temperature,
             initial_coeffs=self.initial_coeffs,
             initial_cov=self.initial_cov,
             learn_coeffs=self.learn_coeffs,
@@ -210,7 +210,7 @@ class RIMARO(models.MARO):
 
         # Loss functions
         ll_loss = ModelOutputLoss()
-        kl_loss = ModelOutputLoss(self.annealing_factor)
+        kl_loss = ModelOutputLoss(self.kl_annealing_factor)
         loss = [ll_loss, kl_loss]
 
         # Compile
@@ -285,8 +285,8 @@ class RIMARO(models.MARO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.do_annealing:
-            self.annealing_factor.assign(0.0)
+        if self.do_kl_annealing:
+            self.kl_annealing_factor.assign(0.0)
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
@@ -483,7 +483,7 @@ def _model_structure(
     dropout_rate_model: float,
     theta_normalization: str,
     alpha_xform: str,
-    alphaemperature: float,
+    alpha_temperature: float,
     initial_coeffs: np.ndarray,
     initial_cov: np.ndarray,
     learn_coeffs: bool,
@@ -524,7 +524,7 @@ def _model_structure(
     alpha_xform : str
         Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
         'relu'.
-    alphaemperature : float
+    alpha_temperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
     initial_coeffs : np.ndarray
         Initial values for the MAR coefficients.
@@ -568,7 +568,7 @@ def _model_structure(
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(theta_normalization, name="theta_norm")
-    alpha_layer = ThetaActivationLayer(alpha_xform, alphaemperature, name="alpha")
+    alpha_layer = ThetaActivationLayer(alpha_xform, alpha_temperature, name="alpha")
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)

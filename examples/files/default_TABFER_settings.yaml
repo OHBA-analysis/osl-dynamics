@@ -1,8 +1,8 @@
 alpha_temperature: 2
 alpha_xform: gumbel-softmax
-annealing_sharpness: 10
+kl_annealing_sharpness: 10
 batch_size: 64
-do_annealing: true
+do_kl_annealing: true
 dropout_rate_inference: 0.0
 dropout_rate_model: 0.0
 learn_alpha_scaling: false
@@ -10,7 +10,7 @@ learn_covariances: true
 learn_means: false
 learning_rate: 0.001
 n_epochs: 500
-n_epochs_annealing: 300
+n_epochs_kl_annealing: 300
 n_layers_inference: 1
 n_layers_model: 1
 n_states: 10
