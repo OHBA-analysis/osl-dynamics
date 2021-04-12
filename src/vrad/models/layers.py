@@ -189,23 +189,49 @@ class ThetaActivationLayer(layers.Layer):
     Parameters
     ----------
     alpha_xform : str
-        The functional form used to convert from theta to alpha.
-    alpha_temperature : float
+        The functional form of the activation used to convert from theta to alpha.
+    initial_alpha_temperature : float
         Temperature parameter for the softmax or Gumbel-Softmax.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature?
     """
 
-    def __init__(self, alpha_xform: str, alpha_temperature: float, **kwargs):
+    def __init__(
+        self,
+        alpha_xform: str,
+        initial_alpha_temperature: float,
+        learn_alpha_temperature: bool,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.alpha_xform = alpha_xform
-        self.alpha_temperature = alpha_temperature
+        self.initial_alpha_temperature = initial_alpha_temperature
+        self.learn_alpha_temperature = learn_alpha_temperature
+
+    def build(self, input_shape):
+
+        # Initialiser for the a learnable alpha temperature
+        def alpha_temperature_initializer(shape, dtype=None):
+            return self.initial_alpha_temperature
+
+        self.alpha_temperature_initializer = alpha_temperature_initializer
+
+        # Create trainable alpha temperature
+        self.alpha_temperature = self.add_weight(
+            "alpha_temperature",
+            shape=(),
+            dtype=tf.float32,
+            initializer=self.alpha_temperature_initializer,
+            trainable=self.learn_alpha_temperature,
+        )
+
+        self.built = True
 
     def call(self, theta, **kwargs):
 
         # Calculate alpha from theta
         if self.alpha_xform == "softplus":
             alpha = activations.softplus(theta)
-        elif self.alpha_xform == "relu":
-            alpha = activations.relu(theta)
         elif self.alpha_xform == "softmax":
             alpha = activations.softmax(theta / self.alpha_temperature, axis=2)
         elif self.alpha_xform == "gumbel-softmax":
@@ -222,12 +248,7 @@ class ThetaActivationLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update(
-            {
-                "alpha_xform": self.alpha_xform,
-                "alpha_temperature": self.alpha_temperature,
-            }
-        )
+        config.update({"alpha_xform": self.alpha_xform})
         return config
 
 

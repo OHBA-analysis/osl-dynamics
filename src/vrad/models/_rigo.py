@@ -63,10 +63,20 @@ class RIGO(models.GO):
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
-        'relu'.
-    alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature when alpha_xform = 'softmax' or
+        'gumbel-softmax'?
+    do_alpha_temperature_annealing : bool
+        Should we perform alpha temperature annealing. Can be used when
+        alpha_xform = 'softmax' or 'gumbel-softmax'.
+    initial_alpha_temperature : float
+        Initial value for the alpha temperature if it is being learnt or if
+        we are performing alpha temperature annealing.
+    final_alpha_temperature : float
+        Final value for the alpha temperature if we are annealing.
+    n_epochs_alpha_temperature_annealing : int
+        Number of alpha temperature annealing epochs.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
     normalize_covariances : bool
@@ -104,13 +114,13 @@ class RIGO(models.GO):
         dropout_rate_model: float,
         theta_normalization: str,
         alpha_xform: str,
-        do_alpha_temperature_annealing: bool,
+        initial_alpha_temperature: float,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
         do_kl_annealing: bool,
         learning_rate: float,
-        alpha_temperature: float = None,
-        initial_alpha_temperature: float = None,
+        learn_alpha_temperature: bool = None,
+        do_alpha_temperature_annealing: bool = False,
         final_alpha_temperature: float = None,
         n_epochs_alpha_temperature_annealing: int = None,
         kl_annealing_sharpness: float = None,
@@ -129,15 +139,15 @@ class RIGO(models.GO):
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus", "relu"]:
+        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
             raise ValueError(
-                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
+                "alpha_xform must be 'gumbel-softmax', 'softmax' or 'softplus'."
             )
 
         if do_kl_annealing:
             if kl_annealing_sharpness is None or n_epochs_kl_annealing is None:
                 raise ValueError(
-                    "If we are performing KL annealing kl_annealing_sharpness and "
+                    "If we are performing KL annealing, kl_annealing_sharpness and "
                     + "n_epochs_kl_annealing must be passed."
                 )
 
@@ -149,23 +159,28 @@ class RIGO(models.GO):
                     "n_epochs_kl_annealing must be equal to or greater than zero."
                 )
 
-        if do_alpha_temperature_annealing:
-            if initial_alpha_temperature is None:
-                raise ValueError("initial_alpha_temperature must be passed.")
+        if learn_alpha_temperature is None and do_alpha_temperature_annealing is None:
+            raise ValueError(
+                "Either learn_alpha_temperature or do_alpha_temperature_annealing "
+                + "must be passed."
+            )
 
-            if final_alpha_temperature is None:
-                raise ValueError("final_alpha_temperature must be passed.")
+        if do_alpha_temperature_annealing:
+            if (
+                final_alpha_temperature is None
+                or n_epochs_alpha_temperature_annealing is None
+            ):
+                raise ValueError(
+                    "If we are performing alpha temperature annealing, "
+                    + "final_alpha_temperature and n_epochs_alpha_temperature_annealing "
+                    + "must be passed."
+                )
 
             if n_epochs_alpha_temperature_annealing < 0:
                 raise ValueError(
                     "n_epochs_alpha_temperature_annealing must be equal to or greater "
                     + "than zero."
                 )
-        elif alpha_temperature is None:
-            if initial_alpha_temperature is not None:
-                alpha_temperature = initial_alpha_temperature
-            else:
-                raise ValueError("alpha_temperature must be passed.")
 
         # RNN and inference hyperparameters
         self.rnn_type = rnn_type
@@ -185,13 +200,10 @@ class RIGO(models.GO):
         self.kl_annealing_sharpness = kl_annealing_sharpness
         self.n_epochs_kl_annealing = n_epochs_kl_annealing
 
-        # Alpha temperature annealing
+        # Alpha temperature learning/annealing
+        self.learn_alpha_temperature = learn_alpha_temperature
         self.do_alpha_temperature_annealing = do_alpha_temperature_annealing
         self.initial_alpha_temperature = initial_alpha_temperature
-        if do_alpha_temperature_annealing:
-            self.alpha_temperature = initial_alpha_temperature
-        else:
-            self.alpha_temperature = alpha_temperature
         self.final_alpha_temperature = final_alpha_temperature
         self.n_epochs_alpha_temperature_annealing = n_epochs_alpha_temperature_annealing
 
@@ -226,7 +238,8 @@ class RIGO(models.GO):
             dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
             alpha_xform=self.alpha_xform,
-            alpha_temperature=self.alpha_temperature,
+            learn_alpha_temperature=self.learn_alpha_temperature,
+            initial_alpha_temperature=self.initial_alpha_temperature,
             initial_means=None,
             initial_covariances=self.initial_covariances,
             learn_means=False,
@@ -464,7 +477,8 @@ class RIGO(models.GO):
             Alpha temperature.
         """
         alpha_layer = self.model.get_layer("alpha")
-        return alpha_layer.alpha_temperature
+        alpha_temperature = alpha_layer.alpha_temperature.numpy()
+        return alpha_temperature
 
     def sample_alpha(self, n_samples: int) -> np.ndarray:
         """Uses the model RNN to sample state mixing factors, alpha.
@@ -541,7 +555,8 @@ def _model_structure(
     dropout_rate_model: float,
     theta_normalization: str,
     alpha_xform: str,
-    alpha_temperature: float,
+    learn_alpha_temperature: bool,
+    initial_alpha_temperature: float,
     initial_means: np.ndarray,
     initial_covariances: np.ndarray,
     learn_means: bool,
@@ -589,9 +604,11 @@ def _model_structure(
         Initial values for the state covariances. Should have shape (n_states,
         n_channels, n_channels).
     alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
-        'relu'.
-    alpha_temperature : float
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature when alpha_xform = 'softmax' or
+        'gumbel-softmax'?
+    initial_alpha_temperature : float
         Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha?
@@ -631,7 +648,12 @@ def _model_structure(
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(theta_normalization, name="theta_norm")
-    alpha_layer = ThetaActivationLayer(alpha_xform, alpha_temperature, name="alpha")
+    alpha_layer = ThetaActivationLayer(
+        alpha_xform,
+        initial_alpha_temperature,
+        learn_alpha_temperature,
+        name="alpha",
+    )
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)

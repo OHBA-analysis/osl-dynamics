@@ -44,10 +44,8 @@ dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
 alpha_xform = "gumbel-softmax"
-do_alpha_temperature_annealing = False
+learn_alpha_temperature = False
 initial_alpha_temperature = 1.0
-final_alpha_temperature = 0.1
-n_epochs_alpha_temperature_annealing = n_epochs_kl_annealing
 
 learn_covariances = False
 learn_alpha_scaling = False
@@ -92,10 +90,8 @@ model = RIGO(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
-    do_alpha_temperature_annealing=do_alpha_temperature_annealing,
+    learn_alpha_temperature=learn_alpha_temperature,
     initial_alpha_temperature=initial_alpha_temperature,
-    final_alpha_temperature=final_alpha_temperature,
-    n_epochs_alpha_temperature_annealing=n_epochs_alpha_temperature_annealing,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_kl_annealing=do_kl_annealing,
@@ -110,7 +106,7 @@ print("Training model")
 history = model.fit(
     training_dataset,
     epochs=n_epochs,
-    save_best_after=max(n_epochs_kl_annealing, n_epochs_alpha_temperature_annealing),
+    save_best_after=n_epochs_kl_annealing,
     save_filepath="tmp/model",
 )
 

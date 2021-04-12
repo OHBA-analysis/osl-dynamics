@@ -249,7 +249,7 @@ class RIDGO(models.GO):
             name="callbacks",
             item=self.create_callbacks(
                 kl_annealing_callback,
-                True,
+                False,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,

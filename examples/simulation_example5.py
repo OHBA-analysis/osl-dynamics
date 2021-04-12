@@ -41,7 +41,8 @@ dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
 alpha_xform = "softmax"
-alpha_temperature = 2.0
+learn_alpha_temperature = False
+initial_alpha_temperature = 2.0
 
 # MAR parameters
 A11 = [[0.9, 0], [0.16, 0.8]]
@@ -94,7 +95,8 @@ model = RIMARO(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
-    alpha_temperature=alpha_temperature,
+    learn_alpha_temperature=learn_alpha_temperature,
+    initial_alpha_temperature=initial_alpha_temperature,
     do_kl_annealing=do_kl_annealing,
     kl_annealing_sharpness=kl_annealing_sharpness,
     n_epochs_kl_annealing=n_epochs_kl_annealing,

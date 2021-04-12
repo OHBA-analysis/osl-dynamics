@@ -64,10 +64,12 @@ class RIMARO(models.MARO):
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
-        'relu'.
-    alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature when alpha_xform = 'softmax' or
+        'gumbel-softmax'?
+    initial_alpha_temperature : float
+        Initial temperature for when alpha_xform = 'softmax' or 'gumbel-softmax'.
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_sharpness : float
@@ -106,7 +108,8 @@ class RIMARO(models.MARO):
         dropout_rate_model: float,
         theta_normalization: str,
         alpha_xform: str,
-        alpha_temperature: float,
+        learn_alpha_temperature: bool,
+        initial_alpha_temperature: float,
         do_kl_annealing: bool,
         learning_rate: float,
         kl_annealing_sharpness: float = None,
@@ -128,15 +131,15 @@ class RIMARO(models.MARO):
         if dropout_rate_inference < 0 or dropout_rate_model < 0:
             raise ValueError("dropout_rate must be greater than or equal to zero.")
 
-        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus", "relu"]:
+        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
             raise ValueError(
-                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
+                "alpha_xform must be 'gumbel-softmax', 'softmax' or 'softplus'."
             )
 
         if do_kl_annealing:
             if kl_annealing_sharpness is None or n_epochs_kl_annealing is None:
                 raise ValueError(
-                    "If we are performing KL annealing kl_annealing_sharpness and "
+                    "If we are performing KL annealing, kl_annealing_sharpness and "
                     + "n_epochs_kl_annealing must be passed."
                 )
 
@@ -159,13 +162,16 @@ class RIMARO(models.MARO):
         self.dropout_rate_model = dropout_rate_model
         self.theta_normalization = theta_normalization
         self.alpha_xform = alpha_xform
-        self.alpha_temperature = alpha_temperature
 
         # KL annealing
         self.do_kl_annealing = do_kl_annealing
         self.kl_annealing_factor = Variable(0.0) if do_kl_annealing else Variable(1.0)
         self.kl_annealing_sharpness = kl_annealing_sharpness
         self.n_epochs_kl_annealing = n_epochs_kl_annealing
+
+        # Alpha temperature learning
+        self.learn_alpha_temperature = learn_alpha_temperature
+        self.initial_alpha_temperature = initial_alpha_temperature
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
@@ -200,7 +206,8 @@ class RIMARO(models.MARO):
             dropout_rate_model=self.dropout_rate_model,
             theta_normalization=self.theta_normalization,
             alpha_xform=self.alpha_xform,
-            alpha_temperature=self.alpha_temperature,
+            learn_alpha_temperature=self.learn_alpha_temperature,
+            initial_alpha_temperature=self.initial_alpha_temperature,
             initial_coeffs=self.initial_coeffs,
             initial_cov=self.initial_cov,
             learn_coeffs=self.learn_coeffs,
@@ -491,7 +498,8 @@ def _model_structure(
     dropout_rate_model: float,
     theta_normalization: str,
     alpha_xform: str,
-    alpha_temperature: float,
+    learn_alpha_temperature: bool,
+    initial_alpha_temperature: float,
     initial_coeffs: np.ndarray,
     initial_cov: np.ndarray,
     learn_coeffs: bool,
@@ -530,10 +538,12 @@ def _model_structure(
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
     alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax', 'softplus' or
-        'relu'.
-    alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature when alpha_xform = 'softmax' or
+        'gumbel-softmax'?
+    initial_alpha_temperature : float
+        Initial temperature for when alpha_xform = 'softmax' or 'gumbel-softmax'.
     initial_coeffs : np.ndarray
         Initial values for the MAR coefficients.
     initial_cov : np.ndarray
@@ -570,20 +580,25 @@ def _model_structure(
         name="inf_rnn",
     )
     inf_mu_layer = layers.Dense(n_states, name="inf_mu")
-    log_inf_sigma_layer = layers.Dense(n_states, name="log_inf_sigma")
+    inf_sigma_layer = layers.Dense(n_states, activation="softplus", name="inf_sigma")
 
     # Layers to sample theta from q(theta) and to convert to state mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(theta_normalization, name="theta_norm")
-    alpha_layer = ThetaActivationLayer(alpha_xform, alpha_temperature, name="alpha")
+    alpha_layer = ThetaActivationLayer(
+        alpha_xform,
+        initial_alpha_temperature,
+        learn_alpha_temperature,
+        name="alpha",
+    )
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)
     inference_output = inference_output_layers(inference_input_dropout)
     inf_mu = inf_mu_layer(inference_output)
-    log_inf_sigma = log_inf_sigma_layer(inference_output)
-    theta = theta_layer([inf_mu, log_inf_sigma])
+    inf_sigma = inf_sigma_layer(inference_output)
+    theta = theta_layer([inf_mu, inf_sigma])
     theta_norm = theta_norm_layer(theta)
     alpha = alpha_layer(theta_norm)
 
@@ -634,14 +649,14 @@ def _model_structure(
         name="mod_rnn",
     )
     mod_mu_layer = layers.Dense(n_states, name="mod_mu")
-    log_mod_sigma_layer = layers.Dense(n_states, name="log_mod_sigma")
+    mod_sigma_layer = layers.Dense(n_states, activation="softplus", name="mod_sigma")
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
     model_output = model_output_layers(model_input_dropout)
     mod_mu = mod_mu_layer(model_output)
-    log_mod_sigma = log_mod_sigma_layer(model_output)
-    kl_loss = kl_loss_layer([inf_mu, log_inf_sigma, mod_mu, log_mod_sigma])
+    mod_sigma = mod_sigma_layer(model_output)
+    kl_loss = kl_loss_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha])

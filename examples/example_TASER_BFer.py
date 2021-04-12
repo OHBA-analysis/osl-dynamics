@@ -57,7 +57,8 @@ alpha_xform = settings["alpha_xform"]
 learn_alpha_scaling = settings["learn_alpha_scaling"]
 normalize_covariances = settings["normalize_covariances"]
 learning_rate = settings["learning_rate"]
-alpha_temperature = settings["alpha_temperature"]
+learn_alpha_temperature = settings["learn_alpha_temperature"]
+initial_alpha_temperature = settings["initial_alpha_temperature"]
 cov_init_type = "random"
 
 # Load functional data from a pre-processed MATLAB object
@@ -106,6 +107,8 @@ model = RIGO(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
+    learn_alpha_temperature=learn_alpha_temperature,
+    alpha_temperature=alpha_temperature,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
     do_kl_annealing=do_kl_annealing,
@@ -113,7 +116,6 @@ model = RIGO(
     n_epochs_kl_annealing=n_epochs_kl_annealing,
     learning_rate=learning_rate,
     multi_gpu=multi_gpu,
-    alpha_temperature=alpha_temperature,
 )
 model.summary()
 
