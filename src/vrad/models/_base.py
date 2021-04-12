@@ -16,7 +16,11 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
-from vrad.inference.callbacks import KLAnnealingCallback, SaveBestCallback
+from vrad.inference.callbacks import (
+    AlphaTemperatureAnnealingCallback,
+    KLAnnealingCallback,
+    SaveBestCallback,
+)
 from vrad.inference.tf_ops import tensorboard_run_logdir
 from vrad.utils.misc import check_iterable_type, class_from_yaml
 from vrad.utils.model import HTMLTable, LatexTable
@@ -130,7 +134,8 @@ class Base:
 
     def create_callbacks(
         self,
-        no_kl_annealing_callback: bool,
+        kl_annealing_callback: bool,
+        alpha_temperature_annealing_callback: bool,
         use_tqdm: bool,
         tqdm_class,
         use_tensorboard: bool,
@@ -142,8 +147,10 @@ class Base:
 
         Parameters
         ----------
-        no_kl_annealing_callback : bool
-            Should we NOT update the kl_annealing factor during training?
+        kl_annealing_callback : bool
+            Should we update the kl_annealing factor during training?
+        alpha_temperature_annealing_callback : bool
+            Should we update the alpha temperature annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -166,14 +173,23 @@ class Base:
         """
         additional_callbacks = []
 
-        # Callback for KL kl_annealing
-        if not no_kl_annealing_callback:
+        # Callback for KL annealing
+        if kl_annealing_callback:
             kl_annealing_callback = KLAnnealingCallback(
                 kl_annealing_factor=self.kl_annealing_factor,
-                kl_annealing_sharpness=self.kl_annealing_sharpness,
-                n_epochs_kl_annealing=self.n_epochs_kl_annealing,
+                annealing_sharpness=self.kl_annealing_sharpness,
+                n_epochs_annealing=self.n_epochs_kl_annealing,
             )
             additional_callbacks.append(kl_annealing_callback)
+
+        # Callback for alpha temperature annealing
+        if alpha_temperature_annealing_callback:
+            alpha_temperature_annealing_callback = AlphaTemperatureAnnealingCallback(
+                initial_alpha_temperature=self.initial_alpha_temperature,
+                final_alpha_temperature=self.final_alpha_temperature,
+                n_epochs_annealing=self.n_epochs_alpha_temperature_annealing,
+            )
+            additional_callbacks.append(alpha_temperature_annealing_callback)
 
         # Callback to display a progress bar with tqdm
         if use_tqdm:

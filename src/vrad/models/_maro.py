@@ -143,7 +143,8 @@ class MARO(models.Base):
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                True,
+                False,
+                False,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,

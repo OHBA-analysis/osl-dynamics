@@ -25,9 +25,9 @@ batch_size = 64
 learning_rate = 0.01
 n_epochs = 200
 
-do_annealing = True
-annealing_sharpness = 10
-n_epochs_annealing = 100
+do_kl_annealing = True
+kl_annealing_sharpness = 10
+n_epochs_kl_annealing = 100
 
 rnn_type = "lstm"
 rnn_normalization = "layer"
@@ -43,10 +43,13 @@ dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
 alpha_xform = "gumbel-softmax"
-alpha_temperature = 1.0
-learn_alpha_scaling = False
+do_alpha_temperature_annealing = False
+initial_alpha_temperature = 1.0
+final_alpha_temperature = 0.1
+n_epochs_alpha_temperature_annealing = n_epochs_kl_annealing
 
 learn_covariances = False
+learn_alpha_scaling = False
 normalize_covariances = False
 
 # Read MEG data
@@ -83,12 +86,15 @@ model = RIGO(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
-    alpha_temperature=alpha_temperature,
+    do_alpha_temperature_annealing=do_alpha_temperature_annealing,
+    initial_alpha_temperature=initial_alpha_temperature,
+    final_alpha_temperature=final_alpha_temperature,
+    n_epochs_alpha_temperature_annealing=n_epochs_alpha_temperature_annealing,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
-    do_annealing=do_annealing,
-    annealing_sharpness=annealing_sharpness,
-    n_epochs_annealing=n_epochs_annealing,
+    do_kl_annealing=do_kl_annealing,
+    kl_annealing_sharpness=kl_annealing_sharpness,
+    n_epochs_kl_annealing=n_epochs_kl_annealing,
     learning_rate=learning_rate,
     multi_gpu=multi_gpu,
 )
@@ -98,7 +104,7 @@ print("Training model")
 history = model.fit(
     training_dataset,
     epochs=n_epochs,
-    save_best_after=n_epochs_annealing,
+    save_best_after=max(n_epochs_kl_annealing, n_epochs_alpha_temperature_annealing),
     save_filepath="tmp/model",
 )
 

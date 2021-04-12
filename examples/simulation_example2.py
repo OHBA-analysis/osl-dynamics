@@ -47,10 +47,11 @@ dropout_rate_inference = 0.0
 dropout_rate_model = 0.0
 
 alpha_xform = "softmax"
+do_alpha_temperature_annealing = False
 alpha_temperature = 0.25
-learn_alpha_scaling = False
 
 learn_covariances = True
+learn_alpha_scaling = False
 normalize_covariances = False
 
 # Load covariances for each state
@@ -92,6 +93,7 @@ model = RIGO(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
+    do_alpha_temperature_annealing=do_alpha_temperature_annealing,
     alpha_temperature=alpha_temperature,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,

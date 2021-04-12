@@ -104,13 +104,17 @@ class RIGO(models.GO):
         dropout_rate_model: float,
         theta_normalization: str,
         alpha_xform: str,
-        alpha_temperature: float,
+        do_alpha_temperature_annealing: bool,
         learn_alpha_scaling: bool,
         normalize_covariances: bool,
         do_kl_annealing: bool,
-        kl_annealing_sharpness: float,
-        n_epochs_kl_annealing: int,
         learning_rate: float,
+        alpha_temperature: float = None,
+        initial_alpha_temperature: float = None,
+        final_alpha_temperature: float = None,
+        n_epochs_alpha_temperature_annealing: int = None,
+        kl_annealing_sharpness: float = None,
+        n_epochs_kl_annealing: int = None,
         multi_gpu: bool = False,
         strategy: str = None,
         initial_covariances: np.ndarray = None,
@@ -130,13 +134,31 @@ class RIGO(models.GO):
                 "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or 'relu'."
             )
 
-        if kl_annealing_sharpness <= 0:
-            raise ValueError("kl_annealing_sharpness must be greater than zero.")
+        if do_kl_annealing:
+            if kl_annealing_sharpness <= 0:
+                raise ValueError("kl_annealing_sharpness must be greater than zero.")
 
-        if n_epochs_kl_annealing < 0:
-            raise ValueError(
-                "n_epochs_kl_annealing must be equal to or greater than zero."
-            )
+            if n_epochs_kl_annealing < 0:
+                raise ValueError(
+                    "n_epochs_kl_annealing must be equal to or greater than zero."
+                )
+
+        if do_alpha_temperature_annealing:
+            if initial_alpha_temperature is None:
+                raise ValueError("initial_alpha_temperature must be passed.")
+
+            if final_alpha_temperature is None:
+                raise ValueError("final_alpha_temperature must be passed.")
+
+            if n_epochs_alpha_temperature_annealing < 0:
+                raise ValueError(
+                    "n_epochs_alpha_temperature_annealing must be equal to or greater than zero."
+                )
+        elif alpha_temperature is None:
+            if initial_alpha_temperature is not None:
+                alpha_temperature = initial_alpha_temperature
+            else:
+                raise ValueError("alpha_temperature must be passed.")
 
         # RNN and inference hyperparameters
         self.rnn_type = rnn_type
@@ -149,13 +171,22 @@ class RIGO(models.GO):
         self.dropout_rate_model = dropout_rate_model
         self.theta_normalization = theta_normalization
         self.alpha_xform = alpha_xform
-        self.alpha_temperature = alpha_temperature
 
         # KL annealing
         self.do_kl_annealing = do_kl_annealing
         self.kl_annealing_factor = Variable(0.0) if do_kl_annealing else Variable(1.0)
         self.kl_annealing_sharpness = kl_annealing_sharpness
         self.n_epochs_kl_annealing = n_epochs_kl_annealing
+
+        # Alpha temperature annealing
+        self.do_alpha_temperature_annealing = do_alpha_temperature_annealing
+        self.initial_alpha_temperature = initial_alpha_temperature
+        if do_alpha_temperature_annealing:
+            self.alpha_temperature = initial_alpha_temperature
+        else:
+            self.alpha_temperature = alpha_temperature
+        self.final_alpha_temperature = final_alpha_temperature
+        self.n_epochs_alpha_temperature_annealing = n_epochs_alpha_temperature_annealing
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
@@ -216,7 +247,8 @@ class RIGO(models.GO):
     def fit(
         self,
         *args,
-        no_annealing_callback=False,
+        kl_annealing_callback=None,
+        alpha_temperature_annealing_callback=None,
         use_tqdm=False,
         tqdm_class=None,
         use_tensorboard=None,
@@ -231,8 +263,10 @@ class RIGO(models.GO):
 
         Parameters
         ----------
-        no_annealing_callback : bool
-            Should we NOT update the annealing factor during training?
+        kl_annealing_callback : bool
+            Should we update the KL annealing factor during training?
+        alpha_temperature_annealing_callback : bool
+            Should we update the alpha temperature annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -256,11 +290,18 @@ class RIGO(models.GO):
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
 
+        if kl_annealing_callback is None:
+            kl_annealing_callback = self.do_kl_annealing
+
+        if alpha_temperature_annealing_callback is None:
+            alpha_temperature_annealing_callback = self.do_alpha_temperature_annealing
+
         args, kwargs = replace_argument(
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                no_annealing_callback,
+                kl_annealing_callback,
+                alpha_temperature_annealing_callback,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
@@ -284,6 +325,9 @@ class RIGO(models.GO):
         initializers.reinitialize_model_weights(self.model)
         if self.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
+        if self.do_alpha_temperature_annealing:
+            alpha_layer = self.model.get_layer("alpha")
+            alpha_layer.alpha_temperature = self.initial_alpha_temperature
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
@@ -403,6 +447,17 @@ class RIGO(models.GO):
         # Make means and covariances trainable again and compile
         means_covs_layer.trainable = True
         self.compile()
+
+    def get_alpha_temperature(self) -> float:
+        """Alpha temperature used in the model.
+
+        Returns
+        -------
+        float
+            Alpha temperature.
+        """
+        alpha_layer = self.model.get_layer("alpha")
+        return alpha_layer.alpha_temperature
 
     def sample_alpha(self, n_samples: int) -> np.ndarray:
         """Uses the model RNN to sample state mixing factors, alpha.

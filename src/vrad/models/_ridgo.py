@@ -197,7 +197,7 @@ class RIDGO(models.GO):
     def fit(
         self,
         *args,
-        no_annealing_callback=False,
+        kl_annealing_callback=True,
         use_tqdm=False,
         tqdm_class=None,
         use_tensorboard=None,
@@ -212,7 +212,7 @@ class RIDGO(models.GO):
 
         Parameters
         ----------
-        no_annealing_callback : bool
+        kl_annealing_callback : bool
             Should we NOT update the annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
@@ -241,7 +241,8 @@ class RIDGO(models.GO):
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                no_annealing_callback,
+                kl_annealing_callback,
+                True,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,

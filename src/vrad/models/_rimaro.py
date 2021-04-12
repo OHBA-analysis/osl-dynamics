@@ -219,7 +219,7 @@ class RIMARO(models.MARO):
     def fit(
         self,
         *args,
-        no_annealing_callback=False,
+        kl_annealing_callback=True,
         use_tqdm=False,
         tqdm_class=None,
         use_tensorboard=None,
@@ -234,8 +234,8 @@ class RIMARO(models.MARO):
 
         Parameters
         ----------
-        no_annealing_callback : bool
-            Should we NOT update the annealing factor during training?
+        kl_annealing_callback : bool
+            Should we update the annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -263,7 +263,8 @@ class RIMARO(models.MARO):
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                no_annealing_callback,
+                kl_annealing_callback,
+                False,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
