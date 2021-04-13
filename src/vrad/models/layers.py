@@ -248,7 +248,12 @@ class ThetaActivationLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({"alpha_xform": self.alpha_xform})
+        config.update(
+            {
+                "alpha_xform": self.alpha_xform,
+                "initial_alpha_temperature": self.initial_alpha_temperature,
+            }
+        )
         return config
 
 
