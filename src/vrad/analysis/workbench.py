@@ -84,21 +84,27 @@ def render(
     dense_timeseries(cifti=cifti_right, output=output_right, left_or_right="right")
     dense_timeseries(cifti=cifti_left, output=output_left, left_or_right="left")
 
+    temp_scene = str(save_dir) + "/temp_scene.scene"
+
     if image_name:
         image(
             cifti_left=cifti_left,
             cifti_right=cifti_right,
             file_name=image_name,
             inflation=inflation,
+            temp_scene=temp_scene,
         )
 
     if gui:
-        visualise(cifti_left=cifti_left, cifti_right=cifti_right, inflation=inflation)
+        visualise(
+            cifti_left=cifti_left,
+            cifti_right=cifti_right,
+            inflation=inflation,
+            temp_scene=temp_scene,
+        )
 
 
-def create_scene(
-    cifti_left, cifti_right, inflation, temp_scene=pathlib.Path("temp_scene.scene")
-):
+def create_scene(cifti_left, cifti_right, inflation, temp_scene):
     scene_file = state_scene
     temp_scene = pathlib.Path(temp_scene)
 
@@ -112,19 +118,22 @@ def create_scene(
     temp_scene.write_text(scene)
 
 
-def visualise(cifti_left, cifti_right, inflation=0):
+def visualise(cifti_left, cifti_right, inflation=0, temp_scene=None):
     surface = surfs.get(inflation, None)
-    create_scene(cifti_left, cifti_right, inflation)
     if surface is None:
         _logger.warning(
             f"Inflation of {inflation} is not a valid selection. Using '0' instead."
         )
 
+    if temp_scene is None:
+        temp_scene = "temp_scene.scene"
+    create_scene(cifti_left, cifti_right, inflation, temp_scene)
+
     subprocess.run(
         [
             "wb_view",
             "-scene-load-hd",
-            "temp_scene.scene",
+            temp_scene,
             "ready",
             *surface,
             cifti_left,
@@ -132,13 +141,17 @@ def visualise(cifti_left, cifti_right, inflation=0):
         ]
     )
 
+    pathlib.Path(temp_scene).unlink()
 
-def image(cifti_left, cifti_right, file_name: str, inflation=0):
+
+def image(cifti_left, cifti_right, file_name, inflation=0, temp_scene=None):
     file_path = pathlib.Path(file_name)
     suffix = file_path.suffix or ".png"
     file_path = file_path.with_suffix("")
 
-    create_scene(cifti_left, cifti_right, inflation)
+    if temp_scene is None:
+        temp_scene = "temp_scene.scene"
+    create_scene(cifti_left, cifti_right, inflation, temp_scene)
 
     n_states = nib.load(cifti_left).shape[0]
     max_int_length = len(str(n_states))
@@ -151,7 +164,7 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
             [
                 "wb_command",
                 "-show-scene",
-                "temp_scene.scene",
+                temp_scene,
                 "ready",
                 file_pattern.format(i),
                 "0",
@@ -164,7 +177,7 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
             capture_output=True,
         )
 
-    pathlib.Path("temp_scene.scene").unlink()
+    pathlib.Path(temp_scene).unlink()
 
 
 def volume_to_surface(nii, surf, output, interptype="trilinear"):
