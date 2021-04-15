@@ -370,29 +370,6 @@ class RIDGO(models.GO):
         free_energy = ll_loss + kl_loss
         return free_energy
 
-    def burn_in(self, *args, **kwargs):
-        """Burn-in training phase.
-
-        Fits the model with means and covariances non-trainable.
-        """
-        if check_arguments(args, kwargs, 3, "epochs", 1, lt):
-            _logger.warning(
-                "Number of burn-in epochs is less than 1. Skipping burn-in."
-            )
-            return
-
-        # Make means and covariances non-trainable and compile
-        means_covs_layer = self.model.get_layer("means_covs")
-        means_covs_layer.trainable = False
-        self.compile()
-
-        # Train the model
-        self.fit(*args, **kwargs)
-
-        # Make means and covariances trainable again and compile
-        means_covs_layer.trainable = True
-        self.compile()
-
     def sample(self, n_samples: int) -> np.ndarray:
         """Uses the model RNN to sample a state time course.
 

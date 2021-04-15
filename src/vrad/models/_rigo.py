@@ -445,10 +445,26 @@ class RIGO(models.GO):
         free_energy = ll_loss + kl_loss
         return free_energy
 
-    def burn_in(self, *args, **kwargs):
+    def burn_in(
+        self,
+        *args,
+        learn_covariances: bool = False,
+        learn_alpha_temperature: bool = False,
+        **kwargs,
+    ):
         """Burn-in training phase.
 
-        Fits the model with means and covariances non-trainable.
+        Fits the model with means and covariances or alpha_temperature
+        non-trainable.
+
+        Parameters
+        ----------
+        learn_covariances : bool
+            Should we learn the means and covariances during the burn-in training?
+            Optional, default is False.
+        learn_alpha_temperature : bool
+            Should we learn the alpha temperature during the burn-in taining?
+            Optional, default is False.
         """
         if check_arguments(args, kwargs, 3, "epochs", 1, lt):
             _logger.warning(
@@ -457,16 +473,29 @@ class RIGO(models.GO):
             return
 
         # Make means and covariances non-trainable and compile
-        means_covs_layer = self.model.get_layer("means_covs")
-        means_covs_layer.trainable = False
-        self.compile()
+        if not learn_covariances:
+            means_covs_layer = self.model.get_layer("means_covs")
+            means_covs_layer.trainable = False
+            self.compile()
+
+        # Make alpha temperature non-trainable and compile
+        if not learn_alpha_temperature:
+            alpha_layer = self.model.get_layer("alpha_layer")
+            alpha_layer.trainable = False
+            self.compile()
 
         # Train the model
         self.fit(*args, **kwargs)
 
         # Make means and covariances trainable again and compile
-        means_covs_layer.trainable = True
-        self.compile()
+        if not learn_covariances:
+            means_covs_layer.trainable = True
+            self.compile()
+
+        # Make alpha temperature trainable again and compile
+        if not learn_alpha_temperature:
+            alpha_layer.trainable = True
+            self.compile()
 
     def get_alpha_temperature(self) -> float:
         """Alpha temperature used in the model.
