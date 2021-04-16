@@ -1,16 +1,14 @@
-"""Class for a Gaussian observation model.
+"""Class for a multivariate autoregressive observation model.
 
 """
 
 import numpy as np
-from tensorflow.keras import Model, layers, optimizers
-from vrad import models
-from vrad.inference import initializers, losses
+from tensorflow.keras import Model, layers
+from vrad.models.obs_mod_base import ObservationModelBase
 from vrad.models.layers import LogLikelihoodLayer, MARMeanCovLayer, MARParametersLayer
-from vrad.utils.misc import replace_argument
 
 
-class MARO(models.Base):
+class MARO(ObservationModelBase):
     """Multivariate Autoregressive Observations (MARO) model.
 
     Parameters
@@ -18,86 +16,15 @@ class MARO(models.Base):
     config : vrad.models.Config
     """
 
-    def __init__(self, config: models.Config):
+    def __init__(self, config):
         if config.observation_model != "multivariate_autoregressive":
             raise ValueError("Observation model must be multivariate_autoregressive.")
 
-        # The base class will build and compile the keras model
-        super().__init__(config)
+        ObservationModelBase.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
-
-    def compile(self):
-        """Wrapper for the standard keras compile method."""
-        self.model.compile(
-            optimizer=self.config.optimizer, loss=[losses.ModelOutputLoss()]
-        )
-
-    def fit(
-        self,
-        *args,
-        use_tqdm=False,
-        tqdm_class=None,
-        use_tensorboard=None,
-        tensorboard_dir=None,
-        save_best_after=None,
-        save_filepath=None,
-        **kwargs,
-    ):
-        """Wrapper for the standard keras fit method.
-
-        Adds callbacks and then trains the model.
-
-        Parameters
-        ----------
-        use_tqdm : bool
-            Should we use a tqdm progress bar instead of the usual output from
-            tensorflow.
-        tqdm_class : tqdm
-            Class for the tqdm progress bar.
-        use_tensorboard : bool
-            Should we use TensorBoard?
-        tensorboard_dir : str
-            Path to the location to save the TensorBoard log files.
-        save_best_after : int
-            Epoch number after which we should save the best model. The best model is
-            that which achieves the lowest loss.
-        save_filepath : str
-            Path to save the best model to.
-
-        Returns
-        -------
-        history
-            The training history.
-        """
-        if use_tqdm:
-            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
-
-        args, kwargs = replace_argument(
-            func=self.model.fit,
-            name="callbacks",
-            item=self.create_callbacks(
-                use_tqdm,
-                tqdm_class,
-                use_tensorboard,
-                tensorboard_dir,
-                save_best_after,
-                save_filepath,
-                additional_callbacks=[],
-            ),
-            args=args,
-            kwargs=kwargs,
-            append=True,
-        )
-
-        return self.model.fit(*args, **kwargs)
-
-    def reset_weights(self):
-        """Reset the model as if you've built a new model."""
-        self.compile()
-        initializers.reinitialize_model_weights(self.model)
 
     def get_params(self):
         """Get the parameters of the MAR model.
@@ -135,7 +62,7 @@ class MARO(models.Base):
         mar_params_layer.set_weights(layer_weights)
 
 
-def _model_structure(config: models.Config):
+def _model_structure(config):
 
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")

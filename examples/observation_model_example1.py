@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import tf_ops
-from vrad.models import config, GO
+from vrad.models import Config, ObservationModel
 from vrad.utils import plotting
 
 # GPU settings
@@ -20,24 +20,6 @@ n_samples = 25600
 observation_error = 0.2
 gamma_shape = 20
 gamma_scale = 10
-
-dimensions = config.Dimensions(
-    n_states=5,
-    n_channels=80,
-    sequence_length=200,
-)
-
-observation_model = config.ObservationModel(
-    model="multivariate_normal",
-    learn_alpha_scaling=False,
-    normalize_covariances=False,
-)
-
-training = config.Training(
-    batch_size=16,
-    learning_rate=0.01,
-    n_epochs=20,
-)
 
 # Load state transition probability matrix and covariances of each state
 example_file_directory = Path(__file__).parent / "files"
@@ -63,19 +45,31 @@ sim = simulation.MixedHSMM_MVN(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
+# Settings
+config = Config(
+    n_states=sim.n_states,
+    n_channels=sim.n_channels,
+    sequence_length=200,
+    learn_alpha_scaling=False,
+    normalize_covariances=False,
+    batch_size=16,
+    learning_rate=0.01,
+    n_epochs=20,
+)
+
 # Prepare dataset
 training_dataset = meg_data.training_dataset(
-    dimensions.sequence_length,
-    training.batch_size,
+    config.sequence_length,
+    config.batch_size,
     alpha=[sim.state_time_course],
 )
 
 # Build model
-model = GO(dimensions, observation_model, training)
+model = ObservationModel(config)
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=training.n_epochs)
+history = model.fit(training_dataset, epochs=config.n_epochs)
 
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")

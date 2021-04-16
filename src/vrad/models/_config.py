@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
+from vrad.utils.decorators import pass_if_all_none
 
 
 @dataclass
@@ -17,6 +18,9 @@ class Config:
 
     Alpha Parameters
     ----------------
+    alpha_pdf : str
+        Probability distribution used to generate alpha. Either 'normal' or
+        'dirichlet'.
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
@@ -106,7 +110,8 @@ class Config:
     kl_annealing_curve : str
         Type of KL annealing curve. Either 'linear' or 'tanh'.
     kl_annealing_sharpness : float
-        Parameter to control the shape of the annealing curve if kl_annealing_curve='tanh'.
+        Parameter to control the shape of the annealing curve if
+        kl_annealing_curve='tanh'.
     n_epochs_kl_annealing : int
         Number of epochs to perform KL annealing.
 
@@ -125,6 +130,10 @@ class Config:
     strategy : str
         Strategy for distributed learning.
     """
+
+    # Parameters related to the model choice
+    alpha_pdf: str = "normal"
+    observation_model: str = "multivariate_normal"
 
     # Dimension parameters
     n_states: int = None
@@ -157,8 +166,6 @@ class Config:
     n_epochs_alpha_temperature_annealing: int = None
 
     # Observation model parameters
-    observation_model: str = None
-
     learn_covariances: bool = None
     learn_alpha_scaling: bool = None
     normalize_covariances: bool = None
@@ -185,6 +192,10 @@ class Config:
     strategy: str = None
 
     def __post_init__(self):
+        validate_model_choice_parameters(
+            self.alpha_pdf,
+            self.observation_model,
+        )
         validate_dimension_parameters(
             self.n_states, self.n_channels, self.sequence_length
         )
@@ -251,6 +262,19 @@ class Config:
             self.strategy = get_strategy()
 
 
+def validate_model_choice_parameters(alpha_pdf, observation_model):
+
+    if alpha_pdf not in ["normal", "dirichlet"]:
+        raise ValueError("alpha_pdf must be 'normal' or 'dirichlet'.")
+
+    if observation_model not in ["multivariate_normal", "multivariate_autoregressive"]:
+        raise ValueError(
+            "observation_model must be 'multivariate_normal' or "
+            + "'multivariate_autoregressive'."
+        )
+
+
+@pass_if_all_none
 def validate_alpha_parameters(
     theta_normalization,
     alpha_xform,
@@ -271,7 +295,8 @@ def validate_alpha_parameters(
     if "softmax" in alpha_xform:
         if learn_alpha_temperature is None and do_alpha_temperature_annealing is None:
             raise ValueError(
-                "Either learn_alpha_temperature or do_alpha_temperature_annealing must be passed."
+                "Either learn_alpha_temperature or do_alpha_temperature_annealing "
+                + "must be passed."
             )
 
         if initial_alpha_temperature is None:
@@ -323,6 +348,7 @@ def validate_dimension_parameters(n_states, n_channels, sequence_length):
         raise ValueError("sequence_length must be one or greater.")
 
 
+@pass_if_all_none
 def validate_kl_annealing_parameters(
     do_kl_annealing, kl_annealing_curve, kl_annealing_sharpness, n_epochs_kl_annealing
 ):
@@ -340,7 +366,8 @@ def validate_kl_annealing_parameters(
 
         if n_epochs_kl_annealing is None:
             raise ValueError(
-                "If we are performing KL annealing, n_epochs_kl_annealing must be passed."
+                "If we are performing KL annealing, n_epochs_kl_annealing must be "
+                + "passed."
             )
 
         if n_epochs_kl_annealing < 1:
@@ -349,7 +376,8 @@ def validate_kl_annealing_parameters(
         if kl_annealing_curve == "tanh":
             if kl_annealing_sharpness is None:
                 raise ValueError(
-                    "kl_annealing_sharpness must be passed if kl_annealing_curve='tanh'."
+                    "kl_annealing_sharpness must be passed if "
+                    + "kl_annealing_curve='tanh'."
                 )
 
             if kl_annealing_sharpness < 0:
@@ -365,15 +393,6 @@ def validate_observation_model_parameters(
     learn_coeffs,
     learn_cov,
 ):
-    if observation_model not in [
-        "multivariate_normal",
-        "multivariate_autoregressive",
-    ]:
-        raise ValueError(
-            "observation_model must be 'multivariable_normal' or "
-            + "'multivariate_autoregressive'."
-        )
-
     if observation_model == "multivariate_normal":
         if learn_covariances is None:
             learn_covariances = True
@@ -397,6 +416,7 @@ def validate_observation_model_parameters(
             learn_cov = True
 
 
+@pass_if_all_none
 def validate_rnn_parameters(rnn, n_layers, n_units, dropout_rate, normalization):
 
     if rnn not in ["gru", "lstm"]:

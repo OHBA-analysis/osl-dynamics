@@ -7,7 +7,7 @@ print("Setting up")
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import Config, RIMARO
+from vrad.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -20,13 +20,13 @@ config = Config(
     inference_rnn="lstm",
     inference_n_layers=1,
     inference_n_units=64,
-    inference_dropout_rate=0.0,
     inference_normalization="layer",
+    inference_dropout_rate=0.0,
     model_rnn="lstm",
     model_n_layers=1,
     model_n_units=64,
-    model_dropout_rate=0.0,
     model_normalization="layer",
+    model_dropout_rate=0.0,
     theta_normalization=None,
     alpha_xform="softmax",
     learn_alpha_temperature=False,
@@ -82,7 +82,7 @@ prediction_dataset = meg_data.prediction_dataset(
 )
 
 # Build model
-model = RIMARO(config)
+model = Model(config)
 model.summary()
 
 print("Training model")

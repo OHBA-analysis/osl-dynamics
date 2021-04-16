@@ -3,7 +3,7 @@ print("Setting up")
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import tf_ops
-from vrad.models import config, MARO
+from vrad.models import Config, ObservationModel
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -39,17 +39,12 @@ sim.standardize()
 meg_data = data.Data(sim.time_series)
 
 # Settings
-dimensions = config.Dimensions(
+config = Config(
     n_states=sim.n_states,
-    n_channels=meg_data.n_channels,
+    n_channels=sim.n_channels,
     sequence_length=100,
-)
-
-observation_model = config.ObservationModel(
-    model="multivariate_autoregressive", n_lags=sim.order
-)
-
-training = config.Training(
+    observation_model="multivariate_autoregressive",
+    n_lags=sim.order,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=200,
@@ -57,17 +52,17 @@ training = config.Training(
 
 # Create dataset
 training_dataset = meg_data.training_dataset(
-    dimensions.sequence_length,
-    training.batch_size,
+    config.sequence_length,
+    config.batch_size,
     alpha=[sim.state_time_course],
 )
 
 # Build model
-model = MARO(dimensions, observation_model, training)
+model = ObservationModel(config)
 model.summary()
 
 # Train the observation model
-history = model.fit(training_dataset, epochs=training.n_epochs)
+history = model.fit(training_dataset, epochs=config.n_epochs)
 
 inf_coeffs, inf_cov = model.get_params()
 

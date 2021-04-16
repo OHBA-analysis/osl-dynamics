@@ -2,15 +2,11 @@
 
 """
 
-import logging
-from operator import lt
-from typing import Tuple, Union
 
 import numpy as np
-from tensorflow import Variable
-from tensorflow.keras import Model, layers, optimizers
+from tensorflow.keras import Model, layers
 from tqdm import trange
-from vrad import models
+from vrad.models.inf_obs_mod_base import InferenceAndObservationModelBase
 from vrad.inference import callbacks, initializers, losses
 from vrad.models.layers import (
     DirichletKLDivergenceLayer,
@@ -22,12 +18,10 @@ from vrad.models.layers import (
     NormalizationLayer,
     SampleDirichletDistributionLayer,
 )
-from vrad.utils.misc import check_arguments, replace_argument
-
-_logger = logging.getLogger("VRAD")
+from vrad.utils.misc import replace_argument
 
 
-class RIDGO(models.GO):
+class RIDGO(InferenceAndObservationModelBase):
     """RNN Inference/model network, Dirichlet samples and Gaussian Observations (RIDGO).
 
     Parameters
@@ -35,31 +29,12 @@ class RIDGO(models.GO):
     config : vrad.models.Config
     """
 
-    def __init__(self, config: models.Config):
-
-        # KL annealing
-        self.kl_annealing_factor = (
-            Variable(0.0) if config.do_kl_annealing else Variable(1.0)
-        )
-
-        # Initialise the observation model
-        # This will inherit the base model, build and compile the model
-        super().__init__(config)
+    def __init__(self, config):
+        InferenceAndObservationModelBase.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
-
-    def compile(self):
-        """Wrapper for the standard keras compile method."""
-
-        # Loss function
-        ll_loss = losses.ModelOutputLoss()
-        kl_loss = losses.ModelOutputLoss(self.kl_annealing_factor)
-        loss = [ll_loss, kl_loss]
-
-        # Compile
-        self.model.compile(optimizer=self.config.optimizer, loss=loss)
 
     def fit(
         self,
@@ -146,102 +121,6 @@ class RIDGO(models.GO):
         if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
 
-    def predict(self, *args, **kwargs) -> dict:
-        """Wrapper for the standard keras predict method.
-
-        Returns
-        -------
-        dict
-            Dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, *kwargs)
-        return_names = ["ll_loss", "kl_loss", "alpha"]
-        predictions_dict = dict(zip(return_names, predictions))
-        return predictions_dict
-
-    def predict_states(
-        self, inputs, *args, concatenate: bool = False, **kwargs
-    ) -> Union[list, np.ndarray]:
-        """State mixing factors, alpha.
-
-        Parameters
-        ----------
-        inputs : tensorflow.data.Dataset
-            Prediction dataset.
-        concatenate : bool
-            Should we concatenate alpha for each subject? Optional, default
-            is False.
-
-        Returns
-        -------
-        np.ndarray
-            State mixing factors with shape (n_subjects, n_samples, n_states) or
-            (n_samples, n_states).
-        """
-        inputs = self._make_dataset(inputs)
-        outputs = []
-        for dataset in inputs:
-            alpha = self.predict(dataset, *args, **kwargs)["alpha"]
-            alpha = np.concatenate(alpha)
-            outputs.append(alpha)
-        if len(outputs) == 1:
-            outputs = outputs[0]
-        elif concatenate:
-            outputs = np.concatenate(outputs)
-        return outputs
-
-    def losses(self, dataset, return_mean: bool = False) -> Tuple[float, float]:
-        """Calculates the log-likelihood and KL loss for a dataset.
-
-        Parameters
-        ----------
-        dataset : tensorflow.data.Dataset
-            Dataset to calculate losses for.
-        return_mean : bool
-            Should we return the mean loss over batches? Otherwise we return
-            the sum. Optional, default is False.
-
-        Returns
-        -------
-        ll_loss : float
-            Negative log-likelihood loss.
-        kl_loss : float
-            KL divergence loss.
-        """
-        if return_mean:
-            mean_or_sum = np.mean
-        else:
-            mean_or_sum = np.sum
-        if isinstance(dataset, list):
-            predictions = [self.predict(subject) for subject in dataset]
-            ll_loss = mean_or_sum([mean_or_sum(p["ll_loss"]) for p in predictions])
-            kl_loss = mean_or_sum([mean_or_sum(p["kl_loss"]) for p in predictions])
-        else:
-            predictions = self.predict(dataset)
-            ll_loss = mean_or_sum(predictions["ll_loss"])
-            kl_loss = mean_or_sum(predictions["kl_loss"])
-        return ll_loss, kl_loss
-
-    def free_energy(self, dataset, return_mean: bool = False) -> float:
-        """Calculates the variational free energy of a dataset.
-
-        Parameters
-        ----------
-        dataset : tensorflow.data.Dataset
-            Dataset to calculate the variational free energy for.
-        return_mean : bool
-            Should we return the mean free energy over batches? Otherwise
-            we return the sum. Optional, default is False.
-
-        Returns
-        -------
-        float
-            Variational free energy for the dataset.
-        """
-        ll_loss, kl_loss = self.losses(dataset, return_mean=return_mean)
-        free_energy = ll_loss + kl_loss
-        return free_energy
-
     def sample(self, n_samples: int) -> np.ndarray:
         """Uses the model RNN to sample a state time course.
 
@@ -273,7 +152,7 @@ class RIDGO(models.GO):
         return stc
 
 
-def _model_structure(config: models.Config):
+def _model_structure(config):
 
     # Layer for input
     inputs = layers.Input(

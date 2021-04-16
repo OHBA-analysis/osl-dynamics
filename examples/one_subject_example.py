@@ -11,7 +11,7 @@ print("Setting up")
 from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import Config, RIGO
+from vrad.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -34,7 +34,6 @@ config = Config(
     alpha_xform="gumbel-softmax",
     learn_alpha_temperature=False,
     initial_alpha_temperature=1.0,
-    observation_model="multivariate_normal",
     learn_covariances=False,
     learn_alpha_scaling=False,
     normalize_covariances=False,
@@ -71,7 +70,7 @@ hmm = OSL_HMM("/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-1_K-6/h
 config.initial_covariances = hmm.covariances
 
 # Build model
-model = RIGO(config)
+model = Model(config)
 model.summary()
 
 print("Training model")

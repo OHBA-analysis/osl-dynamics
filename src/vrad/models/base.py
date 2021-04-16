@@ -1,6 +1,7 @@
 """Base class for models.
 
 """
+
 import pickle
 import re
 from abc import abstractmethod
@@ -13,20 +14,15 @@ from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
-from vrad import models
 from vrad.data import Data
-from vrad.inference.callbacks import (
-    AlphaTemperatureAnnealingCallback,
-    KLAnnealingCallback,
-    SaveBestCallback,
-)
+from vrad.inference import callbacks
 from vrad.inference.tf_ops import tensorboard_run_logdir
-from vrad.utils.misc import check_iterable_type, class_from_yaml
+from vrad.utils.misc import check_iterable_type, class_from_yaml, replace_argument
 from vrad.utils.model import HTMLTable, LatexTable
 
 
 class Base:
-    """Base class for models.
+    """Base class for all models.
 
     Acts as a wrapper for a standard Keras model.
 
@@ -35,7 +31,7 @@ class Base:
     config : vrad.models.Config
     """
 
-    def __init__(self, config: models.Config):
+    def __init__(self, config):
         self._identifier = np.random.randint(100000)
         self.config = config
 
@@ -163,7 +159,7 @@ class Base:
         if save_best_after is not None:
             if save_filepath is None:
                 save_filepath = f"/tmp/model_weights/best_{self._identifier}"
-            save_best_callback = SaveBestCallback(
+            save_best_callback = callbacks.SaveBestCallback(
                 save_best_after=save_best_after,
                 filepath=save_filepath,
             )
