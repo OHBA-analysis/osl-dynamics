@@ -33,54 +33,23 @@ class RIGO(models.GO):
 
     Parameters
     ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of the data in the model.
-    inference_network : vrad.models.config.RNN
-        Inference network hyperparameters.
-    model_network : vrad.models.config.RNN
-        Model network hyperparameters.
-    alpha : vrad.models.config.Alpha
-        Parameters related to alpha.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    kl_annealing : vrad.models.config.KLAnnealing
-        Parameters related to KL annealing.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
+    config : vrad.models.Config
     """
 
-    def __init__(
-        self,
-        dimensions: models.config.Dimensions,
-        inference_network: models.config.RNN,
-        model_network: models.config.RNN,
-        alpha: models.config.Alpha,
-        observation_model: models.config.ObservationModel,
-        kl_annealing: models.config.KLAnnealing,
-        training: models.config.Training,
-    ):
-        # Settings
-        self.inference_network = inference_network
-        self.model_network = model_network
-        self.alpha = alpha
-        self.kl_annealing = kl_annealing
+    def __init__(self, config: models.Config):
 
         # KL annealing
-        self.kl_annealing_factor = Variable(0.0) if kl_annealing.do else Variable(1.0)
+        self.kl_annealing_factor = (
+            Variable(0.0) if config.do_kl_annealing else Variable(1.0)
+        )
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
-        super().__init__(dimensions, observation_model, training)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(
-            self.dimensions,
-            self.inference_network,
-            self.model_network,
-            self.alpha,
-            self.observation_model,
-        )
+        self.model = _model_structure(self.config)
 
     def compile(self):
         """Wrapper for the standard keras compile method."""
@@ -91,7 +60,7 @@ class RIGO(models.GO):
         loss = [ll_loss, kl_loss]
 
         # Compile
-        self.model.compile(optimizer=self.training.optimizer, loss=loss)
+        self.model.compile(optimizer=self.config.optimizer, loss=loss)
 
     def fit(
         self,
@@ -142,25 +111,25 @@ class RIGO(models.GO):
         additional_callbacks = []
 
         if kl_annealing_callback is None:
-            kl_annealing_callback = self.kl_annealing.do
+            kl_annealing_callback = self.config.do_kl_annealing
 
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
                 kl_annealing_factor=self.kl_annealing_factor,
-                annealing_sharpness=self.kl_annealing.sharpness,
-                n_epochs_annealing=self.kl_annealing.n_epochs,
+                annealing_sharpness=self.config.kl_annealing_sharpness,
+                n_epochs_annealing=self.config.n_epochs_kl_annealing,
             )
             additional_callbacks.append(kl_annealing_callback)
 
         if alpha_temperature_annealing_callback is None:
-            alpha_temperature_annealing_callback = self.alpha.learn_temperature
+            alpha_temperature_annealing_callback = self.config.learn_alpha_temperature
 
         if alpha_temperature_annealing_callback:
             alpha_temperature_annealing_callback = (
                 callbacks.AlphaTemperatureAnnealingCallback(
-                    initial_alpha_temperature=self.alpha.initial_temperature,
-                    final_alpha_temperature=self.alpha.final_temperature,
-                    n_epochs_annealing=self.alpha.n_epochs_annealing,
+                    initial_alpha_temperature=self.config.initial_alpha_temperature,
+                    final_alpha_temperature=self.config.final_alpha_temperature,
+                    n_epochs_annealing=self.config.n_epochs_alpha_temperature_annealing,
                 )
             )
             additional_callbacks.append(alpha_temperature_annealing_callback)
@@ -191,11 +160,11 @@ class RIGO(models.GO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.kl_annealing.do:
+        if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
-        if self.alpha.do_annealing:
+        if self.config.do_alpha_temperature_annealing:
             alpha_layer = self.model.get_layer("alpha")
-            alpha_layer.alpha_temperature = self.alpha.initial_temperature
+            alpha_layer.alpha_temperature = self.config.initial_alpha_temperature
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
@@ -227,7 +196,7 @@ class RIGO(models.GO):
         -------
         np.ndarray
             State mixing factors with shape (n_subjects, n_samples,
-            dimensions.n_states) or (n_samples, dimensions.n_states).
+            n_states) or (n_samples, n_states).
         """
         inputs = self._make_dataset(inputs)
         outputs = []
@@ -379,20 +348,20 @@ class RIGO(models.GO):
 
         # Sequence of the underlying logits theta
         theta_norm = np.zeros(
-            [self.dimensions.sequence_length, self.dimensions.n_states],
+            [self.config.sequence_length, self.config.n_states],
             dtype=np.float32,
         )
 
         # Normally distributed random numbers used to sample the logits theta
-        epsilon = np.random.normal(
-            0, 1, [n_samples + 1, self.dimensions.n_states]
-        ).astype(np.float32)
+        epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_states]).astype(
+            np.float32
+        )
 
         # Activate the first state for the first sample
         theta_norm[-1, 0] = 1
 
         # Sample the state fixing factors
-        alpha = np.empty([n_samples, self.dimensions.n_states], dtype=np.float32)
+        alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
             # If there are leading zeros we trim theta so that we don't pass the zeros
@@ -421,41 +390,11 @@ class RIGO(models.GO):
         return alpha
 
 
-def _model_structure(
-    dimensions: models.config.Dimensions,
-    inference_network: models.config.RNN,
-    model_network: models.config.RNN,
-    alpha: models.config.Alpha,
-    observation_model: models.config.ObservationModel,
-):
-    """Model structure.
-
-    Parameters
-    ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of the data in the model.
-    inference_network : vrad.models.config.RNN
-        Inference network hyperparameters.
-    model_network : vrad.models.config.RNN
-        Model network hyperparameters.
-    alpha : vrad.models.config.Alpha
-        Parameters related to alpha.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    kl_annealing : vrad.models.config.KLAnnealing
-        Parameters related to KL annealing.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
-
-    Returns
-    -------
-    tensorflow.keras.Model
-        Keras model built using the functional API.
-    """
+def _model_structure(config: models.Config):
 
     # Layer for input
     inputs = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+        shape=(config.sequence_length, config.n_channels), name="data"
     )
 
     # Inference RNN:
@@ -465,29 +404,29 @@ def _model_structure(
 
     # Definition of layers
     inference_input_dropout_layer = layers.Dropout(
-        inference_network.dropout_rate, name="data_drop"
+        config.inference_dropout_rate, name="data_drop"
     )
     inference_output_layers = InferenceRNNLayers(
-        inference_network.rnn,
-        inference_network.normalization,
-        inference_network.n_layers,
-        inference_network.n_units,
-        inference_network.dropout_rate,
+        config.inference_rnn,
+        config.inference_normalization,
+        config.inference_n_layers,
+        config.inference_n_units,
+        config.inference_dropout_rate,
         name="inf_rnn",
     )
-    inf_mu_layer = layers.Dense(dimensions.n_states, name="inf_mu")
+    inf_mu_layer = layers.Dense(config.n_states, name="inf_mu")
     inf_sigma_layer = layers.Dense(
-        dimensions.n_states, activation="softplus", name="inf_sigma"
+        config.n_states, activation="softplus", name="inf_sigma"
     )
 
     # Layers to sample theta from q(theta) and to convert to state mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
-    theta_norm_layer = NormalizationLayer(alpha.theta_normalization, name="theta_norm")
+    theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = ThetaActivationLayer(
-        alpha.xform,
-        alpha.initial_temperature,
-        alpha.learn_temperature,
+        config.alpha_xform,
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
         name="alpha",
     )
 
@@ -508,19 +447,19 @@ def _model_structure(
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
+        config.n_states,
+        config.n_channels,
         learn_means=False,
-        learn_covariances=observation_model.learn_covariances,
-        normalize_covariances=observation_model.normalize_covariances,
+        learn_covariances=config.learn_covariances,
+        normalize_covariances=config.normalize_covariances,
         initial_means=None,
-        initial_covariances=observation_model.initial_covariances,
+        initial_covariances=config.initial_covariances,
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        observation_model.learn_alpha_scaling,
+        config.n_states,
+        config.n_channels,
+        config.learn_alpha_scaling,
         name="mix_means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
@@ -537,19 +476,19 @@ def _model_structure(
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
-        model_network.dropout_rate, name="theta_norm_drop"
+        config.model_dropout_rate, name="theta_norm_drop"
     )
     model_output_layers = ModelRNNLayers(
-        model_network.rnn,
-        model_network.normalization,
-        model_network.n_layers,
-        model_network.n_units,
-        model_network.dropout_rate,
+        config.model_rnn,
+        config.model_normalization,
+        config.model_n_layers,
+        config.model_n_units,
+        config.model_dropout_rate,
         name="mod_rnn",
     )
-    mod_mu_layer = layers.Dense(dimensions.n_states, name="mod_mu")
+    mod_mu_layer = layers.Dense(config.n_states, name="mod_mu")
     mod_sigma_layer = layers.Dense(
-        dimensions.n_states, activation="softplus", name="mod_sigma"
+        config.n_states, activation="softplus", name="mod_sigma"
     )
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 

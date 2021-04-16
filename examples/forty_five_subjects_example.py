@@ -12,56 +12,37 @@ import numpy as np
 from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import config, RIGO
+from vrad.models import Config, RIGO
 
 # GPU settings
 tf_ops.gpu_growth()
 
 # Settings
-dimensions = config.Dimensions(
+config = Config(
     n_states=6,
-    n_channels=80,
     sequence_length=400,
-)
-
-inference_network = config.RNN(
-    rnn="lstm",
-    n_layers=1,
-    n_units=64,
-    dropout_rate=0.0,
-    normalization="layer",
-)
-
-model_network = config.RNN(
-    rnn="lstm",
-    n_layers=1,
-    n_units=64,
-    dropout_rate=0.0,
-    normalization="layer",
-)
-
-alpha = config.Alpha(
+    inference_rnn="lstm",
+    inference_n_layers=1,
+    inference_n_units=64,
+    inference_dropout_rate=0.0,
+    inference_normalization="layer",
+    model_rnn="lstm",
+    model_n_layers=1,
+    model_n_units=64,
+    model_dropout_rate=0.0,
+    model_normalization="layer",
     theta_normalization="layer",
-    xform="gumbel-softmax",
-    learn_temperature=False,
-    initial_temperature=1.0,
-)
-
-observation_model = config.ObservationModel(
-    model="multivariate_normal",
+    alpha_xform="gumbel-softmax",
+    learn_alpha_temperature=False,
+    initial_alpha_temperature=1.0,
+    observation_model="multivariate_normal",
     learn_covariances=False,
     learn_alpha_scaling=False,
     normalize_covariances=False,
-)
-
-kl_annealing = config.KLAnnealing(
-    do=True,
-    curve="tanh",
-    sharpness=10,
-    n_epochs=100,
-)
-
-training = config.Training(
+    do_kl_annealing=True,
+    kl_annealing_curve="tanh",
+    kl_annealing_sharpness=10,
+    n_epochs_kl_annealing=100,
     batch_size=128,
     learning_rate=0.01,
     n_epochs=200,
@@ -79,37 +60,31 @@ prepared_data = Data(
     n_embeddings=15,
 )
 
+config.n_channels = prepared_data.n_channels
+
 # Prepare dataset
 training_dataset = prepared_data.training_dataset(
-    dimensions.sequence_length, training.batch_size
+    config.sequence_length, config.batch_size
 )
 prediction_dataset = prepared_data.prediction_dataset(
-    dimensions.sequence_length, training.batch_size
+    config.sequence_length, config.batch_size
 )
 
 # Initialise covariances with the final HMM covariances
 hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-45_K-6/hmm.mat"
 )
-observation_model.initial_covariances = hmm.covariances
+config.initial_covariances = hmm.covariances
 
 # Build model
-model = RIGO(
-    dimensions,
-    inference_network,
-    model_network,
-    alpha,
-    observation_model,
-    kl_annealing,
-    training,
-)
+model = RIGO(config)
 model.summary()
 
 print("Training model")
 history = model.fit(
     training_dataset,
-    epochs=training.n_epochs,
-    save_best_after=kl_annealing.n_epochs,
+    epochs=config.n_epochs,
+    save_best_after=config.n_epochs_kl_annealing,
     save_filepath="tmp/model",
 )
 
@@ -122,7 +97,7 @@ alpha = model.predict_states(prediction_dataset)
 inf_stc = states.time_courses(alpha, concatenate=True)
 hmm_stc = manipulation.trim_time_series(
     time_series=hmm.state_time_course(),
-    sequence_length=dimensions.sequence_length,
+    sequence_length=config.sequence_length,
     concatenate=True,
 )
 
@@ -137,7 +112,7 @@ preprocessed_data = Data(
     ]
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=dimensions.sequence_length,
+    sequence_length=config.sequence_length,
     n_embeddings=prepared_data.n_embeddings,
 )
 

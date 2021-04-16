@@ -34,54 +34,23 @@ class RIMARO(models.MARO):
 
     Parameters
     ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of the data in the model.
-    inference_network : vrad.models.config.RNN
-        Inference network hyperparameters.
-    model_network : vrad.models.config.RNN
-        Model network hyperparameters.
-    alpha : vrad.models.config.Alpha
-        Parameters related to alpha.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    kl_annealing : vrad.models.config.KLAnnealing
-        Parameters related to KL annealing.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
+    config : vrad.models.Config
     """
 
-    def __init__(
-        self,
-        dimensions: models.config.Dimensions,
-        inference_network: models.config.RNN,
-        model_network: models.config.RNN,
-        alpha: models.config.Alpha,
-        observation_model: models.config.ObservationModel,
-        kl_annealing: models.config.KLAnnealing,
-        training: models.config.Training,
-    ):
-        # Settings
-        self.inference_network = inference_network
-        self.model_network = model_network
-        self.alpha = alpha
-        self.kl_annealing = kl_annealing
+    def __init__(self, config: models.Config):
 
         # KL annealing
-        self.kl_annealing_factor = Variable(0.0) if kl_annealing.do else Variable(1.0)
+        self.kl_annealing_factor = (
+            Variable(0.0) if config.do_kl_annealing else Variable(1.0)
+        )
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
-        super().__init__(dimensions, observation_model, training)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(
-            self.dimensions,
-            self.inference_network,
-            self.model_network,
-            self.alpha,
-            self.observation_model,
-        )
+        self.model = _model_structure(self.config)
 
     def compile(self):
         """Wrapper for the standard keras compile method."""
@@ -91,7 +60,7 @@ class RIMARO(models.MARO):
         loss = [ll_loss, kl_loss]
 
         # Compile
-        self.model.compile(optimizer=self.training.optimizer, loss=loss)
+        self.model.compile(optimizer=self.config.optimizer, loss=loss)
 
     def fit(
         self,
@@ -143,24 +112,24 @@ class RIMARO(models.MARO):
         additional_callbacks = []
 
         if kl_annealing_callback is None:
-            kl_annealing_callback = self.kl_annealing.do
+            kl_annealing_callback = self.config.do_kl_annealing
 
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
                 kl_annealing_factor=self.kl_annealing_factor,
-                annealing_sharpness=self.kl_annealing.sharpness,
-                n_epochs_annealing=self.kl_annealing.n_epochs,
+                annealing_sharpness=self.config.kl_annealing_sharpness,
+                n_epochs_annealing=self.config.n_epochs_kl_annealing,
             )
             additional_callbacks.append(kl_annealing_callback)
 
         if alpha_temperature_annealing_callback is None:
-            alpha_temperature_annealing_callback = self.alpha.learn_temperature
+            alpha_temperature_annealing_callback = self.config.learn_alpha_temperature
 
         if alpha_temperature_annealing_callback:
             alpha_temperature_annealing_callback = AlphaTemperatureAnnealingCallback(
-                initial_alpha_temperature=self.alpha.initial_temperature,
-                final_alpha_temperature=self.alpha.final_temperature,
-                n_epochs_annealing=self.alpha.n_epochs_annealing,
+                initial_alpha_temperature=self.config.initial_alpha_temperature,
+                final_alpha_temperature=self.config.final_alpha_temperature,
+                n_epochs_annealing=self.config.n_epochs_alpha_temperature_annealing,
             )
             additional_callbacks.append(alpha_temperature_annealing_callback)
 
@@ -190,11 +159,11 @@ class RIMARO(models.MARO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.kl_annealing.do:
+        if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
-        if self.alpha.do_annealing:
+        if self.config.do_alpha_temperature_annealing:
             alpha_layer = self.model.get_layer("alpha")
-            alpha_layer.alpha_temperature = self.alpha.initial_temperature
+            alpha_layer.alpha_temperature = self.config.initial_alpha_temperature
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
@@ -293,41 +262,11 @@ class RIMARO(models.MARO):
         return free_energy
 
 
-def _model_structure(
-    dimensions: models.config.Dimensions,
-    inference_network: models.config.RNN,
-    model_network: models.config.RNN,
-    alpha: models.config.Alpha,
-    observation_model: models.config.ObservationModel,
-):
-    """Model structure.
-
-    Parameters
-    ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of the data in the model.
-    inference_network : vrad.models.config.RNN
-        Inference network hyperparameters.
-    model_network : vrad.models.config.RNN
-        Model network hyperparameters.
-    alpha : vrad.models.config.Alpha
-        Parameters related to alpha.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    kl_annealing : vrad.models.config.KLAnnealing
-        Parameters related to KL annealing.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
-
-    Returns
-    -------
-    tensorflow.keras.Model
-        Keras model built using the functional API.
-    """
+def _model_structure(config: models.Config):
 
     # Layer for input
     inputs = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+        shape=(config.sequence_length, config.n_channels), name="data"
     )
 
     # Inference RNN:
@@ -337,29 +276,29 @@ def _model_structure(
 
     # Definition of layers
     inference_input_dropout_layer = layers.Dropout(
-        inference_network.dropout_rate, name="data_drop"
+        config.inference_dropout_rate, name="data_drop"
     )
     inference_output_layers = InferenceRNNLayers(
-        inference_network.rnn,
-        inference_network.normalization,
-        inference_network.n_layers,
-        inference_network.n_units,
-        inference_network.dropout_rate,
+        config.inference_rnn,
+        config.inference_normalization,
+        config.inference_n_layers,
+        config.inference_n_units,
+        config.inference_dropout_rate,
         name="inf_rnn",
     )
-    inf_mu_layer = layers.Dense(dimensions.n_states, name="inf_mu")
+    inf_mu_layer = layers.Dense(config.n_states, name="inf_mu")
     inf_sigma_layer = layers.Dense(
-        dimensions.n_states, activation="softplus", name="inf_sigma"
+        config.n_states, activation="softplus", name="inf_sigma"
     )
 
     # Layers to sample theta from q(theta) and to convert to state mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
-    theta_norm_layer = NormalizationLayer(alpha.theta_normalization, name="theta_norm")
+    theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = ThetaActivationLayer(
-        alpha.xform,
-        alpha.initial_temperature,
-        alpha.learn_temperature,
+        config.alpha_xform,
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
         name="alpha",
     )
 
@@ -382,20 +321,20 @@ def _model_structure(
 
     # Definition of layers
     mar_params_layer = MARParametersLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        observation_model.n_lags,
-        observation_model.initial_coeffs,
-        observation_model.initial_cov,
-        observation_model.learn_coeffs,
-        observation_model.learn_cov,
+        config.n_states,
+        config.n_channels,
+        config.n_lags,
+        config.initial_coeffs,
+        config.initial_cov,
+        config.learn_coeffs,
+        config.learn_cov,
         name="mar_params",
     )
     mean_cov_layer = MARMeanCovLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        dimensions.sequence_length,
-        observation_model.n_lags,
+        config.n_states,
+        config.n_channels,
+        config.sequence_length,
+        config.n_lags,
         name="mean_cov",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
@@ -412,19 +351,19 @@ def _model_structure(
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
-        model_network.dropout_rate, name="theta_norm_drop"
+        config.model_dropout_rate, name="theta_norm_drop"
     )
     model_output_layers = ModelRNNLayers(
-        model_network.rnn,
-        model_network.normalization,
-        model_network.n_layers,
-        model_network.n_units,
-        model_network.dropout_rate,
+        config.model_rnn,
+        config.model_normalization,
+        config.model_n_layers,
+        config.model_n_units,
+        config.model_dropout_rate,
         name="mod_rnn",
     )
-    mod_mu_layer = layers.Dense(dimensions.n_states, name="mod_mu")
+    mod_mu_layer = layers.Dense(config.n_states, name="mod_mu")
     mod_sigma_layer = layers.Dense(
-        dimensions.n_states, activation="softplus", name="mod_sigma"
+        config.n_states, activation="softplus", name="mod_sigma"
     )
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 

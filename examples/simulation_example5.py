@@ -7,7 +7,7 @@ print("Setting up")
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import config, RIMARO
+from vrad.models import Config, RIMARO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -15,42 +15,28 @@ tf_ops.gpu_growth()
 # Settings
 n_samples = 51200
 
-inference_network = config.RNN(
-    rnn="lstm",
-    n_layers=1,
-    n_units=64,
-    dropout_rate=0.0,
-    normalization="layer",
-)
-
-model_network = config.RNN(
-    rnn="lstm",
-    n_layers=1,
-    n_units=64,
-    dropout_rate=0.0,
-    normalization="layer",
-)
-
-alpha = config.Alpha(
+config = Config(
+    sequence_length=200,
+    inference_rnn="lstm",
+    inference_n_layers=1,
+    inference_n_units=64,
+    inference_dropout_rate=0.0,
+    inference_normalization="layer",
+    model_rnn="lstm",
+    model_n_layers=1,
+    model_n_units=64,
+    model_dropout_rate=0.0,
+    model_normalization="layer",
     theta_normalization=None,
-    xform="softmax",
-    learn_temperature=False,
-    initial_temperature=2.0,
-)
-
-observation_model = config.ObservationModel(
-    model="multivariate_autoregressive",
+    alpha_xform="softmax",
+    learn_alpha_temperature=False,
+    initial_alpha_temperature=2.0,
+    observation_model="multivariate_autoregressive",
     n_lags=2,
-)
-
-kl_annealing = config.KLAnnealing(
-    do=True,
-    curve="tanh",
-    sharpness=15,
-    n_epochs=600,
-)
-
-training = config.Training(
+    do_kl_annealing=True,
+    kl_annealing_curve="tanh",
+    kl_annealing_sharpness=15,
+    n_epochs_kl_annealing=600,
     batch_size=64,
     learning_rate=0.001,
     n_epochs=800,
@@ -86,35 +72,21 @@ sim = simulation.HMM_MAR(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
-dimensions = config.Dimensions(
-    n_states=sim.n_states,
-    n_channels=meg_data.n_channels,
-    sequence_length=200,
-)
-
+config.n_states = sim.n_states
+config.n_channels = meg_data.n_channels
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(
-    dimensions.sequence_length, training.batch_size
-)
+training_dataset = meg_data.training_dataset(config.sequence_length, config.batch_size)
 prediction_dataset = meg_data.prediction_dataset(
-    dimensions.sequence_length, training.batch_size
+    config.sequence_length, config.batch_size
 )
 
 # Build model
-model = RIMARO(
-    dimensions,
-    inference_network,
-    model_network,
-    alpha,
-    observation_model,
-    kl_annealing,
-    training,
-)
+model = RIMARO(config)
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=training.n_epochs)
+history = model.fit(training_dataset, epochs=config.n_epochs)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)

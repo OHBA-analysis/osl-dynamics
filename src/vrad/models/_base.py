@@ -13,6 +13,7 @@ from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
+from vrad import models
 from vrad.data import Data
 from vrad.inference.callbacks import (
     AlphaTemperatureAnnealingCallback,
@@ -20,7 +21,6 @@ from vrad.inference.callbacks import (
     SaveBestCallback,
 )
 from vrad.inference.tf_ops import tensorboard_run_logdir
-from vrad.models import config
 from vrad.utils.misc import check_iterable_type, class_from_yaml
 from vrad.utils.model import HTMLTable, LatexTable
 
@@ -32,28 +32,16 @@ class Base:
 
     Parameters
     ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of data in the model.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
+    config : vrad.models.Config
     """
 
-    def __init__(
-        self,
-        dimensions: config.Dimensions,
-        observation_model: config.ObservationModel,
-        training: config.Training,
-    ):
+    def __init__(self, config: models.Config):
         self._identifier = np.random.randint(100000)
-        self.dimensions = dimensions
-        self.observation_model = observation_model
-        self.training = training
+        self.config = config
 
         # Build and compile the model
         self.model = None
-        with self.training.strategy.scope():
+        with self.config.strategy.scope():
             self.build_model()
         self.compile()
 
@@ -85,26 +73,24 @@ class Base:
             Tensorflow dataset that can be used for training.
         """
         if isinstance(inputs, Data):
-            return inputs.prediction_dataset(self.dimensions.sequence_length)
+            return inputs.prediction_dataset(self.config.sequence_length)
         if isinstance(inputs, Dataset):
             return [inputs]
         if isinstance(inputs, str):
-            return [Data(inputs).prediction_dataset(self.dimensions.sequence_length)]
+            return [Data(inputs).prediction_dataset(self.config.sequence_length)]
         if isinstance(inputs, np.ndarray):
             if inputs.ndim == 2:
-                return [
-                    Data(inputs).prediction_dataset(self.dimensions.sequence_length)
-                ]
+                return [Data(inputs).prediction_dataset(self.config.sequence_length)]
             if inputs.ndim == 3:
                 return [
-                    Data(subject).prediction_dataset(self.dimensions.sequence_length)
+                    Data(subject).prediction_dataset(self.config.sequence_length)
                     for subject in inputs
                 ]
         if check_iterable_type(inputs, Dataset):
             return inputs
         if check_iterable_type(inputs, str):
             datasets = [
-                Data(subject).prediction_dataset(self.dimensions.sequence_length)
+                Data(subject).prediction_dataset(self.config.sequence_length)
                 for subject in inputs
             ]
             return datasets

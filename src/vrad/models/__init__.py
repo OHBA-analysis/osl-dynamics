@@ -2,6 +2,7 @@
 
 """
 
+from vrad.models._config import *  # noqa
 from vrad.models._base import *  # noqa
 from vrad.models._go import *  # noqa
 from vrad.models._maro import *  # noqa

@@ -15,34 +15,24 @@ class MARO(models.Base):
 
     Parameters
     ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of data in the model.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
+    config : vrad.models.Config
     """
 
-    def __init__(
-        self,
-        dimensions: models.config.Dimensions,
-        observation_model: models.config.ObservationModel,
-        training: models.config.Training,
-    ):
-        if observation_model.model != "multivariate_autoregressive":
+    def __init__(self, config: models.Config):
+        if config.observation_model != "multivariate_autoregressive":
             raise ValueError("Observation model must be multivariate_autoregressive.")
 
         # The base class will build and compile the keras model
-        super().__init__(dimensions, observation_model, training)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.dimensions, self.observation_model)
+        self.model = _model_structure(self.config)
 
     def compile(self):
         """Wrapper for the standard keras compile method."""
         self.model.compile(
-            optimizer=self.training.optimizer, loss=[losses.ModelOutputLoss()]
+            optimizer=self.config.optimizer, loss=[losses.ModelOutputLoss()]
         )
 
     def fit(
@@ -145,30 +135,11 @@ class MARO(models.Base):
         mar_params_layer.set_weights(layer_weights)
 
 
-def _model_structure(
-    dimensions: models.config.Dimensions,
-    observation_model: models.config.ObservationModel,
-):
-    """Model structure.
-
-    Parameters
-    ----------
-    dimensions : vrad.models.config.Dimensions
-    observation_model : vrad.models.config.ObservationModel
-
-    Returns
-    -------
-    tensorflow.keras.Model
-        Keras model built using the functional API.
-    """
+def _model_structure(config: models.Config):
 
     # Layers for inputs
-    data = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
-    )
-    alpha = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_states), name="alpha"
-    )
+    data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
+    alpha = layers.Input(shape=(config.sequence_length, config.n_states), name="alpha")
 
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
@@ -180,20 +151,20 @@ def _model_structure(
 
     # Definition of layers
     mar_params_layer = MARParametersLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        observation_model.n_lags,
-        observation_model.initial_coeffs,
-        observation_model.initial_cov,
-        observation_model.learn_coeffs,
-        observation_model.learn_cov,
+        config.n_states,
+        config.n_channels,
+        config.n_lags,
+        config.initial_coeffs,
+        config.initial_cov,
+        config.learn_coeffs,
+        config.learn_cov,
         name="mar_params",
     )
     mean_cov_layer = MARMeanCovLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        dimensions.sequence_length,
-        observation_model.n_lags,
+        config.n_states,
+        config.n_channels,
+        config.sequence_length,
+        config.n_lags,
         name="mean_cov",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")

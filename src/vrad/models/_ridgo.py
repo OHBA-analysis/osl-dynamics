@@ -32,54 +32,23 @@ class RIDGO(models.GO):
 
     Parameters
     ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of the data in the model.
-    inference_network : vrad.models.config.RNN
-        Inference network hyperparameters.
-    model_network : vrad.models.config.RNN
-        Model network hyperparameters.
-    alpha : vrad.models.config.Alpha
-        Parameters related to alpha.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    kl_annealing : vrad.models.config.KLAnnealing
-        Parameters related to KL annealing.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
+    config : vrad.models.Config
     """
 
-    def __init__(
-        self,
-        dimensions: models.config.Dimensions,
-        inference_network: models.config.RNN,
-        model_network: models.config.RNN,
-        alpha: models.config.Alpha,
-        observation_model: models.config.ObservationModel,
-        kl_annealing: models.config.KLAnnealing,
-        training: models.config.Training,
-    ):
-        # Settings
-        self.inference_network = inference_network
-        self.model_network = model_network
-        self.alpha = alpha
-        self.kl_annealing = kl_annealing
+    def __init__(self, config: models.Config):
 
         # KL annealing
-        self.kl_annealing_factor = Variable(0.0) if kl_annealing.do else Variable(1.0)
+        self.kl_annealing_factor = (
+            Variable(0.0) if config.do_kl_annealing else Variable(1.0)
+        )
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
-        super().__init__(dimensions, observation_model, training)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(
-            self.dimensions,
-            self.inference_network,
-            self.model_network,
-            self.alpha,
-            self.observation_model,
-        )
+        self.model = _model_structure(self.config)
 
     def compile(self):
         """Wrapper for the standard keras compile method."""
@@ -90,7 +59,7 @@ class RIDGO(models.GO):
         loss = [ll_loss, kl_loss]
 
         # Compile
-        self.model.compile(optimizer=self.training.optimizer, loss=loss)
+        self.model.compile(optimizer=self.config.optimizer, loss=loss)
 
     def fit(
         self,
@@ -138,13 +107,13 @@ class RIDGO(models.GO):
         additional_callbacks = []
 
         if kl_annealing_callback is None:
-            kl_annealing_callback = self.kl_annealing.do
+            kl_annealing_callback = self.config.do_kl_annealing
 
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
                 kl_annealing_factor=self.kl_annealing_factor,
-                annealing_sharpness=self.kl_annealing.sharpness,
-                n_epochs_annealing=self.kl_annealing.n_epochs,
+                annealing_sharpness=self.config.kl_annealing_sharpness,
+                n_epochs_annealing=self.config.n_epochs_kl_annealing,
             )
             additional_callbacks.append(kl_annealing_callback)
 
@@ -174,7 +143,7 @@ class RIDGO(models.GO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.kl_annealing.do:
+        if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
 
     def predict(self, *args, **kwargs) -> dict:
@@ -292,10 +261,10 @@ class RIDGO(models.GO):
         alpha_layer = self.model.get_layer("mod_alpha")
 
         # Activate the first state and sample from the model RNN
-        stc = np.zeros([n_samples, self.dimensions.n_states], dtype=np.float32)
+        stc = np.zeros([n_samples, self.config.n_states], dtype=np.float32)
         stc[0, 0] = 1
         for i in trange(1, n_samples, desc="Sampling state time course", ncols=98):
-            samples = stc[np.newaxis, max(0, i - self.dimensions.sequence_length) : i]
+            samples = stc[np.newaxis, max(0, i - self.config.sequence_length) : i]
             samples_norm = samples_norm_layer(samples)
             model_rnn_output = rnn_layer(samples_norm)
             alpha = alpha_layer(model_rnn_output)[0, -1]
@@ -304,41 +273,11 @@ class RIDGO(models.GO):
         return stc
 
 
-def _model_structure(
-    dimensions: models.config.Dimensions,
-    inference_network: models.config.RNN,
-    model_network: models.config.RNN,
-    alpha: models.config.Alpha,
-    observation_model: models.config.ObservationModel,
-):
-    """Model structure.
-
-    Parameters
-    ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of the data in the model.
-    inference_network : vrad.models.config.RNN
-        Inference network hyperparameters.
-    model_network : vrad.models.config.RNN
-        Model network hyperparameters.
-    alpha : vrad.models.config.Alpha
-        Parameters related to alpha.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    kl_annealing : vrad.models.config.KLAnnealing
-        Parameters related to KL annealing.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
-
-    Returns
-    -------
-    tensorflow.keras.Model
-        Keras model built using the functional API.
-    """
+def _model_structure(config: models.Config):
 
     # Layer for input
     inputs = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+        shape=(config.sequence_length, config.n_channels), name="data"
     )
 
     # Inference RNN:
@@ -347,15 +286,15 @@ def _model_structure(
 
     # Definition of layers
     inference_rnn_output_layers = InferenceRNNLayers(
-        inference_network.rnn,
-        inference_network.normalization,
-        inference_network.n_layers,
-        inference_network.n_units,
-        inference_network.dropout_rate,
+        config.inference_rnn,
+        config.inference_normalization,
+        config.inference_n_layers,
+        config.inference_n_units,
+        config.inference_dropout_rate,
         name="inf_rnn",
     )
     inference_alpha_layer = layers.Dense(
-        dimensions.n_states, activation=alpha.xform, name="inf_alpha"
+        config.n_states, activation=config.alpha_xform, name="inf_alpha"
     )
     samples_layer = SampleDirichletDistributionLayer(name="samples")
 
@@ -372,19 +311,19 @@ def _model_structure(
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
+        config.n_states,
+        config.n_channels,
         learn_means=False,
-        learn_covariances=observation_model.learn_covariances,
-        normalize_covariances=observation_model.normalize_covariances,
+        learn_covariances=config.learn_covariances,
+        normalize_covariances=config.normalize_covariances,
         initial_means=None,
-        initial_covariances=observation_model.initial_covariances,
+        initial_covariances=config.initial_covariances,
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        observation_model.learn_alpha_scaling,
+        config.n_states,
+        config.n_channels,
+        config.learn_alpha_scaling,
         name="mix_means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
@@ -400,18 +339,18 @@ def _model_structure(
 
     # Definition of layers
     samples_norm_layer = NormalizationLayer(
-        alpha.theta_normalization, name="samples_norm"
+        config.theta_normalization, name="samples_norm"
     )
     model_rnn_output_layers = ModelRNNLayers(
-        model_network.rnn,
-        model_network.normalization,
-        model_network.n_layers,
-        model_network.n_units,
-        model_network.dropout_rate,
+        config.model_rnn,
+        config.model_normalization,
+        config.model_n_layers,
+        config.model_n_units,
+        config.model_dropout_rate,
         name="mod_rnn",
     )
     model_alpha_layer = layers.Dense(
-        dimensions.n_states, activation=alpha.xform, name="mod_alpha"
+        config.n_states, activation=config.alpha_xform, name="mod_alpha"
     )
     kl_loss_layer = DirichletKLDivergenceLayer(name="kl")
 

@@ -22,34 +22,24 @@ class GO(models.Base):
 
     Parameters
     ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of data in the model.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-    training : vrad.models.config.Training
-        Parameters related to training a model.
+    config : vrad.models.Config
     """
 
-    def __init__(
-        self,
-        dimensions: models.config.Dimensions,
-        observation_model: models.config.ObservationModel,
-        training: models.config.Training,
-    ):
-        if observation_model.model != "multivariate_normal":
+    def __init__(self, config: models.Config):
+        if config.observation_model != "multivariate_normal":
             raise ValueError("Observation model must be multivariate_normal.")
 
         # The base class will build and compile the keras model
-        super().__init__(dimensions, observation_model, training)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.dimensions, self.observation_model)
+        self.model = _model_structure(self.config)
 
     def compile(self):
         """Wrapper for the standard keras compile method."""
         self.model.compile(
-            optimizer=self.training.optimizer, loss=[losses.ModelOutputLoss()]
+            optimizer=self.config.optimizer, loss=[losses.ModelOutputLoss()]
         )
 
     def fit(
@@ -137,7 +127,7 @@ class GO(models.Base):
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
 
         # Normalise covariances
-        if self.observation_model.normalize_covariances:
+        if self.config.normalize_covariances:
             covariances = trace_normalize(covariances).numpy()
 
         # Apply alpha scaling
@@ -189,32 +179,11 @@ class GO(models.Base):
         return alpha_scaling
 
 
-def _model_structure(
-    dimensions: models.config.Dimensions,
-    observation_model: models.config.ObservationModel,
-):
-    """Model structure.
-
-    Parameters
-    ----------
-    dimensions : vrad.models.config.Dimensions
-        Dimensions of data in the model.
-    observation_model : vrad.models.config.ObservationModel
-        Parameters related to the observation model.
-
-    Returns
-    -------
-    tensorflow.keras.Model
-        Keras model built using the functional API.
-    """
+def _model_structure(config: models.Config):
 
     # Layers for inputs
-    data = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
-    )
-    alpha = layers.Input(
-        shape=(dimensions.sequence_length, dimensions.n_states), name="alpha"
-    )
+    data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
+    alpha = layers.Input(shape=(config.sequence_length, config.n_states), name="alpha")
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
@@ -224,19 +193,19 @@ def _model_structure(
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
+        config.n_states,
+        config.n_channels,
         learn_means=False,
-        learn_covariances=observation_model.learn_covariances,
-        normalize_covariances=observation_model.normalize_covariances,
+        learn_covariances=config.learn_covariances,
+        normalize_covariances=config.normalize_covariances,
         initial_means=None,
-        initial_covariances=observation_model.initial_covariances,
+        initial_covariances=config.initial_covariances,
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        dimensions.n_states,
-        dimensions.n_channels,
-        observation_model.learn_alpha_scaling,
+        config.n_states,
+        config.n_channels,
+        config.learn_alpha_scaling,
         name="mix_means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")

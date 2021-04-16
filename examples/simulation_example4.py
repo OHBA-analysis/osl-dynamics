@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import config, RIGO
+from vrad.models import Config, RIGO
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -17,50 +17,32 @@ tf_ops.gpu_growth()
 n_samples = 25600
 observation_error = 0.2
 
-dimensions = config.Dimensions(
+config = Config(
     n_states=5,
     n_channels=80,
     sequence_length=200,
-)
-
-inference_network = config.RNN(
-    rnn="lstm",
-    n_layers=1,
-    n_units=64,
-    dropout_rate=0.0,
-    normalization="layer",
-)
-
-model_network = config.RNN(
-    rnn="lstm",
-    n_layers=1,
-    n_units=64,
-    dropout_rate=0.0,
-    normalization="layer",
-)
-
-alpha = config.Alpha(
+    inference_rnn="lstm",
+    inference_n_layers=1,
+    inference_n_units=64,
+    inference_dropout_rate=0.0,
+    inference_normalization="layer",
+    model_rnn="lstm",
+    model_n_layers=1,
+    model_n_units=64,
+    model_dropout_rate=0.0,
+    model_normalization="layer",
     theta_normalization=None,
-    xform="softmax",
-    initial_temperature=0.25,
-    learn_temperature=False,
-)
-
-observation_model = config.ObservationModel(
-    model="multivariate_normal",
+    alpha_xform="softmax",
+    initial_alpha_temperature=0.25,
+    learn_alpha_temperature=False,
+    observation_model="multivariate_normal",
     learn_covariances=True,
     learn_alpha_scaling=False,
     normalize_covariances=False,
-)
-
-kl_annealing = config.KLAnnealing(
-    do=True,
-    curve="tanh",
-    sharpness=10,
-    n_epochs=50,
-)
-
-training = config.Training(
+    do_kl_annealing=True,
+    kl_annealing_curve="tanh",
+    kl_annealing_sharpness=10,
+    n_epochs_kl_annealing=50,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=100,
@@ -116,31 +98,23 @@ sim = simulation.HierarchicalHMM_MVN(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
+config.n_channel = meg_data.n_channels
+
 # Prepare dataset
-training_dataset = meg_data.training_dataset(
-    dimensions.sequence_length, training.batch_size
-)
+training_dataset = meg_data.training_dataset(config.sequence_length, config.batch_size)
 prediction_dataset = meg_data.prediction_dataset(
-    dimensions.sequence_length, training.batch_size
+    config.sequence_length, config.batch_size
 )
 
 # Build model
-model = RIGO(
-    dimensions,
-    inference_network,
-    model_network,
-    alpha,
-    observation_model,
-    kl_annealing,
-    training,
-)
+model = RIGO(config)
 model.summary()
 
 print("Training model")
 history = model.fit(
     training_dataset,
-    epochs=training.n_epochs,
-    save_best_after=kl_annealing.n_epochs,
+    epochs=config.n_epochs,
+    save_best_after=config.n_epochs_kl_annealing,
     save_filepath="tmp/weights",
 )
 
