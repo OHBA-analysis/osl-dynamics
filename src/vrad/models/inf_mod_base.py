@@ -93,6 +93,7 @@ class InferenceModelBase:
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
                 kl_annealing_factor=self.kl_annealing_factor,
+                curve=self.config.kl_annealing_curve,
                 annealing_sharpness=self.config.kl_annealing_sharpness,
                 n_epochs_annealing=self.config.n_epochs_kl_annealing,
             )

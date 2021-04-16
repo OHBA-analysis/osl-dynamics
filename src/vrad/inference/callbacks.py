@@ -59,15 +59,12 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
-    The loss function during training is calculated as loss = ll_loss +
-    kl_annealing_factor * kl_loss, where the annealing factor is calculated as
-    0.5*tanh(annealing_sharpness*epoch - 0.5*n_epochs_annealing)/n_epochs_annealing
-    + 0.5.
-
     Parameters
     ----------
     kl_annealing_factor : tf.Variable
         Annealing factor for the KL term in the loss function.
+    curve : str
+        Shape of the annealing curve. Either 'linear' or 'tanh'.
     annealing_sharpness : float
         Parameter to control the shape of the annealing curve.
     n_epochs_annealing : int
@@ -77,11 +74,16 @@ class KLAnnealingCallback(callbacks.Callback):
     def __init__(
         self,
         kl_annealing_factor: tf.Variable,
+        curve: str,
         annealing_sharpness: float,
         n_epochs_annealing: int,
     ):
+        if curve not in ["linear", "tanh"]:
+            raise NotImplementedError(curve)
+
         super().__init__()
         self.kl_annealing_factor = kl_annealing_factor
+        self.curve = curve
         self.annealing_sharpness = annealing_sharpness
         self.n_epochs_annealing = n_epochs_annealing
 
@@ -97,15 +99,19 @@ class KLAnnealingCallback(callbacks.Callback):
             validation is performed.
         """
         if epoch < self.n_epochs_annealing:
-            new_value = (
-                0.5
-                * tanh(
-                    self.annealing_sharpness
-                    * (epoch - 0.5 * self.n_epochs_annealing)
-                    / self.n_epochs_annealing
+            if self.curve == "tanh":
+                new_value = (
+                    0.5
+                    * tanh(
+                        self.annealing_sharpness
+                        * (epoch - 0.5 * self.n_epochs_annealing)
+                        / self.n_epochs_annealing
+                    )
+                    + 0.5
                 )
-                + 0.5
-            )
+            elif self.curve == "linear":
+                epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
+                new_value = epoch / self.n_epochs_annealing
             self.kl_annealing_factor.assign(new_value)
         else:
             self.kl_annealing_factor.assign(1.0)
