@@ -6,7 +6,8 @@
 import numpy as np
 from tensorflow.keras import Model, layers
 from tqdm import trange
-from vrad.models.inf_obs_mod_base import InferenceAndObservationModelBase
+from vrad.models.inf_mod_base import InferenceModelBase
+from vrad.models.go import GO
 from vrad.inference import callbacks, initializers, losses
 from vrad.models.layers import (
     DirichletKLDivergenceLayer,
@@ -21,7 +22,7 @@ from vrad.models.layers import (
 from vrad.utils.misc import replace_argument
 
 
-class RIDGO(InferenceAndObservationModelBase):
+class RIDGO(InferenceModelBase, GO):
     """RNN Inference/model network, Dirichlet samples and Gaussian Observations (RIDGO).
 
     Parameters
@@ -30,7 +31,8 @@ class RIDGO(InferenceAndObservationModelBase):
     """
 
     def __init__(self, config):
-        InferenceAndObservationModelBase.__init__(self, config)
+        InferenceModelBase.__init__(self, config)
+        GO.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""

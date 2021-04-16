@@ -1,4 +1,4 @@
-"""Base class for a joint inference and observation model.
+"""Base class for an inference model.
 
 """
 import logging
@@ -8,15 +8,13 @@ from typing import Tuple, Union
 import numpy as np
 from tensorflow import Variable
 from vrad.inference import callbacks, initializers, losses
-from vrad.models.go import GO
-from vrad.models.maro import MARO
 from vrad.utils.misc import replace_argument
 
 _logger = logging.getLogger("VRAD")
 
 
-class InferenceAndObservationModelBase(GO, MARO):
-    """Base class for a joint inference and observation model.
+class InferenceModelBase:
+    """Base class for an inference model.
 
     Parameters
     ----------
@@ -29,12 +27,6 @@ class InferenceAndObservationModelBase(GO, MARO):
         self.kl_annealing_factor = (
             Variable(0.0) if config.do_kl_annealing else Variable(1.0)
         )
-
-        # Initialise the observation model
-        if config.observation_model == "multivariate_normal":
-            GO.__init__(self, config)
-        elif config.observation_model == "multivariate_autoregressive":
-            MARO.__init__(self, config)
 
     def compile(self):
         """Wrapper for the standard keras compile method."""

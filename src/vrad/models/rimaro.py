@@ -5,7 +5,8 @@
 
 import numpy as np
 from tensorflow.keras import Model, layers
-from vrad.models.inf_obs_mod_base import InferenceAndObservationModelBase
+from vrad.models.inf_mod_base import InferenceModelBase
+from vrad.models.maro import MARO
 from vrad.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLayer,
@@ -19,7 +20,7 @@ from vrad.models.layers import (
 )
 
 
-class RIMARO(InferenceAndObservationModelBase):
+class RIMARO(InferenceModelBase, MARO):
     """RNN Inference/model network and Multivariate AutoRegressive Observations (RIMARO).
 
     Parameters
@@ -28,7 +29,8 @@ class RIMARO(InferenceAndObservationModelBase):
     """
 
     def __init__(self, config):
-        InferenceAndObservationModelBase.__init__(self, config)
+        InferenceModelBase.__init__(self, config)
+        MARO.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""
