@@ -11,44 +11,61 @@ print("Setting up")
 from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
-from vrad.models import RIGO
+from vrad.models import config, RIGO
 
 # GPU settings
 tf_ops.gpu_growth()
-multi_gpu = True
 
 # Settings
-n_states = 6
-sequence_length = 400
+dimensions = config.Dimensions(
+    n_states=6,
+    n_channels=80,
+    sequence_length=400,
+)
 
-batch_size = 64
-learning_rate = 0.01
-n_epochs = 200
+inference_network = config.RNN(
+    rnn="lstm",
+    n_layers=1,
+    n_units=64,
+    dropout_rate=0.0,
+    normalization="layer",
+)
 
-do_kl_annealing = True
-kl_annealing_sharpness = 10
-n_epochs_kl_annealing = 100
+model_network = config.RNN(
+    rnn="lstm",
+    n_layers=1,
+    n_units=64,
+    dropout_rate=0.0,
+    normalization="layer",
+)
 
-rnn_type = "lstm"
-rnn_normalization = "layer"
-theta_normalization = "layer"
+alpha = config.Alpha(
+    theta_normalization="layer",
+    xform="gumbel-softmax",
+    learn_temperature=False,
+    initial_temperature=1.0,
+)
 
-n_layers_inference = 1
-n_layers_model = 1
+observation_model = config.ObservationModel(
+    model="multivariate_normal",
+    learn_covariances=False,
+    learn_alpha_scaling=False,
+    normalize_covariances=False,
+)
 
-n_units_inference = 64
-n_units_model = 64
+kl_annealing = config.KLAnnealing(
+    do=True,
+    curve="tanh",
+    sharpness=10,
+    n_epochs=100,
+)
 
-dropout_rate_inference = 0.0
-dropout_rate_model = 0.0
-
-alpha_xform = "gumbel-softmax"
-learn_alpha_temperature = False
-initial_alpha_temperature = 1.0
-
-learn_covariances = False
-learn_alpha_scaling = False
-normalize_covariances = False
+training = config.Training(
+    batch_size=64,
+    learning_rate=0.01,
+    n_epochs=200,
+    multi_gpu=True,
+)
 
 # Read MEG data
 print("Reading MEG data")
@@ -57,50 +74,36 @@ prepared_data = Data(
     sampling_frequency=250,
     n_embeddings=15,
 )
-n_channels = prepared_data.n_channels
 
 # Prepare dataset
-training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
+training_dataset = prepared_data.training_dataset(
+    dimensions.sequence_length, training.batch_size
+)
+prediction_dataset = prepared_data.prediction_dataset(
+    dimensions.sequence_length, training.batch_size
+)
 
 # Initialise covariances with the final HMM covariances
 hmm = OSL_HMM("/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-1_K-6/hmm.mat")
-initial_covariances = hmm.covariances
+observation_model.initial_covariances = hmm.covariances
 
 # Build model
 model = RIGO(
-    n_channels=n_channels,
-    n_states=n_states,
-    sequence_length=sequence_length,
-    learn_covariances=learn_covariances,
-    initial_covariances=initial_covariances,
-    rnn_type=rnn_type,
-    rnn_normalization=rnn_normalization,
-    n_layers_inference=n_layers_inference,
-    n_layers_model=n_layers_model,
-    n_units_inference=n_units_inference,
-    n_units_model=n_units_model,
-    dropout_rate_inference=dropout_rate_inference,
-    dropout_rate_model=dropout_rate_model,
-    theta_normalization=theta_normalization,
-    alpha_xform=alpha_xform,
-    learn_alpha_temperature=learn_alpha_temperature,
-    initial_alpha_temperature=initial_alpha_temperature,
-    learn_alpha_scaling=learn_alpha_scaling,
-    normalize_covariances=normalize_covariances,
-    do_kl_annealing=do_kl_annealing,
-    kl_annealing_sharpness=kl_annealing_sharpness,
-    n_epochs_kl_annealing=n_epochs_kl_annealing,
-    learning_rate=learning_rate,
-    multi_gpu=multi_gpu,
+    dimensions,
+    inference_network,
+    model_network,
+    alpha,
+    observation_model,
+    kl_annealing,
+    training,
 )
 model.summary()
 
 print("Training model")
 history = model.fit(
     training_dataset,
-    epochs=n_epochs,
-    save_best_after=n_epochs_kl_annealing,
+    epochs=training.n_epochs,
+    save_best_after=kl_annealing.n_epochs,
     save_filepath="tmp/model",
 )
 
@@ -113,7 +116,7 @@ alpha = model.predict_states(prediction_dataset)
 inf_stc = states.time_courses(alpha)
 hmm_stc = manipulation.trim_time_series(
     time_series=hmm.state_time_course(),
-    sequence_length=sequence_length,
+    sequence_length=dimensions.sequence_length,
 )
 
 # Dice coefficient
@@ -124,7 +127,7 @@ preprocessed_data = Data(
     "/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject1.mat",
 )
 preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=sequence_length,
+    sequence_length=dimensions.sequence_length,
     n_embeddings=prepared_data.n_embeddings,
 )
 

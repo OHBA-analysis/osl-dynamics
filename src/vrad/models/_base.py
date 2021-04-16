@@ -11,8 +11,6 @@ import numpy as np
 import yaml
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
-from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from vrad.data import Data
@@ -22,6 +20,7 @@ from vrad.inference.callbacks import (
     SaveBestCallback,
 )
 from vrad.inference.tf_ops import tensorboard_run_logdir
+from vrad.models import config
 from vrad.utils.misc import check_iterable_type, class_from_yaml
 from vrad.utils.model import HTMLTable, LatexTable
 
@@ -33,52 +32,28 @@ class Base:
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    learning_rate : float
-        Learning rate for updating model parameters/weights.
-    multi_gpu : bool
-        Should be use multiple GPUs for training?
-    strategy : str
-        Strategy for distributed learning.
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of data in the model.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
     """
 
     def __init__(
         self,
-        n_states: int,
-        n_channels: int,
-        sequence_length: int,
-        learning_rate: float,
-        multi_gpu: bool,
-        strategy: str,
+        dimensions: config.Dimensions,
+        observation_model: config.ObservationModel,
+        training: config.Training,
     ):
-        # Validation
-        if sequence_length < 1:
-            raise ValueError("sequence_length must be greater than zero.")
-
-        if learning_rate <= 0:
-            raise ValueError("learning_rate must be greater than zero.")
-
         self._identifier = np.random.randint(100000)
-        self.n_states = n_states
-        self.n_channels = n_channels
-        self.sequence_length = sequence_length
-        self.learning_rate = learning_rate
-
-        # Strategy for distributed learning
-        self.strategy = strategy
-        if multi_gpu:
-            self.strategy = MirroredStrategy()
-        elif strategy is None:
-            self.strategy = get_strategy()
+        self.dimensions = dimensions
+        self.observation_model = observation_model
+        self.training = training
 
         # Build and compile the model
         self.model = None
-        with self.strategy.scope():
+        with self.training.strategy.scope():
             self.build_model()
         self.compile()
 
@@ -110,47 +85,44 @@ class Base:
             Tensorflow dataset that can be used for training.
         """
         if isinstance(inputs, Data):
-            return inputs.prediction_dataset(self.sequence_length)
+            return inputs.prediction_dataset(self.dimensions.sequence_length)
         if isinstance(inputs, Dataset):
             return [inputs]
         if isinstance(inputs, str):
-            return [Data(inputs).prediction_dataset(self.sequence_length)]
+            return [Data(inputs).prediction_dataset(self.dimensions.sequence_length)]
         if isinstance(inputs, np.ndarray):
             if inputs.ndim == 2:
-                return [Data(inputs).prediction_dataset(self.sequence_length)]
+                return [
+                    Data(inputs).prediction_dataset(self.dimensions.sequence_length)
+                ]
             if inputs.ndim == 3:
                 return [
-                    Data(subject).prediction_dataset(self.sequence_length)
+                    Data(subject).prediction_dataset(self.dimensions.sequence_length)
                     for subject in inputs
                 ]
         if check_iterable_type(inputs, Dataset):
             return inputs
         if check_iterable_type(inputs, str):
             datasets = [
-                Data(subject).prediction_dataset(self.sequence_length)
+                Data(subject).prediction_dataset(self.dimensions.sequence_length)
                 for subject in inputs
             ]
             return datasets
 
     def create_callbacks(
         self,
-        kl_annealing_callback: bool,
-        alpha_temperature_annealing_callback: bool,
         use_tqdm: bool,
         tqdm_class,
         use_tensorboard: bool,
         tensorboard_dir: str,
         save_best_after: int,
         save_filepath: str,
+        additional_callbacks: list,
     ):
         """Create callbacks for training.
 
         Parameters
         ----------
-        kl_annealing_callback : bool
-            Should we update the kl_annealing factor during training?
-        alpha_temperature_annealing_callback : bool
-            Should we update the alpha temperature annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -165,32 +137,14 @@ class Base:
             that which achieves the lowest loss.
         save_filepath : str
             Path to save the best model to.
+        additional_callbacks : list
+            Callbacks to include during training.
 
         Returns
         -------
         list
             A list of callbacks to use during training.
         """
-        additional_callbacks = []
-
-        # Callback for KL annealing
-        if kl_annealing_callback:
-            kl_annealing_callback = KLAnnealingCallback(
-                kl_annealing_factor=self.kl_annealing_factor,
-                annealing_sharpness=self.kl_annealing_sharpness,
-                n_epochs_annealing=self.n_epochs_kl_annealing,
-            )
-            additional_callbacks.append(kl_annealing_callback)
-
-        # Callback for alpha temperature annealing
-        if alpha_temperature_annealing_callback:
-            alpha_temperature_annealing_callback = AlphaTemperatureAnnealingCallback(
-                initial_alpha_temperature=self.initial_alpha_temperature,
-                final_alpha_temperature=self.final_alpha_temperature,
-                n_epochs_annealing=self.n_epochs_alpha_temperature_annealing,
-            )
-            additional_callbacks.append(alpha_temperature_annealing_callback)
-
         # Callback to display a progress bar with tqdm
         if use_tqdm:
             if tqdm_class is not None:
@@ -240,7 +194,7 @@ class Base:
         str
             Path to file containing model weights.
         """
-        with self.strategy.scope():
+        with self.training.strategy.scope():
             self.model.load_weights(filepath)
 
     def summary_string(self):

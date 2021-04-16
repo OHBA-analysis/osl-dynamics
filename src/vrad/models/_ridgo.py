@@ -11,8 +11,7 @@ from tensorflow import Variable
 from tensorflow.keras import Model, layers, optimizers
 from tqdm import trange
 from vrad import models
-from vrad.inference import initializers
-from vrad.inference.losses import ModelOutputLoss
+from vrad.inference import callbacks, initializers, losses
 from vrad.models.layers import (
     DirichletKLDivergenceLayer,
     InferenceRNNLayers,
@@ -33,173 +32,65 @@ class RIDGO(models.GO):
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-    rnn_type : str
-        RNN to use, either 'lstm' or 'gru'.
-    rnn_normalization : str
-        Type of normalization to use in the inference network and generative model.
-        Either 'layer', 'batch' or None.
-    n_layers_inference : int
-        Number of layers in the inference network.
-    n_layers_model : int
-        Number of layers in the generative model neural network.
-    n_units_inference : int
-        Number of units/neurons in the inference network.
-    n_units_model : int
-        Number of units/neurons in the generative model neural network.
-    sample_normalization : str
-        Normalization for samples from the posterior.
-        Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Activation function for Dense layers. Either 'softplus' or 'softmax'.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
-    do_kl_annealing : bool
-        Should we use KL annealing during training?
-    kl_annealing_sharpness : float
-        Parameter to control the annealing curve.
-    n_epochs_kl_annealing : int
-        Number of epochs to perform annealing.
-    learning_rate : float
-        Learning rate for updating model parameters/weights.
-    multi_gpu : bool
-        Should be use multiple GPUs for training?
-    strategy : str
-        Strategy for distributed learning.
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of the data in the model.
+    inference_network : vrad.models.config.RNN
+        Inference network hyperparameters.
+    model_network : vrad.models.config.RNN
+        Model network hyperparameters.
+    alpha : vrad.models.config.Alpha
+        Parameters related to alpha.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    kl_annealing : vrad.models.config.KLAnnealing
+        Parameters related to KL annealing.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
     """
 
     def __init__(
         self,
-        n_states: int,
-        n_channels: int,
-        sequence_length: int,
-        learn_covariances: bool,
-        rnn_type: str,
-        rnn_normalization: str,
-        n_layers_inference: int,
-        n_layers_model: int,
-        n_units_inference: int,
-        n_units_model: int,
-        sample_normalization: str,
-        alpha_xform: str,
-        learn_alpha_scaling: bool,
-        normalize_covariances: bool,
-        do_kl_annealing: bool,
-        learning_rate: float,
-        kl_annealing_sharpness: float = None,
-        n_epochs_kl_annealing: int = None,
-        multi_gpu: bool = False,
-        strategy: str = None,
-        initial_covariances: np.ndarray = None,
+        dimensions: models.config.Dimensions,
+        inference_network: models.config.RNN,
+        model_network: models.config.RNN,
+        alpha: models.config.Alpha,
+        observation_model: models.config.ObservationModel,
+        kl_annealing: models.config.KLAnnealing,
+        training: models.config.Training,
     ):
-        # Validation
-        if rnn_type not in ["lstm", "gru"]:
-            raise ValueError("rnn_type must be 'lstm' or 'gru'.")
-
-        if n_layers_inference < 1 or n_layers_model < 1:
-            raise ValueError("n_layers must be greater than zero.")
-
-        if n_units_inference < 1 or n_units_model < 1:
-            raise ValueError("n_units must be greater than zero.")
-
-        if alpha_xform not in ["softplus", "softmax"]:
-            raise ValueError("alpha_xform must be 'softplus' or 'softmax'.")
-
-        if do_kl_annealing:
-            if kl_annealing_sharpness is None or n_epochs_kl_annealing is None:
-                raise ValueError(
-                    "If we are performing KL annealing kl_annealing_sharpness and "
-                    + "n_epochs_kl_annealing must be passed."
-                )
-
-            if kl_annealing_sharpness <= 0:
-                raise ValueError("kl_annealing_sharpness must be greater than zero.")
-
-            if n_epochs_kl_annealing < 0:
-                raise ValueError(
-                    "n_epochs_kl_annealing must be equal to or greater than zero."
-                )
-
-        # RNN and inference hyperparameters
-        self.rnn_type = rnn_type
-        self.rnn_normalization = rnn_normalization
-        self.n_layers_inference = n_layers_inference
-        self.n_layers_model = n_layers_model
-        self.n_units_inference = n_units_inference
-        self.n_units_model = n_units_model
-        self.sample_normalization = sample_normalization
-        self.alpha_xform = alpha_xform
+        # Settings
+        self.inference_network = inference_network
+        self.model_network = model_network
+        self.alpha = alpha
+        self.kl_annealing = kl_annealing
 
         # KL annealing
-        self.do_kl_annealing = do_kl_annealing
-        self.kl_annealing_factor = Variable(0.0) if do_kl_annealing else Variable(1.0)
-        self.kl_annealing_sharpness = kl_annealing_sharpness
-        self.n_epochs_kl_annealing = n_epochs_kl_annealing
+        self.kl_annealing_factor = Variable(0.0) if kl_annealing.do else Variable(1.0)
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
-        super().__init__(
-            n_states=n_states,
-            n_channels=n_channels,
-            sequence_length=sequence_length,
-            learn_alpha_scaling=learn_alpha_scaling,
-            normalize_covariances=normalize_covariances,
-            learning_rate=learning_rate,
-            multi_gpu=multi_gpu,
-            strategy=strategy,
-            initial_covariances=initial_covariances,
-            learn_covariances=learn_covariances,
-        )
+        super().__init__(dimensions, observation_model, training)
 
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(
-            n_states=self.n_states,
-            n_channels=self.n_channels,
-            sequence_length=self.sequence_length,
-            rnn_type=self.rnn_type,
-            rnn_normalization=self.rnn_normalization,
-            n_layers_inference=self.n_layers_inference,
-            n_layers_model=self.n_layers_model,
-            n_units_inference=self.n_units_inference,
-            n_units_model=self.n_units_model,
-            sample_normalization=self.sample_normalization,
-            alpha_xform=self.alpha_xform,
-            initial_means=None,
-            initial_covariances=self.initial_covariances,
-            learn_means=False,
-            learn_covariances=self.learn_covariances,
-            learn_alpha_scaling=self.learn_alpha_scaling,
-            normalize_covariances=self.normalize_covariances,
+            self.dimensions,
+            self.inference_network,
+            self.model_network,
+            self.alpha,
+            self.observation_model,
         )
 
     def compile(self):
-        """Wrapper for the standard keras compile method.
+        """Wrapper for the standard keras compile method."""
 
-        Sets up the optimizer and loss functions.
-        """
-        # Setup optimizer
-        optimizer = optimizers.Adam(learning_rate=self.learning_rate)
-
-        # Loss functions
-        ll_loss = ModelOutputLoss()
-        kl_loss = ModelOutputLoss(self.kl_annealing_factor)
+        # Loss function
+        ll_loss = losses.ModelOutputLoss()
+        kl_loss = losses.ModelOutputLoss(self.kl_annealing_factor)
         loss = [ll_loss, kl_loss]
 
         # Compile
-        self.model.compile(optimizer=optimizer, loss=loss)
+        self.model.compile(optimizer=self.training.optimizer, loss=loss)
 
     def fit(
         self,
@@ -244,18 +135,30 @@ class RIDGO(models.GO):
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
 
+        additional_callbacks = []
+
+        if kl_annealing_callback is None:
+            kl_annealing_callback = self.kl_annealing.do
+
+        if kl_annealing_callback:
+            kl_annealing_callback = callbacks.KLAnnealingCallback(
+                kl_annealing_factor=self.kl_annealing_factor,
+                annealing_sharpness=self.kl_annealing.sharpness,
+                n_epochs_annealing=self.kl_annealing.n_epochs,
+            )
+            additional_callbacks.append(kl_annealing_callback)
+
         args, kwargs = replace_argument(
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                kl_annealing_callback,
-                False,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
                 tensorboard_dir,
                 save_best_after,
                 save_filepath,
+                additional_callbacks,
             ),
             args=args,
             kwargs=kwargs,
@@ -271,7 +174,7 @@ class RIDGO(models.GO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.do_kl_annealing:
+        if self.kl_annealing.do:
             self.kl_annealing_factor.assign(0.0)
 
     def predict(self, *args, **kwargs) -> dict:
@@ -389,10 +292,10 @@ class RIDGO(models.GO):
         alpha_layer = self.model.get_layer("mod_alpha")
 
         # Activate the first state and sample from the model RNN
-        stc = np.zeros([n_samples, self.n_states], dtype=np.float32)
+        stc = np.zeros([n_samples, self.dimensions.n_states], dtype=np.float32)
         stc[0, 0] = 1
         for i in trange(1, n_samples, desc="Sampling state time course", ncols=98):
-            samples = stc[np.newaxis, max(0, i - self.sequence_length) : i]
+            samples = stc[np.newaxis, max(0, i - self.dimensions.sequence_length) : i]
             samples_norm = samples_norm_layer(samples)
             model_rnn_output = rnn_layer(samples_norm)
             alpha = alpha_layer(model_rnn_output)[0, -1]
@@ -402,65 +305,30 @@ class RIDGO(models.GO):
 
 
 def _model_structure(
-    n_states: int,
-    n_channels: int,
-    sequence_length: int,
-    rnn_type: str,
-    rnn_normalization: str,
-    n_layers_inference: int,
-    n_layers_model: int,
-    n_units_inference: int,
-    n_units_model: int,
-    sample_normalization: str,
-    alpha_xform: str,
-    initial_means: np.ndarray,
-    initial_covariances: np.ndarray,
-    learn_means: bool,
-    learn_covariances: bool,
-    learn_alpha_scaling: bool,
-    normalize_covariances: bool,
+    dimensions: models.config.Dimensions,
+    inference_network: models.config.RNN,
+    model_network: models.config.RNN,
+    alpha: models.config.Alpha,
+    observation_model: models.config.ObservationModel,
 ):
     """Model structure.
 
     Parameters
     ----------
-    n_states : int
-        Numeber of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    rnn_type : int
-        RNN to use, either 'lstm' or 'gru'.
-    rnn_normalization : str
-        Type of normalization to use in the inference network and generative model.
-        Either 'layer', 'batch' or None.
-    n_layers_inference : int
-        Number of layers in the inference network.
-    n_layers_model : int
-        Number of layers in the generative model neural network.
-    n_units_inference : int
-        Number of units/neurons in the inference network.
-    n_units_model : int
-        Number of units/neurons in the generative model neural network.
-    sample_normalization : str
-        Normalization for samples from the posterior.
-        Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Activation function for Dense layers. Either 'softplus' or 'softmax'.
-    learn_means : bool
-        Should we learn the mean vector for each state?
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-    initial_means : np.ndarray
-        Initial values for the state means. Should have shape (n_states, n_channels).
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of the data in the model.
+    inference_network : vrad.models.config.RNN
+        Inference network hyperparameters.
+    model_network : vrad.models.config.RNN
+        Model network hyperparameters.
+    alpha : vrad.models.config.Alpha
+        Parameters related to alpha.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    kl_annealing : vrad.models.config.KLAnnealing
+        Parameters related to KL annealing.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
 
     Returns
     -------
@@ -469,7 +337,9 @@ def _model_structure(
     """
 
     # Layer for input
-    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
+    inputs = layers.Input(
+        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+    )
 
     # Inference RNN:
     # - Learns q(samples) ~ Dir(samples | inference_alpha), where
@@ -477,15 +347,15 @@ def _model_structure(
 
     # Definition of layers
     inference_rnn_output_layers = InferenceRNNLayers(
-        rnn_type,
-        rnn_normalization,
-        n_layers_inference,
-        n_units_inference,
-        dropout_rate=0.0,
+        inference_network.rnn,
+        inference_network.normalization,
+        inference_network.n_layers,
+        inference_network.n_units,
+        inference_network.dropout_rate,
         name="inf_rnn",
     )
     inference_alpha_layer = layers.Dense(
-        n_states, activation=alpha_xform, name="inf_alpha"
+        dimensions.n_states, activation=alpha.xform, name="inf_alpha"
     )
     samples_layer = SampleDirichletDistributionLayer(name="samples")
 
@@ -502,17 +372,20 @@ def _model_structure(
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        n_states,
-        n_channels,
-        learn_means=learn_means,
-        learn_covariances=learn_covariances,
-        normalize_covariances=normalize_covariances,
-        initial_means=initial_means,
-        initial_covariances=initial_covariances,
+        dimensions.n_states,
+        dimensions.n_channels,
+        learn_means=False,
+        learn_covariances=observation_model.learn_covariances,
+        normalize_covariances=observation_model.normalize_covariances,
+        initial_means=None,
+        initial_covariances=observation_model.initial_covariances,
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, learn_alpha_scaling, name="mix_means_covs"
+        dimensions.n_states,
+        dimensions.n_channels,
+        observation_model.learn_alpha_scaling,
+        name="mix_means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
@@ -526,16 +399,20 @@ def _model_structure(
     #     - model_alpha = softplus(RNN(samples_<t))
 
     # Definition of layers
-    samples_norm_layer = NormalizationLayer(sample_normalization, name="samples_norm")
+    samples_norm_layer = NormalizationLayer(
+        alpha.theta_normalization, name="samples_norm"
+    )
     model_rnn_output_layers = ModelRNNLayers(
-        rnn_type,
-        rnn_normalization,
-        n_layers_model,
-        n_units_model,
-        dropout_rate=0.0,
+        model_network.rnn,
+        model_network.normalization,
+        model_network.n_layers,
+        model_network.n_units,
+        model_network.dropout_rate,
         name="mod_rnn",
     )
-    model_alpha_layer = layers.Dense(n_states, activation=alpha_xform, name="mod_alpha")
+    model_alpha_layer = layers.Dense(
+        dimensions.n_states, activation=alpha.xform, name="mod_alpha"
+    )
     kl_loss_layer = DirichletKLDivergenceLayer(name="kl")
 
     # Data flow

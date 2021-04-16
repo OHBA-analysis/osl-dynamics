@@ -5,8 +5,7 @@
 import numpy as np
 from tensorflow.keras import Model, layers, optimizers
 from vrad import models
-from vrad.inference import initializers
-from vrad.inference.losses import ModelOutputLoss
+from vrad.inference import initializers, losses
 from vrad.models.layers import LogLikelihoodLayer, MARMeanCovLayer, MARParametersLayer
 from vrad.utils.misc import replace_argument
 
@@ -16,88 +15,35 @@ class MARO(models.Base):
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    n_lags : int
-        Order of the multivariate autoregressive observation model.
-    learning_rate : float
-        Learning rate for updating model parameters/weights.
-    multi_gpu : bool
-        Should be use multiple GPUs for training? Optional.
-    strategy : str
-        Strategy for distributed learning. Optional.
-    initial_coeffs : np.ndarray
-        Initial values for the MAR coefficients. Optional.
-    initial_cov : np.ndarray
-        Initial values for the covariances. Optional.
-    learn_coeffs : bool
-        Should we learn the MAR coefficients? Optional, default is True.
-    learn_cov : bool
-        Should we learn the covariances. Optional, default is True.
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of data in the model.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
     """
 
     def __init__(
         self,
-        n_states: int,
-        n_channels: int,
-        sequence_length: int,
-        n_lags: int,
-        learning_rate: float,
-        multi_gpu: bool = False,
-        strategy: str = None,
-        initial_coeffs: np.ndarray = None,
-        initial_cov: np.ndarray = None,
-        learn_coeffs: bool = True,
-        learn_cov: bool = True,
+        dimensions: models.config.Dimensions,
+        observation_model: models.config.ObservationModel,
+        training: models.config.Training,
     ):
-        # Parameters related to the observation model
-        self.n_lags = n_lags
-        self.initial_coeffs = initial_coeffs
-        self.initial_cov = initial_cov
-        self.learn_coeffs = learn_coeffs
-        self.learn_cov = learn_cov
+        if observation_model.model != "multivariate_autoregressive":
+            raise ValueError("Observation model must be multivariate_autoregressive.")
 
-        # Initialise the model base class
-        # This will build and compile the keras model
-        super().__init__(
-            n_states=n_states,
-            n_channels=n_channels,
-            sequence_length=sequence_length,
-            learning_rate=learning_rate,
-            multi_gpu=multi_gpu,
-            strategy=strategy,
-        )
+        # The base class will build and compile the keras model
+        super().__init__(dimensions, observation_model, training)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(
-            n_states=self.n_states,
-            n_channels=self.n_channels,
-            sequence_length=self.sequence_length,
-            n_lags=self.n_lags,
-            initial_coeffs=self.initial_coeffs,
-            initial_cov=self.initial_cov,
-            learn_coeffs=self.learn_coeffs,
-            learn_cov=self.learn_cov,
-        )
+        self.model = _model_structure(self.dimensions, self.observation_model)
 
     def compile(self):
-        """Wrapper for the standard keras compile method.
-
-        Sets up the optimizer and loss functions.
-        """
-        # Setup optimizer
-        optimizer = optimizers.Adam(learning_rate=self.learning_rate)
-
-        # Loss function
-        ll_loss = ModelOutputLoss()
-
-        # Compile
-        self.model.compile(optimizer=optimizer, loss=[ll_loss])
+        """Wrapper for the standard keras compile method."""
+        self.model.compile(
+            optimizer=self.training.optimizer, loss=[losses.ModelOutputLoss()]
+        )
 
     def fit(
         self,
@@ -143,14 +89,13 @@ class MARO(models.Base):
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                False,
-                False,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
                 tensorboard_dir,
                 save_best_after,
                 save_filepath,
+                additional_callbacks=[],
             ),
             args=args,
             kwargs=kwargs,
@@ -201,35 +146,15 @@ class MARO(models.Base):
 
 
 def _model_structure(
-    n_states: int,
-    n_channels: int,
-    sequence_length: int,
-    n_lags: int,
-    initial_coeffs: np.ndarray,
-    initial_cov: np.ndarray,
-    learn_coeffs: bool,
-    learn_cov: bool,
+    dimensions: models.config.Dimensions,
+    observation_model: models.config.ObservationModel,
 ):
     """Model structure.
 
     Parameters
     ----------
-    n_states : int
-        Numeber of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    n_lags : int
-        Order of the multivariate autoregressive observation model.
-    initial_coeffs : np.ndarray
-        Initial values for the MAR coefficients.
-    initial_cov : np.ndarray
-        Initial values for the covariances.
-    learn_coeffs : bool
-        Should we learn the MAR coefficients?
-    learn_cov : bool
-        Should we learn the covariances.
+    dimensions : vrad.models.config.Dimensions
+    observation_model : vrad.models.config.ObservationModel
 
     Returns
     -------
@@ -238,8 +163,12 @@ def _model_structure(
     """
 
     # Layers for inputs
-    data = layers.Input(shape=(sequence_length, n_channels), name="data")
-    alpha = layers.Input(shape=(sequence_length, n_states), name="alpha")
+    data = layers.Input(
+        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+    )
+    alpha = layers.Input(
+        shape=(dimensions.sequence_length, dimensions.n_states), name="alpha"
+    )
 
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
@@ -251,17 +180,21 @@ def _model_structure(
 
     # Definition of layers
     mar_params_layer = MARParametersLayer(
-        n_states,
-        n_channels,
-        n_lags,
-        initial_coeffs,
-        initial_cov,
-        learn_coeffs,
-        learn_cov,
+        dimensions.n_states,
+        dimensions.n_channels,
+        observation_model.n_lags,
+        observation_model.initial_coeffs,
+        observation_model.initial_cov,
+        observation_model.learn_coeffs,
+        observation_model.learn_cov,
         name="mar_params",
     )
     mean_cov_layer = MARMeanCovLayer(
-        n_states, n_channels, sequence_length, n_lags, name="mean_cov"
+        dimensions.n_states,
+        dimensions.n_channels,
+        dimensions.sequence_length,
+        observation_model.n_lags,
+        name="mean_cov",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 

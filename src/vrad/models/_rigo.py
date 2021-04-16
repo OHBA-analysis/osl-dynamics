@@ -11,8 +11,7 @@ from tensorflow import Variable
 from tensorflow.keras import Model, layers, optimizers
 from tqdm import trange
 from vrad import models
-from vrad.inference import initializers
-from vrad.inference.losses import ModelOutputLoss
+from vrad.inference import callbacks, initializers, losses
 from vrad.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLayer,
@@ -34,235 +33,65 @@ class RIGO(models.GO):
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-    rnn_type : str
-        RNN to use, either 'lstm' or 'gru'.
-    rnn_normalization : str
-        Type of normalization to use in the inference network and generative model.
-        Either 'layer', 'batch' or None.
-    n_layers_inference : int
-        Number of layers in the inference network.
-    n_layers_model : int
-        Number of layers in the generative model neural network.
-    n_units_inference : int
-        Number of units/neurons in the inference network.
-    n_units_model : int
-        Number of units/neurons in the generative model neural network.
-    dropout_rate_inference : float
-        Dropout rate in the inference network.
-    dropout_rate_model : float
-        Dropout rate in the generative model neural network.
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
-    learn_alpha_temperature : bool
-        Should we learn the alpha temperature when alpha_xform = 'softmax' or
-        'gumbel-softmax'?
-    do_alpha_temperature_annealing : bool
-        Should we perform alpha temperature annealing. Can be used when
-        alpha_xform = 'softmax' or 'gumbel-softmax'.
-    initial_alpha_temperature : float
-        Initial value for the alpha temperature if it is being learnt or if
-        we are performing alpha temperature annealing.
-    final_alpha_temperature : float
-        Final value for the alpha temperature if we are annealing.
-    n_epochs_alpha_temperature_annealing : int
-        Number of alpha temperature annealing epochs.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
-    do_kl_annealing : bool
-        Should we use KL annealing during training?
-    kl_annealing_sharpness : float
-        Parameter to control the annealing curve.
-    n_epochs_kl_annealing : int
-        Number of epochs to perform annealing.
-    learning_rate : float
-        Learning rate for updating model parameters/weights.
-    multi_gpu : bool
-        Should be use multiple GPUs for training?
-    strategy : str
-        Strategy for distributed learning.
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of the data in the model.
+    inference_network : vrad.models.config.RNN
+        Inference network hyperparameters.
+    model_network : vrad.models.config.RNN
+        Model network hyperparameters.
+    alpha : vrad.models.config.Alpha
+        Parameters related to alpha.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    kl_annealing : vrad.models.config.KLAnnealing
+        Parameters related to KL annealing.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
     """
 
     def __init__(
         self,
-        n_states: int,
-        n_channels: int,
-        sequence_length: int,
-        learn_covariances: bool,
-        rnn_type: str,
-        rnn_normalization: str,
-        n_layers_inference: int,
-        n_layers_model: int,
-        n_units_inference: int,
-        n_units_model: int,
-        dropout_rate_inference: float,
-        dropout_rate_model: float,
-        theta_normalization: str,
-        alpha_xform: str,
-        initial_alpha_temperature: float,
-        learn_alpha_scaling: bool,
-        normalize_covariances: bool,
-        do_kl_annealing: bool,
-        learning_rate: float,
-        learn_alpha_temperature: bool = None,
-        do_alpha_temperature_annealing: bool = False,
-        final_alpha_temperature: float = None,
-        n_epochs_alpha_temperature_annealing: int = None,
-        kl_annealing_sharpness: float = None,
-        n_epochs_kl_annealing: int = None,
-        multi_gpu: bool = False,
-        strategy: str = None,
-        initial_covariances: np.ndarray = None,
+        dimensions: models.config.Dimensions,
+        inference_network: models.config.RNN,
+        model_network: models.config.RNN,
+        alpha: models.config.Alpha,
+        observation_model: models.config.ObservationModel,
+        kl_annealing: models.config.KLAnnealing,
+        training: models.config.Training,
     ):
-        # Validation
-        if n_layers_inference < 1 or n_layers_model < 1:
-            raise ValueError("n_layers must be greater than zero.")
-
-        if n_units_inference < 1 or n_units_model < 1:
-            raise ValueError("n_units must be greater than zero.")
-
-        if dropout_rate_inference < 0 or dropout_rate_model < 0:
-            raise ValueError("dropout_rate must be greater than or equal to zero.")
-
-        if alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
-            raise ValueError(
-                "alpha_xform must be 'gumbel-softmax', 'softmax' or 'softplus'."
-            )
-
-        if do_kl_annealing:
-            if kl_annealing_sharpness is None or n_epochs_kl_annealing is None:
-                raise ValueError(
-                    "If we are performing KL annealing, kl_annealing_sharpness and "
-                    + "n_epochs_kl_annealing must be passed."
-                )
-
-            if kl_annealing_sharpness <= 0:
-                raise ValueError("kl_annealing_sharpness must be greater than zero.")
-
-            if n_epochs_kl_annealing < 0:
-                raise ValueError(
-                    "n_epochs_kl_annealing must be equal to or greater than zero."
-                )
-
-        if learn_alpha_temperature is None and do_alpha_temperature_annealing is None:
-            raise ValueError(
-                "Either learn_alpha_temperature or do_alpha_temperature_annealing "
-                + "must be passed."
-            )
-
-        if do_alpha_temperature_annealing:
-            if (
-                final_alpha_temperature is None
-                or n_epochs_alpha_temperature_annealing is None
-            ):
-                raise ValueError(
-                    "If we are performing alpha temperature annealing, "
-                    + "final_alpha_temperature and n_epochs_alpha_temperature_annealing "
-                    + "must be passed."
-                )
-
-            if n_epochs_alpha_temperature_annealing < 0:
-                raise ValueError(
-                    "n_epochs_alpha_temperature_annealing must be equal to or greater "
-                    + "than zero."
-                )
-
-        # RNN and inference hyperparameters
-        self.rnn_type = rnn_type
-        self.rnn_normalization = rnn_normalization
-        self.n_layers_inference = n_layers_inference
-        self.n_layers_model = n_layers_model
-        self.n_units_inference = n_units_inference
-        self.n_units_model = n_units_model
-        self.dropout_rate_inference = dropout_rate_inference
-        self.dropout_rate_model = dropout_rate_model
-        self.theta_normalization = theta_normalization
-        self.alpha_xform = alpha_xform
+        # Settings
+        self.inference_network = inference_network
+        self.model_network = model_network
+        self.alpha = alpha
+        self.kl_annealing = kl_annealing
 
         # KL annealing
-        self.do_kl_annealing = do_kl_annealing
-        self.kl_annealing_factor = Variable(0.0) if do_kl_annealing else Variable(1.0)
-        self.kl_annealing_sharpness = kl_annealing_sharpness
-        self.n_epochs_kl_annealing = n_epochs_kl_annealing
-
-        # Alpha temperature learning/annealing
-        self.learn_alpha_temperature = learn_alpha_temperature
-        self.do_alpha_temperature_annealing = do_alpha_temperature_annealing
-        self.initial_alpha_temperature = initial_alpha_temperature
-        self.final_alpha_temperature = final_alpha_temperature
-        self.n_epochs_alpha_temperature_annealing = n_epochs_alpha_temperature_annealing
+        self.kl_annealing_factor = Variable(0.0) if kl_annealing.do else Variable(1.0)
 
         # Initialise the observation model
         # This will inherit the base model, build and compile the model
-        super().__init__(
-            n_states=n_states,
-            n_channels=n_channels,
-            sequence_length=sequence_length,
-            learn_alpha_scaling=learn_alpha_scaling,
-            normalize_covariances=normalize_covariances,
-            learning_rate=learning_rate,
-            multi_gpu=multi_gpu,
-            strategy=strategy,
-            initial_covariances=initial_covariances,
-            learn_covariances=learn_covariances,
-        )
+        super().__init__(dimensions, observation_model, training)
 
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(
-            n_states=self.n_states,
-            n_channels=self.n_channels,
-            sequence_length=self.sequence_length,
-            rnn_type=self.rnn_type,
-            rnn_normalization=self.rnn_normalization,
-            n_layers_inference=self.n_layers_inference,
-            n_layers_model=self.n_layers_model,
-            n_units_inference=self.n_units_inference,
-            n_units_model=self.n_units_model,
-            dropout_rate_inference=self.dropout_rate_inference,
-            dropout_rate_model=self.dropout_rate_model,
-            theta_normalization=self.theta_normalization,
-            alpha_xform=self.alpha_xform,
-            learn_alpha_temperature=self.learn_alpha_temperature,
-            initial_alpha_temperature=self.initial_alpha_temperature,
-            initial_means=None,
-            initial_covariances=self.initial_covariances,
-            learn_means=False,
-            learn_covariances=self.learn_covariances,
-            learn_alpha_scaling=self.learn_alpha_scaling,
-            normalize_covariances=self.normalize_covariances,
+            self.dimensions,
+            self.inference_network,
+            self.model_network,
+            self.alpha,
+            self.observation_model,
         )
 
     def compile(self):
-        """Wrapper for the standard keras compile method.
+        """Wrapper for the standard keras compile method."""
 
-        Sets up the optimizer and loss functions.
-        """
-        # Setup optimizer
-        optimizer = optimizers.Adam(learning_rate=self.learning_rate)
-
-        # Loss functions
-        ll_loss = ModelOutputLoss()
-        kl_loss = ModelOutputLoss(self.kl_annealing_factor)
+        # Loss function
+        ll_loss = losses.ModelOutputLoss()
+        kl_loss = losses.ModelOutputLoss(self.kl_annealing_factor)
         loss = [ll_loss, kl_loss]
 
         # Compile
-        self.model.compile(optimizer=optimizer, loss=loss)
+        self.model.compile(optimizer=self.training.optimizer, loss=loss)
 
     def fit(
         self,
@@ -310,24 +139,43 @@ class RIGO(models.GO):
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
 
+        additional_callbacks = []
+
         if kl_annealing_callback is None:
-            kl_annealing_callback = self.do_kl_annealing
+            kl_annealing_callback = self.kl_annealing.do
+
+        if kl_annealing_callback:
+            kl_annealing_callback = callbacks.KLAnnealingCallback(
+                kl_annealing_factor=self.kl_annealing_factor,
+                annealing_sharpness=self.kl_annealing.sharpness,
+                n_epochs_annealing=self.kl_annealing.n_epochs,
+            )
+            additional_callbacks.append(kl_annealing_callback)
 
         if alpha_temperature_annealing_callback is None:
-            alpha_temperature_annealing_callback = self.do_alpha_temperature_annealing
+            alpha_temperature_annealing_callback = self.alpha.learn_temperature
+
+        if alpha_temperature_annealing_callback:
+            alpha_temperature_annealing_callback = (
+                callbacks.AlphaTemperatureAnnealingCallback(
+                    initial_alpha_temperature=self.alpha.initial_temperature,
+                    final_alpha_temperature=self.alpha.final_temperature,
+                    n_epochs_annealing=self.alpha.n_epochs_annealing,
+                )
+            )
+            additional_callbacks.append(alpha_temperature_annealing_callback)
 
         args, kwargs = replace_argument(
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                kl_annealing_callback,
-                alpha_temperature_annealing_callback,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
                 tensorboard_dir,
                 save_best_after,
                 save_filepath,
+                additional_callbacks,
             ),
             args=args,
             kwargs=kwargs,
@@ -343,11 +191,11 @@ class RIGO(models.GO):
         """
         self.compile()
         initializers.reinitialize_model_weights(self.model)
-        if self.do_kl_annealing:
+        if self.kl_annealing.do:
             self.kl_annealing_factor.assign(0.0)
-        if self.do_alpha_temperature_annealing:
+        if self.alpha.do_annealing:
             alpha_layer = self.model.get_layer("alpha")
-            alpha_layer.alpha_temperature = self.initial_alpha_temperature
+            alpha_layer.alpha_temperature = self.alpha.initial_temperature
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
@@ -378,8 +226,8 @@ class RIGO(models.GO):
         Returns
         -------
         np.ndarray
-            State mixing factors with shape (n_subjects, n_samples, n_states) or
-            (n_samples, n_states).
+            State mixing factors with shape (n_subjects, n_samples,
+            dimensions.n_states) or (n_samples, dimensions.n_states).
         """
         inputs = self._make_dataset(inputs)
         outputs = []
@@ -530,18 +378,21 @@ class RIGO(models.GO):
         alpha_layer = self.model.get_layer("alpha")
 
         # Sequence of the underlying logits theta
-        theta_norm = np.zeros([self.sequence_length, self.n_states], dtype=np.float32)
+        theta_norm = np.zeros(
+            [self.dimensions.sequence_length, self.dimensions.n_states],
+            dtype=np.float32,
+        )
 
         # Normally distributed random numbers used to sample the logits theta
-        epsilon = np.random.normal(0, 1, [n_samples + 1, self.n_states]).astype(
-            np.float32
-        )
+        epsilon = np.random.normal(
+            0, 1, [n_samples + 1, self.dimensions.n_states]
+        ).astype(np.float32)
 
         # Activate the first state for the first sample
         theta_norm[-1, 0] = 1
 
         # Sample the state fixing factors
-        alpha = np.empty([n_samples, self.n_states], dtype=np.float32)
+        alpha = np.empty([n_samples, self.dimensions.n_states], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling state time course", ncols=98):
 
             # If there are leading zeros we trim theta so that we don't pass the zeros
@@ -571,78 +422,30 @@ class RIGO(models.GO):
 
 
 def _model_structure(
-    n_states: int,
-    n_channels: int,
-    sequence_length: int,
-    rnn_type: str,
-    rnn_normalization: str,
-    n_layers_inference: int,
-    n_layers_model: int,
-    n_units_inference: int,
-    n_units_model: int,
-    dropout_rate_inference: float,
-    dropout_rate_model: float,
-    theta_normalization: str,
-    alpha_xform: str,
-    learn_alpha_temperature: bool,
-    initial_alpha_temperature: float,
-    initial_means: np.ndarray,
-    initial_covariances: np.ndarray,
-    learn_means: bool,
-    learn_covariances: bool,
-    learn_alpha_scaling: bool,
-    normalize_covariances: bool,
+    dimensions: models.config.Dimensions,
+    inference_network: models.config.RNN,
+    model_network: models.config.RNN,
+    alpha: models.config.Alpha,
+    observation_model: models.config.ObservationModel,
 ):
     """Model structure.
 
     Parameters
     ----------
-    n_states : int
-        Numeber of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    rnn_type : int
-        RNN to use, either 'lstm' or 'gru'.
-    rnn_normalization : str
-        Type of normalization to use in the inference network and generative model.
-        Either 'layer', 'batch' or None.
-    n_layers_inference : int
-        Number of layers in the inference network.
-    n_layers_model : int
-        Number of layers in the generative model neural network.
-    n_units_inference : int
-        Number of units/neurons in the inference network.
-    n_units_model : int
-        Number of units/neurons in the generative model neural network.
-    dropout_rate_inference : float
-        Dropout rate in the inference network.
-    dropout_rate_model : float
-        Dropout rate in the generative model neural network.
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
-    learn_means : bool
-        Should we learn the mean vector for each state?
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-    initial_means : np.ndarray
-        Initial values for the state means. Should have shape (n_states, n_channels).
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
-    alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
-    learn_alpha_temperature : bool
-        Should we learn the alpha temperature when alpha_xform = 'softmax' or
-        'gumbel-softmax'?
-    initial_alpha_temperature : float
-        Temperature parameter for when alpha_xform = 'softmax' or 'gumbel-softmax'.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of the data in the model.
+    inference_network : vrad.models.config.RNN
+        Inference network hyperparameters.
+    model_network : vrad.models.config.RNN
+        Model network hyperparameters.
+    alpha : vrad.models.config.Alpha
+        Parameters related to alpha.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    kl_annealing : vrad.models.config.KLAnnealing
+        Parameters related to KL annealing.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
 
     Returns
     -------
@@ -651,7 +454,9 @@ def _model_structure(
     """
 
     # Layer for input
-    inputs = layers.Input(shape=(sequence_length, n_channels), name="data")
+    inputs = layers.Input(
+        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+    )
 
     # Inference RNN:
     # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
@@ -660,27 +465,29 @@ def _model_structure(
 
     # Definition of layers
     inference_input_dropout_layer = layers.Dropout(
-        dropout_rate_inference, name="data_drop"
+        inference_network.dropout_rate, name="data_drop"
     )
     inference_output_layers = InferenceRNNLayers(
-        rnn_type,
-        rnn_normalization,
-        n_layers_inference,
-        n_units_inference,
-        dropout_rate_inference,
+        inference_network.rnn,
+        inference_network.normalization,
+        inference_network.n_layers,
+        inference_network.n_units,
+        inference_network.dropout_rate,
         name="inf_rnn",
     )
-    inf_mu_layer = layers.Dense(n_states, name="inf_mu")
-    inf_sigma_layer = layers.Dense(n_states, activation="softplus", name="inf_sigma")
+    inf_mu_layer = layers.Dense(dimensions.n_states, name="inf_mu")
+    inf_sigma_layer = layers.Dense(
+        dimensions.n_states, activation="softplus", name="inf_sigma"
+    )
 
     # Layers to sample theta from q(theta) and to convert to state mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
-    theta_norm_layer = NormalizationLayer(theta_normalization, name="theta_norm")
+    theta_norm_layer = NormalizationLayer(alpha.theta_normalization, name="theta_norm")
     alpha_layer = ThetaActivationLayer(
-        alpha_xform,
-        initial_alpha_temperature,
-        learn_alpha_temperature,
+        alpha.xform,
+        alpha.initial_temperature,
+        alpha.learn_temperature,
         name="alpha",
     )
 
@@ -701,17 +508,20 @@ def _model_structure(
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        n_states,
-        n_channels,
-        learn_means=learn_means,
-        learn_covariances=learn_covariances,
-        normalize_covariances=normalize_covariances,
-        initial_means=initial_means,
-        initial_covariances=initial_covariances,
+        dimensions.n_states,
+        dimensions.n_channels,
+        learn_means=False,
+        learn_covariances=observation_model.learn_covariances,
+        normalize_covariances=observation_model.normalize_covariances,
+        initial_means=None,
+        initial_covariances=observation_model.initial_covariances,
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, learn_alpha_scaling, name="mix_means_covs"
+        dimensions.n_states,
+        dimensions.n_channels,
+        observation_model.learn_alpha_scaling,
+        name="mix_means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
@@ -727,18 +537,20 @@ def _model_structure(
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
-        dropout_rate_model, name="theta_norm_drop"
+        model_network.dropout_rate, name="theta_norm_drop"
     )
     model_output_layers = ModelRNNLayers(
-        rnn_type,
-        rnn_normalization,
-        n_layers_model,
-        n_units_model,
-        dropout_rate_model,
+        model_network.rnn,
+        model_network.normalization,
+        model_network.n_layers,
+        model_network.n_units,
+        model_network.dropout_rate,
         name="mod_rnn",
     )
-    mod_mu_layer = layers.Dense(n_states, name="mod_mu")
-    mod_sigma_layer = layers.Dense(n_states, activation="softplus", name="mod_sigma")
+    mod_mu_layer = layers.Dense(dimensions.n_states, name="mod_mu")
+    mod_sigma_layer = layers.Dense(
+        dimensions.n_states, activation="softplus", name="mod_sigma"
+    )
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 
     # Data flow

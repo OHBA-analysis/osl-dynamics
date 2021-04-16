@@ -7,13 +7,12 @@ import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers, optimizers
 from tensorflow.nn import softplus
 from vrad import models
-from vrad.inference import initializers
+from vrad.inference import initializers, losses
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
-from vrad.inference.losses import ModelOutputLoss
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
 from vrad.utils.misc import replace_argument
 
@@ -23,85 +22,35 @@ class GO(models.Base):
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
-    learning_rate : float
-        Learning rate for updating model parameters/weights.
-    multi_gpu : bool
-        Should be use multiple GPUs for training?
-    strategy : str
-        Strategy for distributed learning.
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels). Optional.
-    learn_covariances : bool
-        Should we learn the covariance matrix for each state?
-        Optional, default is True.
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of data in the model.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
+    training : vrad.models.config.Training
+        Parameters related to training a model.
     """
 
     def __init__(
         self,
-        n_states: int,
-        n_channels: int,
-        sequence_length: int,
-        learn_alpha_scaling: bool,
-        normalize_covariances: bool,
-        learning_rate: float,
-        multi_gpu: bool = False,
-        strategy: str = None,
-        initial_covariances: np.ndarray = None,
-        learn_covariances: bool = True,
+        dimensions: models.config.Dimensions,
+        observation_model: models.config.ObservationModel,
+        training: models.config.Training,
     ):
-        # Parameters related to the observation model
-        self.learn_alpha_scaling = learn_alpha_scaling
-        self.normalize_covariances = normalize_covariances
-        self.initial_covariances = initial_covariances
-        self.learn_covariances = learn_covariances
+        if observation_model.model != "multivariate_normal":
+            raise ValueError("Observation model must be multivariate_normal.")
 
-        # Initialise the model base class
-        # This will build and compile the keras model
-        super().__init__(
-            n_states=n_states,
-            n_channels=n_channels,
-            sequence_length=sequence_length,
-            learning_rate=learning_rate,
-            multi_gpu=multi_gpu,
-            strategy=strategy,
-        )
+        # The base class will build and compile the keras model
+        super().__init__(dimensions, observation_model, training)
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(
-            n_states=self.n_states,
-            n_channels=self.n_channels,
-            sequence_length=self.sequence_length,
-            learn_alpha_scaling=self.learn_alpha_scaling,
-            normalize_covariances=self.normalize_covariances,
-            initial_covariances=self.initial_covariances,
-            learn_covariances=self.learn_covariances,
-        )
+        self.model = _model_structure(self.dimensions, self.observation_model)
 
     def compile(self):
-        """Wrapper for the standard keras compile method.
-
-        Sets up the optimizer and loss functions.
-        """
-        # Setup optimizer
-        optimizer = optimizers.Adam(learning_rate=self.learning_rate)
-
-        # Loss function
-        ll_loss = ModelOutputLoss()
-
-        # Compile
-        self.model.compile(optimizer=optimizer, loss=[ll_loss])
+        """Wrapper for the standard keras compile method."""
+        self.model.compile(
+            optimizer=self.training.optimizer, loss=[losses.ModelOutputLoss()]
+        )
 
     def fit(
         self,
@@ -147,14 +96,13 @@ class GO(models.Base):
             func=self.model.fit,
             name="callbacks",
             item=self.create_callbacks(
-                False,
-                False,
                 use_tqdm,
                 tqdm_class,
                 use_tensorboard,
                 tensorboard_dir,
                 save_best_after,
                 save_filepath,
+                addtional_callbacks=[],
             ),
             args=args,
             kwargs=kwargs,
@@ -189,7 +137,7 @@ class GO(models.Base):
         covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
 
         # Normalise covariances
-        if self.normalize_covariances:
+        if self.observation_model.normalize_covariances:
             covariances = trace_normalize(covariances).numpy()
 
         # Apply alpha scaling
@@ -242,33 +190,17 @@ class GO(models.Base):
 
 
 def _model_structure(
-    n_states: int,
-    n_channels: int,
-    sequence_length: int,
-    learn_alpha_scaling: bool,
-    normalize_covariances: bool,
-    initial_covariances: np.ndarray,
-    learn_covariances: bool,
+    dimensions: models.config.Dimensions,
+    observation_model: models.config.ObservationModel,
 ):
     """Model structure.
 
     Parameters
     ----------
-    n_states : int
-        Numeber of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the state covariances?
-    initial_covariances : np.ndarray
-        Initial values for the state covariances. Should have shape (n_states,
-        n_channels, n_channels).
-    learn_covariances : bool
-        Should we learn the covariances?
+    dimensions : vrad.models.config.Dimensions
+        Dimensions of data in the model.
+    observation_model : vrad.models.config.ObservationModel
+        Parameters related to the observation model.
 
     Returns
     -------
@@ -277,8 +209,12 @@ def _model_structure(
     """
 
     # Layers for inputs
-    data = layers.Input(shape=(sequence_length, n_channels), name="data")
-    alpha = layers.Input(shape=(sequence_length, n_states), name="alpha")
+    data = layers.Input(
+        shape=(dimensions.sequence_length, dimensions.n_channels), name="data"
+    )
+    alpha = layers.Input(
+        shape=(dimensions.sequence_length, dimensions.n_states), name="alpha"
+    )
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
@@ -288,17 +224,20 @@ def _model_structure(
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        n_states,
-        n_channels,
+        dimensions.n_states,
+        dimensions.n_channels,
         learn_means=False,
-        learn_covariances=learn_covariances,
-        normalize_covariances=normalize_covariances,
+        learn_covariances=observation_model.learn_covariances,
+        normalize_covariances=observation_model.normalize_covariances,
         initial_means=None,
-        initial_covariances=initial_covariances,
+        initial_covariances=observation_model.initial_covariances,
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        n_states, n_channels, learn_alpha_scaling, name="mix_means_covs"
+        dimensions.n_states,
+        dimensions.n_channels,
+        observation_model.learn_alpha_scaling,
+        name="mix_means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 

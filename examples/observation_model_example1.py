@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import tf_ops
-from vrad.models import GO
+from vrad.models import config, GO
 from vrad.utils import plotting
 
 # GPU settings
@@ -21,15 +21,23 @@ observation_error = 0.2
 gamma_shape = 20
 gamma_scale = 10
 
-n_states = 5
-sequence_length = 200
+dimensions = config.Dimensions(
+    n_states=5,
+    n_channels=80,
+    sequence_length=200,
+)
 
-batch_size = 16
-learning_rate = 0.01
-n_epochs = 20
+observation_model = config.ObservationModel(
+    model="multivariate_normal",
+    learn_alpha_scaling=False,
+    normalize_covariances=False,
+)
 
-learn_alpha_scaling = False
-normalize_covariances = False
+training = config.Training(
+    batch_size=16,
+    learning_rate=0.01,
+    n_epochs=20,
+)
 
 # Load state transition probability matrix and covariances of each state
 example_file_directory = Path(__file__).parent / "files"
@@ -54,28 +62,20 @@ sim = simulation.MixedHSMM_MVN(
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
-n_channels = meg_data.n_channels
 
 # Prepare dataset
 training_dataset = meg_data.training_dataset(
-    sequence_length,
-    batch_size,
+    dimensions.sequence_length,
+    training.batch_size,
     alpha=[sim.state_time_course],
 )
 
 # Build model
-model = GO(
-    n_channels=n_channels,
-    n_states=n_states,
-    sequence_length=sequence_length,
-    learn_alpha_scaling=learn_alpha_scaling,
-    normalize_covariances=normalize_covariances,
-    learning_rate=learning_rate,
-)
+model = GO(dimensions, observation_model, training)
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
+history = model.fit(training_dataset, epochs=training.n_epochs)
 
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")
