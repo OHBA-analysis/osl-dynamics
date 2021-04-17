@@ -1,16 +1,13 @@
 """Base class for an inference model.
 
 """
-import logging
-from operator import lt
+
 from typing import Tuple, Union
 
 import numpy as np
 from tensorflow import Variable
 from vrad.inference import callbacks, initializers, losses
 from vrad.utils.misc import replace_argument
-
-_logger = logging.getLogger("VRAD")
 
 
 class InferenceModelBase:

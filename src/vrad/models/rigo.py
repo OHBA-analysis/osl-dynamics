@@ -2,6 +2,9 @@
 
 """
 
+import logging
+from operator import lt
+
 import numpy as np
 from tensorflow.keras import Model, layers
 from tqdm import trange
@@ -18,6 +21,8 @@ from vrad.models.layers import (
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
 )
+
+_logger = logging.getLogger("VRAD")
 
 
 class RIGO(InferenceModelBase, GO):
