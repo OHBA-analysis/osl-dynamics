@@ -16,7 +16,7 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
         Alpha temperature for the theta activation function.
     final_alpha_temperature : float
         Final value for the alpha temperature.
-    n_epochs_annealing : int
+    n_annealing_epochs : int
         Number of epochs to apply annealing.
     """
 
@@ -24,15 +24,15 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
         self,
         initial_alpha_temperature: float,
         final_alpha_temperature: float,
-        n_epochs_annealing: int,
+        n_annealing_epochs: int,
     ):
         super().__init__()
         self.initial_alpha_temperature = initial_alpha_temperature
         self.final_alpha_temperature = final_alpha_temperature
-        self.n_epochs_annealing = n_epochs_annealing
+        self.n_annealing_epochs = n_annealing_epochs
         self.alpha_temperature_gradient = (
             final_alpha_temperature - initial_alpha_temperature
-        ) / n_epochs_annealing
+        ) / n_annealing_epochs
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -47,7 +47,7 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
         """
         alpha_layer = self.model.get_layer("alpha")
         epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
-        if epoch < self.n_epochs_annealing:
+        if epoch < self.n_annealing_epochs:
             new_value = (
                 self.initial_alpha_temperature + epoch * self.alpha_temperature_gradient
             )
@@ -67,10 +67,10 @@ class KLAnnealingCallback(callbacks.Callback):
         Shape of the annealing curve. Either 'linear' or 'tanh'.
     annealing_sharpness : float
         Parameter to control the shape of the annealing curve.
-    n_epochs_annealing : int
+    n_annealing_epochs : int
         Number of epochs to apply annealing.
     n_cycles : int
-        Number of times to perform KL annealing with n_epochs_annealing.
+        Number of times to perform KL annealing with n_annealing_epochs.
     """
 
     def __init__(
@@ -78,7 +78,7 @@ class KLAnnealingCallback(callbacks.Callback):
         kl_annealing_factor: tf.Variable,
         curve: str,
         annealing_sharpness: float,
-        n_epochs_annealing: int,
+        n_annealing_epochs: int,
         n_cycles: int,
     ):
         if curve not in ["linear", "tanh"]:
@@ -88,9 +88,9 @@ class KLAnnealingCallback(callbacks.Callback):
         self.kl_annealing_factor = kl_annealing_factor
         self.curve = curve
         self.annealing_sharpness = annealing_sharpness
-        self.n_epochs_annealing = n_epochs_annealing
+        self.n_annealing_epochs = n_annealing_epochs
         self.n_cycles = n_cycles
-        self.n_epochs_one_cycle = n_epochs_annealing // n_cycles
+        self.n_epochs_one_cycle = n_annealing_epochs // n_cycles
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -104,7 +104,7 @@ class KLAnnealingCallback(callbacks.Callback):
             validation is performed.
         """
         epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
-        if epoch < self.n_epochs_annealing:
+        if epoch < self.n_annealing_epochs:
             epoch = epoch % self.n_epochs_one_cycle
             if self.curve == "tanh":
                 new_value = (

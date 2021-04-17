@@ -92,8 +92,8 @@ class InferenceModelBase:
                 kl_annealing_factor=self.kl_annealing_factor,
                 curve=self.config.kl_annealing_curve,
                 annealing_sharpness=self.config.kl_annealing_sharpness,
-                n_epochs_annealing=self.config.n_epochs_kl_annealing,
-                n_cycles=self.config.n_cycles_kl_annealing,
+                n_epochs_annealing=self.config.n_kl_annealing_epochs,
+                n_cycles=self.config.n_kl_annealing_cycles,
             )
             additional_callbacks.append(kl_annealing_callback)
 

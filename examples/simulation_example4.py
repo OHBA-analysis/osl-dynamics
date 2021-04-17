@@ -41,8 +41,8 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_epochs_kl_annealing=50,
-    n_cycles_kl_annealing=1,
+    n_kl_annealing_epochs=50,
+    n_kl_annealing_cycles=1,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=100,
@@ -114,7 +114,7 @@ print("Training model")
 history = model.fit(
     training_dataset,
     epochs=config.n_epochs,
-    save_best_after=config.n_epochs_kl_annealing,
+    save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
 )
 
