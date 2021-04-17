@@ -92,6 +92,7 @@ class RIDGO(InferenceModelBase, GO):
                 curve=self.config.kl_annealing_curve,
                 annealing_sharpness=self.config.kl_annealing_sharpness,
                 n_epochs_annealing=self.config.n_epochs_kl_annealing,
+                n_cycles=self.config.n_cycles_kl_annealing,
             )
             additional_callbacks.append(kl_annealing_callback)
 

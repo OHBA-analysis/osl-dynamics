@@ -37,6 +37,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=15,
     n_epochs_kl_annealing=600,
+    n_cycles_kl_annealing=1,
     batch_size=64,
     learning_rate=0.001,
     n_epochs=800,

@@ -69,6 +69,8 @@ class KLAnnealingCallback(callbacks.Callback):
         Parameter to control the shape of the annealing curve.
     n_epochs_annealing : int
         Number of epochs to apply annealing.
+    n_cycles : int
+        Number of times to perform KL annealing with n_epochs_annealing.
     """
 
     def __init__(
@@ -77,6 +79,7 @@ class KLAnnealingCallback(callbacks.Callback):
         curve: str,
         annealing_sharpness: float,
         n_epochs_annealing: int,
+        n_cycles: int,
     ):
         if curve not in ["linear", "tanh"]:
             raise NotImplementedError(curve)
@@ -86,6 +89,8 @@ class KLAnnealingCallback(callbacks.Callback):
         self.curve = curve
         self.annealing_sharpness = annealing_sharpness
         self.n_epochs_annealing = n_epochs_annealing
+        self.n_cycles = n_cycles
+        self.n_epochs_one_cycle = n_epochs_annealing // n_cycles
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -98,20 +103,21 @@ class KLAnnealingCallback(callbacks.Callback):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
+        epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
         if epoch < self.n_epochs_annealing:
+            epoch = epoch % self.n_epochs_one_cycle
             if self.curve == "tanh":
                 new_value = (
                     0.5
                     * tanh(
                         self.annealing_sharpness
-                        * (epoch - 0.5 * self.n_epochs_annealing)
-                        / self.n_epochs_annealing
+                        * (epoch - 0.5 * self.n_epochs_one_cycle)
+                        / self.n_epochs_one_cycle
                     )
                     + 0.5
                 )
             elif self.curve == "linear":
-                epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
-                new_value = epoch / self.n_epochs_annealing
+                new_value = epoch / self.n_epochs_one_cycle
             self.kl_annealing_factor.assign(new_value)
         else:
             self.kl_annealing_factor.assign(1.0)

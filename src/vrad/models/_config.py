@@ -120,6 +120,8 @@ class Config:
         kl_annealing_curve='tanh'.
     n_epochs_kl_annealing : int
         Number of epochs to perform KL annealing.
+    n_cycles_kl_annealing : int
+        Number of times to perform KL annealing within n_epochs_kl_annealing.
 
     Training Parameters
     -------------------
@@ -190,6 +192,7 @@ class Config:
     kl_annealing_curve: Literal["linear", "tanh"] = None
     kl_annealing_sharpness: float = None
     n_epochs_kl_annealing: int = None
+    n_cycles_kl_annealing: int = None
 
     # Training parameters
     batch_size: int = None
@@ -244,6 +247,7 @@ class Config:
             self.kl_annealing_curve,
             self.kl_annealing_sharpness,
             self.n_epochs_kl_annealing,
+            self.n_cycles_kl_annealing,
         )
         validate_training_parameters(
             self.batch_size, self.n_epochs, self.learning_rate, self.optimizer
@@ -260,6 +264,7 @@ class Config:
             learning_rate=self.learning_rate
         )
 
+        # Multi-GPU training
         if self.multi_gpu is None:
             self.multi_gpu = True
 
@@ -358,7 +363,11 @@ def validate_dimension_parameters(n_states, n_channels, sequence_length):
 
 @pass_if_all_none
 def validate_kl_annealing_parameters(
-    do_kl_annealing, kl_annealing_curve, kl_annealing_sharpness, n_epochs_kl_annealing
+    do_kl_annealing,
+    kl_annealing_curve,
+    kl_annealing_sharpness,
+    n_epochs_kl_annealing,
+    n_cycles_kl_annealing,
 ):
     if do_kl_annealing is None:
         raise ValueError("do_kl_annealing must be passed.")
@@ -372,15 +381,6 @@ def validate_kl_annealing_parameters(
         if kl_annealing_curve not in ["linear", "tanh"]:
             raise ValueError("KL annealing curve must be 'linear' or 'tanh'.")
 
-        if n_epochs_kl_annealing is None:
-            raise ValueError(
-                "If we are performing KL annealing, n_epochs_kl_annealing must be "
-                + "passed."
-            )
-
-        if n_epochs_kl_annealing < 1:
-            raise ValueError("Number of KL annealing epochs must be greater than zero.")
-
         if kl_annealing_curve == "tanh":
             if kl_annealing_sharpness is None:
                 raise ValueError(
@@ -390,6 +390,23 @@ def validate_kl_annealing_parameters(
 
             if kl_annealing_sharpness < 0:
                 raise ValueError("KL annealing sharpness must be positive.")
+
+        if n_epochs_kl_annealing is None:
+            raise ValueError(
+                "If we are performing KL annealing, n_epochs_kl_annealing must be "
+                + "passed."
+            )
+
+        if n_epochs_kl_annealing < 1:
+            raise ValueError("Number of KL annealing epochs must be greater than zero.")
+
+        if n_cycles_kl_annealing is None:
+            raise ValueError(
+                "If we are perform KL annealing, n_cycles_kl_annealing must be passed."
+            )
+
+        if n_cycles_kl_annealing < 1:
+            raise ValueError("n_cycles_kl_annealing must be one or greater.")
 
 
 def validate_observation_model_parameters(
