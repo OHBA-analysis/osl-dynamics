@@ -142,4 +142,4 @@ def _model_structure(config):
     m, C = mix_means_covs_layer([alpha, mu, D])
     ll_loss = ll_loss_layer([data, m, C])
 
-    return Model(inputs=[data, alpha], outputs=[ll_loss])
+    return Model(inputs=[data, alpha], outputs=[ll_loss], name="GO")

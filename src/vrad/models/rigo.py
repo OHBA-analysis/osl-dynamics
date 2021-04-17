@@ -268,4 +268,4 @@ def _model_structure(config):
     mod_sigma = mod_sigma_layer(model_output)
     kl_loss = kl_loss_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
-    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha])
+    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RIGO")

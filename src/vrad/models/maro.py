@@ -101,4 +101,4 @@ def _model_structure(config):
     clipped_data, mu, sigma = mean_cov_layer([data, alpha, coeffs, cov])
     ll_loss = ll_loss_layer([clipped_data, mu, sigma])
 
-    return Model(inputs=[data, alpha], outputs=[ll_loss])
+    return Model(inputs=[data, alpha], outputs=[ll_loss], name="MARO")

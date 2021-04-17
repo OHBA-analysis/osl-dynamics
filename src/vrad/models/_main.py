@@ -27,27 +27,22 @@ def Model(config):
     if config.inference_rnn is None:
 
         if config.observation_model == "multivariate_normal":
-            print("Using GO")
             return GO(config)
 
         elif config.observation_model == "multivariate_autoregressive":
-            print("Using MARO")
             return MARO(config)
 
     if config.observation_model == "multivariate_normal":
 
         if config.alpha_pdf == "normal":
-            print("Using RIGO")
             return RIGO(config)
 
         elif config.alpha_pdf == "dirichlet":
-            print("Using RIDGO")
             return RIDGO(config)
 
     elif config.observation_model == "multivariate_autoregressive":
 
         if config.alpha_pdf == "normal":
-            print("Using RIMARO")
             return RIMARO(config)
 
         elif config.alpha_pdf == "dirichlet":

@@ -244,4 +244,4 @@ def _model_structure(config):
     model_alpha = model_alpha_layer(model_rnn_output)
     kl_loss = kl_loss_layer([inference_alpha, model_alpha])
 
-    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, samples])
+    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, samples], name="RIDGO")
