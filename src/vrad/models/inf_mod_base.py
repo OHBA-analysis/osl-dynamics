@@ -98,7 +98,9 @@ class InferenceModelBase:
             additional_callbacks.append(kl_annealing_callback)
 
         if alpha_temperature_annealing_callback is None:
-            alpha_temperature_annealing_callback = self.config.learn_alpha_temperature
+            alpha_temperature_annealing_callback = (
+                self.config.do_alpha_temperature_annealing
+            )
 
         if alpha_temperature_annealing_callback:
             alpha_temperature_annealing_callback = (
