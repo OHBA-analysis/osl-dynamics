@@ -10,7 +10,10 @@ from vrad.models.rimaro import RIMARO
 
 
 def Model(config):
-    """A joint inference and observation model.
+    """Main VRAD model.
+
+    Selects either an observation model (GO or MARO) or joint inference
+    and observation model (RIGO, RIDGO, RIMARO) based on the passed config.
 
     Parameters
     ----------
@@ -22,9 +25,14 @@ def Model(config):
     """
 
     if config.inference_rnn is None:
-        raise ValueError(
-            "Inference network parameters not passed. Use ObservationModel."
-        )
+
+        if config.observation_model == "multivariate_normal":
+            print("Using GO")
+            return GO(config)
+
+        elif config.observation_model == "multivariate_autoregressive":
+            print("Using MARO")
+            return MARO(config)
 
     if config.observation_model == "multivariate_normal":
 
@@ -36,41 +44,11 @@ def Model(config):
             print("Using RIDGO")
             return RIDGO(config)
 
-        else:
-            raise NotImplementedError("Requested config not implemented.")
-
     elif config.observation_model == "multivariate_autoregressive":
 
         if config.alpha_pdf == "normal":
             print("Using RIMARO")
             return RIMARO(config)
 
-        else:
-            raise NotImplementedError("Requested config not implemented.")
-
-    else:
-        raise NotImplementedError("Requested config not implemented.")
-
-
-def ObservationModel(config):
-    """An observation model.
-
-    Parameters
-    ----------
-    config : vrad.models.Config
-
-    Returns
-    -------
-    A VRAD model class.
-    """
-
-    if config.observation_model == "multivariate_normal":
-        print("Using GO")
-        return GO(config)
-
-    elif config.observation_model == "multivariate_autoregressive":
-        print("Using MARO")
-        return MARO(config)
-
-    else:
-        raise NotImplementedError("Requested config not implemented.")
+        elif config.alpha_pdf == "dirichlet":
+            raise NotImplementedError("Requested config not available.")

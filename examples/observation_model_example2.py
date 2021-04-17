@@ -3,7 +3,7 @@ print("Setting up")
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import tf_ops
-from vrad.models import Config, ObservationModel
+from vrad.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -58,7 +58,7 @@ training_dataset = meg_data.training_dataset(
 )
 
 # Build model
-model = ObservationModel(config)
+model = Model(config)
 model.summary()
 
 # Train the observation model

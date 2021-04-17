@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import tf_ops
-from vrad.models import Config, ObservationModel
+from vrad.models import Config, Model
 from vrad.utils import plotting
 
 # GPU settings
@@ -65,7 +65,7 @@ training_dataset = meg_data.training_dataset(
 )
 
 # Build model
-model = ObservationModel(config)
+model = Model(config)
 model.summary()
 
 print("Training model")
