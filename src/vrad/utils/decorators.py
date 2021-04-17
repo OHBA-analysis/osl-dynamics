@@ -279,16 +279,3 @@ def deprecated(f, *, replaced_by: str = None, reason: str = None):
         return f(*args, **kwargs)
 
     return wrapper_function
-
-
-def pass_if_all_none(f):
-    def func(*args, **kwargs):
-        all_none = all(a is None for a in args) and all(
-            v is None for k, v in kwargs.items()
-        )
-        if all_none:
-            pass
-        else:
-            return f(*args, **kwargs)
-
-    return func

@@ -92,7 +92,7 @@ class InferenceModelBase:
                 kl_annealing_factor=self.kl_annealing_factor,
                 curve=self.config.kl_annealing_curve,
                 annealing_sharpness=self.config.kl_annealing_sharpness,
-                n_epochs_annealing=self.config.n_kl_annealing_epochs,
+                n_annealing_epochs=self.config.n_kl_annealing_epochs,
                 n_cycles=self.config.n_kl_annealing_cycles,
             )
             additional_callbacks.append(kl_annealing_callback)
@@ -182,9 +182,7 @@ class InferenceModelBase:
             alpha = self.predict(dataset, *args, **kwargs)["alpha"]
             alpha = np.concatenate(alpha)
             outputs.append(alpha)
-        if len(outputs) == 1:
-            outputs = outputs[0]
-        elif concatenate:
+        if concatenate or len(outputs) == 1:
             outputs = np.concatenate(outputs)
         return outputs
 
