@@ -176,7 +176,7 @@ class Base:
         str
             Path to file containing model weights.
         """
-        with self.training.strategy.scope():
+        with self.config.strategy.scope():
             self.model.load_weights(filepath)
 
     def summary_string(self):
