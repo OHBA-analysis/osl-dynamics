@@ -583,6 +583,8 @@ class InferenceRNNLayers(layers.Layer):
         Either 'lstm' or 'gru'. Defaults to GRU.
     norm_type : str
         Either 'layer', 'batch' or None.
+    act_type : 'str'
+        Activation type, e.g. 'relu', 'elu', etc.
     n_layers : int
         Number of layers.
     n_units : int
@@ -595,6 +597,7 @@ class InferenceRNNLayers(layers.Layer):
         self,
         rnn_type: str,
         norm_type: str,
+        act_type: str,
         n_layers: int,
         n_units: int,
         dropout_rate: float,
@@ -613,6 +616,7 @@ class InferenceRNNLayers(layers.Layer):
                 )
             )
             self.layers.append(NormalizationLayer(norm_type))
+            self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(dropout_rate))
 
     def call(self, inputs, **kwargs):
@@ -639,6 +643,8 @@ class ModelRNNLayers(layers.Layer):
         Either 'lstm' or 'gru'. Defaults to GRU.
     norm_type : str
         Either 'layer', 'batch' or None.
+    act_type : 'str'
+        Activation type, e.g. 'relu', 'elu', etc.
     n_layers : int
         Number of layers.
     n_units : int
@@ -651,6 +657,7 @@ class ModelRNNLayers(layers.Layer):
         self,
         rnn_type: str,
         norm_type: str,
+        act_type: str,
         n_layers: int,
         n_units: int,
         dropout_rate: float,
@@ -665,6 +672,7 @@ class ModelRNNLayers(layers.Layer):
                 RNNLayer(rnn_type, n_units, return_sequences=True, stateful=False)
             )
             self.layers.append(NormalizationLayer(norm_type))
+            self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(dropout_rate))
 
     def call(self, inputs, **kwargs):

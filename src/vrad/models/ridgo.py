@@ -170,6 +170,7 @@ def _model_structure(config):
     inference_rnn_output_layers = InferenceRNNLayers(
         config.inference_rnn,
         config.inference_normalization,
+        config.inference_activation,
         config.inference_n_layers,
         config.inference_n_units,
         config.inference_dropout_rate,
@@ -226,6 +227,7 @@ def _model_structure(config):
     model_rnn_output_layers = ModelRNNLayers(
         config.model_rnn,
         config.model_normalization,
+        config.model_activation,
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout_rate,

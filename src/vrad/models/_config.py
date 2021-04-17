@@ -59,6 +59,9 @@ class Config:
         Number of units.
     inference_normalization : str
         Type of normalization to use. Either None, 'batch' or 'layer'.
+    inference_activation : str
+        Type of activation to use after normalization and before dropout.
+        E.g. 'relu', 'elu', etc.
     inference_dropout_rate : float
         Dropout rate.
 
@@ -72,6 +75,9 @@ class Config:
         Number of units.
     model_normalization : str
         Type of normalization to use. Either None, 'batch' or 'layer'.
+    model_activation : str
+        Type of activation to use after normalization and before dropout.
+        E.g. 'relu', 'elu', etc.
     model_dropout_rate : float
         Dropout rate.
 
@@ -145,6 +151,7 @@ class Config:
     inference_n_layers: int = None
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_activation: str = None
     inference_dropout_rate: float = None
 
     # Model network parameters
@@ -152,6 +159,7 @@ class Config:
     model_n_layers: int = None
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
+    model_activation: str = None
     model_dropout_rate: float = None
 
     # Alpha parameters
