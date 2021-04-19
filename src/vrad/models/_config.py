@@ -128,6 +128,9 @@ class Config:
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    gradient_clip : float
+        Value to clip gradients by. This is the clipnorm argument passed to
+        the Keras optimizer. Cannot be used if multi_gpu=True.
     n_epochs : int
         Number of training epochs.
     optimizer : tensorflow.keras.optimizers.Optimizer
@@ -196,6 +199,7 @@ class Config:
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
+    gradient_clip: float = None
     n_epochs: int = None
     optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
     multi_gpu: bool = True
@@ -399,7 +403,8 @@ class Config:
             raise NotImplementedError("Please use optimizer='adam'.")
 
         self.optimizer = tensorflow.keras.optimizers.Adam(
-            learning_rate=self.learning_rate
+            learning_rate=self.learning_rate,
+            clipnorm=self.gradient_clip,
         )
 
         # Strategy for distributed learning

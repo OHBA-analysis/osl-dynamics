@@ -490,6 +490,7 @@ class LogLikelihoodLayer(layers.Layer):
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=mu,
             scale_tril=tf.linalg.cholesky(sigma + 1e-6 * tf.eye(sigma.shape[-1])),
+            allow_nan_stats=False,
         )
         ll_loss = mvn.log_prob(x)
 
@@ -529,7 +530,9 @@ class NormalKLDivergenceLayer(layers.Layer):
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
-        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
+        kl_loss = tfp.distributions.kl_divergence(
+            posterior, prior, allow_nan_stats=False
+        )
 
         # Sum the KL loss for each state and time point and average over batches
         kl_loss = tf.reduce_sum(kl_loss, axis=2)
