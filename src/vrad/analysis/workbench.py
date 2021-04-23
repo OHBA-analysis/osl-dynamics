@@ -111,8 +111,8 @@ def create_scene(cifti_left, cifti_right, inflation, temp_scene):
     surf_left, surf_right = surfs.get(inflation, surfs[0])
 
     scene = scene_file.read_text()
-    scene = re.sub("{left_series}", str(cifti_left), scene)
-    scene = re.sub("{right_series}", str(cifti_right), scene)
+    scene = re.sub("{left_series}", str(cifti_left.name), scene)
+    scene = re.sub("{right_series}", str(cifti_right.name), scene)
     scene = re.sub("{parcellation_file_left}", surf_left, scene)
     scene = re.sub("{parcellation_file_right}", surf_right, scene)
     temp_scene.write_text(scene)

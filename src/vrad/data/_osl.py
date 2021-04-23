@@ -57,9 +57,11 @@ class OSL_HMM:
         # points for different subjects
         if "T" in self.hmm:
             self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm.T]
-        else:
+        elif self.gamma is not None:
             # Assume gamma has no discontinuities
             self.discontinuities = [self.gamma.shape[0]]
+        else:
+            self.discontinuities = None
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"
