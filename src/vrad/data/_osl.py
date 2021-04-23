@@ -35,12 +35,14 @@ class OSL_HMM:
         elif "Gamma" in self.hmm:
             self.gamma = self.hmm.Gamma.astype(np.float32)
         else:
-            raise AttributeError("OSL HMM object does not contain gamma.")
+            self.gamma = None
 
         # State time course
         if self.gamma is not None:
-            stc = self.gamma.argmax(axis=1)
-            self.stc = array_ops.get_one_hot(stc).astype(np.float32)
+            vpath = self.gamma.argmax(axis=1)
+            self.vpath = array_ops.get_one_hot(vpath).astype(np.float32)
+        else:
+            self.vpath = None
 
         # State covariances
         self.covariances = np.array(
@@ -78,6 +80,9 @@ class OSL_HMM:
             Pad the alpha for each subject with zeros to replace the data points lost
             by performing n_embeddings. Optional, default is no padding.
         """
+        if self.gamma is None:
+            return None
+
         if pad_n_embeddings is None:
             if concatenate or len(self.discontinuities) == 1:
                 return self.gamma
@@ -118,15 +123,18 @@ class OSL_HMM:
             Pad the state time course for each subject with zeros to replace the data
             points lost by performing n_embeddings. Optional, default is no padding.
         """
+        if self.vpath is None:
+            return None
+
         if pad_n_embeddings is None:
             if concatenate or len(self.discontinuities) == 1:
-                return self.stc
+                return self.vpath
             else:
-                return np.split(self.stc, np.cumsum(self.discontinuities[:-1]))
+                return np.split(self.vpath, np.cumsum(self.discontinuities[:-1]))
         else:
             padded_stc = [
-                np.pad(stc, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
-                for stc in np.split(self.stc, np.cumsum(self.discontinuities[:-1]))
+                np.pad(vpath, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
+                for stc in np.split(self.vpath, np.cumsum(self.discontinuities[:-1]))
             ]
             if concatenate:
                 return np.concatenate(padded_stc)
