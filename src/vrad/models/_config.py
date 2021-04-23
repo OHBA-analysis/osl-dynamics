@@ -152,7 +152,7 @@ class Config:
 
     # Inference network parameters
     inference_rnn: Literal["gru", "lstm"] = None
-    inference_n_layers: int = None
+    inference_n_layers: int = 1
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = None
@@ -160,7 +160,7 @@ class Config:
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = None
-    model_n_layers: int = None
+    model_n_layers: int = 1
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = None
