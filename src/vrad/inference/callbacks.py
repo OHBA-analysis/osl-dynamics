@@ -51,9 +51,9 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
             new_value = (
                 self.initial_alpha_temperature + epoch * self.alpha_temperature_gradient
             )
-            alpha_layer.alpha_temperature = new_value
+            alpha_layer.alpha_temperature.assign(new_value)
         else:
-            alpha_layer.alpha_temperature = self.final_alpha_temperature
+            alpha_layer.alpha_temperature.assign(self.final_alpha_temperature)
 
 
 class KLAnnealingCallback(callbacks.Callback):
