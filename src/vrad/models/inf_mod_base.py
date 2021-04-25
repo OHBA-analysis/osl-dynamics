@@ -107,7 +107,7 @@ class InferenceModelBase:
                 callbacks.AlphaTemperatureAnnealingCallback(
                     initial_alpha_temperature=self.config.initial_alpha_temperature,
                     final_alpha_temperature=self.config.final_alpha_temperature,
-                    n_epochs_annealing=self.config.n_epochs_alpha_temperature_annealing,
+                    n_annealing_epochs=self.config.n_alpha_temperature_annealing_epochs,
                 )
             )
             additional_callbacks.append(alpha_temperature_annealing_callback)

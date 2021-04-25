@@ -36,7 +36,7 @@ class Config:
         alpha_xform = 'softmax' or 'gumbel-softmax'.
     final_alpha_temperature : bool
         Final value for the alpha temperature if we are annealing.
-    n_epochs_alpha_temperature_annealing : int
+    n_alpha_temperature_annealing_epochs : int
         Number of alpha temperature annealing epochs.
 
     Dimension Parameters
@@ -175,7 +175,7 @@ class Config:
 
     do_alpha_temperature_annealing: bool = None
     final_alpha_temperature: float = None
-    n_epochs_alpha_temperature_annealing: int = None
+    n_alpha_temperature_annealing_epochs: int = None
 
     # Observation model parameters
     learn_covariances: bool = None
@@ -284,15 +284,15 @@ class Config:
                         "final_alpha_temperature must be greater than zero."
                     )
 
-                if self.n_epochs_alpha_temperature_annealing is None:
+                if self.n_alpha_temperature_annealing_epochs is None:
                     raise ValueError(
                         "If we are performing alpha temperature annealing, "
-                        + "n_epochs_alpha_temperature_annealing must be passed."
+                        + "n_alpha_temperature_annealing_epochs must be passed."
                     )
 
-                if self.n_epochs_alpha_temperature_annealing < 1:
+                if self.n_alpha_temperature_annealing_epochs < 1:
                     raise ValueError(
-                        "n_epochs_alpha_temperature_annealing must be one or above."
+                        "n_alpha_temperature_annealing_epochs must be one or above."
                     )
 
         elif self.alpha_xform == "softplus":
