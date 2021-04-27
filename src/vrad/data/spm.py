@@ -30,7 +30,7 @@ class SPM:
             self.channel_labels[i] for i, bad in enumerate(self.bad_channels) if bad
         ]
 
-        self.discontinuities = self.get_discontinuities(D["trials"]["events"])
+        self.discontinuities = self.get_discontinuities()
 
         self.spm_filename = filename
         self.data_filename = D["data"]["fname"]
@@ -48,23 +48,21 @@ class SPM:
         ]
         return "\n ".join(info)
 
-    def get_discontinuities(self, events: list) -> np.ndarray:
-        if isinstance(events, dict):
-            events = [events]
+    def get_discontinuities(self) -> np.ndarray:
 
-        discontinuities = []
-        for event in events:
-            if event["type"] == "artefact_OSL" and "MEG" in event["value"]:
-                start = round(event["time"] * self.sampling_frequency) - 1
-                duration = round(event["duration"] * self.sampling_frequency)
-                end = start + duration
-                discontinuities.append(start)
-                discontinuities.append(end)
+        discontinuities = [1]
+        for i in range(self.n_samples - 1):
+            if self.good_samples[i] != self.good_samples[i + 1]:
+                discontinuities.append(1)
+            else:
+                discontinuities[-1] += 1
 
-        if discontinuities[-1] != self.n_samples:
-            discontinuities.append(self.n_samples)
+        if self.good_samples[0]:
+            discontinuities = discontinuities[::2]
+        else:
+            discontinuities = discontinuities[1::2]
 
-        return np.diff(discontinuities)[1::2]
+        return np.array(discontinuities)
 
     def get_good_channels(self, channels: list) -> np.ndarray:
         return np.array([channel["bad"] == 0 for channel in channels])
