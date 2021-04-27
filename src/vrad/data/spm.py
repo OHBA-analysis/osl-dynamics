@@ -49,29 +49,38 @@ class SPM:
         return "\n ".join(info)
 
     def get_discontinuities(self, events: list) -> np.ndarray:
+        if isinstance(events, dict):
+            events = [events]
+
         discontinuities = []
         for event in events:
-            if event["type"] == "artefact_OSL" and event["value"] == "MEGGRAD":
+            if event["type"] == "artefact_OSL" and "MEG" in event["value"]:
                 start = round(event["time"] * self.sampling_frequency) - 1
                 duration = round(event["duration"] * self.sampling_frequency)
                 end = start + duration
                 discontinuities.append(start)
                 discontinuities.append(end)
+
         if discontinuities[-1] != self.n_samples:
             discontinuities.append(self.n_samples)
+
         return np.diff(discontinuities)[1::2]
 
     def get_good_channels(self, channels: list) -> np.ndarray:
         return np.array([channel["bad"] == 0 for channel in channels])
 
     def get_good_samples(self, events: list) -> np.ndarray:
+        if isinstance(events, dict):
+            events = [events]
+
         good_samples = np.ones(self.n_samples, dtype=bool)
         for event in events:
-            if event["type"] == "artefact_OSL" and event["value"] == "MEGGRAD":
+            if event["type"] == "artefact_OSL" and "MEG" in event["value"]:
                 start = round(event["time"] * self.sampling_frequency) - 1
                 duration = round(event["duration"] * self.sampling_frequency)
                 end = start + duration
                 good_samples[start:end] = False
+
         return good_samples
 
     def load_data_file(self) -> np.ndarray:

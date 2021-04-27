@@ -23,7 +23,7 @@ def make_channels_consistent(spm_filenames: list, output_folder: str = "."):
     # Find channels that are common to all SPM files only keeping the MEG
     # Recordings. N.b. the ordering of this list is random.
     common_channels = set(channel_labels[0]).intersection(*channel_labels)
-    common_channels = [channel for channel in common_channels if "M" in channel]
+    common_channels = [channel for channel in common_channels if "MEG" in channel]
 
     # Write the channel labels to file in the correct order
     with open(output_folder + "/channels.dat", "w") as file:
