@@ -1,0 +1,47 @@
+from pathlib import Path
+from typing import Union
+
+import nibabel as nib
+import numpy as np
+from vrad.analysis import parc_files
+
+
+class Parcellation:
+    def __init__(self, file: Union[str, Path]):
+        self.file = Path(file)
+        if not self.file.exists():
+            self.file = Path(parc_files.directory) / file
+        if not self.file.exists():
+            raise FileNotFoundError(file)
+        self.parcellation = nib.load(self.file)
+
+        self.dims = self.parcellation.shape[:3]
+        self.n_parcels = self.parcellation.shape[3]
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}("{str(self.file)}")'
+
+    def data(self):
+        return self.parcellation.get_fdata()
+
+    def nonzero(self):
+        return [np.nonzero(self.data()[..., i]) for i in range(self.n_parcels)]
+
+    def nonzero_coords(self):
+        return [
+            nib.affines.apply_affine(self.parcellation.affine, np.array(nonzero).T)
+            for nonzero in self.nonzero()
+        ]
+
+    def weights(self):
+        return [
+            self.data()[..., i][nonzero] for i, nonzero in enumerate(self.nonzero())
+        ]
+
+    def roi_centers(self):
+        return np.array(
+            [
+                np.average(c, weights=w, axis=0)
+                for c, w in zip(self.nonzero_coords(), self.weights())
+            ]
+        )

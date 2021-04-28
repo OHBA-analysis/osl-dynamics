@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import nibabel as nib
+import numpy as np
+
 surf_right = str(
     Path(__file__).parent / "ParcellationPilot.R.midthickness.32k_fs_LR.surf.gii"
 )
@@ -20,3 +23,31 @@ surf_left_vinf = str(
 )
 
 directory = str(Path(__file__).parent)
+
+
+def get_surf(inflation: int):
+    surfs = {
+        0: [surf_left, surf_right],
+        1: [surf_left_inf, surf_right_inf],
+        2: [surf_left_vinf, surf_right_vinf],
+    }
+    if inflation not in surfs.keys():
+        raise ValueError(f"inflation must be in {list(surfs.keys())}")
+
+    return combine_surfs(*surfs[inflation])
+
+
+def combine_surfs(left_file, right_file):
+    surf_left = nib.load(left_file)
+    surf_right = nib.load(right_file)
+
+    points_left = surf_left.agg_data("pointset")
+    points_right = surf_right.agg_data("pointset")
+
+    triangles_left = surf_left.agg_data("triangle")
+    triangles_right = surf_right.agg_data("triangle")
+
+    points = np.concatenate([points_left, points_right])
+    triangles = np.concatenate([triangles_left, triangles_right + len(points_left)])
+
+    return points, triangles
