@@ -888,7 +888,11 @@ def compare_state_data(
 
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
-def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+def plot_confusion_matrix(
+    state_time_course_1: np.ndarray,
+    state_time_course_2: np.ndarray,
+    filename: str = None,
+):
     """Plot a confusion matrix.
 
     For two state time courses, plot the confusion matrix between each pair of states.
@@ -901,13 +905,15 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
         The first state time course.
     state_time_course_2: numpy.ndarray
         The second state time course.
+    filename : str
+        Output filename. Optional.
     """
     confusion = vrad.inference.metrics.confusion_matrix(
         state_time_course_1, state_time_course_2
     )
     nan_diagonal = confusion.copy().astype(float)
     nan_diagonal[np.diag_indices_from(nan_diagonal)] = np.nan
-    plot_matrices([confusion, nan_diagonal], group_color_scale=False)
+    plot_matrices([confusion, nan_diagonal], group_color_scale=False, filename=filename)
 
 
 def plot_line(
