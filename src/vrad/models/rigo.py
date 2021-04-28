@@ -8,8 +8,8 @@ from operator import lt
 import numpy as np
 from tensorflow.keras import Model, layers
 from tqdm import trange
-from vrad.models.inf_mod_base import InferenceModelBase
 from vrad.models.go import GO
+from vrad.models.inf_mod_base import InferenceModelBase
 from vrad.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLayer,
@@ -21,6 +21,7 @@ from vrad.models.layers import (
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
 )
+from vrad.utils.misc import check_arguments
 
 _logger = logging.getLogger("VRAD")
 

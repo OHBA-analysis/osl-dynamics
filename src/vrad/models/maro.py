@@ -4,8 +4,8 @@
 
 import numpy as np
 from tensorflow.keras import Model, layers
-from vrad.models.obs_mod_base import ObservationModelBase
 from vrad.models.layers import LogLikelihoodLayer, MARMeanCovLayer, MARParametersLayer
+from vrad.models.obs_mod_base import ObservationModelBase
 
 
 class MARO(ObservationModelBase):

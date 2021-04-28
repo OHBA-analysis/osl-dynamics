@@ -8,7 +8,6 @@
 """
 
 print("Setting up")
-import numpy as np
 from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops

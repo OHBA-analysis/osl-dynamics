@@ -17,7 +17,7 @@ from tqdm.keras import TqdmCallback
 from vrad.data import Data
 from vrad.inference import callbacks
 from vrad.inference.tf_ops import tensorboard_run_logdir
-from vrad.utils.misc import check_iterable_type, class_from_yaml, replace_argument
+from vrad.utils.misc import check_iterable_type, class_from_yaml
 from vrad.utils.model import HTMLTable, LatexTable
 
 

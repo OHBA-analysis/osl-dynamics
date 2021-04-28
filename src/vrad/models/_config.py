@@ -7,8 +7,8 @@ from typing import Literal
 
 import numpy as np
 import tensorflow
-from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
+from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 
 
 @dataclass
@@ -324,7 +324,8 @@ class Config:
         if self.do_kl_annealing:
             if self.kl_annealing_curve is None:
                 raise ValueError(
-                    "If we are performing KL annealing, kl_annealing_curve must be passed."
+                    "If we are performing KL annealing, "
+                    "kl_annealing_curve must be passed."
                 )
 
             if self.kl_annealing_curve not in ["linear", "tanh"]:

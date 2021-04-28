@@ -3,10 +3,8 @@
 
 """
 
-import numpy as np
 from tensorflow.keras import Model, layers
 from vrad.models.inf_mod_base import InferenceModelBase
-from vrad.models.maro import MARO
 from vrad.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLayer,
@@ -18,6 +16,7 @@ from vrad.models.layers import (
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
 )
+from vrad.models.maro import MARO
 
 
 class RIMARO(InferenceModelBase, MARO):

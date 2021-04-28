@@ -4,8 +4,8 @@
 
 from vrad.models.go import GO
 from vrad.models.maro import MARO
-from vrad.models.rigo import RIGO
 from vrad.models.ridgo import RIDGO
+from vrad.models.rigo import RIGO
 from vrad.models.rimaro import RIMARO
 
 

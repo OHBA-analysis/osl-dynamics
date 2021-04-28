@@ -6,13 +6,13 @@ import numpy as np
 import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
-from vrad.models.obs_mod_base import ObservationModelBase
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
     trace_normalize,
 )
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
+from vrad.models.obs_mod_base import ObservationModelBase
 
 
 class GO(ObservationModelBase):

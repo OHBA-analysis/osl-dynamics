@@ -135,7 +135,7 @@ class OSL_HMM:
                 return np.split(self.vpath, np.cumsum(self.discontinuities[:-1]))
         else:
             padded_stc = [
-                np.pad(vpath, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
+                np.pad(self.vpath, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
                 for stc in np.split(self.vpath, np.cumsum(self.discontinuities[:-1]))
             ]
             if concatenate:

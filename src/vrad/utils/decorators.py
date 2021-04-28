@@ -1,6 +1,5 @@
 import inspect
 import logging
-from decorator import decorator
 from functools import wraps
 from time import time
 

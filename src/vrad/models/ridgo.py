@@ -6,9 +6,9 @@
 import numpy as np
 from tensorflow.keras import Model, layers
 from tqdm import trange
-from vrad.models.inf_mod_base import InferenceModelBase
+from vrad.inference import callbacks, initializers
 from vrad.models.go import GO
-from vrad.inference import callbacks, initializers, losses
+from vrad.models.inf_mod_base import InferenceModelBase
 from vrad.models.layers import (
     DirichletKLDivergenceLayer,
     InferenceRNNLayers,
