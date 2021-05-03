@@ -2,6 +2,7 @@
 
 """
 
+from tensorflow.keras import optimizers
 from vrad.inference import initializers, losses
 from vrad.models.base import Base
 from vrad.utils.misc import replace_argument
@@ -19,11 +20,22 @@ class ObservationModelBase(Base):
         # The base class will build and compile the model
         Base.__init__(self, config)
 
-    def compile(self):
+    def compile(self, optimizer=None):
         """Wrapper for the standard keras compile method."""
-        self.model.compile(
-            optimizer=self.config.optimizer, loss=[losses.ModelOutputLoss()]
-        )
+
+        # Loss function
+        loss = [losses.ModelOutputLoss()]
+
+        # Optimiser
+        if optimizer is None:
+            if self.config.optimizer.lower() == "adam":
+                optimizer = optimizers.Adam(
+                    learning_rate=self.config.learning_rate,
+                    clipnorm=self.config.gradient_clip,
+                )
+
+        # Compile
+        self.model.compile(optimizer=optimizer, loss=loss)
 
     def fit(
         self,
@@ -86,5 +98,4 @@ class ObservationModelBase(Base):
 
     def reset_weights(self):
         """Reset the model as if you've built a new model."""
-        self.compile()
         initializers.reinitialize_model_weights(self.model)

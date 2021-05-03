@@ -2,12 +2,16 @@
 
 """
 
+import logging
 from typing import Tuple, Union
 
 import numpy as np
 from tensorflow import Variable
+from tensorflow.keras import optimizers
 from vrad.inference import callbacks, initializers, losses
 from vrad.utils.misc import replace_argument
+
+_logger = logging.getLogger("VRAD")
 
 
 class InferenceModelBase:
@@ -25,7 +29,7 @@ class InferenceModelBase:
             Variable(0.0) if config.do_kl_annealing else Variable(1.0)
         )
 
-    def compile(self):
+    def compile(self, optimizer=None):
         """Wrapper for the standard keras compile method."""
 
         # Loss function
@@ -33,8 +37,16 @@ class InferenceModelBase:
         kl_loss = losses.ModelOutputLoss(self.kl_annealing_factor)
         loss = [ll_loss, kl_loss]
 
+        # Optimiser
+        if optimizer is None:
+            if self.config.optimizer.lower() == "adam":
+                optimizer = optimizers.Adam(
+                    learning_rate=self.config.learning_rate,
+                    clipnorm=self.config.gradient_clip,
+                )
+
         # Compile
-        self.model.compile(optimizer=self.config.optimizer, loss=loss)
+        self.model.compile(optimizer=optimizer, loss=loss)
 
     def fit(
         self,
@@ -131,12 +143,77 @@ class InferenceModelBase:
 
         return self.model.fit(*args, **kwargs)
 
-    def reset_weight(self):
-        """Reset the model as if you've built a new model.
+    def initialize(
+        self,
+        training_dataset,
+        epochs,
+        n_initializations,
+        verbose=1,
+        use_tqdm=False,
+        tqdm_class=None,
+    ):
+        """Initialize the means and covariances.
 
-        Resets the model weights, optimizer and annealing factor.
+        The model is trained for a few epochs and the model with the best
+        free energy is chosen.
+
+        Parameters
+        ----------
+        training_dataset : tensorflow.data.Dataset
+            Dataset to use for training.
+        epochs : int
+            Number of epochs to train the model.
+        n_initializations : int
+            Number of initializations.
+        verbose : int
+            Show verbose (1) or not (0).
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual Tensorflow output?
+        tqdm_class : tqdm
+            Tqdm class for the progress bar.
+
+        Returns
+        -------
+        history
+            The training history of the best initialization.
         """
-        self.compile()
+        if n_initializations is None or n_initializations == 0:
+            _logger.warning(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        # Pick the initialization with the lowest free energy
+        best_free_energy = np.Inf
+        for n in range(n_initializations):
+            print(f"Initialization {n}")
+            self.reset_weights()
+            self.compile()
+            history = self.fit(
+                training_dataset,
+                epochs=epochs,
+                verbose=verbose,
+                use_tqdm=use_tqdm,
+                tqdm_class=tqdm_class,
+            )
+            free_energy = history.history["loss"][-1]
+            if free_energy < best_free_energy:
+                best_initialization = n
+                best_free_energy = free_energy
+                best_weights = self.model.get_weights()
+                best_optimizer = self.model.optimizer
+                best_history = history
+
+        print(f"Using initialization {best_initialization}")
+        self.reset_weights()
+        self.model.set_weights(best_weights)
+        self.compile(optimizer=best_optimizer)
+
+        return best_history
+
+    def reset_weights(self):
+        """Reset the model as if you've built a new model."""
         initializers.reinitialize_model_weights(self.model)
         if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)

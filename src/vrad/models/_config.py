@@ -122,6 +122,13 @@ class Config:
     n_kl_annealing_cycles : int
         Number of times to perform KL annealing within n_kl_annealing_epochs.
 
+    Initialization Parameters
+    -------------------------
+    n_initializations : int
+        Number of initializations.
+    n_initialization_epochs : int
+        Number of epochs to train each initialization.
+
     Training Parameters
     -------------------
     batch_size : int
@@ -196,13 +203,17 @@ class Config:
     n_kl_annealing_epochs: int = None
     n_kl_annealing_cycles: int = 1
 
+    # Initialisation parameters
+    n_initializations: int = None
+    n_initialization_epochs: int = None
+
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
     gradient_clip: float = None
     n_epochs: int = None
     optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
-    multi_gpu: bool = True
+    multi_gpu: bool = False
     strategy: str = None
 
     def __post_init__(self):
@@ -212,6 +223,7 @@ class Config:
         self.validate_alpha_parameters()
         self.validate_observation_model_parameters()
         self.validate_kl_annealing_parameters()
+        self.validate_initialization_parameters()
         self.validate_training_parameters()
 
     def validate_model_choice_parameters(self):
@@ -379,6 +391,21 @@ class Config:
             if self.learn_cov is None:
                 self.learn_cov = True
 
+    def validate_initialization_parameters(self):
+
+        if self.n_initializations is not None:
+            if self.n_initializations < 1:
+                raise ValueError("n_initializations must be one or greater.")
+
+            if self.n_initialization_epochs is None:
+                raise ValueError(
+                    "If we are initializing the model, n_initialization_epochs "
+                    + "must be passed."
+                )
+
+            if self.n_initialization_epochs < 1:
+                raise ValueError("n_initialization_epochs must be one or greater.")
+
     def validate_training_parameters(self):
 
         if self.batch_size is None:
@@ -399,14 +426,8 @@ class Config:
         if self.learning_rate < 0:
             raise ValueError("learning_rate must be greater than zero.")
 
-        # Optimizer
         if self.optimizer not in ["adam", "Adam"]:
             raise NotImplementedError("Please use optimizer='adam'.")
-
-        self.optimizer = tensorflow.keras.optimizers.Adam(
-            learning_rate=self.learning_rate,
-            clipnorm=self.gradient_clip,
-        )
 
         # Strategy for distributed learning
         if self.multi_gpu:
