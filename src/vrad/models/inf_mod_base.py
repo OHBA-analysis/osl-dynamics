@@ -263,16 +263,16 @@ class InferenceModelBase:
             outputs = np.concatenate(outputs)
         return outputs
 
-    def losses(self, dataset, return_mean: bool = False) -> Tuple[float, float]:
+    def losses(self, dataset, return_sum: bool = False) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
             Dataset to calculate losses for.
-        return_mean : bool
-            Should we return the mean loss over batches? Otherwise we return
-            the sum. Optional, default is False.
+        return_sum : bool
+            Should we return the loss for each batch summed? Otherwise we return
+            the mean. Optional, default is False.
 
         Returns
         -------
@@ -281,10 +281,10 @@ class InferenceModelBase:
         kl_loss : float
             KL divergence loss.
         """
-        if return_mean:
-            mean_or_sum = np.mean
-        else:
+        if return_sum:
             mean_or_sum = np.sum
+        else:
+            mean_or_sum = np.mean
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
             ll_loss = mean_or_sum([mean_or_sum(p["ll_loss"]) for p in predictions])
@@ -295,23 +295,23 @@ class InferenceModelBase:
             kl_loss = mean_or_sum(predictions["kl_loss"])
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset, return_mean: bool = False) -> float:
+    def free_energy(self, dataset, return_sum: bool = False) -> float:
         """Calculates the variational free energy of a dataset.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
             Dataset to calculate the variational free energy for.
-        return_mean : bool
-            Should we return the mean free energy over batches? Otherwise
-            we return the sum. Optional, default is False.
+        return_sum : bool
+            Should we return the free energy for each batch summed? Otherwise
+            we return the mean. Optional, default is False.
 
         Returns
         -------
         float
             Variational free energy for the dataset.
         """
-        ll_loss, kl_loss = self.losses(dataset, return_mean=return_mean)
+        ll_loss, kl_loss = self.losses(dataset, return_sum=return_sum)
         free_energy = ll_loss + kl_loss
         return free_energy
 
