@@ -148,9 +148,7 @@ class InferenceModelBase:
         training_dataset,
         epochs,
         n_initializations,
-        verbose=1,
-        use_tqdm=False,
-        tqdm_class=None,
+        **kwargs,
     ):
         """Initialize the means and covariances.
 
@@ -165,12 +163,6 @@ class InferenceModelBase:
             Number of epochs to train the model.
         n_initializations : int
             Number of initializations.
-        verbose : int
-            Show verbose (1) or not (0).
-        use_tqdm : bool
-            Should we use a tqdm progress bar instead of the usual Tensorflow output?
-        tqdm_class : tqdm
-            Tqdm class for the progress bar.
 
         Returns
         -------
@@ -193,9 +185,7 @@ class InferenceModelBase:
             history = self.fit(
                 training_dataset,
                 epochs=epochs,
-                verbose=verbose,
-                use_tqdm=use_tqdm,
-                tqdm_class=tqdm_class,
+                **kwargs,
             )
             free_energy = history.history["loss"][-1]
             if free_energy < best_free_energy:
