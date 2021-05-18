@@ -124,9 +124,9 @@ class Config:
 
     Initialization Parameters
     -------------------------
-    n_initializations : int
+    n_init : int
         Number of initializations.
-    n_initialization_epochs : int
+    n_init_epochs : int
         Number of epochs to train each initialization.
 
     Training Parameters
@@ -204,8 +204,8 @@ class Config:
     n_kl_annealing_cycles: int = 1
 
     # Initialisation parameters
-    n_initializations: int = None
-    n_initialization_epochs: int = None
+    n_init: int = None
+    n_init_epochs: int = None
 
     # Training parameters
     batch_size: int = None
@@ -393,18 +393,18 @@ class Config:
 
     def validate_initialization_parameters(self):
 
-        if self.n_initializations is not None:
-            if self.n_initializations < 1:
-                raise ValueError("n_initializations must be one or greater.")
+        if self.n_init is not None:
+            if self.n_init < 1:
+                raise ValueError("n_init must be one or greater.")
 
-            if self.n_initialization_epochs is None:
+            if self.n_init_epochs is None:
                 raise ValueError(
-                    "If we are initializing the model, n_initialization_epochs "
+                    "If we are initializing the model, n_init_epochs "
                     + "must be passed."
                 )
 
-            if self.n_initialization_epochs < 1:
-                raise ValueError("n_initialization_epochs must be one or greater.")
+            if self.n_init_epochs < 1:
+                raise ValueError("n_init_epochs must be one or greater.")
 
     def validate_training_parameters(self):
 

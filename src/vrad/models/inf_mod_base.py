@@ -147,7 +147,7 @@ class InferenceModelBase:
         self,
         training_dataset,
         epochs,
-        n_initializations,
+        n_init,
         **kwargs,
     ):
         """Initialize the means and covariances.
@@ -161,7 +161,7 @@ class InferenceModelBase:
             Dataset to use for training.
         epochs : int
             Number of epochs to train the model.
-        n_initializations : int
+        n_init : int
             Number of initializations.
 
         Returns
@@ -169,7 +169,7 @@ class InferenceModelBase:
         history
             The training history of the best initialization.
         """
-        if n_initializations is None or n_initializations == 0:
+        if n_init is None or n_init == 0:
             _logger.warning(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
@@ -178,7 +178,7 @@ class InferenceModelBase:
 
         # Pick the initialization with the lowest free energy
         best_free_energy = np.Inf
-        for n in range(n_initializations):
+        for n in range(n_init):
             print(f"Initialization {n}")
             self.reset_weights()
             self.compile()
