@@ -6,13 +6,14 @@ from typing import Tuple
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from scipy.linalg import eigvalsh
 from sklearn.metrics import confusion_matrix as sklearn_confusion
 from tqdm import trange
 from vrad.inference.states import state_lifetimes
 from vrad.utils.decorators import transpose
 
 
-def correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
+def alpha_correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
     """Calculates the correlation between states of two alpha time series.
 
     Parameters
@@ -313,3 +314,66 @@ def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
     mean = np.array([np.mean(lt) for lt in lifetimes])
     std = np.array([np.std(lt) for lt in lifetimes])
     return mean, std
+
+
+def state_covariance_correlations(state_covariances: np.ndarray) -> np.ndarray:
+    """Calculate the correlation between elements of the state covariances.
+
+    Parameters
+    ----------
+    state_covariances : np.ndarray
+        State covariances matrices.
+        Shape must be (n_states, n_channels, n_channels).
+
+    Returns
+    -------
+    np.ndarray
+        Correlation between elements of each state covariance.
+        Shape is (n_states, n_states).
+    """
+    n_states = state_covariances.shape[0]
+    state_covariances = state_covariances.reshape(n_states, -1)
+    return np.corrcoef(state_covariances)
+
+
+def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
+    """Calculate the Riemannian distance between two matrices.
+
+    The Riemannian distance is defined as:
+    d = (sum log(eig(M_1 * M_2))) ^ 0.5
+
+    Parameters
+    ----------
+    M1 : np.ndarray
+    M2 : np.ndarray
+
+    Returns
+    -------
+    np.ndarray
+    """
+    d = np.sqrt(np.sum((np.log(eigvalsh(M1, M2)) ** 2)))
+    return d
+
+
+def state_covariance_riemannian_distances(state_covariances: np.ndarray) -> np.ndarray:
+    """Calculate the Riemannian distance between state covariances.
+
+    Parameters
+    ----------
+    state_covariances : np.ndarray
+        State covariances. Shape must be (n_states, n_channels, n_channels).
+
+    Returns
+    -------
+    np.ndarray
+        Matrix containing the Riemannian distances between states.
+        Shape is (n_states, n_states).
+    """
+    n_states = state_covariances.shape[0]
+    riemannian_distances = np.empty([n_states, n_states])
+    for i in range(n_states):
+        for j in range(n_states):
+            riemannian_distances[i][j] = riemannian_distance(
+                state_covariances[i], state_covariances[j]
+            )
+    return riemannian_distances
