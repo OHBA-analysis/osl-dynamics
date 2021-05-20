@@ -19,7 +19,7 @@ def is_symmetric(matrix: np.ndarray) -> bool:
     bool
         Flag to indicate whether or not the matrix is symmetric.
     """
-    return np.all(np.abs(matrix - np.transpose(matrix, (0, 2, 1))) < 1e-8)
+    return np.all(np.abs(matrix - np.transpose(matrix, (0, 2, 1))) < 1e-6)
 
 
 @tf.function
@@ -44,6 +44,9 @@ def cholesky_factor_to_full_matrix(cholesky_factor: tf.Tensor):
 
     # Calculate the full matrix
     full_matrix = tf.matmul(cholesky_factor, tf.transpose(cholesky_factor, (0, 2, 1)))
+
+    # Add a more error to the diagonal to ensure matrix is positive semi-definite
+    full_matrix += 1e-6 * tf.eye(full_matrix.shape[-1])
 
     return full_matrix
 

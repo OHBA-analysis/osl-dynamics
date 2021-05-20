@@ -489,7 +489,7 @@ class LogLikelihoodLayer(layers.Layer):
         # Calculate the log-likelihood
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma + 1e-6 * tf.eye(sigma.shape[-1])),
+            scale_tril=tf.linalg.cholesky(sigma),
             allow_nan_stats=False,
         )
         ll_loss = mvn.log_prob(x)
