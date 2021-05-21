@@ -556,11 +556,7 @@ def plot_matrices(
     if matrix.ndim != 3:
         raise ValueError("Must be a 3D array.")
     short, long, empty = rough_square_axes(len(matrix))
-    f_width = 2.5 * short
-    f_height = 2.5 * long
-    fig, axes = plt.subplots(
-        ncols=short, nrows=long, figsize=(f_width, f_height), squeeze=False
-    )
+    fig, axes = plt.subplots(ncols=short, nrows=long, squeeze=False)
 
     if titles is None:
         titles = [""] * len(matrix)

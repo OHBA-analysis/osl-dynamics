@@ -316,7 +316,9 @@ def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
     return mean, std
 
 
-def state_covariance_correlations(state_covariances: np.ndarray) -> np.ndarray:
+def state_covariance_correlations(
+    state_covariances: np.ndarray, remove_diagonal: bool = True
+) -> np.ndarray:
     """Calculate the correlation between elements of the state covariances.
 
     Parameters
@@ -333,14 +335,15 @@ def state_covariance_correlations(state_covariances: np.ndarray) -> np.ndarray:
     """
     n_states = state_covariances.shape[0]
     state_covariances = state_covariances.reshape(n_states, -1)
-    return np.corrcoef(state_covariances)
+    correlations = np.corrcoef(state_covariances)
+    correlations -= np.eye(n_states)
+    return correlations
 
 
 def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
     """Calculate the Riemannian distance between two matrices.
 
-    The Riemannian distance is defined as:
-    d = (sum log(eig(M_1 * M_2))) ^ 0.5
+    The Riemannian distance is defined as: d = (sum log(eig(M_1 * M_2))) ^ 0.5
 
     Parameters
     ----------
