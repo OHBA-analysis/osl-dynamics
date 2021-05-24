@@ -141,7 +141,7 @@ class Config:
     n_epochs : int
         Number of training epochs.
     optimizer : tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. Must be 'adam'.
+        Optimizer to use. Must be 'adam' or 'rmsprop'.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -426,8 +426,8 @@ class Config:
         if self.learning_rate < 0:
             raise ValueError("learning_rate must be greater than zero.")
 
-        if self.optimizer not in ["adam", "Adam"]:
-            raise NotImplementedError("Please use optimizer='adam'.")
+        if self.optimizer not in ["adam", "Adam", "rmsprop", "RMSprop"]:
+            raise NotImplementedError("Please use optimizer='adam' or 'rmsprop'.")
 
         # Strategy for distributed learning
         if self.multi_gpu:

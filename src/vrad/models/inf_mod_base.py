@@ -44,6 +44,11 @@ class InferenceModelBase:
                     learning_rate=self.config.learning_rate,
                     clipnorm=self.config.gradient_clip,
                 )
+            elif self.config.optimizer.lower() == "rmsprop":
+                optimizer = optimizers.RMSprop(
+                    learning_rate=self.config.learning_rate,
+                    clipnorm=self.config.gradient_clip,
+                )
 
         # Compile
         self.model.compile(optimizer=optimizer, loss=loss)
