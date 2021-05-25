@@ -2,13 +2,15 @@
 VariationalRNNAutoDecoder (VRAD)
 ================================
 
-
-VRAD can learn your alphas!!
-
-
-Install in editable mode
-========================
+BMRC Installation
+=================
 .. code-block:: shell
+
+    module load Anaconda3
+    module load cudnn
+
+    conda create --name myenv python=3.8
+    conda activate myenv
 
     cd VRAD
     pip install -e .
@@ -23,30 +25,8 @@ Build documentation
 
 
 Run tests
-========================
+=========
 .. code-block:: shell
 
     cd VRAD
     python setup.py test
-
-
-Usage
-=====
-You can import things from VRAD like any other package.
-
-.. code-block:: python
-
-    from vrad.inference.models import RNNGaussian
-
-.. Description
-    ===========
-
-    A longer description of your project goes here...
-
-
-    Note
-    ====
-
-    This project has been set up using PyScaffold 3.2.3. For details and usage
-    information on PyScaffold see https://pyscaffold.org/.
-
