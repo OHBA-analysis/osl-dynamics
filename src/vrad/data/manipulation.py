@@ -112,6 +112,7 @@ class Manipulation:
         self,
         n_embeddings: int = 1,
         n_pca_components: int = None,
+        pca_components: np.ndarray = None,
         whiten: bool = False,
     ):
         """Prepares data to train the model with.
@@ -124,6 +125,9 @@ class Manipulation:
             Number of data points to embed the data. Optional, default is 1.
         n_pca_components : int
             Number of PCA components to keep. Optional, default is no PCA.
+        pca_components : np.ndarray
+            PCA components to apply if they have already been calculated.
+            Optional.
         whiten : bool
             Should we whiten the PCA'ed data? Optional, default is False.
         """
@@ -133,8 +137,12 @@ class Manipulation:
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
+        self.pca_components = pca_components
         self.whiten = whiten
         self.prepared = True
+
+        if n_pca_components is not None and pca_components is not None:
+            raise ValueError("Please only pass n_pca_components or pca_components.")
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -166,9 +174,6 @@ class Manipulation:
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
-
-        else:
-            self.pca_components = None
 
         # Prepare the data
         for raw_data_memmap, prepared_data_file in zip(
