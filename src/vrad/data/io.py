@@ -10,7 +10,6 @@ import numpy as np
 import scipy.io
 from tqdm import tqdm
 from vrad.data import spm
-from vrad.utils.misc import time_axis_first
 
 _logger = logging.getLogger("VRAD")
 
@@ -29,6 +28,8 @@ class IO:
         Sampling frequency of the data in Hz. Optional.
     store_dir : str
         Directory to save results and intermediate steps to. Optional, default is /tmp.
+    time_axis_first : bool
+        Is the input data of shape (n_samples, n_channels)?
     """
 
     def __init__(
@@ -37,6 +38,7 @@ class IO:
         data_field: str,
         sampling_frequency: float,
         store_dir: str,
+        time_axis_first: bool,
     ):
         # Validate inputs
         if isinstance(inputs, str):
@@ -75,7 +77,7 @@ class IO:
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load and validate the raw data
-        self.raw_data_memmaps = self.load_raw_data(data_field)
+        self.raw_data_memmaps = self.load_raw_data(data_field, time_axis_first)
         self.validate_data()
 
         # Get data prepration attributes if the raw data has been prepared
@@ -110,7 +112,7 @@ class IO:
                     self.n_pca_components = preparation["pca_components"].shape[1]
                     self.prepared = True
 
-    def load_raw_data(self, data_field: str) -> list:
+    def load_raw_data(self, data_field: str, time_axis_first: bool) -> list:
         """Import data into a list of memory maps.
 
         Parameters
@@ -118,6 +120,8 @@ class IO:
         data_field : str
             If a MATLAB filename is passed, this is the field that corresponds
             to the data. By default we read the field 'X'.
+        time_axis_first : bool
+            Is the input data of shape (n_samples, n_channels)?
 
         Returns
         -------
@@ -139,6 +143,8 @@ class IO:
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
             raw_data_mmap = load_data(raw_data, data_field, mmap_location)
+            if not time_axis_first:
+                raw_data_mmap = raw_data_mmap.T
             memmaps.append(raw_data_mmap)
 
         return memmaps
@@ -354,7 +360,7 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
 def validate_time_series(data: np.ndarray) -> np.ndarray:
     """Validate time series data.
 
-    Enforces shape to be time by channels and a float32 data type.
+    Enforces a float32 data type.
 
     Parameters
     ----------
@@ -366,6 +372,5 @@ def validate_time_series(data: np.ndarray) -> np.ndarray:
     np.ndarray
         Valid data.
     """
-    data = time_axis_first(data)
     data = data.astype(np.float32)
     return data
