@@ -248,7 +248,7 @@ def load_data(
         Data.
     """
     if isinstance(data, np.ndarray):
-        data = validate_time_series(data)
+        data = data.astype(np.float32)
         if mmap_location is None:
             return data
         else:
@@ -269,7 +269,7 @@ def load_data(
         # Load a MATLAB file
         if ext == ".mat":
             data = load_matlab(data, data_field)
-            data = validate_time_series(data)
+            data = data.astype(np.float32)
             if mmap_location is None:
                 return data
             else:
@@ -281,7 +281,7 @@ def load_data(
         elif ext == ".npy":
             if mmap_location is None:
                 data = np.load(data)
-                data = validate_time_series(data)
+                data = data.astype(np.float32)
                 return data
             else:
                 mmap_location = data
@@ -355,22 +355,3 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
             mat = mat[fields[0]]
 
     return mat
-
-
-def validate_time_series(data: np.ndarray) -> np.ndarray:
-    """Validate time series data.
-
-    Enforces a float32 data type.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Time series data.
-
-    Returns
-    -------
-    np.ndarray
-        Valid data.
-    """
-    data = data.astype(np.float32)
-    return data
