@@ -30,6 +30,8 @@ class Data(IO, Manipulation, TensorFlowDataset):
         Directory to save results and intermediate steps to. Optional, default is /tmp.
     n_embeddings : int
         Number of embeddings. Optional. Can be passed if data has already been prepared.
+    time_axis_first : bool
+        Is the input data of shape (n_samples, n_channels)? Optional, default is True.
     """
 
     def __init__(
@@ -39,12 +41,15 @@ class Data(IO, Manipulation, TensorFlowDataset):
         sampling_frequency: float = None,
         store_dir: str = "tmp",
         n_embeddings: int = None,
+        time_axis_first: bool = True,
     ):
         # Unique identifier for the Data object
         self._identifier = id(inputs)
 
         # Load data by initialising an IO object
-        IO.__init__(self, inputs, matlab_field, sampling_frequency, store_dir)
+        IO.__init__(
+            self, inputs, matlab_field, sampling_frequency, store_dir, time_axis_first
+        )
 
         # Initialise a Manipulation object so we have method we can use to prepare
         # the data
