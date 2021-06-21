@@ -100,7 +100,7 @@ plotting.plot_separate_time_series(
     matched_alpha, matched_sim_stc, n_samples=10000, filename="stc.png"
 )
 
-corr = metrics.correlation(matched_alpha, matched_sim_stc)
+corr = metrics.alpha_correlation(matched_alpha, matched_sim_stc)
 print("Correlation (VRAD vs Simulation):", corr)
 
 # Delete the temporary folder holding the data

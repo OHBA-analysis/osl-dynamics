@@ -44,7 +44,7 @@ config = Config(
 print("Reading MEG data")
 prepared_data = Data(
     [
-        f"/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/subject{i}.mat"
         for i in range(1, 11)
     ],
     sampling_frequency=250,
@@ -63,7 +63,7 @@ prediction_dataset = prepared_data.prediction_dataset(
 
 # Initialise covariances with the final HMM covariances
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-10_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
 config.initial_covariances = hmm.covariances
 
@@ -98,7 +98,7 @@ print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 # Load preprocessed data to calculate spatial power maps
 preprocessed_data = Data(
     [
-        f"/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/preproc_data/subject{i}.mat"
         for i in range(1, 11)
     ]
 )
