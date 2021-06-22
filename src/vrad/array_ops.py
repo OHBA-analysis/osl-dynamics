@@ -222,3 +222,44 @@ def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=Fa
     return np.lib.stride_tricks.as_strided(
         x, strides=out_strides, shape=out_shape, subok=subok, writeable=writeable
     )
+
+
+def validate(
+    array: np.ndarray,
+    correct_dimensionality: int,
+    allow_dimensions: list,
+    error_message: str,
+) -> np.ndarray:
+    """Checks if an array has been passed correctly.
+
+    This function checks the dimensionality of the array is correct.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        Array to be checked.
+    correct_dimensionality : int
+        The desired number of dimensions in the array.
+    allow_dimensions : int
+        The number of dimensions that is acceptable for the passed array to have.
+    error_message : str
+        Message to print if the array is not valid.
+
+    Returns:
+    np.ndarray
+        Array with the correct dimensionality.
+
+    """
+    array = np.array(array)
+
+    # Add dimensions to ensure array has the correct dimensionality
+    for dimensionality in allow_dimensions:
+        if array.ndim == dimensionality:
+            for i in range(correct_dimensionality - dimensionality):
+                array = array[np.newaxis, ...]
+
+    # Check no other dimensionality has been passed
+    if array.ndim != correct_dimensionality:
+        raise ValueError(error_message)
+
+    return array

@@ -7,8 +7,7 @@ import os
 
 import nibabel as nib
 import numpy as np
-from vrad import files
-from vrad.analysis.functions import validate_array
+from vrad import array_ops, files
 
 _logger = logging.getLogger("VRAD")
 
@@ -47,7 +46,7 @@ def state_power_maps(
         + "or 4D numpy array (n_states, n_channels, n_channels, "
         + "n_frequency_bins) must be passed for spectra."
     )
-    power_spectra = validate_array(
+    power_spectra = array_ops.validate(
         power_spectra,
         correct_dimensionality=5,
         allow_dimensions=[3, 4],
@@ -131,7 +130,7 @@ def save_nii_file(
 
     # Validation
     error_message = f"Dimensionality of power_map must be 4, got ndim={power_map.ndim}."
-    power_map = validate_array(
+    power_map = array_ops.validate(
         power_map,
         correct_dimensionality=4,
         allow_dimensions=[3],
