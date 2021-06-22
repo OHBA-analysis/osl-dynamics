@@ -4,9 +4,12 @@
 
 import logging
 import os
+from pathlib import Path
 
 import nibabel as nib
 import numpy as np
+from nilearn import plotting
+from tqdm import trange
 from vrad import array_ops, files
 
 _logger = logging.getLogger("VRAD")
@@ -97,7 +100,78 @@ def state_power_maps(
     return np.squeeze(p)
 
 
-def save_nii_file(
+def spatial_map_grid(
+    mask_file: str,
+    parcellation_file: str,
+    power_map: np.ndarray,
+    component: int = 0,
+    subtract_mean: bool = False,
+    mean_weights: np.ndarray = None,
+) -> np.ndarray:
+    """Returns the power at locations on a spatial map grid."""
+
+    # Validation
+    error_message = f"Dimensionality of power_map must be 4, got ndim={power_map.ndim}."
+    power_map = array_ops.validate(
+        power_map,
+        correct_dimensionality=4,
+        allow_dimensions=[3],
+        error_message=error_message,
+    )
+
+    # Load the mask
+    mask = nib.load(mask_file)
+    mask_grid = mask.get_data()
+
+    # Flatten the mask
+    mask_grid = mask_grid.ravel(order="F")
+
+    # Get indices of non-zero elements, i.e. those which contain the brain
+    non_zero_parcels = mask_grid != 0
+
+    # Load the parcellation
+    parcellation = nib.load(parcellation_file)
+    parcellation_grid = parcellation.get_data()
+
+    # Number of parcels
+    n_parcels = parcellation.shape[-1]
+
+    # Make a 1D array of voxel weights for each channel
+    parcels = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_parcels]
+
+    # Number of parcels
+    n_parcels = parcels.shape[0]
+
+    # Normalise the parcels to have comparable weights
+    parcels /= parcels.max(axis=0)[np.newaxis, ...]
+
+    # Number of components, states, channels
+    n_components, n_states, n_channels, n_channels = power_map.shape
+
+    # Generate spatial map
+    spatial_map = np.empty([n_parcels, n_states])
+    for i in range(n_states):
+        spatial_map[:, i] = parcels @ np.diag(np.squeeze(power_map[component, i]))
+
+    # Subtract weighted mean
+    if subtract_mean:
+        spatial_map -= np.average(
+            spatial_map,
+            axis=1,
+            weights=mean_weights,
+        )[..., np.newaxis]
+
+    # Convert spatial map into a grid
+    spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
+    spatial_map_grid[non_zero_parcels] = spatial_map
+    spatial_map_grid = spatial_map_grid.reshape(
+        mask.shape[0], mask.shape[1], mask.shape[2], n_states, order="F"
+    )
+
+    return spatial_map_grid
+
+
+def save_nii(
     mask_file: str,
     parcellation_file: str,
     power_map: np.ndarray,
@@ -128,14 +202,71 @@ def save_nii_file(
         Optional, default is equal weighting.
     """
 
-    # Validation
-    error_message = f"Dimensionality of power_map must be 4, got ndim={power_map.ndim}."
-    power_map = array_ops.validate(
-        power_map,
-        correct_dimensionality=4,
-        allow_dimensions=[3],
-        error_message=error_message,
+    # If the mask file doesn't exist, check if it's in files.mask
+    if not os.path.exists(mask_file):
+        if os.path.exists(f"{files.mask.directory}/{mask_file}"):
+            mask_file = f"{files.mask.directory}/{mask_file}"
+        else:
+            raise FileNotFoundError(mask_file)
+
+    # If the parcellation file doesn't exist, check if  it's in files.parcellation
+    if not os.path.exists(parcellation_file):
+        if os.path.exists(f"{files.parcellation.directory}/{parcellation_file}"):
+            parcellation_file = f"{files.parcellation.directory}/{parcellation_file}"
+        else:
+            raise FileNotFoundError(parcellation_file)
+
+    # Calculate power maps
+    power_map = spatial_map_grid(
+        mask_file=mask_file,
+        parcellation_file=parcellation_file,
+        power_map=power_map,
+        component=component,
+        subtract_mean=subtract_mean,
+        mean_weights=mean_weights,
     )
+
+    # Load the mask
+    mask = nib.load(mask_file)
+
+    # Save as nii file
+    if "nii" not in filename:
+        filename += ".nii.gz"
+    print(f"Saving {filename}")
+    nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
+    nib.save(nii, filename)
+
+
+def save_images(
+    mask_file: str,
+    parcellation_file: str,
+    power_map: np.ndarray,
+    filename: str,
+    component: int = 0,
+    subtract_mean: bool = False,
+    mean_weights: np.ndarray = None,
+):
+    """Saves power maps as an image file.
+
+    Parameters
+    ----------
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcelate the training data.
+    power_map : np.ndarray
+        Power map to save.
+        Shape must be (n_components, n_states, n_channels, n_channels).
+    filename : str
+        Output file name.
+    component : int
+        Spectral component to save. Optional.
+    subtract_mean : bool
+        Should we subtract the mean power across states? Optional: default is False.
+    mean_weights: np.ndarray
+        Numpy array with weightings for each state to use to calculate the mean.
+        Optional, default is equal weighting.
+    """
 
     # If the mask file doesn't exist, check if it's in files.mask
     if not os.path.exists(mask_file):
@@ -151,58 +282,30 @@ def save_nii_file(
         else:
             raise FileNotFoundError(parcellation_file)
 
-    # Load the mask
-    mask = nib.load(mask_file)
-    mask_grid = mask.get_data()
-
-    # Flatten the mask
-    mask_grid = mask_grid.ravel(order="F")
-
-    # Get indices of non-zero elements, i.e. those which contain the brain
-    non_zero_voxels = mask_grid != 0
-
-    # Load the parcellation
-    parcellation = nib.load(parcellation_file)
-    parcellation_grid = parcellation.get_data()
-
-    # Number of parcels
-    n_parcels = parcellation.shape[-1]
-
-    # Make a 1D array of voxel weights for each channel
-    voxels = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
-
-    # Number of voxels
-    n_voxels = voxels.shape[0]
-
-    # Normalise the voxels to have comparable weights
-    voxels /= voxels.max(axis=0)[np.newaxis, ...]
-
-    # Number of components, states, channels
-    n_components, n_states, n_channels, n_channels = power_map.shape
-
-    # Generate spatial map
-    spatial_map = np.empty([n_voxels, n_states])
-    for i in range(n_states):
-        spatial_map[:, i] = voxels @ np.diag(np.squeeze(power_map[component, i]))
-
-    # Subtract weighted mean
-    if subtract_mean:
-        spatial_map -= np.average(
-            spatial_map,
-            axis=1,
-            weights=mean_weights,
-        )[..., np.newaxis]
-
-    # Convert spatial map into a grid
-    spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
-    spatial_map_grid[non_zero_voxels] = spatial_map
-    spatial_map_grid = spatial_map_grid.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], n_states, order="F"
+    # Calculate power maps
+    power_map = spatial_map_grid(
+        mask_file=mask_file,
+        parcellation_file=parcellation_file,
+        power_map=power_map,
+        component=component,
+        subtract_mean=subtract_mean,
+        mean_weights=mean_weights,
     )
 
-    # Save as nii file
-    if "nii" not in filename:
-        filename += ".nii.gz"
-    print(f"Saving {filename}")
-    nii_file = nib.Nifti1Image(spatial_map_grid, mask.affine, mask.header)
-    nib.save(nii_file, filename)
+    # Load the mask
+    mask = nib.load(mask_file)
+
+    # Save each map as an image
+    n_states = power_map.shape[-1]
+    for i in trange(n_states, desc="Saving images", ncols=98):
+        nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
+        output_file = "{fn.stem}{i:0{w}d}{fn.suffix}".format(
+            fn=Path(filename), i=i, w=len(str(n_states))
+        )
+        plotting.plot_img_on_surf(
+            nii,
+            views=["lateral", "medial"],
+            hemispheres=["left", "right"],
+            colorbar=True,
+            output_file=output_file,
+        )
