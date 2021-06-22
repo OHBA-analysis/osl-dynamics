@@ -16,14 +16,14 @@ import scipy.io as spio
 import tensorflow as tf
 import vrad
 import yaml
-from vrad import data
+from vrad import data, files
 from vrad.inference import tf_ops
 from vrad.models import RIGO
 from vrad.utils import plotting
 
 tf.keras.backend.clear_session()
 
-default_settings = pathlib.Path(vrad.example_files) / "default_TABFER_settings.yaml"
+default_settings = files.example.directory / "default_TABFER_settings.yaml"
 results_folder_name = "example_results"
 
 # GPU settings

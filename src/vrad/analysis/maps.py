@@ -7,7 +7,7 @@ import os
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import parc_files, std_masks
+from vrad import files
 from vrad.analysis.functions import validate_array
 
 _logger = logging.getLogger("VRAD")
@@ -138,17 +138,17 @@ def save_nii_file(
         error_message=error_message,
     )
 
-    # If the mask file doesn't exist, check if it's in std_masks
+    # If the mask file doesn't exist, check if it's in files.mask
     if not os.path.exists(mask_file):
-        if os.path.exists(f"{std_masks.directory}/{mask_file}"):
-            mask_file = f"{std_masks.directory}/{mask_file}"
+        if os.path.exists(f"{files.mask.directory}/{mask_file}"):
+            mask_file = f"{files.mask.directory}/{mask_file}"
         else:
             raise FileNotFoundError(mask_file)
 
-    # If the parcellation file doesn't exist, check if  it's in parc_files
+    # If the parcellation file doesn't exist, check if  it's in files.parcellation
     if not os.path.exists(parcellation_file):
-        if os.path.exists(f"{parc_files.directory}/{parcellation_file}"):
-            parcellation_file = f"{parc_files.directory}/{parcellation_file}"
+        if os.path.exists(f"{files.parcellation.directory}/{parcellation_file}"):
+            parcellation_file = f"{files.parcellation.directory}/{parcellation_file}"
         else:
             raise FileNotFoundError(parcellation_file)
 

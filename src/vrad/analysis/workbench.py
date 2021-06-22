@@ -6,15 +6,14 @@ import subprocess
 
 import nibabel as nib
 from tqdm import trange
-from vrad.analysis import std_masks
-from vrad.analysis.scenes import state_scene
+from vrad import files
 
 _logger = logging.getLogger("VRAD")
 
 surfs = {
-    0: [std_masks.surf_left, std_masks.surf_right],
-    1: [std_masks.surf_left_inf, std_masks.surf_right_inf],
-    2: [std_masks.surf_left_vinf, std_masks.surf_right_vinf],
+    0: [files.mask.surf_left, files.mask.surf_right],
+    1: [files.mask.surf_left_inf, files.mask.surf_right_inf],
+    2: [files.mask.surf_left_vinf, files.mask.surf_right_vinf],
 }
 
 
@@ -105,7 +104,7 @@ def render(
 
 
 def create_scene(cifti_left, cifti_right, inflation, temp_scene):
-    scene_file = state_scene
+    scene_file = files.scene.state_scene
     temp_scene = pathlib.Path(temp_scene)
 
     surf_left, surf_right = surfs.get(inflation, surfs[0])
