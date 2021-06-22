@@ -44,6 +44,9 @@ class OSL_HMM:
         else:
             self.vpath = None
 
+        # State means
+        self.means = np.array([state.W.Mu_W for state in self.state])
+
         # State covariances
         self.covariances = np.array(
             [
