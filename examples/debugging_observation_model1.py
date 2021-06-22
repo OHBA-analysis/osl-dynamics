@@ -4,10 +4,8 @@
 """
 
 print("Setting up")
-from pathlib import Path
-
 import numpy as np
-from vrad import data, simulation
+from vrad import data, files, simulation
 from vrad.inference import tf_ops
 from vrad.models import Config, Model
 from vrad.utils import plotting
@@ -22,8 +20,7 @@ gamma_shape = 20
 gamma_scale = 10
 
 # Load state transition probability matrix and covariances of each state
-example_file_directory = Path(__file__).parent / "files"
-cov = np.load(example_file_directory / "hmm_cov.npy")
+cov = np.load(files.example.directory / "hmm_cov.npy")
 
 # Mixtures of states to include in the simulation
 mixed_state_vectors = np.array(

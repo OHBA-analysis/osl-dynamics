@@ -5,10 +5,8 @@
 """
 
 print("Setting up")
-from pathlib import Path
-
 import numpy as np
-from vrad import data, simulation, files
+from vrad import data, files, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import Config, Model
 
@@ -43,8 +41,8 @@ config = Config(
 )
 
 # Load state transition probability matrix and covariances of each state
-trans_prob = np.load(files.examples.directory / "hmm_trans_prob.npy")
-cov = np.load(files.examples.directory / "hmm_cov.npy")
+trans_prob = np.load(files.example.directory / "hmm_trans_prob.npy")
+cov = np.load(files.example.directory / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")

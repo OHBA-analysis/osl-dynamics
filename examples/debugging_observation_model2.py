@@ -1,5 +1,4 @@
 print("Setting up")
-
 import numpy as np
 from vrad import data, simulation
 from vrad.inference import tf_ops

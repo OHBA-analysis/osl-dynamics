@@ -3,10 +3,8 @@
 """
 
 print("Setting up")
-from pathlib import Path
-
 import numpy as np
-from vrad import data, simulation, files
+from vrad import data, files, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import Config, Model
 
