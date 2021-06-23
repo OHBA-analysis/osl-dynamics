@@ -1,3 +1,7 @@
+"""Functions to use Connectome Workbench.
+
+"""
+
 import logging
 import os
 import pathlib

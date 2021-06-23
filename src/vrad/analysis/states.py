@@ -1,3 +1,7 @@
+"""Functions to manipulate state data for analysis.
+
+"""
+
 from typing import Union
 
 import numpy as np
@@ -99,11 +103,11 @@ def raw_covariances(
     state_covariances: Union[list, np.ndarray],
     n_embeddings: int,
     pca_components: np.ndarray,
+    return_mean: bool = False,
 ) -> np.ndarray:
     """Covariance matrix of the raw channels.
 
-    PCA and standardization is reversed to give you to the covariance
-    matrix for the raw channels.
+    PCA is reversed to give you to the covariance matrix of the raw channels.
 
     Parameters
     ----------
@@ -116,6 +120,9 @@ def raw_covariances(
     pca_components : np.ndarray
         Components used for dimensionality reduction.
         Shape must be (n_te_channels, n_pca_components).
+    return_mean : bool
+        Should we turn the zero-lag elements (False) or the mean of each
+        lag (True). Optional, default is False.
 
     Returns
     -------
@@ -124,55 +131,21 @@ def raw_covariances(
         Shape is (n_subjects, n_states, n_channels, n_channels) or
         (n_states, n_channels, n_channels).
     """
-    # Get covariance of time embedded data.
+    # Get covariance of time embedded data
     te_covs = reverse_pca(state_covariances, pca_components)
 
-    # Get elements corresponding to zero-lag.
-    raw_covs = te_covs[
-        :, :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings
-    ]
+    if return_mean:
+        # Get block means
+        n_parcels = te_covs.shape[-1] // n_embeddings
+        raw_covs = te_covs.reshape(
+            -1, n_parcels, n_embeddings, n_parcels, n_embeddings
+        ).mean(axis=(2, 4))
 
-    return np.squeeze(raw_covs)
-
-
-def raw_covariances_mean(
-    state_covariances: Union[list, np.ndarray],
-    n_embeddings: int,
-    pca_components: np.ndarray,
-) -> np.ndarray:
-    """Covariance matrix of the raw channels.
-
-    PCA and standardization is reversed to give you to the covariance
-    matrix for the raw channels. Produces equivalent results to raw_covariances, but
-    uses a block mean for each parcel, rather than taking the zero-lag elements.
-
-    Parameters
-    ----------
-    state_covariances : np.ndarray
-        State covariance matrices.
-        Shape is (n_subjects, n_states, n_channels, n_channels).
-        These must be subject specific covariances.
-    n_embeddings : int
-        Number of embeddings applied to the training data.
-    pca_components : np.ndarray
-        Components used for dimensionality reduction.
-        Shape must be (n_te_channels, n_pca_components).
-
-    Returns
-    -------
-    np.ndarray
-        The variance for each channel, state and subject.
-        Shape is (n_subjects, n_states, n_channels, n_channels) or
-        (n_states, n_channels, n_channels).
-    """
-    # Get covariance of time embedded data.
-    te_covs = reverse_pca(state_covariances, pca_components)
-
-    # Get block means.
-    n_parcels = te_covs.shape[-1] // n_embeddings
-    raw_covs = te_covs.reshape(
-        -1, n_parcels, n_embeddings, n_parcels, n_embeddings
-    ).mean(axis=(2, 4))
+    else:
+        # Get elements corresponding to zero-lag
+        raw_covs = te_covs[
+            :, :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings
+        ]
 
     return np.squeeze(raw_covs)
 

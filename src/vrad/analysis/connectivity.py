@@ -1,3 +1,7 @@
+"""Functions to calculate/plot connectivity.
+
+"""
+
 import numpy as np
 from nilearn.plotting import plot_connectome
 from vrad.files import mask
