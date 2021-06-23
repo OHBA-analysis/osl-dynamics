@@ -3,18 +3,13 @@ from typing import Union
 
 import nibabel as nib
 import numpy as np
-from vrad.analysis import parc_files
+from vrad import files
 
 
 class Parcellation:
     def __init__(self, file: Union[str, Path]):
-        self.file = Path(file)
-        if not self.file.exists():
-            self.file = Path(parc_files.directory) / file
-        if not self.file.exists():
-            raise FileNotFoundError(file)
+        self.file = files.check_exists(file, files.parcellation.directory)
         self.parcellation = nib.load(self.file)
-
         self.dims = self.parcellation.shape[:3]
         self.n_parcels = self.parcellation.shape[3]
 
