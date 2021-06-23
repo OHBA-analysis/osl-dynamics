@@ -1,0 +1,118 @@
+"""Example code for plotting different types of power maps.
+
+"""
+
+print("Setting up")
+from vrad.analysis import states, spectral, power, workbench
+from vrad.data import Data, io, OSL_HMM
+from vrad.utils import plotting
+
+# Load an HMM fit
+hmm = OSL_HMM(
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
+)
+alp = hmm.alpha(concatenate=True)
+cov = hmm.covariances
+
+n_embeddings = 15
+pca_components = io.loadmat(
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/pca_components.mat"
+)
+sampling_frequency = 250
+frequency_range = [1, 45]
+
+# Use elements of the state covariance matrices for the power maps
+power_map = states.raw_covariances(
+    state_covariances=cov,
+    n_embeddings=n_embeddings,
+    pca_components=pca_components,
+)
+
+power.save(
+    power_map=power_map,
+    filename="var.nii.gz",
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    subtract_mean=True,
+)
+
+workbench.setup("/well/woolrich/projects/software/workbench/bin_linux64")
+workbench.render("var.nii.gz", "tmp", gui=False, image_name="var_.png")
+
+# Calculate power maps using power spectra calculated using the state covariances
+acf = states.autocorrelation_functions(
+    state_covariances=cov,
+    n_embeddings=n_embeddings,
+    pca_components=pca_components,
+)
+f, psd, coh = spectral.state_covariance_spectra(
+    acf,
+    sampling_frequency=sampling_frequency,
+    frequency_range=frequency_range,
+)
+power_map = power.variance_from_spectra(f, psd)
+
+power.save(
+    power_map=power_map,
+    filename="acf_.png",
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    subtract_mean=True,
+)
+
+# Calculate power maps using the multitaper method
+preprocessed_data = Data(
+    [
+        f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec/subject{i}.mat"
+        for i in range(1, 11)
+    ]
+)
+ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings, concatenate=True)
+
+f, psd, coh = spectral.multitaper_spectra(
+    data=ts,
+    alpha=alp,
+    sampling_frequency=sampling_frequency,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=frequency_range,
+)
+
+power_map = power.variance_from_spectra(f, psd)
+power.save(
+    power_map=power_map,
+    filename="mt_full_range_.png",
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    subtract_mean=True,
+)
+
+wideband_components = spectral.decompose_spectra(coh, n_components=2)
+plotting.plot_line([f, f], wideband_components, filename="wideband.png")
+
+power_map = maps.variance_from_spectra(f, psd, wideband_components)
+for component in range(2):
+    power.save(
+        power_map=power_map,
+        filename=f"mt_wideband_{component}_.png",
+        mask_file="MNI152_T1_8mm_brain.nii.gz",
+        parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+        subtract_mean=True,
+        component=component,
+    )
+
+narrowband_components = spectral.decompose_spectra(coh, n_components=4)
+plotting.plot_line([f, f, f, f], narrowband_components, filename="narrowband.png")
+
+power_map = maps.variance_from_spectra(f, psd, narrowband_components)
+for component in range(4):
+    power.save(
+        power_map=power_map,
+        filename=f"mt_narrowband_{component}_.png",
+        mask_file="MNI152_T1_8mm_brain.nii.gz",
+        parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+        subtract_mean=True,
+        component=component,
+    )
+
+preprocessed_data.delete_dir()

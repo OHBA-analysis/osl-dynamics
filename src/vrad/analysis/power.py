@@ -1,4 +1,4 @@
-"""Functions to generate spatial maps.
+"""Functions to calculate and save power maps.
 
 """
 
@@ -15,13 +15,13 @@ from vrad import array_ops, files
 _logger = logging.getLogger("VRAD")
 
 
-def state_power_maps(
+def variance_from_spectra(
     frequencies: np.ndarray,
     power_spectra: np.ndarray,
     components: np.ndarray = None,
     frequency_range: list = None,
 ) -> np.ndarray:
-    """Calculates spatial power maps from power spectra.
+    """Calculates variance from power spectra.
 
     Parameters
     ----------
@@ -39,8 +39,8 @@ def state_power_maps(
     Returns
     -------
     np.ndarray
-        Power map for each component of each state. Shape is (n_components,
-        n_states, n_channels, n_channels).
+        Variance over a frequency band for each component of each state.
+        Shape is (n_components, n_states, n_channels, n_channels).
     """
 
     # Validation
@@ -93,14 +93,14 @@ def state_power_maps(
         n_components = 1
     psd = psd.reshape(n_components, n_states, n_channels)
 
-    # Power map
-    p = np.zeros([n_components, n_states, n_channels, n_channels])
-    p[:, :, range(n_channels), range(n_channels)] = psd
+    # Power map (i.e. the variance)
+    var = np.zeros([n_components, n_states, n_channels, n_channels])
+    var[:, :, range(n_channels), range(n_channels)] = psd
 
-    return np.squeeze(p)
+    return np.squeeze(var)
 
 
-def spatial_map_grid(
+def power_map_grid(
     mask_file: str,
     parcellation_file: str,
     power_map: np.ndarray,
@@ -108,7 +108,7 @@ def spatial_map_grid(
     subtract_mean: bool = False,
     mean_weights: np.ndarray = None,
 ) -> np.ndarray:
-    """Returns the power at locations on a spatial map grid."""
+    """Takes a power map and returns the power at locations on a spatial grid."""
 
     # Validation
     error_message = f"Dimensionality of power_map must be 4, got ndim={power_map.ndim}."
@@ -162,37 +162,39 @@ def spatial_map_grid(
         )[..., np.newaxis]
 
     # Convert spatial map into a grid
-    spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])
-    spatial_map_grid[non_zero_parcels] = spatial_map
-    spatial_map_grid = spatial_map_grid.reshape(
+    grid = np.zeros([mask_grid.shape[0], n_states])
+    grid[non_zero_parcels] = spatial_map
+    grid = grid.reshape(
         mask.shape[0], mask.shape[1], mask.shape[2], n_states, order="F"
     )
 
-    return spatial_map_grid
+    return grid
 
 
-def save_nii(
-    mask_file: str,
-    parcellation_file: str,
+def save(
     power_map: np.ndarray,
     filename: str,
+    mask_file: str,
+    parcellation_file: str,
     component: int = 0,
     subtract_mean: bool = False,
     mean_weights: np.ndarray = None,
+    **plot_kwargs,
 ):
-    """Saves a NITFI file containing a map.
+    """Saves power maps.
 
     Parameters
     ----------
-    mask_file : str
-        Mask file used to preprocess the training data.
-    parcellation_file : str
-        Parcellation file used to parcelate the training data.
     power_map : np.ndarray
         Power map to save.
         Shape must be (n_components, n_states, n_channels, n_channels).
     filename : str
-        Output file name.
+        Output filename. If extension is .nii.gz the power map is saved as a
+        NIFTI file. Or if the extension is png, it is saved as images.
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcelate the training data.
     component : int
         Spectral component to save. Optional.
     subtract_mean : bool
@@ -201,23 +203,16 @@ def save_nii(
         Numpy array with weightings for each state to use to calculate the mean.
         Optional, default is equal weighting.
     """
-
-    # If the mask file doesn't exist, check if it's in files.mask
-    if not os.path.exists(mask_file):
-        if os.path.exists(f"{files.mask.directory}/{mask_file}"):
-            mask_file = f"{files.mask.directory}/{mask_file}"
-        else:
-            raise FileNotFoundError(mask_file)
-
-    # If the parcellation file doesn't exist, check if  it's in files.parcellation
-    if not os.path.exists(parcellation_file):
-        if os.path.exists(f"{files.parcellation.directory}/{parcellation_file}"):
-            parcellation_file = f"{files.parcellation.directory}/{parcellation_file}"
-        else:
-            raise FileNotFoundError(parcellation_file)
+    # Validation
+    if ".nii.gz" not in filename and ".png" not in filename:
+        raise ValueError("filename must have extension .nii.gz or .png.")
+    mask_file = files.check_exists(mask_file, files.mask.directory)
+    parcellation_file = files.check_exists(
+        parcellation_file, files.parcellation.directory
+    )
 
     # Calculate power maps
-    power_map = spatial_map_grid(
+    power_map = power_map_grid(
         mask_file=mask_file,
         parcellation_file=parcellation_file,
         power_map=power_map,
@@ -230,82 +225,24 @@ def save_nii(
     mask = nib.load(mask_file)
 
     # Save as nii file
-    if "nii" not in filename:
-        filename += ".nii.gz"
-    print(f"Saving {filename}")
-    nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
-    nib.save(nii, filename)
-
-
-def save_images(
-    mask_file: str,
-    parcellation_file: str,
-    power_map: np.ndarray,
-    filename: str,
-    component: int = 0,
-    subtract_mean: bool = False,
-    mean_weights: np.ndarray = None,
-):
-    """Saves power maps as an image file.
-
-    Parameters
-    ----------
-    mask_file : str
-        Mask file used to preprocess the training data.
-    parcellation_file : str
-        Parcellation file used to parcelate the training data.
-    power_map : np.ndarray
-        Power map to save.
-        Shape must be (n_components, n_states, n_channels, n_channels).
-    filename : str
-        Output file name.
-    component : int
-        Spectral component to save. Optional.
-    subtract_mean : bool
-        Should we subtract the mean power across states? Optional: default is False.
-    mean_weights: np.ndarray
-        Numpy array with weightings for each state to use to calculate the mean.
-        Optional, default is equal weighting.
-    """
-
-    # If the mask file doesn't exist, check if it's in files.mask
-    if not os.path.exists(mask_file):
-        if os.path.exists(f"{files.mask.directory}/{mask_file}"):
-            mask_file = f"{files.mask.directory}/{mask_file}"
-        else:
-            raise FileNotFoundError(mask_file)
-
-    # If the parcellation file doesn't exist, check if  it's in files.parcellation
-    if not os.path.exists(parcellation_file):
-        if os.path.exists(f"{files.parcellation.directory}/{parcellation_file}"):
-            parcellation_file = f"{files.parcellation.directory}/{parcellation_file}"
-        else:
-            raise FileNotFoundError(parcellation_file)
-
-    # Calculate power maps
-    power_map = spatial_map_grid(
-        mask_file=mask_file,
-        parcellation_file=parcellation_file,
-        power_map=power_map,
-        component=component,
-        subtract_mean=subtract_mean,
-        mean_weights=mean_weights,
-    )
-
-    # Load the mask
-    mask = nib.load(mask_file)
+    if ".nii.gz" in filename:
+        print(f"Saving {filename}")
+        nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
+        nib.save(nii, filename)
 
     # Save each map as an image
-    n_states = power_map.shape[-1]
-    for i in trange(n_states, desc="Saving images", ncols=98):
-        nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-        output_file = "{fn.stem}{i:0{w}d}{fn.suffix}".format(
-            fn=Path(filename), i=i, w=len(str(n_states))
-        )
-        plotting.plot_img_on_surf(
-            nii,
-            views=["lateral", "medial"],
-            hemispheres=["left", "right"],
-            colorbar=True,
-            output_file=output_file,
-        )
+    elif ".png" in filename:
+        n_states = power_map.shape[-1]
+        for i in trange(n_states, desc="Saving images", ncols=98):
+            nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
+            output_file = "{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                fn=Path(filename), i=i, w=len(str(n_states))
+            )
+            plotting.plot_img_on_surf(
+                nii,
+                views=["lateral", "medial"],
+                hemispheres=["left", "right"],
+                colorbar=True,
+                output_file=output_file,
+                **plot_kwargs,
+            )
