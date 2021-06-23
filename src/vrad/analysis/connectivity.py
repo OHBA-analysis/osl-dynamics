@@ -1,6 +1,5 @@
 import numpy as np
 from nilearn.plotting import plot_connectome
-from visbrain.objects import BrainObj, ConnectObj, SceneObj
 from vrad.files import mask
 from vrad.utils.parcellation import Parcellation
 
@@ -63,23 +62,3 @@ def plot_connectivity_many(states, parcellation, sigma=0, zero_center=True, **kw
             edge_vmax=vmax,
             **kwargs,
         )
-
-
-def visbrain_plot_connectivity(edges, parcellation, *, inflation=0, selection=None):
-    if isinstance(parcellation, str):
-        parcellation = Parcellation(parcellation)
-    nodes = parcellation.roi_centers()
-
-    scene = SceneObj()
-
-    c = ConnectObj(
-        "Connect", nodes, edges, select=selection, cmap="inferno", antialias=True
-    )
-
-    points, triangles = mask.get_surf(inflation)
-    b = BrainObj("Custom", vertices=points, faces=triangles)
-
-    scene.add_to_subplot(c)
-    scene.add_to_subplot(b)
-
-    scene.preview()
