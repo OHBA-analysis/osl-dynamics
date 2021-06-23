@@ -52,6 +52,8 @@ def render(
         Interpolation type. Default is 'trilinear'.
     gui : bool
         Should we display the rendered plots in workbench? Default is True.
+    image_name : str
+        Filename of image to save.
     """
     nii = pathlib.Path(nii)
 
