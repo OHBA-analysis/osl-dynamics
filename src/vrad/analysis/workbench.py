@@ -131,7 +131,7 @@ def visualise(cifti_left, cifti_right, inflation=0, temp_scene=None):
     subprocess.run(
         [
             "wb_view",
-            "-scene-load-hd",
+            "-scene-load",
             temp_scene,
             "ready",
             *surface,

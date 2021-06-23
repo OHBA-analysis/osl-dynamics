@@ -44,6 +44,27 @@ def plot_connectivity(edges, parcellation, sigma=0, **kwargs):
     plot_connectome(filtered, parcellation.roi_centers(), **kwargs)
 
 
+def plot_connectivity_many(states, parcellation, sigma=0, zero_center=True, **kwargs):
+    states = np.array(states)
+    vmin = states.min()
+    vmax = states.max()
+
+    true_max = np.abs(states).max()
+    if zero_center:
+        vmin = -true_max
+        vmax = true_max
+
+    for state in states:
+        plot_connectivity(
+            state,
+            parcellation,
+            sigma,
+            edge_vmin=vmin,
+            edge_vmax=vmax,
+            **kwargs,
+        )
+
+
 def visbrain_plot_connectivity(edges, parcellation, *, inflation=0, selection=None):
     if isinstance(parcellation, str):
         parcellation = Parcellation(parcellation)
