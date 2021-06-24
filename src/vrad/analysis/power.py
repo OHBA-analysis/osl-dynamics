@@ -122,53 +122,47 @@ def power_map_grid(
     # Load the mask
     mask = nib.load(mask_file)
     mask_grid = mask.get_data()
-
-    # Flatten the mask
     mask_grid = mask_grid.ravel(order="F")
 
     # Get indices of non-zero elements, i.e. those which contain the brain
-    non_zero_parcels = mask_grid != 0
+    non_zero_voxels = mask_grid != 0
 
     # Load the parcellation
     parcellation = nib.load(parcellation_file)
     parcellation_grid = parcellation.get_data()
 
-    # Number of parcels
+    # Make a 2D array of voxel weights for each parcel
     n_parcels = parcellation.shape[-1]
+    voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
 
-    # Make a 1D array of voxel weights for each channel
-    parcels = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_parcels]
+    # Normalise the voxels weights
+    voxel_weights /= voxel_weights.max(axis=0)[np.newaxis, ...]
 
-    # Number of parcels
-    n_parcels = parcels.shape[0]
-
-    # Normalise the parcels to have comparable weights
-    parcels /= parcels.max(axis=0)[np.newaxis, ...]
-
-    # Number of components, states, channels
-    n_components, n_states, n_channels, n_channels = power_map.shape
-
-    # Generate spatial map
-    spatial_map = np.empty([n_parcels, n_states])
+    # Generate a spatial map vector for each state
+    n_voxels = voxel_weights.shape[0]
+    n_states = power_map.shape[1]
+    spatial_map_values = np.empty([n_voxels, n_states])
     for i in range(n_states):
-        spatial_map[:, i] = parcels @ np.diag(np.squeeze(power_map[component, i]))
+        spatial_map_values[:, i] = voxel_weights @ np.diag(
+            np.squeeze(power_map[component, i])
+        )
 
     # Subtract weighted mean
     if subtract_mean:
-        spatial_map -= np.average(
-            spatial_map,
+        spatial_map_values -= np.average(
+            spatial_map_values,
             axis=1,
             weights=mean_weights,
         )[..., np.newaxis]
 
-    # Convert spatial map into a grid
-    grid = np.zeros([mask_grid.shape[0], n_states])
-    grid[non_zero_parcels] = spatial_map
-    grid = grid.reshape(
+    # Final spatial map as a 3D grid for each state
+    spatial_map = np.zeros([mask_grid.shape[0], n_states])
+    spatial_map[non_zero_voxels] = spatial_map_values
+    spatial_map = spatial_map.reshape(
         mask.shape[0], mask.shape[1], mask.shape[2], n_states, order="F"
     )
 
-    return grid
+    return spatial_map
 
 
 def save(

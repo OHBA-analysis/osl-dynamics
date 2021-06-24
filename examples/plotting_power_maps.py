@@ -9,7 +9,7 @@ from vrad.utils import plotting
 
 # Load an HMM fit
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-6/hmm.mat"
 )
 alp = hmm.alpha(concatenate=True)
 cov = hmm.covariances
@@ -21,6 +21,9 @@ pca_components = io.loadmat(
 sampling_frequency = 250
 frequency_range = [1, 45]
 
+mask_file = "MNI152_T1_8mm_brain.nii.gz"
+parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
+
 # Use elements of the state covariance matrices for the power maps
 power_map = states.raw_covariances(
     state_covariances=cov,
@@ -31,8 +34,8 @@ power_map = states.raw_covariances(
 power.save(
     power_map=power_map,
     filename="var.nii.gz",
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    mask_file=mask_file,
+    parcellation_file=parcellation_file,
     subtract_mean=True,
 )
 
@@ -55,8 +58,8 @@ power_map = power.variance_from_spectra(f, psd)
 power.save(
     power_map=power_map,
     filename="acf_.png",
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    mask_file=mask_file,
+    parcellation_file=parcellation_file,
     subtract_mean=True,
 )
 
@@ -82,8 +85,8 @@ power_map = power.variance_from_spectra(f, psd)
 power.save(
     power_map=power_map,
     filename="mt_full_range_.png",
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    mask_file=mask_file,
+    parcellation_file=parcellation_file,
     subtract_mean=True,
 )
 
@@ -95,8 +98,8 @@ for component in range(2):
     power.save(
         power_map=power_map,
         filename=f"mt_wideband_{component}_.png",
-        mask_file="MNI152_T1_8mm_brain.nii.gz",
-        parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+        mask_file=mask_file,
+        parcellation_file=parcellation_file,
         subtract_mean=True,
         component=component,
     )
@@ -109,8 +112,8 @@ for component in range(4):
     power.save(
         power_map=power_map,
         filename=f"mt_narrowband_{component}_.png",
-        mask_file="MNI152_T1_8mm_brain.nii.gz",
-        parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+        mask_file=mask_file,
+        parcellation_file=parcellation_file,
         subtract_mean=True,
         component=component,
     )
