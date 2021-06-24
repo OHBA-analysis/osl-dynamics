@@ -9,7 +9,7 @@ from vrad.utils import plotting
 
 # Load an HMM fit
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
 alp = hmm.alpha(concatenate=True)
 cov = hmm.covariances
@@ -22,7 +22,9 @@ sampling_frequency = 250
 frequency_range = [1, 45]
 
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
-parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
+parcellation_file = (
+    "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
+)
 
 # Use elements of the state covariance matrices for the power maps
 power_map = states.raw_covariances(
@@ -30,7 +32,6 @@ power_map = states.raw_covariances(
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-
 power.save(
     power_map=power_map,
     filename="var.nii.gz",
@@ -38,8 +39,7 @@ power.save(
     parcellation_file=parcellation_file,
     subtract_mean=True,
 )
-
-workbench.setup("/well/woolrich/projects/software/workbench/bin_linux64")
+workbench.setup("/well/woolrich/projects/software/workbench/bin_rh_linux64")
 workbench.render("var.nii.gz", "tmp", gui=False, image_name="var_.png")
 
 # Calculate power maps using power spectra calculated using the state covariances
@@ -53,8 +53,8 @@ f, psd, coh = spectral.state_covariance_spectra(
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,
 )
-power_map = power.variance_from_spectra(f, psd)
 
+power_map = power.variance_from_spectra(f, psd)
 power.save(
     power_map=power_map,
     filename="acf_.png",
@@ -93,7 +93,7 @@ power.save(
 wideband_components = spectral.decompose_spectra(coh, n_components=2)
 plotting.plot_line([f, f], wideband_components, filename="wideband.png")
 
-power_map = maps.variance_from_spectra(f, psd, wideband_components)
+power_map = power.variance_from_spectra(f, psd, wideband_components)
 for component in range(2):
     power.save(
         power_map=power_map,
@@ -107,7 +107,7 @@ for component in range(2):
 narrowband_components = spectral.decompose_spectra(coh, n_components=4)
 plotting.plot_line([f, f, f, f], narrowband_components, filename="narrowband.png")
 
-power_map = maps.variance_from_spectra(f, psd, narrowband_components)
+power_map = power.variance_from_spectra(f, psd, narrowband_components)
 for component in range(4):
     power.save(
         power_map=power_map,
