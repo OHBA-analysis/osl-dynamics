@@ -142,7 +142,9 @@ class IO:
         for raw_data, mmap_location in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
         ):
-            raw_data_mmap = load_data(raw_data, data_field, mmap_location)
+            raw_data_mmap = load_data(
+                raw_data, data_field, mmap_location, mmap_mode="r"
+            )
             if not time_axis_first:
                 raw_data_mmap = raw_data_mmap.T
             memmaps.append(raw_data_mmap)
@@ -227,6 +229,7 @@ def load_data(
     data: Union[str, list, np.ndarray],
     data_field: str = "X",
     mmap_location: str = None,
+    mmap_mode: str = "r+",
 ) -> Union[np.ndarray, np.memmap]:
     """Loads time series data.
 
@@ -241,6 +244,8 @@ def load_data(
         the data.
     mmap_location : str
         Filename to save the data as a numpy memory map.
+    mmap_mode : str
+        Mode to load memory maps in. Optional, default is 'r+'.
 
     Returns
     -------
@@ -287,7 +292,7 @@ def load_data(
                 mmap_location = data
 
     # Load data as memmap
-    data = np.load(mmap_location, mmap_mode="r+")
+    data = np.load(mmap_location, mmap_mode=mmap_mode)
 
     return data
 
