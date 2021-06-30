@@ -229,7 +229,7 @@ def save(
         n_states = power_map.shape[-1]
         for i in trange(n_states, desc="Saving images", ncols=98):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            output_file = "{fn.stem}{i:0{w}d}{fn.suffix}".format(
+            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                 fn=Path(filename), i=i, w=len(str(n_states))
             )
             plotting.plot_img_on_surf(
