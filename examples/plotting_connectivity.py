@@ -1,16 +1,49 @@
-import numpy as np
-from vrad.analysis.connectivity import plot_connectivity
-from vrad.utils.parcellation import Parcellation
+"""Example code for plotting connectivity.
 
-edges = np.random.uniform(low=-10.0, high=10.0, size=(38, 38))
-select = np.logical_and(edges >= 0, edges <= 1.0)
-parcellation = Parcellation(
-    "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
+"""
+
+print("Setting up")
+from vrad.analysis import states, power, connectivity
+from vrad.data import io, OSL_HMM
+
+# Load an HMM fit
+hmm = OSL_HMM(
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
 )
 
-plot_connectivity(
-    edges,
-    parcellation,
-    inflation=0,
-    selection=select,
+n_embeddings = 15
+pca_components = io.loadmat(
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/pca_components.mat"
+)
+
+mask_file = "MNI152_T1_8mm_brain.nii.gz"
+parcellation_file = (
+    "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
+)
+
+# Covariance of raw channels
+raw_cov = states.raw_covariances(
+    state_covariances=hmm.covariances,
+    n_embeddings=n_embeddings,
+    pca_components=pca_components,
+    zero_lag=True,
+)
+
+"""
+# Plot power maps
+power.save(
+    power_map=raw_cov,
+    filename="power_.png",
+    mask_file=mask_file,
+    parcellation_file=parcellation_file,
+    subtract_mean=True,
+)
+"""
+
+# Plot connectivity
+connectivity.save(
+    connectivity_map=abs(raw_cov),
+    threshold=0.98,
+    filename="conn_.png",
+    parcellation_file=parcellation_file,
 )

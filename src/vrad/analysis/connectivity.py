@@ -2,67 +2,52 @@
 
 """
 
+from pathlib import Path
+
 import numpy as np
-from nilearn.plotting import plot_connectome
-from vrad.files import mask
+from nilearn import plotting
+from tqdm import trange
 from vrad.utils.parcellation import Parcellation
 
 
-def exclude_by_sigma(edges, sigma=1):
-    edges = edges.copy()
-    np.fill_diagonal(edges, np.nan)
+def save(
+    connectivity_map: np.ndarray,
+    threshold: float,
+    filename: str,
+    parcellation_file: str,
+    **plot_kwargs,
+):
+    """Save connectivity maps.
 
-    mean = edges[~np.isnan(edges)].mean()
-    std = edges[~np.isnan(edges)].std()
+    Parameters
+    ----------
+    connectivity_map : np.ndarray
+        Matrices containing connectivity strengths to plot.
+        Shape must be (n_states, n_channels, n_channels).
+    threshold : float
+        Threshold to determine which connectivity to show.
+        Should be between 0 and 1.
+    filename : str
+        Output filename.
+    parcellation_file : str
+        Name of parcellation file used.
+    """
+    if threshold > 1 or threshold < 0:
+        raise ValueError("threshold must be between 0 and 1.")
 
-    np.fill_diagonal(edges, mean)
-    selection = (edges >= (mean + sigma * std)) & (edges <= (mean - sigma * std))
-    return selection
-
-
-def std_filter(arr, sigma=0.95):
-    copy = arr.copy()
-
-    mean = copy.mean()
-    std = copy.std()
-
-    low_pass = mean - sigma * std
-    high_pass = mean + sigma * std
-
-    copy[(copy > low_pass) & (copy < high_pass)] = 0
-    return copy
-
-
-def make_symmetric(arr, upper=True):
-    copy = arr.copy()
-    index = np.tril_indices(copy.shape[-1], -1)
-    copy[..., index[0], index[1]] = np.inf
-    return np.minimum(copy, np.swapaxes(copy, -2, -1))
-
-
-def plot_connectivity(edges, parcellation, sigma=0, **kwargs):
-    filtered = std_filter(edges, sigma)
-    if not isinstance(parcellation, Parcellation):
-        parcellation = Parcellation(parcellation)
-    plot_connectome(filtered, parcellation.roi_centers(), **kwargs)
-
-
-def plot_connectivity_many(states, parcellation, sigma=0, zero_center=True, **kwargs):
-    states = np.array(states)
-    vmin = states.min()
-    vmax = states.max()
-
-    true_max = np.abs(states).max()
-    if zero_center:
-        vmin = -true_max
-        vmax = true_max
-
-    for state in states:
-        plot_connectivity(
-            state,
-            parcellation,
-            sigma,
-            edge_vmin=vmin,
-            edge_vmax=vmax,
-            **kwargs,
+    parcellation = Parcellation(parcellation_file)
+    n_states = len(connectivity_map)
+    for i in trange(n_states, desc="Saving images", ncols=98):
+        c = connectivity_map[i].copy()
+        np.fill_diagonal(c, 0)
+        output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+            fn=Path(filename), i=i, w=len(str(n_states))
+        )
+        plotting.plot_connectome(
+            c,
+            parcellation.roi_centers(),
+            colorbar=True,
+            edge_threshold=f"{threshold * 100}%",
+            output_file=output_file,
+            **plot_kwargs,
         )

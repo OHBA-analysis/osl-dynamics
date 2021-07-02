@@ -103,7 +103,7 @@ def raw_covariances(
     state_covariances: Union[list, np.ndarray],
     n_embeddings: int,
     pca_components: np.ndarray,
-    return_mean: bool = False,
+    zero_lag: bool = True,
 ) -> np.ndarray:
     """Covariance matrix of the raw channels.
 
@@ -120,9 +120,8 @@ def raw_covariances(
     pca_components : np.ndarray
         Components used for dimensionality reduction.
         Shape must be (n_te_channels, n_pca_components).
-    return_mean : bool
-        Should we turn the zero-lag elements (False) or the mean of each
-        lag (True). Optional, default is False.
+    zero_lag : bool
+        Should we return just the zero-lag elements? Optional, default is True.
 
     Returns
     -------
@@ -134,18 +133,18 @@ def raw_covariances(
     # Get covariance of time embedded data
     te_covs = reverse_pca(state_covariances, pca_components)
 
-    if return_mean:
-        # Get block means
-        n_parcels = te_covs.shape[-1] // n_embeddings
-        raw_covs = te_covs.reshape(
-            -1, n_parcels, n_embeddings, n_parcels, n_embeddings
-        ).mean(axis=(2, 4))
-
-    else:
+    if zero_lag:
         # Get elements corresponding to zero-lag
         raw_covs = te_covs[
             :, :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings
         ]
+
+    else:
+        # Return block means
+        n_parcels = te_covs.shape[-1] // n_embeddings
+        raw_covs = te_covs.reshape(
+            -1, n_parcels, n_embeddings, n_parcels, n_embeddings
+        ).mean(axis=(2, 4))
 
     return np.squeeze(raw_covs)
 
