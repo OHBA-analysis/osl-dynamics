@@ -111,6 +111,14 @@ class MVN:
             covariances /= np.trace(covariances, axis1=1, axis2=2)[
                 ..., np.newaxis, np.newaxis
             ]
+
+            # Add a large activation to a small number of the channels at random
+            n_active_channels = max(1, self.n_channels // self.n_states)
+            for i in range(self.n_states):
+                active_channels = np.unique(
+                    self._rng.integers(0, self.n_channels, size=n_active_channels)
+                )
+                covariances[i, active_channels, active_channels] += 1
         else:
             raise ValueError("covariances must be a np.array or 'random'.")
         return covariances
