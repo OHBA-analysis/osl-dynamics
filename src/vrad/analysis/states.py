@@ -103,7 +103,7 @@ def raw_covariances(
     state_covariances: Union[list, np.ndarray],
     n_embeddings: int,
     pca_components: np.ndarray,
-    zero_lag: bool = True,
+    zero_lag: bool = False,
 ) -> np.ndarray:
     """Covariance matrix of the raw channels.
 
@@ -121,7 +121,9 @@ def raw_covariances(
         Components used for dimensionality reduction.
         Shape must be (n_te_channels, n_pca_components).
     zero_lag : bool
-        Should we return just the zero-lag elements? Optional, default is True.
+        Should we return just the zero-lag elements? Otherwise, we return
+        the mean over time lags. Optional, default is False.
+
 
     Returns
     -------

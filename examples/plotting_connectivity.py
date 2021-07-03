@@ -26,10 +26,9 @@ raw_cov = states.raw_covariances(
     state_covariances=hmm.covariances,
     n_embeddings=n_embeddings,
     pca_components=pca_components,
-    zero_lag=True,
+    zero_lag=False,
 )
 
-"""
 # Plot power maps
 power.save(
     power_map=raw_cov,
@@ -38,7 +37,6 @@ power.save(
     parcellation_file=parcellation_file,
     subtract_mean=True,
 )
-"""
 
 # Plot connectivity
 connectivity.save(
