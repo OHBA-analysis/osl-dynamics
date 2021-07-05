@@ -416,7 +416,6 @@ def multitaper_spectra(
 
     # Standardise the data
     if standardize_data:
-        # TODO: Maybe default behaviour should not be to standardize
         data = standardize(data, axis=0)
 
     # Use the state mixing factors to get a time series for each state
@@ -478,7 +477,8 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    # TODO: We should be normalising using sum alpha instead of sum alpha^2
+    # TODO: We should be normalising using sum alpha instead of sum alpha^2,
+    # but this makes a small difference, so left like this for consistency with HMM-MAR
     sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
@@ -509,9 +509,8 @@ def coherence_spectra(power_spectra: np.ndarray):
     for i in range(n_states):
         for j in range(n_channels):
             for k in range(n_channels):
-                coherences[i, j, k] = abs(
-                    power_spectra[i, j, k]
-                    / np.sqrt(power_spectra[i, j, j] * power_spectra[i, k, k])
+                coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
+                    power_spectra[i, j, j].real * power_spectra[i, k, k].real
                 )
 
     return coherences

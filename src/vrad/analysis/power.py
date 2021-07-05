@@ -45,9 +45,10 @@ def variance_from_spectra(
 
     # Validation
     error_message = (
-        "a 3D numpy array (n_channels, n_channels, n_frequency_bins) "
-        + "or 4D numpy array (n_states, n_channels, n_channels, "
-        + "n_frequency_bins) must be passed for spectra."
+        "A (n_channels, n_channels, n_frequency_bins), "
+        + "(n_states, n_channels, n_channels, n_frequency_bins) or "
+        + "(n_subjects, n_states, n_channels, n_channels, n_frequency_bins) "
+        + "array must be passed."
     )
     power_spectra = array_ops.validate(
         power_spectra,
@@ -66,36 +67,45 @@ def variance_from_spectra(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
-    # Number of subjects, states, channels and frequency bins
+    # Dimensions
     n_subjects, n_states, n_channels, n_channels, n_f = power_spectra.shape
-
-    # Remove cross-spectral densities from the power spectra array and concatenate
-    # over subjects and states
-    psd = power_spectra[:, :, range(n_channels), range(n_channels)].reshape(-1, n_f)
-
-    # PSDs are real valued so we can recast
-    psd = psd.real
-
-    if components is not None:
-        # Calculate PSD for each spectral component
-        psd = components @ psd.T
-        n_components = components.shape[0]
-    else:
-        # Integrate over the given frequency range
-        if frequency_range is None:
-            psd = np.sum(psd, axis=-1)
-        else:
-            f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-            f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-            if f_max_arg < f_min_arg:
-                raise ValueError("Cannot select the specified frequency range.")
-            psd = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+    if components is None:
         n_components = 1
-    psd = psd.reshape(n_components, n_states, n_channels)
+    else:
+        n_components = components.shape[0]
 
-    # Power map (i.e. the variance)
-    var = np.zeros([n_components, n_states, n_channels, n_channels])
-    var[:, :, range(n_channels), range(n_channels)] = psd
+    # Calculate power maps for each subject
+    var = []
+    for i in range(n_subjects):
+
+        # Remove cross-spectral densities from the power spectra array
+        # and concatenate over states
+        psd = power_spectra[i, :, range(n_channels), range(n_channels)]
+        psd = np.swapaxes(psd, 0, 1)
+        psd = psd.reshape(-1, n_f)
+        psd = psd.real
+
+        if components is not None:
+            # Calculate PSD for each spectral component
+            p = components @ psd.T
+
+        else:
+            # Integrate over the given frequency range
+            if frequency_range is None:
+                p = np.sum(psd, axis=-1)
+            else:
+                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
+                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
+                if f_max_arg < f_min_arg:
+                    raise ValueError("Cannot select the specified frequency range.")
+                p = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+
+        p = p.reshape(n_components, n_states, n_channels)
+
+        # Variance
+        v = np.zeros([n_components, n_states, n_channels, n_channels])
+        v[:, :, range(n_channels), range(n_channels)] = p
+        var.append(v)
 
     return np.squeeze(var)
 

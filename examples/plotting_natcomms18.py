@@ -1,15 +1,15 @@
-"""Example code for plotting different types of power maps.
+"""Example code for reproducing plots from D. Vidaurre's 2018 Nature Comms paper.
 
 """
 
 print("Setting up")
-from vrad.analysis import states, spectral, power, workbench
+from vrad.analysis import states, spectral, power, connectivity
 from vrad.data import Data, io, OSL_HMM
 from vrad.utils import plotting
 
 # Load an HMM fit
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
 )
 cov = hmm.covariances
 alp = hmm.alpha(concatenate=True)
@@ -26,48 +26,11 @@ parcellation_file = (
     "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
 )
 
-# Use elements of the state covariance matrices for the power maps
-power_map = states.raw_covariances(
-    state_covariances=cov,
-    n_embeddings=n_embeddings,
-    pca_components=pca_components,
-)
-power.save(
-    power_map=power_map,
-    filename="var.nii.gz",
-    mask_file=mask_file,
-    parcellation_file=parcellation_file,
-    subtract_mean=True,
-)
-workbench.setup("/well/woolrich/projects/software/workbench/bin_rh_linux64")
-workbench.render("var.nii.gz", "tmp", gui=False, image_name="var_.png")
-
-# Calculate power maps using power spectra calculated using the state covariances
-acf = states.autocorrelation_functions(
-    state_covariances=cov,
-    n_embeddings=n_embeddings,
-    pca_components=pca_components,
-)
-f, psd, coh = spectral.state_covariance_spectra(
-    acf,
-    sampling_frequency=sampling_frequency,
-    frequency_range=frequency_range,
-)
-
-power_map = power.variance_from_spectra(f, psd)
-power.save(
-    power_map=power_map,
-    filename="acf_.png",
-    mask_file=mask_file,
-    parcellation_file=parcellation_file,
-    subtract_mean=True,
-)
-
-# Calculate power maps using the multitaper method
+# Calculate PSDs and coherence using multitaper method
 preprocessed_data = Data(
     [
         f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec/subject{i}.mat"
-        for i in range(1, 11)
+        for i in range(1, 56)
     ]
 )
 ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings, concatenate=True)
@@ -81,41 +44,70 @@ f, psd, coh = spectral.multitaper_spectra(
     frequency_range=frequency_range,
 )
 
+# Non-frequency specific power maps
 power_map = power.variance_from_spectra(f, psd)
 power.save(
     power_map=power_map,
-    filename="mt_fullrange_.png",
+    filename="test/mt_fullrange_.png",
     mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,
 )
 
+# Non-frequency specific connectivity
+conn_map = connectivity.covariance_from_spectra(f, psd)
+connectivity.save(
+    connectivity_map=conn_map,
+    threshold=0.98,
+    filename="test/mt_fullrange_conn_.png",
+    parcellation_file=parcellation_file,
+)
+
+# Fit two spectral components to the coherence
 wideband_components = spectral.decompose_spectra(coh, n_components=2)
-plotting.plot_line([f, f], wideband_components, filename="wideband.png")
+plotting.plot_line([f, f], wideband_components, filename="test/wideband.png")
 
 power_map = power.variance_from_spectra(f, psd, wideband_components)
+conn_map = connectivity.mean_coherence_from_spectra(f, coh, wideband_components)
 for component in range(2):
     power.save(
         power_map=power_map,
-        filename=f"mt_wideband{component}_.png",
+        filename=f"test/mt_wideband{component}_power_.png",
         mask_file=mask_file,
         parcellation_file=parcellation_file,
         subtract_mean=True,
         component=component,
     )
+    connectivity.save(
+        connectivity_map=conn_map,
+        threshold=0.98,
+        filename=f"test/mt_wideband{component}_conn_.png",
+        parcellation_file=parcellation_file,
+        component=component,
+    )
 
+# Fit four spectral components to the coherence
 narrowband_components = spectral.decompose_spectra(coh, n_components=4)
 plotting.plot_line([f, f, f, f], narrowband_components, filename="narrowband.png")
 
 power_map = power.variance_from_spectra(f, psd, narrowband_components)
+conn_map = connectivity.mean_coherence_from_spectra(f, coh, narrowband_components)
 for component in range(4):
     power.save(
         power_map=power_map,
-        filename=f"mt_narrowband{component}_.png",
+        filename=f"test/mt_narrowband{component}_power_.png",
         mask_file=mask_file,
         parcellation_file=parcellation_file,
         subtract_mean=True,
         component=component,
     )
+    connectivity.save(
+        connectivity_map=conn_map,
+        threshold=0.98,
+        filename=f"test/mt_narrowband{component}_conn_.png",
+        parcellation_file=parcellation_file,
+        component=component,
+    )
 
+# Delete temporary directory
 preprocessed_data.delete_dir()
