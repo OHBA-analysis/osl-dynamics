@@ -3,8 +3,8 @@
 """
 
 print("Setting up")
-from vrad.analysis import states, power, connectivity
-from vrad.data import io, OSL_HMM
+from vrad.analysis import connectivity, power, states
+from vrad.data import OSL_HMM, io
 
 # Load an HMM fit
 hmm = OSL_HMM(
@@ -13,7 +13,8 @@ hmm = OSL_HMM(
 
 n_embeddings = 15
 pca_components = io.loadmat(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/pca_components.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/"
+    "natcomms18/prepared_data/pca_components.mat"
 )
 
 mask_file = "MNI152_T1_8mm_brain.nii.gz"

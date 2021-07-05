@@ -4,6 +4,7 @@
 
 from os import path
 
+
 def check_exists(filename, vrad_directory):
     """Looks for a file in the current working directory and in a VRAD directory."""
     if not path.exists(filename):

@@ -3,8 +3,8 @@
 """
 
 print("Setting up")
-from vrad.analysis import states, spectral, power, workbench
-from vrad.data import Data, io, OSL_HMM
+from vrad.analysis import power, spectral, states, workbench
+from vrad.data import OSL_HMM, Data, io
 from vrad.utils import plotting
 
 # Load an HMM fit
@@ -16,7 +16,8 @@ cov = hmm.covariances
 
 n_embeddings = 15
 pca_components = io.loadmat(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/pca_components.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18"
+    "/prepared_data/pca_components.mat"
 )
 sampling_frequency = 250
 frequency_range = [1, 45]

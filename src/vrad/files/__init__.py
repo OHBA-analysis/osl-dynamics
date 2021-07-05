@@ -1,6 +1,4 @@
-from vrad.files import example
-from vrad.files import mask
-from vrad.files import parcellation
-from vrad.files import scene
+# flake8: noqa
 
+from vrad.files import example, mask, parcellation, scene
 from vrad.files._functions import *

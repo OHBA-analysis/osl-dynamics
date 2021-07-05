@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from pathlib import Path
 
 from pkg_resources import DistributionNotFound, get_distribution
 

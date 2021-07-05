@@ -7,6 +7,8 @@ Please also see make_default_settings.py to configure run-time defaults.
 
 Ryan Timms, OHBA, 2021. @blobsonthebrain
 """
+# TODO: This example is out of date.
+# flake8: noqa
 print("Setting up")
 import pathlib
 

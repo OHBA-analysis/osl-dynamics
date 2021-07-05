@@ -171,7 +171,9 @@ def match_states(
         correlation = correlate_states(
             state_time_courses[0][:n_samples], state_time_course[:n_samples]
         )
-        correlation = np.nan_to_num(np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1))
+        correlation = np.nan_to_num(
+            np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
+        )
         matches = linear_sum_assignment(-correlation)
         matched_state_time_courses.append(state_time_course[:n_samples, matches[1]])
         orders.append(matches[1])
