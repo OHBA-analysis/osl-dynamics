@@ -142,11 +142,26 @@ def raw_covariances(
         ]
 
     else:
-        # Return block means
+        n_subjects = te_covs.shape[0]
+        n_states = te_covs.shape[1]
         n_parcels = te_covs.shape[-1] // n_embeddings
-        raw_covs = te_covs.reshape(
-            -1, n_parcels, n_embeddings, n_parcels, n_embeddings
-        ).mean(axis=(2, 4))
+
+        # Return block means
+        raw_covs = np.empty([n_subjects, n_states, n_parcels, n_parcels])
+        for i in range(n_subjects):
+            for j in range(n_states):
+                for k in range(n_parcels):
+                    for l in range(n_parcels):
+                        block = te_covs[
+                            i,
+                            j,
+                            k * n_embeddings : (k + 1) * n_embeddings,
+                            l * n_embeddings : (l + 1) * n_embeddings,
+                        ]
+                        if k == l:
+                            raw_covs[i, j, k, l] = np.mean(np.diag(block))
+                        else:
+                            raw_covs[i, j, k, l] = np.mean(block)
 
     return np.squeeze(raw_covs)
 
