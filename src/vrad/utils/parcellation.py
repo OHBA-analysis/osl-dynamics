@@ -40,3 +40,9 @@ class Parcellation:
                 for c, w in zip(self.nonzero_coords(), self.weights())
             ]
         )
+
+    @staticmethod
+    def find_files():
+        paths = Path(files.parcellation.directory).glob("*")
+        paths = [path.name for path in paths if not path.name.startswith("__")]
+        return sorted(paths)
