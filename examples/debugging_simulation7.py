@@ -17,7 +17,7 @@ tf_ops.gpu_growth()
 
 # Settings
 config = Config(
-    n_states=6,
+    n_states=8,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=64,
@@ -27,7 +27,7 @@ config = Config(
     model_normalization="layer",
     theta_normalization=None,
     alpha_xform="softmax",
-    learn_alpha_temperature=False,
+    learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_covariances=True,
     do_kl_annealing=True,
@@ -43,16 +43,15 @@ config = Config(
 print("Simulating data")
 sim = simulation.MixedSine_MVN(
     n_samples=25600,
-    n_states=6,
+    n_states=8,
     n_channels=80,
-    relative_activation=[2, 0.1, 0.06, 0.02, 0.02, 0.02],
-    amplitudes=[0.1, 0.25, 0.25, 0.5, 1, 2],
-    frequencies=[0.5, 0.5, 1, 1, 2.5, 5],
+    relative_activation=[1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
+    amplitudes=[8, 7, 6, 5, 4, 3, 2, 1],
+    frequencies=[1, 2, 3, 4, 5, 6, 6, 6],
     sampling_frequency=250,
     means="zero",
     covariances="random",
 )
-sim.standardize()
 meg_data = data.Data(sim.time_series)
 
 config.n_channels = meg_data.n_channels
