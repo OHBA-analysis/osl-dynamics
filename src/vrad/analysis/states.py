@@ -151,7 +151,7 @@ def raw_covariances(
         for i in range(n_subjects):
             for j in range(n_states):
                 for k in range(n_parcels):
-                    for l in range(n_parcels):
+                    for l in range(n_parcels):  # noqa: E741
                         block = te_covs[
                             i,
                             j,

@@ -4,8 +4,8 @@
 
 print("Setting up")
 import numpy as np
-from vrad.analysis import connectivity, power, spectral, states
-from vrad.data import Data, io, OSL_HMM
+from vrad.analysis import connectivity, spectral, states
+from vrad.data import OSL_HMM, Data, io
 from vrad.utils import plotting
 
 # Load an HMM fit
