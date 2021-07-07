@@ -3,18 +3,23 @@ from typing import Union
 
 import nibabel as nib
 import numpy as np
+from nilearn.plotting import plot_markers
 from vrad import files
 
 
 class Parcellation:
     def __init__(self, file: Union[str, Path]):
+        if isinstance(file, Parcellation):
+            self.__dict__.update(file.__dict__)
+            return
         self.file = files.check_exists(file, files.parcellation.directory)
+
         self.parcellation = nib.load(self.file)
         self.dims = self.parcellation.shape[:3]
         self.n_parcels = self.parcellation.shape[3]
 
     def __repr__(self):
-        return f'{self.__class__.__name__}("{str(self.file)}")'
+        return f"{self.__class__.__name__}({repr(self.file)})"
 
     def data(self):
         return self.parcellation.get_fdata()
@@ -41,8 +46,22 @@ class Parcellation:
             ]
         )
 
+    def plot(self, **kwargs):
+        return plot_parcellation(self, **kwargs)
+
     @staticmethod
     def find_files():
         paths = Path(files.parcellation.directory).glob("*")
         paths = [path.name for path in paths if not path.name.startswith("__")]
         return sorted(paths)
+
+
+def plot_parcellation(parcellation: Union[Parcellation, str], **kwargs):
+    parcellation = Parcellation(parcellation)
+    return plot_markers(
+        np.zeros(parcellation.n_parcels),
+        parcellation.roi_centers(),
+        colorbar=False,
+        node_cmap="binary_r",
+        **kwargs,
+    )
