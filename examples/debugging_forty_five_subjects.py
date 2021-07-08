@@ -4,11 +4,9 @@
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.82 (when compared to the OSL HMM state time course).
 """
 
 print("Setting up")
-from vrad.analysis import maps, spectral
 from vrad.data import OSL_HMM, Data, manipulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import Config, Model
@@ -44,8 +42,8 @@ config = Config(
 print("Reading MEG data")
 prepared_data = Data(
     [
-        f"/well/woolrich/projects/uk_meg_notts/eo/prepared_data/subject{i}.mat"
-        for i in range(1, 46)
+        f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/subject{i}.mat"
+        for i in range(1, 56)
     ],
     sampling_frequency=250,
     n_embeddings=15,
@@ -63,7 +61,7 @@ prediction_dataset = prepared_data.prediction_dataset(
 
 # Initialise covariances with the final HMM covariances
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/results/nSubjects-45_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-6/hmm.mat"
 )
 config.initial_covariances = hmm.covariances
 
@@ -95,45 +93,5 @@ hmm_stc = manipulation.trim_time_series(
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
-# Load preprocessed data to calculate spatial power maps
-preprocessed_data = Data(
-    [
-        f"/well/woolrich/projects/uk_meg_notts/eo/preproc_data/subject{i}.mat"
-        for i in range(1, 46)
-    ]
-)
-preprocessed_time_series = preprocessed_data.trim_raw_time_series(
-    sequence_length=config.sequence_length,
-    n_embeddings=prepared_data.n_embeddings,
-)
-
-# Compute spectra for states
-f, psd, coh = spectral.multitaper_spectra(
-    data=preprocessed_time_series,
-    alpha=alpha,
-    sampling_frequency=prepared_data.sampling_frequency,
-    time_half_bandwidth=4,
-    n_tapers=7,
-    frequency_range=[1, 45],
-)
-
-# Perform spectral decomposition (into 2 components) based on coherence spectra
-components = spectral.decompose_spectra(coh, n_components=2)
-
-# Calculate spatial maps
-p_map = maps.state_power_maps(f, psd, components)
-
-# Save the power map for the first component as NIFTI file
-# (The second component is noise)
-maps.save_nii_file(
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    power_map=p_map,
-    filename="power_maps.nii.gz",
-    component=0,
-    subtract_mean=True,
-)
-
 # Delete the temporary folder holding the data
 prepared_data.delete_dir()
-preprocessed_data.delete_dir()
