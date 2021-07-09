@@ -99,7 +99,7 @@ def autocorrelation_functions(
     return np.squeeze(autocorrelation_functions)
 
 
-def new_raw_covariances(
+def raw_covariances(
     state_covariances: Union[list, np.ndarray],
     n_embeddings: int,
     pca_components: np.ndarray,
