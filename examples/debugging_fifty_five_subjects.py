@@ -42,7 +42,8 @@ config = Config(
 print("Reading MEG data")
 prepared_data = Data(
     [
-        f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/subject{i}.mat"
+        f"/well/woolrich/projects/uk_meg_notts/"
+        f"eo/natcomms18/prepared_data/subject{i}.mat"
         for i in range(1, 56)
     ],
     sampling_frequency=250,
