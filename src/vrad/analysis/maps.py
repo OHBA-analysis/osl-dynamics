@@ -188,9 +188,11 @@ def save_nii_file(
 
     # Subtract weighted mean
     if subtract_mean:
-        spatial_map -= np.average(spatial_map, axis=1, weights=mean_weights,)[
-            ..., np.newaxis
-        ]
+        spatial_map -= np.average(
+            spatial_map,
+            axis=1,
+            weights=mean_weights,
+        )[..., np.newaxis]
 
     # Convert spatial map into a grid
     spatial_map_grid = np.zeros([mask_grid.shape[0], n_states])

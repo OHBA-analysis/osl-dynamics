@@ -7,6 +7,9 @@ Please also see make_default_settings.py to configure run-time defaults.
 
 Ryan Timms, OHBA, 2021. @blobsonthebrain
 """
+# TODO: This example is out of date.
+# flake8: noqa
+print("Setting up")
 import pathlib
 
 import matplotlib.pyplot as plt
@@ -15,17 +18,14 @@ import scipy.io as spio
 import tensorflow as tf
 import vrad
 import yaml
-from vrad import data
+from vrad import data, files
 from vrad.inference import tf_ops
 from vrad.models import RIGO
 from vrad.utils import plotting
 
-print("Setting up")
-
-
 tf.keras.backend.clear_session()
 
-default_settings = pathlib.Path(vrad.example_files) / "default_TABFER_settings.yaml"
+default_settings = files.example.directory / "default_TABFER_settings.yaml"
 results_folder_name = "example_results"
 
 # GPU settings
@@ -44,10 +44,10 @@ n_layers_inference = settings["n_layers_inference"]
 n_layers_model = settings["n_layers_model"]
 n_units_inference = settings["n_units_inference"]
 n_units_model = settings["n_units_model"]
-do_annealing = settings["do_annealing"]
-annealing_sharpness = settings["annealing_sharpness"]
+do_kl_annealing = settings["do_kl_annealing"]
+kl_annealing_sharpness = settings["kl_annealing_sharpness"]
 n_epochs = settings["n_epochs"]
-n_epochs_annealing = settings["n_epochs_annealing"]
+n_epochs_kl_annealing = settings["n_epochs_kl_annealing"]
 rnn_type = settings["rnn_type"]
 rnn_normalization = settings["rnn_normalization"]
 theta_normalization = settings["theta_normalization"]
@@ -59,7 +59,8 @@ alpha_xform = settings["alpha_xform"]
 learn_alpha_scaling = settings["learn_alpha_scaling"]
 normalize_covariances = settings["normalize_covariances"]
 learning_rate = settings["learning_rate"]
-alpha_temperature = settings["alpha_temperature"]
+learn_alpha_temperature = settings["learn_alpha_temperature"]
+initial_alpha_temperature = settings["initial_alpha_temperature"]
 cov_init_type = "random"
 
 # Load functional data from a pre-processed MATLAB object
@@ -108,14 +109,15 @@ model = RIGO(
     dropout_rate_model=dropout_rate_model,
     theta_normalization=theta_normalization,
     alpha_xform=alpha_xform,
+    learn_alpha_temperature=learn_alpha_temperature,
+    alpha_temperature=initial_alpha_temperature,
     learn_alpha_scaling=learn_alpha_scaling,
     normalize_covariances=normalize_covariances,
-    do_annealing=do_annealing,
-    annealing_sharpness=annealing_sharpness,
-    n_epochs_annealing=n_epochs_annealing,
+    do_kl_annealing=do_kl_annealing,
+    kl_annealing_sharpness=kl_annealing_sharpness,
+    n_epochs_kl_annealing=n_epochs_kl_annealing,
     learning_rate=learning_rate,
     multi_gpu=multi_gpu,
-    alpha_temperature=alpha_temperature,
 )
 model.summary()
 

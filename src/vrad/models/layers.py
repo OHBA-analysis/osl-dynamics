@@ -15,6 +15,40 @@ from vrad.inference.functions import (
 from vrad.inference.initializers import WeightInitializer
 
 
+def NormalizationLayer(norm_type: str, *args, **kwargs):
+    """Returns a normalization layer.
+
+    Parameters
+    ----------
+    norm_type : str
+        Type of normalization layer. Either 'layer', 'batch' or None.
+    """
+    if norm_type == "layer":
+        return layers.LayerNormalization(*args, **kwargs)
+    elif norm_type == "batch":
+        return layers.BatchNormalization(*args, **kwargs)
+    elif norm_type is None:
+        return DummyLayer(*args, **kwargs)
+    else:
+        raise NotImplementedError(norm_type)
+
+
+def RNNLayer(rnn_type: str, *args, **kwargs):
+    """Returns an RNN layer.
+
+    Parameters
+    ----------
+    rnn_type : str
+        Type of RNN. Either 'lstm' or 'gru'.
+    """
+    if rnn_type == "lstm":
+        return layers.LSTM(*args, **kwargs)
+    elif rnn_type == "gru":
+        return layers.GRU(*args, **kwargs)
+    else:
+        raise NotImplementedError(rnn_type)
+
+
 class DummyLayer(layers.Layer):
     """Dummy layer.
 
@@ -102,7 +136,7 @@ class TrainableVariablesLayer(layers.Layer):
 
 
 class SampleNormalDistributionLayer(layers.Layer):
-    """Layer for sampling a normal distribution.
+    """Layer for sampling from a normal distribution.
 
     This layer accepts the mean and (log of) the standard deviation and
     outputs samples from a normal distribution.
@@ -112,52 +146,102 @@ class SampleNormalDistributionLayer(layers.Layer):
         super().__init__(**kwargs)
 
     def call(self, inputs, training=None, **kwargs):
-        mu, log_sigma = inputs
+        mu, sigma = inputs
         if training:
-            N = tfp.distributions.Normal(loc=mu, scale=tf.exp(log_sigma))
+            N = tfp.distributions.Normal(loc=mu, scale=sigma)
             return N.sample()
         else:
             return mu
 
     def compute_output_shape(self, input_shape):
-        mu_shape, log_sigma_shape = input_shape
+        mu_shape, sigma_shape = input_shape
         return mu_shape
 
 
-class AlphaLayer(layers.Layer):
-    """Layer for calculating the mixing ratio of the states.
+class SampleDirichletDistributionLayer(layers.Layer):
+    """Layer for sampling from a Dirichlet distribution.
 
-    This layer accepts the logits theta_t and outputs alpha_t.
+    This layer accepts the parameters of a Dirichlet distribution and
+    outputs a sample.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, concentration, training=None, **kwargs):
+        if training:
+            D = tfp.distributions.Dirichlet(concentration)
+            return D.sample()
+        else:
+            sum_concentration = tf.reduce_sum(concentration, axis=-1)
+            sum_concentration = tf.expand_dims(sum_concentration, axis=-1)
+            return tf.divide(concentration, sum_concentration)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+
+class ThetaActivationLayer(layers.Layer):
+    """Layer for applying an activation function to theta.
+
+    This layer accepts theta and outputs alpha.
 
     Parameters
     ----------
     alpha_xform : str
-        The functional form used to convert from theta_t to alpha_t.
-    alpha_temperature : float
+        The functional form of the activation used to convert from theta to alpha.
+    initial_alpha_temperature : float
         Temperature parameter for the softmax or Gumbel-Softmax.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature?
     """
 
-    def __init__(self, alpha_xform: str, alpha_temperature: float, **kwargs):
+    def __init__(
+        self,
+        alpha_xform: str,
+        initial_alpha_temperature: float,
+        learn_alpha_temperature: bool,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.alpha_xform = alpha_xform
-        self.alpha_temperature = alpha_temperature
+        self.initial_alpha_temperature = initial_alpha_temperature
+        self.learn_alpha_temperature = learn_alpha_temperature
 
-    def call(self, theta_t, **kwargs):
+    def build(self, input_shape):
 
-        # Calculate alpha_t from theta_t
+        # Initialiser for the a learnable alpha temperature
+        def alpha_temperature_initializer(shape, dtype=None):
+            return self.initial_alpha_temperature
+
+        self.alpha_temperature_initializer = alpha_temperature_initializer
+
+        # Create trainable alpha temperature
+        self.alpha_temperature = self.add_weight(
+            "alpha_temperature",
+            shape=(),
+            dtype=tf.float32,
+            initializer=self.alpha_temperature_initializer,
+            trainable=self.learn_alpha_temperature,
+        )
+
+        self.built = True
+
+    def call(self, theta, **kwargs):
+
+        # Calculate alpha from theta
         if self.alpha_xform == "softplus":
-            alpha_t = activations.softplus(theta_t)
-        elif self.alpha_xform == "relu":
-            alpha_t = activations.relu(theta_t)
+            alpha = activations.softplus(theta)
         elif self.alpha_xform == "softmax":
-            alpha_t = activations.softmax(theta_t / self.alpha_temperature, axis=2)
-        elif self.alpha_xform == "categorical":
+            alpha = activations.softmax(theta / self.alpha_temperature, axis=2)
+        elif self.alpha_xform == "gumbel-softmax":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature, logits=theta_t,
+                temperature=self.alpha_temperature,
+                logits=theta,
             )
-            alpha_t = gumbel_softmax_distribution.sample()
+            alpha = gumbel_softmax_distribution.sample()
 
-        return alpha_t
+        return alpha
 
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -167,7 +251,7 @@ class AlphaLayer(layers.Layer):
         config.update(
             {
                 "alpha_xform": self.alpha_xform,
-                "alpha_temperature": self.alpha_temperature,
+                "initial_alpha_temperature": self.initial_alpha_temperature,
             }
         )
         return config
@@ -346,29 +430,29 @@ class MixMeansCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
 
         # Unpack the inputs:
-        # - alpha_t.shape = (None, sequence_length, n_states)
-        # - mu.shape      = (n_states, n_channels)
-        # - D.shape       = (n_states, n_channels, n_channels)
-        alpha_t, mu, D = inputs
+        # - alpha.shape = (None, sequence_length, n_states)
+        # - mu.shape    = (n_states, n_channels)
+        # - D.shape     = (n_states, n_channels, n_channels)
+        alpha, mu, D = inputs
 
         # Rescale the state mixing factors
-        alpha_t = tf.multiply(alpha_t, activations.softplus(self.alpha_scaling))
+        alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
 
-        # Reshape alpha_t and mu for multiplication
-        alpha_t = tf.expand_dims(alpha_t, axis=-1)
+        # Reshape alpha and mu for multiplication
+        alpha = tf.expand_dims(alpha, axis=-1)
         mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
 
         # Calculate the mean: m_t = Sum_j alpha_jt mu_j
-        m_t = tf.reduce_sum(tf.multiply(alpha_t, mu), axis=2)
+        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
 
-        # Reshape alpha_t and D for multiplication
-        alpha_t = tf.expand_dims(alpha_t, axis=-1)
+        # Reshape alpha and D for multiplication
+        alpha = tf.expand_dims(alpha, axis=-1)
         D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
 
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
-        C_t = tf.reduce_sum(tf.multiply(alpha_t, D), axis=2)
+        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
-        return [m_t, C_t]
+        return [m, C]
 
     def compute_output_shape(self, input_shape):
         alpha_t_shape, mu_shape, D_shape = input_shape
@@ -405,7 +489,8 @@ class LogLikelihoodLayer(layers.Layer):
         # Calculate the log-likelihood
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma + 1e-6 * tf.eye(sigma.shape[-1])),
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
         )
         ll_loss = mvn.log_prob(x)
 
@@ -422,11 +507,8 @@ class LogLikelihoodLayer(layers.Layer):
         return tf.TensorShape([1])
 
 
-class KLDivergenceLayer(layers.Layer):
-    """Layer to calculate a KL divergence.
-
-    The KL divergence between the posterior and prior is calculated.
-    """
+class NormalKLDivergenceLayer(layers.Layer):
+    """Layer to calculate a KL divergence between two Normal distributions."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -435,26 +517,58 @@ class KLDivergenceLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        inference_mu, inference_log_sigma, model_mu, model_log_sigma = inputs
+        inference_mu, inference_sigma, model_mu, model_sigma = inputs
 
         # The Model RNN predicts one time step into the future compared to the
         # inference RNN. We clip its last value, and first value of the inference RNN.
         model_mu = model_mu[:, :-1]
-        model_sigma = tf.exp(model_log_sigma)[:, :-1]
+        model_sigma = model_sigma[:, :-1]
 
         inference_mu = inference_mu[:, 1:]
-        inference_sigma = tf.exp(inference_log_sigma)[:, 1:]
+        inference_sigma = inference_sigma[:, 1:]
 
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
-        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
+        kl_loss = tfp.distributions.kl_divergence(
+            posterior, prior, allow_nan_stats=False
+        )
 
-        # Sum the KL loss for state and time point
+        # Sum the KL loss for each state and time point and average over batches
         kl_loss = tf.reduce_sum(kl_loss, axis=2)
         kl_loss = tf.reduce_sum(kl_loss, axis=1)
+        kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
-        # Average over the batch dimension
+        return tf.expand_dims(kl_loss, axis=-1)
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([1])
+
+
+class DirichletKLDivergenceLayer(layers.Layer):
+    """Layer to calculate a KL divergence between two Dirichlet distributions."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        inference_concentration, model_concentration = inputs
+
+        # The Model RNN predicts one time step into the future compared to the
+        # inference RNN. We clip its last value, and first value of the inference RNN.
+        model_concentration = model_concentration[:, :-1]
+        inference_concentration = inference_concentration[:, 1:]
+
+        # Calculate the KL divergence between the posterior and prior
+        prior = tfp.distributions.Dirichlet(model_concentration)
+        posterior = tfp.distributions.Dirichlet(inference_concentration)
+        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
+
+        # Sum the KL loss for each time point and average over batches
+        kl_loss = tf.reduce_sum(kl_loss, axis=1)
         kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
         return tf.expand_dims(kl_loss, axis=-1)
@@ -470,8 +584,10 @@ class InferenceRNNLayers(layers.Layer):
     ----------
     rnn_type : str
         Either 'lstm' or 'gru'. Defaults to GRU.
-    normalization_type : str
+    norm_type : str
         Either 'layer', 'batch' or None.
+    act_type : 'str'
+        Activation type, e.g. 'relu', 'elu', etc.
     n_layers : int
         Number of layers.
     n_units : int
@@ -483,7 +599,8 @@ class InferenceRNNLayers(layers.Layer):
     def __init__(
         self,
         rnn_type: str,
-        normalization_type: str,
+        norm_type: str,
+        act_type: str,
         n_layers: int,
         n_units: int,
         dropout_rate: float,
@@ -492,28 +609,17 @@ class InferenceRNNLayers(layers.Layer):
         super().__init__(**kwargs)
         self.n_units = n_units
 
-        # Choice of RNN
-        if rnn_type == "lstm":
-            RNNLayer = layers.LSTM
-        else:
-            RNNLayer = layers.GRU
-
-        # Choice of normalisation layer
-        if normalization_type == "layer":
-            NormalizationLayer = layers.LayerNormalization
-        elif normalization_type == "batch":
-            NormalizationLayer = layers.BatchNormalization
-        else:
-            NormalizationLayer = DummyLayer
-
         self.layers = []
         for n in range(n_layers):
             self.layers.append(
                 layers.Bidirectional(
-                    layer=RNNLayer(n_units, return_sequences=True, stateful=False)
+                    layer=RNNLayer(
+                        rnn_type, n_units, return_sequences=True, stateful=False
+                    )
                 )
             )
-            self.layers.append(NormalizationLayer())
+            self.layers.append(NormalizationLayer(norm_type))
+            self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(dropout_rate))
 
     def call(self, inputs, **kwargs):
@@ -538,8 +644,10 @@ class ModelRNNLayers(layers.Layer):
     ----------
     rnn_type : str
         Either 'lstm' or 'gru'. Defaults to GRU.
-    normalization_type : str
+    norm_type : str
         Either 'layer', 'batch' or None.
+    act_type : 'str'
+        Activation type, e.g. 'relu', 'elu', etc.
     n_layers : int
         Number of layers.
     n_units : int
@@ -551,7 +659,8 @@ class ModelRNNLayers(layers.Layer):
     def __init__(
         self,
         rnn_type: str,
-        normalization_type: str,
+        norm_type: str,
+        act_type: str,
         n_layers: int,
         n_units: int,
         dropout_rate: float,
@@ -560,24 +669,13 @@ class ModelRNNLayers(layers.Layer):
         super().__init__(**kwargs)
         self.n_units = n_units
 
-        # Choice of RNN
-        if rnn_type == "lstm":
-            RNNLayer = layers.LSTM
-        else:
-            RNNLayer = layers.GRU
-
-        # Choice of normalisation layer
-        if normalization_type == "layer":
-            NormalizationLayer = layers.LayerNormalization
-        elif normalization_type == "batch":
-            NormalizationLayer = layers.BatchNormalization
-        else:
-            NormalizationLayer = DummyLayer
-
         self.layers = []
         for n in range(n_layers):
-            self.layers.append(RNNLayer(n_units, return_sequences=True, stateful=False))
-            self.layers.append(NormalizationLayer())
+            self.layers.append(
+                RNNLayer(rnn_type, n_units, return_sequences=True, stateful=False)
+            )
+            self.layers.append(NormalizationLayer(norm_type))
+            self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(dropout_rate))
 
     def call(self, inputs, **kwargs):

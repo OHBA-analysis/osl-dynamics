@@ -2,38 +2,37 @@
 
 """
 
+import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 
 
-class AnnealingCallback(callbacks.Callback):
-    """Callback to update the annealing factor during training.
-
-    The loss function during training is calculated as loss = ll_loss +
-    annealing_factor * kl_loss, where the annealing factor is calculated as
-    0.5*tanh(annealing_sharpness*epoch - 0.5*n_epochs_annealing)/n_epochs_annealing
-    + 0.5.
+class AlphaTemperatureAnnealingCallback(callbacks.Callback):
+    """Callback to update the alpha temperature during training.
 
     Parameters
     ----------
-    annealing_factor : float
-        Annealing factor for the KL term in the loss function.
-    annealing_sharpness : float
-        Parameter to control the shape of the annealing curve.
-    n_epochs_annealing : int
+    initial_alpha_temperature : float
+        Alpha temperature for the theta activation function.
+    final_alpha_temperature : float
+        Final value for the alpha temperature.
+    n_annealing_epochs : int
         Number of epochs to apply annealing.
     """
 
     def __init__(
         self,
-        annealing_factor: float,
-        annealing_sharpness: float,
-        n_epochs_annealing: int,
+        initial_alpha_temperature: float,
+        final_alpha_temperature: float,
+        n_annealing_epochs: int,
     ):
         super().__init__()
-        self.annealing_factor = annealing_factor
-        self.annealing_sharpness = annealing_sharpness
-        self.n_epochs_annealing = n_epochs_annealing
+        self.initial_alpha_temperature = initial_alpha_temperature
+        self.final_alpha_temperature = final_alpha_temperature
+        self.n_annealing_epochs = n_annealing_epochs
+        self.alpha_temperature_gradient = (
+            final_alpha_temperature - initial_alpha_temperature
+        ) / n_annealing_epochs
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -46,16 +45,82 @@ class AnnealingCallback(callbacks.Callback):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
-        new_value = (
-            0.5
-            * tanh(
-                self.annealing_sharpness
-                * (epoch - 0.5 * self.n_epochs_annealing)
-                / self.n_epochs_annealing
+        alpha_layer = self.model.get_layer("alpha")
+        epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
+        if epoch < self.n_annealing_epochs:
+            new_value = (
+                self.initial_alpha_temperature + epoch * self.alpha_temperature_gradient
             )
-            + 0.5
-        )
-        self.annealing_factor.assign(new_value)
+            alpha_layer.alpha_temperature.assign(new_value)
+        else:
+            alpha_layer.alpha_temperature.assign(self.final_alpha_temperature)
+
+
+class KLAnnealingCallback(callbacks.Callback):
+    """Callback to update the KL annealing factor during training.
+
+    Parameters
+    ----------
+    kl_annealing_factor : tf.Variable
+        Annealing factor for the KL term in the loss function.
+    curve : str
+        Shape of the annealing curve. Either 'linear' or 'tanh'.
+    annealing_sharpness : float
+        Parameter to control the shape of the annealing curve.
+    n_annealing_epochs : int
+        Number of epochs to apply annealing.
+    n_cycles : int
+        Number of times to perform KL annealing with n_annealing_epochs.
+    """
+
+    def __init__(
+        self,
+        kl_annealing_factor: tf.Variable,
+        curve: str,
+        annealing_sharpness: float,
+        n_annealing_epochs: int,
+        n_cycles: int,
+    ):
+        if curve not in ["linear", "tanh"]:
+            raise NotImplementedError(curve)
+
+        super().__init__()
+        self.kl_annealing_factor = kl_annealing_factor
+        self.curve = curve
+        self.annealing_sharpness = annealing_sharpness
+        self.n_annealing_epochs = n_annealing_epochs
+        self.n_cycles = n_cycles
+        self.n_epochs_one_cycle = n_annealing_epochs // n_cycles
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+        epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
+        if epoch < self.n_annealing_epochs:
+            epoch = epoch % self.n_epochs_one_cycle
+            if self.curve == "tanh":
+                new_value = (
+                    0.5
+                    * tanh(
+                        self.annealing_sharpness
+                        * (epoch - 0.5 * self.n_epochs_one_cycle)
+                        / self.n_epochs_one_cycle
+                    )
+                    + 0.5
+                )
+            elif self.curve == "linear":
+                new_value = epoch / self.n_epochs_one_cycle
+            self.kl_annealing_factor.assign(new_value)
+        else:
+            self.kl_annealing_factor.assign(1.0)
 
 
 class SaveBestCallback(callbacks.ModelCheckpoint):
@@ -74,7 +139,10 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
 
         kwargs.update(
             dict(
-                save_weights_only=True, monitor="loss", mode="min", save_best_only=True,
+                save_weights_only=True,
+                monitor="loss",
+                mode="min",
+                save_best_only=True,
             )
         )
 

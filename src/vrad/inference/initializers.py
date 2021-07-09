@@ -70,8 +70,8 @@ def reinitialize_model_weights(model: tf.keras.Model):
         # to this function
         if (
             isinstance(layer, Model)
-            or isinstance(layer, models.InferenceRNNLayers)
-            or isinstance(layer, models.ModelRNNLayers)
+            or isinstance(layer, models.layers.InferenceRNNLayers)
+            or isinstance(layer, models.layers.ModelRNNLayers)
         ):
             for rnn_or_model_layer in layer.layers:
                 # If the layer is bidirectional we need to re-initialise the

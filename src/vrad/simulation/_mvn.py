@@ -96,9 +96,12 @@ class MVN:
         return means
 
     def create_covariances(self, option, eps=1e-6):
+
         if option == "random":
-            # Randomly select the elements of W from a normal distribution
-            W = self._rng.normal(size=[self.n_states, self.n_channels, self.n_channels])
+            # Randomly sample the elements of W from a normal distribution
+            W = self._rng.normal(
+                0, 0.1, size=[self.n_states, self.n_channels, self.n_channels]
+            )
 
             # A small value to add to the diagonal to ensure the covariances are
             # invertible
@@ -107,12 +110,17 @@ class MVN:
             # Calculate the covariances
             covariances = W @ W.transpose([0, 2, 1]) + eps
 
-            # Trace normalisation
-            covariances /= np.trace(covariances, axis1=1, axis2=2)[
-                ..., np.newaxis, np.newaxis
-            ]
+            # Add a large activation to a small number of the channels at random
+            n_active_channels = max(1, self.n_channels // self.n_states)
+            for i in range(self.n_states):
+                active_channels = np.unique(
+                    self._rng.integers(0, self.n_channels, size=n_active_channels)
+                )
+                covariances[i, active_channels, active_channels] += 0.25
+
         else:
-            raise ValueError("covariances must be a np.array or 'random'.")
+            raise ValueError("covariances must be a np.ndarray or 'random'.")
+
         return covariances
 
     def simulate_data(self, state_time_course):

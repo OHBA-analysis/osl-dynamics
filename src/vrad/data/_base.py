@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 import numpy as np
 import yaml
@@ -30,6 +30,8 @@ class Data(IO, Manipulation, TensorFlowDataset):
         Directory to save results and intermediate steps to. Optional, default is /tmp.
     n_embeddings : int
         Number of embeddings. Optional. Can be passed if data has already been prepared.
+    time_axis_first : bool
+        Is the input data of shape (n_samples, n_channels)? Optional, default is True.
     """
 
     def __init__(
@@ -39,12 +41,15 @@ class Data(IO, Manipulation, TensorFlowDataset):
         sampling_frequency: float = None,
         store_dir: str = "tmp",
         n_embeddings: int = None,
+        time_axis_first: bool = True,
     ):
         # Unique identifier for the Data object
         self._identifier = id(inputs)
 
         # Load data by initialising an IO object
-        IO.__init__(self, inputs, matlab_field, sampling_frequency, store_dir)
+        IO.__init__(
+            self, inputs, matlab_field, sampling_frequency, store_dir, time_axis_first
+        )
 
         # Initialise a Manipulation object so we have method we can use to prepare
         # the data
@@ -89,6 +94,25 @@ class Data(IO, Manipulation, TensorFlowDataset):
     def n_subjects(self) -> int:
         """Number of subjects."""
         return len(self.subjects)
+
+    def time_series(self, concatenate: bool = False) -> Union[list, np.ndarray]:
+        """Time series data for all subjects.
+
+        Parameters
+        ----------
+        concatenate : bool
+            Should we return the time series for each subject concatenated?
+            Optional, default is False.
+
+        Returns
+        -------
+        list or np.ndarray
+            Time series data for each subject.
+        """
+        if concatenate or self.n_subjects == 1:
+            return np.concatenate(self.subjects)
+        else:
+            return self.subjects
 
     @classmethod
     def from_yaml(cls, file, **kwargs):

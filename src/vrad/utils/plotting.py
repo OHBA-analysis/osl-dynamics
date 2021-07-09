@@ -56,7 +56,9 @@ def plot_correlation(
 
 
 def plot_state_sums(
-    state_time_course: np.ndarray, color: str = "tab:gray", filename: str = None,
+    state_time_course: np.ndarray,
+    color: str = "tab:gray",
+    filename: str = None,
 ):
     """Bar chart of total state durations.
 
@@ -441,7 +443,7 @@ def state_barcode(
         fig_kwargs = override_dict_defaults(fig_defaults, fig_kwargs)
         fig, axis = plt.subplots(1, **fig_kwargs)
 
-    highlight_defaults = {"alpha": 0.2}
+    highlight_defaults = {}
     highlight_kwargs = override_dict_defaults(highlight_defaults, highlight_kwargs)
 
     n_states = np.max(np.unique(state_time_course)) + 1
@@ -554,11 +556,7 @@ def plot_matrices(
     if matrix.ndim != 3:
         raise ValueError("Must be a 3D array.")
     short, long, empty = rough_square_axes(len(matrix))
-    f_width = 2.5 * short
-    f_height = 2.5 * long
-    fig, axes = plt.subplots(
-        ncols=short, nrows=long, figsize=(f_width, f_height), squeeze=False
-    )
+    fig, axes = plt.subplots(ncols=short, nrows=long, squeeze=False)
 
     if titles is None:
         titles = [""] * len(matrix)
@@ -663,6 +661,8 @@ def plot_state_lifetimes(
     match_scale_x: bool = False,
     match_scale_y: bool = False,
     x_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
     hist_kwargs: dict = None,
     fig_kwargs: dict = None,
     filename: str = None,
@@ -687,6 +687,10 @@ def plot_state_lifetimes(
         If True, all histograms will share the same y-axis scale.
     x_range : list
         The limits on the values presented on the x-axis.
+    x_label : str
+        x-axis label.
+    y_label : str
+        y-axis label.
     hist_kwargs : dict
         Keyword arguments to pass to matplotlib.pyplot.hist.
     fig_kwargs : dict
@@ -705,7 +709,7 @@ def plot_state_lifetimes(
 
     colors = get_colors(n_plots)
 
-    default_hist_kwargs = {"alpha": 0.5}
+    default_hist_kwargs = {}
     hist_kwargs = override_dict_defaults(default_hist_kwargs, hist_kwargs)
 
     default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
@@ -747,6 +751,7 @@ def plot_state_lifetimes(
         )
         axis.xaxis.set_tick_params(labelbottom=True, labelleft=True)
         t.set_bbox({"facecolor": "white", "alpha": 0.7, "boxstyle": "round"})
+
     for axis in axes.ravel():
         if match_scale_x:
             axis.set_xlim(0, furthest_value * 1.1)
@@ -756,8 +761,10 @@ def plot_state_lifetimes(
             if len(x_range) != 2:
                 raise ValueError("x_range must be [x_min, x_max].")
             axis.set_xlim(x_range[0], x_range[1])
-    plt.tight_layout()
+        axis.set_xlabel(x_label)
+        axis.set_ylabel(y_label)
 
+    plt.tight_layout()
     show_or_save(filename)
 
 
@@ -822,12 +829,14 @@ def compare_state_data(
     n_samples: int = None,
     sampling_frequency: float = 1.0,
     titles: list = None,
+    x_label: str = None,
     filename: str = None,
+    **kwargs: dict,
 ):
     """Plot multiple states time courses.
 
     For a list of state time courses, plot the state diagrams produced by
-    vrad.plotting.highlight_states.
+    vrad.utils.plotting.state_barcode.
 
     Parameters
     ----------
@@ -839,8 +848,12 @@ def compare_state_data(
         If given the y-axis will contain timestamps rather than sample numbers.
     titles: list of str
         Titles to give to each axis.
+    x_label : str
+        x-axis label.
     filename: str
         Filename to save figure to.
+    kwargs: dict
+        Keyword arguments passed to state_barcode.
     """
     n_samples = min(n_samples or np.inf, *[len(stc) for stc in state_time_courses])
 
@@ -860,18 +873,22 @@ def compare_state_data(
             n_samples=n_samples,
             legend=False,
             sampling_frequency=sampling_frequency,
+            **kwargs,
         )
         axis.set_title(title)
 
+    axes[-1].set_xlabel(x_label)
     plt.tight_layout()
-
     add_figure_colorbar(fig=fig, mappable=fig.axes[0].get_images()[0])
-
     show_or_save(filename)
 
 
 @transpose("state_time_course_1", 0, "state_time_course_2", 1)
-def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.ndarray):
+def plot_confusion_matrix(
+    state_time_course_1: np.ndarray,
+    state_time_course_2: np.ndarray,
+    filename: str = None,
+):
     """Plot a confusion matrix.
 
     For two state time courses, plot the confusion matrix between each pair of states.
@@ -884,13 +901,15 @@ def confusion_matrix(state_time_course_1: np.ndarray, state_time_course_2: np.nd
         The first state time course.
     state_time_course_2: numpy.ndarray
         The second state time course.
+    filename : str
+        Output filename. Optional.
     """
     confusion = vrad.inference.metrics.confusion_matrix(
         state_time_course_1, state_time_course_2
     )
     nan_diagonal = confusion.copy().astype(float)
     nan_diagonal[np.diag_indices_from(nan_diagonal)] = np.nan
-    plot_matrices([confusion, nan_diagonal], group_color_scale=False)
+    plot_matrices([confusion, nan_diagonal], group_color_scale=False, filename=filename)
 
 
 def plot_line(
@@ -898,6 +917,7 @@ def plot_line(
     y: list,
     labels: list = None,
     legend_loc: int = 1,
+    errors: list = None,
     x_range: list = None,
     y_range: list = None,
     x_label: str = None,
@@ -917,6 +937,8 @@ def plot_line(
         Legend labels for each line.
     legend_loc : int
         Matplotlib legend location identifier. Optional. Default is top right.
+    errors : list with 2 items
+        Min and max errors. Optional.
     x_range : list
         Minimum and maximum for x-axis. Optional.
     y_range : list
@@ -952,9 +974,106 @@ def plot_line(
         labels = [None] * len(x)
         add_legend = False
 
+    if errors is None:
+        errors_min = [None] * len(x)
+        errors_max = [None] * len(x)
+    elif len(errors) != 2:
+        raise ValueError(
+            "Errors must be errors=[[y_min1, y_min2,...], [y_max1, y_max2,..]]."
+        )
+    elif len(errors[0]) != len(x) or len(errors[1]) != len(x):
+        raise ValueError("Incorrect number of errors passed.")
+    else:
+        errors_min = errors[0]
+        errors_max = errors[1]
+
     # Plot lines
-    for (x_data, y_data, label) in zip(x, y, labels):
+    for (x_data, y_data, label, e_min, e_max) in zip(
+        x, y, labels, errors_min, errors_max
+    ):
         ax.plot(x_data, y_data, label=label)
+        ax.fill_between(x_data, e_min, e_max, alpha=0.3)
+
+    # Set axis range
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # Add a legend
+    if add_legend:
+        ax.legend(loc=legend_loc)
+
+    # Clean up layout and show or save
+    plt.tight_layout()
+    show_or_save(filename)
+
+
+def plot_hist(
+    data: list,
+    bins: list,
+    labels: list = None,
+    legend_loc: int = 1,
+    x_range: list = None,
+    y_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
+    title: str = None,
+    filename: str = None,
+):
+    """Basic histogram plot.
+
+    Parameters
+    ----------
+    data : list of np.ndarray
+        Data to plot.
+    bins : list of int
+        Number of bins for each item in data.
+    labels : list of str
+        Legend labels for each line.
+    legend_loc : int
+        Matplotlib legend location identifier. Optional. Default is top right.
+    x_range : list
+        Minimum and maximum for x-axis. Optional.
+    y_range : list
+        Minimum and maximum for y-axis. Optional.
+    x_label : str
+        Label for x-axis. Optional.
+    y_label : str
+        Label for y-axis. Optional.
+    title : str
+        Figure title. Optional.
+    filename : str
+        Output filename. Optional.
+    """
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    if len(data) != len(bins):
+        raise ValueError("Different number of bins and data.")
+
+    if x_range is None:
+        x_range = [None, None]
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = [labels]
+        else:
+            if len(labels) != len(data):
+                raise ValueError("Incorrect number of labels or data passed.")
+        add_legend = True
+    else:
+        labels = [None] * len(data)
+        add_legend = False
+
+    # Plot histograms
+    for (d, b, l) in zip(data, bins, labels):
+        ax.hist(d, bins=b, label=l, histtype="step")
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])

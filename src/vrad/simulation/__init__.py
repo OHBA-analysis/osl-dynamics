@@ -12,3 +12,4 @@ from vrad.simulation._mar import *  # noqa
 from vrad.simulation._mvn import *  # noqa
 from vrad.simulation._hmm import *  # noqa
 from vrad.simulation._hsmm import *  # noqa
+from vrad.simulation._sm import *  # noqa

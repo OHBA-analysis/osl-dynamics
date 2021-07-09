@@ -39,7 +39,9 @@ def time_courses(
         n_states = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
         stcs = [array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs]
-        if concatenate:
+        if len(stcs) == 1:
+            stcs = stcs[0]
+        elif concatenate:
             stcs = np.concatenate(stcs)
     else:
         n_states = alpha.shape[1]
@@ -74,18 +76,37 @@ def correlate_states(
     return correlation
 
 
-def match_covariances(*covariances: np.ndarray) -> Tuple[np.ndarray]:
-    """Matches covariances based on Frobenius norm of the difference of the matrices.
+def match_covariances(
+    *covariances: np.ndarray, comparison="correlation", return_order: bool = False
+) -> Tuple[np.ndarray]:
+    """Matches covariances.
 
+    Can match covariances using the Frobenius norm or correlation.
     Each matrix must be 3D: (n_states, n_channels, n_channels).
 
-    The Frobenius norm is F = [Sum_{i,j} abs(a_{ij}^2)]^0.5,
-    where A is the element-wise difference of two matrices.
+    Parameters
+    ----------
+    covarainces: list of numpy.ndarray
+        Covariance matrices to match.
+        Each covariance must be (n_states, n_channel, n_channels).
+    comparison : str
+        Either "correlation" or "frobenius". Optional, default is 'correlation'.
+    return_order : bool
+        Should we return the order instead of the covariances?
+        Optional, default is False.
+
+    Returns
+    -------
+    tuple
+        Matched covariances.
     """
-    # Check all matrices have the same shape
+    # Validation
     for matrix in covariances[1:]:
         if matrix.shape != covariances[0].shape:
             raise ValueError("Matrices must have the same shape.")
+
+    if comparison not in ["frobenius", "correlation"]:
+        raise ValueError("comparison must be 'correlation' or 'frobenius'.")
 
     # Number of arguments and number of matrices in each argument passed
     n_args = len(covariances)
@@ -98,14 +119,24 @@ def match_covariances(*covariances: np.ndarray) -> Tuple[np.ndarray]:
         for j in range(n_matrices):
             # Find the matrix that is most similar to matrix j
             for k in range(n_matrices):
-                A = abs(np.diagonal(covariances[i][k]) - np.diagonal(covariances[0][j]))
-                F[j, k] = np.linalg.norm(A)
+                if comparison == "frobenius":
+                    A = abs(
+                        np.diagonal(covariances[i][k]) - np.diagonal(covariances[0][j])
+                    )
+                    F[j, k] = np.linalg.norm(A)
+                else:
+                    F[j, k] = -np.corrcoef(
+                        covariances[i][k].flatten(), covariances[0][j].flatten()
+                    )[0, 1]
         order = linear_sum_assignment(F)[1]
 
         # Add the ordered matrix to the list
         matched_covariances.append(covariances[i][order])
 
-    return tuple(matched_covariances)
+    if return_order:
+        return order
+    else:
+        return tuple(matched_covariances)
 
 
 @transpose
@@ -140,7 +171,9 @@ def match_states(
         correlation = correlate_states(
             state_time_courses[0][:n_samples], state_time_course[:n_samples]
         )
-        correlation = np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
+        correlation = np.nan_to_num(
+            np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
+        )
         matches = linear_sum_assignment(-correlation)
         matched_state_time_courses.append(state_time_course[:n_samples, matches[1]])
         orders.append(matches[1])
@@ -195,8 +228,8 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             channel_on.append(np.array([]))
             channel_off.append(np.array([]))
 
-    channel_on = np.array(channel_on)
-    channel_off = np.array(channel_off)
+    channel_on = np.array(channel_on, dtype=object)
+    channel_off = np.array(channel_off, dtype=object)
 
     return channel_on, channel_off
 

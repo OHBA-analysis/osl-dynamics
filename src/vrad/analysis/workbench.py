@@ -1,3 +1,7 @@
+"""Functions to use Connectome Workbench.
+
+"""
+
 import logging
 import os
 import pathlib
@@ -6,15 +10,14 @@ import subprocess
 
 import nibabel as nib
 from tqdm import trange
-from vrad.analysis import std_masks
-from vrad.analysis.scenes import state_scene
+from vrad import files
 
 _logger = logging.getLogger("VRAD")
 
 surfs = {
-    0: [std_masks.surf_left, std_masks.surf_right],
-    1: [std_masks.surf_left_inf, std_masks.surf_right_inf],
-    2: [std_masks.surf_left_vinf, std_masks.surf_right_vinf],
+    0: [files.mask.surf_left, files.mask.surf_right],
+    1: [files.mask.surf_left_inf, files.mask.surf_right_inf],
+    2: [files.mask.surf_left_vinf, files.mask.surf_right_vinf],
 }
 
 
@@ -53,6 +56,8 @@ def render(
         Interpolation type. Default is 'trilinear'.
     gui : bool
         Should we display the rendered plots in workbench? Default is True.
+    image_name : str
+        Filename of image to save.
     """
     nii = pathlib.Path(nii)
 
@@ -84,47 +89,56 @@ def render(
     dense_timeseries(cifti=cifti_right, output=output_right, left_or_right="right")
     dense_timeseries(cifti=cifti_left, output=output_left, left_or_right="left")
 
+    temp_scene = str(save_dir) + "/temp_scene.scene"
+
     if image_name:
         image(
             cifti_left=cifti_left,
             cifti_right=cifti_right,
             file_name=image_name,
             inflation=inflation,
+            temp_scene=temp_scene,
         )
 
     if gui:
-        visualise(cifti_left=cifti_left, cifti_right=cifti_right, inflation=inflation)
+        visualise(
+            cifti_left=cifti_left,
+            cifti_right=cifti_right,
+            inflation=inflation,
+            temp_scene=temp_scene,
+        )
 
 
-def create_scene(
-    cifti_left, cifti_right, inflation, temp_scene=pathlib.Path("temp_scene.scene")
-):
-    scene_file = state_scene
+def create_scene(cifti_left, cifti_right, inflation, temp_scene):
+    scene_file = files.scene.state_scene
     temp_scene = pathlib.Path(temp_scene)
 
     surf_left, surf_right = surfs.get(inflation, surfs[0])
 
     scene = scene_file.read_text()
-    scene = re.sub("{left_series}", str(cifti_left), scene)
-    scene = re.sub("{right_series}", str(cifti_right), scene)
+    scene = re.sub("{left_series}", str(cifti_left.name), scene)
+    scene = re.sub("{right_series}", str(cifti_right.name), scene)
     scene = re.sub("{parcellation_file_left}", surf_left, scene)
     scene = re.sub("{parcellation_file_right}", surf_right, scene)
     temp_scene.write_text(scene)
 
 
-def visualise(cifti_left, cifti_right, inflation=0):
+def visualise(cifti_left, cifti_right, inflation=0, temp_scene=None):
     surface = surfs.get(inflation, None)
-    create_scene(cifti_left, cifti_right, inflation)
     if surface is None:
         _logger.warning(
             f"Inflation of {inflation} is not a valid selection. Using '0' instead."
         )
 
+    if temp_scene is None:
+        temp_scene = "temp_scene.scene"
+    create_scene(cifti_left, cifti_right, inflation, temp_scene)
+
     subprocess.run(
         [
             "wb_view",
-            "-scene-load-hd",
-            "temp_scene.scene",
+            "-scene-load",
+            temp_scene,
             "ready",
             *surface,
             cifti_left,
@@ -132,13 +146,17 @@ def visualise(cifti_left, cifti_right, inflation=0):
         ]
     )
 
+    pathlib.Path(temp_scene).unlink()
 
-def image(cifti_left, cifti_right, file_name: str, inflation=0):
+
+def image(cifti_left, cifti_right, file_name, inflation=0, temp_scene=None):
     file_path = pathlib.Path(file_name)
     suffix = file_path.suffix or ".png"
     file_path = file_path.with_suffix("")
 
-    create_scene(cifti_left, cifti_right, inflation)
+    if temp_scene is None:
+        temp_scene = "temp_scene.scene"
+    create_scene(cifti_left, cifti_right, inflation, temp_scene)
 
     n_states = nib.load(cifti_left).shape[0]
     max_int_length = len(str(n_states))
@@ -146,12 +164,12 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
     pathlib.Path(file_path).parent.mkdir(exist_ok=True, parents=True)
     file_pattern = f"{file_path}{{:0{max_int_length}d}}{suffix}"
 
-    for i in trange(n_states, desc="processing state"):
+    for i in trange(n_states, desc="Saving images", ncols=98):
         subprocess.run(
             [
                 "wb_command",
                 "-show-scene",
-                "temp_scene.scene",
+                temp_scene,
                 "ready",
                 file_pattern.format(i),
                 "0",
@@ -161,9 +179,10 @@ def image(cifti_left, cifti_right, file_name: str, inflation=0):
                 "I",
                 f"{i + 1}",
             ],
+            capture_output=True,
         )
 
-    pathlib.Path("temp_scene.scene").unlink()
+    pathlib.Path(temp_scene).unlink()
 
 
 def volume_to_surface(nii, surf, output, interptype="trilinear"):

@@ -9,11 +9,70 @@ import numpy as np
 from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
-from vrad.analysis.functions import fourier_transform, nextpow2, validate_array
+from vrad import array_ops
 from vrad.analysis.time_series import get_state_time_series
 from vrad.data.manipulation import standardize
 
 _logger = logging.getLogger("VRAD")
+
+
+def fourier_transform(
+    data: np.ndarray,
+    sampling_frequency: float,
+    nfft: int = None,
+    args_range: list = None,
+) -> np.ndarray:
+    """Calculates a Fast Fourier Transform (FFT).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data with shape (n_samples, n_channels) to FFT.
+    sampling_frequency : float
+        Frequency used to sample the data (Hz).
+    nfft : int
+        Number of points in the FFT. (Optional.)
+    args_range : list
+        Minimum and maximum indices of the FFT to keep. (Optional.)
+
+    Returns
+    -------
+    np.ndarray
+        FFT data.
+    """
+    # Number of data points
+    n = data.shape[-1]
+
+    # Number of FFT data points to calculate
+    if nfft is None:
+        nfft = max(256, 2 ** nextpow2(n))
+
+    # Calculate the FFT
+    X = np.fft.fft(data, nfft) / sampling_frequency
+
+    # Only keep the desired frequency range
+    if args_range is not None:
+        X = X[..., args_range[0] : args_range[1]]
+
+    return X
+
+
+def nextpow2(x: int) -> int:
+    """Next power of 2.
+
+    Parameters
+    ----------
+    x : int
+        Any integer.
+
+    Returns
+    -------
+    int
+        The smallest power of two that is greater than or equal to the absolute
+        value of x.
+    """
+    res = np.ceil(np.log2(x))
+    return res.astype("int")
 
 
 def decompose_spectra(
@@ -54,7 +113,7 @@ def decompose_spectra(
         + "(n_states, n_channels, n_channels) or (n_subjects, n_states, "
         + "n_channels, n_channels)."
     )
-    coherences = validate_array(
+    coherences = array_ops.validate(
         coherences,
         correct_dimensionality=5,
         allow_dimensions=[2, 3, 4],
@@ -357,7 +416,6 @@ def multitaper_spectra(
 
     # Standardise the data
     if standardize_data:
-        # TODO: Maybe default behaviour should not be to standardize
         data = standardize(data, axis=0)
 
     # Use the state mixing factors to get a time series for each state
@@ -419,7 +477,8 @@ def multitaper_spectra(
             )
 
     # Normalise the power spectra
-    # TODO: We should be normalising using sum alpha instead of sum alpha^2
+    # TODO: We should be normalising using sum alpha instead of sum alpha^2,
+    # but this makes a small difference, so left like this for consistency with HMM-MAR
     sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
@@ -450,9 +509,8 @@ def coherence_spectra(power_spectra: np.ndarray):
     for i in range(n_states):
         for j in range(n_channels):
             for k in range(n_channels):
-                coherences[i, j, k] = abs(
-                    power_spectra[i, j, k]
-                    / np.sqrt(power_spectra[i, j, j] * power_spectra[i, k, k])
+                coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
+                    power_spectra[i, j, j].real * power_spectra[i, k, k].real
                 )
 
     return coherences
