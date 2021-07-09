@@ -917,6 +917,7 @@ def plot_line(
     y: list,
     labels: list = None,
     legend_loc: int = 1,
+    errors: list = None,
     x_range: list = None,
     y_range: list = None,
     x_label: str = None,
@@ -936,6 +937,8 @@ def plot_line(
         Legend labels for each line.
     legend_loc : int
         Matplotlib legend location identifier. Optional. Default is top right.
+    errors : list with 2 items
+        Min and max errors. Optional.
     x_range : list
         Minimum and maximum for x-axis. Optional.
     y_range : list
@@ -971,9 +974,25 @@ def plot_line(
         labels = [None] * len(x)
         add_legend = False
 
+    if errors is None:
+        errors_min = [None] * len(x)
+        errors_max = [None] * len(x)
+    elif len(errors) != 2:
+        raise ValueError(
+            "Errors must be errors=[[y_min1, y_min2,...], [y_max1, y_max2,..]]."
+        )
+    elif len(errors[0]) != len(x) or len(errors[1]) != len(x):
+        raise ValueError("Incorrect number of errors passed.")
+    else:
+        errors_min = errors[0]
+        errors_max = errors[1]
+
     # Plot lines
-    for (x_data, y_data, label) in zip(x, y, labels):
+    for (x_data, y_data, label, e_min, e_max) in zip(
+        x, y, labels, errors_min, errors_max
+    ):
         ax.plot(x_data, y_data, label=label)
+        ax.fill_between(x_data, e_min, e_max, alpha=0.3)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
