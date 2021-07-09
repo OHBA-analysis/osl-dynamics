@@ -992,7 +992,8 @@ def plot_line(
         x, y, labels, errors_min, errors_max
     ):
         ax.plot(x_data, y_data, label=label)
-        ax.fill_between(x_data, e_min, e_max, alpha=0.3)
+        if e_min is not None:
+            ax.fill_between(x_data, e_min, e_max, alpha=0.3)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
