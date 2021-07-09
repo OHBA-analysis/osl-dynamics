@@ -99,7 +99,7 @@ def autocorrelation_functions(
     return np.squeeze(autocorrelation_functions)
 
 
-def raw_covariances(
+def new_raw_covariances(
     state_covariances: Union[list, np.ndarray],
     n_embeddings: int,
     pca_components: np.ndarray,
@@ -146,22 +146,15 @@ def raw_covariances(
         n_states = te_covs.shape[1]
         n_parcels = te_covs.shape[-1] // n_embeddings
 
-        # Return block means
-        raw_covs = np.empty([n_subjects, n_states, n_parcels, n_parcels])
-        for i in range(n_subjects):
-            for j in range(n_states):
-                for k in range(n_parcels):
-                    for l in range(n_parcels):  # noqa: E741
-                        block = te_covs[
-                            i,
-                            j,
-                            k * n_embeddings : (k + 1) * n_embeddings,
-                            l * n_embeddings : (l + 1) * n_embeddings,
-                        ]
-                        if k == l:
-                            raw_covs[i, j, k, l] = np.mean(np.diag(block))
-                        else:
-                            raw_covs[i, j, k, l] = np.mean(block)
+        n_parcels = te_covs.shape[-1] // n_embeddings
+        block_te = te_covs.reshape(
+            n_subjects, n_states, n_parcels, n_embeddings, n_parcels, n_embeddings
+        )
+        block_diagonal = block_te.diagonal(0, 2, 4)
+        diagonal_means = block_diagonal.diagonal(0, 2, 3).mean(3)
+
+        raw_covs = block_te.mean((3, 5))
+        raw_covs[:, :, np.arange(n_parcels), np.arange(n_parcels)] = diagonal_means
 
     return np.squeeze(raw_covs)
 
