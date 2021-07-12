@@ -1013,6 +1013,95 @@ def plot_line(
     show_or_save(filename)
 
 
+def plot_scatter(
+    x: list,
+    y: list,
+    labels: list = None,
+    legend_loc: int = 1,
+    errors: list = None,
+    x_range: list = None,
+    y_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
+    title: str = None,
+    filename: str = None,
+):
+    """Basic scatter plot.
+
+    Parameters
+    ----------
+    x : list of numpy arrays
+        x-ordinates.
+    y : list of numpy arrays
+        y-ordinates.
+    labels : list of str
+        Legend labels for each line.
+    legend_loc : int
+        Matplotlib legend location identifier. Optional. Default is top right.
+    errors : list
+        Error bars. Optional.
+    x_range : list
+        Minimum and maximum for x-axis. Optional.
+    y_range : list
+        Minimum and maximum for y-axis. Optional.
+    x_label : str
+        Label for x-axis. Optional.
+    y_label : str
+        Label for y-axis. Optional.
+    title : str
+        Figure title. Optional.
+    filename : str
+        Output filename. Optional.
+    """
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    if len(x) != len(y):
+        raise ValueError("Different number of x and y arrays given.")
+
+    if x_range is None:
+        x_range = [None, None]
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = [labels]
+        else:
+            if len(labels) != len(x):
+                raise ValueError("Incorrect number of lines or labels passed.")
+        add_legend = True
+    else:
+        labels = [None] * len(x)
+        add_legend = False
+
+    if errors is None:
+        errors = [None] * len(x)
+
+    # Plot data
+    for (x_data, y_data, label, e_data) in zip(x, y, labels, errors):
+        ax.scatter(x_data, y_data, label=label)
+        if e_data is not None:
+            ax.errorbar(x_data, y_data, yerr=e_data, fmt="none")
+
+    # Set axis range
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # Add a legend
+    if add_legend:
+        ax.legend(loc=legend_loc)
+
+    # Clean up layout and show or save
+    plt.tight_layout()
+    show_or_save(filename)
+
+
 def plot_hist(
     data: list,
     bins: list,
