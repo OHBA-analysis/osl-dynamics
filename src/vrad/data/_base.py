@@ -36,7 +36,7 @@ class Data(IO, Manipulation, TensorFlowDataset):
 
     def __init__(
         self,
-        inputs: list,
+        inputs: Union[List[str], str],
         matlab_field: str = "X",
         sampling_frequency: float = None,
         store_dir: str = "tmp",
