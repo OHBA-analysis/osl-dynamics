@@ -312,7 +312,6 @@ def multitaper_spectra(
     n_tapers: int,
     segment_length: int = None,
     frequency_range: list = None,
-    standardize_data: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates spectra for inferred states using a multitaper.
 
@@ -336,8 +335,6 @@ def multitaper_spectra(
         Length of the data segement to use to calculate the multitaper.
     frequency_range : list
         Minimum and maximum frequency to keep.
-    standardize : bool
-        Should we standardize the data before calculating the PSDs? Default is True.
 
     Returns
     -------
@@ -413,10 +410,6 @@ def multitaper_spectra(
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
-
-    # Standardise the data
-    if standardize_data:
-        data = standardize(data, axis=0)
 
     # Use the state mixing factors to get a time series for each state
     state_time_series = get_state_time_series(data, alpha)
