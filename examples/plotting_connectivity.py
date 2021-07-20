@@ -50,7 +50,7 @@ acf = states.autocorrelation_functions(
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-f, psd, coh = spectral.state_covariance_spectra(
+_, psd, _ = spectral.state_covariance_spectra(
     acf,
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,
