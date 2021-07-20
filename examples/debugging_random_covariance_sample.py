@@ -2,8 +2,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import vrad
 from vrad.data import Data
+from vrad.files import example
 from vrad.inference.states import match_covariances
 from vrad.simulation import HSMMSimulation  # TODO: Update this to HSMM
 from vrad.utils import plotting
@@ -15,7 +15,7 @@ gamma_scale = 5
 
 n_states = 5
 
-covs = np.load(str(Path(vrad.files.example.directory) / "hmm_cov.npy"))
+covs = np.load(str(Path(example.directory) / "hmm_cov.npy"))
 
 # TODO: Arguments need to change with update
 sim = HSMMSimulation(
