@@ -4,7 +4,7 @@ from vrad.utils import plotting
 
 # Get example files
 data_file = files.example.directory + "/ctf275_data.npy"
-channel_file = files.example.directory + "/ctf275_channel_names.npy"
+channel_file = files.scanner.directory + "/ctf275_channel_names.npy"
 
 # N.b. that if you are reading in a cell array of file names from MATLAB, then you
 # can use the following syntax to achieve the requisite formatting for the topoplot
