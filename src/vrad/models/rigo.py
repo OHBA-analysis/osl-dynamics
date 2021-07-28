@@ -45,7 +45,7 @@ class RIGO(InferenceModelBase, GO):
     def burn_in(
         self,
         *args,
-        learn_covariances: bool = False,
+        learn_means_covariances: bool = False,
         learn_alpha_temperature: bool = False,
         **kwargs,
     ):
@@ -56,7 +56,7 @@ class RIGO(InferenceModelBase, GO):
 
         Parameters
         ----------
-        learn_covariances : bool
+        learn_means_covariances : bool
             Should we learn the means and covariances during the burn-in training?
             Optional, default is False.
         learn_alpha_temperature : bool
@@ -70,7 +70,7 @@ class RIGO(InferenceModelBase, GO):
             return
 
         # Make means and covariances non-trainable and compile
-        if not learn_covariances:
+        if not learn_means_covariances:
             means_covs_layer = self.model.get_layer("means_covs")
             means_covs_layer.trainable = False
             self.compile()
@@ -85,7 +85,7 @@ class RIGO(InferenceModelBase, GO):
         self.fit(*args, **kwargs)
 
         # Make means and covariances trainable again and compile
-        if not learn_covariances:
+        if not learn_means_covariances:
             means_covs_layer.trainable = True
             self.compile()
 
@@ -218,10 +218,10 @@ def _model_structure(config):
     means_covs_layer = MeansCovsLayer(
         config.n_states,
         config.n_channels,
-        learn_means=False,
+        learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
         normalize_covariances=config.normalize_covariances,
-        initial_means=None,
+        initial_means=config.initial_means,
         initial_covariances=config.initial_covariances,
         name="means_covs",
     )
