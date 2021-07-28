@@ -561,7 +561,8 @@ def plot_matrices(
     if titles is None:
         titles = [""] * len(matrix)
 
-    matplotlib.cm.get_cmap().set_bad(color=nan_color)
+    cmap = matplotlib.cm.get_cmap(cmap).copy()
+    cmap.set_bad(color=nan_color)
 
     for grid, axis, title in zip_longest(matrix, axes.ravel(), titles):
         if grid is None:
