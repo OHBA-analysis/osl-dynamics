@@ -85,6 +85,9 @@ class Config:
     model : str
         Type of observation model.
         Either 'multivariate_normal' or 'multivariate_autoregressive'.
+    learn_means : bool
+        Should we make the mean vectors for each state trainable?
+        Pass if model='multivariate_normal'.
     learn_covariances : bool
         Should we make the covariance matrix for each state trainable?
         Pass if model='multivariate_normal'.
@@ -93,6 +96,8 @@ class Config:
     normalize_covariances : bool
         Should we trace normalize the state covariances? Pass if
         model='multivariate_normal'.
+    initial_means : np.ndarray
+        Initialisation for mean vectors. Pass if model='multivariate_normal'.
     initial_covariances : np.ndarray
         Initialisation for state covariances. Pass if model='multivariate_normal'.
     n_lags : int
@@ -185,10 +190,12 @@ class Config:
     n_alpha_temperature_annealing_epochs: int = None
 
     # Observation model parameters
+    learn_means: bool = None
     learn_covariances: bool = None
     learn_alpha_scaling: bool = False
     normalize_covariances: bool = False
     initial_covariances: np.ndarray = None
+    initial_means: np.ndarray = None
 
     n_lags: int = None
     learn_coeffs: bool = None
@@ -370,6 +377,9 @@ class Config:
     def validate_observation_model_parameters(self):
 
         if self.observation_model == "multivariate_normal":
+            if self.learn_means is None:
+                self.learn_means = False
+
             if self.learn_covariances is None:
                 self.learn_covariances = True
 

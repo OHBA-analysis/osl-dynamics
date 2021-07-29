@@ -165,7 +165,6 @@ class Topology:
 
         Parameters
         ----------
-
         data: numpy.array or list
             A vector with data corresponding to each sensor.
         plot_boxes: bool

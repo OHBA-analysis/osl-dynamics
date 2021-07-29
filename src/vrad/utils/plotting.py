@@ -1211,6 +1211,7 @@ def topoplot(
     axis: plt.Axes = None,
     cmap: str = "plasma",
     n_contours: int = 10,
+    filename: str = None,
 ):
     """Make a contour plot in sensor space.
 
@@ -1221,7 +1222,6 @@ def topoplot(
 
     Parameters
     ----------
-
     layout: str
         The name of an MEG layout (matching one from FieldTrip).
     data: numpy.ndarray
@@ -1245,11 +1245,15 @@ def topoplot(
         matplotlib colourmap. Defaults to 'plasma'
     n_contours: int
         number of field isolines to show on the plot. Defaults to 10.
+    filename : str
+        Output filename. Optional.
     """
     topology = Topology(layout)
+
     if channel_names is not None:
         topology.keep_channels(channel_names)
-    return topology.plot_data(
+
+    fig = topology.plot_data(
         data,
         plot_boxes=plot_boxes,
         show_deleted_sensors=show_deleted_sensors,
@@ -1260,6 +1264,12 @@ def topoplot(
         cmap=cmap,
         n_contours=n_contours,
     )
+
+    if filename is not None:
+        print(f"Saving {filename}")
+        plt.savefig(filename, dpi=350)
+
+    return fig
 
 
 def plot_connections(

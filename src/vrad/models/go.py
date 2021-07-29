@@ -64,6 +64,61 @@ class GO(ObservationModelBase):
 
         return covariances
 
+    def get_means_covariances(self, alpha_scale=True):
+        """Get the means and covariances of each state.
+
+        Parameters
+        ----------
+        alpah_scale : bool
+            Should we apply alpha scaling? Default is True.
+
+        Returns
+        -------
+        means : np.ndarary
+            State means.
+        covariances : np.ndarray
+            State covariances.
+        """
+        # Get the means and covariances from the MeansCovsLayer
+        means_covs_layer = self.model.get_layer("means_covs")
+
+        means = means_covs_layer.means.numpy()
+
+        cholesky_covariances = tfp.math.fill_triangular(
+            means_covs_layer.flattened_cholesky_covariances
+        )
+        covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
+
+        # Normalise covariances
+        if self.config.normalize_covariances:
+            covariances = trace_normalize(covariances).numpy()
+
+        # Apply alpha scaling
+        if alpha_scale:
+            alpha_scaling = self.get_alpha_scaling()
+            covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
+
+        return means, covariances
+
+    def set_means(self, means):
+        """Set the means of each state.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            State covariances.
+        """
+        means_covs_layer = self.model.get_layer("means_covs")
+        layer_weights = means_covs_layer.get_weights()
+
+        # Replace means in the layer weights
+        for i in range(len(layer_weights)):
+            if layer_weights[i].shape == means.shape:
+                layer_weights[i] = means
+
+        # Set the weights of the layer
+        means_covs_layer.set_weights(layer_weights)
+
     def set_covariances(self, covariances):
         """Set the covariances of each state.
 
@@ -122,10 +177,10 @@ def _model_structure(config):
     means_covs_layer = MeansCovsLayer(
         config.n_states,
         config.n_channels,
-        learn_means=False,
+        learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
         normalize_covariances=config.normalize_covariances,
-        initial_means=None,
+        initial_means=config.initial_means,
         initial_covariances=config.initial_covariances,
         name="means_covs",
     )
