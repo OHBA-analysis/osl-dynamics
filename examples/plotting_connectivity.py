@@ -8,7 +8,7 @@ from vrad.analysis import connectivity, spectral, states
 from vrad.data import OSL_HMM, Data, io
 from vrad.utils import plotting
 
-# Load an HMM fit
+# Load a HMM fit
 hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
