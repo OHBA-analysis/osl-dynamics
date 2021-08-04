@@ -40,7 +40,7 @@ config = Config(
 )
 
 # Load state transition probability matrix and covariances of each state
-cov = np.load(files.example.directory / "hmm_cov.npy")
+cov = np.load(files.example.path / "hmm_cov.npy")
 
 top_level_trans_prob = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
 bottom_level_trans_probs = [

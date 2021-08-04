@@ -25,7 +25,7 @@ from vrad.utils import plotting
 
 tf.keras.backend.clear_session()
 
-default_settings = files.example.directory / "default_TABFER_settings.yaml"
+default_settings = files.example.path / "default_TABFER_settings.yaml"
 results_folder_name = "example_results"
 
 # GPU settings

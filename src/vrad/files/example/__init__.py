@@ -1,3 +1,4 @@
 from pathlib import Path
 
-directory = str(Path(__file__).parent)
+path = Path(__file__).parent
+directory = str(path)

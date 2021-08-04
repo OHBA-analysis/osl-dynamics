@@ -44,7 +44,7 @@ config = Config(
 )
 
 # Load covariances for each state
-cov = np.load(files.example.directory / "hmm_cov.npy")
+cov = np.load(files.example.path / "hmm_cov.npy")
 
 # Mixtures of states to include in the simulation
 mixed_state_vectors = np.array(

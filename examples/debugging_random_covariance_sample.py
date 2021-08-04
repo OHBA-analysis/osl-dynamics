@@ -15,7 +15,7 @@ gamma_scale = 5
 
 n_states = 5
 
-covs = np.load(str(Path(example.directory) / "hmm_cov.npy"))
+covs = np.load(example.path / "hmm_cov.npy")
 
 # TODO: Arguments need to change with update
 sim = HSMMSimulation(

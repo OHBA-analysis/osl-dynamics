@@ -41,8 +41,8 @@ config = Config(
 )
 
 # Load state transition probability matrix and covariances of each state
-trans_prob = np.load(files.example.directory / "hmm_trans_prob.npy")
-cov = np.load(files.example.directory / "hmm_cov.npy")
+trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
+cov = np.load(files.example.path / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")

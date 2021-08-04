@@ -20,7 +20,7 @@ gamma_shape = 20
 gamma_scale = 10
 
 # Load state transition probability matrix and covariances of each state
-cov = np.load(files.example.directory / "hmm_cov.npy")
+cov = np.load(files.example.path / "hmm_cov.npy")
 
 # Mixtures of states to include in the simulation
 mixed_state_vectors = np.array(
