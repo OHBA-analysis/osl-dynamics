@@ -22,6 +22,20 @@ def gaussian_heatmap(center = (2, 2), image_size = (10, 10), sig = 1):
     kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sig))
     return kernel
 
+def set_all_seeds(seed_value):
+    # 1. Set `PYTHONHASHSEED` environment variable at a fixed value
+    os.environ['PYTHONHASHSEED']=str(seed_value)
+
+    # 2. Set `python` built-in pseudo-random generator at a fixed value
+    random.seed(seed_value)
+
+    # 3. Set `numpy` pseudo-random generator at a fixed value
+    np.random.seed(seed_value)
+
+    # 4. Set `tensorflow` pseudo-random generator at a fixed value
+    tf.random.set_seed(seed_value)
+    
+
 print("Setting up")
 import numpy as np
 from vrad import data, simulation
@@ -30,7 +44,15 @@ from vrad.models import Config, Model
 from vrad.utils import plotting
 from scipy.io import savemat
 import random
+import os
 import matplotlib.pyplot as plt
+import tensorflow as tf
+
+
+# Set all seeds for repro.
+seed_value=666
+set_all_seeds(seed_value)
+
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -65,7 +87,6 @@ config = Config(
 
 
 # Generate ground truth covariance matrix for each state, shape should be (n_states,n_channels, n_channels)
-random.seed(666)
 
 GT_covz=np.zeros((n_states,n_chans,n_chans))
 for i in range(n_states):
