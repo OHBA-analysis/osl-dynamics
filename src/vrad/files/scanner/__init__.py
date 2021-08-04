@@ -1,5 +1,6 @@
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 
 path = Path(__file__).parent
 directory = str(path)

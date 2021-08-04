@@ -11,7 +11,6 @@ from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from vrad import array_ops
 from vrad.analysis.time_series import get_state_time_series
-from vrad.data.manipulation import standardize
 
 _logger = logging.getLogger("VRAD")
 
