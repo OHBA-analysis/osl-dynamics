@@ -23,15 +23,16 @@ class TensorFlowDataset:
             [n_batches(memmap, sequence_length) for memmap in self.subjects]
         )
 
-    def training_dataset(
+    def dataset(
         self,
         sequence_length: int,
         batch_size: int,
+        shuffle: bool = True,
         alpha: list = None,
         n_alpha_embeddings: int = 1,
         concatenate: bool = True,
     ) -> tensorflow.data.Dataset:
-        """Create a tensorflow dataset for training.
+        """Create a tensorflow dataset for training or evaluation.
 
         Parameters
         ----------
@@ -39,6 +40,9 @@ class TensorFlowDataset:
             Length of the segement of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
+        shuffle : bool
+            Should we shuffle sequences (within a batch) and batches.
+            Optional, default is True.
         alpha : list of np.ndarray
             List of state mixing factors for each subject. Optional.
             If passed, we create a dataset that includes alpha at each time point.
@@ -52,7 +56,7 @@ class TensorFlowDataset:
         Returns
         -------
         tensorflow.data.Dataset
-            Dataset for training the model.
+            Dataset for training or evaluating the model.
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
@@ -118,46 +122,33 @@ class TensorFlowDataset:
             full_datasets = subject_datasets[0]
             for dataset in subject_datasets[1:]:
                 full_datasets = full_datasets.concatenate(dataset)
-            full_datasets = (
-                full_datasets.shuffle(100000)
-                .batch(batch_size)
-                .shuffle(100000)
-                .prefetch(-1)
-            )
+            if shuffle:
+                full_datasets = (
+                    full_datasets.shuffle(100000)
+                    .batch(batch_size)
+                    .shuffle(100000)
+                    .prefetch(-1)
+                )
+            else:
+                full_datasets = full_datasets.batch(batch_size).prefetch(-1)
 
         # Otherwise create a dataset for each subject separately
         else:
-            full_datasets = [
-                dataset.shuffle(100000).batch(batch_size).shuffle(100000).prefetch(-1)
-                for dataset in subject_datasets
-            ]
+            if shuffle:
+                full_datasets = [
+                    dataset.shuffle(100000)
+                    .batch(batch_size)
+                    .shuffle(100000)
+                    .prefetch(-1)
+                    for dataset in subject_datasets
+                ]
+            else:
+                full_datasets = [
+                    dataset.batch(batch_size).prefetch(-1)
+                    for dataset in subject_datasets
+                ]
 
         return full_datasets
-
-    def prediction_dataset(self, sequence_length: int, batch_size: int) -> list:
-        """Create a tensorflow dataset for predicting the hidden state time course.
-
-        Parameters
-        ----------
-        sequence_length : int
-            Length of the segment of data to feed into the model.
-        batch_size : int
-            Number sequences in each mini-batch which is used to train the model.
-
-        Returns
-        -------
-        list of tensorflow.data.Datasets
-            Dataset for each subject.
-        """
-        subject_datasets = [
-            Dataset.from_tensor_slices(subject)
-            .batch(sequence_length, drop_remainder=True)
-            .batch(batch_size)
-            .prefetch(-1)
-            for subject in self.subjects
-        ]
-
-        return subject_datasets
 
 
 def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> int:

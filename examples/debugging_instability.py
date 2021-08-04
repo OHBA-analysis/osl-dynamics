@@ -66,11 +66,13 @@ prepared_data = Data(
 config.n_channels = prepared_data.n_channels
 
 # Prepare dataset
-training_dataset = prepared_data.training_dataset(
-    config.sequence_length, config.batch_size
+training_dataset = prepared_data.dataset(
+    config.sequence_length,
+    config.batch_size,
+    shuffle=True,
 )
-prediction_dataset = prepared_data.prediction_dataset(
-    config.sequence_length, config.batch_size
+prediction_dataset = prepared_data.dataset(
+    config.sequence_length, config.batch_size, shuffle=False
 )
 
 # Initialise covariances with the final HMM covariances

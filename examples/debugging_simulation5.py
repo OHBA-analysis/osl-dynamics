@@ -72,9 +72,13 @@ config.n_states = sim.n_states
 config.n_channels = meg_data.n_channels
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(config.sequence_length, config.batch_size)
-prediction_dataset = meg_data.prediction_dataset(
-    config.sequence_length, config.batch_size
+training_dataset = meg_data.dataset(
+    config.sequence_length, config.batch_size, shuffle=True
+)
+prediction_dataset = meg_data.dataset(
+    config.sequence_length,
+    config.batch_size,
+    shuffle=False,
 )
 
 # Build model

@@ -55,10 +55,11 @@ config = Config(
 )
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(
+training_dataset = meg_data.dataset(
     config.sequence_length,
     config.batch_size,
     alpha=[sim.state_time_course],
+    shuffle=True,
 )
 
 # Build model
