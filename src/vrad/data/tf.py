@@ -28,6 +28,7 @@ class TensorFlowDataset:
         sequence_length: int,
         batch_size: int,
         shuffle: bool = True,
+        validation_split: float = None,
         alpha: list = None,
         n_alpha_embeddings: int = 1,
         concatenate: bool = True,
@@ -43,6 +44,9 @@ class TensorFlowDataset:
         shuffle : bool
             Should we shuffle sequences (within a batch) and batches.
             Optional, default is True.
+        validation_split : float
+            Ratio to split the dataset into a training and validation set.
+            Optional, default returns the entire data.
         alpha : list of np.ndarray
             List of state mixing factors for each subject. Optional.
             If passed, we create a dataset that includes alpha at each time point.
@@ -55,8 +59,9 @@ class TensorFlowDataset:
 
         Returns
         -------
-        tensorflow.data.Dataset
-            Dataset for training or evaluating the model.
+        tensorflow.data.Dataset or Tuple
+            Dataset for training or evaluating the model along with the validation
+            set if validation_split was passed.
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
@@ -119,18 +124,31 @@ class TensorFlowDataset:
 
         # Create a dataset from all the subjects concatenated
         if concatenate:
-            full_datasets = subject_datasets[0]
+            full_dataset = subject_datasets[0]
             for dataset in subject_datasets[1:]:
-                full_datasets = full_datasets.concatenate(dataset)
+                full_dataset = full_dataset.concatenate(dataset)
             if shuffle:
-                full_datasets = (
-                    full_datasets.shuffle(100000)
+                full_dataset = (
+                    full_dataset.shuffle(100000)
                     .batch(batch_size)
                     .shuffle(100000)
                     .prefetch(-1)
                 )
             else:
-                full_datasets = full_datasets.batch(batch_size).prefetch(-1)
+                full_dataset = full_dataset.batch(batch_size).prefetch(-1)
+
+            if validation_split is None:
+                return full_dataset
+            else:
+                dataset_size = len(full_dataset)
+                training_dataset_size = round((1.0 - validation_split) * dataset_size)
+                training_dataset = full_dataset.take(training_dataset_size)
+                validation_dataset = full_dataset.skip(training_dataset_size)
+                print(
+                    f"{len(training_dataset)} batches in training dataset, "
+                    + f"{len(validation_dataset)} batches in the validation dataset."
+                )
+                return training_dataset, validation_dataset
 
         # Otherwise create a dataset for each subject separately
         else:
@@ -148,7 +166,28 @@ class TensorFlowDataset:
                     for dataset in subject_datasets
                 ]
 
-        return full_datasets
+            if validation_split is None:
+                return full_datasets
+            else:
+                training_datasets = []
+                validation_datasets = []
+                for i in range(len(full_datasets)):
+                    dataset_size = len(full_datasets[i])
+                    training_dataset_size = round(
+                        (1.0 - validation_split) * dataset_size
+                    )
+                    training_datasets.append(
+                        full_datasets[i].take(training_dataset_size)
+                    )
+                    validation_datasets.append(
+                        full_datasets[i].skip(training_dataset_size)
+                    )
+                    print(
+                        f"Subject {i}: "
+                        + f"{len(training_datasets[i])} batches in training dataset, "
+                        + f"{len(validation_datasets[i])} batches in the validation dataset."
+                    )
+                return training_datasets, validation_datasets
 
 
 def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> int:

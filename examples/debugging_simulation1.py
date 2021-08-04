@@ -60,8 +60,11 @@ meg_data = data.Data(sim.time_series)
 config.n_channels = meg_data.n_channels
 
 # Prepare dataset
-training_dataset = meg_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=True
+training_dataset, validation_dataset = meg_data.dataset(
+    config.sequence_length,
+    config.batch_size,
+    shuffle=True,
+    validation_split=0.1,
 )
 prediction_dataset = meg_data.dataset(
     config.sequence_length,
@@ -79,6 +82,7 @@ history = model.fit(
     epochs=config.n_epochs,
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
+    validation_data=validation_dataset,
 )
 
 # Free energy = Log Likelihood - KL Divergence
