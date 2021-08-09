@@ -398,9 +398,9 @@ def state_barcode(
     """Create a barcode plot for a state time course.
 
     Given a state time course either expressed as an 1D array of integer state
-     activations or as a 2D array of one-hot encoded state activations, produce a
-     barcode plot with each state represented by a color drawn from the colormap
-     provided.
+    activations or as a 2D array of one-hot encoded state activations, produce a
+    barcode plot with each state represented by a color drawn from the colormap
+    provided.
 
     Parameters
     ----------
@@ -1449,9 +1449,13 @@ def plot_connections(
 
 def state_stackplots(
     *state_time_courses: np.ndarray,
-    cmap: str = "magma",
+    n_samples: int,
+    cmap: str = "viridis",
     sampling_frequency: float = None,
     fig_kwargs: dict = None,
+    filename: str = None,
+    y_label: str = "State Activation",
+    title: str = None,
     **stackplot_kwargs: dict,
 ) -> plt.Figure:
     """
@@ -1460,12 +1464,18 @@ def state_stackplots(
     ----------
     state_time_courses : numpy.ndarray
         A selection of state time courses passed as separate arguments.
+    n_samples: int
+        Number of time points to be plotted.
     cmap : str
         A matplotlib colormap string.
     sampling_frequency : float
         The sampling frequency of the data in Hertz.
     fig_kwargs : dict
         Any parameters to be passed to the matplotlib.pyplot.subplots constructor.
+    y_label : str
+        Label for y-axis.
+    title : str
+        Title for the plot.
     stackplot_kwargs : dict
         Any parameters to be passed to matplotlib.pyplot.stackplot.
 
@@ -1474,6 +1484,7 @@ def state_stackplots(
     plt.Figure
     """
     n_states = max(stc.shape[1] for stc in state_time_courses)
+    n_samples = min(n_samples or np.inf, state_time_courses[0].shape[0])
     cmap = plt.cm.get_cmap(name=cmap, lut=n_states)
     colors = cmap.colors
 
@@ -1495,15 +1506,16 @@ def state_stackplots(
 
     for stc, axis in zip(state_time_courses, axes):
         time_vector = (
-            np.arange(len(stc)) / sampling_frequency
+            np.arange(n_samples) / sampling_frequency
             if sampling_frequency
-            else range(len(stc))
+            else range(n_samples)
         )
-        axis.stackplot(time_vector, stc.T, **stackplot_kwargs)
+        axis.stackplot(time_vector, stc[:n_samples].T, **stackplot_kwargs)
         axis.autoscale(tight=True)
-        axis.set_ylabel("State activation")
+        axis.set_ylabel(y_label)
 
-    axes[-1].set_xlabel("Time (s)" if sampling_frequency else "Samples")
+    axes[-1].set_xlabel("Time (s)" if sampling_frequency else "Sample")
+    axes[0].set_title(title)
 
     fig.tight_layout()
 
@@ -1514,7 +1526,7 @@ def state_stackplots(
         ),
     )
 
-    return fig
+    show_or_save(filename)
 
 
 def plot_epoched(
