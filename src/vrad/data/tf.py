@@ -124,58 +124,75 @@ class TensorFlowDataset:
 
         # Create a dataset from all the subjects concatenated
         if concatenate:
-            full_dataset = subject_datasets[0]
-            for dataset in subject_datasets[1:]:
-                full_dataset = full_dataset.concatenate(dataset)
+            full_dataset = concatenate_datasets(subject_datasets, shuffle=False)
+
             if shuffle:
-                full_dataset = (
-                    full_dataset.shuffle(100000)
-                    .batch(batch_size)
-                    .shuffle(100000)
-                    .prefetch(-1)
-                )
+                # Shuffle sequences
+                full_dataset = full_dataset.shuffle(100000)
+
+                # Group into mini-batches
+                full_dataset = full_dataset.batch(batch_size)
+
+                # Shuffle mini-batches
+                full_dataset = full_dataset.shuffle(100000)
+
             else:
-                full_dataset = full_dataset.batch(batch_size).prefetch(-1)
+                # Group into mini-batches
+                full_dataset = full_dataset.batch(batch_size)
 
             if validation_split is None:
-                return full_dataset
+                # Return the full dataset
+                return full_dataset.prefetch(-1)
+
             else:
+                # Calculate how many batches should be in the training dataset
                 dataset_size = len(full_dataset)
                 training_dataset_size = round((1.0 - validation_split) * dataset_size)
+
+                # Split the full dataset into a training and validation dataset
                 training_dataset = full_dataset.take(training_dataset_size)
                 validation_dataset = full_dataset.skip(training_dataset_size)
                 print(
                     f"{len(training_dataset)} batches in training dataset, "
                     + f"{len(validation_dataset)} batches in the validation dataset."
                 )
-                return training_dataset, validation_dataset
+
+                return training_dataset.prefetch(-1), validation_dataset.prefetch(-1)
 
         # Otherwise create a dataset for each subject separately
         else:
-            if shuffle:
-                full_datasets = [
-                    dataset.shuffle(100000)
-                    .batch(batch_size)
-                    .shuffle(100000)
-                    .prefetch(-1)
-                    for dataset in subject_datasets
-                ]
-            else:
-                full_datasets = [
-                    dataset.batch(batch_size).prefetch(-1)
-                    for dataset in subject_datasets
-                ]
+            full_datasets = []
+            for ds in subject_datasets:
+                if shuffle:
+                    # Shuffle sequences
+                    ds = ds.shuffle(100000)
+
+                # Group into batches
+                ds = ds.batch(batch_size)
+
+                if shuffle:
+                    # Shuffle batches
+                    ds = ds.shuffle(100000)
+
+                full_datasets.append(ds.prefetch(-1))
 
             if validation_split is None:
+                # Return the full dataset for each subject
                 return full_datasets
+
             else:
+                # Split the dataset for each subject separately
                 training_datasets = []
                 validation_datasets = []
                 for i in range(len(full_datasets)):
+
+                    # Calculate the number of batches in the training dataset
                     dataset_size = len(full_datasets[i])
                     training_dataset_size = round(
                         (1.0 - validation_split) * dataset_size
                     )
+
+                    # Split this subject's dataset
                     training_datasets.append(
                         full_datasets[i].take(training_dataset_size)
                     )
@@ -213,3 +230,30 @@ def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> i
         sequence_length
     )
     return len(index)
+
+
+def concatenate_datasets(datasets: list, shuffle: bool = True) -> tensorflow.data.Dataset:
+    """Concatenates a list of Tensorflow datasets.
+
+    Parameters
+    ----------
+    datasets : list
+        List of Tensorflow datasets.
+    Shuffle : bool
+        Should we shuffle the final concatenated dataset?
+        Optional, default is True.
+
+    Returns
+    -------
+    tensorflow.data.Dataset
+        Concatenated dataset.
+    """
+
+    full_dataset = datasets[0]
+    for ds in datasets[1:]:
+        full_dataset = full_dataset.concatenate(ds)
+
+    if shuffle:
+        full_dataset = full_dataset.shuffle(100000)
+
+    return full_dataset
