@@ -56,16 +56,24 @@ def reinitialize_layer_weights(layer: tf.keras.layers.Layer):
         var.assign(initializer(var.shape, var.dtype))
 
 
-def reinitialize_model_weights(model: tf.keras.Model):
+def reinitialize_model_weights(model: tf.keras.Model, keep: list = None):
     """Re-initialize the weights in the model.
 
     Parameters
     ----------
-    model: tensorflow.keras.Model
+    model : tensorflow.keras.Model
         Model to re-initialize weights for.
+    keep : list
+        List of str containing names for layers to not reinitialize.
     """
+    if keep is None:
+        keep = []
 
     for layer in model.layers:
+        # Skip layers that we want to keep
+        if layer.name in keep:
+            continue
+
         # If the layer consists and multiple layers pass the layer back
         # to this function
         if (
