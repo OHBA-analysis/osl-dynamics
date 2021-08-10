@@ -2,9 +2,11 @@
 
 """
 
+import numpy as np
 import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.python.keras import callbacks
+from vrad import inference
 
 
 class AlphaTemperatureAnnealingCallback(callbacks.Callback):
@@ -54,6 +56,40 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
             alpha_layer.alpha_temperature.assign(new_value)
         else:
             alpha_layer.alpha_temperature.assign(self.final_alpha_temperature)
+
+
+class DiceCoefficientCallback(callbacks.Callback):
+    """Callback to calculate a dice coefficient during training."""
+
+    def __init__(
+        self,
+        prediction_dataset: tf.data.Dataset,
+        ground_truth_state_time_course: np.ndarray,
+    ):
+        super().__init__()
+        self.prediction_dataset = prediction_dataset
+        self.gtstc = ground_truth_state_time_course
+        self.n_states = ground_truth_state_time_course.shape[-1]
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+        [_, _, alpha] = self.model.predict(self.prediction_dataset)
+        pstc = inference.states.time_courses(
+            alpha, concatenate=True, n_states=self.n_states
+        )
+        pstc, gtstc = inference.states.match_states(pstc, self.gtstc)
+        dice = inference.metrics.dice_coefficient(pstc, gtstc)
+        logs["dice"] = dice
+        print(f" - dice: {dice}", end="")
 
 
 class KLAnnealingCallback(callbacks.Callback):

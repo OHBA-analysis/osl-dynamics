@@ -15,7 +15,9 @@ _rng = np.random.default_rng()
 
 
 def time_courses(
-    alpha: Union[list, np.ndarray], concatenate: bool = False
+    alpha: Union[list, np.ndarray],
+    concatenate: bool = False,
+    n_states: int = None,
 ) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
@@ -27,8 +29,10 @@ def time_courses(
         State mixing factors with shape (n_subjects, n_samples, n_states)
         or (n_samples, n_states).
     concatenate : bool
-    If alpha is a list, should we concatenate the state time course?
-    Optional, default is True.
+        If alpha is a list, should we concatenate the state time course?
+        Optional, default is True.
+    n_states : int
+        Number of states there should be. Optional.
 
     Returns
     -------
@@ -36,15 +40,26 @@ def time_courses(
         State time courses.
     """
     if isinstance(alpha, list):
-        n_states = alpha[0].shape[1]
+        if n_states is None:
+            n_states = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
         stcs = [array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs]
         if len(stcs) == 1:
             stcs = stcs[0]
         elif concatenate:
             stcs = np.concatenate(stcs)
+    elif alpha.ndim == 3:
+        if n_states is None:
+            n_states = alpha.shape[-1]
+        stcs = alpha.argmax(axis=2)
+        stcs = np.array([array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs])
+        if len(stcs) == 1:
+            stcs = stcs[0]
+        elif concatenate:
+            stcs = np.concatenate(stcs)
     else:
-        n_states = alpha.shape[1]
+        if n_states is None:
+            n_states = alpha.shape[1]
         stcs = alpha.argmax(axis=1)
         stcs = array_ops.get_one_hot(stcs, n_states=n_states)
     return stcs
