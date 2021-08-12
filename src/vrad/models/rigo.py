@@ -143,7 +143,6 @@ class RIGO(InferenceModelBase, GO):
             model_rnn = model_rnn_layer(trimmed_theta)
             mod_mu = mod_mu_layer(model_rnn)[0, -1]
             mod_sigma = mod_sigma_layer(model_rnn)[0, -1]
-            mod_sigma = np.exp(mod_sigma)
 
             # Shift theta one time step to the left
             theta_norm = np.roll(theta_norm, -1, axis=0)
