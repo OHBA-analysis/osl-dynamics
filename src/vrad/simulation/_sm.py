@@ -63,17 +63,17 @@ class MixedSine:
         self.phases = self._rng.uniform(0, 2 * np.pi, self.n_states)
 
         # Generator state time courses
-        states = np.empty([n_samples, self.n_states], dtype=np.float32)
+        self.logits = np.empty([n_samples, self.n_states], dtype=np.float32)
         t = np.arange(
             0, n_samples / self.sampling_frequency, 1.0 / self.sampling_frequency
         )
         for i in range(self.n_states):
-            states[:, i] = self.relative_activation[i] + self.amplitudes[i] * np.sin(
-                2 * np.pi * self.frequencies[i] * t + self.phases[i]
-            )
+            self.logits[:, i] = self.relative_activation[i] + self.amplitudes[
+                i
+            ] * np.sin(2 * np.pi * self.frequencies[i] * t + self.phases[i])
 
         # Ensure state time courses sum to one at each time point
-        states = softmax(states, axis=1)
+        states = softmax(self.logits, axis=1)
 
         return states
 
