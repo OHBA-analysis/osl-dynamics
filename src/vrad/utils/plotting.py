@@ -924,6 +924,7 @@ def plot_line(
     x_label: str = None,
     y_label: str = None,
     title: str = None,
+    figsize: tuple = (7, 4),
     filename: str = None,
 ):
     """Basic line plot.
@@ -950,10 +951,12 @@ def plot_line(
         Label for y-axis. Optional.
     title : str
         Figure title. Optional.
+    figsize : tuple
+        Figure size in inches. Optional, default is (7, 4).
     filename : str
         Output filename. Optional.
     """
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=figsize)
 
     if len(x) != len(y):
         raise ValueError("Different number of x and y arrays given.")
@@ -1025,6 +1028,7 @@ def plot_scatter(
     x_label: str = None,
     y_label: str = None,
     title: str = None,
+    figsize: tuple = (7, 4),
     filename: str = None,
 ):
     """Basic scatter plot.
@@ -1051,10 +1055,12 @@ def plot_scatter(
         Label for y-axis. Optional.
     title : str
         Figure title. Optional.
+    figsize : tuple
+        Figure size in inches. Optional, default is (7, 4).
     filename : str
         Output filename. Optional.
     """
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=figsize)
 
     if len(x) != len(y):
         raise ValueError("Different number of x and y arrays given.")
