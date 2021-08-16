@@ -10,6 +10,7 @@ import matplotlib.patches as patches
 import numpy as np
 import vrad.inference.metrics
 from matplotlib import pyplot as plt
+from matplotlib.colors import LogNorm
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
@@ -523,8 +524,9 @@ def plot_matrices(
     group_color_scale: bool = True,
     titles: list = None,
     main_title: str = None,
-    cmap="viridis",
-    nan_color="white",
+    cmap: str = "viridis",
+    nan_color: str = "white",
+    log_norm: bool = False,
     filename: str = None,
 ):
     """Plot a collection of matrices.
@@ -547,6 +549,8 @@ def plot_matrices(
         Matplotlib colormap.
     nan_color: str
         Matplotlib color to use for NaN values. Default is white.
+    log_norm: bool
+        Should we show the elements on a log scale? Default is False.
     filename: str
         A file to which to save the figure.
     """
@@ -571,9 +575,15 @@ def plot_matrices(
         if group_color_scale:
             v_min = matrix.min()
             v_max = matrix.max()
-            im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
+            if log_norm:
+                im = axis.matshow(grid, cmap=cmap, norm=LogNorm(vmin=v_min, vmax=v_max))
+            else:
+                im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
         else:
-            im = axis.matshow(grid, cmap=cmap)
+            if log_norm:
+                im = axis.matshow(grid, cmap=cmap, norm=LogNorm())
+            else:
+                im = axis.matshow(grid, cmap=cmap)
         axis.set_title(title)
 
     if group_color_scale:
