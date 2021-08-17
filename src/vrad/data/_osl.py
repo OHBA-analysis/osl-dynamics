@@ -56,6 +56,9 @@ class OSL_HMM:
             ]
         )
 
+        # Transition probability matrix
+        self.trans_prob = self.p
+
         # Discontinuities in the training data which indicate the number of data
         # points for different subjects
         if "T" in self.hmm:

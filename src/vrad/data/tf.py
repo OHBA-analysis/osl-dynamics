@@ -232,7 +232,9 @@ def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> i
     return len(index)
 
 
-def concatenate_datasets(datasets: list, shuffle: bool = True) -> tensorflow.data.Dataset:
+def concatenate_datasets(
+    datasets: list, shuffle: bool = True
+) -> tensorflow.data.Dataset:
     """Concatenates a list of Tensorflow datasets.
 
     Parameters
