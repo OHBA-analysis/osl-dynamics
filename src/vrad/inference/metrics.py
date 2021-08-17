@@ -380,3 +380,42 @@ def state_covariance_riemannian_distances(state_covariances: np.ndarray) -> np.n
                 state_covariances[i], state_covariances[j]
             )
     return riemannian_distances
+
+
+def rv_coefficient(M: list) -> float:
+    """Calculate the RV coefficient for two matrices.
+
+    Parameters
+    ----------
+    M : list of np.ndarray
+        List of matrices.
+
+    Returns
+    -------
+    float
+        RV coefficient.
+    """
+    # First compute the scalar product matrices for each data set X
+    scal_arr_list = []
+
+    for arr in M:
+        scal_arr = np.dot(arr, np.transpose(arr))
+        scal_arr_list.append(scal_arr)
+
+    # Now compute the 'between study cosine matrix' C
+    C = np.zeros((len(M), len(M)), float)
+
+    for index, element in np.ndenumerate(C):
+        nom = np.trace(
+            np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[1]])
+        )
+        denom1 = np.trace(
+            np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[0]])
+        )
+        denom2 = np.trace(
+            np.dot(np.transpose(scal_arr_list[index[1]]), scal_arr_list[index[1]])
+        )
+        Rv = nom / np.sqrt(np.dot(denom1, denom2))
+        C[index[0], index[1]] = Rv
+
+    return C
