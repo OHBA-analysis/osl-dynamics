@@ -277,7 +277,9 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose(0, "state_time_course")
-def lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
+def lifetimes(
+    state_time_course: np.ndarray, sampling_frequency: float = None
+) -> List[np.ndarray]:
     """Calculate state lifetimes for a state time course.
 
     Given a state time course (one-hot encoded), calculate the lifetime of each
@@ -287,6 +289,8 @@ def lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
     ----------
     state_time_course : numpy.ndarray
         State time course (strictly binary).
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
 
     Returns
     -------
@@ -297,6 +301,8 @@ def lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
     """
     ons, offs = state_activation(state_time_course)
     channel_lifetimes = offs - ons
+    if sampling_frequency is not None:
+        channel_lifetimes = [lt / sampling_frequency for lt in channel_lifetimes]
     return channel_lifetimes
 
 
