@@ -3,7 +3,7 @@ from typing import Union
 import mat73
 import numpy as np
 from vrad import array_ops
-from vrad.inference import metrics
+from vrad.inference import states
 from vrad.utils import plotting
 
 
@@ -115,7 +115,7 @@ class OSL_HMM:
             Fractional occupancies.
         """
         stc = self.state_time_course(concatenate=True)
-        return metrics.fractional_occupancies(stc)
+        return states.fractional_occupancies(stc)
 
     def state_time_course(
         self, concatenate: bool = False, pad_n_embeddings: int = None

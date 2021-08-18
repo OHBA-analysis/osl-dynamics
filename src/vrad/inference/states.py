@@ -319,3 +319,19 @@ def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
     mean = np.array([np.mean(lt) for lt in lts])
     std = np.array([np.std(lt) for lt in lts])
     return mean, std
+
+
+def fractional_occupancies(state_time_course: np.ndarray) -> np.ndarray:
+    """Calculates the fractional occupancy.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    np.ndarray
+        The fractional occupancy of each state.
+    """
+    return np.sum(state_time_course, axis=0) / state_time_course.shape[0]

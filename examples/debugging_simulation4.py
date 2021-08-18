@@ -125,8 +125,8 @@ sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
-print("Fractional occupancies (Simulation):", metrics.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", metrics.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

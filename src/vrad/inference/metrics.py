@@ -148,22 +148,6 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     return dice_coefficient_1d(sequence_1, sequence_2)
 
 
-def fractional_occupancies(state_time_course: np.ndarray) -> np.ndarray:
-    """Calculates the fractional occupancy.
-
-    Parameters
-    ----------
-    state_time_course : np.ndarray
-        State time course. Shape is (n_samples, n_states).
-
-    Returns
-    -------
-    np.ndarray
-        The fractional occupancy of each state.
-    """
-    return np.sum(state_time_course, axis=0) / state_time_course.shape[0]
-
-
 def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
     """Calculates the frobenius norm of the difference of two matrices.
 
