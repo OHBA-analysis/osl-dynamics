@@ -222,16 +222,16 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
     Returns
     -------
     ons : list of numpy.ndarray
-        List containing state beginnings in the order they occur for each channel.
+        List containing state beginnings in the order they occur for each state.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     offs : list of numpy.ndarray
-        List containing state ends in the order they occur for each channel.
+        List containing state ends in the order they occur for each state.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
-    channel_on = []
-    channel_off = []
+    state_on = []
+    state_off = []
 
     diffs = np.diff(state_time_course, axis=0)
     for i, diff in enumerate(diffs.T):
@@ -244,17 +244,17 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             if off[0] < on[0]:
                 on = np.insert(on, 0, -1)
 
-            channel_on.append(on)
-            channel_off.append(off)
+            state_on.append(on)
+            state_off.append(off)
         except IndexError:
             _logger.info(f"No activation in state {i}.")
-            channel_on.append(np.array([]))
-            channel_off.append(np.array([]))
+            state_on.append(np.array([]))
+            state_off.append(np.array([]))
 
-    channel_on = np.array(channel_on, dtype=object)
-    channel_off = np.array(channel_off, dtype=object)
+    state_on = np.array(state_on, dtype=object)
+    state_off = np.array(state_off, dtype=object)
 
-    return channel_on, channel_off
+    return state_on, state_off
 
 
 @transpose(0, "state_time_course")
@@ -294,16 +294,16 @@ def lifetimes(
 
     Returns
     -------
-    channel_lifetimes : list of numpy.ndarray
-        List containing an array of lifetimes in the order they occur for each channel.
+    list of numpy.ndarray
+        List containing an array of lifetimes in the order they occur for each state.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
     ons, offs = state_activation(state_time_course)
-    channel_lifetimes = offs - ons
+    lts = offs - ons
     if sampling_frequency is not None:
-        channel_lifetimes = [lt / sampling_frequency for lt in channel_lifetimes]
-    return channel_lifetimes
+        lts = [lt / sampling_frequency for lt in lts]
+    return lts
 
 
 def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
@@ -325,6 +325,35 @@ def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
     mean = np.array([np.mean(lt) for lt in lts])
     std = np.array([np.std(lt) for lt in lts])
     return mean, std
+
+
+def intervals(state_time_course: np.ndarray, sampling_frequency: float = None):
+    """Calculate state intervals for a state time course.
+
+    An interval is the duration between successive visits for a particular
+    state.
+
+    Parameters
+    ----------
+    state_time_course : numpy.ndarray
+        State time course (strictly binary).
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If passed returns the intervals in seconds.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        List containing an array of intervals in the order they occur for each state.
+        This cannot necessarily be converted into an array as an equal number of
+        elements in each array is not guaranteed.
+    """
+    ons, offs = state_activation(state_time_course)
+    intvs = []
+    for on, off in zip(ons, offs):
+        intvs.append(on[1:] - off[:-1])
+    if sampling_frequency is not None:
+        intvs = [intv / sampling_frequency for intv in intvs]
+    return intvs
 
 
 def fractional_occupancies(state_time_course: np.ndarray) -> np.ndarray:
