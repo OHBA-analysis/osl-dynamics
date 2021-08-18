@@ -277,7 +277,7 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose(0, "state_time_course")
-def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
+def lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
     """Calculate state lifetimes for a state time course.
 
     Given a state time course (one-hot encoded), calculate the lifetime of each
@@ -298,3 +298,24 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
     ons, offs = state_activation(state_time_course)
     channel_lifetimes = offs - ons
     return channel_lifetimes
+
+
+def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
+    """Calculate statistics of the lifetime distribution of each state.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    means : np.ndarray
+        Mean lifetime of each state.
+    std : np.ndarray
+        Standard deviation of each state.
+    """
+    lts = lifetimes(state_time_course)
+    mean = np.array([np.mean(lt) for lt in lts])
+    std = np.array([np.std(lt) for lt in lts])
+    return mean, std

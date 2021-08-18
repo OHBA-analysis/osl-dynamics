@@ -9,7 +9,6 @@ import tensorflow_probability as tfp
 from scipy.linalg import eigvalsh
 from sklearn.metrics import confusion_matrix as sklearn_confusion
 from tqdm import trange
-from vrad.inference.states import state_lifetimes
 from vrad.utils.decorators import transpose
 
 
@@ -293,27 +292,6 @@ def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
 
     # Sum over time and return the negative log-likelihood
     return -tf.reduce_sum(ll, axis=0)
-
-
-def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
-    """Calculate statistics of the lifetime distribution of each state.
-
-    Parameters
-    ----------
-    state_time_course : np.ndarray
-        State time course. Shape is (n_samples, n_states).
-
-    Returns
-    -------
-    means : np.ndarray
-        Mean lifetime of each state.
-    std : np.ndarray
-        Standard deviation of each state.
-    """
-    lifetimes = state_lifetimes(state_time_course)
-    mean = np.array([np.mean(lt) for lt in lifetimes])
-    std = np.array([np.std(lt) for lt in lifetimes])
-    return mean, std
 
 
 def state_covariance_correlations(

@@ -15,7 +15,7 @@ from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from vrad.array_ops import from_cholesky, get_one_hot, mean_diagonal
 from vrad.data.task import epoch_mean
-from vrad.inference.states import correlate_states, match_states, state_lifetimes
+from vrad.inference.states import correlate_states, match_states, lifetimes
 from vrad.utils.decorators import transpose
 from vrad.utils.misc import override_dict_defaults
 from vrad.utils.topoplots import Topology
@@ -714,7 +714,7 @@ def plot_state_lifetimes(
     if state_time_course.ndim != 2:
         raise ValueError("state_timecourse must be a 2D array")
 
-    channel_lifetimes = state_lifetimes(state_time_course)
+    channel_lifetimes = lifetimes(state_time_course)
     n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
 
