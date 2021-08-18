@@ -1039,6 +1039,8 @@ def plot_scatter(
     y_label: str = None,
     title: str = None,
     figsize: tuple = (7, 4),
+    markers: list = None,
+    marker_size: float = None,
     filename: str = None,
 ):
     """Basic scatter plot.
@@ -1067,6 +1069,10 @@ def plot_scatter(
         Figure title. Optional.
     figsize : tuple
         Figure size in inches. Optional, default is (7, 4).
+    markers : list of str
+        Markers to used for each set of data points. Optional.
+    marker_size : float
+        Size of markers. Optional.
     filename : str
         Output filename. Optional.
     """
@@ -1086,7 +1092,7 @@ def plot_scatter(
             labels = [labels]
         else:
             if len(labels) != len(x):
-                raise ValueError("Incorrect number of lines or labels passed.")
+                raise ValueError("Incorrect number of data points or labels passed.")
         add_legend = True
     else:
         labels = [None] * len(x)
@@ -1095,11 +1101,23 @@ def plot_scatter(
     if errors is None:
         errors = [None] * len(x)
 
+    if markers is not None:
+        if len(markers) != len(x):
+            raise ValueError("Incorrect number of data points or markers passed.")
+    else:
+        markers = [None] * len(x)
+
+    # Colours
+    prop_cycle = plt.rcParams["axes.prop_cycle"]
+    colors = prop_cycle.by_key()["color"]
+    if len(x) > len(colors):
+        raise ValueError("Too many data points passed for the color cycle.")
+
     # Plot data
-    for (x_data, y_data, label, e_data) in zip(x, y, labels, errors):
-        ax.scatter(x_data, y_data, label=label)
-        if e_data is not None:
-            ax.errorbar(x_data, y_data, yerr=e_data, fmt="none")
+    for i in range(len(x)):
+        ax.scatter(x[i], y[i], label=labels[i], marker=markers[i], s=marker_size)
+        if errors[i] is not None:
+            ax.errorbar(x[i], y[i], yerr=errors[i], fmt="none", c=colors[i])
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
