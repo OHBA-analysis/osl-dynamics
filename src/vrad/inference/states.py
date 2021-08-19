@@ -306,13 +306,17 @@ def lifetimes(
     return lts
 
 
-def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
+def lifetime_statistics(
+    state_time_course: np.ndarray, sampling_frequency: float = None
+) -> Tuple:
     """Calculate statistics of the lifetime distribution of each state.
 
     Parameters
     ----------
     state_time_course : np.ndarray
         State time course. Shape is (n_samples, n_states).
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
 
     Returns
     -------
@@ -321,7 +325,7 @@ def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
     std : np.ndarray
         Standard deviation of each state.
     """
-    lts = lifetimes(state_time_course)
+    lts = lifetimes(state_time_course, sampling_frequency)
     mean = np.array([np.mean(lt) for lt in lts])
     std = np.array([np.std(lt) for lt in lts])
     return mean, std
