@@ -152,7 +152,7 @@ class HMM_MAR(Simulation):
     coeffs : np.ndarray
         Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
         n_channels).
-    var : np.ndarray
+    covs : np.ndarray
         Variance of eps_t. Shape must be (n_states, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
@@ -166,14 +166,14 @@ class HMM_MAR(Simulation):
         n_samples: int,
         trans_prob: Union[np.ndarray, str, None],
         coeffs: np.ndarray,
-        cov: np.ndarray,
+        covs: np.ndarray,
         stay_prob: float = None,
         random_seed: int = None,
     ):
         # Observation model
         self.obs_mod = MAR(
             coeffs=coeffs,
-            cov=cov,
+            covs=covs,
             random_seed=random_seed,
         )
 

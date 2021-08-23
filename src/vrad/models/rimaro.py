@@ -6,10 +6,11 @@
 from tensorflow.keras import Model, layers
 from vrad.models.inf_mod_base import InferenceModelBase
 from vrad.models.layers import (
+    CoeffsCovsLayer,
     InferenceRNNLayers,
     LogLikelihoodLayer,
-    MARMeanCovLayer,
-    MARParametersLayer,
+    MARMeansCovsLayer,
+    MixCoeffsCovsLayer,
     ModelRNNLayers,
     NormalizationLayer,
     NormalKLDivergenceLayer,
@@ -89,35 +90,42 @@ def _model_structure(config):
     # Observation model:
     # - We use x_t ~ N(mu, sigma), where
     #      - mu = Sum_j Sum_l alpha_jt W_jt x_{t-l}.
-    #      - sigma = Sum_j alpha^2_jt sigma_jt, where sigma_jt is a learnable
+    #      - sigma = Sum_j alpha^2_jt sigma_j, where sigma_jt is a learnable
     #        diagonal covariance matrix.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
-    mar_params_layer = MARParametersLayer(
+    coeffs_covs_layer = CoeffsCovsLayer(
         config.n_states,
         config.n_channels,
         config.n_lags,
         config.initial_coeffs,
-        config.initial_cov,
+        config.initial_covs,
         config.learn_coeffs,
-        config.learn_cov,
-        name="mar_params",
+        config.learn_covs,
+        name="coeffs_covs",
     )
-    mean_cov_layer = MARMeanCovLayer(
+    mix_coeffs_covs_layer = MixCoeffsCovsLayer(
         config.n_states,
         config.n_channels,
         config.sequence_length,
         config.n_lags,
-        name="mean_cov",
+        name="mix_coeffs_covs",
+    )
+    mar_means_covs_layer = MARMeansCovsLayer(
+        config.n_channels,
+        config.sequence_length,
+        config.n_lags,
+        name="means_covs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow
-    coeffs, cov = mar_params_layer(inputs)  # inputs not used
-    clipped_data, mu, sigma = mean_cov_layer([inputs, alpha, coeffs, cov])
-    ll_loss = ll_loss_layer([clipped_data, mu, sigma])
+    coeffs_jl, covs_j = coeffs_covs_layer(inputs)  # inputs not used
+    coeffs_lt, covs_t = mix_coeffs_covs_layer([alpha, coeffs_jl, covs_j])
+    x_t, mu_t, sigma_t = mar_means_covs_layer([inputs, coeffs_lt, covs_t])
+    ll_loss = ll_loss_layer([x_t, mu_t, sigma_t])
 
     # Model RNN:
     # - Learns p(theta|theta_<t) ~ N(theta | mod_mu, mod_sigma), where

@@ -17,24 +17,24 @@ A22 = [[0.4, 0], [-0.1, 0.1]]
 A31 = [[1, -0.15], [0, 0.7]]
 A32 = [[-0.3, -0.2], [0.5, 0.5]]
 
-C1 = [1, 1]
+C1 = [0.1, 0.1]
 C2 = [0.1, 0.1]
-C3 = [10, 10]
+C3 = [0.1, 0.1]
 
 coeffs = np.array([[A11, A12], [A21, A22], [A31, A32]])
-cov = np.array([np.diag(C1), np.diag(C2), np.diag(C3)])
+covs = np.array([np.diag(C1), np.diag(C2), np.diag(C3)])
 
 # Simulate data
 print("Simulating data")
 sim = simulation.HMM_MAR(
-    n_samples=51200,
+    n_samples=25600,
     trans_prob="sequence",
     stay_prob=0.95,
     coeffs=coeffs,
-    cov=cov,
+    covs=covs,
     random_seed=123,
 )
-sim.standardize()
+# sim.standardize()
 meg_data = data.Data(sim.time_series)
 
 # Settings
@@ -64,14 +64,20 @@ model.summary()
 # Train the observation model
 history = model.fit(training_dataset, epochs=config.n_epochs)
 
-inf_coeffs, inf_cov = model.get_params()
+# Inferred parameters
+inf_coeffs, inf_covs = model.get_params()
 
 print("Ground truth:")
 print(np.squeeze(coeffs))
 print()
+print(np.squeeze(covs))
+print()
 
 print("Inferred:")
 print(np.squeeze(inf_coeffs))
+print()
+print(np.squeeze(inf_covs))
+print()
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

@@ -105,12 +105,12 @@ class Config:
     learn_coeffs : bool
         Should we learn the autoregressive coefficients? Pass if
         model='multivariate_autoregressive'.
-    learn_cov : bool
+    learn_covs : bool
         Should we learn the covariances? Pass if model='multivariate_autoregressive'.
     initial_coeffs : np.ndarray
         Initialisation for autoregressive coefficients. Pass if
         model='multivariate_autoregressive'.
-    initial_cov : np.ndarray
+    initial_covs : np.ndarray
         Initialisation for covariances. Pass if model='multivariate_autoregressive'.
 
     KL Annealing Parameters
@@ -199,9 +199,9 @@ class Config:
 
     n_lags: int = None
     learn_coeffs: bool = None
-    learn_cov: bool = None
+    learn_covs: bool = None
     initial_coeffs: np.ndarray = None
-    initial_cov: np.ndarray = None
+    initial_covs: np.ndarray = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None
@@ -264,6 +264,8 @@ class Config:
             raise ValueError("Please pass model_rnn.")
 
     def validate_alpha_parameters(self):
+        if self.inference_rnn is None:
+            return
 
         if self.alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
             raise ValueError(
@@ -336,6 +338,8 @@ class Config:
             raise ValueError("sequence_length must be one or greater.")
 
     def validate_kl_annealing_parameters(self):
+        if self.inference_rnn is None:
+            return
 
         if self.do_kl_annealing is None:
             raise ValueError("do_kl_annealing must be passed.")
@@ -398,8 +402,8 @@ class Config:
             if self.learn_coeffs is None:
                 self.learn_coeffs = True
 
-            if self.learn_cov is None:
-                self.learn_cov = True
+            if self.learn_covs is None:
+                self.learn_covs = True
 
     def validate_initialization_parameters(self):
 

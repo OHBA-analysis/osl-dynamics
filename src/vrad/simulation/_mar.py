@@ -12,8 +12,8 @@ class MAR:
 
         x_t = coeffs_1 x_{t-1} + ... + coeffs_p x_{t-p} + eps_t
 
-    where eps_t ~ N(0, cov). The MAR model is therefore parameterized by the MAR
-    coefficients, coeffs_i, and covariance, cov.
+    where eps_t ~ N(0, covs). The MAR model is therefore parameterized by the MAR
+    coefficients, coeffs_i, and covsariance, covs.
 
     This model is also known as VAR or MVAR.
 
@@ -22,7 +22,7 @@ class MAR:
     coeffs : np.ndarray
         Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
         n_channels).
-    cov : np.ndarray
+    covs : np.ndarray
         Coariance of eps_t. Shape must be (n_states, n_channels, n_channels)
     random_seed: int
         Seed for the random number generator.
@@ -31,7 +31,7 @@ class MAR:
     def __init__(
         self,
         coeffs: np.ndarray,
-        cov: float,
+        covs: float,
         random_seed: int = None,
     ):
         # Validation
@@ -40,18 +40,18 @@ class MAR:
                 "coeffs must be a (n_states, n_lags, n_channels, n_channels) array."
             )
 
-        if cov.ndim != 3:
-            raise ValueError("cov must be a (n_states, n_channels, n_channels) array.")
+        if covs.ndim != 3:
+            raise ValueError("covs must be a (n_states, n_channels, n_channels) array.")
 
-        if coeffs.shape[0] != cov.shape[0]:
-            raise ValueError("Different number of states in coeffs and cov passed.")
+        if coeffs.shape[0] != covs.shape[0]:
+            raise ValueError("Different number of states in coeffs and covs passed.")
 
-        if coeffs.shape[-1] != cov.shape[-1]:
-            raise ValueError("Different number of channels in coeffs and cov passed.")
+        if coeffs.shape[-1] != covs.shape[-1]:
+            raise ValueError("Different number of channels in coeffs and covs passed.")
 
         # Model parameters
         self.coeffs = coeffs
-        self.cov = cov
+        self.covs = covs
         self.order = coeffs.shape[1]
 
         # Number of states and channels
@@ -73,7 +73,7 @@ class MAR:
             n_time_points_active = np.count_nonzero(time_points_active)
             data[time_points_active] = self._rng.multivariate_normal(
                 np.zeros(self.n_channels),
-                self.cov[i],
+                self.covs[i],
                 size=n_time_points_active,
             )
 
@@ -81,6 +81,6 @@ class MAR:
         for t in range(n_samples):
             state = state_time_course[t].argmax()
             for lag in range(min(t, self.order)):
-                data[t, :] += np.dot(self.coeffs[state, lag], data[t - lag - 1])
+                data[t] += np.dot(self.coeffs[state, lag], data[t - lag - 1])
 
         return data.astype(np.float32)
