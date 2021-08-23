@@ -480,9 +480,6 @@ class LogLikelihoodLayer(layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def build(self, input_shape):
-        self.built = True
-
     def call(self, inputs):
         x, mu, sigma = inputs
 
@@ -512,9 +509,6 @@ class NormalKLDivergenceLayer(layers.Layer):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.built = True
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
@@ -550,9 +544,6 @@ class DirichletKLDivergenceLayer(layers.Layer):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.built = True
 
     def call(self, inputs, **kwargs):
         inference_concentration, model_concentration = inputs
@@ -715,6 +706,8 @@ class CoeffsCovsLayer(layers.Layer):
         Should we learn the MAR coefficients?
     learn_cov : bool
         Should we learn the covariances?
+    diag_covs : bool
+        Are the covariances diagonal? Optional, default is False.
     """
 
     def __init__(
@@ -726,6 +719,7 @@ class CoeffsCovsLayer(layers.Layer):
         initial_covs: np.ndarray,
         learn_coeffs: bool,
         learn_covs: bool,
+        diag_covs: bool = False,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -734,6 +728,7 @@ class CoeffsCovsLayer(layers.Layer):
         self.n_lags = n_lags
         self.learn_coeffs = learn_coeffs
         self.learn_covs = learn_covs
+        self.diag_covs = diag_covs
 
         # Initialisation for MAR coefficients
         if initial_coeffs is None:
@@ -745,19 +740,35 @@ class CoeffsCovsLayer(layers.Layer):
         self.coeffs_initializer = WeightInitializer(self.initial_coeffs)
 
         # Initialisation for covariances
-        if initial_covs is None:
-            self.initial_covs = np.ones([n_states, n_channels], dtype=np.float32)
+        if self.diag_covs:
+            if initial_covs is None:
+                self.initial_covs = np.ones([n_states, n_channels], dtype=np.float32)
+            else:
+                self.initial_covs = initial_covs
+            self.initial_covs = np.log(np.exp(self.initial_covs) - 1.0)
+            self.diagonal_covs_initializer = WeightInitializer(self.initial_covs)
         else:
-            self.initial_covs = initial_covs
-
-        # We apply a softplus to the learnt values, so we must apply an
-        # inverse softplus to the initial value
-        self.initial_covs = np.log(np.exp(self.initial_covs) - 1.0)
-
-        self.covs_initializer = WeightInitializer(self.initial_covs)
+            if initial_covs is None:
+                self.initial_covs = np.stack(
+                    [np.eye(n_channels, dtype=np.float32)] * n_states
+                )
+                self.initial_cholesky_covs = cholesky_factor(self.initial_covs)
+            else:
+                if initial_covs.ndim == 2:
+                    raise ValueError(
+                        "Please pass covariances with shape (n_states, n_channels, "
+                        + "n_channels) or use diag_covs=True."
+                    )
+                initial_covs = initial_covs.astype("float32")
+                if is_symmetric(initial_covs):
+                    self.initial_cholesky_covs = cholesky_factor(initial_covs)
+                else:
+                    self.initial_cholesky_covs = initial_covs
+            self.flattened_cholesky_covs_initializer = WeightInitializer(
+                tfp.math.fill_triangular_inverse(self.initial_cholesky_covs)
+            )
 
     def build(self, input_shape):
-
         # Create weights for the MAR coefficients
         self.coeffs = self.add_weight(
             "coeffs",
@@ -768,22 +779,36 @@ class CoeffsCovsLayer(layers.Layer):
         )
 
         # Create weights for the MAR covariance
-        self.covs = self.add_weight(
-            "covs",
-            shape=(self.n_states, self.n_channels),
-            dtype=tf.float32,
-            initializer=self.covs_initializer,
-            trainable=self.learn_covs,
-        )
+        if self.diag_covs:
+            self.diagonal_covs = self.add_weight(
+                "diagonal_covs",
+                shape=(self.n_states, self.n_channels),
+                dtype=tf.float32,
+                initializer=self.diagonal_covs_initializer,
+                trainable=self.learn_covs,
+            )
+        else:
+            self.flattened_cholesky_covs = self.add_weight(
+                "flattened_cholesky_covs",
+                shape=(self.n_states, self.n_channels * (self.n_channels + 1) // 2),
+                dtype=tf.float32,
+                initializer=self.flattened_cholesky_covs_initializer,
+                trainable=self.learn_covs,
+            )
 
         self.built = True
 
     def call(self, inputs, **kwargs):
+        if self.diag_covs:
+            # Ensure covariances contain variances that are positive
+            covs = activations.softplus(self.diagonal_covs)
+            covs = tf.linalg.diag(covs)
+        else:
+            # Calculate the covariance matrix from the cholesky factor
+            cholesky_covs = tfp.math.fill_triangular(self.flattened_cholesky_covs)
+            covs = cholesky_factor_to_full_matrix(cholesky_covs)
 
-        # Ensure covariances contain variances that are positive
-        covs = activations.softplus(self.covs)
-
-        return [self.coeffs, tf.linalg.diag(covs)]
+        return [self.coeffs, covs]
 
     def compute_output_shape(self, input_shape):
         return [
@@ -802,12 +827,27 @@ class CoeffsCovsLayer(layers.Layer):
                 "n_lags": self.n_lags,
                 "learn_coeffs": self.learn_coeffs,
                 "learn_covs": self.learn_covs,
+                "diag_covs": diag_covs,
             }
         )
         return config
 
 
 class MixCoeffsCovsLayer(layers.Layer):
+    """Mixes the MAR coefficients and covariances.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Sequence length.
+    n_lags : int
+        Number of lags.
+    """
+
     def __init__(
         self,
         n_states: int,
@@ -891,7 +931,19 @@ class MixCoeffsCovsLayer(layers.Layer):
 
 
 class MARMeansCovsLayer(layers.Layer):
-    def __init__(self, n_channels, sequence_length, n_lags, **kwargs):
+    """Calculates the time-vaying mean and covariance for observing MAR data.
+
+    Parameters
+    ----------
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Sequence length.
+    n_lags : int
+        Number of lags.
+    """
+
+    def __init__(self, n_channels: int, sequence_length: int, n_lags: int, **kwargs):
         super().__init__(**kwargs)
         self.n_channels = n_channels
         self.sequence_length = sequence_length
@@ -957,3 +1009,14 @@ class MARMeansCovsLayer(layers.Layer):
                 ]
             ),
         ]
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_channels": self.n_channels,
+                "sequence_length": self.sequence_length,
+                "n_lags": self.n_lags,
+            }
+        )
+        return config

@@ -81,7 +81,7 @@ prediction_dataset = meg_data.dataset(
 )
 
 config.initial_coeffs = coeffs
-config.initial_covs = np.array([C1, C2, C3])
+config.initial_covs = covs
 
 # Build model
 model = Model(config)
