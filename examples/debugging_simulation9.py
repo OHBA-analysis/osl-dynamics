@@ -1,11 +1,13 @@
-"""Example script for running inference on simulated HMM-MVN data.
+"""Example script for running inference using a vector quantized version of VRAD
+ on simulated HMM-MVN data.
 
-- Should achieve a dice of ~0.8.
+- Achieves a dice of ~0.75.
+- There is a large run-to-run variability.
 """
 
 print("Setting up")
 import numpy as np
-from vrad import data, files, simulation
+from vrad import data, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import Config, Model
 
@@ -14,11 +16,11 @@ tf_ops.gpu_growth()
 
 # Settings
 n_samples = 25600
-observation_error = 0.2
 
 config = Config(
     n_states=5,
-    sequence_length=200,
+    n_channels=80,
+    sequence_length=100,
     inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
@@ -27,37 +29,33 @@ config = Config(
     model_normalization="layer",
     theta_normalization=None,
     n_quantized_vectors=5,
-    alpha_xform="softmax",
+    alpha_xform="gumbel-softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_covariances=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
-    batch_size=16,
+    n_kl_annealing_epochs=50,
+    batch_size=8,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=100,
 )
-
-# Load state transition probability matrix and covariances of each state
-trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
-cov = np.load(files.example.path / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
 sim = simulation.HMM_MVN(
     n_samples=n_samples,
-    trans_prob=trans_prob,
+    n_states=config.n_states,
+    n_channels=config.n_channels,
+    trans_prob="sequence",
+    stay_prob=0.9,
     means="zero",
-    covariances=cov,
-    observation_error=observation_error,
+    covariances="random",
     random_seed=123,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
-
-config.n_channels = meg_data.n_channels
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
@@ -83,13 +81,9 @@ history = model.fit(
     save_filepath="tmp/weights",
 )
 
-# Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(prediction_dataset)
-print(f"Free energy: {free_energy}")
-
 # Inferred state mixing factors and state time course
-inf_alpha = model.predict_states(prediction_dataset)
-inf_stc = states.time_courses(inf_alpha)
+inf_alp = model.predict_states(prediction_dataset)
+inf_stc = states.time_courses(inf_alp)
 sim_stc = sim.state_time_course
 
 sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
@@ -100,12 +94,9 @@ print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_
 print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
 
 # Load at the inferred quantized vectors
-vec_quant_layer = model.get_layer("vec_quant")
-alpha_layer = model.get_layer("alpha")
-quantized_vectors = vec_quant_layer.quantized_vectors
-quantized_alpha = alpha_layer(quantized_vectors).numpy()
+quant_alp = model.get_quantized_alpha()
 print("Quantized vectors:")
-print(quantized_alpha)
+print(quant_alp)
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

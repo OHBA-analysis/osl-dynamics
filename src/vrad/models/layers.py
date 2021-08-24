@@ -871,17 +871,36 @@ class VectorQuantizerLayer(layers.Layer):
     vector_dim : int
         Dimensionality of the vectors.
     beta : float
-        Weighting term for the commitment loss. Optional, default is 0.25.
+        Weighting term for the commitment loss.
+    initial_quantized_vectors : np.ndarray
+        Initial values for the quantized vectors.
+    learn_quantized_vectors : bool
+        Should we learn the quantized vectors?
     """
 
-    def __init__(self, n_vectors: int, vector_dim: int, beta: float = 0.25, **kwargs):
+    def __init__(
+        self,
+        n_vectors: int,
+        vector_dim: int,
+        beta: float,
+        initial_quantized_vectors: np.ndarray,
+        learn_quantized_vectors: bool,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.n_vectors = n_vectors
         self.vector_dim = vector_dim
         self.beta = beta
+        self.initial_quantized_vectors = initial_quantized_vectors
+        self.learn_quantized_vectors = learn_quantized_vectors
 
-        # Initializer for the quantised vectors
-        self.quantized_vectors_initializer = tf.random_uniform_initializer()
+        # Initialiser for the quantised vectors
+        if self.initial_quantized_vectors is None:
+            self.quantized_vectors_initializer = tf.random_uniform_initializer()
+        else:
+            self.quantized_vectors_initializer = WeightInitializer(
+                self.initial_quantized_vectors
+            )
 
     def build(self, input_shape):
 
@@ -891,7 +910,7 @@ class VectorQuantizerLayer(layers.Layer):
             shape=(self.vector_dim, self.n_vectors),
             dtype=tf.float32,
             initializer=self.quantized_vectors_initializer,
-            trainable=True,
+            trainable=self.learn_quantized_vectors,
         )
 
         self.built = True
@@ -908,7 +927,7 @@ class VectorQuantizerLayer(layers.Layer):
         quantized = tf.matmul(encodings, self.quantized_vectors, transpose_b=True)
         quantized = tf.reshape(quantized, input_shape)
 
-        # Calculate vector quantization loss and add that to the layer.
+        # Calculate vector quantization loss and add that to the layer
         commitment_loss = self.beta * tf.reduce_mean(
             (tf.stop_gradient(quantized) - inputs) ** 2
         )
@@ -934,3 +953,15 @@ class VectorQuantizerLayer(layers.Layer):
         encoding_indices = tf.argmin(distances, axis=1)
 
         return encoding_indices
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_vectors": self.n_vectors,
+                "vector_dim": self.vector_dim,
+                "beta": self.beta,
+                "learn_quantized_vectors": self.learn_quantized_vectors,
+            }
+        )
+        return config

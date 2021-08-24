@@ -189,7 +189,11 @@ class Config:
     final_alpha_temperature: float = None
     n_alpha_temperature_annealing_epochs: int = None
 
+    # Vector quantisation parameters
     n_quantized_vectors: int = None
+    quantized_vector_beta: float = 0.25
+    initial_quantized_vectors: np.ndarray = None
+    learn_quantized_vectors: bool = True
 
     # Observation model parameters
     learn_means: bool = None

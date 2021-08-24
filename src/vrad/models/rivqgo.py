@@ -3,12 +3,8 @@ quantized latent space.
 
 """
 
-import logging
-from operator import lt
-
 import numpy as np
 from tensorflow.keras import Model, layers
-from tqdm import trange
 from vrad.models.go import GO
 from vrad.models.inf_mod_base import InferenceModelBase
 from vrad.models.layers import (
@@ -23,9 +19,6 @@ from vrad.models.layers import (
     ThetaActivationLayer,
     VectorQuantizerLayer,
 )
-from vrad.utils.misc import check_arguments
-
-_logger = logging.getLogger("VRAD")
 
 
 class RIVQGO(InferenceModelBase, GO):
@@ -44,6 +37,20 @@ class RIVQGO(InferenceModelBase, GO):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def get_quantized_alpha(self) -> np.ndarray:
+        """Inferred quantized alpha vectors.
+
+        Returns
+        -------
+        np.ndarray
+            Quantized alpha vectors. Shape is (n_vectors, vector_dim).
+        """
+        vec_quant_layer = self.model.get_layer("quant_theta_norm")
+        alpha_layer = self.model.get_layer("alpha")
+        quantized_vectors = vec_quant_layer.quantized_vectors
+        quantized_alpha = alpha_layer(quantized_vectors).numpy()
+        return quantized_alpha
 
 
 def _model_structure(config):
@@ -80,10 +87,13 @@ def _model_structure(config):
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
-    vec_quant_layer = VectorQuantizerLayer(
+    quant_theta_norm_layer = VectorQuantizerLayer(
         config.n_quantized_vectors,
         config.n_states,
-        name="vec_quant",
+        config.quantized_vector_beta,
+        config.initial_quantized_vectors,
+        config.learn_quantized_vectors,
+        name="quant_theta_norm",
     )
     alpha_layer = ThetaActivationLayer(
         config.alpha_xform,
@@ -99,7 +109,7 @@ def _model_structure(config):
     inf_sigma = inf_sigma_layer(inference_output)
     theta = theta_layer([inf_mu, inf_sigma])
     theta_norm = theta_norm_layer(theta)
-    quant_theta_norm = vec_quant_layer(theta_norm)
+    quant_theta_norm = quant_theta_norm_layer(theta_norm)
     alpha = alpha_layer(quant_theta_norm)
 
     # Observation model:
@@ -139,7 +149,7 @@ def _model_structure(config):
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
-        config.model_dropout_rate, name="theta_norm_drop"
+        config.model_dropout_rate, name="quant_theta_norm_drop"
     )
     model_output_layers = ModelRNNLayers(
         config.model_rnn,
@@ -157,7 +167,7 @@ def _model_structure(config):
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 
     # Data flow
-    model_input_dropout = model_input_dropout_layer(theta_norm)
+    model_input_dropout = model_input_dropout_layer(quant_theta_norm)
     model_output = model_output_layers(model_input_dropout)
     mod_mu = mod_mu_layer(model_output)
     mod_sigma = mod_sigma_layer(model_output)
