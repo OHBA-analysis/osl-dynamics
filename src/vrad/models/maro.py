@@ -88,19 +88,8 @@ def _model_structure(config):
         config.learn_covs,
         name="coeffs_covs",
     )
-    mix_coeffs_covs_layer = MixCoeffsCovsLayer(
-        config.n_states,
-        config.n_channels,
-        config.sequence_length,
-        config.n_lags,
-        name="mix_coeffs_covs",
-    )
-    mar_means_covs_layer = MARMeansCovsLayer(
-        config.n_channels,
-        config.sequence_length,
-        config.n_lags,
-        name="means_covs",
-    )
+    mix_coeffs_covs_layer = MixCoeffsCovsLayer(name="mix_coeffs_covs")
+    mar_means_covs_layer = MARMeansCovsLayer(config.n_lags, name="means_covs")
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
     # Data flow

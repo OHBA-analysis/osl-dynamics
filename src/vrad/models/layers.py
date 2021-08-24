@@ -768,33 +768,7 @@ class CoeffsCovsLayer(layers.Layer):
 
 
 class MixCoeffsCovsLayer(layers.Layer):
-    """Mixes the MAR coefficients and covariances.
-
-    Parameters
-    ----------
-    n_states : int
-        Number of states.
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Sequence length.
-    n_lags : int
-        Number of lags.
-    """
-
-    def __init__(
-        self,
-        n_states: int,
-        n_channels: int,
-        sequence_length: int,
-        n_lags: int,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.n_states = n_states
-        self.n_channels = n_channels
-        self.sequence_length = sequence_length
-        self.n_lags = n_lags
+    """Mixes the MAR coefficients and covariances."""
 
     def call(self, inputs, **kwargs):
 
@@ -831,36 +805,18 @@ class MixCoeffsCovsLayer(layers.Layer):
 
         return coeffs_lt, cov_t
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_states": self.n_states,
-                "n_channels": self.n_channels,
-                "sequence_length": self.sequence_length,
-                "n_lags": self.n_lags,
-            }
-        )
-        return config
-
 
 class MARMeansCovsLayer(layers.Layer):
     """Calculates the time-vaying mean and covariance for observing MAR data.
 
     Parameters
     ----------
-    n_channels : int
-        Number of channels.
-    sequence_length : int
-        Sequence length.
     n_lags : int
         Number of lags.
     """
 
-    def __init__(self, n_channels: int, sequence_length: int, n_lags: int, **kwargs):
+    def __init__(self, n_lags: int, **kwargs):
         super().__init__(**kwargs)
-        self.n_channels = n_channels
-        self.sequence_length = sequence_length
         self.n_lags = n_lags
 
     def call(self, inputs, **kwargs):
@@ -901,11 +857,5 @@ class MARMeansCovsLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update(
-            {
-                "n_channels": self.n_channels,
-                "sequence_length": self.sequence_length,
-                "n_lags": self.n_lags,
-            }
-        )
+        config.update({"n_lags": self.n_lags})
         return config
