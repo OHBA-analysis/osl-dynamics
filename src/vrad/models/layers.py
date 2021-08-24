@@ -5,7 +5,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, constraints, layers
+from tensorflow.keras import activations, layers
 from vrad.inference.functions import (
     cholesky_factor,
     cholesky_factor_to_full_matrix,
@@ -55,14 +55,8 @@ class DummyLayer(layers.Layer):
     Returns the inputs without modification.
     """
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def call(self, inputs, **kwargs):
         return inputs
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
 
 
 class TrainableVariablesLayer(layers.Layer):
@@ -121,9 +115,6 @@ class TrainableVariablesLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         return self.activation(self.values)
 
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape(self.shape)
-
     def get_config(self):
         config = super().get_config()
         config.update(
@@ -142,9 +133,6 @@ class SampleNormalDistributionLayer(layers.Layer):
     outputs samples from a normal distribution.
     """
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def call(self, inputs, training=None, **kwargs):
         mu, sigma = inputs
         if training:
@@ -152,10 +140,6 @@ class SampleNormalDistributionLayer(layers.Layer):
             return N.sample()
         else:
             return mu
-
-    def compute_output_shape(self, input_shape):
-        mu_shape, sigma_shape = input_shape
-        return mu_shape
 
 
 class SampleDirichletDistributionLayer(layers.Layer):
@@ -165,9 +149,6 @@ class SampleDirichletDistributionLayer(layers.Layer):
     outputs a sample.
     """
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def call(self, concentration, training=None, **kwargs):
         if training:
             D = tfp.distributions.Dirichlet(concentration)
@@ -176,9 +157,6 @@ class SampleDirichletDistributionLayer(layers.Layer):
             sum_concentration = tf.reduce_sum(concentration, axis=-1)
             sum_concentration = tf.expand_dims(sum_concentration, axis=-1)
             return tf.divide(concentration, sum_concentration)
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
 
 
 class ThetaActivationLayer(layers.Layer):
@@ -242,9 +220,6 @@ class ThetaActivationLayer(layers.Layer):
             alpha = gumbel_softmax_distribution.sample()
 
         return alpha
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
 
     def get_config(self):
         config = super().get_config()
@@ -356,6 +331,7 @@ class MeansCovsLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
+
         # Calculate the covariance matrix from the cholesky factor
         cholesky_covariances = tfp.math.fill_triangular(
             self.flattened_cholesky_covariances
@@ -367,12 +343,6 @@ class MeansCovsLayer(layers.Layer):
             self.covariances = trace_normalize(self.covariances)
 
         return [self.means, self.covariances]
-
-    def compute_output_shape(self, input_shape):
-        return [
-            tf.TensorShape([self.n_states, self.n_channels]),
-            tf.TensorShape([self.n_states, self.n_channels, self.n_channels]),
-        ]
 
     def get_config(self):
         config = super().get_config()
@@ -454,10 +424,6 @@ class MixMeansCovsLayer(layers.Layer):
 
         return [m, C]
 
-    def compute_output_shape(self, input_shape):
-        alpha_t_shape, mu_shape, D_shape = input_shape
-        return [mu_shape, D_shape]
-
     def get_config(self):
         config = super().get_config()
         config.update(
@@ -476,9 +442,6 @@ class LogLikelihoodLayer(layers.Layer):
     The negative log-likelihood is calculated assuming a multivariate normal
     probability density.
     """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def call(self, inputs):
         x, mu, sigma = inputs
@@ -500,15 +463,9 @@ class LogLikelihoodLayer(layers.Layer):
 
         return tf.expand_dims(nll_loss, axis=-1)
 
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape([1])
-
 
 class NormalKLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two Normal distributions."""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
@@ -535,15 +492,9 @@ class NormalKLDivergenceLayer(layers.Layer):
 
         return tf.expand_dims(kl_loss, axis=-1)
 
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape([1])
-
 
 class DirichletKLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two Dirichlet distributions."""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def call(self, inputs, **kwargs):
         inference_concentration, model_concentration = inputs
@@ -563,9 +514,6 @@ class DirichletKLDivergenceLayer(layers.Layer):
         kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
         return tf.expand_dims(kl_loss, axis=-1)
-
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape([1])
 
 
 class InferenceRNNLayers(layers.Layer):
@@ -618,10 +566,6 @@ class InferenceRNNLayers(layers.Layer):
             inputs = layer(inputs, **kwargs)
         return inputs
 
-    def compute_output_shape(self, input_shape):
-        # we multiply self.n_units by 2 because we're using a bidirectional RNN
-        return tf.TensorShape(input_shape.as_list()[:-1] + [2 * self.n_units])
-
     def get_config(self):
         config = super().get_config()
         config.update({"n_units": self.n_units})
@@ -673,9 +617,6 @@ class ModelRNNLayers(layers.Layer):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
-
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape(input_shape.as_list()[:-1] + [self.n_units])
 
     def get_config(self):
         config = super().get_config()
@@ -769,6 +710,7 @@ class CoeffsCovsLayer(layers.Layer):
             )
 
     def build(self, input_shape):
+
         # Create weights for the MAR coefficients
         self.coeffs = self.add_weight(
             "coeffs",
@@ -809,14 +751,6 @@ class CoeffsCovsLayer(layers.Layer):
             covs = cholesky_factor_to_full_matrix(cholesky_covs)
 
         return [self.coeffs, covs]
-
-    def compute_output_shape(self, input_shape):
-        return [
-            tf.TensorShape(
-                [self.n_states, self.n_lags, self.n_channels, self.n_channels]
-            ),
-            tf.TensorShape([self.n_states, self.n_channels, self.n_channels]),
-        ]
 
     def get_config(self):
         config = super().get_config()
@@ -863,6 +797,7 @@ class MixCoeffsCovsLayer(layers.Layer):
         self.n_lags = n_lags
 
     def call(self, inputs, **kwargs):
+
         # Input data:
         # - alpha_jt.shape = (None, sequence_length, n_states)
         # - coeffs_jl.shape = (n_states, n_lags, n_channels, n_channels)
@@ -895,27 +830,6 @@ class MixCoeffsCovsLayer(layers.Layer):
         cov_t = tf.reduce_sum(tf.multiply(alpha2_jt, cov_j), axis=2)
 
         return coeffs_lt, cov_t
-
-    def compute_output_shape(self, input_shape):
-        return [
-            tf.TensorShape(
-                [
-                    None,
-                    self.sequence_length,
-                    self.n_lags,
-                    self.n_channels,
-                    self.n_channels,
-                ]
-            ),
-            tf.TensorShape(
-                [
-                    None,
-                    self.sequence_length,
-                    self.n_channels,
-                    self.n_channels,
-                ]
-            ),
-        ]
 
     def get_config(self):
         config = super().get_config()
@@ -950,6 +864,7 @@ class MARMeansCovsLayer(layers.Layer):
         self.n_lags = n_lags
 
     def call(self, inputs, **kwargs):
+
         # Input data:
         # - data.shape = (None, sequence_length, n_channels)
         # - coeffs_lt.shape = (None, sequence_length, n_lags, n_channels, n_channels)
@@ -983,32 +898,6 @@ class MARMeansCovsLayer(layers.Layer):
         sigma_t = sigma_t[:, self.n_lags : -1]
 
         return x_t, mu_t, sigma_t
-
-    def compute_output_shape(self, input_shape):
-        return [
-            tf.TensorShape(
-                [
-                    None,
-                    self.sequence_length - self.n_lags - 1,
-                    self.n_channels,
-                ]
-            ),
-            tf.TensorShape(
-                [
-                    None,
-                    self.sequence_length - self.n_lags - 1,
-                    self.n_channels,
-                ]
-            ),
-            tf.TensorShape(
-                [
-                    None,
-                    self.sequence_length - self.n_lags - 1,
-                    self.n_channels,
-                    self.n_channels,
-                ]
-            ),
-        ]
 
     def get_config(self):
         config = super().get_config()

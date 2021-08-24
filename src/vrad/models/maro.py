@@ -40,7 +40,7 @@ class MARO(ObservationModelBase):
         -------
         coeffs : np.ndarray
             MAR coefficients. Shape is (n_states, n_lags, n_channels, n_channels).
-        cov : np.ndarray
+        covs : np.ndarray
             Mar covariance. Shape is (n_states, n_channels, n_channels).
         """
         coeffs_covs_layer = self.model.get_layer("coeffs_covs")
