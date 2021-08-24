@@ -189,6 +189,8 @@ class Config:
     final_alpha_temperature: float = None
     n_alpha_temperature_annealing_epochs: int = None
 
+    n_quantized_vectors: int = None
+
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None

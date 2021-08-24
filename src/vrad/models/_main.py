@@ -7,6 +7,7 @@ from vrad.models.maro import MARO
 from vrad.models.ridgo import RIDGO
 from vrad.models.rigo import RIGO
 from vrad.models.rimaro import RIMARO
+from vrad.models.rivqgo import RIVQGO
 
 
 def Model(config):
@@ -35,7 +36,10 @@ def Model(config):
     if config.observation_model == "multivariate_normal":
 
         if config.alpha_pdf == "normal":
-            return RIGO(config)
+            if config.n_quantized_vectors is not None:
+                return RIVQGO(config)
+            else:
+                return RIGO(config)
 
         elif config.alpha_pdf == "dirichlet":
             return RIDGO(config)
@@ -43,7 +47,10 @@ def Model(config):
     elif config.observation_model == "multivariate_autoregressive":
 
         if config.alpha_pdf == "normal":
-            return RIMARO(config)
+            if config.n_quantized_vectors is not None:
+                raise NotImplementedError("Requested config not available.")
+            else:
+                return RIMARO(config)
 
         elif config.alpha_pdf == "dirichlet":
             raise NotImplementedError("Requested config not available.")

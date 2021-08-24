@@ -859,3 +859,78 @@ class MARMeansCovsLayer(layers.Layer):
         config = super().get_config()
         config.update({"n_lags": self.n_lags})
         return config
+
+
+class VectorQuantizerLayer(layers.Layer):
+    """Layer to perform vector quantization.
+
+    Parameters
+    ----------
+    n_vectors : int
+        Number of vectors.
+    vector_dim : int
+        Dimensionality of the vectors.
+    beta : float
+        Weighting term for the commitment loss. Optional, default is 0.25.
+    """
+
+    def __init__(self, n_vectors: int, vector_dim: int, beta: float = 0.25, **kwargs):
+        super().__init__(**kwargs)
+        self.n_vectors = n_vectors
+        self.vector_dim = vector_dim
+        self.beta = beta
+
+        # Initializer for the quantised vectors
+        self.quantized_vectors_initializer = tf.random_uniform_initializer()
+
+    def build(self, input_shape):
+
+        # Trainable weights for the quantised vectors
+        self.quantized_vectors = self.add_weight(
+            "quantized_vectors",
+            shape=(self.vector_dim, self.n_vectors),
+            dtype=tf.float32,
+            initializer=self.quantized_vectors_initializer,
+            trainable=True,
+        )
+
+        self.built = True
+
+    def call(self, inputs):
+        input_shape = tf.shape(inputs)
+
+        # Flatten the inputs keeping vector_dim intact
+        flattened = tf.reshape(inputs, [-1, self.vector_dim])
+
+        # Quantization
+        encoding_indices = self.get_code_indices(flattened)
+        encodings = tf.one_hot(encoding_indices, self.n_vectors)
+        quantized = tf.matmul(encodings, self.quantized_vectors, transpose_b=True)
+        quantized = tf.reshape(quantized, input_shape)
+
+        # Calculate vector quantization loss and add that to the layer.
+        commitment_loss = self.beta * tf.reduce_mean(
+            (tf.stop_gradient(quantized) - inputs) ** 2
+        )
+        codebook_loss = tf.reduce_mean((quantized - tf.stop_gradient(inputs)) ** 2)
+        self.add_loss(commitment_loss + codebook_loss)
+
+        # Straight-through estimator
+        quantized = inputs + tf.stop_gradient(quantized - inputs)
+
+        return quantized
+
+    def get_code_indices(self, flattened_inputs):
+
+        # Calculate L2-normalized distance between the inputs and the codes
+        similarity = tf.matmul(flattened_inputs, self.quantized_vectors)
+        distances = (
+            tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
+            + tf.reduce_sum(self.quantized_vectors ** 2, axis=0)
+            - 2 * similarity
+        )
+
+        # Derive the indices for minimum distances
+        encoding_indices = tf.argmin(distances, axis=1)
+
+        return encoding_indices
