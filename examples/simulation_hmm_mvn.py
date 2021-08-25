@@ -1,6 +1,6 @@
-"""Example script for running inference on simulated HSMM data.
+"""Example script for running inference on simulated HMM-MVN data.
 
-- Should achieve a dice coefficient of ~0.99.
+- Should achieve a dice coefficient of ~0.96.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -9,7 +9,6 @@ import numpy as np
 from vrad import data, files, simulation
 from vrad.inference import metrics, states, tf_ops
 from vrad.models import Config, Model
-from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -17,8 +16,6 @@ tf_ops.gpu_growth()
 # Settings
 n_samples = 25600
 observation_error = 0.2
-gamma_shape = 10
-gamma_scale = 5
 
 config = Config(
     n_states=5,
@@ -31,27 +28,27 @@ config = Config(
     model_normalization="layer",
     theta_normalization=None,
     alpha_xform="softmax",
-    learn_alpha_temperature=False,
-    initial_alpha_temperature=0.25,
+    learn_alpha_temperature=True,
+    initial_alpha_temperature=1.0,
     learn_covariances=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=50,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=100,
 )
 
-# Load covariances for each state
+# Load state transition probability matrix and covariances of each state
+trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
 cov = np.load(files.example.path / "hmm_cov.npy")
 
 # Simulate data
 print("Simulating data")
-sim = simulation.HSMM_MVN(
+sim = simulation.HMM_MVN(
     n_samples=n_samples,
-    gamma_shape=gamma_shape,
-    gamma_scale=gamma_scale,
+    trans_prob=trans_prob,
     means="zero",
     covariances=cov,
     observation_error=observation_error,
@@ -64,10 +61,14 @@ config.n_channels = meg_data.n_channels
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=True
+    config.sequence_length,
+    config.batch_size,
+    shuffle=True,
 )
 prediction_dataset = meg_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=False
+    config.sequence_length,
+    config.batch_size,
+    shuffle=False,
 )
 
 # Build model
@@ -79,7 +80,7 @@ history = model.fit(
     training_dataset,
     epochs=config.n_epochs,
     save_best_after=config.n_kl_annealing_epochs,
-    save_filepath="tmp/model",
+    save_filepath="tmp/weights",
 )
 
 # Free energy = Log Likelihood - KL Divergence
@@ -94,24 +95,9 @@ sim_stc = sim.state_time_course
 sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
-# Sample from the model RNN
-mod_alpha = model.sample_alpha(n_samples=20000)
-mod_stc = states.time_courses(mod_alpha)
-
-# Plot lifetime distributions for the ground truth, inferred state time course
-# and sampled state time course
-plotting.plot_state_lifetimes(sim_stc, filename="sim_lt.png")
-plotting.plot_state_lifetimes(inf_stc, filename="inf_lt.png")
-plotting.plot_state_lifetimes(mod_stc, filename="mod_lt.png")
-
-# Compare lifetime statistics
-sim_lt_mean, sim_lt_std = metrics.lifetime_statistics(sim_stc)
-inf_lt_mean, inf_lt_std = metrics.lifetime_statistics(inf_stc)
-mod_lt_mean, mod_lt_std = metrics.lifetime_statistics(mod_stc)
-
-print("Lifetime mean (Simulation):", sim_lt_mean)
-print("Lifetime mean (Inferred):  ", inf_lt_mean)
-print("Lifetime mean (Sample):    ", mod_lt_mean)
+# Fractional occupancies
+print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

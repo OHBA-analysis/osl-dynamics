@@ -1,6 +1,5 @@
 """Example script for running inference on simulated HMM-MAR data.
 
-- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")

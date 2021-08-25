@@ -144,6 +144,9 @@ class Manipulation:
         if n_pca_components is not None and pca_components is not None:
             raise ValueError("Please only pass n_pca_components or pca_components.")
 
+        if pca_components is not None and not isinstance(pca_components, np.ndarray):
+            raise ValueError("pca_components must be a numpy array.")
+
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
 

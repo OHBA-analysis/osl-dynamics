@@ -1,6 +1,5 @@
-"""Example script for fitting the observation model to HMM data.
+"""Example script for fitting a multivariate normal observation model to data.
 
-- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")

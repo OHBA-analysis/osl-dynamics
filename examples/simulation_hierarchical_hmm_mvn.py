@@ -1,7 +1,5 @@
-"""Example script for running inference on simulated HMM-MVN data.
+"""Example script for running inference on a hierarchical HMM simulation.
 
-- Should achieve a dice coefficient of ~0.98.
-- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
@@ -19,6 +17,7 @@ observation_error = 0.2
 
 config = Config(
     n_states=5,
+    n_channels=80,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=64,
@@ -28,8 +27,8 @@ config = Config(
     model_normalization="layer",
     theta_normalization=None,
     alpha_xform="softmax",
-    learn_alpha_temperature=False,
-    initial_alpha_temperature=0.25,
+    learn_alpha_temperature=True,
+    initial_alpha_temperature=1.0,
     learn_covariances=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
@@ -41,30 +40,59 @@ config = Config(
 )
 
 # Load state transition probability matrix and covariances of each state
-trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
 cov = np.load(files.example.path / "hmm_cov.npy")
 
+top_level_trans_prob = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
+bottom_level_trans_probs = [
+    np.array(
+        [
+            [0.6, 0.1, 0.1, 0.1, 0.1],
+            [0.1, 0.6, 0.1, 0.1, 0.1],
+            [0.1, 0.1, 0.6, 0.1, 0.1],
+            [0.1, 0.1, 0.1, 0.6, 0.1],
+            [0.1, 0.1, 0.1, 0.1, 0.6],
+        ]
+    ),
+    np.array(
+        [
+            [0.9, 0.1, 0, 0, 0],
+            [0, 0.9, 0.1, 0, 0],
+            [0, 0, 0.9, 0.1, 0],
+            [0, 0, 0, 0.9, 0.1],
+            [0.1, 0, 0, 0, 0.9],
+        ]
+    ),
+    np.array(
+        [
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.2, 0.2],
+        ]
+    ),
+]
 # Simulate data
 print("Simulating data")
-sim = simulation.HMM_MVN(
+sim = simulation.HierarchicalHMM_MVN(
     n_samples=n_samples,
-    trans_prob=trans_prob,
+    top_level_trans_prob=top_level_trans_prob,
+    bottom_level_trans_probs=bottom_level_trans_probs,
     means="zero",
     covariances=cov,
     observation_error=observation_error,
-    random_seed=123,
+    top_level_random_seed=123,
+    bottom_level_random_seeds=[124, 126, 127],
+    data_random_seed=555,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
-config.n_channels = meg_data.n_channels
+config.n_channel = meg_data.n_channels
 
 # Prepare dataset
-training_dataset, validation_dataset = meg_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-    validation_split=0.1,
+training_dataset = meg_data.dataset(
+    config.sequence_length, config.batch_size, shuffle=True
 )
 prediction_dataset = meg_data.dataset(
     config.sequence_length,
@@ -82,7 +110,6 @@ history = model.fit(
     epochs=config.n_epochs,
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
-    validation_data=validation_dataset,
 )
 
 # Free energy = Log Likelihood - KL Divergence

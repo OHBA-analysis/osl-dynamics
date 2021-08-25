@@ -1,3 +1,7 @@
+"""Example script for inferring parameters of a MAR observation model.
+
+"""
+
 print("Setting up")
 import numpy as np
 from vrad import data, simulation
