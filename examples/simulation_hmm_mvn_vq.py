@@ -82,7 +82,7 @@ history = model.fit(
 )
 
 # Inferred state mixing factors and state time course
-inf_alp = model.predict_states(prediction_dataset)
+inf_alp = model.get_alpha(prediction_dataset)
 inf_stc = states.time_courses(inf_alp)
 sim_stc = sim.state_time_course
 

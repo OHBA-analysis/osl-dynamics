@@ -125,7 +125,7 @@ model.summary()
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Get our inferred parameters
-alpha = model.predict_states(prediction_dataset)
+alpha = model.get_alpha(prediction_dataset)
 covz = model.get_covariances()
 kl = history.history["kl_loss"]
 ll = history.history["ll_loss"]

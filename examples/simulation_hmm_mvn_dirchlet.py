@@ -86,7 +86,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time course
-inf_alpha = model.predict_states(prediction_dataset)
+inf_alpha = model.get_alpha(prediction_dataset)
 inf_stc = states.time_courses(inf_alpha)
 sim_stc = sim.state_time_course
 

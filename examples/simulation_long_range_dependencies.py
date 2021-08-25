@@ -100,7 +100,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # VRAD inferred alpha
-inf_alp = model.predict_states(prediction_dataset)
+inf_alp = model.get_alpha(prediction_dataset)
 
 # State time courses
 sim_stc = sim.state_time_course

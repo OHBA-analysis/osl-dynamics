@@ -229,7 +229,7 @@ class InferenceModelBase:
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
-    def predict_states(
+    def get_alpha(
         self, inputs, *args, concatenate: bool = False, **kwargs
     ) -> Union[list, np.ndarray]:
         """State mixing factors, alpha.

@@ -160,7 +160,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Compare the inferred state time course to the ground truth
-alpha = model.predict_states(prediction_dataset)
+alpha = model.get_alpha(prediction_dataset)
 inferred_covz = model.get_covariances()
 
 # Match inferred and ground truth covariances/alphas for visulaisation

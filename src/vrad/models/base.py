@@ -229,7 +229,7 @@ class Base:
 
     def get_all_model_info(self, prediction_dataset, file=None):
         # Inferred state mixing factors and state time courses
-        alpha = self.predict_states(prediction_dataset)
+        alpha = self.get_alpha(prediction_dataset)
         history = self.history.history
 
         info = dict(

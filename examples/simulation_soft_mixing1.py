@@ -90,7 +90,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred alpha and state time course
-inf_alp = model.predict_states(prediction_dataset)
+inf_alp = model.get_alpha(prediction_dataset)
 sim_stc, inf_stc = states.match_states(sim_stc, inf_alp)
 
 # Compare the inferred state time course to the ground truth
