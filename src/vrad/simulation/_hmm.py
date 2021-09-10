@@ -77,14 +77,12 @@ class HMM:
                     "trans_prob must be a np.array, 'sequence' or 'uniform'."
                 )
 
-            if n_states < 2:
-                raise ValueError(
-                    "n_states must be greater than one if we are constructing "
-                    + "a transition probability matrix."
-                )
+            # Special case of there being only one state
+            if n_states == 1:
+                self.trans_prob = np.ones([1, 1])
 
             # Sequential transition probability matrix
-            if trans_prob == "sequence":
+            elif trans_prob == "sequence":
                 if stay_prob is None or n_states is None:
                     raise ValueError(
                         "If trans_prob is 'sequence', stay_prob and n_states "
