@@ -3,7 +3,6 @@
 """
 
 from vrad.data.manipulation import standardize
-from vrad.utils import plotting
 
 
 class Simulation:
@@ -37,18 +36,3 @@ class Simulation:
 
     def standardize(self):
         self.time_series = standardize(self.time_series, axis=0)
-
-    def plot_data(self, n_points: int = 1000, filename: str = None):
-        """Method for plotting simulated data.
-
-        Parameters
-        ----------
-        n_points : int
-            Number of time points to plot.
-        filename : str
-            Filename to save plot to.
-        """
-        n_points = min(n_points, self.n_samples)
-        plotting.plot_time_series(
-            self.time_series, n_samples=n_points, filename=filename
-        )
