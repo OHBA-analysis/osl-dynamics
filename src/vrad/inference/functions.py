@@ -30,20 +30,20 @@ def cholesky_factor_to_full_matrix(cholesky_factor: tf.Tensor):
     ----------
     cholesky_factor : tf.Tensor
         Cholesky factor of the matrix. Only the lower triangle of this tensor is used.
-        Shape is (None, n_states, n_channels, n_channels).
 
     Returns
     -------
     tf.Tensor
-        The full matrix calculated from the cholesky factor. Shape is
-        (None, n_states, n_channels, n_channels).
+        The full matrix calculated from the cholesky factor.
     """
     # The upper triangle is trainable but we should zero it because the array
     # is the cholesky factor of the full covariance
     cholesky_factor = tf.linalg.band_part(cholesky_factor, -1, 0)
 
     # Calculate the full matrix
-    full_matrix = tf.matmul(cholesky_factor, tf.transpose(cholesky_factor, (0, 2, 1)))
+    full_matrix = tf.matmul(
+        cholesky_factor, tf.linalg.matrix_transpose(cholesky_factor)
+    )
 
     # Add a more error to the diagonal to ensure matrix is positive semi-definite
     full_matrix += 1e-6 * tf.eye(full_matrix.shape[-1])

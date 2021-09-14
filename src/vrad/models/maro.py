@@ -13,6 +13,7 @@ from vrad.models.layers import (
     LogLikelihoodLayer,
 )
 from vrad.models.obs_mod_base import ObservationModelBase
+from vrad.simulation import MAR
 
 
 class MARO(ObservationModelBase):
@@ -41,7 +42,7 @@ class MARO(ObservationModelBase):
         coeffs : np.ndarray
             MAR coefficients. Shape is (n_states, n_lags, n_channels, n_channels).
         covs : np.ndarray
-            Mar covariance. Shape is (n_states, n_channels, n_channels).
+            MAR covariances. Shape is (n_states, n_channels, n_channels).
         """
         coeffs_covs_layer = self.model.get_layer("coeffs_covs")
 
@@ -54,6 +55,7 @@ class MARO(ObservationModelBase):
                     for c in coeffs_covs_layer.diagonal_covs.numpy()
                 ]
             )
+            covs = covs ** 2  # the model learns the standard deviations
         else:
             cholesky_covs = tfp.math.fill_triangular(
                 coeffs_covs_layer.flattened_cholesky_covs
@@ -61,6 +63,23 @@ class MARO(ObservationModelBase):
             covs = cholesky_factor_to_full_matrix(cholesky_covs).numpy()
 
         return coeffs, covs
+
+    def sample(self, alpha: np.ndarray) -> np.ndarray:
+        """Samples from the generative model.
+
+        Parameters
+        ----------
+        alpha : np.ndarray
+            State mixing factors. Shape must be (n_samples, n_states).
+
+        Returns
+        -------
+        np.ndarray
+            Sampled time series.
+        """
+        coeffs, covs = self.get_params()
+        mar = MAR(coeffs, covs)
+        return mar.simulate_data(alpha)
 
 
 def _model_structure(config):
@@ -72,7 +91,7 @@ def _model_structure(config):
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
     #      - mu_t = Sum_j Sum_l alpha_jt coeffs_jlt x_{t-l}.
-    #      - sigma_t = Sum_j alpha^2_jt cov_j, where cov_j is a learnable
+    #      - sigma_t = Sum_j alpha_jt cov_j, where cov_j is a learnable
     #        diagonal covariance matrix.
     # - We calculate the likelihood of generating the training data with alpha_jt
     #   and the observation model.
@@ -86,11 +105,12 @@ def _model_structure(config):
         config.initial_covs,
         config.learn_coeffs,
         config.learn_covs,
+        config.diag_covs,
         name="coeffs_covs",
     )
-    mix_coeffs_covs_layer = MixCoeffsCovsLayer(name="mix_coeffs_covs")
+    mix_coeffs_covs_layer = MixCoeffsCovsLayer(config.diag_covs, name="mix_coeffs_covs")
     mar_means_covs_layer = MARMeansCovsLayer(config.n_lags, name="means_covs")
-    ll_loss_layer = LogLikelihoodLayer(name="ll")
+    ll_loss_layer = LogLikelihoodLayer(config.diag_covs, name="ll")
 
     # Data flow
     coeffs_jl, covs_j = coeffs_covs_layer(data)  # data not used

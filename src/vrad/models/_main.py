@@ -4,6 +4,7 @@
 
 from vrad.models.go import GO
 from vrad.models.maro import MARO
+from vrad.models.cnno import CNNO
 from vrad.models.ridgo import RIDGO
 from vrad.models.rigo import RIGO
 from vrad.models.rimaro import RIMARO
@@ -32,6 +33,9 @@ def Model(config):
 
         elif config.observation_model == "multivariate_autoregressive":
             return MARO(config)
+
+        elif config.observation_model == "conv_net":
+            return CNNO(config)
 
     if config.observation_model == "multivariate_normal":
 
