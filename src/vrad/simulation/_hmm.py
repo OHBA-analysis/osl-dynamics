@@ -7,7 +7,7 @@ from typing import Union
 
 import numpy as np
 from vrad.array_ops import get_one_hot
-from vrad.simulation import MAR, MVN, Simulation
+from vrad.simulation import MAR, MVN, SingleSine, Simulation
 
 _logger = logging.getLogger("VRAD")
 
@@ -409,3 +409,83 @@ class HierarchicalHMM_MVN(Simulation):
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...
         ]
+
+
+class HMM_Sine(Simulation):
+    """Simulate an HMM with sine waves as the observation model.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    amplitudes : np.ndarray
+        Amplitude for the sine wave for each state and channel.
+        Shape must be (n_states, n_channels).
+    frequenices : np.ndarray
+        Frequency for the sine wave for each state and channel.
+        Shape must be (n_states, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hertz.
+    covariances : np.ndarray
+        Covariances for each state. Shape must be (n_states, n_channels)
+        or (n_states, n_channels, n_channels).
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+        Optional.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for random number generator. Optional.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str, None],
+        amplitudes: np.ndarray,
+        frequencies: np.ndarray,
+        sampling_frequency: float,
+        covariances: np.ndarray = None,
+        stay_prob: float = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+    ):
+        # Observation model
+        self.obs_mod = SingleSine(
+            amplitudes=amplitudes,
+            frequencies=frequencies,
+            sampling_frequency=sampling_frequency,
+            covariances=covariances,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
+
+        # HMM object
+        # N.b. we use a different random seed to the observation model
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_states=self.n_states,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = self.hmm.generate_states(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hmm):
+            return getattr(self.hmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
