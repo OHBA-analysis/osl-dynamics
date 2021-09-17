@@ -14,6 +14,8 @@ from vrad.inference.functions import (
 )
 from vrad.inference.initializers import WeightInitializer
 
+tfb = tfp.bijectors
+
 
 def NormalizationLayer(norm_type: str, *args, **kwargs):
     """Returns a normalization layer.
@@ -308,6 +310,8 @@ class MeansCovsLayer(layers.Layer):
             tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
         )
 
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
     def build(self, input_shape):
 
         # Create weights the means
@@ -333,10 +337,12 @@ class MeansCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
 
         # Calculate the covariance matrix from the cholesky factor
-        cholesky_covariances = tfp.math.fill_triangular(
-            self.flattened_cholesky_covariances
-        )
-        self.covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+        # cholesky_covariances = tfp.math.fill_triangular(
+        #     self.flattened_cholesky_covariances
+        # )
+        # self.covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
+
+        self.covariances = self.bijector(self.flattened_cholesky_covariances)
 
         # Normalise the covariance
         if self.normalize_covariances:
