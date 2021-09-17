@@ -3,7 +3,7 @@ import pathlib
 import pickle
 from os import listdir, path
 from shutil import rmtree
-from typing import Union
+from typing import Tuple, Union
 
 import mat73
 import numpy as np
@@ -39,6 +39,7 @@ class IO:
         sampling_frequency: float,
         store_dir: str,
         time_axis_first: bool,
+        keep_memmaps_on_close: bool = False,
     ):
         # Validate inputs
         if isinstance(inputs, str):
@@ -72,12 +73,16 @@ class IO:
         if len(self.inputs) == 0:
             raise ValueError("No valid inputs were passed.")
 
+        self.keep_memmaps_on_close = keep_memmaps_on_close
+
         # Directory to store memory maps created by this class
         self.store_dir = pathlib.Path(store_dir)
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load and validate the raw data
-        self.raw_data_memmaps = self.load_raw_data(data_field, time_axis_first)
+        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data(
+            data_field, time_axis_first
+        )
         self.validate_data()
 
         # Get data prepration attributes if the raw data has been prepared
@@ -91,9 +96,20 @@ class IO:
         # Use raw data for the subject data
         self.subjects = self.raw_data_memmaps
 
-    def delete_dir(self):
-        """Deletes the directory that stores the memory maps."""
-        rmtree(self.store_dir, ignore_errors=True)
+    def delete_io_dir(self):
+        """Deletes memmaps and removes store_dir if empty."""
+        for filename in self.raw_data_filenames:
+            pathlib.Path(filename).unlink(missing_ok=True)
+        if not any(self.store_dir.iterdir()):
+            # Delete directory if it's not empty
+            self.store_dir.rmdir()
+        self.raw_data_memmaps = None
+        self.raw_data_filenames = None
+
+    def __del__(self):
+        print("Cleaning IO")
+        if not self.keep_memmaps_on_close:
+            self.delete_io_dir()
 
     def load_preparation(self, inputs: str):
         """Loads a pickle file containing preparation settings.
@@ -112,7 +128,9 @@ class IO:
                     self.n_pca_components = preparation["pca_components"].shape[1]
                     self.prepared = True
 
-    def load_raw_data(self, data_field: str, time_axis_first: bool) -> list:
+    def load_raw_data(
+        self, data_field: str, time_axis_first: bool
+    ) -> Tuple[list, list]:
         """Import data into a list of memory maps.
 
         Parameters
@@ -131,7 +149,7 @@ class IO:
         raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
         )
-        self.raw_data_filenames = [
+        raw_data_filenames = [
             str(self.store_dir / raw_data_pattern.format(i=i))
             for i in range(len(self.inputs))
         ]
@@ -140,7 +158,7 @@ class IO:
 
         memmaps = []
         for raw_data, mmap_location in zip(
-            tqdm(self.inputs, desc="Loading files", ncols=98), self.raw_data_filenames
+            tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
         ):
             raw_data_mmap = load_data(
                 raw_data, data_field, mmap_location, mmap_mode="r"
@@ -149,7 +167,7 @@ class IO:
                 raw_data_mmap = raw_data_mmap.T
             memmaps.append(raw_data_mmap)
 
-        return memmaps
+        return memmaps, raw_data_filenames
 
     def save(self, output_dir: str = "."):
         """Saves data to numpy files.
