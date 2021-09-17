@@ -234,7 +234,6 @@ class Manipulation:
         self.prepared_data_filenames = None
 
     def __del__(self):
-        print("cleaning manipulation")
         if not self.keep_memmaps_on_close:
             self.delete_manipulation_dir()
 

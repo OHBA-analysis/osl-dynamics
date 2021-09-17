@@ -107,7 +107,6 @@ class IO:
         self.raw_data_filenames = None
 
     def __del__(self):
-        print("Cleaning IO")
         if not self.keep_memmaps_on_close:
             self.delete_io_dir()
 

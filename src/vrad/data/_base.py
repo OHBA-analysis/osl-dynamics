@@ -71,7 +71,6 @@ class Data(IO, Manipulation, TensorFlowDataset):
         self.keep_memmaps_on_close = keep_memmaps_on_close
 
     def __del__(self):
-        print("cleaning files")
         if not self.keep_memmaps_on_close:
             Manipulation.__del__(self)
             IO.__del__(self)
