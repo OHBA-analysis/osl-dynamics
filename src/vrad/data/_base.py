@@ -42,22 +42,38 @@ class Data(IO, Manipulation, TensorFlowDataset):
         store_dir: str = "tmp",
         n_embeddings: int = None,
         time_axis_first: bool = True,
+        keep_memmaps_on_close: bool = False,
     ):
         # Unique identifier for the Data object
         self._identifier = id(inputs)
 
         # Load data by initialising an IO object
         IO.__init__(
-            self, inputs, matlab_field, sampling_frequency, store_dir, time_axis_first
+            self,
+            inputs,
+            matlab_field,
+            sampling_frequency,
+            store_dir,
+            time_axis_first,
+            keep_memmaps_on_close=keep_memmaps_on_close,
         )
 
         # Initialise a Manipulation object so we have method we can use to prepare
         # the data
-        Manipulation.__init__(self, n_embeddings)
+        Manipulation.__init__(
+            self, n_embeddings, keep_memmaps_on_close=keep_memmaps_on_close
+        )
 
         # Initialise a TensorFlowDataset object so we have methods to create
         # training/prediction datasets
         TensorFlowDataset.__init__(self)
+
+        self.keep_memmaps_on_close = keep_memmaps_on_close
+
+    def __del__(self):
+        if not self.keep_memmaps_on_close:
+            Manipulation.__del__(self)
+            IO.__del__(self)
 
     def __iter__(self):
         return iter(self.subjects)

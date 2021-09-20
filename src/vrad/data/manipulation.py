@@ -22,9 +22,11 @@ class Manipulation:
         Number of embeddings.
     """
 
-    def __init__(self, n_embeddings: int):
+    def __init__(self, n_embeddings: int, keep_memmaps_on_close: bool = False):
         self.n_embeddings = n_embeddings
         self.prepared = False
+        self.prepared_data_filenames = []
+        self.keep_memmaps_on_close = keep_memmaps_on_close
 
     def _process_from_yaml(self, file, **kwargs):
         with open(file) as f:
@@ -220,6 +222,20 @@ class Manipulation:
         ]
 
         self.prepared_data_memmaps = []
+
+    def delete_manipulation_dir(self):
+        """Deletes memmaps and removes store_dir if empty."""
+        for filename in self.prepared_data_filenames:
+            pathlib.Path(filename).unlink(missing_ok=True)
+        if not any(self.store_dir.iterdir()):
+            # Delete directory if it's not empty
+            self.store_dir.rmdir()
+        self.prepared_data_memmaps = None
+        self.prepared_data_filenames = None
+
+    def __del__(self):
+        if not self.keep_memmaps_on_close:
+            self.delete_manipulation_dir()
 
     def trim_raw_time_series(
         self,
