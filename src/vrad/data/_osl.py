@@ -4,7 +4,6 @@ import mat73
 import numpy as np
 from vrad import array_ops
 from vrad.inference import states
-from vrad.utils import plotting
 
 
 class OSL_HMM:
@@ -148,14 +147,6 @@ class OSL_HMM:
                 return np.concatenate(padded_stc)
             else:
                 return padded_stc
-
-    def plot_covariances(self, *args, **kwargs):
-        """Wraps plotting.plot_matrices for self.covariances."""
-        plotting.plot_matrices(self.covariances, *args, **kwargs)
-
-    def plot_states(self, *args, **kwargs):
-        """Wraps plotting.highlight_states for self.state_time_course."""
-        plotting.state_barcode(self.state_time_course, *args, **kwargs)
 
     def covariance_weights(self) -> np.ndarray:
         """Calculate covariance weightings based on variance (trace).
