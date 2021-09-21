@@ -223,19 +223,20 @@ class Manipulation:
 
         self.prepared_data_memmaps = []
 
-    def delete_manipulation_dir(self):
+    def delete_manipulation_memmaps(self):
         """Deletes memmaps and removes store_dir if empty."""
-        for filename in self.prepared_data_filenames:
-            pathlib.Path(filename).unlink(missing_ok=True)
-        if not any(self.store_dir.iterdir()):
-            # Delete directory if it's not empty
-            self.store_dir.rmdir()
+        if self.prepared_data_filenames is not None:
+            for filename in self.prepared_data_filenames:
+                pathlib.Path(filename).unlink(missing_ok=True)
+        if self.store_dir.exists():
+            if not any(self.store_dir.iterdir()):
+                self.store_dir.rmdir()
         self.prepared_data_memmaps = None
         self.prepared_data_filenames = None
 
     def __del__(self):
         if not self.keep_memmaps_on_close:
-            self.delete_manipulation_dir()
+            self.delete_manipulation_memmaps()
 
     def trim_raw_time_series(
         self,

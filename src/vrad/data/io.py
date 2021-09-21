@@ -30,6 +30,8 @@ class IO:
         Directory to save results and intermediate steps to. Optional, default is /tmp.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)?
+    keep_memmaps_on_close : bool
+        Should we keep the memmaps? Optional, default is False.
     """
 
     def __init__(
@@ -96,19 +98,25 @@ class IO:
         # Use raw data for the subject data
         self.subjects = self.raw_data_memmaps
 
-    def delete_io_dir(self):
+    def delete_dir(self):
+        """Deletes store_dir."""
+        if self.store_dir.exists():
+            rmtree(self.store_dir)
+
+    def delete_io_memmaps(self):
         """Deletes memmaps and removes store_dir if empty."""
-        for filename in self.raw_data_filenames:
-            pathlib.Path(filename).unlink(missing_ok=True)
-        if not any(self.store_dir.iterdir()):
-            # Delete directory if it's not empty
-            self.store_dir.rmdir()
+        if self.raw_data_filenames is not None:
+            for filename in self.raw_data_filenames:
+                pathlib.Path(filename).unlink(missing_ok=True)
+        if self.store_dir.exists():
+            if not any(self.store_dir.iterdir()):
+                self.store_dir.rmdir()
         self.raw_data_memmaps = None
         self.raw_data_filenames = None
 
     def __del__(self):
         if not self.keep_memmaps_on_close:
-            self.delete_io_dir()
+            self.delete_io_memmaps()
 
     def load_preparation(self, inputs: str):
         """Loads a pickle file containing preparation settings.
