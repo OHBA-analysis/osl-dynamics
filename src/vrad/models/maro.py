@@ -5,7 +5,6 @@
 import numpy as np
 import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers, activations
-from vrad.inference.functions import cholesky_factor_to_full_matrix
 from vrad.models.layers import (
     CoeffsCovsLayer,
     MixCoeffsCovsLayer,
@@ -44,23 +43,8 @@ class MARO(ObservationModelBase):
             Mar covariance. Shape is (n_states, n_channels, n_channels).
         """
         coeffs_covs_layer = self.model.get_layer("coeffs_covs")
-
-        coeffs = coeffs_covs_layer.coeffs.numpy()
-
-        if coeffs_covs_layer.diag_covs:
-            covs = np.array(
-                [
-                    np.diag(activations.softplus(c))
-                    for c in coeffs_covs_layer.diagonal_covs.numpy()
-                ]
-            )
-        else:
-            cholesky_covs = tfp.math.fill_triangular(
-                coeffs_covs_layer.flattened_cholesky_covs
-            )
-            covs = cholesky_factor_to_full_matrix(cholesky_covs).numpy()
-
-        return coeffs, covs
+        coeffs, covs = coeffs_covs_layer(1)
+        return coeffs.numpy(), covs.numpy()
 
 
 def _model_structure(config):

@@ -6,12 +6,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, layers
-from vrad.inference.functions import (
-    cholesky_factor,
-    cholesky_factor_to_full_matrix,
-    is_symmetric,
-    trace_normalize,
-)
 from vrad.inference.initializers import WeightInitializer
 
 tfb = tfp.bijectors
@@ -273,11 +267,14 @@ class MeansCovsLayer(layers.Layer):
         self.learn_covariances = learn_covariances
         self.normalize_covariances = normalize_covariances
 
+        # Bijector used to transform covariance matrices to a learnable vector
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
         # Initialisation of means
         if initial_means is None:
             self.initial_means = np.zeros([n_states, n_channels], dtype=np.float32)
         else:
-            self.initial_means = initial_means
+            self.initial_means = initial_means.astype("float32")
 
         self.means_initializer = WeightInitializer(self.initial_means)
 
@@ -286,31 +283,25 @@ class MeansCovsLayer(layers.Layer):
             self.initial_covariances = np.stack(
                 [np.eye(n_channels, dtype=np.float32)] * n_states
             )
-            self.initial_cholesky_covariances = cholesky_factor(
-                self.initial_covariances
-            )
         else:
-            # Ensure data is float32
-            initial_covariances = initial_covariances.astype("float32")
+            self.initial_covariances = initial_covariances.astype("float32")
 
-            # Normalise the covariances if required
-            if normalize_covariances:
-                initial_covariances = trace_normalize(initial_covariances)
+        if normalize_covariances:
+            normalization = (
+                tf.reduce_sum(tf.linalg.diag_part(self.initial_covariances), axis=1)[
+                    ..., tf.newaxis, tf.newaxis
+                ]
+                / n_channels
+            )
+            self.initial_covariances = self.initial_covariances / normalization
 
-            # If the matrix is symmetric we assume it's the full covariance matrix
-            # WARNING: diagonal matrices are assumed to be the full covariance matrix
-            if is_symmetric(initial_covariances):
-                self.initial_cholesky_covariances = cholesky_factor(initial_covariances)
-
-            # Otherwise, we assume the cholesky factor has already been calculated
-            else:
-                self.initial_cholesky_covariances = initial_covariances
-
-        self.flattened_cholesky_covariances_initializer = WeightInitializer(
-            tfp.math.fill_triangular_inverse(self.initial_cholesky_covariances)
+        self.initial_flattened_cholesky_covariances = self.bijector.inverse(
+            self.initial_covariances
         )
 
-        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+        self.flattened_cholesky_covariances_initializer = WeightInitializer(
+            self.initial_flattened_cholesky_covariances
+        )
 
     def build(self, input_shape):
 
@@ -337,16 +328,17 @@ class MeansCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
 
         # Calculate the covariance matrix from the cholesky factor
-        # cholesky_covariances = tfp.math.fill_triangular(
-        #     self.flattened_cholesky_covariances
-        # )
-        # self.covariances = cholesky_factor_to_full_matrix(cholesky_covariances)
-
         self.covariances = self.bijector(self.flattened_cholesky_covariances)
 
-        # Normalise the covariance
+        # Normalise the covariance by the trace
         if self.normalize_covariances:
-            self.covariances = trace_normalize(self.covariances)
+            normalization = (
+                tf.reduce_sum(tf.linalg.diag_part(self.covariances), axis=1)[
+                    ..., tf.newaxis, tf.newaxis
+                ]
+                / self.n_channels
+            )
+            self.covariances = self.covariances / normalization
 
         return [self.means, self.covariances]
 
@@ -692,27 +684,34 @@ class CoeffsCovsLayer(layers.Layer):
                 self.initial_covs = np.ones([n_states, n_channels], dtype=np.float32)
             else:
                 self.initial_covs = initial_covs
+
             self.initial_covs = np.log(np.exp(self.initial_covs) - 1.0)
+
             self.diagonal_covs_initializer = WeightInitializer(self.initial_covs)
+
         else:
+            # Bijector used to transform covariance matrices to a learnable vector
+            self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
             if initial_covs is None:
                 self.initial_covs = np.stack(
                     [np.eye(n_channels, dtype=np.float32)] * n_states
                 )
-                self.initial_cholesky_covs = cholesky_factor(self.initial_covs)
+
             else:
                 if initial_covs.ndim == 2:
                     raise ValueError(
                         "Please pass covariances with shape (n_states, n_channels, "
                         + "n_channels) or use diag_covs=True."
                     )
-                initial_covs = initial_covs.astype("float32")
-                if is_symmetric(initial_covs):
-                    self.initial_cholesky_covs = cholesky_factor(initial_covs)
-                else:
-                    self.initial_cholesky_covs = initial_covs
+                self.initial_covs = initial_covs.astype("float32")
+
+            self.initial_flattened_cholesky_covs = self.bijector.inverse(
+                self.initial_covs
+            )
+
             self.flattened_cholesky_covs_initializer = WeightInitializer(
-                tfp.math.fill_triangular_inverse(self.initial_cholesky_covs)
+                self.initial_flattened_cholesky_covs
             )
 
     def build(self, input_shape):
@@ -726,7 +725,7 @@ class CoeffsCovsLayer(layers.Layer):
             trainable=self.learn_coeffs,
         )
 
-        # Create weights for the MAR covariance
+        # Create weights for the MAR covariances
         if self.diag_covs:
             self.diagonal_covs = self.add_weight(
                 "diagonal_covs",
@@ -749,14 +748,13 @@ class CoeffsCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         if self.diag_covs:
             # Ensure covariances contain variances that are positive
-            covs = activations.softplus(self.diagonal_covs)
-            covs = tf.linalg.diag(covs)
+            self.covs = activations.softplus(self.diagonal_covs)
+            self.covs = tf.linalg.diag(self.covs)
         else:
             # Calculate the covariance matrix from the cholesky factor
-            cholesky_covs = tfp.math.fill_triangular(self.flattened_cholesky_covs)
-            covs = cholesky_factor_to_full_matrix(cholesky_covs)
+            self.covs = self.bijector(self.flattened_cholesky_covs)
 
-        return [self.coeffs, covs]
+        return [self.coeffs, self.covs]
 
     def get_config(self):
         config = super().get_config()

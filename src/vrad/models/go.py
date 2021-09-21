@@ -5,7 +5,6 @@
 import numpy as np
 from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
-from vrad.inference.functions import trace_normalize
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
 from vrad.models.obs_mod_base import ObservationModelBase
 
@@ -46,10 +45,6 @@ class GO(ObservationModelBase):
         _, covariances = means_covs_layer(1)
         covariances = covariances.numpy()
 
-        # Normalise covariances
-        if self.config.normalize_covariances:
-            covariances = trace_normalize(covariances).numpy()
-
         # Apply alpha scaling
         if alpha_scale:
             alpha_scaling = self.get_alpha_scaling()
@@ -76,10 +71,6 @@ class GO(ObservationModelBase):
         means_covs_layer = self.model.get_layer("means_covs")
         means, covariances = means_covs_layer(1)
 
-        # Normalise covariances
-        if self.config.normalize_covariances:
-            covariances = trace_normalize(covariances)
-
         # Apply alpha scaling
         if alpha_scale:
             alpha_scaling = self.get_alpha_scaling()
@@ -97,9 +88,7 @@ class GO(ObservationModelBase):
         """
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.means
-
-        # Set the weights of the layer
-        layer_weights.asign(means)
+        layer_weights.assign(means)
 
     def set_covariances(self, covariances):
         """Set the covariances of each state.
@@ -111,10 +100,8 @@ class GO(ObservationModelBase):
         """
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.flattened_cholesky_covariances
-
-        flat = means_covs_layer.bijector.inverse(covariances)
-        # Set the weights of the layer
-        layer_weights.assign(flat)
+        flattened_cholesky_covariances = means_covs_layer.bijector.inverse(covariances)
+        layer_weights.assign(flattened_cholesky_covariances)
 
     def get_alpha_scaling(self):
         """Get the alpha scaling of each state.
