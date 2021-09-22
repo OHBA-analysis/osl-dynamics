@@ -82,9 +82,10 @@ class Config:
 
     Observation Model Parameters
     ----------------------------
-    model : str
+    observation_model : str
         Type of observation model.
-        Either 'multivariate_normal' or 'multivariate_autoregressive'.
+        Either 'multivariate_normal', 'multivariate_autoregressive' or
+        'conv_net'.
     learn_means : bool
         Should we make the mean vectors for each state trainable?
         Pass if model='multivariate_normal'.
@@ -112,6 +113,9 @@ class Config:
         model='multivariate_autoregressive'.
     initial_covs : np.ndarray
         Initialisation for covariances. Pass if model='multivariate_autoregressive'.
+    diag_covs : bool
+        Should we learn diagonal covariances?
+        Pass if model='multivariate_autoregressive'.
 
     KL Annealing Parameters
     -----------------------
@@ -208,6 +212,7 @@ class Config:
     learn_covs: bool = None
     initial_coeffs: np.ndarray = None
     initial_covs: np.ndarray = None
+    diag_covs: bool = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None
@@ -247,10 +252,11 @@ class Config:
         if self.observation_model not in [
             "multivariate_normal",
             "multivariate_autoregressive",
+            "conv_net",
         ]:
             raise ValueError(
-                "observation_model must be 'multivariate_normal' or "
-                + "'multivariate_autoregressive'."
+                "observation_model must be 'multivariate_normal', "
+                + "'multivariate_autoregressive' or 'conv_net'."
             )
 
     def validate_rnn_parameters(self):

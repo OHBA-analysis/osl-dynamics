@@ -439,17 +439,33 @@ class LogLikelihoodLayer(layers.Layer):
 
     The negative log-likelihood is calculated assuming a multivariate normal
     probability density.
+
+    Parameters
+    ----------
+    diag_only : bool
+        Are the covariances passed just the diagonal? Optional, default is False.
     """
+
+    def __init__(self, diag_only: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.diag_only = diag_only
 
     def call(self, inputs):
         x, mu, sigma = inputs
 
         # Calculate the log-likelihood
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
-        )
+        if self.diag_only:
+            mvn = tfp.distributions.MultivariateNormalDiag(
+                loc=mu,
+                scale_diag=sigma,
+                allow_nan_stats=False,
+            )
+        else:
+            mvn = tfp.distributions.MultivariateNormalTriL(
+                loc=mu,
+                scale_tril=tf.linalg.cholesky(sigma),
+                allow_nan_stats=False,
+            )
         ll_loss = mvn.log_prob(x)
 
         # Sum over time dimension and average over the batch dimension
@@ -460,6 +476,11 @@ class LogLikelihoodLayer(layers.Layer):
         nll_loss = -ll_loss
 
         return tf.expand_dims(nll_loss, axis=-1)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"diag_only": self.diag_only})
+        return config
 
 
 class NormalKLDivergenceLayer(layers.Layer):
@@ -646,7 +667,7 @@ class CoeffsCovsLayer(layers.Layer):
     learn_cov : bool
         Should we learn the covariances?
     diag_covs : bool
-        Are the covariances diagonal? Optional, default is False.
+        Are the covariances diagonal?
     """
 
     def __init__(
@@ -658,7 +679,7 @@ class CoeffsCovsLayer(layers.Layer):
         initial_covs: np.ndarray,
         learn_coeffs: bool,
         learn_covs: bool,
-        diag_covs: bool = False,
+        diag_covs: bool,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -772,14 +793,25 @@ class CoeffsCovsLayer(layers.Layer):
 
 
 class MixCoeffsCovsLayer(layers.Layer):
-    """Mixes the MAR coefficients and covariances."""
+    """Mixes the MAR coefficients and covariances.
+
+    Parameters
+    ----------
+    diag_only : bool
+        Is the covariance matrix diagonal?
+    """
+
+    def __init__(self, diag_only: bool, **kwargs):
+        super().__init__(**kwargs)
+        self.diag_only = diag_only
 
     def call(self, inputs, **kwargs):
 
         # Input data:
         # - alpha_jt.shape = (None, sequence_length, n_states)
         # - coeffs_jl.shape = (n_states, n_lags, n_channels, n_channels)
-        # - cov_j.shape = (n_states, n_channels, n_channels)
+        # - cov_j.shape = (n_states, n_channels) if diag_only
+        #   else (n_states, n_channels, n_channels)
         alpha_jt, coeffs_jl, cov_j = inputs
 
         # Reshape alpha_jt and coeffs_jl for multiplication
@@ -796,18 +828,28 @@ class MixCoeffsCovsLayer(layers.Layer):
         coeffs_lt = tf.reduce_sum(tf.multiply(alpha_jt, coeffs_jl), axis=2)
 
         # Reshape alpha_jt and cov_j for multiplication
-        # alpha_jt -> (None, sequence_length, n_states, 1, 1)
-        # cov_j -> (1, 1, n_states, n_channels, n_channels)
-        alpha_jt = tf.squeeze(alpha_jt, axis=-1)
+        # if diag_only:
+        #     alpha_jt -> (None, sequence_length, n_states, 1)
+        #     cov_j -> (1, 1, n_states, n_channels)
+        # else:
+        #     alpha_jt -> (None, sequence_length, n_states, 1, 1)
+        #     cov_j -> (1, 1, n_states, n_channels, n_channels)
+        if self.diag_only:
+            alpha_jt = tf.squeeze(tf.squeeze(alpha_jt, axis=-1), axis=-1)
+        else:
+            alpha_jt = tf.squeeze(alpha_jt, axis=-1)
         cov_j = tf.expand_dims(tf.expand_dims(cov_j, axis=0), axis=0)
 
         # Calcalute covariance at each time point:
-        # - cov_t = Sum_j alpha^2_jt cov_j
-        # - cov_t.shape = (None, sequence_length, n_channels, n_channels)
-        alpha2_jt = tf.square(alpha_jt)
-        cov_t = tf.reduce_sum(tf.multiply(alpha2_jt, cov_j), axis=2)
+        # - cov_t = Sum_j alpha_jt cov_j
+        cov_t = tf.reduce_sum(tf.multiply(alpha_jt, cov_j), axis=2)
 
         return coeffs_lt, cov_t
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"diag_covs": diag_covs})
+        return config
 
 
 class MARMeansCovsLayer(layers.Layer):
@@ -828,7 +870,8 @@ class MARMeansCovsLayer(layers.Layer):
         # Input data:
         # - data.shape = (None, sequence_length, n_channels)
         # - coeffs_lt.shape = (None, sequence_length, n_lags, n_channels, n_channels)
-        # - covs_t.shape = (None, sequence_length, n_channels, n_channels)
+        # - covs_t.shape = (None, sequence_length, n_channels, n_channels) if diag_only
+        #   else (None, sequence_length, n_channels)
         data, coeffs_lt, covs_t = inputs
 
         # Reshape data for multiplication
@@ -969,3 +1012,50 @@ class VectorQuantizerLayer(layers.Layer):
             }
         )
         return config
+
+
+class ConvNetObservationsLayer(layers.Layer):
+    """Layer for generating data using a convolutional neural network.
+
+    Parameters
+    ----------
+    n_channels : int
+        Number of channels.
+    """
+
+    def __init__(self, n_channels: int, **kwargs):
+        super().__init__(**kwargs)
+        self.layer = layers.Conv1D(filters=n_channels, kernel_size=2, padding="causal")
+
+    def call(self, inputs):
+        outputs = self.layer(inputs)
+        return outputs
+
+
+class MeanSquaredErrorLayer(layers.Layer):
+    """Layer for calculating the mean squared error.
+
+    Parameters
+    ----------
+    clip : int
+        Number of data points to clip from each input.
+        Optional, default is no clipping.
+    """
+
+    def __init__(self, clip: int = None, **kwargs):
+        super().__init__(**kwargs)
+        self.clip = clip
+
+    def call(self, inputs, training=None, **kwargs):
+        training_data, generated_data = inputs
+
+        if self.clip is not None:
+            training_data = training_data[:, self.clip :]
+            generated_data = generated_data[:, : -self.clip]
+
+        se = tf.math.squared_difference(training_data, generated_data)
+        mse = tf.reduce_mean(se, axis=-1)  # mean over channels
+        mse = tf.reduce_sum(mse, axis=-1)  # sum over time points
+        mse = tf.reduce_mean(mse, axis=-1)  # mean over batches
+
+        return tf.expand_dims(mse, axis=-1)

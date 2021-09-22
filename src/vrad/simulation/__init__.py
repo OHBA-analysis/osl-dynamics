@@ -8,6 +8,7 @@ isort:skip_file
 """
 
 from vrad.simulation._base import *  # noqa
+from vrad.simulation._sin import *  # noqa
 from vrad.simulation._mar import *  # noqa
 from vrad.simulation._mvn import *  # noqa
 from vrad.simulation._hmm import *  # noqa

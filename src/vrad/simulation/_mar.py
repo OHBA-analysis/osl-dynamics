@@ -20,10 +20,11 @@ class MAR:
     Paramters
     ---------
     coeffs : np.ndarray
-        Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
-        n_channels).
+        Array of MAR coefficients.
+        Shape must be (n_states, n_lags, n_channels, n_channels).
     covs : np.ndarray
-        Coariance of eps_t. Shape must be (n_states, n_channels, n_channels)
+        Covariance of eps_t. Shape must be (n_states, n_channels) or
+        (n_states, n_channels, n_channels).
     random_seed: int
         Seed for the random number generator.
     """
@@ -40,8 +41,8 @@ class MAR:
                 "coeffs must be a (n_states, n_lags, n_channels, n_channels) array."
             )
 
-        if covs.ndim != 3:
-            raise ValueError("covs must be a (n_states, n_channels, n_channels) array.")
+        if covs.ndim == 2:
+            covs = np.array([np.diag(c) for c in covs])
 
         if coeffs.shape[0] != covs.shape[0]:
             raise ValueError("Different number of states in coeffs and covs passed.")

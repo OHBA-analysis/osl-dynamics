@@ -5,40 +5,32 @@
 print("Setting up")
 import numpy as np
 from vrad import data, simulation
+from vrad.analysis import spectral
 from vrad.inference import tf_ops
 from vrad.models import Config, Model
+from vrad.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
 
-# MAR parameters
-A11 = [[0.9, 0], [0.16, 0.8]]
-A12 = [[-0.5, 0], [-0.2, -0.5]]
-
-A21 = [[0.6, 0.1], [0.1, -0.2]]
-A22 = [[0.4, 0], [-0.1, 0.1]]
-
-A31 = [[1, -0.15], [0, 0.7]]
-A32 = [[-0.3, -0.2], [0.5, 0.5]]
-
-C1 = [0.1, 0.1]
-C2 = [0.1, 0.1]
-C3 = [0.1, 0.1]
-
-coeffs = np.array([[A11, A12], [A21, A22], [A31, A32]])
-covs = np.array([np.diag(C1), np.diag(C2), np.diag(C3)])
+# Settings
+amplitudes = np.ones([4, 4])
+frequencies = np.array(
+    [[10, 30, 50, 70], [15, 35, 55, 75], [20, 40, 60, 80], [25, 45, 65, 85]]
+)
+sampling_frequency = 250
 
 # Simulate data
 print("Simulating data")
-sim = simulation.HMM_MAR(
+sim = simulation.HMM_Sine(
     n_samples=25600,
     trans_prob="sequence",
-    stay_prob=0.95,
-    coeffs=coeffs,
-    covs=covs,
-    random_seed=123,
+    stay_prob=0.9,
+    amplitudes=amplitudes,
+    frequencies=frequencies,
+    sampling_frequency=sampling_frequency,
+    observation_error=0.05,
 )
-# sim.standardize()
 meg_data = data.Data(sim.time_series)
 
 # Settings
@@ -47,10 +39,11 @@ config = Config(
     n_channels=sim.n_channels,
     sequence_length=100,
     observation_model="multivariate_autoregressive",
-    n_lags=sim.order,
+    n_lags=2,
+    diag_covs=True,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=100,
 )
 
 # Create dataset
@@ -71,17 +64,24 @@ history = model.fit(training_dataset, epochs=config.n_epochs)
 # Inferred parameters
 inf_coeffs, inf_covs = model.get_params()
 
-print("Ground truth:")
-print(np.squeeze(coeffs))
-print()
-print(np.squeeze(covs))
-print()
-
-print("Inferred:")
+print("Coefficients:")
 print(np.squeeze(inf_coeffs))
 print()
+
+print("Covariances:")
 print(np.squeeze(inf_covs))
 print()
+
+# Calculate power spectral densities from model parameters
+f, psd = spectral.mar_spectra(inf_coeffs, inf_covs, sampling_frequency)
+
+for i in range(sim.n_states):
+    plotting.plot_line(
+        [f] * sim.n_channels,
+        psd[:, i, range(sim.n_channels), range(sim.n_channels)].T.real,
+        labels=[f"channel {i}" for i in range(1, sim.n_channels + 1)],
+        filename=f"psd_state{i}.png",
+    )
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
