@@ -18,6 +18,22 @@ from vrad.utils.misc import override_dict_defaults
 from vrad.utils.topoplots import Topology
 
 
+QUAL_CMAPS = [
+    "Pastel1",
+    "Pastel2",
+    "Paired",
+    "Accent",
+    "Dark2",
+    "Set1",
+    "Set2",
+    "Set3",
+    "tab10",
+    "tab20",
+    "tab20b",
+    "tab20c",
+]
+
+
 def create_figure(*args, **kwargs):
     """Creates matplotlib figure and axes objects.
 
@@ -1269,7 +1285,7 @@ def topoplot(
 def plot_alpha(
     *alpha: np.ndarray,
     n_samples: int = None,
-    cmap: str = "viridis",
+    cmap: str = "Set3",
     sampling_frequency: float = None,
     y_labels: Union[list, str] = None,
     title: str = None,
@@ -1305,7 +1321,10 @@ def plot_alpha(
     n_alphas = len(alpha)
     n_states = max(stc.shape[1] for stc in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
-    cmap = plt.cm.get_cmap(name=cmap, lut=n_states)
+    if cmap in QUAL_CMAPS:
+        cmap = plt.cm.get_cmap(name=cmap)
+    else:
+        cmap = plt.cm.get_cmap(name=cmap, lut=n_states)
     colors = cmap.colors
 
     # Validation
@@ -1350,13 +1369,18 @@ def plot_alpha(
     axes[-1].set_xlabel("Time (s)" if sampling_frequency else "Sample")
     axes[0].set_title(title)
 
+    # Fix layout
+    plt.tight_layout()
+
     # Add a colour bar
-    mappable = plt.cm.ScalarMappable(
-        norm=matplotlib.colors.Normalize(vmin=-0.5, vmax=n_states - 0.5), cmap=cmap
+    norm = matplotlib.colors.BoundaryNorm(
+        boundaries=range(n_states + 1), ncolors=n_states
     )
+    mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     fig.subplots_adjust(right=0.94)
-    color_bar_axis = fig.add_axes([0.95, 0.15, 0.025, 0.7])
-    fig.colorbar(mappable, cax=color_bar_axis)
+    cb_ax = fig.add_axes([0.95, 0.15, 0.025, 0.7])
+    cb = fig.colorbar(mappable, cax=cb_ax, ticks=np.arange(0.5, n_states + 1, 1))
+    cb.ax.set_yticklabels(range(1, n_states + 1))
 
     # Save to file if a filename as been passed
     if filename is not None:
