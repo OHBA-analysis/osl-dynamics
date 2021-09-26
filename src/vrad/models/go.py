@@ -78,30 +78,51 @@ class GO(ObservationModelBase):
 
         return means.numpy(), covariances.numpy()
 
-    def set_means(self, means):
+    def set_means(self, means, update_initializer=True):
         """Set the means of each state.
 
         Parameters
         ----------
-        covariances : np.ndarray
+        means : np.ndarray
             State covariances.
+        update_initializer : bool
+            Do we want to use the passed means when we re-initialize
+            the model? Optional, default is True.
         """
+        means = means.astype(np.float32)
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.means
         layer_weights.assign(means)
 
-    def set_covariances(self, covariances):
+        if update_initializer:
+            means_covs_layer.initial_means = means
+            means_covs_layer.means_initializer.initial_value = means
+
+    def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each state.
 
         Parameters
         ----------
         covariances : np.ndarray
             State covariances.
+        update_initializer : bool
+            Do we want to use the passed covariances when we re-initialize
+            the model? Optional, default is True.
         """
+        covariances = covariances.astype(np.float32)
         means_covs_layer = self.model.get_layer("means_covs")
         layer_weights = means_covs_layer.flattened_cholesky_covariances
         flattened_cholesky_covariances = means_covs_layer.bijector.inverse(covariances)
         layer_weights.assign(flattened_cholesky_covariances)
+
+        if update_initializer:
+            means_covs_layer.initial_covariances = covariances
+            means_covs_layer.initial_flattened_cholesky_covariances = (
+                flattened_cholesky_covariances
+            )
+            means_covs_layer.flattened_cholesky_covariances_initializer.initial_value = (
+                flattened_cholesky_covariances
+            )
 
     def get_alpha_scaling(self):
         """Get the alpha scaling of each state.
