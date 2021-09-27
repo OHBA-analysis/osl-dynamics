@@ -32,6 +32,8 @@ class Data(IO, Manipulation, TensorFlowDataset):
         Number of embeddings. Optional. Can be passed if data has already been prepared.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)? Optional, default is True.
+    keep_memmaps_on_close : bool
+        Should we keep the memmaps? Optional, default is False.
     """
 
     def __init__(
@@ -64,11 +66,8 @@ class Data(IO, Manipulation, TensorFlowDataset):
             self, n_embeddings, keep_memmaps_on_close=keep_memmaps_on_close
         )
 
-        # Initialise a TensorFlowDataset object so we have methods to create
-        # training/prediction datasets
+        # Initialise a TensorFlowDataset object so we have methods to create datasets
         TensorFlowDataset.__init__(self)
-
-        self.keep_memmaps_on_close = keep_memmaps_on_close
 
     def __del__(self):
         if not self.keep_memmaps_on_close:

@@ -523,7 +523,7 @@ def mar_spectra(
         Sampling frequency in Hertz.
     n_f : int
         Number of frequency bins in the cross power spectral density to calculate.
-        Optional, default is 256.
+        Optional, default is 512.
 
     Returns
     -------
