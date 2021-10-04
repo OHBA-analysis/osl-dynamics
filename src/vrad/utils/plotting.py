@@ -1022,12 +1022,16 @@ def plot_matrices(
             v_min = matrix.min()
             v_max = matrix.max()
             if log_norm:
-                im = axis.matshow(grid, cmap=cmap, norm=LogNorm(vmin=v_min, vmax=v_max))
+                im = axis.matshow(
+                    grid,
+                    cmap=cmap,
+                    norm=matplotlib.colors.LogNorm(vmin=v_min, vmax=v_max),
+                )
             else:
                 im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
         else:
             if log_norm:
-                im = axis.matshow(grid, cmap=cmap, norm=LogNorm())
+                im = axis.matshow(grid, cmap=cmap, norm=matplotlib.colors.LogNorm())
             else:
                 im = axis.matshow(grid, cmap=cmap)
         axis.set_title(title)
