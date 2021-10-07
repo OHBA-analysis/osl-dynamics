@@ -1,6 +1,12 @@
 # Contribution Guide
 
-## The Biomedical Research Computing (BMRC) Cluster
+This is an introductory guide to using VRAD on the Biomedical Research Computing (BMRC) cluster. This guide covers:
+- [The BMRC Cluster](#the-bmrc-cluster)
+- [Installing VRAD on BMRC](#installing-vrad-on-bmrc)
+- [Overview of the VRAD package](#overview-of-the-vrad-package)
+- [Git Workflow](#git-workflow)
+
+## The BMRC Cluster
 
 Website: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/cluster-usage.
 
@@ -33,7 +39,7 @@ qlogin -q short.qc (or long.qc)
 
 List screens with: `screen -ls`. Reconnect to a session with: `screen -r <id>`.
 
-To submit a non-interactive GPU job, first create a `submision.sh` file:
+To submit a non-interactive GPU job, first create a `submission.sh` file:
 ```
 #!/bin/bash
 #$ -q short.qg
@@ -60,17 +66,20 @@ Delete all jobs: `qdel -u <username>`.
 Further info: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources.
 
 ## Installing VRAD on BMRC
-It is recommended to install VRAD within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on differnt GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
+It is recommended to install VRAD within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
 
 ### TensorFlow 2.5
+Install:
 ```
+module use /well/woolrich/projects/software/modulefiles
 module load Anaconda3
-conda create -n vrad-tf25
+module load cuda/11.2
+conda create --name vrad-tf25 python=3.8
 conda activate vrad-tf25
-. /well/woolrich/projects/software/cuda/conda-setup.sh
 cd VRAD
 pip install -e .
 ```
+This version is recommended for compG017.
 
 ### TensorFlow 2.4 
 Update setup.cfg with dependencies:
@@ -105,6 +114,17 @@ conda activate vrad-tf23
 cd VRAD
 pip install -e .
 ```
+
+## Overview of the VRAD Package
+
+Useful example scripts can be found in `/VRAD/examples`.
+
+The main source code is contained in `/VRAD/src/vrad`. This directory contains 7 subpackages:
+- `data`: Classes and functions used to read/load and manipulate data.
+- `models` and `inference`: Classes for each model type and TensorFlow functions used for inference.
+- `analysis`: Functions for analysing a fitted model.
+- `simulation`: Classes for simulating training data.
+- `utils` and `files`: Helpful utility functions and necessary files.
 
 ## Git Workflow
 Create a branch for changes:
