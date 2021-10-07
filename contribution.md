@@ -2,6 +2,8 @@
 
 ## The Biomedical Research Computing (BMRC) Cluster
 
+Website: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/cluster-usage.
+
 ### Login
 To login: `ssh <username>@rescomp1.well.ox.ac.uk` (or `@rescomp2.well.ox.ac.uk`).
 
@@ -29,7 +31,9 @@ qlogin -q short.qc (or long.qc)
 ```
 `Ctrl-A Crtl-D` can be used to exit the screen session.
 
-To submit a non-interactive GPU job, first create a `submision.qsub` file:
+List screens with: `screen -ls`. Reconnect to a session with: `screen -r <id>`.
+
+To submit a non-interactive GPU job, first create a `submision.sh` file:
 ```
 #!/bin/bash
 #$ -q short.qg
@@ -47,13 +51,16 @@ source activate vrad-tf23
 python simulation_hmm_mvn.py
 ```
 
-Submit with `qsub submission.qsub`.
-Monitor jobs: `watch qstat`
-Delete all jobs: `qdel -u <username>`
+Submit with: `qsub submission.sh`.
 
+Monitor jobs: `watch qstat`.
+
+Delete all jobs: `qdel -u <username>`.
+
+Further info: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources.
 
 ## Installing VRAD on BMRC
-It is recommended to install VRAD within a virtual environment.
+It is recommended to install VRAD within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on differnt GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
 
 ### TensorFlow 2.5
 ```
