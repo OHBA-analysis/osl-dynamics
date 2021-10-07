@@ -71,8 +71,8 @@ class Data(IO, Manipulation, TensorFlowDataset):
 
     def __del__(self):
         if not self.keep_memmaps_on_close:
-            Manipulation.__del__(self)
-            IO.__del__(self)
+            self.delete_manipulation_memmaps()
+            self.delete_io_memmaps()
 
     def __iter__(self):
         return iter(self.subjects)

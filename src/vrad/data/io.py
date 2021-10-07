@@ -114,10 +114,6 @@ class IO:
         self.raw_data_memmaps = None
         self.raw_data_filenames = None
 
-    def __del__(self):
-        if not self.keep_memmaps_on_close:
-            self.delete_io_memmaps()
-
     def load_preparation(self, inputs: str):
         """Loads a pickle file containing preparation settings.
 

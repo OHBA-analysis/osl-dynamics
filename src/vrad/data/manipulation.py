@@ -234,10 +234,6 @@ class Manipulation:
         self.prepared_data_memmaps = None
         self.prepared_data_filenames = None
 
-    def __del__(self):
-        if not self.keep_memmaps_on_close:
-            self.delete_manipulation_memmaps()
-
     def trim_raw_time_series(
         self,
         sequence_length: int = None,
