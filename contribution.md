@@ -187,8 +187,13 @@ git add <file>
 git commit -m "Short description of changes"
 ```
 
-Merge branch into development and push to remote repo:
+Either push the new branch to remote repo:
+```
+git push --set-upstream origin <branch-name>
+```
+or merge branch into development and push:
 ```
 git checkout development
 git merge <branch-name>
+git push
 ```
