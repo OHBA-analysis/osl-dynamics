@@ -1,3 +1,4 @@
+
 # Contribution Guide
 
 This is an introductory guide to using VRAD on the Biomedical Research Computing (BMRC) cluster. This guide covers:
@@ -15,6 +16,8 @@ To login: `ssh <username>@rescomp1.well.ox.ac.uk` (or `@rescomp2.well.ox.ac.uk`)
 
 To login to an interactive GPU node: `ssh <username>@compG017`.
 compG017 has 2 GPUs. Can view usage with: `nvidia-smi`.
+
+To login with graphical output enabled use: `ssh -X <username@rescomp1.well.ox.ac.uk>`. An X11 forwarding client must be installed on your local computer, e.g. XQuartz.
 
 ### Directories
 Your home directory is `/users/woolrich/<username>`, however, this directory is limited in space. It is recommended you work from your data directory located at `/well/woolrich/users/<username>`.
@@ -153,21 +156,31 @@ The main source code is contained in `/VRAD/src/vrad`. This directory contains 7
 
 ### Text Editors
 
-<!-- A text editor is required for making changes to the source code. The source code must be located on the computer your running VRAD on, which in our case is the BMRC cluster. There are two options for editing the source code:
-- Using an in terminal editor like vi, vim, or emacs.
-- Keeping a copy of the source code on your local computer and copying it to the BMRC server. The files can be copied using the `rsync` command described above. In this case, we can use editors with a graphical interface, e.g. PyCharm. -->
+A text editor is required for making changes to the source code. There are multiple options for this:
+- Use an in terminal editor like vi, vim, or emacs. E.g. to use vim: `vim <filename>`.
+- Use a graphical text editor such as gedit directly on the server. To do this you must login with X11 forwarding (see [The BMRC Cluster](#the-bmrc-cluster)). To launch the editor: `gedit <filename> &`.
+- Keep a copy of the source code on your local computer and copy it to the BMRC server. The files can be copied using `rsync` (see [The BMRC Cluster](#the-bmrc-cluster)) or you can setup a development environment on your local computer to sync the files automatically for you.
 
 We recommend using VSCode locally and the `Remote - SSH` extension to edit remote files.
-- Install VSCode: https://code.visualstudio.com/
-- Install the `Remote - SSH` extension: https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh
-- Click the green quick configuration button in the bottom left of VSCode 
+- Activate your Linux Shell Account: [https://help.it.ox.ac.uk/use-linux-service](https://help.it.ox.ac.uk/use-linux-service#collapse3091407).
+- Install VSCode: https://code.visualstudio.com/.
+- Install the `Remote - SSH` extension: https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh.
+- Click the green quick configuration button in the bottom left of VSCode:
 ![configure ssh](https://microsoft.github.io/vscode-remote-release/images/remote-dev-status-bar.png)
-- Click `Remote-SSH: Connect to Host...`
-- Click `Add New SSH Host...`
-- Type `ssh -J <oxford-user-name>@linux.ox.ac.uk <bmrc-user-name>@rescomp1.well.ox.ac.uk -A`
-- Open the folder you want to work in using the panel on the left of the window
-- You will always need to enter a password for the cluster.
-- If you are working on the university VPN, you can omit `-J <oxford-user-name>@linux.ox.ac.uk`
+- Click `Open SSH Configation File...`.
+- Select the first config file, e.g. for me: `/Users/<username>/.ssh/config`.
+- Paste the following into the text editor with your corresponding Oxford SSO and BMRC username:
+```
+Host vscode-rescomp1
+    HostName rescomp1.well.ox.ac.uk
+    ProxyJump <oxford-sso-username>@linux.ox.ac.uk
+    User <bmrc-username>
+    ForwardAgent yes
+```
+- Save with `Ctrl-S`, after which the text editor can be closed.
+- To connect to the server, click the green quick configuration bottom again and click `Connect to Host...`. Then select `vscode-rescomp1`.
+- You will be asked for your SSO password then BMRC password.
+- If you are working on the university VPN, you can omit `ProxyJump <oxford-sso-username>@linux.ox.ac.uk` line.
 - You can set up SSH keys for the university linux server if you want to avoid typing two passwords every time. [Guide](https://www.ssh.com/academy/ssh/copy-id).
 
 ### Formatting and Conventions
@@ -200,7 +213,9 @@ git add <file>
 git commit -m "Short description of changes"
 ```
 
-Either push the new branch to remote repo:
+When writing commit messages please follow the conventions [here](https://www.conventionalcommits.org/en/v1.0.0-beta.2/#specification).
+
+Then either push the new branch to remote repo:
 ```
 git push --set-upstream origin <branch-name>
 ```
