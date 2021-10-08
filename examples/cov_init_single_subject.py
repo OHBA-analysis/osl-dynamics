@@ -93,5 +93,5 @@ with open(f"init_cov_runs.dat", "w") as file:
     file.write(f"chose: {subject_chosen}\n")
     file.write(f"losses: {' '.join([str(s) for s in losses])}\n")
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 training_data.delete_dir()

@@ -57,6 +57,3 @@ history = model.fit(training_dataset, epochs=config.n_epochs)
 cnn_layer = model.get_layer("conv_net")
 w = cnn_layer.get_weights()
 print(np.squeeze(w))
-
-# Delete the temporary folder holding the data
-meg_data.delete_dir()

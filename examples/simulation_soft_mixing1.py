@@ -143,5 +143,5 @@ plotting.plot_line(
     filename="figures/rd.png",
 )
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 meg_data.delete_dir()

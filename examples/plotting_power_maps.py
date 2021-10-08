@@ -118,5 +118,3 @@ for component in range(4):
         subtract_mean=True,
         component=component,
     )
-
-preprocessed_data.delete_dir()

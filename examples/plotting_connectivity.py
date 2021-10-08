@@ -93,6 +93,3 @@ connectivity.save(
     parcellation_file=parcellation_file,
     component=0,  # only plot the first spectral component
 )
-
-# Delete temporary directory
-preprocessed_data.delete_dir()

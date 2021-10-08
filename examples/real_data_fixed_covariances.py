@@ -94,5 +94,5 @@ hmm_stc = manipulation.trim_time_series(
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 prepared_data.delete_dir()

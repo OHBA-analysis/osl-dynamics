@@ -17,7 +17,7 @@ class OSL_HMM:
 
     def __init__(self, filename):
         self.filename = filename
-        self.hmm = mat73.loadmat(filename)["hmm"]
+        self.hmm = mat73.loadmat(filename, use_attrdict=True)["hmm"]
 
         self.state = self.hmm.state
         self.k = int(self.hmm.K)

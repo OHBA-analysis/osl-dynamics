@@ -36,6 +36,3 @@ print(training_dataset)
 
 # We can save the prepared data
 meg_data.save("prepared_data")
-
-# Delete the temporary folder holding the data
-meg_data.delete_dir()

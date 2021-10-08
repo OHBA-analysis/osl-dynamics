@@ -98,5 +98,5 @@ quant_alp = model.get_quantized_alpha()
 print("Quantized vectors:")
 print(quant_alp)
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 meg_data.delete_dir()

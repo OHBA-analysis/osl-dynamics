@@ -49,7 +49,7 @@ f, psd, coh = spectral.multitaper_spectra(
 power_map = power.variance_from_spectra(f, psd)
 power.save(
     power_map=power_map,
-    filename="figures/mt_fullrange_power_.png",
+    filename="mt_fullrange_power_.png",
     mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,
@@ -60,20 +60,20 @@ conn_map = connectivity.covariance_from_spectra(f, psd)
 connectivity.save(
     connectivity_map=conn_map,
     threshold=0.98,
-    filename="figures/mt_fullrange_conn_.png",
+    filename="mt_fullrange_conn_.png",
     parcellation_file=parcellation_file,
 )
 
 # Fit two spectral components to the coherence
 wideband_components = spectral.decompose_spectra(coh, n_components=2)
-plotting.plot_line([f, f], wideband_components, filename="figures/wideband.png")
+plotting.plot_line([f, f], wideband_components, filename="wideband.png")
 
 power_map = power.variance_from_spectra(f, psd, wideband_components)
 conn_map = connectivity.mean_coherence_from_spectra(f, coh, wideband_components)
 for component in range(2):
     power.save(
         power_map=power_map,
-        filename=f"figures/mt_wideband{component}_power_.png",
+        filename=f"mt_wideband{component}_power_.png",
         mask_file=mask_file,
         parcellation_file=parcellation_file,
         subtract_mean=True,
@@ -82,23 +82,21 @@ for component in range(2):
     connectivity.save(
         connectivity_map=conn_map,
         threshold=0.98,
-        filename=f"figures/mt_wideband{component}_conn_.png",
+        filename=f"mt_wideband{component}_conn_.png",
         parcellation_file=parcellation_file,
         component=component,
     )
 
 # Fit four spectral components to the coherence
 narrowband_components = spectral.decompose_spectra(coh, n_components=4)
-plotting.plot_line(
-    [f, f, f, f], narrowband_components, filename="figures/narrowband.png"
-)
+plotting.plot_line([f, f, f, f], narrowband_components, filename="narrowband.png")
 
 power_map = power.variance_from_spectra(f, psd, narrowband_components)
 conn_map = connectivity.mean_coherence_from_spectra(f, coh, narrowband_components)
 for component in range(4):
     power.save(
         power_map=power_map,
-        filename=f"figures/mt_narrowband{component}_power_.png",
+        filename=f"mt_narrowband{component}_power_.png",
         mask_file=mask_file,
         parcellation_file=parcellation_file,
         subtract_mean=True,
@@ -107,10 +105,7 @@ for component in range(4):
     connectivity.save(
         connectivity_map=conn_map,
         threshold=0.98,
-        filename=f"figures/mt_narrowband{component}_conn_.png",
+        filename=f"mt_narrowband{component}_conn_.png",
         parcellation_file=parcellation_file,
         component=component,
     )
-
-# Delete temporary directory
-preprocessed_data.delete_dir()

@@ -136,6 +136,3 @@ for i in range(sim.n_states):
         labels=[f"channel {i}" for i in range(1, sim.n_channels + 1)],
         filename=f"psd_state{i}.png",
     )
-
-# Delete the temporary folder holding the data
-meg_data.delete_dir()

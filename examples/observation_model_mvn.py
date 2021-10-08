@@ -70,6 +70,3 @@ history = model.fit(training_dataset, epochs=config.n_epochs)
 
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")
-
-# Delete the temporary folder holding the data
-meg_data.delete_dir()

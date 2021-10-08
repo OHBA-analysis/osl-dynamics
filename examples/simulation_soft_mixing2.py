@@ -185,4 +185,5 @@ for i in range(n_states):
     plt.title("Ground truth")
     plt.colorbar()
 
+# Delete temporary directory
 meg_data.delete_dir()

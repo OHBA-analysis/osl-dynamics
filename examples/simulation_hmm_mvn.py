@@ -99,5 +99,5 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
 print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 meg_data.delete_dir()
