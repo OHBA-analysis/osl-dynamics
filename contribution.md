@@ -153,9 +153,22 @@ The main source code is contained in `/VRAD/src/vrad`. This directory contains 7
 
 ### Text Editors
 
-A text editor is required for making changes to the source code. The source code must be located on the computer your running VRAD on, which in our case is the BMRC cluster. There are two options for editing the source code:
+<!-- A text editor is required for making changes to the source code. The source code must be located on the computer your running VRAD on, which in our case is the BMRC cluster. There are two options for editing the source code:
 - Using an in terminal editor like vi, vim, or emacs.
-- Keeping a copy of the source code on your local computer and copying it to the BMRC server. The files can be copied using the `rsync` command described above. In this case, we can use editors with a graphical interface, e.g. PyCharm.
+- Keeping a copy of the source code on your local computer and copying it to the BMRC server. The files can be copied using the `rsync` command described above. In this case, we can use editors with a graphical interface, e.g. PyCharm. -->
+
+We recommend using VSCode locally and the `Remote - SSH` extension to edit remote files.
+- Install VSCode: https://code.visualstudio.com/
+- Install the `Remote - SSH` extension: https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh
+- Click the green quick configuration button in the bottom left of VSCode 
+![configure ssh](https://microsoft.github.io/vscode-remote-release/images/remote-dev-status-bar.png)
+- Click `Remote-SSH: Connect to Host...`
+- Click `Add New SSH Host...`
+- Type `ssh -J <oxford-user-name>@linux.ox.ac.uk <bmrc-user-name>@rescomp1.well.ox.ac.uk -A`
+- Open the folder you want to work in using the panel on the left of the window
+- You will always need to enter a password for the cluster.
+- If you are working on the university VPN, you can omit `-J <oxford-user-name>@linux.ox.ac.uk`
+- You can set up SSH keys for the university linux server if you want to avoid typing two passwords every time. [Guide](https://www.ssh.com/academy/ssh/copy-id).
 
 ### Formatting and Conventions
 
