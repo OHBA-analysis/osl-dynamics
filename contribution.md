@@ -17,7 +17,7 @@ To login: `ssh <username>@rescomp1.well.ox.ac.uk` (or `@rescomp2.well.ox.ac.uk`)
 To login to an interactive GPU node: `ssh <username>@compG017`.
 compG017 has 2 GPUs. Can view usage with: `nvidia-smi`.
 
-To login with graphical output enabled use: `ssh -X <username@rescomp1.well.ox.ac.uk>`. An X11 forwarding client must be installed on your local computer, e.g. XQuartz.
+To login with graphical output enabled use: `ssh -X <username>@rescomp1.well.ox.ac.uk>`. An X11 forwarding client must be installed on your local computer, e.g. XQuartz.
 
 ### Directories
 Your home directory is `/users/woolrich/<username>`, however, this directory is limited in space. It is recommended you work from your data directory located at `/well/woolrich/users/<username>`.
@@ -148,7 +148,7 @@ This section gives an overview of the source code and useful tips for editing.
 ### Overview of the VRAD Package
 
 The main source code is contained in `/VRAD/src/vrad`. This directory contains 7 subpackages:
-- `data`: Classes and functions used to read/load and manipulate data.
+- `data`: Classes and functions used to load, save and manipulate data.
 - `models` and `inference`: Classes for each model type and TensorFlow functions used for inference.
 - `analysis`: Functions for analysing a fitted model.
 - `simulation`: Classes for simulating training data.
@@ -215,7 +215,7 @@ git commit -m "Short description of changes"
 
 When writing commit messages please follow the conventions [here](https://www.conventionalcommits.org/en/v1.0.0-beta.2/#specification).
 
-Then either push the new branch to remote repo:
+Then either push the new branch to the remote repository:
 ```
 git push --set-upstream origin <branch-name>
 ```
