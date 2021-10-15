@@ -5,7 +5,7 @@
 import numpy as np
 from tqdm import trange
 from tensorflow.keras import Model, layers
-from vrad.models.layers import ConvNetObservationsLayer, MeanSquaredErrorLayer
+from vrad.models.layers import WaveNetLayer, MeanSquaredErrorLayer
 from vrad.models.obs_mod_base import ObservationModelBase
 
 
@@ -27,6 +27,60 @@ class CNNO(ObservationModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def loss(self, dataset):
+        """Mean squared error loss.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset
+            Dataset to evaluate loss for.
+
+        Returns
+        -------
+        float
+            Mean squared error loss.
+        """
+        losses = self.model.predict(dataset)
+        return np.mean(losses)
+
+    def sample(self, n_samples, std_dev, alpha):
+        """Sample from the observation model.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+        std_dev : float
+            Standard deviation to use for sampling.
+        alpha : int
+            Index for state to sample.
+
+        Returns
+        -------
+        np.ndarray
+            Sample from the observation model.
+        """
+        cnn_layer = self.model.get_layer("wavenet")
+
+        x = np.zeros(
+            [1, self.config.sequence_length, self.config.n_channels], dtype=np.float32
+        )
+        x[0, -1] = np.random.normal(size=self.config.n_channels)
+
+        a = np.zeros(
+            [1, self.config.sequence_length, self.config.n_states], dtype=np.float32
+        )
+        a[:, alpha] = 1
+
+        d = np.empty([n_samples, self.config.n_channels])
+        for i in trange(n_samples, desc=f"Sampling state {alpha}", ncols=98):
+            y = cnn_layer([x, a])[0, -1]
+            x = np.roll(x, shift=-1, axis=1)
+            x[0, -1] = y + np.random.normal(scale=std_dev)
+            d[i] = y.numpy()
+
+        return d
+
 
 def _model_structure(config):
 
@@ -37,11 +91,17 @@ def _model_structure(config):
     alpha = layers.Input(shape=(config.sequence_length, config.n_states), name="alpha")
 
     # Definition of layers
-    cnn_obs_layer = ConvNetObservationsLayer(config.n_channels, name="conv_net")
+    cnn_obs_layer = WaveNetLayer(
+        config.n_channels,
+        config.n_filters,
+        config.n_residual_blocks,
+        config.n_conv_layers,
+        name="wavenet",
+    )
     mse_layer = MeanSquaredErrorLayer(clip=1, name="mse")
 
     # Data flow
-    gen_data = cnn_obs_layer(inp_data)
+    gen_data = cnn_obs_layer([inp_data, alpha])
     mse = mse_layer([inp_data, gen_data])
 
     return Model(inputs=[inp_data, alpha], outputs=[mse], name="CNNO")

@@ -116,6 +116,12 @@ class Config:
     diag_covs : bool
         Should we learn diagonal covariances?
         Pass if model='multivariate_autoregressive'.
+    n_filters : int
+        Number of filters in the each convolulation layer.
+    n_residual_blocks : int
+        Number of residual blocks in WaveNet.
+    n_conv_layers : int
+        Number of layers in each residual block.
 
     KL Annealing Parameters
     -----------------------
@@ -213,6 +219,10 @@ class Config:
     initial_coeffs: np.ndarray = None
     initial_covs: np.ndarray = None
     diag_covs: bool = None
+
+    n_filters: int = None
+    n_residual_blocks: int = None
+    n_conv_layers: int = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None

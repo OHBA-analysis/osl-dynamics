@@ -1,9 +1,7 @@
 """Example script for fitting a convolutional neural network observation model to data.
 
-- Uses a conv. net observation model to infer a sine wave.
-- The kernel weights should be approx. [-1, 2] and the bias should be [0].
-- There is a large run-to-run variability, suspected to be due to the initialisation
-  of the CNN weights.
+- Simulates a sine wave at a particular frequency and trains a WaveNet model.
+- The trained model is then sampled from.
 """
 
 print("Setting up")
@@ -21,16 +19,20 @@ tf_ops.gpu_growth()
 print("Simulating data")
 sim = simulation.HMM_Sine(
     n_samples=25600,
-    amplitudes=np.array([[1]]),
-    frequencies=np.array([[10]]),
     sampling_frequency=250,
+    amplitudes=np.array([[1]]),
+    frequencies=np.array([[3]]),
     trans_prob=None,
+    observation_error=0.05,
 )
 meg_data = data.Data(sim.time_series)
 
 # Settings
 config = Config(
     observation_model="conv_net",
+    n_filters=1,
+    n_residual_blocks=1,
+    n_conv_layers=6,
     n_states=sim.n_states,
     n_channels=sim.n_channels,
     sequence_length=100,
@@ -54,6 +56,14 @@ model.summary()
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
 
-cnn_layer = model.get_layer("conv_net")
-w = cnn_layer.get_weights()
-print(np.squeeze(w))
+# Mean squared error
+mse = model.loss(training_dataset)
+print("MSE:", mse)
+
+# Sample from the observation model
+# TODO: should use std_dev=sqrt(mse)
+samples = np.empty([config.n_states, 500, config.n_channels])
+for alpha in range(config.n_states):
+    samples[alpha] = model.sample(500, std_dev=0.05, alpha=alpha)
+
+plotting.plot_line([range(500)] * config.n_states, samples, filename="samples.png")

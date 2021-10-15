@@ -1014,22 +1014,118 @@ class VectorQuantizerLayer(layers.Layer):
         return config
 
 
-class ConvNetObservationsLayer(layers.Layer):
-    """Layer for generating data using a convolutional neural network.
+class WaveNetLayer(layers.Layer):
+    """Layer for generating data using a WaveNet architecture.
 
     Parameters
     ----------
     n_channels : int
         Number of channels.
+    n_filters : int
+        Number of filters for each convolution.
+    n_residual_blocks : int
+        Number of residual blocks.
+    n_conv_layers : int
+        Number of dilated causal convolution layers in each residual block.
     """
 
-    def __init__(self, n_channels: int, **kwargs):
+    def __init__(
+        self,
+        n_channels: int,
+        n_filters: int,
+        n_residual_blocks: int,
+        n_conv_layers: int,
+        **kwargs
+    ):
         super().__init__(**kwargs)
-        self.layer = layers.Conv1D(filters=n_channels, kernel_size=2, padding="causal")
 
-    def call(self, inputs):
-        outputs = self.layer(inputs)
-        return outputs
+        self.n_channels = n_channels
+        self.n_filters = n_filters
+        self.n_residual_blocks = n_residual_blocks
+        self.n_conv_layers = n_conv_layers
+
+        self.causal_conv_layer = layers.Conv1D(
+            filters=n_filters,
+            kernel_size=2,
+            dilation_rate=1,
+            padding="causal",
+        )
+        self.residual_block_layers = []
+        for i in range(n_residual_blocks):
+            for j in range(1, n_conv_layers):
+                self.residual_block_layers.append(
+                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** j)
+                )
+        self.dense_layers = [
+            layers.Conv1D(filters=n_channels, kernel_size=1, padding="same"),
+            layers.Conv1D(filters=n_channels, kernel_size=1, padding="same"),
+        ]
+
+    def call(self, inputs, training=None, **kwargs):
+        x, alpha = inputs
+        out = self.causal_conv_layer(x)
+        skips = []
+        for layer in self.residual_block_layers:
+            out, skip = layer(out)  # TODO: ALSO PASS ALPHA
+            skips.append(skip)
+        out = tf.add_n(skips)
+        for layer in self.dense_layers:
+            out = activations.selu(out)  # Empirically works better than relu
+            out = layer(out)
+        return out
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_channels": self.n_channels,
+                "n_filters": self.n_filters,
+                "n_residual_blocks": self.n_residual_blocks,
+                "n_conv_layers": self.n_conv_layers,
+            }
+        )
+        return config
+
+
+class WaveNetResidualBlockLayer(layers.Layer):
+    """Layer for a residual block in WaveNet.
+
+    TODO: ADD LOCAL CONDITIONING ON ALPHA.
+
+    Parameters
+    ----------
+    filters : int
+        Number of filters for the convolutions.
+    dilation_rate : int
+        Dilation rate for the causal convolutions.
+    """
+
+    def __init__(self, filters: int, dilation_rate: int, **kwargs):
+        super().__init__(**kwargs)
+        self.filter_layer = layers.Conv1D(
+            filters,
+            kernel_size=2,
+            dilation_rate=dilation_rate,
+            padding="causal",
+            use_bias=False,
+        )
+        self.gate_layer = layers.Conv1D(
+            filters,
+            kernel_size=2,
+            dilation_rate=dilation_rate,
+            padding="causal",
+            use_bias=False,
+        )
+        self.dense_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
+        self.skip_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
+
+    def call(self, x, training=None, **kwargs):
+        filter_ = self.filter_layer(x)
+        gate = self.gate_layer(x)
+        z = tf.tanh(filter_) * tf.sigmoid(gate)
+        residual = self.dense_layer(z)
+        skip = self.skip_layer(z)
+        return x + residual, skip
 
 
 class MeanSquaredErrorLayer(layers.Layer):
