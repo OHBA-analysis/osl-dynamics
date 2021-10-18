@@ -31,12 +31,12 @@ meg_data = data.Data(sim.time_series)
 # Settings
 config = Config(
     observation_model="conv_net",
-    n_filters=1,
+    n_filters=4,
     n_residual_blocks=1,
-    n_conv_layers=6,
+    n_conv_layers=7,
     n_states=sim.n_states,
     n_channels=sim.n_channels,
-    sequence_length=100,
+    sequence_length=128,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=200,
@@ -62,9 +62,8 @@ mse = model.loss(training_dataset)
 print("MSE:", mse)
 
 # Sample from the observation model
-# TODO: should use std_dev=sqrt(mse)
 samples = np.empty([config.n_states, 500, config.n_channels])
 for alpha in range(config.n_states):
-    samples[alpha] = model.sample(500, std_dev=0.05, alpha=alpha)
+    samples[alpha] = model.sample(500, std_dev=np.sqrt(mse), alpha=alpha)
 
 plotting.plot_line([range(500)] * config.n_states, samples, filename="samples.png")

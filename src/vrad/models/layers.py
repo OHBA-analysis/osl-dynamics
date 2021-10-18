@@ -1101,6 +1101,7 @@ class WaveNetResidualBlockLayer(layers.Layer):
 
     def __init__(self, filters: int, dilation_rate: int, **kwargs):
         super().__init__(**kwargs)
+        self.h_transform_layer = layers.Conv1D(filters, kernel_size=1, padding="same")
         self.x_filter_layer = layers.Conv1D(
             filters,
             kernel_size=2,
@@ -1129,17 +1130,18 @@ class WaveNetResidualBlockLayer(layers.Layer):
             padding="same",
             use_bias=False,
         )
-        self.dense_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
+        self.res_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
         self.skip_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
 
     def call(self, inputs, training=None, **kwargs):
-        x, y = inputs
+        x, h = inputs
+        y = self.h_transform_layer(h)
         x_filter = self.x_filter_layer(x)
         y_filter = self.y_filter_layer(y)
         x_gate = self.x_gate_layer(x)
         y_gate = self.y_gate_layer(y)
         z = tf.tanh(x_filter + y_filter) * tf.sigmoid(x_gate + y_gate)
-        residual = self.dense_layer(z)
+        residual = self.res_layer(z)
         skip = self.skip_layer(z)
         return x + residual, skip
 
@@ -1166,8 +1168,6 @@ class MeanSquaredErrorLayer(layers.Layer):
             generated_data = generated_data[:, : -self.clip]
 
         se = tf.math.squared_difference(training_data, generated_data)
-        mse = tf.reduce_mean(se, axis=-1)  # mean over channels
-        mse = tf.reduce_sum(mse, axis=-1)  # sum over time points
-        mse = tf.reduce_mean(mse, axis=-1)  # mean over batches
+        mse = tf.reduce_mean(se)  # mean over batches, time points and channels
 
         return tf.expand_dims(mse, axis=-1)
