@@ -22,7 +22,8 @@ sim = simulation.HMM_Sine(
     sampling_frequency=250,
     amplitudes=np.array([[1]]),
     frequencies=np.array([[3]]),
-    trans_prob=None,
+    trans_prob="sequence",
+    stay_prob=0.9,
     observation_error=0.05,
 )
 meg_data = data.Data(sim.time_series)

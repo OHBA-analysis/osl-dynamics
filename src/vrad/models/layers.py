@@ -1063,14 +1063,15 @@ class WaveNetLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         x, alpha = inputs
+        alpha = tf.roll(alpha, shift=-1, axis=1)
         out = self.causal_conv_layer(x)
         skips = []
         for layer in self.residual_block_layers:
-            out, skip = layer(out)  # TODO: ALSO PASS ALPHA
+            out, skip = layer([out, alpha])
             skips.append(skip)
         out = tf.add_n(skips)
         for layer in self.dense_layers:
-            out = activations.selu(out)  # Empirically works better than relu
+            out = activations.selu(out)
             out = layer(out)
         return out
 
@@ -1090,8 +1091,6 @@ class WaveNetLayer(layers.Layer):
 class WaveNetResidualBlockLayer(layers.Layer):
     """Layer for a residual block in WaveNet.
 
-    TODO: ADD LOCAL CONDITIONING ON ALPHA.
-
     Parameters
     ----------
     filters : int
@@ -1102,27 +1101,44 @@ class WaveNetResidualBlockLayer(layers.Layer):
 
     def __init__(self, filters: int, dilation_rate: int, **kwargs):
         super().__init__(**kwargs)
-        self.filter_layer = layers.Conv1D(
+        self.x_filter_layer = layers.Conv1D(
             filters,
             kernel_size=2,
             dilation_rate=dilation_rate,
             padding="causal",
             use_bias=False,
         )
-        self.gate_layer = layers.Conv1D(
+        self.y_filter_layer = layers.Conv1D(
+            filters,
+            kernel_size=1,
+            dilation_rate=dilation_rate,
+            padding="same",
+            use_bias=False,
+        )
+        self.x_gate_layer = layers.Conv1D(
             filters,
             kernel_size=2,
             dilation_rate=dilation_rate,
             padding="causal",
+            use_bias=False,
+        )
+        self.y_gate_layer = layers.Conv1D(
+            filters,
+            kernel_size=1,
+            dilation_rate=dilation_rate,
+            padding="same",
             use_bias=False,
         )
         self.dense_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
         self.skip_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
 
-    def call(self, x, training=None, **kwargs):
-        filter_ = self.filter_layer(x)
-        gate = self.gate_layer(x)
-        z = tf.tanh(filter_) * tf.sigmoid(gate)
+    def call(self, inputs, training=None, **kwargs):
+        x, y = inputs
+        x_filter = self.x_filter_layer(x)
+        y_filter = self.y_filter_layer(y)
+        x_gate = self.x_gate_layer(x)
+        y_gate = self.y_gate_layer(y)
+        z = tf.tanh(x_filter + y_filter) * tf.sigmoid(x_gate + y_gate)
         residual = self.dense_layer(z)
         skip = self.skip_layer(z)
         return x + residual, skip
