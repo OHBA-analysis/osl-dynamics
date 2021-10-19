@@ -21,10 +21,10 @@ class MAR:
     ---------
     coeffs : np.ndarray
         Array of MAR coefficients.
-        Shape must be (n_states, n_lags, n_channels, n_channels).
+        Shape must be (n_modes, n_lags, n_channels, n_channels).
     covs : np.ndarray
-        Covariance of eps_t. Shape must be (n_states, n_channels) or
-        (n_states, n_channels, n_channels).
+        Covariance of eps_t. Shape must be (n_modes, n_channels) or
+        (n_modes, n_channels, n_channels).
     random_seed: int
         Seed for the random number generator.
     """
@@ -38,14 +38,14 @@ class MAR:
         # Validation
         if coeffs.ndim != 4:
             raise ValueError(
-                "coeffs must be a (n_states, n_lags, n_channels, n_channels) array."
+                "coeffs must be a (n_modes, n_lags, n_channels, n_channels) array."
             )
 
         if covs.ndim == 2:
             covs = np.array([np.diag(c) for c in covs])
 
         if coeffs.shape[0] != covs.shape[0]:
-            raise ValueError("Different number of states in coeffs and covs passed.")
+            raise ValueError("Different number of modes in coeffs and covs passed.")
 
         if coeffs.shape[-1] != covs.shape[-1]:
             raise ValueError("Different number of channels in coeffs and covs passed.")
@@ -55,22 +55,22 @@ class MAR:
         self.covs = covs
         self.order = coeffs.shape[1]
 
-        # Number of states and channels
-        self.n_states = coeffs.shape[0]
+        # Number of modes and channels
+        self.n_modes = coeffs.shape[0]
         self.n_channels = coeffs.shape[2]
 
         # Setup random number generator
         self._rng = np.random.default_rng(random_seed)
 
-    def simulate_data(self, state_time_course):
-        # NOTE: We assume mutually exclusive states when generating the data
+    def simulate_data(self, mode_time_course):
+        # NOTE: We assume mutually exclusive modes when generating the data
 
-        n_samples = state_time_course.shape[0]
+        n_samples = mode_time_course.shape[0]
         data = np.empty([n_samples, self.n_channels])
 
         # Generate the noise term first
-        for i in range(self.n_states):
-            time_points_active = state_time_course[:, i] == 1
+        for i in range(self.n_modes):
+            time_points_active = mode_time_course[:, i] == 1
             n_time_points_active = np.count_nonzero(time_points_active)
             data[time_points_active] = self._rng.multivariate_normal(
                 np.zeros(self.n_channels),
@@ -80,8 +80,8 @@ class MAR:
 
         # Generate the MAR process
         for t in range(n_samples):
-            state = state_time_course[t].argmax()
+            mode = mode_time_course[t].argmax()
             for lag in range(min(t, self.order)):
-                data[t] += np.dot(self.coeffs[state, lag], data[t - lag - 1])
+                data[t] += np.dot(self.coeffs[mode, lag], data[t - lag - 1])
 
         return data.astype(np.float32)

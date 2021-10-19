@@ -95,7 +95,7 @@ class RIGO(InferenceModelBase, GO):
             self.compile()
 
     def sample_alpha(self, n_samples: int) -> np.ndarray:
-        """Uses the model RNN to sample state mixing factors, alpha.
+        """Uses the model RNN to sample mode mixing factors, alpha.
 
         Parameters
         ----------
@@ -116,21 +116,21 @@ class RIGO(InferenceModelBase, GO):
 
         # Sequence of the underlying logits theta
         theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_states],
+            [self.config.sequence_length, self.config.n_modes],
             dtype=np.float32,
         )
 
         # Normally distributed random numbers used to sample the logits theta
-        epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_states]).astype(
+        epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
             np.float32
         )
 
-        # Activate the first state for the first sample
+        # Activate the first mode for the first sample
         theta_norm[-1, 0] = 1
 
-        # Sample the state fixing factors
-        alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
-        for i in trange(n_samples, desc="Sampling state time course", ncols=98):
+        # Sample the mode fixing factors
+        alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        for i in trange(n_samples, desc="Sampling mode time course", ncols=98):
 
             # If there are leading zeros we trim theta so that we don't pass the zeros
             trimmed_theta = theta_norm[~np.all(theta_norm == 0, axis=1)][
@@ -151,7 +151,7 @@ class RIGO(InferenceModelBase, GO):
             theta = mod_mu + mod_sigma * epsilon[i]
             theta_norm[-1] = theta_norm_layer(theta[np.newaxis, np.newaxis, :])[0]
 
-            # Calculate the state mixing factors
+            # Calculate the mode mixing factors
             alpha[i] = alpha_layer(theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha
@@ -182,12 +182,12 @@ def _model_structure(config):
         config.inference_dropout_rate,
         name="inf_rnn",
     )
-    inf_mu_layer = layers.Dense(config.n_states, name="inf_mu")
+    inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
     inf_sigma_layer = layers.Dense(
-        config.n_states, activation="softplus", name="inf_sigma"
+        config.n_modes, activation="softplus", name="inf_sigma"
     )
 
-    # Layers to sample theta from q(theta) and to convert to state mixing
+    # Layers to sample theta from q(theta) and to convert to mode mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
@@ -209,13 +209,13 @@ def _model_structure(config):
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each state as the observation model.
+    #   each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
@@ -225,7 +225,7 @@ def _model_structure(config):
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         config.learn_alpha_scaling,
         name="mix_means_covs",
@@ -255,9 +255,9 @@ def _model_structure(config):
         config.model_dropout_rate,
         name="mod_rnn",
     )
-    mod_mu_layer = layers.Dense(config.n_states, name="mod_mu")
+    mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
     mod_sigma_layer = layers.Dense(
-        config.n_states, activation="softplus", name="mod_sigma"
+        config.n_modes, activation="softplus", name="mod_sigma"
     )
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 

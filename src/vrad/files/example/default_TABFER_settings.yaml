@@ -14,7 +14,7 @@ n_epochs: 500
 n_epochs_kl_annealing: 300
 n_layers_inference: 1
 n_layers_model: 1
-n_states: 10
+n_modes: 10
 n_units_inference: 64
 n_units_model: 96
 normalize_covariances: false

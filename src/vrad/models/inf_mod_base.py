@@ -232,7 +232,7 @@ class InferenceModelBase:
     def get_alpha(
         self, inputs, *args, concatenate: bool = False, **kwargs
     ) -> Union[list, np.ndarray]:
-        """State mixing factors, alpha.
+        """Mode mixing factors, alpha.
 
         Parameters
         ----------
@@ -245,8 +245,8 @@ class InferenceModelBase:
         Returns
         -------
         np.ndarray
-            State mixing factors with shape (n_subjects, n_samples,
-            n_states) or (n_samples, n_states).
+            Mode mixing factors with shape (n_subjects, n_samples,
+            n_modes) or (n_samples, n_modes).
         """
         inputs = self._make_dataset(inputs)
         outputs = []

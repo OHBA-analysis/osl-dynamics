@@ -25,8 +25,8 @@ class HMM:
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
         Optional.
-    n_states : int
-        Number of states. Needed when trans_prob is a str to construct the
+    n_modes : int
+        Number of modes. Needed when trans_prob is a str to construct the
         transition probability matrix. Optional.
     random_seed : int
         Seed for random number generator. Optional.
@@ -36,7 +36,7 @@ class HMM:
         self,
         trans_prob: Union[np.ndarray, str],
         stay_prob: float = None,
-        n_states: int = None,
+        n_modes: int = None,
         random_seed: int = None,
     ):
 
@@ -77,64 +77,64 @@ class HMM:
                     "trans_prob must be a np.array, 'sequence' or 'uniform'."
                 )
 
-            # Special case of there being only one state
-            if n_states == 1:
+            # Special case of there being only one mode
+            if n_modes == 1:
                 self.trans_prob = np.ones([1, 1])
 
             # Sequential transition probability matrix
             elif trans_prob == "sequence":
-                if stay_prob is None or n_states is None:
+                if stay_prob is None or n_modes is None:
                     raise ValueError(
-                        "If trans_prob is 'sequence', stay_prob and n_states "
+                        "If trans_prob is 'sequence', stay_prob and n_modes "
                         + "must be passed."
                     )
                 self.trans_prob = self.construct_sequence_trans_prob(
-                    stay_prob, n_states
+                    stay_prob, n_modes
                 )
 
             # Uniform transition probability matrix
             elif trans_prob == "uniform":
-                if n_states is None:
+                if n_modes is None:
                     raise ValueError(
-                        "If trans_prob is 'uniform', n_states must be passed."
+                        "If trans_prob is 'uniform', n_modes must be passed."
                     )
                 if stay_prob is None:
-                    stay_prob = 1.0 / n_states
-                self.trans_prob = self.construct_uniform_trans_prob(stay_prob, n_states)
+                    stay_prob = 1.0 / n_modes
+                self.trans_prob = self.construct_uniform_trans_prob(stay_prob, n_modes)
 
-        elif trans_prob is None and n_states == 1:
+        elif trans_prob is None and n_modes == 1:
             self.trans_prob = np.ones([1, 1])
 
-        # Infer number of states from the transition probability matrix
-        self.n_states = self.trans_prob.shape[0]
+        # Infer number of modes from the transition probability matrix
+        self.n_modes = self.trans_prob.shape[0]
 
         # Setup random number generator
         self._rng = np.random.default_rng(random_seed)
 
     @staticmethod
-    def construct_sequence_trans_prob(stay_prob, n_states):
-        trans_prob = np.zeros([n_states, n_states])
+    def construct_sequence_trans_prob(stay_prob, n_modes):
+        trans_prob = np.zeros([n_modes, n_modes])
         np.fill_diagonal(trans_prob, stay_prob)
         np.fill_diagonal(trans_prob[:, 1:], 1 - stay_prob)
         trans_prob[-1, 0] = 1 - stay_prob
         return trans_prob
 
     @staticmethod
-    def construct_uniform_trans_prob(stay_prob, n_states):
-        single_trans_prob = (1 - stay_prob) / (n_states - 1)
-        trans_prob = np.ones((n_states, n_states)) * single_trans_prob
-        trans_prob[np.diag_indices(n_states)] = stay_prob
+    def construct_uniform_trans_prob(stay_prob, n_modes):
+        single_trans_prob = (1 - stay_prob) / (n_modes - 1)
+        trans_prob = np.ones((n_modes, n_modes)) * single_trans_prob
+        trans_prob[np.diag_indices(n_modes)] = stay_prob
         return trans_prob
 
-    def generate_states(self, n_samples):
+    def generate_modes(self, n_samples):
         rands = [
-            iter(self._rng.choice(self.n_states, size=n_samples, p=self.trans_prob[i]))
-            for i in range(self.n_states)
+            iter(self._rng.choice(self.n_modes, size=n_samples, p=self.trans_prob[i]))
+            for i in range(self.n_modes)
         ]
-        states = np.zeros(n_samples, int)
+        modes = np.zeros(n_samples, int)
         for sample in range(1, n_samples):
-            states[sample] = next(rands[states[sample - 1]])
-        return get_one_hot(states, n_states=self.n_states)
+            modes[sample] = next(rands[modes[sample - 1]])
+        return get_one_hot(modes, n_modes=self.n_modes)
 
 
 class HMM_MAR(Simulation):
@@ -148,10 +148,10 @@ class HMM_MAR(Simulation):
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
     coeffs : np.ndarray
-        Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
+        Array of MAR coefficients. Shape must be (n_modes, n_lags, n_channels,
         n_channels).
     covs : np.ndarray
-        Variance of eps_t. Shape must be (n_states, n_channels).
+        Variance of eps_t. Shape must be (n_modes, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
         Optional.
@@ -175,7 +175,7 @@ class HMM_MAR(Simulation):
             random_seed=random_seed,
         )
 
-        self.n_states = self.obs_mod.n_states
+        self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
 
         # HMM object
@@ -183,7 +183,7 @@ class HMM_MAR(Simulation):
         self.hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
-            n_states=self.n_states,
+            n_modes=self.n_modes,
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
@@ -191,8 +191,8 @@ class HMM_MAR(Simulation):
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        self.state_time_course = self.hmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+        self.mode_time_course = self.hmm.generate_modes(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
@@ -214,13 +214,13 @@ class HMM_MVN(Simulation):
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
     means : np.ndarray or str
-        Mean vector for each state, shape should be (n_states, n_channels).
+        Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or 'zero' or 'random'.
     covariances : np.ndarray or str
-        Covariance matrix for each state, shape should be (n_states,
+        Covariance matrix for each mode, shape should be (n_modes,
         n_channels, n_channels). Either a numpy array or 'random'.
-    n_states : int
-        Number of states.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
     stay_prob : float
@@ -238,7 +238,7 @@ class HMM_MVN(Simulation):
         trans_prob: Union[np.ndarray, str, None],
         means: Union[np.ndarray, str],
         covariances: Union[np.ndarray, str],
-        n_states: int = None,
+        n_modes: int = None,
         n_channels: int = None,
         stay_prob: float = None,
         observation_error: float = 0.0,
@@ -248,13 +248,13 @@ class HMM_MVN(Simulation):
         self.obs_mod = MVN(
             means=means,
             covariances=covariances,
-            n_states=n_states,
+            n_modes=n_modes,
             n_channels=n_channels,
             observation_error=observation_error,
             random_seed=random_seed,
         )
 
-        self.n_states = self.obs_mod.n_states
+        self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
 
         # HMM object
@@ -262,7 +262,7 @@ class HMM_MVN(Simulation):
         self.hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
-            n_states=self.n_states,
+            n_modes=self.n_modes,
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
@@ -270,8 +270,8 @@ class HMM_MVN(Simulation):
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        self.state_time_course = self.hmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+        self.mode_time_course = self.hmm.generate_modes(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
@@ -292,7 +292,7 @@ class HMM_MVN(Simulation):
 class HierarchicalHMM_MVN(Simulation):
     """Hierarchical two-level HMM simulation.
 
-    The bottom level HMMs share the same states, i.e. have the same
+    The bottom level HMMs share the same modes, i.e. have the same
     observation model. Only the transition probability matrix changes.
 
     Parameters
@@ -306,19 +306,19 @@ class HierarchicalHMM_MVN(Simulation):
         Transitions probability matrices for the bottom level HMMs,
         which generate the observed data.
     means : np.ndarray or str
-        Mean vector for each state, shape should be (n_states, n_channels).
+        Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or 'zero' or 'random'.
     covariances : np.ndarray or str
-        Covariance matrix for each state, shape should be (n_states,
+        Covariance matrix for each mode, shape should be (n_modes,
         n_channels, n_channels). Either a numpy array or 'random'.
-    n_states : int
-        Number of states.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
     observation_error : float
         Standard deviation of random noise to be added to the observations.
     top_level_random_seed : int
-        Random seed for generating the state time course of the top level HMM.
+        Random seed for generating the mode time course of the top level HMM.
     bottom_level_random_seeds : list of int
         Random seeds for the bottom level HMMs.
     data_random_seed : int
@@ -332,7 +332,7 @@ class HierarchicalHMM_MVN(Simulation):
         bottom_level_trans_probs: list,
         means: np.ndarray = None,
         covariances: np.ndarray = None,
-        n_states: int = None,
+        n_modes: int = None,
         n_channels: int = None,
         observation_error: float = 0.0,
         top_level_random_seed: int = None,
@@ -343,13 +343,13 @@ class HierarchicalHMM_MVN(Simulation):
         self.obs_mod = MVN(
             means=means,
             covariances=covariances,
-            n_states=n_states,
+            n_modes=n_modes,
             n_channels=n_channels,
             observation_error=observation_error,
             random_seed=data_random_seed,
         )
 
-        self.n_states = self.obs_mod.n_states
+        self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
 
         if bottom_level_random_seeds is None:
@@ -377,8 +377,8 @@ class HierarchicalHMM_MVN(Simulation):
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        self.state_time_course = self.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+        self.mode_time_course = self.generate_modes(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
@@ -388,16 +388,16 @@ class HierarchicalHMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def generate_states(self, n_samples):
-        stc = np.empty([n_samples, self.n_states])
+    def generate_modes(self, n_samples):
+        stc = np.empty([n_samples, self.n_modes])
 
         # Top level HMM to select the bottom level HMM at each time point
-        top_level_stc = self.top_level_hmm.generate_states(n_samples)
+        top_level_stc = self.top_level_hmm.generate_modes(n_samples)
 
-        # Generate state time courses when each bottom level HMM is activate
+        # Generate mode time courses when each bottom level HMM is activate
         for i in range(self.n_bottom_level_hmms):
             time_points_active = np.argwhere(top_level_stc[:, i] == 1)[:, 0]
-            stc[time_points_active] = self.bottom_level_hmms[i].generate_states(
+            stc[time_points_active] = self.bottom_level_hmms[i].generate_modes(
                 n_samples
             )[: len(time_points_active)]
 
@@ -422,16 +422,16 @@ class HMM_Sine(Simulation):
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
     amplitudes : np.ndarray
-        Amplitude for the sine wave for each state and channel.
-        Shape must be (n_states, n_channels).
+        Amplitude for the sine wave for each mode and channel.
+        Shape must be (n_modes, n_channels).
     frequenices : np.ndarray
-        Frequency for the sine wave for each state and channel.
-        Shape must be (n_states, n_channels).
+        Frequency for the sine wave for each mode and channel.
+        Shape must be (n_modes, n_channels).
     sampling_frequency : float
         Sampling frequency in Hertz.
     covariances : np.ndarray
-        Covariances for each state. Shape must be (n_states, n_channels)
-        or (n_states, n_channels, n_channels).
+        Covariances for each mode. Shape must be (n_modes, n_channels)
+        or (n_modes, n_channels, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
         Optional.
@@ -463,7 +463,7 @@ class HMM_Sine(Simulation):
             random_seed=random_seed,
         )
 
-        self.n_states = self.obs_mod.n_states
+        self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
 
         # HMM object
@@ -471,7 +471,7 @@ class HMM_Sine(Simulation):
         self.hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
-            n_states=self.n_states,
+            n_modes=self.n_modes,
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
@@ -479,8 +479,8 @@ class HMM_Sine(Simulation):
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        self.state_time_course = self.hmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+        self.mode_time_course = self.hmm.generate_modes(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):

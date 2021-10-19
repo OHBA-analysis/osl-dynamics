@@ -13,7 +13,7 @@ from matplotlib.path import Path
 
 from vrad.array_ops import get_one_hot
 from vrad.data.task import epoch_mean
-from vrad.inference import states
+from vrad.inference import modes
 from vrad.utils.misc import override_dict_defaults
 from vrad.utils.topoplots import Topology
 
@@ -110,7 +110,7 @@ def rough_square_axes(n_plots: int) -> Tuple[int, int, int]:
 
 
 def get_colors(
-    n_states: int, colormap: str = "magma"
+    n_modes: int, colormap: str = "magma"
 ) -> List[Tuple[float, float, float, float]]:
     """Produce equidistant colors from a matplotlib colormap.
 
@@ -121,7 +121,7 @@ def get_colors(
 
     Parameters
     ----------
-    n_states : int
+    n_modes : int
         The number of colors to return.
     colormap : str
         The name of a matplotlib colormap.
@@ -132,7 +132,7 @@ def get_colors(
         A list of colors in RGBA format. A = 1.0 in all cases.
     """
     colormap = plt.get_cmap(colormap)
-    colors = [colormap(1 * i / n_states) for i in range(n_states)]
+    colors = [colormap(1 * i / n_modes) for i in range(n_modes)]
     return colors
 
 
@@ -1323,12 +1323,12 @@ def plot_alpha(
         Output filename.
     """
     n_alphas = len(alpha)
-    n_states = max(stc.shape[1] for stc in alpha)
+    n_modes = max(stc.shape[1] for stc in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
     if cmap in QUAL_CMAPS:
         cmap = plt.cm.get_cmap(name=cmap)
     else:
-        cmap = plt.cm.get_cmap(name=cmap, lut=n_states)
+        cmap = plt.cm.get_cmap(name=cmap, lut=n_modes)
     colors = cmap.colors
 
     # Validation
@@ -1378,21 +1378,21 @@ def plot_alpha(
 
     # Add a colour bar
     norm = matplotlib.colors.BoundaryNorm(
-        boundaries=range(n_states + 1), ncolors=n_states
+        boundaries=range(n_modes + 1), ncolors=n_modes
     )
     mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     fig.subplots_adjust(right=0.94)
     cb_ax = fig.add_axes([0.95, 0.15, 0.025, 0.7])
-    cb = fig.colorbar(mappable, cax=cb_ax, ticks=np.arange(0.5, n_states + 1, 1))
-    cb.ax.set_yticklabels(range(1, n_states + 1))
+    cb = fig.colorbar(mappable, cax=cb_ax, ticks=np.arange(0.5, n_modes + 1, 1))
+    cb.ax.set_yticklabels(range(1, n_modes + 1))
 
     # Save to file if a filename as been passed
     if filename is not None:
         save(fig, filename, tight_layout=False)
 
 
-def plot_state_lifetimes(
-    state_time_course: np.ndarray,
+def plot_mode_lifetimes(
+    mode_time_course: np.ndarray,
     bins: int = "auto",
     density: bool = False,
     match_scale_x: bool = False,
@@ -1404,19 +1404,19 @@ def plot_state_lifetimes(
     fig_kwargs: dict = None,
     filename: str = None,
 ):
-    """Create a histogram of state lifetimes.
+    """Create a histogram of mode lifetimes.
 
-    For a state time course, create a histogram for each state with the distribution
+    For a mode time course, create a histogram for each mode with the distribution
     of the lengths of time for which it is active.
 
     Parameters
     ----------
-    state_time_course : numpy.ndarray
-        State time course to analyse.
+    mode_time_course : numpy.ndarray
+        Mode time course to analyse.
     bins : int
         Number of bins for the histograms.
     density : bool
-        If True, plot the probability density of the state activation lengths.
+        If True, plot the probability density of the mode activation lengths.
         If False, raw number.
     match_scale_x : bool
         If True, all histograms will share the same x-axis scale.
@@ -1435,15 +1435,15 @@ def plot_state_lifetimes(
     filename : str
         A file to which to save the figure.
     """
-    n_plots = state_time_course.shape[1]
+    n_plots = mode_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
     colors = get_colors(n_plots)
 
     # Validation
-    if state_time_course.ndim == 1:
-        state_time_course = get_one_hot(state_time_course)
-    if state_time_course.ndim != 2:
-        raise ValueError("state_timecourse must be a 2D array")
+    if mode_time_course.ndim == 1:
+        mode_time_course = get_one_hot(mode_time_course)
+    if mode_time_course.ndim != 2:
+        raise ValueError("mode_timecourse must be a 2D array")
 
     default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
     if fig_kwargs is None:
@@ -1454,8 +1454,8 @@ def plot_state_lifetimes(
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    # Calculate state lifetimes
-    channel_lifetimes = states.lifetimes(state_time_course)
+    # Calculate mode lifetimes
+    channel_lifetimes = modes.lifetimes(mode_time_course)
 
     # Create figure
     fig, axes = create_figure(short, long, **fig_kwargs)
@@ -1488,7 +1488,7 @@ def plot_state_lifetimes(
         t = axis.text(
             0.95,
             0.95,
-            f"{np.sum(channel) / len(state_time_course) * 100:.2f}%",
+            f"{np.sum(channel) / len(mode_time_course) * 100:.2f}%",
             fontsize=10,
             horizontalalignment="right",
             verticalalignment="top",

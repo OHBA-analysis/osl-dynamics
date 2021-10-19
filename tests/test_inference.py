@@ -4,48 +4,48 @@ import numpy as np
 from vrad import array_ops, inference
 
 
-class TestCorrelateStates(TestCase):
+class TestCorrelateModes(TestCase):
     def setUp(self) -> None:
-        self.state_time_course_1 = array_ops.get_one_hot(
+        self.mode_time_course_1 = array_ops.get_one_hot(
             np.random.randint(10, size=1000)
         )
-        self.state_time_course_2 = self.state_time_course_1.copy()
+        self.mode_time_course_2 = self.mode_time_course_1.copy()
 
-    def test_correlate_states(self):
-        correlation = inference.states.correlate_states(
-            self.state_time_course_1, self.state_time_course_2
+    def test_correlate_modes(self):
+        correlation = inference.modes.correlate_modes(
+            self.mode_time_course_1, self.mode_time_course_2
         )
 
         self.assertTrue(np.allclose(np.diagonal(correlation), 1))
 
 
-class TestMatchStates(TestCase):
+class TestMatchModes(TestCase):
     def setUp(self) -> None:
-        self.state_time_course_1 = array_ops.get_one_hot(
+        self.mode_time_course_1 = array_ops.get_one_hot(
             np.random.randint(10, size=1000)
         )
-        self.state_time_course_2 = self.state_time_course_1.copy()
+        self.mode_time_course_2 = self.mode_time_course_1.copy()
 
         new_order = np.random.permutation(10)
 
-        self.state_time_course_2 = self.state_time_course_2[:, new_order]
+        self.mode_time_course_2 = self.mode_time_course_2[:, new_order]
 
-    def test_match_states(self):
+    def test_match_modes(self):
         self.assertFalse(
-            np.allclose(self.state_time_course_1, self.state_time_course_2),
-            msg="State time courses are the same.",
+            np.allclose(self.mode_time_course_1, self.mode_time_course_2),
+            msg="Mode time courses are the same.",
         )
         self.assertTrue(
             np.allclose(
-                *inference.states.match_states(
-                    self.state_time_course_1, self.state_time_course_2
+                *inference.modes.match_modes(
+                    self.mode_time_course_1, self.mode_time_course_2
                 )
             ),
-            msg="States post-matching were not the same.",
+            msg="Modes post-matching were not the same.",
         )
 
 
-class TestStateActivation(TestCase):
+class TestModeActivation(TestCase):
     def setUp(self) -> None:
         r2 = np.random.randint(5, size=1000)
         to_delete = []
@@ -62,33 +62,33 @@ class TestStateActivation(TestCase):
             activation.extend([j] * i)
         activation = np.array(activation)
 
-        self.one_hot = array_ops.get_one_hot(activation, n_states=7)
+        self.one_hot = array_ops.get_one_hot(activation, n_modes=7)
 
-    def test_state_activation(self):
-        ons, offs = inference.states.state_activation(self.one_hot)
+    def test_mode_activation(self):
+        ons, offs = inference.modes.mode_activation(self.one_hot)
         for idx, (on, off) in enumerate(zip(ons, offs)):
             self.assertTrue(np.all((off - on) == self.r[self.r2 == idx]))
 
-    def test_state_lifetimes(self):
+    def test_mode_lifetimes(self):
         self.assertTrue(
             np.concatenate(
                 [
                     i == self.r[self.r2 == j]
                     for i, j in zip(
-                        inference.states.state_lifetimes(self.one_hot), range(5)
+                        inference.modes.mode_lifetimes(self.one_hot), range(5)
                     )
                 ]
             ).all()
         )
 
 
-class TestReduceStateTimeCourse(TestCase):
+class TestReduceModeTimeCourse(TestCase):
     def setUp(self) -> None:
         self.a = array_ops.get_one_hot(np.random.randint(5, size=1000))
         self.b = np.zeros((self.a.shape[0], self.a.shape[1] + 1))
         self.b[:, :-1] = self.a
 
-    def test_reduce_state_time_course(self):
+    def test_reduce_mode_time_course(self):
         self.assertTrue(
-            np.all(inference.states.reduce_state_time_course(self.b) == self.a)
+            np.all(inference.modes.reduce_mode_time_course(self.b) == self.a)
         )

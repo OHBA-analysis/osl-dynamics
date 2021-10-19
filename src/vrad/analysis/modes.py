@@ -1,4 +1,4 @@
-"""Functions to manipulate state data for analysis.
+"""Functions to manipulate mode data for analysis.
 
 """
 
@@ -7,16 +7,16 @@ from vrad import array_ops
 
 
 def autocorrelation_functions(
-    state_covariances: np.ndarray,
+    mode_covariances: np.ndarray,
     n_embeddings: int,
     pca_components: np.ndarray,
 ) -> np.ndarray:
-    """Auto/cross-correlation function from the state covariance matrices.
+    """Auto/cross-correlation function from the mode covariance matrices.
 
     Parameters
     ----------
-    state_covariances : np.ndarray
-        State covariance matrices.
+    mode_covariances : np.ndarray
+        Mode covariance matrices.
     n_embeddings : int
         Number of embeddings applied to the training data.
     pca_components : np.ndarray
@@ -30,32 +30,32 @@ def autocorrelation_functions(
 
     # Validation
     error_message = (
-        "state_covariances must be of shape (n_channels, n_channels) or "
-        + "(n_states, n_channels, n_channels) or "
-        + "(n_subjects, n_states, n_channels, n_channels)."
+        "mode_covariances must be of shape (n_channels, n_channels) or "
+        + "(n_modes, n_channels, n_channels) or "
+        + "(n_subjects, n_modes, n_channels, n_channels)."
     )
-    state_covariances = array_ops.validate(
-        state_covariances,
+    mode_covariances = array_ops.validate(
+        mode_covariances,
         correct_dimensionality=4,
         allow_dimensions=[2, 3],
         error_message=error_message,
     )
 
     # Get covariance of time embedded data
-    te_covs = reverse_pca(state_covariances, pca_components)
+    te_covs = reverse_pca(mode_covariances, pca_components)
 
     # Dimensions
     n_subjects = te_covs.shape[0]
-    n_states = te_covs.shape[1]
+    n_modes = te_covs.shape[1]
     n_parcels = te_covs.shape[-1] // n_embeddings
     n_acf = 2 * n_embeddings - 1
 
     # Take mean of elements from the time embedded covariances that
     # correspond to the auto/cross-correlation function
     blocks = te_covs.reshape(
-        n_subjects, n_states, n_parcels, n_embeddings, n_parcels, n_embeddings
+        n_subjects, n_modes, n_parcels, n_embeddings, n_parcels, n_embeddings
     )
-    acfs = np.empty([n_subjects, n_states, n_parcels, n_parcels, n_acf])
+    acfs = np.empty([n_subjects, n_modes, n_parcels, n_parcels, n_acf])
     for i in range(n_acf):
         acfs[:, :, :, :, i] = np.mean(
             np.diagonal(blocks, offset=i - n_embeddings + 1, axis1=3, axis2=5), axis=-1
@@ -65,7 +65,7 @@ def autocorrelation_functions(
 
 
 def raw_covariances(
-    state_covariances: np.ndarray,
+    mode_covariances: np.ndarray,
     n_embeddings: int,
     pca_components: np.ndarray,
     zero_lag: bool = False,
@@ -77,8 +77,8 @@ def raw_covariances(
 
     Parameters
     ----------
-    state_covariances : np.ndarray
-        State covariance matrices.
+    mode_covariances : np.ndarray
+        Mode covariance matrices.
     n_embeddings : int
         Number of embeddings applied to the training data.
     pca_components : np.ndarray
@@ -95,19 +95,19 @@ def raw_covariances(
 
     # Validation
     error_message = (
-        "state_covariances must be of shape (n_channels, n_channels) or "
-        + "(n_states, n_channels, n_channels) or "
-        + "(n_subjects, n_states, n_channels, n_channels)."
+        "mode_covariances must be of shape (n_channels, n_channels) or "
+        + "(n_modes, n_channels, n_channels) or "
+        + "(n_subjects, n_modes, n_channels, n_channels)."
     )
-    state_covariances = array_ops.validate(
-        state_covariances,
+    mode_covariances = array_ops.validate(
+        mode_covariances,
         correct_dimensionality=4,
         allow_dimensions=[2, 3],
         error_message=error_message,
     )
 
     # Get covariance of time embedded data
-    te_covs = reverse_pca(state_covariances, pca_components)
+    te_covs = reverse_pca(mode_covariances, pca_components)
 
     if zero_lag:
         # Return the zero-lag elements only
@@ -118,12 +118,12 @@ def raw_covariances(
     else:
         # Return block means
         n_subjects = te_covs.shape[0]
-        n_states = te_covs.shape[1]
+        n_modes = te_covs.shape[1]
         n_parcels = te_covs.shape[-1] // n_embeddings
 
         n_parcels = te_covs.shape[-1] // n_embeddings
         blocks = te_covs.reshape(
-            n_subjects, n_states, n_parcels, n_embeddings, n_parcels, n_embeddings
+            n_subjects, n_modes, n_parcels, n_embeddings, n_parcels, n_embeddings
         )
         block_diagonal = blocks.diagonal(0, 2, 4)
         diagonal_means = block_diagonal.diagonal(0, 2, 3).mean(3)

@@ -53,7 +53,7 @@ class CNNO(ObservationModelBase):
         std_dev : float
             Standard deviation to use for sampling.
         alpha : int
-            Index for state to sample.
+            Index for mode to sample.
 
         Returns
         -------
@@ -68,12 +68,12 @@ class CNNO(ObservationModelBase):
         x[0, -1] = np.random.normal(size=self.config.n_channels)
 
         a = np.zeros(
-            [1, self.config.sequence_length, self.config.n_states], dtype=np.float32
+            [1, self.config.sequence_length, self.config.n_modes], dtype=np.float32
         )
         a[:, alpha] = 1
 
         d = np.empty([n_samples, self.config.n_channels])
-        for i in trange(n_samples, desc=f"Sampling state {alpha}", ncols=98):
+        for i in trange(n_samples, desc=f"Sampling mode {alpha}", ncols=98):
             y = cnn_layer([x, a])[0, -1]
             x = np.roll(x, shift=-1, axis=1)
             x[0, -1] = y + np.random.normal(scale=std_dev)
@@ -88,7 +88,7 @@ def _model_structure(config):
     inp_data = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
     )
-    alpha = layers.Input(shape=(config.sequence_length, config.n_states), name="alpha")
+    alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
 
     # Definition of layers
     cnn_obs_layer = WaveNetLayer(

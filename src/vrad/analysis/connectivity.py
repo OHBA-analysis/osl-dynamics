@@ -24,7 +24,7 @@ def covariance_from_spectra(
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if frequency_range is given.
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape is (n_states, n_channels,
+        Power/cross spectra for each channel. Shape is (n_modes, n_channels,
         n_channels, n_f).
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
@@ -35,15 +35,15 @@ def covariance_from_spectra(
     Returns
     -------
     np.ndarray
-        Covariance over a frequency band for each component of each state.
-        Shape is (n_components, n_states, n_channels, n_channels).
+        Covariance over a frequency band for each component of each mode.
+        Shape is (n_components, n_modes, n_channels, n_channels).
     """
 
     # Validation
     error_message = (
         "A (n_channels, n_channels, n_frequency_bins), "
-        + "(n_states, n_channels, n_channels, n_frequency_bins) or "
-        + "(n_subjects, n_states, n_channels, n_channels, n_frequency_bins) "
+        + "(n_modes, n_channels, n_channels, n_frequency_bins) or "
+        + "(n_subjects, n_modes, n_channels, n_channels, n_frequency_bins) "
         + "array must be passed."
     )
     power_spectra = array_ops.validate(
@@ -64,7 +64,7 @@ def covariance_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_states, n_channels, n_channels, n_f = power_spectra.shape
+    n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
     if components is None:
         n_components = 1
     else:
@@ -92,7 +92,7 @@ def covariance_from_spectra(
                     raise ValueError("Cannot select the specified frequency range.")
                 c = np.sum(csd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
-        c = c.reshape(n_components, n_states, n_channels, n_channels)
+        c = c.reshape(n_components, n_modes, n_channels, n_channels)
         covar.append(c)
 
     return np.squeeze(covar)
@@ -111,7 +111,7 @@ def mean_coherence_from_spectra(
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if frequency_range is given.
     coherence : np.ndarray
-        Coherence for each channel. Shape is (n_states, n_channels,
+        Coherence for each channel. Shape is (n_modes, n_channels,
         n_channels, n_f).
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
@@ -122,14 +122,14 @@ def mean_coherence_from_spectra(
     Returns
     -------
     np.ndarray
-        Mean coherence over a frequency band for each component of each state.
-        Shape is (n_components, n_states, n_channels, n_channels).
+        Mean coherence over a frequency band for each component of each mode.
+        Shape is (n_components, n_modes, n_channels, n_channels).
     """
 
     # Validation
     error_message = (
         "a 3D numpy array (n_channels, n_channels, n_frequency_bins) "
-        + "or 4D numpy array (n_states, n_channels, n_channels, "
+        + "or 4D numpy array (n_modes, n_channels, n_channels, "
         + "n_frequency_bins) must be passed for spectra."
     )
     coherence = array_ops.validate(
@@ -150,7 +150,7 @@ def mean_coherence_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_states, n_channels, n_channels, n_f = coherence.shape
+    n_subjects, n_modes, n_channels, n_channels, n_f = coherence.shape
     if components is None:
         n_components = 1
     else:
@@ -160,7 +160,7 @@ def mean_coherence_from_spectra(
     c = []
     for i in range(n_subjects):
 
-        # Concatenate over states
+        # Concatenate over modes
         coh = coherence[i].reshape(-1, n_f)
 
         if components is not None:
@@ -178,7 +178,7 @@ def mean_coherence_from_spectra(
                     raise ValueError("Cannot select the specified frequency range.")
                 coh = np.mean(coh[..., f_min_arg : f_max_arg + 1], axis=-1)
 
-        coh = coh.reshape(n_components, n_states, n_channels, n_channels)
+        coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)
 
     return np.squeeze(coh)
@@ -198,7 +198,7 @@ def save(
     ----------
     connectivity_map : np.ndarray
         Matrices containing connectivity strengths to plot.
-        Shape must be (n_states, n_channels, n_channels).
+        Shape must be (n_modes, n_channels, n_channels).
     threshold : float
         Threshold to determine which connectivity to show.
         Should be between 0 and 1.
@@ -230,12 +230,12 @@ def save(
     parcellation = Parcellation(parcellation_file)
 
     # Plot maps
-    n_states = connectivity_map.shape[1]
-    for i in trange(n_states, desc="Saving images", ncols=98):
+    n_modes = connectivity_map.shape[1]
+    for i in trange(n_modes, desc="Saving images", ncols=98):
         conn_map = connectivity_map[component, i].copy()
         np.fill_diagonal(conn_map, 0)
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-            fn=Path(filename), i=i, w=len(str(n_states))
+            fn=Path(filename), i=i, w=len(str(n_modes))
         )
         plotting.plot_connectome(
             conn_map,

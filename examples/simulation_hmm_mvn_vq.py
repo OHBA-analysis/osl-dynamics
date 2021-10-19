@@ -8,7 +8,7 @@
 print("Setting up")
 import numpy as np
 from vrad import data, simulation
-from vrad.inference import metrics, states, tf_ops
+from vrad.inference import metrics, modes, tf_ops
 from vrad.models import Config, Model
 
 # GPU settings
@@ -18,7 +18,7 @@ tf_ops.gpu_growth()
 n_samples = 25600
 
 config = Config(
-    n_states=5,
+    n_modes=5,
     n_channels=80,
     sequence_length=100,
     inference_rnn="lstm",
@@ -46,7 +46,7 @@ config = Config(
 print("Simulating data")
 sim = simulation.HMM_MVN(
     n_samples=n_samples,
-    n_states=config.n_states,
+    n_modes=config.n_modes,
     n_channels=config.n_channels,
     trans_prob="sequence",
     stay_prob=0.9,
@@ -81,17 +81,17 @@ history = model.fit(
     save_filepath="tmp/weights",
 )
 
-# Inferred state mixing factors and state time course
+# Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-inf_stc = states.time_courses(inf_alp)
-sim_stc = sim.state_time_course
+inf_stc = modes.time_courses(inf_alp)
+sim_stc = sim.mode_time_course
 
-sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
+sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
-print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", modes.fractional_occupancies(inf_stc))
 
 # Load at the inferred quantized vectors
 quant_alp = model.get_quantized_alpha()

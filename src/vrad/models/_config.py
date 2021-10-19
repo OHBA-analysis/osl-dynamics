@@ -41,8 +41,8 @@ class Config:
 
     Dimension Parameters
     --------------------
-    n_states : int
-        Number of states.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
     sequence_length : int
@@ -87,20 +87,20 @@ class Config:
         Either 'multivariate_normal', 'multivariate_autoregressive' or
         'conv_net'.
     learn_means : bool
-        Should we make the mean vectors for each state trainable?
+        Should we make the mean vectors for each mode trainable?
         Pass if model='multivariate_normal'.
     learn_covariances : bool
-        Should we make the covariance matrix for each state trainable?
+        Should we make the covariance matrix for each mode trainable?
         Pass if model='multivariate_normal'.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha? Pass if model='multivariate_normal'.
     normalize_covariances : bool
-        Should we trace normalize the state covariances? Pass if
+        Should we trace normalize the mode covariances? Pass if
         model='multivariate_normal'.
     initial_means : np.ndarray
         Initialisation for mean vectors. Pass if model='multivariate_normal'.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. Pass if model='multivariate_normal'.
+        Initialisation for mode covariances. Pass if model='multivariate_normal'.
     n_lags : int
         Number of autoregressive lags. Pass if model='multivariate_autoregressive'.
     learn_coeffs : bool
@@ -168,7 +168,7 @@ class Config:
     observation_model: str = "multivariate_normal"
 
     # Dimension parameters
-    n_states: int = None
+    n_modes: int = None
     n_channels: int = None
     sequence_length: int = None
 
@@ -348,9 +348,9 @@ class Config:
         if self.sequence_length is None:
             raise ValueError("sequence_length must be passed.")
 
-        if self.n_states is not None:
-            if self.n_states < 1:
-                raise ValueError("n_states must be one or greater.")
+        if self.n_modes is not None:
+            if self.n_modes < 1:
+                raise ValueError("n_modes must be one or greater.")
 
         if self.n_channels is not None:
             if self.n_channels < 1:

@@ -10,7 +10,7 @@ from vrad.utils.decorators import transpose
 _logger = logging.getLogger("VRAD")
 
 
-def get_one_hot(values: np.ndarray, n_states: int = None):
+def get_one_hot(values: np.ndarray, n_modes: int = None):
     """Expand a categorical variable to a series of boolean columns (one-hot encoding).
 
     +----------------------+
@@ -42,10 +42,10 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
     Parameters
     ----------
     values : numpy.ndarray
-        Categorical variable in a 1D array. Values should be integers (i.e. state 0, 1,
-        2, 3, ... , `n_states`).
-    n_states : int
-        Total number of states in `values`. Must be at least the number of states
+        Categorical variable in a 1D array. Values should be integers (i.e. mode 0, 1,
+        2, 3, ... , `n_modes`).
+    n_modes : int
+        Total number of modes in `values`. Must be at least the number of modes
         present in `values`. Default is the number of unique values in `values`.
 
     Returns
@@ -57,10 +57,10 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
     if values.ndim == 2:
         _logger.info("argmax being taken on shorter axis.")
         values = values.argmax(axis=1)
-    if n_states is None:
-        n_states = values.max() + 1
-    res = np.eye(n_states)[np.array(values).reshape(-1)]
-    return res.reshape(list(values.shape) + [n_states])
+    if n_modes is None:
+        n_modes = values.max() + 1
+    res = np.eye(n_modes)[np.array(values).reshape(-1)]
+    return res.reshape(list(values.shape) + [n_modes])
 
 
 @transpose(0, "sequence_1", 1, "sequence_2")
@@ -152,17 +152,17 @@ def mean_diagonal(array: np.ndarray):
 
 
 def trace_weights(covariance_matrices: Union[np.ndarray, List[np.ndarray]]):
-    """Calculate a weight for each state in a list of covariances, from their variance.
+    """Calculate a weight for each mode in a list of covariances, from their variance.
 
     Parameters
     ----------
     covariance_matrices: np.ndarray or list of np.ndarray
-        A 3D matrix of dimensions [states x chans x chans] ([states x covariance]).
+        A 3D matrix of dimensions [modes x chans x chans] ([modes x covariance]).
 
     Returns
     -------
     weights: np.ndarray
-        The relative weights of each state, from its variance.
+        The relative weights of each mode, from its variance.
 
     """
     covariance_matrices = np.array(covariance_matrices)

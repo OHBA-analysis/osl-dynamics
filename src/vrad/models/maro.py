@@ -39,9 +39,9 @@ class MARO(ObservationModelBase):
         Returns
         -------
         coeffs : np.ndarray
-            MAR coefficients. Shape is (n_states, n_lags, n_channels, n_channels).
+            MAR coefficients. Shape is (n_modes, n_lags, n_channels, n_channels).
         covs : np.ndarray
-            MAR covariances. Shape is (n_states, n_channels, n_channels).
+            MAR covariances. Shape is (n_modes, n_channels, n_channels).
         """
         coeffs_covs_layer = self.model.get_layer("coeffs_covs")
         coeffs, covs = coeffs_covs_layer(1)
@@ -53,7 +53,7 @@ class MARO(ObservationModelBase):
         Parameters
         ----------
         alpha : np.ndarray
-            State mixing factors. Shape must be (n_samples, n_states).
+            Mode mixing factors. Shape must be (n_samples, n_modes).
 
         Returns
         -------
@@ -69,7 +69,7 @@ def _model_structure(config):
 
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
-    alpha = layers.Input(shape=(config.sequence_length, config.n_states), name="alpha")
+    alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
 
     # Observation model:
     # - We use x_t ~ N(mu_t, sigma_t), where
@@ -81,7 +81,7 @@ def _model_structure(config):
 
     # Definition of layers
     coeffs_covs_layer = CoeffsCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         config.n_lags,
         config.initial_coeffs,

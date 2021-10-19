@@ -103,7 +103,7 @@ class Manipulation:
 
         flat_covariances = covariances.reshape((covariances.shape[0], -1))
 
-        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat_covariances)
+        kmeans = KMeans(n_clusters=n_clusters, random_mode=0).fit(flat_covariances)
 
         kmeans_covariances = kmeans.cluster_centers_.reshape(
             (n_clusters, *covariances.shape[1:])

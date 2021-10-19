@@ -110,7 +110,7 @@ def render(
 
 
 def create_scene(cifti_left, cifti_right, inflation, temp_scene):
-    scene_file = files.scene.state_scene
+    scene_file = files.scene.mode_scene
     temp_scene = pathlib.Path(temp_scene)
 
     surf_left, surf_right = surfs.get(inflation, surfs[0])
@@ -158,13 +158,13 @@ def image(cifti_left, cifti_right, file_name, inflation=0, temp_scene=None):
         temp_scene = "temp_scene.scene"
     create_scene(cifti_left, cifti_right, inflation, temp_scene)
 
-    n_states = nib.load(cifti_left).shape[0]
-    max_int_length = len(str(n_states))
+    n_modes = nib.load(cifti_left).shape[0]
+    max_int_length = len(str(n_modes))
 
     pathlib.Path(file_path).parent.mkdir(exist_ok=True, parents=True)
     file_pattern = f"{file_path}{{:0{max_int_length}d}}{suffix}"
 
-    for i in trange(n_states, desc="Saving images", ncols=98):
+    for i in trange(n_modes, desc="Saving images", ncols=98):
         subprocess.run(
             [
                 "wb_command",

@@ -74,12 +74,12 @@ plotting.plot_connections(
 )
 
 #
-# State analysis plots
+# Mode analysis plots
 #
 
 # Simulate data
 hmm = simulation.HMM_MVN(
-    n_states=5,
+    n_modes=5,
     n_channels=11,
     n_samples=12800,
     trans_prob="sequence",
@@ -87,11 +87,11 @@ hmm = simulation.HMM_MVN(
     means="zero",
     covariances="random",
 )
-hmm_stc = hmm.state_time_course
+hmm_stc = hmm.mode_time_course
 
 sm = simulation.MixedSine_MVN(
     n_samples=25600,
-    n_states=6,
+    n_modes=6,
     n_channels=80,
     relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
     amplitudes=[6, 5, 4, 3, 2, 1],
@@ -100,10 +100,10 @@ sm = simulation.MixedSine_MVN(
     means="zero",
     covariances="random",
 )
-sm_stc = sm.state_time_course
+sm_stc = sm.mode_time_course
 
-# Alpha/state time course
+# Alpha/mode time course
 plotting.plot_alpha(hmm_stc, sm_stc, y_labels=["HMM", "SM"], filename="stc.png")
 
-# State lifetimes
-plotting.plot_state_lifetimes(hmm_stc, filename="slt.png")
+# Mode lifetimes
+plotting.plot_mode_lifetimes(hmm_stc, filename="slt.png")

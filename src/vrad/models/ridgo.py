@@ -126,7 +126,7 @@ class RIDGO(InferenceModelBase, GO):
             self.kl_annealing_factor.assign(0.0)
 
     def sample(self, n_samples: int) -> np.ndarray:
-        """Uses the model RNN to sample a state time course.
+        """Uses the model RNN to sample a mode time course.
 
         Parameters
         ----------
@@ -136,17 +136,17 @@ class RIDGO(InferenceModelBase, GO):
         Returns
         -------
         np.ndarray
-            Sampled state time course.
+            Sampled mode time course.
         """
         # Get layers
         samples_norm_layer = self.model.get_layer("samples_norm")
         rnn_layer = self.model.get_layer("mod_rnn")
         alpha_layer = self.model.get_layer("mod_alpha")
 
-        # Activate the first state and sample from the model RNN
-        stc = np.zeros([n_samples, self.config.n_states], dtype=np.float32)
+        # Activate the first mode and sample from the model RNN
+        stc = np.zeros([n_samples, self.config.n_modes], dtype=np.float32)
         stc[0, 0] = 1
-        for i in trange(1, n_samples, desc="Sampling state time course", ncols=98):
+        for i in trange(1, n_samples, desc="Sampling mode time course", ncols=98):
             samples = stc[np.newaxis, max(0, i - self.config.sequence_length) : i]
             samples_norm = samples_norm_layer(samples)
             model_rnn_output = rnn_layer(samples_norm)
@@ -178,7 +178,7 @@ def _model_structure(config):
         name="inf_rnn",
     )
     inference_alpha_layer = layers.Dense(
-        config.n_states, activation=config.alpha_xform, name="inf_alpha"
+        config.n_modes, activation=config.alpha_xform, name="inf_alpha"
     )
     samples_layer = SampleDirichletDistributionLayer(name="samples")
 
@@ -189,13 +189,13 @@ def _model_structure(config):
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each state as the observation model.
+    #   each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
@@ -205,7 +205,7 @@ def _model_structure(config):
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         config.learn_alpha_scaling,
         name="mix_means_covs",
@@ -235,7 +235,7 @@ def _model_structure(config):
         name="mod_rnn",
     )
     model_alpha_layer = layers.Dense(
-        config.n_states, activation=config.alpha_xform, name="mod_alpha"
+        config.n_modes, activation=config.alpha_xform, name="mod_alpha"
     )
     kl_loss_layer = DirichletKLDivergenceLayer(name="kl")
 

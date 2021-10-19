@@ -230,7 +230,7 @@ class Base:
         return self.html_summary()
 
     def get_all_model_info(self, prediction_dataset, file=None):
-        # Inferred state mixing factors and state time courses
+        # Inferred mode mixing factors and mode time courses
         alpha = self.get_alpha(prediction_dataset)
         history = self.history.history
 

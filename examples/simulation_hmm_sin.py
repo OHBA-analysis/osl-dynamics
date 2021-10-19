@@ -3,13 +3,13 @@
 - Simulates an HMM with sine waves for the observation model.
 - Inference is performed with a MAR observation model.
 - Achieves a dice of ~0.7.
-- Only works well if each state has channels that oscillate with the same frequency.
+- Only works well if each mode has channels that oscillate with the same frequency.
 """
 
 print("Setting up")
 import numpy as np
 from vrad import analysis, data, simulation
-from vrad.inference import callbacks, metrics, states, tf_ops
+from vrad.inference import callbacks, metrics, modes, tf_ops
 from vrad.models import Config, Model
 from vrad.utils import plotting
 
@@ -70,7 +70,7 @@ sim = simulation.HMM_Sine(
 )
 meg_data = data.Data(sim.time_series)
 
-config.n_states = sim.n_states
+config.n_modes = sim.n_modes
 config.n_channels = sim.n_channels
 
 # Prepare dataset
@@ -89,7 +89,7 @@ model.summary()
 
 # Callbacks
 dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.state_time_course
+    prediction_dataset, sim.mode_time_course
 )
 
 print("Training model")
@@ -103,17 +103,17 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state mixing factors and state time course
+# Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-inf_stc = states.time_courses(inf_alp)
-sim_stc = sim.state_time_course
+inf_stc = modes.time_courses(inf_alp)
+sim_stc = sim.mode_time_course
 
-sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
+sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
-print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", modes.fractional_occupancies(inf_stc))
 
 # Inferred parameters
 inf_coeffs, inf_covs = model.get_params()
@@ -129,10 +129,10 @@ print()
 # Calculate power spectral densities from model parameters
 f, psd = analysis.spectral.mar_spectra(inf_coeffs, inf_covs, sampling_frequency)
 
-for i in range(sim.n_states):
+for i in range(sim.n_modes):
     plotting.plot_line(
         [f] * sim.n_channels,
         psd[:, i, range(sim.n_channels), range(sim.n_channels)].T.real,
         labels=[f"channel {i}" for i in range(1, sim.n_channels + 1)],
-        filename=f"psd_state{i}.png",
+        filename=f"psd_mode{i}.png",
     )

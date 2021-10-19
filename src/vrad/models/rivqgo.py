@@ -78,18 +78,18 @@ def _model_structure(config):
         config.inference_dropout_rate,
         name="inf_rnn",
     )
-    inf_mu_layer = layers.Dense(config.n_states, name="inf_mu")
+    inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
     inf_sigma_layer = layers.Dense(
-        config.n_states, activation="softplus", name="inf_sigma"
+        config.n_modes, activation="softplus", name="inf_sigma"
     )
 
-    # Layers to sample theta from q(theta) and to convert to state mixing
+    # Layers to sample theta from q(theta) and to convert to mode mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     quant_theta_norm_layer = VectorQuantizerLayer(
         config.n_quantized_vectors,
-        config.n_states,
+        config.n_modes,
         config.quantized_vector_beta,
         config.initial_quantized_vectors,
         config.learn_quantized_vectors,
@@ -114,13 +114,13 @@ def _model_structure(config):
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each state as the observation model.
+    #   each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
@@ -130,7 +130,7 @@ def _model_structure(config):
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         config.learn_alpha_scaling,
         name="mix_means_covs",
@@ -160,9 +160,9 @@ def _model_structure(config):
         config.model_dropout_rate,
         name="mod_rnn",
     )
-    mod_mu_layer = layers.Dense(config.n_states, name="mod_mu")
+    mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
     mod_sigma_layer = layers.Dense(
-        config.n_states, activation="softplus", name="mod_sigma"
+        config.n_modes, activation="softplus", name="mod_sigma"
     )
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 

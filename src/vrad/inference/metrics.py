@@ -1,4 +1,4 @@
-"""Metrics to analyse model performance.
+"""metrics to analyse model performance.
 
 """
 from typing import Tuple
@@ -13,40 +13,40 @@ from vrad.utils.decorators import transpose
 
 
 def alpha_correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
-    """Calculates the correlation between states of two alpha time series.
+    """Calculates the correlation between modes of two alpha time series.
 
     Parameters
     ----------
     alpha_1 : np.ndarray
-        First alpha time series. Shape is (n_samples, n_states).
+        First alpha time series. Shape is (n_samples, n_modes).
     alpha_2 : np.ndarray
-        Second alpha time series. Shape is (n_samples, n_states).
+        Second alpha time series. Shape is (n_samples, n_modes).
 
     Returns
     -------
     np.ndarray
-        Correlation of each state in the corresponding alphas.
-        Shape is (n_states,).
+        Correlation of each mode in the corresponding alphas.
+        Shape is (n_modes,).
     """
     if alpha_1.shape[1] != alpha_2.shape[1]:
         raise ValueError(
             "alpha_1 and alpha_2 shapes are incomptible. "
             + f"alpha_1.shape={alpha_1.shape}, alpha_2.shape={alpha_2.shape}."
         )
-    n_states = alpha_1.shape[1]
+    n_modes = alpha_1.shape[1]
     corr = np.corrcoef(alpha_1, alpha_2, rowvar=False)
-    corr = np.diagonal(corr[:n_states, n_states:])
+    corr = np.diagonal(corr[:n_modes, n_modes:])
     return corr
 
 
-@transpose("state_time_course_1", 0, "state_time_course_2", 1)
+@transpose("mode_time_course_1", 0, "mode_time_course_2", 1)
 def confusion_matrix(
-    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+    mode_time_course_1: np.ndarray, mode_time_course_2: np.ndarray
 ) -> np.ndarray:
-    """Calculate the confusion matrix of two state time courses.
+    """Calculate the confusion matrix of two mode time courses.
 
-    For two state-time-courses, calculate the confusion matrix (i.e. the
-    disagreement between the state selection for each sample). If either sequence is
+    For two mode-time-courses, calculate the confusion matrix (i.e. the
+    disagreement between the mode selection for each sample). If either sequence is
     two dimensional, it will first have argmax(axis=1) applied to it. The produces the
     expected result for a one-hot encoded sequence but other inputs are not guaranteed
     to behave.
@@ -55,22 +55,22 @@ def confusion_matrix(
 
     Parameters
     ----------
-    state_time_course_1: numpy.ndarray
-    state_time_course_2: numpy.ndarray
+    mode_time_course_1: numpy.ndarray
+    mode_time_course_2: numpy.ndarray
 
     Returns
     -------
     numpy.ndarray
         Confusion matrix
     """
-    if state_time_course_1.ndim == 2:
-        state_time_course_1 = state_time_course_1.argmax(axis=1)
-    if state_time_course_2.ndim == 2:
-        state_time_course_2 = state_time_course_2.argmax(axis=1)
-    if not ((state_time_course_1.ndim == 1) and (state_time_course_2.ndim == 1)):
-        raise ValueError("Both state time courses must be either 1D or 2D.")
+    if mode_time_course_1.ndim == 2:
+        mode_time_course_1 = mode_time_course_1.argmax(axis=1)
+    if mode_time_course_2.ndim == 2:
+        mode_time_course_2 = mode_time_course_2.argmax(axis=1)
+    if not ((mode_time_course_1.ndim == 1) and (mode_time_course_2.ndim == 1)):
+        raise ValueError("Both mode time courses must be either 1D or 2D.")
 
-    return sklearn_confusion(state_time_course_1, state_time_course_2)
+    return sklearn_confusion(mode_time_course_1, mode_time_course_2)
 
 
 def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
@@ -156,10 +156,10 @@ def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
     Parameters
     ----------
     A : np.ndarray
-        First matrix. Shape must be (n_states, n_channels, n_channels) or
+        First matrix. Shape must be (n_modes, n_channels, n_channels) or
         (n_channels, n_channels).
     B : np.ndarray
-        Second matrix. Shape must be (n_states, n_channels, n_channels) or
+        Second matrix. Shape must be (n_modes, n_channels, n_channels) or
         (n_channels, n_channels).
 
     Returns
@@ -197,11 +197,11 @@ def log_likelihood(
     time_series : np.ndarray
         Time series data. Shape must be (n_samples, n_channels).
     alpha : np.ndarray
-        Inferred state mixing factors. Shape must be (n_samples, n_states).
+        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
     covariances : np.ndarray
-        Inferred state covariances. Shape must be (n_states, n_channels, n_channels).
+        Inferred mode covariances. Shape must be (n_modes, n_channels, n_channels).
     means : np.ndarray
-        Inferred mean vectors. Shape must be (n_states, n_channels).
+        Inferred mean vectors. Shape must be (n_modes, n_channels).
     sequence_length : int
         Length of time series to recursively pass to tf_nll.
     """
@@ -251,11 +251,11 @@ def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
     x : tf.constant
         Time series data. Shape must be (sequence_length, n_channels).
     alpha : tf.constant
-        State mixing factors. Shape must be (sequence_length, n_states).
+        Mode mixing factors. Shape must be (sequence_length, n_modes).
     mu : tf.constant
-        State mean vectors. Shape must be (n_states, n_channels).
+        Mode mean vectors. Shape must be (n_modes, n_channels).
     D : tf.constant
-        State covariances. Shape must be (n_states, n_channels, n_channels).
+        Mode covariances. Shape must be (n_modes, n_channels, n_channels).
     """
     # Calculate the mean: m = Sum_j alpha_jt mu_j
     alpha = tf.expand_dims(alpha, axis=-1)
@@ -278,27 +278,27 @@ def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
     return -tf.reduce_sum(ll, axis=0)
 
 
-def state_covariance_correlations(
-    state_covariances: np.ndarray, remove_diagonal: bool = True
+def mode_covariance_correlations(
+    mode_covariances: np.ndarray, remove_diagonal: bool = True
 ) -> np.ndarray:
-    """Calculate the correlation between elements of the state covariances.
+    """Calculate the correlation between elements of the mode covariances.
 
     Parameters
     ----------
-    state_covariances : np.ndarray
-        State covariances matrices.
-        Shape must be (n_states, n_channels, n_channels).
+    mode_covariances : np.ndarray
+        Mode covariances matrices.
+        Shape must be (n_modes, n_channels, n_channels).
 
     Returns
     -------
     np.ndarray
-        Correlation between elements of each state covariance.
-        Shape is (n_states, n_states).
+        Correlation between elements of each mode covariance.
+        Shape is (n_modes, n_modes).
     """
-    n_states = state_covariances.shape[0]
-    state_covariances = state_covariances.reshape(n_states, -1)
-    correlations = np.corrcoef(state_covariances)
-    correlations -= np.eye(n_states)
+    n_modes = mode_covariances.shape[0]
+    mode_covariances = mode_covariances.reshape(n_modes, -1)
+    correlations = np.corrcoef(mode_covariances)
+    correlations -= np.eye(n_modes)
     return correlations
 
 
@@ -320,26 +320,26 @@ def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
     return d
 
 
-def state_covariance_riemannian_distances(state_covariances: np.ndarray) -> np.ndarray:
-    """Calculate the Riemannian distance between state covariances.
+def mode_covariance_riemannian_distances(mode_covariances: np.ndarray) -> np.ndarray:
+    """Calculate the Riemannian distance between mode covariances.
 
     Parameters
     ----------
-    state_covariances : np.ndarray
-        State covariances. Shape must be (n_states, n_channels, n_channels).
+    mode_covariances : np.ndarray
+        Mode covariances. Shape must be (n_modes, n_channels, n_channels).
 
     Returns
     -------
     np.ndarray
-        Matrix containing the Riemannian distances between states.
-        Shape is (n_states, n_states).
+        Matrix containing the Riemannian distances between modes.
+        Shape is (n_modes, n_modes).
     """
-    n_states = state_covariances.shape[0]
-    riemannian_distances = np.empty([n_states, n_states])
-    for i in range(n_states):
-        for j in range(n_states):
+    n_modes = mode_covariances.shape[0]
+    riemannian_distances = np.empty([n_modes, n_modes])
+    for i in range(n_modes):
+        for j in range(n_modes):
             riemannian_distances[i][j] = riemannian_distance(
-                state_covariances[i], state_covariances[j]
+                mode_covariances[i], mode_covariances[j]
             )
     return riemannian_distances
 

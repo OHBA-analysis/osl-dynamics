@@ -28,7 +28,7 @@ class GO(ObservationModelBase):
         self.model = _model_structure(self.config)
 
     def get_covariances(self, alpha_scale=True):
-        """Get the covariances of each state.
+        """Get the covariances of each mode.
 
         Parameters
         ----------
@@ -38,7 +38,7 @@ class GO(ObservationModelBase):
         Returns
         -------
         np.ndarary
-            State covariances.
+            Mode covariances.
         """
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
@@ -53,7 +53,7 @@ class GO(ObservationModelBase):
         return covariances
 
     def get_means_covariances(self, alpha_scale=True):
-        """Get the means and covariances of each state.
+        """Get the means and covariances of each mode.
 
         Parameters
         ----------
@@ -63,9 +63,9 @@ class GO(ObservationModelBase):
         Returns
         -------
         means : np.ndarary
-            State means.
+            Mode means.
         covariances : np.ndarray
-            State covariances.
+            Mode covariances.
         """
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
@@ -79,12 +79,12 @@ class GO(ObservationModelBase):
         return means.numpy(), covariances.numpy()
 
     def set_means(self, means, update_initializer=True):
-        """Set the means of each state.
+        """Set the means of each mode.
 
         Parameters
         ----------
         means : np.ndarray
-            State covariances.
+            Mode covariances.
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model? Optional, default is True.
@@ -99,12 +99,12 @@ class GO(ObservationModelBase):
             means_covs_layer.means_initializer.initial_value = means
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each state.
+        """Set the covariances of each mode.
 
         Parameters
         ----------
         covariances : np.ndarray
-            State covariances.
+            Mode covariances.
         update_initializer : bool
             Do we want to use the passed covariances when we re-initialize
             the model? Optional, default is True.
@@ -125,12 +125,12 @@ class GO(ObservationModelBase):
             )
 
     def get_alpha_scaling(self):
-        """Get the alpha scaling of each state.
+        """Get the alpha scaling of each mode.
 
         Returns
         ----------
         bool
-            Alpha scaling for each state.
+            Alpha scaling for each mode.
         """
         mix_means_covs_layer = self.model.get_layer("mix_means_covs")
         alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
@@ -142,17 +142,17 @@ def _model_structure(config):
 
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
-    alpha = layers.Input(shape=(config.sequence_length, config.n_states), name="alpha")
+    alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each state as the observation model.
+    #   each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
     # Definition of layers
     means_covs_layer = MeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
@@ -162,7 +162,7 @@ def _model_structure(config):
         name="means_covs",
     )
     mix_means_covs_layer = MixMeansCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         config.learn_alpha_scaling,
         name="mix_means_covs",

@@ -1,3 +1,3 @@
 from pathlib import Path
 
-state_scene = Path(__file__).parent / "state_scene.scene"
+mode_scene = Path(__file__).parent / "mode_scene.scene"

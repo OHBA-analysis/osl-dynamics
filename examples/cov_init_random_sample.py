@@ -6,7 +6,7 @@ of the training data.
 import numpy as np
 from vrad.data import Data
 from vrad.files import example
-from vrad.inference.states import match_covariances
+from vrad.inference.modes import match_covariances
 from vrad.simulation import HSMM_MVN
 from vrad.utils import plotting
 

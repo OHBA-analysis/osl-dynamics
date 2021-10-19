@@ -10,7 +10,7 @@ from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from vrad import array_ops
-from vrad.analysis.time_series import get_state_time_series
+from vrad.analysis.time_series import get_mode_time_series
 
 _logger = logging.getLogger("VRAD")
 
@@ -78,7 +78,7 @@ def decompose_spectra(
     coherences: np.ndarray,
     n_components: int,
     max_iter: int = 50000,
-    random_state: int = None,
+    random_mode: int = None,
     verbose: int = 0,
 ) -> np.ndarray:
     """Performs spectral decomposition using coherences.
@@ -89,12 +89,12 @@ def decompose_spectra(
     Parameters
     ----------
     coherences : np.ndarray
-        Coherences with shape (n_states, n_channels, n_channels, n_f).
+        Coherences with shape (n_modes, n_channels, n_channels, n_f).
     n_components : int
         Number of spectral components to fit.
     max_iter : int
         Maximum number of iterations in sklearn's non_negative_factorization.
-    random_state : int
+    random_mode : int
         Seed for the random number generator.
     verbose : int
         Show verbose? (1) yes, (0) no.
@@ -109,7 +109,7 @@ def decompose_spectra(
     # Validation
     error_message = (
         "coherences must be a numpy array with shape (n_channels, n_channels), "
-        + "(n_states, n_channels, n_channels) or (n_subjects, n_states, "
+        + "(n_modes, n_channels, n_channels) or (n_subjects, n_modes, "
         + "n_channels, n_channels)."
     )
     coherences = array_ops.validate(
@@ -119,13 +119,13 @@ def decompose_spectra(
         error_message=error_message,
     )
 
-    # Number of subjects, states, channels and frequency bins
-    n_subjects, n_states, n_channels, n_channels, n_f = coherences.shape
+    # Number of subjects, modes, channels and frequency bins
+    n_subjects, n_modes, n_channels, n_channels, n_f = coherences.shape
 
     # Indices of the upper triangle of the [n_channels, n_channels, n_f] sub-array
     i, j = np.triu_indices(n_channels, 1)
 
-    # Concatenate coherences for each subject and state and only keep the upper triangle
+    # Concatenate coherences for each subject and mode and only keep the upper triangle
     coherences = coherences[:, :, i, j].reshape(-1, n_f)
 
     # Perform non-negative matrix factorisation
@@ -134,7 +134,7 @@ def decompose_spectra(
         n_components=n_components,
         init=None,
         max_iter=max_iter,
-        random_state=random_state,
+        random_mode=random_mode,
         verbose=verbose,
     )
 
@@ -145,7 +145,7 @@ def decompose_spectra(
     return components
 
 
-def state_covariance_spectra(
+def mode_covariance_spectra(
     autocorrelation_function: np.ndarray,
     sampling_frequency: float,
     nfft: int = 64,
@@ -153,14 +153,14 @@ def state_covariance_spectra(
 ):
     """Calculates spectra from the autocorrelation function.
 
-    The power spectrum of each state is calculated as the Fourier transform of
+    The power spectrum of each mode is calculated as the Fourier transform of
     the auto-correlation function. Coherences are calculated from the power spectra.
 
     Parameters
     ----------
     autocorrelation_function : np.ndarray
-        State autocorrelation functions.
-        Shape must be (n_states, n_channels, n_channels, n_acf).
+        Mode autocorrelation functions.
+        Shape must be (n_modes, n_channels, n_channels, n_acf).
     sampling_frequency : float
         Frequency at which the data was sampled (Hz).
     nfft : int
@@ -176,10 +176,10 @@ def state_covariance_spectra(
     frequencies : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_f,).
     power_spectra : np.ndarray
-        Power (or cross) spectra calculated for each state. Shape is (n_states,
+        Power (or cross) spectra calculated for each mode. Shape is (n_modes,
         n_channels, n_channels, n_f).
     coherences : np.ndarray
-        Coherences calculated for each state. Shape is (n_states, n_channels,
+        Coherences calculated for each mode. Shape is (n_modes, n_channels,
         n_channels, n_f).
     """
     print("Calculating power spectra")
@@ -217,7 +217,7 @@ def state_covariance_spectra(
     # Normalise the power spectra
     power_spectra /= nfft ** 2
 
-    # Coherences for each state
+    # Coherences for each mode
     coherences = coherence_spectra(power_spectra)
 
     return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
@@ -312,7 +312,7 @@ def multitaper_spectra(
     segment_length: int = None,
     frequency_range: list = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Calculates spectra for inferred states using a multitaper.
+    """Calculates spectra for inferred modes using a multitaper.
 
     This includes power and coherence spectra.
     Follows the same procedure as the OSL function HMM-MAR/spectral/hmmspectamt.m
@@ -322,8 +322,8 @@ def multitaper_spectra(
     data : np.ndarray
         Raw time series data with shape (n_samples, n_channels).
     alpha : np.ndarray
-        Inferred state mixing factor alpha_t at each time point. Shape is (n_samples,
-        n_states).
+        Inferred mode mixing factor alpha_t at each time point. Shape is (n_samples,
+        n_modes).
     sampling_frequency : float
         Frequency used to sample the data (Hz).
     time_half_bandwidth : float
@@ -340,10 +340,10 @@ def multitaper_spectra(
     frequencies : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_f,).
     power_spectra : np.ndarray
-        Power (or cross) spectra calculated for each state. Shape is (n_states,
+        Power (or cross) spectra calculated for each mode. Shape is (n_modes,
         n_channels, n_channels, n_f).
     coherences : np.ndarray
-        Coherences calculated for each state. Shape is (n_states, n_channels,
+        Coherences calculated for each mode. Shape is (n_modes, n_channels,
         n_channels, n_f).
     """
 
@@ -365,7 +365,7 @@ def multitaper_spectra(
             raise ValueError("data cannot have less samples than alpha.")
 
     if isinstance(data, list):
-        # Check data and state mixing factors for the same number of subjects has
+        # Check data and mode mixing factors for the same number of subjects has
         # been passed
         if len(data) != len(alpha):
             raise ValueError(
@@ -383,20 +383,20 @@ def multitaper_spectra(
             elif alpha[i].shape[0] != data[i].shape[0]:
                 raise ValueError("data cannot have less samples than alpha.")
 
-        # Concatenate the data and state mixing factors for each subject
+        # Concatenate the data and mode mixing factors for each subject
         data = np.concatenate(data, axis=0)
         alpha = np.concatenate(alpha, axis=0)
 
     if data.ndim != 2:
         raise ValueError(
-            "data must have shape (n_samples, n_states) "
-            + "or (n_subjects, n_samples, n_states)."
+            "data must have shape (n_samples, n_modes) "
+            + "or (n_subjects, n_samples, n_modes)."
         )
 
     if alpha.ndim != 2:
         raise ValueError(
-            "alpha must have shape (n_samples, n_states) "
-            + "or (n_subjects, n_samples, n_states)."
+            "alpha must have shape (n_samples, n_modes) "
+            + "or (n_subjects, n_samples, n_modes)."
         )
 
     if segment_length is None:
@@ -410,11 +410,11 @@ def multitaper_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Use the state mixing factors to get a time series for each state
-    state_time_series = get_state_time_series(data, alpha)
+    # Use the mode mixing factors to get a time series for each mode
+    mode_time_series = get_mode_time_series(data, alpha)
 
-    # Number of subjects, states, samples and channels
-    n_states, n_samples, n_channels = state_time_series.shape
+    # Number of subjects, modes, samples and channels
+    n_modes, n_samples, n_channels = mode_time_series.shape
 
     # Number of FFT data points to calculate
     nfft = max(256, 2 ** nextpow2(segment_length))
@@ -439,15 +439,15 @@ def multitaper_spectra(
     # Number of segments in the time series
     n_segments = round(n_samples / segment_length)
 
-    # Power spectra for each state
-    power_spectra = np.zeros([n_states, n_channels, n_channels, n_f], dtype=np.complex_)
+    # Power spectra for each mode
+    power_spectra = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex_)
 
     print("Calculating power spectra")
-    for i in range(n_states):
-        for j in trange(n_segments, desc=f"State {i}", ncols=98):
+    for i in range(n_modes):
+        for j in trange(n_segments, desc=f"Mode {i}", ncols=98):
 
-            # Time series for state i and segment j
-            time_series_segment = state_time_series[
+            # Time series for mode i and segment j
+            time_series_segment = mode_time_series[
                 i, j * segment_length : (j + 1) * segment_length
             ]
 
@@ -474,7 +474,7 @@ def multitaper_spectra(
     sum_alpha = np.sum(alpha ** 2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
     power_spectra *= n_samples / (sum_alpha * n_tapers * n_segments)
 
-    # Coherences for each state
+    # Coherences for each mode
     coherences = coherence_spectra(power_spectra)
 
     return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
@@ -486,19 +486,19 @@ def coherence_spectra(power_spectra: np.ndarray):
     Parameters
     ----------
     power_spectra : np.ndarray
-        Power spectra. Shape is (n_states, n_channels, n_channels, n_f).
+        Power spectra. Shape is (n_modes, n_channels, n_channels, n_f).
 
     Returns
     -------
     np.ndarray
-        Coherence spectra for each state. Shape is (n_states, n_channels, n_channels,
+        Coherence spectra for each mode. Shape is (n_modes, n_channels, n_channels,
         n_f).
     """
-    n_states, n_channels, n_channels, n_f = power_spectra.shape
+    n_modes, n_channels, n_channels, n_f = power_spectra.shape
 
     print("Calculating coherences")
-    coherences = np.empty([n_states, n_channels, n_channels, n_f])
-    for i in range(n_states):
+    coherences = np.empty([n_modes, n_channels, n_channels, n_f])
+    for i in range(n_modes):
         for j in range(n_channels):
             for k in range(n_channels):
                 coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
@@ -516,9 +516,9 @@ def mar_spectra(
     Parameters
     ----------
     coeffs : np.ndarray
-        MAR coefficients. Shape must be (n_states, n_lags, n_channels, n_channels).
+        MAR coefficients. Shape must be (n_modes, n_lags, n_channels, n_channels).
     covs : np.ndarray
-        MAR covariances. Shape must be (n_states, n_channels, n_channels).
+        MAR covariances. Shape must be (n_modes, n_channels, n_channels).
     sampling_frequency : float
         Sampling frequency in Hertz.
     n_f : int
@@ -529,10 +529,10 @@ def mar_spectra(
     -------
     np.ndarray
         Cross power spectral densities.
-        Shape is (n_f, n_states, n_channels, n_channels) or
+        Shape is (n_f, n_modes, n_channels, n_channels) or
         (n_f, n_channels, n_channels).
     """
-    n_states = coeffs.shape[0]
+    n_modes = coeffs.shape[0]
     n_lags = coeffs.shape[1]
     n_channels = coeffs.shape[-1]
 
@@ -540,7 +540,7 @@ def mar_spectra(
     f = np.arange(0, sampling_frequency / 2, sampling_frequency / (2 * n_f))
 
     # z-transform of the coefficients
-    A = np.zeros([n_f, n_states, n_channels, n_channels], dtype=np.complex_)
+    A = np.zeros([n_f, n_modes, n_channels, n_channels], dtype=np.complex_)
     for i in range(n_f):
         for l in range(n_lags):
             z = np.exp(-1j * (l + 1) * 2 * np.pi * f[i] / sampling_frequency)

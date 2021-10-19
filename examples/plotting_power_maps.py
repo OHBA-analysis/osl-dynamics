@@ -3,7 +3,7 @@
 """
 
 print("Setting up")
-from vrad.analysis import power, spectral, states, workbench
+from vrad.analysis import power, spectral, modes, workbench
 from vrad.data import OSL_HMM, Data, io
 from vrad.utils import plotting
 
@@ -27,9 +27,9 @@ parcellation_file = (
     "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
 )
 
-# Use elements of the state covariance matrices for the power maps
-power_map = states.raw_covariances(
-    state_covariances=cov,
+# Use elements of the mode covariance matrices for the power maps
+power_map = modes.raw_covariances(
+    mode_covariances=cov,
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
@@ -43,13 +43,13 @@ power.save(
 workbench.setup("/well/woolrich/projects/software/workbench/bin_rh_linux64")
 workbench.render("var.nii.gz", "tmp", gui=False, image_name="var_.png")
 
-# Calculate power maps using power spectra calculated using the state covariances
-acf = states.autocorrelation_functions(
-    state_covariances=cov,
+# Calculate power maps using power spectra calculated using the mode covariances
+acf = modes.autocorrelation_functions(
+    mode_covariances=cov,
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-f, psd, _ = spectral.state_covariance_spectra(
+f, psd, _ = spectral.mode_covariance_spectra(
     acf,
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,

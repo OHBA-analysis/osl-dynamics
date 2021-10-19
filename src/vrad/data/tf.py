@@ -48,7 +48,7 @@ class TensorFlowDataset:
             Ratio to split the dataset into a training and validation set.
             Optional, default returns the entire data.
         alpha : list of np.ndarray
-            List of state mixing factors for each subject. Optional.
+            List of mode mixing factors for each subject. Optional.
             If passed, we create a dataset that includes alpha at each time point.
             Such a dataset can be used to train the observation model.
         n_alpha_embeddings : int

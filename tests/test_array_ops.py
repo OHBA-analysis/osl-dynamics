@@ -7,24 +7,24 @@ from vrad import array_ops
 
 class TestGetOneHot(TestCase):
     def setUp(self) -> None:
-        self.state_time_course_2d = np.random.rand(100, 5)
-        self.state_time_course = self.state_time_course_2d.argmax(axis=1)
+        self.mode_time_course_2d = np.random.rand(100, 5)
+        self.mode_time_course = self.mode_time_course_2d.argmax(axis=1)
 
     def test_get_one_hot(self):
-        one_hot = array_ops.get_one_hot(self.state_time_course)
+        one_hot = array_ops.get_one_hot(self.mode_time_course)
 
         self.assertTrue(
-            np.all(one_hot.argmax(axis=1) == self.state_time_course),
+            np.all(one_hot.argmax(axis=1) == self.mode_time_course),
             msg="One hot did not reproduce the categorical sequence when inverted.",
         )
 
     def test_get_one_hot_2D(self):
-        one_hot_1d = array_ops.get_one_hot(self.state_time_course)
-        one_hot_2d = array_ops.get_one_hot(self.state_time_course_2d)
-        one_hot_2d_states = array_ops.get_one_hot(self.state_time_course_2d, n_states=7)
+        one_hot_1d = array_ops.get_one_hot(self.mode_time_course)
+        one_hot_2d = array_ops.get_one_hot(self.mode_time_course_2d)
+        one_hot_2d_modes = array_ops.get_one_hot(self.mode_time_course_2d, n_modes=7)
 
         self.assertTrue(np.all(one_hot_1d == one_hot_2d))
-        self.assertTrue(np.all(one_hot_1d == one_hot_2d_states[:, :5]))
+        self.assertTrue(np.all(one_hot_1d == one_hot_2d_modes[:, :5]))
 
 
 class TestDiceCoefficient1D(TestCase):
@@ -45,7 +45,7 @@ class TestDiceCoefficient1D(TestCase):
         self.assertTrue(
             0.1 < dice_2 < 0.3,
             msg="A randomly shuffled array should "
-            "have a dice coefficient of around 1/n states.",
+            "have a dice coefficient of around 1/n modes.",
         )
 
         one_hot = array_ops.get_one_hot(self.sequence_1)
@@ -78,7 +78,7 @@ class TestDiceCoefficient(TestCase):
         self.assertTrue(
             0.1 < dice_2 < 0.3,
             msg="A randomly shuffled array should "
-            "have a dice coefficient of around 1/n states.",
+            "have a dice coefficient of around 1/n modes.",
         )
 
         with self.assertRaises(ValueError):
@@ -142,24 +142,24 @@ class TestCalculateTransProbMatrix(TestCase):
         rand_norm = rand / rand.sum(axis=1)[:, None]
         trans_prob = rand_norm.cumsum(axis=1)
 
-        state = [0]
+        mode = [0]
         for i in range(1, 5000):
             r = np.random.rand()
-            state.append(np.argmax(trans_prob[state[-1]] > r))
+            mode.append(np.argmax(trans_prob[mode[-1]] > r))
 
-        self.state = np.array(state)
+        self.mode = np.array(mode)
         z = np.zeros((5, 5))
-        for i, j in zip(state, state[1:]):
+        for i, j in zip(mode, mode[1:]):
             z[i, j] += 1
 
         self.z = z / z.sum(axis=1)[:, None]
 
     def test_calculate_trans_prob_matrix(self):
-        inf_tb = array_ops.calculate_trans_prob_matrix(self.state)
+        inf_tb = array_ops.calculate_trans_prob_matrix(self.mode)
         self.assertTrue(np.allclose(inf_tb, self.z))
 
         inf_tb_from_2d = array_ops.calculate_trans_prob_matrix(
-            array_ops.get_one_hot(self.state)
+            array_ops.get_one_hot(self.mode)
         )
 
         self.assertTrue(np.allclose(inf_tb_from_2d, self.z))
@@ -169,7 +169,7 @@ class TestCalculateTransProbMatrix(TestCase):
 
         self.assertTrue(
             np.allclose(
-                array_ops.calculate_trans_prob_matrix(self.state, n_states=10)[:5, :5],
+                array_ops.calculate_trans_prob_matrix(self.mode, n_modes=10)[:5, :5],
                 self.z,
             )
         )
@@ -178,7 +178,7 @@ class TestCalculateTransProbMatrix(TestCase):
         np.fill_diagonal(z2, 0)
         self.assertTrue(
             np.allclose(
-                array_ops.calculate_trans_prob_matrix(self.state, zero_diagonal=True),
+                array_ops.calculate_trans_prob_matrix(self.mode, zero_diagonal=True),
                 z2,
             )
         )

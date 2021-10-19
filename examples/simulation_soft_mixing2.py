@@ -3,8 +3,8 @@ Example to show VRAD's ability to learn non-categorical descriptions of latent d
 using non-overlapping Gaussian Kernels as the covariance matrix elements.
 
 This example demonstrates what can sometimes happen when the underlying ground truth
-covariances have a similar structure - states can be "knocked out" and/or combined
-during the inference stage. See the first two states (as they are plotted) here.
+covariances have a similar structure - modes can be "knocked out" and/or combined
+during the inference stage. See the first two modes (as they are plotted) here.
 
 Ryan Timms and Chetan Gohil, 2021.
 """
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from vrad import data, simulation
-from vrad.inference import states, tf_ops
+from vrad.inference import modes, tf_ops
 from vrad.models import Config, Model
 
 # GPU settings
@@ -68,12 +68,12 @@ set_all_seeds(seed_value)
 # GPU settings
 tf_ops.gpu_growth()
 
-n_states = 6
+n_modes = 6
 n_chans = 80
 
 # Settings
 config = Config(
-    n_states=n_states,
+    n_modes=n_modes,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=64,
@@ -95,11 +95,11 @@ config = Config(
     n_epochs=500,
 )
 
-# Generate ground truth covariance matrix for each state,
-# shape should be (n_states,n_channels, n_channels)
+# Generate ground truth covariance matrix for each mode,
+# shape should be (n_modes,n_channels, n_channels)
 
-GT_covz = np.zeros((n_states, n_chans, n_chans))
-for i in range(n_states):
+GT_covz = np.zeros((n_modes, n_chans, n_chans))
+for i in range(n_modes):
     tmp = (
         gaussian_heatmap(
             center=(
@@ -117,7 +117,7 @@ for i in range(n_states):
 print("Simulating data")
 sim = simulation.MixedSine_MVN(
     n_samples=25600 * 2,
-    n_states=6,
+    n_modes=6,
     n_channels=80,
     relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
     amplitudes=[6, 5, 4, 3, 2, 1],
@@ -128,7 +128,7 @@ sim = simulation.MixedSine_MVN(
     random_seed=123,
 )
 sim.standardize()
-sim_stc = sim.state_time_course
+sim_stc = sim.mode_time_course
 meg_data = data.Data(sim.time_series)
 
 config.n_channels = meg_data.n_channels
@@ -159,15 +159,15 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Compare the inferred state time course to the ground truth
+# Compare the inferred mode time course to the ground truth
 alpha = model.get_alpha(prediction_dataset)
 inferred_covz = model.get_covariances()
 
 # Match inferred and ground truth covariances/alphas for visulaisation
-sim_stc, inf_stc = states.match_states(sim_stc, alpha)
-GT_covz, inferred_covz = states.match_covariances(GT_covz, inferred_covz)
+sim_stc, inf_stc = modes.match_modes(sim_stc, alpha)
+GT_covz, inferred_covz = modes.match_covariances(GT_covz, inferred_covz)
 
-for i in range(n_states):
+for i in range(n_modes):
     plt.figure()
     plt.plot(inf_stc[:, i])
     plt.plot(sim_stc[:, i])

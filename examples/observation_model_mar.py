@@ -35,7 +35,7 @@ meg_data = data.Data(sim.time_series)
 
 # Settings
 config = Config(
-    n_states=sim.n_states,
+    n_modes=sim.n_modes,
     n_channels=sim.n_channels,
     sequence_length=100,
     observation_model="multivariate_autoregressive",
@@ -50,7 +50,7 @@ config = Config(
 training_dataset = meg_data.dataset(
     config.sequence_length,
     config.batch_size,
-    alpha=[sim.state_time_course],
+    alpha=[sim.mode_time_course],
     shuffle=True,
 )
 
@@ -75,10 +75,10 @@ print()
 # Calculate power spectral densities from model parameters
 f, psd = spectral.mar_spectra(inf_coeffs, inf_covs, sampling_frequency)
 
-for i in range(sim.n_states):
+for i in range(sim.n_modes):
     plotting.plot_line(
         [f] * sim.n_channels,
         psd[:, i, range(sim.n_channels), range(sim.n_channels)].T.real,
         labels=[f"channel {i}" for i in range(1, sim.n_channels + 1)],
-        filename=f"psd_state{i}.png",
+        filename=f"psd_mode{i}.png",
     )

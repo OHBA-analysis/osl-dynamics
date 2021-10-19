@@ -37,7 +37,7 @@ settings = yaml.safe_load(default_settings.open())
 print(f"Loaded default settings from {default_settings}.")
 
 # Settings
-n_states = settings["n_states"]
+n_modes = settings["n_modes"]
 sequence_length = settings["sequence_length"]
 batch_size = settings["batch_size"]
 n_layers_inference = settings["n_layers_inference"]
@@ -81,21 +81,21 @@ if cov_init_type == "random":
     rand_init = rand_init["rand_init"]  # needs to be channels or PCs by time
 
     # Ensure data are PSD
-    for i in range(n_states):
+    for i in range(n_modes):
         rand_init[i, :, :] = np.linalg.cholesky(
             rand_init[i, :, :] + (1e-5 * np.eye(n_channels))
         )
     initial_covariances = rand_init.astype("float32")
 else:
-    initial_covariances = np.tile(np.eye(n_channels), (n_states, 1, 1))
+    initial_covariances = np.tile(np.eye(n_channels), (n_modes, 1, 1))
 
-initial_means = np.zeros((n_states, n_channels))
+initial_means = np.zeros((n_modes, n_channels))
 
 
 # Build model
 model = RIGO(
     n_channels=n_channels,
-    n_states=n_states,
+    n_modes=n_modes,
     sequence_length=sequence_length,
     learn_covariances=learn_covariances,
     initial_covariances=initial_covariances,
@@ -136,12 +136,12 @@ ll = history.history["ll_loss"]
 trl_length = 3001
 n_trials = int(np.floor(np.asarray(np.shape(alpha[:, 0])) / trl_length))
 cropped_alphas = alpha[0 : n_trials * trl_length, :]
-tw_alphas = np.reshape(cropped_alphas, (n_trials, trl_length, n_states))
+tw_alphas = np.reshape(cropped_alphas, (n_trials, trl_length, n_modes))
 plt.figure(figsize=(10, 20))
-for i in range(n_states):
-    plt.subplot(n_states, 1, i + 1)
+for i in range(n_modes):
+    plt.subplot(n_modes, 1, i + 1)
     plt.plot(np.mean(tw_alphas, 0)[:, i])
-    plt.title("State " + str(i))
+    plt.title("Mode " + str(i))
 plt.xlabel("Time (s)")
 plt.suptitle("Inferred trial-wise dynamics")
 plt.tight_layout()
@@ -155,7 +155,7 @@ chan_names = spio.loadmat(
 chan_names = chan_names["ans"][0]
 ctf275_channel_names = [chan_name[0] for chan_name in chan_names]
 
-for ii in range(n_states):
+for ii in range(n_modes):
     # Project back to the full-space
     tmp = covz[ii, :, :]
     res = np.matmul(np.matmul(np.transpose(U), tmp), U)
@@ -172,7 +172,7 @@ for ii in range(n_states):
         plot_boxes=False,
         show_deleted_sensors=True,
         show_names=False,
-        title="State " + str(ii),
+        title="Mode " + str(ii),
         colorbar=True,
         cmap="plasma",
         n_contours=25,

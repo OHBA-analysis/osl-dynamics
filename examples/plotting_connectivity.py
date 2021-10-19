@@ -4,7 +4,7 @@
 
 print("Setting up")
 import numpy as np
-from vrad.analysis import connectivity, spectral, states
+from vrad.analysis import connectivity, spectral, modes
 from vrad.data import OSL_HMM, Data, io
 from vrad.utils import plotting
 
@@ -29,8 +29,8 @@ parcellation_file = (
 )
 
 # Connectivity using correlations taken from the raw covariance matrix
-raw_cov = states.raw_covariances(
-    state_covariances=cov,
+raw_cov = modes.raw_covariances(
+    mode_covariances=cov,
     n_embeddings=n_embeddings,
     pca_components=pca_components,
     zero_lag=False,
@@ -45,12 +45,12 @@ connectivity.save(
 )
 
 # Connectivity using covariance calculated from autocorrelation functions
-acf = states.autocorrelation_functions(
-    state_covariances=cov,
+acf = modes.autocorrelation_functions(
+    mode_covariances=cov,
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-_, psd, _ = spectral.state_covariance_spectra(
+_, psd, _ = spectral.mode_covariance_spectra(
     acf,
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,

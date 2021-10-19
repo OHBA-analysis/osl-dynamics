@@ -27,7 +27,7 @@ def variance_from_spectra(
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if frequency_range is given.
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape is (n_states, n_channels,
+        Power/cross spectra for each channel. Shape is (n_modes, n_channels,
         n_channels, n_f).
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
@@ -38,15 +38,15 @@ def variance_from_spectra(
     Returns
     -------
     np.ndarray
-        Variance over a frequency band for each component of each state.
-        Shape is (n_components, n_states, n_channels, n_channels).
+        Variance over a frequency band for each component of each mode.
+        Shape is (n_components, n_modes, n_channels, n_channels).
     """
 
     # Validation
     error_message = (
         "A (n_channels, n_channels, n_frequency_bins), "
-        + "(n_states, n_channels, n_channels, n_frequency_bins) or "
-        + "(n_subjects, n_states, n_channels, n_channels, n_frequency_bins) "
+        + "(n_modes, n_channels, n_channels, n_frequency_bins) or "
+        + "(n_subjects, n_modes, n_channels, n_channels, n_frequency_bins) "
         + "array must be passed."
     )
     power_spectra = array_ops.validate(
@@ -67,7 +67,7 @@ def variance_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_states, n_channels, n_channels, n_f = power_spectra.shape
+    n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
     if components is None:
         n_components = 1
     else:
@@ -78,7 +78,7 @@ def variance_from_spectra(
     for i in range(n_subjects):
 
         # Remove cross-spectral densities from the power spectra array
-        # and concatenate over states
+        # and concatenate over modes
         psd = power_spectra[i, :, range(n_channels), range(n_channels)]
         psd = np.swapaxes(psd, 0, 1)
         psd = psd.reshape(-1, n_f)
@@ -99,10 +99,10 @@ def variance_from_spectra(
                     raise ValueError("Cannot select the specified frequency range.")
                 p = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
-        p = p.reshape(n_components, n_states, n_channels)
+        p = p.reshape(n_components, n_modes, n_channels)
 
         # Variance
-        v = np.zeros([n_components, n_states, n_channels, n_channels])
+        v = np.zeros([n_components, n_modes, n_channels, n_channels])
         v[:, :, range(n_channels), range(n_channels)] = p
         var.append(v)
 
@@ -149,11 +149,11 @@ def power_map_grid(
     # Normalise the voxels weights
     voxel_weights /= voxel_weights.max(axis=0)[np.newaxis, ...]
 
-    # Generate a spatial map vector for each state
+    # Generate a spatial map vector for each mode
     n_voxels = voxel_weights.shape[0]
-    n_states = power_map.shape[1]
-    spatial_map_values = np.empty([n_voxels, n_states])
-    for i in range(n_states):
+    n_modes = power_map.shape[1]
+    spatial_map_values = np.empty([n_voxels, n_modes])
+    for i in range(n_modes):
         spatial_map_values[:, i] = voxel_weights @ np.diag(
             np.squeeze(power_map[component, i])
         )
@@ -166,11 +166,11 @@ def power_map_grid(
             weights=mean_weights,
         )[..., np.newaxis]
 
-    # Final spatial map as a 3D grid for each state
-    spatial_map = np.zeros([mask_grid.shape[0], n_states])
+    # Final spatial map as a 3D grid for each mode
+    spatial_map = np.zeros([mask_grid.shape[0], n_modes])
     spatial_map[non_zero_voxels] = spatial_map_values
     spatial_map = spatial_map.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], n_states, order="F"
+        mask.shape[0], mask.shape[1], mask.shape[2], n_modes, order="F"
     )
 
     return spatial_map
@@ -192,7 +192,7 @@ def save(
     ----------
     power_map : np.ndarray
         Power map to save.
-        Shape must be (n_components, n_states, n_channels, n_channels).
+        Shape must be (n_components, n_modes, n_channels, n_channels).
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png, it is saved as images.
@@ -203,9 +203,9 @@ def save(
     component : int
         Spectral component to save. Optional.
     subtract_mean : bool
-        Should we subtract the mean power across states? Optional: default is False.
+        Should we subtract the mean power across modes? Optional: default is False.
     mean_weights: np.ndarray
-        Numpy array with weightings for each state to use to calculate the mean.
+        Numpy array with weightings for each mode to use to calculate the mean.
         Optional, default is equal weighting.
     """
     # Validation
@@ -237,11 +237,11 @@ def save(
 
     # Save each map as an image
     elif ".png" in filename:
-        n_states = power_map.shape[-1]
-        for i in trange(n_states, desc="Saving images", ncols=98):
+        n_modes = power_map.shape[-1]
+        for i in trange(n_modes, desc="Saving images", ncols=98):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
             output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-                fn=Path(filename), i=i, w=len(str(n_states))
+                fn=Path(filename), i=i, w=len(str(n_modes))
             )
             plotting.plot_img_on_surf(
                 nii,

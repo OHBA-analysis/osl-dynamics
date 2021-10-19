@@ -64,12 +64,12 @@ class DiceCoefficientCallback(callbacks.Callback):
     def __init__(
         self,
         prediction_dataset: tf.data.Dataset,
-        ground_truth_state_time_course: np.ndarray,
+        ground_truth_mode_time_course: np.ndarray,
     ):
         super().__init__()
         self.prediction_dataset = prediction_dataset
-        self.gtstc = ground_truth_state_time_course
-        self.n_states = ground_truth_state_time_course.shape[-1]
+        self.gtstc = ground_truth_mode_time_course
+        self.n_modes = ground_truth_mode_time_course.shape[-1]
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -83,10 +83,10 @@ class DiceCoefficientCallback(callbacks.Callback):
             validation is performed.
         """
         [_, _, alpha] = self.model.predict(self.prediction_dataset)
-        pstc = inference.states.time_courses(
-            alpha, concatenate=True, n_states=self.n_states
+        pstc = inference.modes.time_courses(
+            alpha, concatenate=True, n_modes=self.n_modes
         )
-        pstc, gtstc = inference.states.match_states(pstc, self.gtstc)
+        pstc, gtstc = inference.modes.match_modes(pstc, self.gtstc)
         dice = inference.metrics.dice_coefficient(pstc, gtstc)
         logs["dice"] = dice
         print(f" - dice: {dice}", end="")

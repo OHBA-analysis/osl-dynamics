@@ -19,7 +19,7 @@ tf_ops.gpu_growth()
 
 # Hyperparameters
 config = Config(
-    n_states=10,
+    n_modes=10,
     n_channels=80,
     sequence_length=200,
     inference_rnn="lstm",

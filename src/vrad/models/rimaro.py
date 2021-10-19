@@ -62,12 +62,12 @@ def _model_structure(config):
         config.inference_dropout_rate,
         name="inf_rnn",
     )
-    inf_mu_layer = layers.Dense(config.n_states, name="inf_mu")
+    inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
     inf_sigma_layer = layers.Dense(
-        config.n_states, activation="softplus", name="inf_sigma"
+        config.n_modes, activation="softplus", name="inf_sigma"
     )
 
-    # Layers to sample theta from q(theta) and to convert to state mixing
+    # Layers to sample theta from q(theta) and to convert to mode mixing
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
@@ -97,7 +97,7 @@ def _model_structure(config):
 
     # Definition of layers
     coeffs_covs_layer = CoeffsCovsLayer(
-        config.n_states,
+        config.n_modes,
         config.n_channels,
         config.n_lags,
         config.initial_coeffs,
@@ -135,9 +135,9 @@ def _model_structure(config):
         config.model_dropout_rate,
         name="mod_rnn",
     )
-    mod_mu_layer = layers.Dense(config.n_states, name="mod_mu")
+    mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
     mod_sigma_layer = layers.Dense(
-        config.n_states, activation="softplus", name="mod_sigma"
+        config.n_modes, activation="softplus", name="mod_sigma"
     )
     kl_loss_layer = NormalKLDivergenceLayer(name="kl")
 

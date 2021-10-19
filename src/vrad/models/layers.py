@@ -229,14 +229,14 @@ class ThetaActivationLayer(layers.Layer):
 
 
 class MeansCovsLayer(layers.Layer):
-    """Layer to learn the mean and covariance of each state.
+    """Layer to learn the mean and covariance of each mode.
 
-    Outputs the mean vector and covariance matrix of each state.
+    Outputs the mean vector and covariance matrix of each mode.
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
     learn_means : bool
@@ -244,14 +244,14 @@ class MeansCovsLayer(layers.Layer):
     learn_covariances : bool
         Should we learn the covariances?
     initial_means : np.ndarray
-        Initial values for the mean of each state.
+        Initial values for the mean of each mode.
     initial_covariances : np.ndarray
-        Initial values for the covariance of each state. Must be dtype float32
+        Initial values for the covariance of each mode. Must be dtype float32
     """
 
     def __init__(
         self,
-        n_states: int,
+        n_modes: int,
         n_channels: int,
         learn_means: bool,
         learn_covariances: bool,
@@ -261,7 +261,7 @@ class MeansCovsLayer(layers.Layer):
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.n_states = n_states
+        self.n_modes = n_modes
         self.n_channels = n_channels
         self.learn_means = learn_means
         self.learn_covariances = learn_covariances
@@ -272,7 +272,7 @@ class MeansCovsLayer(layers.Layer):
 
         # Initialisation of means
         if initial_means is None:
-            self.initial_means = np.zeros([n_states, n_channels], dtype=np.float32)
+            self.initial_means = np.zeros([n_modes, n_channels], dtype=np.float32)
         else:
             self.initial_means = initial_means.astype("float32")
 
@@ -281,7 +281,7 @@ class MeansCovsLayer(layers.Layer):
         # Initialisation of covariances
         if initial_covariances is None:
             self.initial_covariances = np.stack(
-                [np.eye(n_channels, dtype=np.float32)] * n_states
+                [np.eye(n_channels, dtype=np.float32)] * n_modes
             )
         else:
             self.initial_covariances = initial_covariances.astype("float32")
@@ -308,7 +308,7 @@ class MeansCovsLayer(layers.Layer):
         # Create weights the means
         self.means = self.add_weight(
             "means",
-            shape=(self.n_states, self.n_channels),
+            shape=(self.n_modes, self.n_channels),
             dtype=tf.float32,
             initializer=self.means_initializer,
             trainable=self.learn_means,
@@ -317,7 +317,7 @@ class MeansCovsLayer(layers.Layer):
         # Create weights for the cholesky decomposition of the covariances
         self.flattened_cholesky_covariances = self.add_weight(
             "flattened_cholesky_covariances",
-            shape=(self.n_states, self.n_channels * (self.n_channels + 1) // 2),
+            shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
             dtype=tf.float32,
             initializer=self.flattened_cholesky_covariances_initializer,
             trainable=self.learn_covariances,
@@ -346,7 +346,7 @@ class MeansCovsLayer(layers.Layer):
         config = super().get_config()
         config.update(
             {
-                "n_states": self.n_states,
+                "n_modes": self.n_modes,
                 "n_channels": self.n_channels,
                 "learn_means": self.learn_means,
                 "learn_covariances": self.learn_covariances,
@@ -364,8 +364,8 @@ class MixMeansCovsLayer(layers.Layer):
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
     learn_alpha_scaling : bool
@@ -373,10 +373,10 @@ class MixMeansCovsLayer(layers.Layer):
     """
 
     def __init__(
-        self, n_states: int, n_channels: int, learn_alpha_scaling: bool, **kwargs
+        self, n_modes: int, n_channels: int, learn_alpha_scaling: bool, **kwargs
     ):
         super().__init__(**kwargs)
-        self.n_states = n_states
+        self.n_modes = n_modes
         self.n_channels = n_channels
         self.learn_alpha_scaling = learn_alpha_scaling
 
@@ -388,7 +388,7 @@ class MixMeansCovsLayer(layers.Layer):
         )
         self.alpha_scaling = self.add_weight(
             "alpha_scaling",
-            shape=self.n_states,
+            shape=self.n_modes,
             dtype=tf.float32,
             initializer=self.alpha_scaling_initializer,
             trainable=self.learn_alpha_scaling,
@@ -398,24 +398,24 @@ class MixMeansCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
 
         # Unpack the inputs:
-        # - alpha.shape = (None, sequence_length, n_states)
-        # - mu.shape    = (n_states, n_channels)
-        # - D.shape     = (n_states, n_channels, n_channels)
+        # - alpha.shape = (None, sequence_length, n_modes)
+        # - mu.shape    = (n_modes, n_channels)
+        # - D.shape     = (n_modes, n_channels, n_channels)
         alpha, mu, D = inputs
 
-        # Rescale the state mixing factors
+        # Rescale the mode mixing factors
         alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
 
         # Reshape alpha and mu for multiplication
         alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.reshape(mu, (1, 1, self.n_states, self.n_channels))
+        mu = tf.reshape(mu, (1, 1, self.n_modes, self.n_channels))
 
         # Calculate the mean: m_t = Sum_j alpha_jt mu_j
         m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
 
         # Reshape alpha and D for multiplication
         alpha = tf.expand_dims(alpha, axis=-1)
-        D = tf.reshape(D, (1, 1, self.n_states, self.n_channels, self.n_channels))
+        D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
 
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
@@ -426,7 +426,7 @@ class MixMeansCovsLayer(layers.Layer):
         config = super().get_config()
         config.update(
             {
-                "n_states": self.n_states,
+                "n_modes": self.n_modes,
                 "n_channels": self.n_channels,
                 "learn_alpha_scaling": self.learn_alpha_scaling,
             }
@@ -504,7 +504,7 @@ class NormalKLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        # Sum the KL loss for each state and time point and average over batches
+        # Sum the KL loss for each mode and time point and average over batches
         kl_loss = tf.reduce_sum(kl_loss, axis=2)
         kl_loss = tf.reduce_sum(kl_loss, axis=1)
         kl_loss = tf.reduce_mean(kl_loss, axis=0)
@@ -647,13 +647,13 @@ class CoeffsCovsLayer(layers.Layer):
     """Layer to learn parameters of a multivariate autoregressive (MAR) model.
 
     Outputs the MAR parameters:
-    - Matrix of MAR coefficients for each state and lag.
-    - Covariance matrix for each state.
+    - Matrix of MAR coefficients for each mode and lag.
+    - Covariance matrix for each mode.
 
     Parameters
     ----------
-    n_states : int
-        Number of states.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
     n_lags : int
@@ -672,7 +672,7 @@ class CoeffsCovsLayer(layers.Layer):
 
     def __init__(
         self,
-        n_states: int,
+        n_modes: int,
         n_channels: int,
         n_lags: int,
         initial_coeffs: np.ndarray,
@@ -683,7 +683,7 @@ class CoeffsCovsLayer(layers.Layer):
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.n_states = n_states
+        self.n_modes = n_modes
         self.n_channels = n_channels
         self.n_lags = n_lags
         self.learn_coeffs = learn_coeffs
@@ -693,7 +693,7 @@ class CoeffsCovsLayer(layers.Layer):
         # Initialisation for MAR coefficients
         if initial_coeffs is None:
             self.initial_coeffs = np.zeros(
-                [n_states, n_lags, n_channels, n_channels], dtype=np.float32
+                [n_modes, n_lags, n_channels, n_channels], dtype=np.float32
             )
         else:
             self.initial_coeffs = initial_coeffs
@@ -702,7 +702,7 @@ class CoeffsCovsLayer(layers.Layer):
         # Initialisation for covariances
         if self.diag_covs:
             if initial_covs is None:
-                self.initial_covs = np.ones([n_states, n_channels], dtype=np.float32)
+                self.initial_covs = np.ones([n_modes, n_channels], dtype=np.float32)
             else:
                 self.initial_covs = initial_covs
 
@@ -716,13 +716,13 @@ class CoeffsCovsLayer(layers.Layer):
 
             if initial_covs is None:
                 self.initial_covs = np.stack(
-                    [np.eye(n_channels, dtype=np.float32)] * n_states
+                    [np.eye(n_channels, dtype=np.float32)] * n_modes
                 )
 
             else:
                 if initial_covs.ndim == 2:
                     raise ValueError(
-                        "Please pass covariances with shape (n_states, n_channels, "
+                        "Please pass covariances with shape (n_modes, n_channels, "
                         + "n_channels) or use diag_covs=True."
                     )
                 self.initial_covs = initial_covs.astype("float32")
@@ -740,7 +740,7 @@ class CoeffsCovsLayer(layers.Layer):
         # Create weights for the MAR coefficients
         self.coeffs = self.add_weight(
             "coeffs",
-            shape=(self.n_states, self.n_lags, self.n_channels, self.n_channels),
+            shape=(self.n_modes, self.n_lags, self.n_channels, self.n_channels),
             dtype=tf.float32,
             initializer=self.coeffs_initializer,
             trainable=self.learn_coeffs,
@@ -750,7 +750,7 @@ class CoeffsCovsLayer(layers.Layer):
         if self.diag_covs:
             self.diagonal_covs = self.add_weight(
                 "diagonal_covs",
-                shape=(self.n_states, self.n_channels),
+                shape=(self.n_modes, self.n_channels),
                 dtype=tf.float32,
                 initializer=self.diagonal_covs_initializer,
                 trainable=self.learn_covs,
@@ -758,7 +758,7 @@ class CoeffsCovsLayer(layers.Layer):
         else:
             self.flattened_cholesky_covs = self.add_weight(
                 "flattened_cholesky_covs",
-                shape=(self.n_states, self.n_channels * (self.n_channels + 1) // 2),
+                shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
                 dtype=tf.float32,
                 initializer=self.flattened_cholesky_covs_initializer,
                 trainable=self.learn_covs,
@@ -781,7 +781,7 @@ class CoeffsCovsLayer(layers.Layer):
         config = super().get_config()
         config.update(
             {
-                "n_states": self.n_states,
+                "n_modes": self.n_modes,
                 "n_channels": self.n_channels,
                 "n_lags": self.n_lags,
                 "learn_coeffs": self.learn_coeffs,
@@ -808,15 +808,15 @@ class MixCoeffsCovsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
 
         # Input data:
-        # - alpha_jt.shape = (None, sequence_length, n_states)
-        # - coeffs_jl.shape = (n_states, n_lags, n_channels, n_channels)
-        # - cov_j.shape = (n_states, n_channels) if diag_only
-        #   else (n_states, n_channels, n_channels)
+        # - alpha_jt.shape = (None, sequence_length, n_modes)
+        # - coeffs_jl.shape = (n_modes, n_lags, n_channels, n_channels)
+        # - cov_j.shape = (n_modes, n_channels) if diag_only
+        #   else (n_modes, n_channels, n_channels)
         alpha_jt, coeffs_jl, cov_j = inputs
 
         # Reshape alpha_jt and coeffs_jl for multiplication
-        # alpha_jt -> (None, sequence_length, n_states, 1, 1, 1)
-        # coeffs_jl -> (1, 1, n_states, n_lags, n_channels, n_channels)
+        # alpha_jt -> (None, sequence_length, n_modes, 1, 1, 1)
+        # coeffs_jl -> (1, 1, n_modes, n_lags, n_channels, n_channels)
         alpha_jt = tf.expand_dims(
             tf.expand_dims(tf.expand_dims(alpha_jt, axis=-1), axis=-1), axis=-1
         )
@@ -829,11 +829,11 @@ class MixCoeffsCovsLayer(layers.Layer):
 
         # Reshape alpha_jt and cov_j for multiplication
         # if diag_only:
-        #     alpha_jt -> (None, sequence_length, n_states, 1)
-        #     cov_j -> (1, 1, n_states, n_channels)
+        #     alpha_jt -> (None, sequence_length, n_modes, 1)
+        #     cov_j -> (1, 1, n_modes, n_channels)
         # else:
-        #     alpha_jt -> (None, sequence_length, n_states, 1, 1)
-        #     cov_j -> (1, 1, n_states, n_channels, n_channels)
+        #     alpha_jt -> (None, sequence_length, n_modes, 1, 1)
+        #     cov_j -> (1, 1, n_modes, n_channels, n_channels)
         if self.diag_only:
             alpha_jt = tf.squeeze(tf.squeeze(alpha_jt, axis=-1), axis=-1)
         else:

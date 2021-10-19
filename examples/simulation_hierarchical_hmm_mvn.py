@@ -5,7 +5,7 @@
 print("Setting up")
 import numpy as np
 from vrad import data, files, simulation
-from vrad.inference import metrics, states, tf_ops
+from vrad.inference import metrics, modes, tf_ops
 from vrad.models import Config, Model
 
 # GPU settings
@@ -16,7 +16,7 @@ n_samples = 25600
 observation_error = 0.2
 
 config = Config(
-    n_states=5,
+    n_modes=5,
     n_channels=80,
     sequence_length=200,
     inference_rnn="lstm",
@@ -39,7 +39,7 @@ config = Config(
     n_epochs=100,
 )
 
-# Load state transition probability matrix and covariances of each state
+# Load mode transition probability matrix and covariances of each mode
 cov = np.load(files.example.path / "hmm_cov.npy")
 
 top_level_trans_prob = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
@@ -116,17 +116,17 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state mixing factors and state time course
+# Inferred mode mixing factors and mode time course
 inf_alpha = model.get_alpha(prediction_dataset)
-inf_stc = states.time_courses(inf_alpha)
-sim_stc = sim.state_time_course
+inf_stc = modes.time_courses(inf_alpha)
+sim_stc = sim.mode_time_course
 
-sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
+sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
-print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", modes.fractional_occupancies(inf_stc))
 
 # Delete temporary directory
 meg_data.delete_dir()
