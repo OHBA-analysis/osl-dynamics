@@ -27,8 +27,8 @@ config = Config(
     model_normalization="layer",
     theta_normalization=None,
     alpha_xform="softmax",
-    learn_alpha_temperature=False,
-    initial_alpha_temperature=0.25,
+    learn_alpha_temperature=True,
+    initial_alpha_temperature=1.0,
     learn_covariances=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
@@ -40,7 +40,7 @@ config = Config(
 )
 
 # Load state transition probability matrix and covariances of each state
-cov = np.load(files.example.directory / "hmm_cov.npy")
+cov = np.load(files.example.path / "hmm_cov.npy")
 
 top_level_trans_prob = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
 bottom_level_trans_probs = [
@@ -91,9 +91,13 @@ meg_data = data.Data(sim.time_series)
 config.n_channel = meg_data.n_channels
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(config.sequence_length, config.batch_size)
-prediction_dataset = meg_data.prediction_dataset(
-    config.sequence_length, config.batch_size
+training_dataset = meg_data.dataset(
+    config.sequence_length, config.batch_size, shuffle=True
+)
+prediction_dataset = meg_data.dataset(
+    config.sequence_length,
+    config.batch_size,
+    shuffle=False,
 )
 
 # Build model
@@ -113,7 +117,7 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time course
-inf_alpha = model.predict_states(prediction_dataset)
+inf_alpha = model.get_alpha(prediction_dataset)
 inf_stc = states.time_courses(inf_alpha)
 sim_stc = sim.state_time_course
 
@@ -121,8 +125,8 @@ sim_stc, inf_stc = states.match_states(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
-print("Fractional occupancies (Simulation):", metrics.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", metrics.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Simulation):", states.fractional_occupancies(sim_stc))
+print("Fractional occupancies (VRAD):      ", states.fractional_occupancies(inf_stc))
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 meg_data.delete_dir()

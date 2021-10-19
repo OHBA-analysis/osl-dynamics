@@ -120,11 +120,13 @@ def power_map_grid(
     """Takes a power map and returns the power at locations on a spatial grid."""
 
     # Validation
-    error_message = f"Dimensionality of power_map must be 4, got ndim={power_map.ndim}."
+    error_message = (
+        f"Dimensionality of power_map must be 2, 3, or 4, got ndim={power_map.ndim}."
+    )
     power_map = array_ops.validate(
         power_map,
         correct_dimensionality=4,
-        allow_dimensions=[3],
+        allow_dimensions=[2, 3],
         error_message=error_message,
     )
 

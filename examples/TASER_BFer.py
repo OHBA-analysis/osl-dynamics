@@ -25,7 +25,7 @@ from vrad.utils import plotting
 
 tf.keras.backend.clear_session()
 
-default_settings = files.example.directory / "default_TABFER_settings.yaml"
+default_settings = files.example.path / "default_TABFER_settings.yaml"
 results_folder_name = "example_results"
 
 # GPU settings
@@ -71,8 +71,8 @@ Y = Y["reduced_data"]  # needs to be channels (or PCs) by time
 print("Reading MEG data")
 prepared_data = data.Data(Y[np.newaxis])
 n_channels = prepared_data.n_channels
-training_dataset = prepared_data.training_dataset(sequence_length, batch_size)
-prediction_dataset = prepared_data.prediction_dataset(sequence_length, batch_size)
+training_dataset = prepared_data.dataset(sequence_length, batch_size, shuffle=True)
+prediction_dataset = prepared_data.dataset(sequence_length, batch_size, shuffle=False)
 
 if cov_init_type == "random":
     # Use random covariances for the initialisation.
@@ -125,7 +125,7 @@ model.summary()
 history = model.fit(training_dataset, epochs=n_epochs)
 
 # Get our inferred parameters
-alpha = model.predict_states(prediction_dataset)[0]
+alpha = model.get_alpha(prediction_dataset)
 covz = model.get_covariances()
 kl = history.history["kl_loss"]
 ll = history.history["ll_loss"]

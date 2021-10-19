@@ -22,7 +22,8 @@ surf_left_vinf = str(
     Path(__file__).parent / "ParcellationPilot.L.very_inflated.32k_fs_LR.surf.gii"
 )
 
-directory = str(Path(__file__).parent)
+path = Path(__file__).parent
+directory = str(path)
 
 
 def get_surf(inflation: int):

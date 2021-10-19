@@ -2,193 +2,158 @@
 
 """
 
-from typing import Union
-
 import numpy as np
-
-
-def _acf_from_te_cov(te_covariances: np.ndarray, n_embeddings: int) -> np.ndarray:
-    """Get the autocorrelation function from the covariance matrix of time embedded data.
-
-    Parameters
-    ----------
-    te_covariances : np.ndarray
-        Time embedded state covariance matrices.
-        Shape is (n_states, n_te_channels, n_te_channels).
-    n_embeddings : int
-        Number of time embeddings.
-
-    Returns
-    -------
-    np.ndarray
-        Autocorrelation function. Shape is (n_states, n_acf)
-    """
-    # Number of data points in the autocorrelation function
-    n_acf = 2 * n_embeddings - 1
-
-    # Number of states
-    n_states = len(te_covariances)
-
-    # Number of channels in the original covariance matrix
-    n_raw_data_channels = te_covariances[0].shape[-1] // n_embeddings
-
-    # Get the autocorrelation function
-    autocorrelation_function = np.empty(
-        [n_states, n_raw_data_channels, n_raw_data_channels, n_acf]
-    )
-    for i in range(n_states):
-        for j in range(n_raw_data_channels):
-            for k in range(n_raw_data_channels):
-                # Auto/cross-correlation between channel j and channel k
-                # of state i
-                autocorrelation_function_jk = te_covariances[
-                    i,
-                    j * n_embeddings : (j + 1) * n_embeddings,
-                    k * n_embeddings : (k + 1) * n_embeddings,
-                ]
-
-                # Take elements from the first row and column
-                autocorrelation_function[i, j, k] = np.concatenate(
-                    [
-                        autocorrelation_function_jk[0, n_embeddings // 2 + 1 :][::-1],
-                        autocorrelation_function_jk[:, n_embeddings // 2],
-                        autocorrelation_function_jk[-1, : n_embeddings // 2][::-1],
-                    ]
-                )
-
-    return autocorrelation_function
+from vrad import array_ops
 
 
 def autocorrelation_functions(
-    state_covariances: Union[list, np.ndarray],
+    state_covariances: np.ndarray,
     n_embeddings: int,
     pca_components: np.ndarray,
 ) -> np.ndarray:
-    """Gets the autocorrelation function from the state covariance matrices.
-
-    An autocorrelation function is calculated for each state for each subject.
+    """Auto/cross-correlation function from the state covariance matrices.
 
     Parameters
     ----------
     state_covariances : np.ndarray
         State covariance matrices.
-        Shape is (n_subjects, n_states, n_channels, n_channels).
-        These must be subject specific covariances.
     n_embeddings : int
         Number of embeddings applied to the training data.
     pca_components : np.ndarray
-        Components used for dimensionality reduction.
-        Shape must be (n_te_channels, n_pca_components).
+        PCA components used for dimensionality reduction.
 
     Returns
     -------
     np.ndarray
-        Autocorrelation functions.
-        Shape is (n_subjects, n_states, n_channels, n_channels, n_acf)
-        or (n_states, n_channels, n_channels, n_acf).
+        Auto/cross-correlation functions.
     """
+
+    # Validation
+    error_message = (
+        "state_covariances must be of shape (n_channels, n_channels) or "
+        + "(n_states, n_channels, n_channels) or "
+        + "(n_subjects, n_states, n_channels, n_channels)."
+    )
+    state_covariances = array_ops.validate(
+        state_covariances,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message=error_message,
+    )
+
     # Get covariance of time embedded data
     te_covs = reverse_pca(state_covariances, pca_components)
 
-    # Take elements from the time embedded covariances that
-    # correspond to the autocorrelation function
-    autocorrelation_functions = []
-    for n in range(len(te_covs)):
-        autocorrelation_functions.append(_acf_from_te_cov(te_covs[n], n_embeddings))
+    # Dimensions
+    n_subjects = te_covs.shape[0]
+    n_states = te_covs.shape[1]
+    n_parcels = te_covs.shape[-1] // n_embeddings
+    n_acf = 2 * n_embeddings - 1
 
-    return np.squeeze(autocorrelation_functions)
+    # Take mean of elements from the time embedded covariances that
+    # correspond to the auto/cross-correlation function
+    blocks = te_covs.reshape(
+        n_subjects, n_states, n_parcels, n_embeddings, n_parcels, n_embeddings
+    )
+    acfs = np.empty([n_subjects, n_states, n_parcels, n_parcels, n_acf])
+    for i in range(n_acf):
+        acfs[:, :, :, :, i] = np.mean(
+            np.diagonal(blocks, offset=i - n_embeddings + 1, axis1=3, axis2=5), axis=-1
+        )
+
+    return np.squeeze(acfs)
 
 
 def raw_covariances(
-    state_covariances: Union[list, np.ndarray],
+    state_covariances: np.ndarray,
     n_embeddings: int,
     pca_components: np.ndarray,
     zero_lag: bool = False,
 ) -> np.ndarray:
     """Covariance matrix of the raw channels.
 
-    PCA is reversed to give you to the covariance matrix of the raw channels.
+    PCA and time embedding is reversed to give you to the covariance matrix
+    of the raw channels.
 
     Parameters
     ----------
     state_covariances : np.ndarray
         State covariance matrices.
-        Shape is (n_subjects, n_states, n_channels, n_channels).
-        These must be subject specific covariances.
     n_embeddings : int
         Number of embeddings applied to the training data.
     pca_components : np.ndarray
-        Components used for dimensionality reduction.
-        Shape must be (n_te_channels, n_pca_components).
+        PCA components used for dimensionality reduction.
     zero_lag : bool
         Should we return just the zero-lag elements? Otherwise, we return
         the mean over time lags. Optional, default is False.
 
-
     Returns
     -------
     np.ndarray
-        The variance for each channel, state and subject.
-        Shape is (n_subjects, n_states, n_channels, n_channels) or
-        (n_states, n_channels, n_channels).
+        Covariance matrix for raw channels.
     """
+
+    # Validation
+    error_message = (
+        "state_covariances must be of shape (n_channels, n_channels) or "
+        + "(n_states, n_channels, n_channels) or "
+        + "(n_subjects, n_states, n_channels, n_channels)."
+    )
+    state_covariances = array_ops.validate(
+        state_covariances,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message=error_message,
+    )
+
     # Get covariance of time embedded data
     te_covs = reverse_pca(state_covariances, pca_components)
 
     if zero_lag:
-        # Get elements corresponding to zero-lag
+        # Return the zero-lag elements only
         raw_covs = te_covs[
             :, :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings
         ]
 
     else:
+        # Return block means
         n_subjects = te_covs.shape[0]
         n_states = te_covs.shape[1]
         n_parcels = te_covs.shape[-1] // n_embeddings
 
         n_parcels = te_covs.shape[-1] // n_embeddings
-        block_te = te_covs.reshape(
+        blocks = te_covs.reshape(
             n_subjects, n_states, n_parcels, n_embeddings, n_parcels, n_embeddings
         )
-        block_diagonal = block_te.diagonal(0, 2, 4)
+        block_diagonal = blocks.diagonal(0, 2, 4)
         diagonal_means = block_diagonal.diagonal(0, 2, 3).mean(3)
 
-        raw_covs = block_te.mean((3, 5))
+        raw_covs = blocks.mean((3, 5))
         raw_covs[:, :, np.arange(n_parcels), np.arange(n_parcels)] = diagonal_means
 
     return np.squeeze(raw_covs)
 
 
 def reverse_pca(covariances: np.ndarray, pca_components: np.ndarray) -> np.ndarray:
-    """Reverses the effect of PCA on a covariance matrix.
+    """Reverses the effect of PCA on covariance matrices.
 
     Parameters
     ----------
     covariances : np.ndarray
-        State covariance matrices.
-        Shape is (n_subjects, n_states, n_channels, n_channels).
-        These must be subject specific covariances.
+        Covariance matrices.
     pca_components : np.ndarray
-        Components used for dimensionality reduction.
-        Shape must be (n_te_channels, n_pca_components).
+        PCA components used for dimensionality reduction.
 
     Returns
     -------
     np.ndarray
         Covariance matrix of the time embedded data.
     """
-
-    # Validation
-    covariances = np.array(covariances)
-    if covariances.ndim == 3:
-        covariances = covariances[None]
-    if covariances.ndim != 4:
+    if covariances.shape[-1] != pca_components.shape[-1]:
         raise ValueError(
-            "covariances must be shape (n_states, n_channels, n_channels) or"
-            + " (n_subjects, n_states, n_channels, n_channels)."
+            "Covariance matrix and PCA components have incompatible shapes: "
+            + f"covariances.shape={covariances.shape}, "
+            + f"pca_components.shape={pca_components.shape}."
         )
 
-    n_subjects, n_states = covariances.shape[:2]
-    te_covs = pca_components @ covariances @ pca_components.T
-
-    return te_covs
+    return pca_components @ covariances @ pca_components.T

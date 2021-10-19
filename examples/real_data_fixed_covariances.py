@@ -1,9 +1,10 @@
-"""Example script for running inference on resting-state MEG data (forty five subjects).
+"""Example script for running inference on resting-state MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/projects/uk_meg_notts
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
   state.
 - Covariances are NOT trainable.
+- Achieves a dice coefficient of ~0.94 (when compared to the OSL HMM state time course).
 """
 
 print("Setting up")
@@ -25,27 +26,23 @@ config = Config(
     model_n_units=64,
     model_normalization="layer",
     theta_normalization="layer",
-    alpha_xform="gumbel-softmax",
-    learn_alpha_temperature=False,
+    alpha_xform="softmax",
+    learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_covariances=False,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=20,
-    batch_size=128,
+    n_kl_annealing_epochs=100,
+    batch_size=64,
     learning_rate=0.01,
-    n_epochs=50,
+    n_epochs=200,
 )
 
 # Read MEG data
 print("Reading MEG data")
 prepared_data = Data(
-    [
-        f"/well/woolrich/projects/uk_meg_notts/"
-        f"eo/natcomms18/prepared_data/subject{i}.mat"
-        for i in range(1, 56)
-    ],
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/subject1.mat",
     sampling_frequency=250,
     n_embeddings=15,
 )
@@ -53,16 +50,20 @@ prepared_data = Data(
 config.n_channels = prepared_data.n_channels
 
 # Prepare dataset
-training_dataset = prepared_data.training_dataset(
-    config.sequence_length, config.batch_size
+training_dataset = prepared_data.dataset(
+    config.sequence_length,
+    config.batch_size,
+    shuffle=True,
 )
-prediction_dataset = prepared_data.prediction_dataset(
-    config.sequence_length, config.batch_size
+prediction_dataset = prepared_data.dataset(
+    config.sequence_length,
+    config.batch_size,
+    shuffle=False,
 )
 
 # Initialise covariances with the final HMM covariances
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-1_K-6/hmm.mat"
 )
 config.initial_covariances = hmm.covariances
 
@@ -83,16 +84,15 @@ free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
 # Inferred state mixing factors and state time courses
-alpha = model.predict_states(prediction_dataset)
-inf_stc = states.time_courses(alpha, concatenate=True)
+alpha = model.get_alpha(prediction_dataset)
+inf_stc = states.time_courses(alpha)
 hmm_stc = manipulation.trim_time_series(
     time_series=hmm.state_time_course(),
     sequence_length=config.sequence_length,
-    concatenate=True,
 )
 
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
 
-# Delete the temporary folder holding the data
+# Delete temporary directory
 prepared_data.delete_dir()

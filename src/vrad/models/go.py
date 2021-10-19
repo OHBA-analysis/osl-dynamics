@@ -3,14 +3,8 @@
 """
 
 import numpy as np
-import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
-from vrad.inference.functions import (
-    cholesky_factor,
-    cholesky_factor_to_full_matrix,
-    trace_normalize,
-)
 from vrad.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
 from vrad.models.obs_mod_base import ObservationModelBase
 
@@ -48,14 +42,8 @@ class GO(ObservationModelBase):
         """
         # Get the means and covariances from the MeansCovsLayer
         means_covs_layer = self.model.get_layer("means_covs")
-        cholesky_covariances = tfp.math.fill_triangular(
-            means_covs_layer.flattened_cholesky_covariances
-        )
-        covariances = cholesky_factor_to_full_matrix(cholesky_covariances).numpy()
-
-        # Normalise covariances
-        if self.config.normalize_covariances:
-            covariances = trace_normalize(covariances).numpy()
+        _, covariances = means_covs_layer(1)
+        covariances = covariances.numpy()
 
         # Apply alpha scaling
         if alpha_scale:
@@ -64,33 +52,77 @@ class GO(ObservationModelBase):
 
         return covariances
 
-    def set_covariances(self, covariances):
+    def get_means_covariances(self, alpha_scale=True):
+        """Get the means and covariances of each state.
+
+        Parameters
+        ----------
+        alpah_scale : bool
+            Should we apply alpha scaling? Default is True.
+
+        Returns
+        -------
+        means : np.ndarary
+            State means.
+        covariances : np.ndarray
+            State covariances.
+        """
+        # Get the means and covariances from the MeansCovsLayer
+        means_covs_layer = self.model.get_layer("means_covs")
+        means, covariances = means_covs_layer(1)
+
+        # Apply alpha scaling
+        if alpha_scale:
+            alpha_scaling = self.get_alpha_scaling()
+            covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
+
+        return means.numpy(), covariances.numpy()
+
+    def set_means(self, means, update_initializer=True):
+        """Set the means of each state.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            State covariances.
+        update_initializer : bool
+            Do we want to use the passed means when we re-initialize
+            the model? Optional, default is True.
+        """
+        means = means.astype(np.float32)
+        means_covs_layer = self.model.get_layer("means_covs")
+        layer_weights = means_covs_layer.means
+        layer_weights.assign(means)
+
+        if update_initializer:
+            means_covs_layer.initial_means = means
+            means_covs_layer.means_initializer.initial_value = means
+
+    def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each state.
 
         Parameters
         ----------
         covariances : np.ndarray
             State covariances.
+        update_initializer : bool
+            Do we want to use the passed covariances when we re-initialize
+            the model? Optional, default is True.
         """
+        covariances = covariances.astype(np.float32)
         means_covs_layer = self.model.get_layer("means_covs")
-        layer_weights = means_covs_layer.get_weights()
+        layer_weights = means_covs_layer.flattened_cholesky_covariances
+        flattened_cholesky_covariances = means_covs_layer.bijector.inverse(covariances)
+        layer_weights.assign(flattened_cholesky_covariances)
 
-        flattened_covariances_shape = (
-            covariances.shape[0],
-            covariances.shape[1] * (covariances.shape[1] + 1) // 2,
-        )
-
-        # Replace covariances in the layer weights
-        for i in range(len(layer_weights)):
-            if layer_weights[i].shape == flattened_covariances_shape:
-                cholesky_covariances = cholesky_factor(covariances)
-                flattened_cholesky_covariances = tfp.math.fill_triangular_inverse(
-                    cholesky_covariances
-                )
-                layer_weights[i] = flattened_cholesky_covariances
-
-        # Set the weights of the layer
-        means_covs_layer.set_weights(layer_weights)
+        if update_initializer:
+            means_covs_layer.initial_covariances = covariances
+            means_covs_layer.initial_flattened_cholesky_covariances = (
+                flattened_cholesky_covariances
+            )
+            means_covs_layer.flattened_cholesky_covariances_initializer.initial_value = (
+                flattened_cholesky_covariances
+            )
 
     def get_alpha_scaling(self):
         """Get the alpha scaling of each state.
@@ -122,10 +154,10 @@ def _model_structure(config):
     means_covs_layer = MeansCovsLayer(
         config.n_states,
         config.n_channels,
-        learn_means=False,
+        learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
         normalize_covariances=config.normalize_covariances,
-        initial_means=None,
+        initial_means=config.initial_means,
         initial_covariances=config.initial_covariances,
         name="means_covs",
     )

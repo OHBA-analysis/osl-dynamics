@@ -207,9 +207,9 @@ class InferenceModelBase:
 
         return best_history
 
-    def reset_weights(self):
+    def reset_weights(self, keep=None):
         """Reset the model as if you've built a new model."""
-        initializers.reinitialize_model_weights(self.model)
+        initializers.reinitialize_model_weights(self.model, keep)
         if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
         if self.config.do_alpha_temperature_annealing:
@@ -229,7 +229,7 @@ class InferenceModelBase:
         predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
-    def predict_states(
+    def get_alpha(
         self, inputs, *args, concatenate: bool = False, **kwargs
     ) -> Union[list, np.ndarray]:
         """State mixing factors, alpha.

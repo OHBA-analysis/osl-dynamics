@@ -82,9 +82,13 @@ class Config:
 
     Observation Model Parameters
     ----------------------------
-    model : str
+    observation_model : str
         Type of observation model.
-        Either 'multivariate_normal' or 'multivariate_autoregressive'.
+        Either 'multivariate_normal', 'multivariate_autoregressive' or
+        'conv_net'.
+    learn_means : bool
+        Should we make the mean vectors for each state trainable?
+        Pass if model='multivariate_normal'.
     learn_covariances : bool
         Should we make the covariance matrix for each state trainable?
         Pass if model='multivariate_normal'.
@@ -93,6 +97,8 @@ class Config:
     normalize_covariances : bool
         Should we trace normalize the state covariances? Pass if
         model='multivariate_normal'.
+    initial_means : np.ndarray
+        Initialisation for mean vectors. Pass if model='multivariate_normal'.
     initial_covariances : np.ndarray
         Initialisation for state covariances. Pass if model='multivariate_normal'.
     n_lags : int
@@ -100,13 +106,22 @@ class Config:
     learn_coeffs : bool
         Should we learn the autoregressive coefficients? Pass if
         model='multivariate_autoregressive'.
-    learn_cov : bool
+    learn_covs : bool
         Should we learn the covariances? Pass if model='multivariate_autoregressive'.
     initial_coeffs : np.ndarray
         Initialisation for autoregressive coefficients. Pass if
         model='multivariate_autoregressive'.
-    initial_cov : np.ndarray
+    initial_covs : np.ndarray
         Initialisation for covariances. Pass if model='multivariate_autoregressive'.
+    diag_covs : bool
+        Should we learn diagonal covariances?
+        Pass if model='multivariate_autoregressive'.
+    n_filters : int
+        Number of filters in the each convolulation layer.
+    n_residual_blocks : int
+        Number of residual blocks in WaveNet.
+    n_conv_layers : int
+        Number of layers in each residual block.
 
     KL Annealing Parameters
     -----------------------
@@ -184,17 +199,30 @@ class Config:
     final_alpha_temperature: float = None
     n_alpha_temperature_annealing_epochs: int = None
 
+    # Vector quantisation parameters
+    n_quantized_vectors: int = None
+    quantized_vector_beta: float = 0.25
+    initial_quantized_vectors: np.ndarray = None
+    learn_quantized_vectors: bool = True
+
     # Observation model parameters
+    learn_means: bool = None
     learn_covariances: bool = None
     learn_alpha_scaling: bool = False
     normalize_covariances: bool = False
     initial_covariances: np.ndarray = None
+    initial_means: np.ndarray = None
 
     n_lags: int = None
     learn_coeffs: bool = None
-    learn_cov: bool = None
+    learn_covs: bool = None
     initial_coeffs: np.ndarray = None
-    initial_cov: np.ndarray = None
+    initial_covs: np.ndarray = None
+    diag_covs: bool = None
+
+    n_filters: int = None
+    n_residual_blocks: int = None
+    n_conv_layers: int = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None
@@ -234,10 +262,11 @@ class Config:
         if self.observation_model not in [
             "multivariate_normal",
             "multivariate_autoregressive",
+            "conv_net",
         ]:
             raise ValueError(
-                "observation_model must be 'multivariate_normal' or "
-                + "'multivariate_autoregressive'."
+                "observation_model must be 'multivariate_normal', "
+                + "'multivariate_autoregressive' or 'conv_net'."
             )
 
     def validate_rnn_parameters(self):
@@ -257,6 +286,8 @@ class Config:
             raise ValueError("Please pass model_rnn.")
 
     def validate_alpha_parameters(self):
+        if self.inference_rnn is None:
+            return
 
         if self.alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
             raise ValueError(
@@ -329,6 +360,8 @@ class Config:
             raise ValueError("sequence_length must be one or greater.")
 
     def validate_kl_annealing_parameters(self):
+        if self.inference_rnn is None:
+            return
 
         if self.do_kl_annealing is None:
             raise ValueError("do_kl_annealing must be passed.")
@@ -370,6 +403,9 @@ class Config:
     def validate_observation_model_parameters(self):
 
         if self.observation_model == "multivariate_normal":
+            if self.learn_means is None:
+                self.learn_means = False
+
             if self.learn_covariances is None:
                 self.learn_covariances = True
 
@@ -388,8 +424,8 @@ class Config:
             if self.learn_coeffs is None:
                 self.learn_coeffs = True
 
-            if self.learn_cov is None:
-                self.learn_cov = True
+            if self.learn_covs is None:
+                self.learn_covs = True
 
     def validate_initialization_parameters(self):
 

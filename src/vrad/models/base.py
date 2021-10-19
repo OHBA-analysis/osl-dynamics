@@ -69,24 +69,26 @@ class Base:
             Tensorflow dataset that can be used for training.
         """
         if isinstance(inputs, Data):
-            return inputs.prediction_dataset(self.config.sequence_length)
+            return inputs.dataset(self.config.sequence_length, shuffle=False)
         if isinstance(inputs, Dataset):
             return [inputs]
         if isinstance(inputs, str):
-            return [Data(inputs).prediction_dataset(self.config.sequence_length)]
+            return [Data(inputs).dataset(self.config.sequence_length, shuffle=False)]
         if isinstance(inputs, np.ndarray):
             if inputs.ndim == 2:
-                return [Data(inputs).prediction_dataset(self.config.sequence_length)]
+                return [
+                    Data(inputs).dataset(self.config.sequence_length, shuffle=False)
+                ]
             if inputs.ndim == 3:
                 return [
-                    Data(subject).prediction_dataset(self.config.sequence_length)
+                    Data(subject).dataset(self.config.sequence_length, shuffle=False)
                     for subject in inputs
                 ]
         if check_iterable_type(inputs, Dataset):
             return inputs
         if check_iterable_type(inputs, str):
             datasets = [
-                Data(subject).prediction_dataset(self.config.sequence_length)
+                Data(subject).dataset(self.config.sequence_length, shuffle=False)
                 for subject in inputs
             ]
             return datasets
@@ -229,7 +231,7 @@ class Base:
 
     def get_all_model_info(self, prediction_dataset, file=None):
         # Inferred state mixing factors and state time courses
-        alpha = self.predict_states(prediction_dataset)
+        alpha = self.get_alpha(prediction_dataset)
         history = self.history.history
 
         info = dict(

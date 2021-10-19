@@ -9,7 +9,6 @@ import tensorflow_probability as tfp
 from scipy.linalg import eigvalsh
 from sklearn.metrics import confusion_matrix as sklearn_confusion
 from tqdm import trange
-from vrad.inference.states import state_lifetimes
 from vrad.utils.decorators import transpose
 
 
@@ -149,22 +148,6 @@ def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     return dice_coefficient_1d(sequence_1, sequence_2)
 
 
-def fractional_occupancies(state_time_course: np.ndarray) -> np.ndarray:
-    """Calculates the fractional occupancy.
-
-    Parameters
-    ----------
-    state_time_course : np.ndarray
-        State time course. Shape is (n_samples, n_states).
-
-    Returns
-    -------
-    np.ndarray
-        The fractional occupancy of each state.
-    """
-    return np.sum(state_time_course, axis=0) / state_time_course.shape[0]
-
-
 def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
     """Calculates the frobenius norm of the difference of two matrices.
 
@@ -295,27 +278,6 @@ def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
     return -tf.reduce_sum(ll, axis=0)
 
 
-def lifetime_statistics(state_time_course: np.ndarray) -> Tuple:
-    """Calculate statistics of the lifetime distribution of each state.
-
-    Parameters
-    ----------
-    state_time_course : np.ndarray
-        State time course. Shape is (n_samples, n_states).
-
-    Returns
-    -------
-    means : np.ndarray
-        Mean lifetime of each state.
-    std : np.ndarray
-        Standard deviation of each state.
-    """
-    lifetimes = state_lifetimes(state_time_course)
-    mean = np.array([np.mean(lt) for lt in lifetimes])
-    std = np.array([np.std(lt) for lt in lifetimes])
-    return mean, std
-
-
 def state_covariance_correlations(
     state_covariances: np.ndarray, remove_diagonal: bool = True
 ) -> np.ndarray:
@@ -380,3 +342,42 @@ def state_covariance_riemannian_distances(state_covariances: np.ndarray) -> np.n
                 state_covariances[i], state_covariances[j]
             )
     return riemannian_distances
+
+
+def rv_coefficient(M: list) -> float:
+    """Calculate the RV coefficient for two matrices.
+
+    Parameters
+    ----------
+    M : list of np.ndarray
+        List of matrices.
+
+    Returns
+    -------
+    float
+        RV coefficient.
+    """
+    # First compute the scalar product matrices for each data set X
+    scal_arr_list = []
+
+    for arr in M:
+        scal_arr = np.dot(arr, np.transpose(arr))
+        scal_arr_list.append(scal_arr)
+
+    # Now compute the 'between study cosine matrix' C
+    C = np.zeros((len(M), len(M)), float)
+
+    for index, element in np.ndenumerate(C):
+        nom = np.trace(
+            np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[1]])
+        )
+        denom1 = np.trace(
+            np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[0]])
+        )
+        denom2 = np.trace(
+            np.dot(np.transpose(scal_arr_list[index[1]]), scal_arr_list[index[1]])
+        )
+        Rv = nom / np.sqrt(np.dot(denom1, denom2))
+        C[index[0], index[1]] = Rv
+
+    return C

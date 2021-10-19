@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import griddata
+from vrad.files.scanner import layouts
 
 _logger = logging.getLogger("VRAD")
 
 
 def available_layouts():
-    layouts = Path(__file__).parent / "layouts"
     layout_names = [file.stem for file in sorted(layouts.glob("*.lay"))]
     return layout_names
 
@@ -23,13 +23,12 @@ def get_layout(layout_name: str):
     if layout_name not in layout_names:
         raise FileNotFoundError(f"{layout_name} not found.")
 
-    layout = Path(__file__).parent / "layouts" / f"{layout_name}.lay"
+    layout = layouts / f"{layout_name}.lay"
     return str(layout)
 
 
 def available_outlines():
-    outlines = Path(__file__).parent / "layouts"
-    outline_names = [file.stem for file in sorted(outlines.glob("*.outline"))]
+    outline_names = [file.stem for file in sorted(layouts.glob("*.outline"))]
     return outline_names
 
 
@@ -39,7 +38,7 @@ def get_outline(outline_name: str):
     if outline_name not in outline_names:
         raise FileNotFoundError(f"{outline_name} not found.")
 
-    outline = Path(__file__).parent / "layouts" / f"{outline_name}.outline"
+    outline = layouts / f"{outline_name}.outline"
     return str(outline)
 
 
@@ -165,7 +164,6 @@ class Topology:
 
         Parameters
         ----------
-
         data: numpy.array or list
             A vector with data corresponding to each sensor.
         plot_boxes: bool

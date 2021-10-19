@@ -217,7 +217,7 @@ def save(
     connectivity_map = array_ops.validate(
         connectivity_map,
         correct_dimensionality=4,
-        allow_dimensions=[3],
+        allow_dimensions=[2, 3],
         error_message=error_message,
     )
 

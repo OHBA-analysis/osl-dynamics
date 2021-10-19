@@ -8,6 +8,7 @@ from typing import List, Tuple, Union
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from vrad import array_ops
+from vrad.inference import metrics
 from vrad.utils.decorators import transpose
 
 _logger = logging.getLogger("VRAD")
@@ -15,7 +16,9 @@ _rng = np.random.default_rng()
 
 
 def time_courses(
-    alpha: Union[list, np.ndarray], concatenate: bool = False
+    alpha: Union[list, np.ndarray],
+    concatenate: bool = False,
+    n_states: int = None,
 ) -> Union[list, np.ndarray]:
     """Calculates state time courses.
 
@@ -27,8 +30,10 @@ def time_courses(
         State mixing factors with shape (n_subjects, n_samples, n_states)
         or (n_samples, n_states).
     concatenate : bool
-    If alpha is a list, should we concatenate the state time course?
-    Optional, default is True.
+        If alpha is a list, should we concatenate the state time course?
+        Optional, default is True.
+    n_states : int
+        Number of states there should be. Optional.
 
     Returns
     -------
@@ -36,15 +41,26 @@ def time_courses(
         State time courses.
     """
     if isinstance(alpha, list):
-        n_states = alpha[0].shape[1]
+        if n_states is None:
+            n_states = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
         stcs = [array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs]
         if len(stcs) == 1:
             stcs = stcs[0]
         elif concatenate:
             stcs = np.concatenate(stcs)
+    elif alpha.ndim == 3:
+        if n_states is None:
+            n_states = alpha.shape[-1]
+        stcs = alpha.argmax(axis=2)
+        stcs = np.array([array_ops.get_one_hot(stc, n_states=n_states) for stc in stcs])
+        if len(stcs) == 1:
+            stcs = stcs[0]
+        elif concatenate:
+            stcs = np.concatenate(stcs)
     else:
-        n_states = alpha.shape[1]
+        if n_states is None:
+            n_states = alpha.shape[1]
         stcs = alpha.argmax(axis=1)
         stcs = array_ops.get_one_hot(stcs, n_states=n_states)
     return stcs
@@ -77,11 +93,11 @@ def correlate_states(
 
 
 def match_covariances(
-    *covariances: np.ndarray, comparison="correlation", return_order: bool = False
+    *covariances: np.ndarray, comparison="rv_coefficient", return_order: bool = False
 ) -> Tuple[np.ndarray]:
     """Matches covariances.
 
-    Can match covariances using the Frobenius norm or correlation.
+    Can match covariances using the Frobenius norm, correlation or RV coefficient.
     Each matrix must be 3D: (n_states, n_channels, n_channels).
 
     Parameters
@@ -90,7 +106,8 @@ def match_covariances(
         Covariance matrices to match.
         Each covariance must be (n_states, n_channel, n_channels).
     comparison : str
-        Either "correlation" or "frobenius". Optional, default is 'correlation'.
+        Either 'rv_coefficient', 'correlation' or 'frobenius'.
+        Optional, default is 'rv_coefficient'.
     return_order : bool
         Should we return the order instead of the covariances?
         Optional, default is False.
@@ -105,8 +122,10 @@ def match_covariances(
         if matrix.shape != covariances[0].shape:
             raise ValueError("Matrices must have the same shape.")
 
-    if comparison not in ["frobenius", "correlation"]:
-        raise ValueError("comparison must be 'correlation' or 'frobenius'.")
+    if comparison not in ["frobenius", "correlation", "rv_coefficient"]:
+        raise ValueError(
+            "Comparison must be 'rv_coefficient', 'correlation' or 'frobenius'."
+        )
 
     # Number of arguments and number of matrices in each argument passed
     n_args = len(covariances)
@@ -124,9 +143,13 @@ def match_covariances(
                         np.diagonal(covariances[i][k]) - np.diagonal(covariances[0][j])
                     )
                     F[j, k] = np.linalg.norm(A)
-                else:
+                elif comparison == "correlation":
                     F[j, k] = -np.corrcoef(
                         covariances[i][k].flatten(), covariances[0][j].flatten()
+                    )[0, 1]
+                else:
+                    F[j, k] = -metrics.rv_coefficient(
+                        [covariances[i][k], covariances[0][j]]
                     )[0, 1]
         order = linear_sum_assignment(F)[1]
 
@@ -199,16 +222,16 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
     Returns
     -------
     ons : list of numpy.ndarray
-        List containing state beginnings in the order they occur for each channel.
+        List containing state beginnings in the order they occur for each state.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     offs : list of numpy.ndarray
-        List containing state ends in the order they occur for each channel.
+        List containing state ends in the order they occur for each state.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
-    channel_on = []
-    channel_off = []
+    state_on = []
+    state_off = []
 
     diffs = np.diff(state_time_course, axis=0)
     for i, diff in enumerate(diffs.T):
@@ -221,17 +244,17 @@ def state_activation(state_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndar
             if off[0] < on[0]:
                 on = np.insert(on, 0, -1)
 
-            channel_on.append(on)
-            channel_off.append(off)
+            state_on.append(on)
+            state_off.append(off)
         except IndexError:
             _logger.info(f"No activation in state {i}.")
-            channel_on.append(np.array([]))
-            channel_off.append(np.array([]))
+            state_on.append(np.array([]))
+            state_off.append(np.array([]))
 
-    channel_on = np.array(channel_on, dtype=object)
-    channel_off = np.array(channel_off, dtype=object)
+    state_on = np.array(state_on, dtype=object)
+    state_off = np.array(state_off, dtype=object)
 
-    return channel_on, channel_off
+    return state_on, state_off
 
 
 @transpose(0, "state_time_course")
@@ -254,7 +277,9 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
 
 
 @transpose(0, "state_time_course")
-def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
+def lifetimes(
+    state_time_course: np.ndarray, sampling_frequency: float = None
+) -> List[np.ndarray]:
     """Calculate state lifetimes for a state time course.
 
     Given a state time course (one-hot encoded), calculate the lifetime of each
@@ -264,14 +289,88 @@ def state_lifetimes(state_time_course: np.ndarray) -> List[np.ndarray]:
     ----------
     state_time_course : numpy.ndarray
         State time course (strictly binary).
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
 
     Returns
     -------
-    channel_lifetimes : list of numpy.ndarray
-        List containing an array of lifetimes in the order they occur for each channel.
+    list of numpy.ndarray
+        List containing an array of lifetimes in the order they occur for each state.
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
     ons, offs = state_activation(state_time_course)
-    channel_lifetimes = offs - ons
-    return channel_lifetimes
+    lts = offs - ons
+    if sampling_frequency is not None:
+        lts = [lt / sampling_frequency for lt in lts]
+    return lts
+
+
+def lifetime_statistics(
+    state_time_course: np.ndarray, sampling_frequency: float = None
+) -> Tuple:
+    """Calculate statistics of the lifetime distribution of each state.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
+
+    Returns
+    -------
+    means : np.ndarray
+        Mean lifetime of each state.
+    std : np.ndarray
+        Standard deviation of each state.
+    """
+    lts = lifetimes(state_time_course, sampling_frequency)
+    mean = np.array([np.mean(lt) for lt in lts])
+    std = np.array([np.std(lt) for lt in lts])
+    return mean, std
+
+
+def intervals(state_time_course: np.ndarray, sampling_frequency: float = None):
+    """Calculate state intervals for a state time course.
+
+    An interval is the duration between successive visits for a particular
+    state.
+
+    Parameters
+    ----------
+    state_time_course : numpy.ndarray
+        State time course (strictly binary).
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If passed returns the intervals in seconds.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        List containing an array of intervals in the order they occur for each state.
+        This cannot necessarily be converted into an array as an equal number of
+        elements in each array is not guaranteed.
+    """
+    ons, offs = state_activation(state_time_course)
+    intvs = []
+    for on, off in zip(ons, offs):
+        intvs.append(on[1:] - off[:-1])
+    if sampling_frequency is not None:
+        intvs = [intv / sampling_frequency for intv in intvs]
+    return intvs
+
+
+def fractional_occupancies(state_time_course: np.ndarray) -> np.ndarray:
+    """Calculates the fractional occupancy.
+
+    Parameters
+    ----------
+    state_time_course : np.ndarray
+        State time course. Shape is (n_samples, n_states).
+
+    Returns
+    -------
+    np.ndarray
+        The fractional occupancy of each state.
+    """
+    return np.sum(state_time_course, axis=0) / state_time_course.shape[0]

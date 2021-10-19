@@ -1,15 +1,12 @@
-"""Example script for fitting the observation model to HMM data.
+"""Example script for fitting a multivariate normal observation model to data.
 
-- A seed is set for the random number generators for reproducibility.
 """
 
 print("Setting up")
-from pathlib import Path
-
 import numpy as np
-from vrad import data, simulation
+from vrad import data, files, simulation
 from vrad.inference import tf_ops
-from vrad.models import GO
+from vrad.models import Config, Model
 from vrad.utils import plotting
 
 # GPU settings
@@ -21,20 +18,8 @@ observation_error = 0.2
 gamma_shape = 20
 gamma_scale = 10
 
-n_states = 5
-sequence_length = 200
-batch_size = 16
-
-n_epochs = 20
-
-learn_alpha_scaling = False
-normalize_covariances = False
-
-learning_rate = 0.01
-
 # Load state transition probability matrix and covariances of each state
-example_file_directory = Path(__file__).parent / "files"
-cov = np.load(example_file_directory / "hmm_cov.npy")
+cov = np.load(files.example.path / "hmm_cov.npy")
 
 # Mixtures of states to include in the simulation
 mixed_state_vectors = np.array(
@@ -55,31 +40,33 @@ sim = simulation.MixedHSMM_MVN(
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
-n_channels = meg_data.n_channels
+
+# Settings
+config = Config(
+    n_states=sim.n_states,
+    n_channels=sim.n_channels,
+    sequence_length=200,
+    learn_alpha_scaling=False,
+    normalize_covariances=False,
+    batch_size=16,
+    learning_rate=0.01,
+    n_epochs=20,
+)
 
 # Prepare dataset
-training_dataset = meg_data.training_dataset(
-    sequence_length,
-    batch_size,
+training_dataset = meg_data.dataset(
+    config.sequence_length,
+    config.batch_size,
     alpha=[sim.state_time_course],
+    shuffle=True,
 )
 
 # Build model
-model = GO(
-    n_channels=n_channels,
-    n_states=n_states,
-    sequence_length=sequence_length,
-    learn_alpha_scaling=learn_alpha_scaling,
-    normalize_covariances=normalize_covariances,
-    learning_rate=learning_rate,
-)
+model = Model(config)
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=n_epochs)
+history = model.fit(training_dataset, epochs=config.n_epochs)
 
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")
-
-# Delete the temporary folder holding the data
-meg_data.delete_dir()

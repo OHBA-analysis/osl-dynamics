@@ -11,7 +11,6 @@ from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from vrad import array_ops
 from vrad.analysis.time_series import get_state_time_series
-from vrad.data.manipulation import standardize
 
 _logger = logging.getLogger("VRAD")
 
@@ -312,7 +311,6 @@ def multitaper_spectra(
     n_tapers: int,
     segment_length: int = None,
     frequency_range: list = None,
-    standardize_data: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates spectra for inferred states using a multitaper.
 
@@ -336,8 +334,6 @@ def multitaper_spectra(
         Length of the data segement to use to calculate the multitaper.
     frequency_range : list
         Minimum and maximum frequency to keep.
-    standardize : bool
-        Should we standardize the data before calculating the PSDs? Default is True.
 
     Returns
     -------
@@ -413,10 +409,6 @@ def multitaper_spectra(
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
-
-    # Standardise the data
-    if standardize_data:
-        data = standardize(data, axis=0)
 
     # Use the state mixing factors to get a time series for each state
     state_time_series = get_state_time_series(data, alpha)
@@ -514,3 +506,51 @@ def coherence_spectra(power_spectra: np.ndarray):
                 )
 
     return coherences
+
+
+def mar_spectra(
+    coeffs: np.ndarray, covs: np.ndarray, sampling_frequency: float, n_f: int = 512
+) -> np.ndarray:
+    """Calculates cross power spectral densities from MAR model parameters.
+
+    Parameters
+    ----------
+    coeffs : np.ndarray
+        MAR coefficients. Shape must be (n_states, n_lags, n_channels, n_channels).
+    covs : np.ndarray
+        MAR covariances. Shape must be (n_states, n_channels, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hertz.
+    n_f : int
+        Number of frequency bins in the cross power spectral density to calculate.
+        Optional, default is 512.
+
+    Returns
+    -------
+    np.ndarray
+        Cross power spectral densities.
+        Shape is (n_f, n_states, n_channels, n_channels) or
+        (n_f, n_channels, n_channels).
+    """
+    n_states = coeffs.shape[0]
+    n_lags = coeffs.shape[1]
+    n_channels = coeffs.shape[-1]
+
+    # Frequencies to evaluate the PSD at
+    f = np.arange(0, sampling_frequency / 2, sampling_frequency / (2 * n_f))
+
+    # z-transform of the coefficients
+    A = np.zeros([n_f, n_states, n_channels, n_channels], dtype=np.complex_)
+    for i in range(n_f):
+        for l in range(n_lags):
+            z = np.exp(-1j * (l + 1) * 2 * np.pi * f[i] / sampling_frequency)
+            A[i] += coeffs[:, l] * z
+
+    # Transfer function
+    I = np.identity(n_channels)[np.newaxis, np.newaxis, ...]
+    H = np.linalg.inv(I - A)
+
+    # PSDs
+    P = H @ covs[np.newaxis, ...] @ np.transpose(np.conj(H), axes=[0, 1, 3, 2])
+
+    return f, np.squeeze(P)

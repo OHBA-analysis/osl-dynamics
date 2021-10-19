@@ -49,7 +49,7 @@ acf = states.autocorrelation_functions(
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-f, psd, coh = spectral.state_covariance_spectra(
+f, psd, _ = spectral.state_covariance_spectra(
     acf,
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,
@@ -118,5 +118,3 @@ for component in range(4):
         subtract_mean=True,
         component=component,
     )
-
-preprocessed_data.delete_dir()

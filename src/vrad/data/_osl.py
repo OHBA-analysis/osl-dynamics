@@ -3,8 +3,7 @@ from typing import Union
 import mat73
 import numpy as np
 from vrad import array_ops
-from vrad.inference import metrics
-from vrad.utils import plotting
+from vrad.inference import states
 
 
 class OSL_HMM:
@@ -18,7 +17,7 @@ class OSL_HMM:
 
     def __init__(self, filename):
         self.filename = filename
-        self.hmm = mat73.loadmat(filename)["hmm"]
+        self.hmm = mat73.loadmat(filename, use_attrdict=True)["hmm"]
 
         self.state = self.hmm.state
         self.k = int(self.hmm.K)
@@ -55,6 +54,9 @@ class OSL_HMM:
                 for state in self.state
             ]
         )
+
+        # Transition probability matrix
+        self.trans_prob = self.p
 
         # Discontinuities in the training data which indicate the number of data
         # points for different subjects
@@ -112,7 +114,7 @@ class OSL_HMM:
             Fractional occupancies.
         """
         stc = self.state_time_course(concatenate=True)
-        return metrics.fractional_occupancies(stc)
+        return states.fractional_occupancies(stc)
 
     def state_time_course(
         self, concatenate: bool = False, pad_n_embeddings: int = None
@@ -145,14 +147,6 @@ class OSL_HMM:
                 return np.concatenate(padded_stc)
             else:
                 return padded_stc
-
-    def plot_covariances(self, *args, **kwargs):
-        """Wraps plotting.plot_matrices for self.covariances."""
-        plotting.plot_matrices(self.covariances, *args, **kwargs)
-
-    def plot_states(self, *args, **kwargs):
-        """Wraps plotting.highlight_states for self.state_time_course."""
-        plotting.state_barcode(self.state_time_course, *args, **kwargs)
 
     def covariance_weights(self) -> np.ndarray:
         """Calculate covariance weightings based on variance (trace).

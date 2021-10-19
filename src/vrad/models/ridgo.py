@@ -197,10 +197,10 @@ def _model_structure(config):
     means_covs_layer = MeansCovsLayer(
         config.n_states,
         config.n_channels,
-        learn_means=False,
+        learn_means=config.learn_means,
         learn_covariances=config.learn_covariances,
         normalize_covariances=config.normalize_covariances,
-        initial_means=None,
+        initial_means=config.initial_means,
         initial_covariances=config.initial_covariances,
         name="means_covs",
     )

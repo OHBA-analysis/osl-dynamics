@@ -32,32 +32,47 @@ class Data(IO, Manipulation, TensorFlowDataset):
         Number of embeddings. Optional. Can be passed if data has already been prepared.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)? Optional, default is True.
+    keep_memmaps_on_close : bool
+        Should we keep the memmaps? Optional, default is False.
     """
 
     def __init__(
         self,
-        inputs: list,
+        inputs: Union[List[str], str],
         matlab_field: str = "X",
         sampling_frequency: float = None,
         store_dir: str = "tmp",
         n_embeddings: int = None,
         time_axis_first: bool = True,
+        keep_memmaps_on_close: bool = False,
     ):
         # Unique identifier for the Data object
         self._identifier = id(inputs)
 
         # Load data by initialising an IO object
         IO.__init__(
-            self, inputs, matlab_field, sampling_frequency, store_dir, time_axis_first
+            self,
+            inputs,
+            matlab_field,
+            sampling_frequency,
+            store_dir,
+            time_axis_first,
+            keep_memmaps_on_close=keep_memmaps_on_close,
         )
 
         # Initialise a Manipulation object so we have method we can use to prepare
         # the data
-        Manipulation.__init__(self, n_embeddings)
+        Manipulation.__init__(
+            self, n_embeddings, keep_memmaps_on_close=keep_memmaps_on_close
+        )
 
-        # Initialise a TensorFlowDataset object so we have methods to create
-        # training/prediction datasets
+        # Initialise a TensorFlowDataset object so we have methods to create datasets
         TensorFlowDataset.__init__(self)
+
+    def __del__(self):
+        if not self.keep_memmaps_on_close:
+            self.delete_manipulation_memmaps()
+            self.delete_io_memmaps()
 
     def __iter__(self):
         return iter(self.subjects)

@@ -8,7 +8,7 @@ from vrad.analysis import connectivity, spectral, states
 from vrad.data import OSL_HMM, Data, io
 from vrad.utils import plotting
 
-# Load an HMM fit
+# Load a HMM fit
 hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
@@ -50,7 +50,7 @@ acf = states.autocorrelation_functions(
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-f, psd, coh = spectral.state_covariance_spectra(
+_, psd, _ = spectral.state_covariance_spectra(
     acf,
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,
@@ -93,6 +93,3 @@ connectivity.save(
     parcellation_file=parcellation_file,
     component=0,  # only plot the first spectral component
 )
-
-# Delete temporary directory
-preprocessed_data.delete_dir()

@@ -1,4 +1,5 @@
 import logging
+import pathlib
 from typing import List, Union
 
 import numpy as np
@@ -22,9 +23,11 @@ class Manipulation:
         Number of embeddings.
     """
 
-    def __init__(self, n_embeddings: int):
+    def __init__(self, n_embeddings: int, keep_memmaps_on_close: bool = False):
         self.n_embeddings = n_embeddings
         self.prepared = False
+        self.prepared_data_filenames = []
+        self.keep_memmaps_on_close = keep_memmaps_on_close
 
     def _process_from_yaml(self, file, **kwargs):
         with open(file) as f:
@@ -112,6 +115,7 @@ class Manipulation:
         self,
         n_embeddings: int = 1,
         n_pca_components: int = None,
+        pca_components: np.ndarray = None,
         whiten: bool = False,
     ):
         """Prepares data to train the model with.
@@ -124,6 +128,9 @@ class Manipulation:
             Number of data points to embed the data. Optional, default is 1.
         n_pca_components : int
             Number of PCA components to keep. Optional, default is no PCA.
+        pca_components : np.ndarray
+            PCA components to apply if they have already been calculated.
+            Optional.
         whiten : bool
             Should we whiten the PCA'ed data? Optional, default is False.
         """
@@ -133,8 +140,15 @@ class Manipulation:
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
+        self.pca_components = pca_components
         self.whiten = whiten
         self.prepared = True
+
+        if n_pca_components is not None and pca_components is not None:
+            raise ValueError("Please only pass n_pca_components or pca_components.")
+
+        if pca_components is not None and not isinstance(pca_components, np.ndarray):
+            raise ValueError("pca_components must be a numpy array.")
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -166,9 +180,6 @@ class Manipulation:
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
-
-        else:
-            self.pca_components = None
 
         # Prepare the data
         for raw_data_memmap, prepared_data_file in zip(
@@ -212,6 +223,17 @@ class Manipulation:
         ]
 
         self.prepared_data_memmaps = []
+
+    def delete_manipulation_memmaps(self):
+        """Deletes memmaps and removes store_dir if empty."""
+        if self.prepared_data_filenames is not None:
+            for filename in self.prepared_data_filenames:
+                pathlib.Path(filename).unlink(missing_ok=True)
+        if self.store_dir.exists():
+            if not any(self.store_dir.iterdir()):
+                self.store_dir.rmdir()
+        self.prepared_data_memmaps = None
+        self.prepared_data_filenames = None
 
     def trim_raw_time_series(
         self,
@@ -333,7 +355,7 @@ def time_embed(time_series: np.ndarray, n_embeddings: int):
 
 
 def trim_time_series(
-    time_series: np.ndarray,
+    time_series: Union[list, np.ndarray],
     sequence_length: int,
     discontinuities: list = None,
     concatenate: bool = False,
@@ -360,16 +382,21 @@ def trim_time_series(
     list of np.ndarray
         Trimmed time series.
     """
-    if discontinuities is None:
-        # Assume entire time series corresponds to a single subject
-        ts = [time_series]
+    if isinstance(time_series, np.ndarray):
+        if discontinuities is None:
+            # Assume entire time series corresponds to a single subject
+            ts = [time_series]
+        else:
+            # Separate the time series for each subject
+            ts = []
+            for i in range(len(discontinuities)):
+                start = sum(discontinuities[:i])
+                end = sum(discontinuities[: i + 1])
+                ts.append(time_series[start:end])
+    elif isinstance(time_series, list):
+        ts = time_series
     else:
-        # Separate the time series for each subject
-        ts = []
-        for i in range(len(discontinuities)):
-            start = sum(discontinuities[:i])
-            end = sum(discontinuities[: i + 1])
-            ts.append(time_series[start:end])
+        raise ValueError("time_series must be a list or numpy array.")
 
     # Remove data points lost to separating into sequences
     for i in range(len(ts)):
