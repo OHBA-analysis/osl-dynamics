@@ -1,6 +1,6 @@
 import numpy as np
-from vrad import files
-from vrad.utils import plotting
+from dynemo import files
+from dynemo.utils import plotting
 
 # Example files
 data_file = files.example.path / "ctf275_data.npy"

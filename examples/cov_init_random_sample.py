@@ -4,11 +4,11 @@ of the training data.
 """
 
 import numpy as np
-from vrad.data import Data
-from vrad.files import example
-from vrad.inference.states import match_covariances
-from vrad.simulation import HSMM_MVN
-from vrad.utils import plotting
+from dynemo.data import Data
+from dynemo.files import example
+from dynemo.inference.modes import match_covariances
+from dynemo.simulation import HSMM_MVN
+from dynemo.utils import plotting
 
 # Ground truth covariances
 gt_covs = np.load(example.path / "hmm_cov.npy")

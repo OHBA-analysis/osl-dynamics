@@ -4,10 +4,10 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data, files, simulation
-from vrad.inference import tf_ops
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, files, simulation
+from dynemo.inference import tf_ops
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -18,11 +18,11 @@ observation_error = 0.2
 gamma_shape = 20
 gamma_scale = 10
 
-# Load state transition probability matrix and covariances of each state
+# Load mode transition probability matrix and covariances of each mode
 cov = np.load(files.example.path / "hmm_cov.npy")
 
-# Mixtures of states to include in the simulation
-mixed_state_vectors = np.array(
+# Mixtures of modes to include in the simulation
+mixed_mode_vectors = np.array(
     [[0.5, 0.5, 0, 0, 0], [0, 0.3, 0, 0.7, 0], [0, 0, 0.6, 0.4, 0]]
 )
 
@@ -30,7 +30,7 @@ mixed_state_vectors = np.array(
 print("Simulating data")
 sim = simulation.MixedHSMM_MVN(
     n_samples=n_samples,
-    mixed_state_vectors=mixed_state_vectors,
+    mixed_mode_vectors=mixed_mode_vectors,
     gamma_shape=gamma_shape,
     gamma_scale=gamma_scale,
     means="zero",
@@ -43,7 +43,7 @@ meg_data = data.Data(sim.time_series)
 
 # Settings
 config = Config(
-    n_states=sim.n_states,
+    n_modes=sim.n_modes,
     n_channels=sim.n_channels,
     sequence_length=200,
     learn_alpha_scaling=False,
@@ -57,7 +57,7 @@ config = Config(
 training_dataset = meg_data.dataset(
     config.sequence_length,
     config.batch_size,
-    alpha=[sim.state_time_course],
+    alpha=[sim.mode_time_course],
     shuffle=True,
 )
 

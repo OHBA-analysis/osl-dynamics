@@ -1,14 +1,14 @@
-"""Example script for demonstrating VRAD's ability to infer a soft mixture of states.
+"""Example script for demonstrating DyNeMo's ability to infer a soft mixture of modes.
 
 """
 
 print("Setting up")
 import os
 import numpy as np
-from vrad import data, simulation
-from vrad.inference import metrics, states, tf_ops
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, simulation
+from dynemo.inference import metrics, modes, tf_ops
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 from tqdm import trange
 
 
@@ -20,7 +20,7 @@ tf_ops.gpu_growth()
 
 # Settings
 config = Config(
-    n_states=6,
+    n_modes=6,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=64,
@@ -45,7 +45,7 @@ config = Config(
 print("Simulating data")
 sim = simulation.MixedSine_MVN(
     n_samples=25600,
-    n_states=6,
+    n_modes=6,
     n_channels=80,
     relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
     amplitudes=[6, 5, 4, 3, 2, 1],
@@ -55,7 +55,7 @@ sim = simulation.MixedSine_MVN(
     covariances="random",
     random_seed=123,
 )
-sim_stc = sim.state_time_course
+sim_stc = sim.mode_time_course
 meg_data = data.Data(sim.time_series)
 
 config.n_channels = meg_data.n_channels
@@ -89,32 +89,32 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred alpha and state time course
+# Inferred alpha and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-sim_stc, inf_stc = states.match_states(sim_stc, inf_alp)
+sim_stc, inf_stc = modes.match_modes(sim_stc, inf_alp)
 
-# Compare the inferred state time course to the ground truth
+# Compare the inferred mode time course to the ground truth
 plotting.plot_separate_time_series(
     sim_stc, inf_stc, n_samples=2000, filename="figures/stc.png"
 )
-plotting.state_stackplots(
+plotting.plot_alpha(
     sim_stc,
     n_samples=2000,
     title="Ground Truth",
-    y_label=r"$\alpha_{jt}$",
+    y_labels=r"$\alpha_{jt}$",
     filename="figures/sim_stc.png",
 )
-plotting.state_stackplots(
+plotting.plot_alpha(
     inf_stc,
     n_samples=2000,
-    title="VRAD",
-    y_label=r"$\alpha_{jt}$",
+    title="DyNeMo",
+    y_labels=r"$\alpha_{jt}$",
     filename="figures/inf_stc.png",
 )
 
-# Correlation between state time courses
+# Correlation between mode time courses
 corr = metrics.alpha_correlation(inf_stc, sim_stc)
-print("Correlation (VRAD vs Simulation):", corr)
+print("Correlation (DyNeMo vs Simulation):", corr)
 
 # Reconstruction of the time-varying covariance
 sim_cov = sim.covariances
@@ -136,10 +136,10 @@ for i in trange(2000, ncols=98):
 plotting.plot_line(
     [range(2000)],
     [rd],
-    labels=["VRAD"],
+    labels=["DyNeMo"],
     x_label="Sample",
     y_label="$d$",
-    figsize=(15, 1.5),
+    fig_kwargs={"figsize": (15, 1.5)},
     filename="figures/rd.png",
 )
 

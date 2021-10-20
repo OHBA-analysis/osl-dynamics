@@ -1,17 +1,17 @@
-"""Example script for training VRAD on a single subject to use the inferred covariances
+"""Example script for training DyNeMo on a single subject to use the inferred covariances
 as initialization for full training.
 
 - Picks 1 of 46 subjects to train on at randomly.
-- Trains VRAD using identity matrices to initialize the covariances.
+- Trains DyNeMo using identity matrices to initialize the covariances.
 - This is repeated 10 times.
 - Then save the inferred covariances from the fit with the best free energy.
 """
 
 print("Setting up")
 import numpy as np
-from vrad.data import Data
-from vrad.inference import tf_ops
-from vrad.models import Config, Model
+from dynemo.data import Data
+from dynemo.inference import tf_ops
+from dynemo.models import Config, Model
 
 
 # GPU settings
@@ -19,7 +19,7 @@ tf_ops.gpu_growth()
 
 # Hyperparameters
 config = Config(
-    n_states=10,
+    n_modes=10,
     n_channels=80,
     sequence_length=200,
     inference_rnn="lstm",

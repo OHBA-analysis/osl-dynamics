@@ -1,11 +1,11 @@
 
 # Contribution Guide
 
-This is an introductory guide to using VRAD on the Biomedical Research Computing (BMRC) cluster. This guide covers:
+This is an introductory guide to using DyNeMo on the Biomedical Research Computing (BMRC) cluster. This guide covers:
 - [The BMRC Cluster](#the-bmrc-cluster)
-- [Installing VRAD on BMRC](#installing-vrad-on-bmrc)
-- [Using VRAD on BMRC](#using-vrad-on-bmrc)
-- [Editing VRAD Source Code](#editing-vrad-source-code)
+- [Installing DyNeMo on BMRC](#installing-dynemo-on-bmrc)
+- [Using DyNeMo on BMRC](#using-dynemo-on-bmrc)
+- [Editing DyNeMo Source Code](#editing-dynemo-source-code)
 
 ## The BMRC Cluster
 
@@ -57,7 +57,7 @@ To submit a non-interactive GPU job, first create a `submission.sh` file:
 # Setup your environment
 module load Anaconda3
 module load cudnn
-source activate vrad-tf23
+source activate dynemo-tf23
 
 # Run scripts
 python simulation_hmm_mvn.py
@@ -71,17 +71,17 @@ Delete all jobs: `qdel -u <username>`.
 
 Further info: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources.
 
-## Installing VRAD on BMRC
-It is recommended to install VRAD within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
+## Installing DyNeMo on BMRC
+It is recommended to install DyNeMo within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
 
 ### TensorFlow 2.5 (Recommended for compG017)
 ```
 module use /well/woolrich/projects/software/modulefiles
 module load Anaconda3
 module load cuda/11.2
-conda create --name vrad-tf25 python=3.8
-conda activate vrad-tf25
-cd VRAD
+conda create --name dynemo-tf25 python=3.8
+conda activate dynemo-tf25
+cd DyNeMo
 pip install -e .
 ```
 
@@ -96,9 +96,9 @@ Install:
 ```
 module load Anaconda3
 module load cudNN
-conda create --name vrad-tf24
-conda activate vrad-tf24
-cd VRAD
+conda create --name dynemo-tf24
+conda activate dynemo-tf24
+cd DyNeMo
 pip install -e .
 ```
 
@@ -113,41 +113,41 @@ Install:
 ```
 module load Anaconda3
 module load cudnn
-conda create --name vrad-tf23
-conda activate vrad-tf23
-cd VRAD
+conda create --name dynemo-tf23
+conda activate dynemo-tf23
+cd DyNeMo
 pip install -e .
 ```
 
-## Using VRAD on BMRC
+## Using DyNeMo on BMRC
 
-There are two options for running VRAD:
-- In a standalone script, e.g. the scripts in `/VRAD/examples`.
+There are two options for running DyNeMo:
+- In a standalone script, e.g. the scripts in `/DyNeMo/examples`.
 - In a Jupyter Notebook setup.
 
 ### Standalone Scripts
 
-VRAD can be imported like any other python package in a script:
+DyNeMo can be imported like any other python package in a script:
 ```
-from vrad import array_ops
-from vrad.models import Model
+from dynemo import array_ops
+from dynemo.models import Model
 ```
 
 The script is executed via the command line on a GPU node with `python <script>.py`.
 
-Before you can run the script you need to activate the virtual environment in which VRAD was installed with `conda activate <env>`.
+Before you can run the script you need to activate the virtual environment in which DyNeMo was installed with `conda activate <env>`.
 
 ### Jupyter Notebook
 
 This is a work in progress.
 
-## Editing VRAD Source Code
+## Editing DyNeMo Source Code
 
 This section gives an overview of the source code and useful tips for editing.
 
-### Overview of the VRAD Package
+### Overview of the DyNeMo Package
 
-The main source code is contained in `/VRAD/src/vrad`. This directory contains 7 subpackages:
+The main source code is contained in `/DyNeMo/src/dynemo`. This directory contains 7 subpackages:
 - `data`: Classes and functions used to load, save and manipulate data.
 - `models` and `inference`: Classes for each model type and TensorFlow functions used for inference.
 - `analysis`: Functions for analysing a fitted model.

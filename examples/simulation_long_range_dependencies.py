@@ -1,4 +1,4 @@
-"""Example script for demonstrating VRAD's ability to learn long-range dependependcies.
+"""Example script for demonstrating DyNeMo's ability to learn long-range dependependcies.
 
 - An HSMM is simulated.
 - The output of this script will vary slightly due to random sampling.
@@ -7,10 +7,10 @@
 print("Setting up")
 import os
 import numpy as np
-from vrad import data, simulation
-from vrad.inference import tf_ops, states, metrics, callbacks
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, simulation
+from dynemo.inference import tf_ops, modes, metrics, callbacks
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 # Make directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -25,7 +25,7 @@ gamma_shape = 10
 gamma_scale = 5
 
 config = Config(
-    n_states=3,
+    n_modes=3,
     n_channels=11,
     sequence_length=200,
     inference_rnn="lstm",
@@ -53,7 +53,7 @@ print("Simulating data")
 sim = simulation.HSMM_MVN(
     n_samples=n_samples,
     n_channels=config.n_channels,
-    n_states=config.n_states,
+    n_modes=config.n_modes,
     means="zero",
     covariances="random",
     observation_error=observation_error,
@@ -64,7 +64,7 @@ sim = simulation.HSMM_MVN(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
-# Plot the transition probability matrix for state switching in the HSMM
+# Plot the transition probability matrix for mode switching in the HSMM
 plotting.plot_matrices(
     sim.off_diagonal_trans_prob, filename="figures/sim_trans_prob.png"
 )
@@ -83,7 +83,7 @@ model.summary()
 
 # Callbacks
 dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.state_time_course
+    prediction_dataset, sim.mode_time_course
 )
 
 print("Training model")
@@ -99,30 +99,30 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# VRAD inferred alpha
+# DyNeMo inferred alpha
 inf_alp = model.get_alpha(prediction_dataset)
 
-# State time courses
-sim_stc = sim.state_time_course
-inf_stc = states.time_courses(inf_alp)
+# Mode time courses
+sim_stc = sim.mode_time_course
+inf_stc = modes.time_courses(inf_alp)
 
-# Calculate the dice coefficient between state time courses
-orders = states.match_states(sim_stc, inf_stc, return_order=True)
+# Calculate the dice coefficient between mode time courses
+orders = modes.match_modes(sim_stc, inf_stc, return_order=True)
 inf_stc = inf_stc[:, orders[1]]
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
-plotting.compare_state_data(
+plotting.compare_mode_data(
     sim_stc,
     inf_stc,
-    titles=["Ground Truth", "VRAD"],
+    titles=["Ground Truth", "DyNeMo"],
     x_label="Sample",
     filename="figures/compare.png",
 )
 
-plotting.plot_state_lifetimes(
+plotting.plot_mode_lifetimes(
     sim_stc, x_label="Lifetime", y_label="Occurrence", filename="figures/sim_lt.png"
 )
-plotting.plot_state_lifetimes(
+plotting.plot_mode_lifetimes(
     inf_stc, x_label="Lifetime", y_label="Occurrence", filename="figures/inf_lt.png"
 )
 
@@ -135,9 +135,9 @@ plotting.plot_matrices(inf_cov, filename="figures/inf_cov.png")
 
 # Sample from model RNN
 sam_alp = model.sample_alpha(25600)
-sam_stc = states.time_courses(sam_alp)
+sam_stc = modes.time_courses(sam_alp)
 
-plotting.plot_state_lifetimes(
+plotting.plot_mode_lifetimes(
     sam_stc,
     x_label="Lifetime",
     x_range=[0, 150],

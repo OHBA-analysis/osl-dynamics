@@ -1,23 +1,23 @@
-"""Example script for running inference on resting-state MEG data for one subject.
+"""Example script for running inference on resting-mode MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/projects/uk_meg_notts
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each
-  state.
+  mode.
 - Covariances are NOT trainable.
-- Achieves a dice coefficient of ~0.94 (when compared to the OSL HMM state time course).
+- Achieves a dice coefficient of ~0.94 (when compared to the OSL HMM mode time course).
 """
 
 print("Setting up")
-from vrad.data import OSL_HMM, Data, manipulation
-from vrad.inference import metrics, states, tf_ops
-from vrad.models import Config, Model
+from dynemo.data import OSL_HMM, Data, manipulation
+from dynemo.inference import metrics, modes, tf_ops
+from dynemo.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
 
 # Settings
 config = Config(
-    n_states=6,
+    n_modes=6,
     sequence_length=400,
     inference_rnn="lstm",
     inference_n_units=64,
@@ -83,11 +83,11 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred state mixing factors and state time courses
+# Inferred mode mixing factors and mode time courses
 alpha = model.get_alpha(prediction_dataset)
-inf_stc = states.time_courses(alpha)
+inf_stc = modes.time_courses(alpha)
 hmm_stc = manipulation.trim_time_series(
-    time_series=hmm.state_time_course(),
+    time_series=hmm.mode_time_course(),
     sequence_length=config.sequence_length,
 )
 

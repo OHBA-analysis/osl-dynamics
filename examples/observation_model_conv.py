@@ -6,10 +6,10 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data, simulation
-from vrad.inference import tf_ops
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, simulation
+from dynemo.inference import tf_ops
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 
 # GPU settings
@@ -34,7 +34,7 @@ config = Config(
     n_filters=4,
     n_residual_blocks=1,
     n_conv_layers=7,
-    n_states=sim.n_states,
+    n_modes=sim.n_modes,
     n_channels=sim.n_channels,
     sequence_length=128,
     batch_size=16,
@@ -46,7 +46,7 @@ config = Config(
 training_dataset = meg_data.dataset(
     config.sequence_length,
     config.batch_size,
-    alpha=[sim.state_time_course],
+    alpha=[sim.mode_time_course],
     shuffle=True,
 )
 
@@ -62,8 +62,8 @@ mse = model.loss(training_dataset)
 print("MSE:", mse)
 
 # Sample from the observation model
-samples = np.empty([config.n_states, 500, config.n_channels])
-for alpha in range(config.n_states):
+samples = np.empty([config.n_modes, 500, config.n_channels])
+for alpha in range(config.n_modes):
     samples[alpha] = model.sample(500, std_dev=np.sqrt(mse), alpha=alpha)
 
-plotting.plot_line([range(500)] * config.n_states, samples, filename="samples.png")
+plotting.plot_line([range(500)] * config.n_modes, samples, filename="samples.png")

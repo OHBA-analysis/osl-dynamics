@@ -1,8 +1,8 @@
 ================================
-VariationalRNNAutoDecoder (VRAD)
+Dynamic Network Modes (DyNeMo)
 ================================
 
-This is the documentation of VRAD.
+This is the documentation of DyNeMo.
 
 Contents
 ========
