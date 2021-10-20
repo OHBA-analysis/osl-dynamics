@@ -1,5 +1,5 @@
 ================================
-VariationalRNNAutoDecoder (DyNeMo)
+Dynamic Network Modes (DyNeMo)
 ================================
 
 This is the documentation of DyNeMo.
