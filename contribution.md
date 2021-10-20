@@ -95,7 +95,7 @@ tensorflow_probability==0.12.2
 Install:
 ```
 module load Anaconda3
-module load cudNN
+module load cuDNN
 conda create --name dynemo-tf24
 conda activate dynemo-tf24
 cd DyNeMo
