@@ -1,5 +1,5 @@
 """
-Example use of VRAD on reduced sensor space data.
+Example use of DyNeMo on reduced sensor space data.
 The resulting C(t) matrix can be used for
 TASER (Temporally Adaptive SourcE Reconstruction).
 
@@ -16,12 +16,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as spio
 import tensorflow as tf
-import vrad
+import dynemo
 import yaml
-from vrad import data, files
-from vrad.inference import tf_ops
-from vrad.models import RIGO
-from vrad.utils import plotting
+from dynemo import data, files
+from dynemo.inference import tf_ops
+from dynemo.models import RIGO
+from dynemo.utils import plotting
 
 tf.keras.backend.clear_session()
 
@@ -67,7 +67,7 @@ cov_init_type = "random"
 Y = spio.loadmat("/well/woolrich/shared/TASER/example_data/filtered_motor_data.mat")
 Y = Y["reduced_data"]  # needs to be channels (or PCs) by time
 
-# Prepare the data for VRAD, making a training and prediction dataset
+# Prepare the data for DyNeMo, making a training and prediction dataset
 print("Reading MEG data")
 prepared_data = data.Data(Y[np.newaxis])
 n_channels = prepared_data.n_channels

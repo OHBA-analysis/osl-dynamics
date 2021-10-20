@@ -2,7 +2,7 @@
 #
 # import pytest
 #
-# from vrad.skeleton import fib
+# from dynemo.skeleton import fib
 #
 # __author__ = "evanroberts"
 # __copyright__ = "evanroberts"

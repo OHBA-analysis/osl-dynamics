@@ -8,10 +8,10 @@
 
 print("Setting up")
 import numpy as np
-from vrad import analysis, data, simulation
-from vrad.inference import callbacks, metrics, modes, tf_ops
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import analysis, data, simulation
+from dynemo.inference import callbacks, metrics, modes, tf_ops
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -113,7 +113,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
 
 # Inferred parameters
 inf_coeffs, inf_covs = model.get_params()

@@ -8,9 +8,9 @@
 """
 
 print("Setting up")
-from vrad.data import OSL_HMM, Data, manipulation
-from vrad.inference import metrics, modes, tf_ops
-from vrad.models import Config, Model
+from dynemo.data import OSL_HMM, Data, manipulation
+from dynemo.inference import metrics, modes, tf_ops
+from dynemo.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()

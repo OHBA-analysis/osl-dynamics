@@ -1,14 +1,14 @@
-"""Example script for demonstrating VRAD's ability to infer a soft mixture of modes.
+"""Example script for demonstrating DyNeMo's ability to infer a soft mixture of modes.
 
 """
 
 print("Setting up")
 import os
 import numpy as np
-from vrad import data, simulation
-from vrad.inference import metrics, modes, tf_ops
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, simulation
+from dynemo.inference import metrics, modes, tf_ops
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 from tqdm import trange
 
 
@@ -107,14 +107,14 @@ plotting.plot_alpha(
 plotting.plot_alpha(
     inf_stc,
     n_samples=2000,
-    title="VRAD",
+    title="DyNeMo",
     y_labels=r"$\alpha_{jt}$",
     filename="figures/inf_stc.png",
 )
 
 # Correlation between mode time courses
 corr = metrics.alpha_correlation(inf_stc, sim_stc)
-print("Correlation (VRAD vs Simulation):", corr)
+print("Correlation (DyNeMo vs Simulation):", corr)
 
 # Reconstruction of the time-varying covariance
 sim_cov = sim.covariances
@@ -136,7 +136,7 @@ for i in trange(2000, ncols=98):
 plotting.plot_line(
     [range(2000)],
     [rd],
-    labels=["VRAD"],
+    labels=["DyNeMo"],
     x_label="Sample",
     y_label="$d$",
     fig_kwargs={"figsize": (15, 1.5)},

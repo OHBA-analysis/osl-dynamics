@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from vrad.utils import misc
+from dynemo.utils import misc
 
 
 class TestListify(TestCase):

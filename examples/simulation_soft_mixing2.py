@@ -1,5 +1,5 @@
 """
-Example to show VRAD's ability to learn non-categorical descriptions of latent dynamics,
+Example to show DyNeMo's ability to learn non-categorical descriptions of latent dynamics,
 using non-overlapping Gaussian Kernels as the covariance matrix elements.
 
 This example demonstrates what can sometimes happen when the underlying ground truth
@@ -16,9 +16,9 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from vrad import data, simulation
-from vrad.inference import modes, tf_ops
-from vrad.models import Config, Model
+from dynemo import data, simulation
+from dynemo.inference import modes, tf_ops
+from dynemo.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()

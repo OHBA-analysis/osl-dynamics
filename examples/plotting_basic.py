@@ -3,8 +3,8 @@
 """
 
 import numpy as np
-from vrad import simulation
-from vrad.utils import plotting
+from dynemo import simulation
+from dynemo.utils import plotting
 
 
 #

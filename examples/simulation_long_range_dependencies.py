@@ -1,4 +1,4 @@
-"""Example script for demonstrating VRAD's ability to learn long-range dependependcies.
+"""Example script for demonstrating DyNeMo's ability to learn long-range dependependcies.
 
 - An HSMM is simulated.
 - The output of this script will vary slightly due to random sampling.
@@ -7,10 +7,10 @@
 print("Setting up")
 import os
 import numpy as np
-from vrad import data, simulation
-from vrad.inference import tf_ops, modes, metrics, callbacks
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, simulation
+from dynemo.inference import tf_ops, modes, metrics, callbacks
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 # Make directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -99,7 +99,7 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# VRAD inferred alpha
+# DyNeMo inferred alpha
 inf_alp = model.get_alpha(prediction_dataset)
 
 # Mode time courses
@@ -114,7 +114,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 plotting.compare_mode_data(
     sim_stc,
     inf_stc,
-    titles=["Ground Truth", "VRAD"],
+    titles=["Ground Truth", "DyNeMo"],
     x_label="Sample",
     filename="figures/compare.png",
 )

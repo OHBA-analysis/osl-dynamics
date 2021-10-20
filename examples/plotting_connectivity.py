@@ -4,9 +4,9 @@
 
 print("Setting up")
 import numpy as np
-from vrad.analysis import connectivity, spectral, modes
-from vrad.data import OSL_HMM, Data, io
-from vrad.utils import plotting
+from dynemo.analysis import connectivity, spectral, modes
+from dynemo.data import OSL_HMM, Data, io
+from dynemo.utils import plotting
 
 # Load a HMM fit
 hmm = OSL_HMM(

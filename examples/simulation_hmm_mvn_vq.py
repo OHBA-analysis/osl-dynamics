@@ -1,4 +1,4 @@
-"""Example script for running inference using a vector quantized version of VRAD
+"""Example script for running inference using a vector quantized version of DyNeMo
  on simulated HMM-MVN data.
 
 - Achieves a dice of ~0.75.
@@ -7,9 +7,9 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data, simulation
-from vrad.inference import metrics, modes, tf_ops
-from vrad.models import Config, Model
+from dynemo import data, simulation
+from dynemo.inference import metrics, modes, tf_ops
+from dynemo.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -91,7 +91,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
 
 # Load at the inferred quantized vectors
 quant_alp = model.get_quantized_alpha()

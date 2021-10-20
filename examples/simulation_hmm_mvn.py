@@ -6,9 +6,9 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data, files, simulation
-from vrad.inference import metrics, modes, tf_ops
-from vrad.models import Config, Model
+from dynemo import data, files, simulation
+from dynemo.inference import metrics, modes, tf_ops
+from dynemo.models import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -97,7 +97,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (VRAD):      ", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
 
 # Delete temporary directory
 meg_data.delete_dir()

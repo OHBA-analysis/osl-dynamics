@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 import numpy as np
-from vrad import array_ops, inference
+from dynemo import array_ops, inference
 
 
 class TestCorrelateModes(TestCase):

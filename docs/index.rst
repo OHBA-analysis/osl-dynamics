@@ -1,8 +1,8 @@
 ================================
-VariationalRNNAutoDecoder (VRAD)
+VariationalRNNAutoDecoder (DyNeMo)
 ================================
 
-This is the documentation of VRAD.
+This is the documentation of DyNeMo.
 
 Contents
 ========

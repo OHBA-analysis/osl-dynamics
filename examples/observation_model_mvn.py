@@ -4,10 +4,10 @@
 
 print("Setting up")
 import numpy as np
-from vrad import data, files, simulation
-from vrad.inference import tf_ops
-from vrad.models import Config, Model
-from vrad.utils import plotting
+from dynemo import data, files, simulation
+from dynemo.inference import tf_ops
+from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
