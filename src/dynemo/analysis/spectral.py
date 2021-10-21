@@ -6,6 +6,7 @@ import logging
 from typing import Tuple
 
 import numpy as np
+from scipy.signal import periodogram
 from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
@@ -47,7 +48,7 @@ def fourier_transform(
         nfft = max(256, 2 ** nextpow2(n))
 
     # Calculate the FFT
-    X = np.fft.fft(data, nfft) / sampling_frequency
+    X = np.fft.fft(data, nfft)
 
     # Only keep the desired frequency range
     if args_range is not None:
@@ -287,6 +288,7 @@ def multitaper(
 
     # Calculate the FFT, X, which has shape [n_tapers, n_channels, n_f]
     X = fourier_transform(data, sampling_frequency, nfft=nfft, args_range=args_range)
+    X /= sampling_frequency
 
     # Number of frequency bins in the FFT
     n_f = X.shape[-1]
@@ -554,3 +556,66 @@ def mar_spectra(
     P = H @ covs[np.newaxis, ...] @ np.transpose(np.conj(H), axes=[0, 1, 3, 2])
 
     return f, np.squeeze(P)
+
+
+def regression_spectra(
+    data: np.ndarray,
+    alpha: np.ndarray,
+    window_length: int,
+    sampling_frequency: float = 1.0,
+    n_embeddings: int = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Calculates a spectogram.
+
+    The data is segmented into overlapping windows which is then used to calculate
+    a periodogram.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
+    alpha : np.ndarray
+        Mode mixing factors. Shape must be (n_samples, n_modes).
+    window_length : int
+        Number of data points to use when calculating the periodogram.
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional, default is 1.0.
+    n_embeddings : int
+        Number of time embeddings used when infering alpha. Optional.
+
+    Returns
+    -------
+    t : np.ndarray
+        Time axis.
+    f : np.ndarray
+        Frequency axis.
+    P : np.ndarray
+        Spectrogram.
+    """
+
+    # Remove data points not in alpha due to time embedding the training data
+    if n_embeddings is not None:
+        data = data[n_embeddings // 2 : -(n_embeddings // 2)]
+
+    # Remove the data points lost due to separating into sequences
+    data = data[: alpha.shape[0]]
+
+    # Number of samples and channels
+    n_samples = data.shape[0]
+    n_channels = data.shape[1]
+
+    # First pad the data so we have enough data points to estimate the periodogram
+    # for time points at the start/end of the data
+    data = np.pad(data, window_length // 2)[
+        :, window_length // 2 : (window_length // 2) + n_channels
+    ]
+
+    # Calculate the periodogram for each segment of the data
+    P = np.empty([n_samples, n_channels, window_length // 2 + 1], dtype=np.float32)
+    for i in trange(n_samples, desc="Calculating spectrogram", ncols=98):
+        x = data[i : i + window_length].T
+        f, P[i] = periodogram(x, fs=sampling_frequency, window="hann")
+
+    t = np.arange(0, n_samples / sampling_frequency, 1.0 / sampling_frequency)
+
+    return t, f, P
