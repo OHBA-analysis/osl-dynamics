@@ -242,6 +242,7 @@ class HMM_MVN(Simulation):
         n_channels: int = None,
         stay_prob: float = None,
         observation_error: float = 0.0,
+        multiple_scale: bool = False,
         random_seed: int = None,
     ):
         # Observation model
@@ -270,8 +271,14 @@ class HMM_MVN(Simulation):
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        self.mode_time_course = self.hmm.generate_modes(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
+        if not multiple_scale:
+            self.mode_time_course = self.hmm.generate_modes(self.n_samples)
+            self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
+        else:
+            self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
+            for i in range(3):
+                self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
+            self.time_series = self.obs_mod.simulate_data_multiple_scales(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):

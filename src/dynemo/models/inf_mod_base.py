@@ -224,9 +224,15 @@ class InferenceModelBase:
         dict
             Dictionary with labels for each prediction.
         """
-        predictions = self.model.predict(*args, *kwargs)
-        return_names = ["ll_loss", "kl_loss", "alpha"]
-        predictions_dict = dict(zip(return_names, predictions))
+        if not self.config.multiple_scale:
+            predictions = self.model.predict(*args, *kwargs)
+            return_names = ["ll_loss", "kl_loss", "alpha"]
+            predictions_dict = dict(zip(return_names, predictions))
+
+        else:
+            predictions = self.model.predict(*args, *kwargs)
+            return_names = ["ll_loss", "kl_loss", "alpha", "beta", "gamma"]
+            predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
     def get_alpha(
@@ -249,14 +255,29 @@ class InferenceModelBase:
             n_modes) or (n_samples, n_modes).
         """
         inputs = self._make_dataset(inputs)
-        outputs = []
+        outputs_alpha = []
+        outputs_beta = []
+        outputs_gamma = []
         for dataset in inputs:
-            alpha = self.predict(dataset, *args, **kwargs)["alpha"]
+            predictions_dict = self.predict(dataset, *args, **kwargs)
+            alpha = predictions_dict["alpha"]
             alpha = np.concatenate(alpha)
-            outputs.append(alpha)
-        if concatenate or len(outputs) == 1:
-            outputs = np.concatenate(outputs)
-        return outputs
+            outputs_alpha.append(alpha)
+
+            if self.config.multiple_scale:
+                beta = predictions_dict["beta"]
+                gamma = predictions_dict["gamma"]
+                beta = np.concatenate(beta)
+                gamma = np.concatenate(gamma)
+                outputs_beta.append(beta)
+                outputs_gamma.append(gamma)
+
+        if concatenate or len(outputs_alpha) == 1:
+            outputs_alpha = np.concatenate(outputs_alpha)
+
+        if self.config.multiple_scale:
+            return [outputs_alpha, outputs_beta, outputs_gamma]
+        return outputs_alpha
 
     def losses(self, dataset, return_sum: bool = False) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.

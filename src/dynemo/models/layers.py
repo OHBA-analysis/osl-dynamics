@@ -1171,3 +1171,311 @@ class MeanSquaredErrorLayer(layers.Layer):
         mse = tf.reduce_mean(se)  # mean over batches, time points and channels
 
         return tf.expand_dims(mse, axis=-1)
+
+@tf.function
+def cholesky_factor_to_full_matrix(cholesky_factor):
+    """Convert a cholesky factor into a full matrix."""
+
+    # The upper triangle is trainable but we should zero it because the array
+    # is the cholesky factor of the full covariance
+    cholesky_factor = tf.linalg.band_part(cholesky_factor, -1, 0)
+
+    # Calculate the full matrix
+    full_matrix = tf.matmul(cholesky_factor, tf.transpose(cholesky_factor, (0, 2, 1)))
+
+    # Add a more error to the diagonal to ensure matrix is positive semi-definite
+    full_matrix += 1e-6 * tf.eye(full_matrix.shape[-1])
+
+    return full_matrix
+
+class MeansVarsFcsLayer(layers.Layer):
+    """Layer to learn the means, diagonal variance matrices,
+    and functional connectivities of the modes
+
+    Outputs the mean vector, the variances, and correlation (fc) matrix of each mode.
+
+    Paramters
+    ---------
+    n_modes: int
+        Number of modes.
+    n_channels: int
+        Number of channels.
+    learn_means/vars/fcs
+        Should we learn the means/variances/fcs?
+    initial_means/vars/fcs
+        Initial values of the mean/variance/fc of each mode
+    normalize_variances
+        Should we normalize the variances according to the total variance?
+    """
+
+    def __init__(
+            self,
+            n_modes,
+            n_channels,
+            learn_means,
+            learn_vars,
+            learn_fcs,
+            initial_means,
+            initial_vars,
+            initial_fcs,
+            normalize_variances = False,
+            **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.learn_means = learn_means
+        self.learn_vars = learn_vars
+        self.learn_fcs = learn_fcs
+        self.normalize_variances = normalize_variances
+
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
+        # Initialisation of means
+        if initial_means is None:
+            self.initial_means = np.zeros([n_modes, n_channels], dtype=np.float32)
+        else:
+            self.initial_means = initial_means
+
+        self.means_initializer = WeightInitializer(self.initial_means)
+
+        # Initialisation of diagonal entries
+        if initial_vars is None:
+            self.initial_vars = np.ones([n_modes, n_channels], dtype=np.float32)
+        else:
+            self.initial_vars = initial_vars
+
+        self.diags_initializer = WeightInitializer(self.initial_vars)
+
+        # Initialisation of functional connectiviy matrices
+        if initial_fcs is None:
+            self.initial_fcs = np.stack([np.eye(n_channels, dtype=np.float32)] * n_modes)
+        else:
+            self.initial_fcs = initial_fcs
+
+        self.flattened_cholesky_fcs = self.bijector.inverse(self.initial_fcs)
+
+        self.flattened_cholesky_fcs_initializer = WeightInitializer(
+            self.flattened_cholesky_fcs
+        )
+
+
+    def build(self, input_shape):
+        # Create weights for the means
+        self.means = self.add_weight(
+            "means",
+            shape=(self.n_modes, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.means_initializer,
+            trainable=self.learn_means,
+        )
+
+        # Create weights for the diagonal entries
+        self.vars = self.add_weight(
+            "vars",
+            shape=(self.n_modes, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.diags_initializer,
+            trainable=self.learn_vars,
+        )
+
+        # Create weights for the lower triangular entries
+        self.flattened_cholesky_fcs = self.add_weight(
+            "flattened_cholesky_fcs",
+            shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
+            dtype=tf.float32,
+            initializer=self.flattened_cholesky_fcs_initializer,
+            trainable=self.learn_fcs,
+        )
+
+        self.built = True
+
+
+    def call(self, inputs, **kwargs):
+        if self.normalize_variances:
+            normalization = (
+                    tf.reduce_sum(tf.linalg.diag_part(self.covariances), axis=1)[
+                        ..., tf.newaxis
+                    ]
+                    / self.n_channels
+            )
+            self.vars = self.vars / normalization
+
+        cholesky_fcs = tfp.math.fill_triangular(self.flattened_cholesky_fcs)
+        # normalize so that fcs are correlation matrices
+        cholesky_fcs = tf.linalg.normalize(cholesky_fcs, axis=2)[0]
+        self.fcs = cholesky_factor_to_full_matrix(cholesky_fcs)
+
+        return [self.means, self.vars, self.fcs]
+
+
+    def compute_output_shape(self, input_shape):
+        return [
+            tf.TensorShape([self.n_modes, self.n_channels]),
+            tf.TensorShape([self.n_modes, self.n_channels]),
+            tf.TensorShape([self.n_modes, self.n_channels, self.n_channels]),
+        ]
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_modes": self.n_modes,
+                "n_channels": self.n_channels,
+                "learn_means": self.learn_means,
+                "learn_vars": self.learn_vars,
+                "learn_fcs": self.learn_fcs
+            }
+        )
+        return config
+
+class MixMeansVarsFcsLayer(layers.Layer):
+    """ Compute a probabilistic mixture of means, variances and fcs.
+    The mixture is calculated as
+
+    m_t = \sum_j \alpha_{jt} mu_j
+    diag(G_t) = \sum_j \beta_{jt} E_j
+    F_t = \sum_j \gamma_{jt} D_j
+    C_t = G_t F_t G_t
+
+    Parameters:
+    ----------
+    n_modes: int
+        number of modes.
+    n_channels: int
+        number of channels.
+    learn_alpha/beta/gamma_scaling
+        Should we learn alpha/beta/gamma scaling?
+    """
+    def __init__(
+        self,
+        n_modes: int,
+        n_channels: int,
+        learn_alpha_scaling: bool,
+        learn_beta_scaling: bool,
+        learn_gamma_scaling: bool,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.learn_alpha_scaling = learn_alpha_scaling
+        self.learn_beta_scaling = learn_beta_scaling
+        self.learn_gamma_scaling = learn_gamma_scaling
+
+    def build(self, input_shape):
+        # Initialise such that softplus(alpha_scaling) = 1
+        self.alpha_scaling_initializer = tf.keras.initializers.Constant(np.log(np.exp(1.0) - 1.0))
+        self.alpha_scaling = self.add_weight(
+            "alpha_scaling",
+            shape=self.n_modes,
+            dtype=tf.float32,
+            initializer=self.alpha_scaling_initializer,
+            trainable=self.learn_alpha_scaling,
+        )
+
+        self.beta_scaling_initializer = tf.keras.initializers.Constant(np.log(np.exp(1.0) - 1.0))
+        self.beta_scaling = self.add_weight(
+            "beta_scaling",
+            shape=self.n_modes,
+            dtype=tf.float32,
+            initializer=self.beta_scaling_initializer,
+            trainable=self.learn_beta_scaling,
+        )
+
+        self.gamma_scaling_initializer = tf.keras.initializers.Constant(np.log(np.exp(1.0) - 1.0))
+        self.gamma_scaling = self.add_weight(
+            "gamma_scaling",
+            shape=self.n_modes,
+            dtype=tf.float32,
+            initializer=self.gamma_scaling_initializer,
+            trainable=self.learn_gamma_scaling,
+        )
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        # Unpack the inputs:
+        # - alpha.shape = (None, sequence_length, n_modes)
+        # - beta.shape = (None, sequence_length, n_modes)
+        # - gamma.shape = (None, sequence_length, n_modes)
+        # - mu.shape = (n_modes, n_channels)
+        # - d.shape = (n_modes, n_channels)
+        # - F.shape = (n_modes, n_channels, n_channels)
+        alpha, beta, gamma, mu, E, D = inputs
+
+        # Make sure the variances are positive
+        # with softplus
+        E = tf.math.softplus(E)
+
+        # Rescale the mode mixing factors
+        alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
+        beta = tf.multiply(beta, activations.softplus(self.beta_scaling))
+        gamma = tf.multiply(gamma, activations.softplus(self.gamma_scaling))
+
+        # Reshape alpha and mu for multiplication
+        alpha = tf.expand_dims(alpha, axis=-1)
+        mu = tf.reshape(mu,(1,1,self.n_modes, self.n_channels))
+
+        # Calculate the mixed mean
+        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
+
+        # Reshape beta and E for multiplication
+        beta = tf.expand_dims(beta, axis=-1)
+        E = tf.reshape(E, (1,1,self.n_modes, self.n_channels))
+
+        # Calculate the mixed diagonal entries
+        G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
+
+        # Reshape gamma and D for multiplication
+        gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
+        D = tf.reshape(D,(1,1,self.n_modes, self.n_channels, self.n_channels))
+        F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
+
+        # Calculate the diagonal matrices G
+        G = tf.linalg.diag(G)
+
+        # Construct the covariance matrices given by C = GFG
+        C = tf.matmul(G, tf.matmul(F, G))
+
+
+        return [m, C]
+
+    def compute_output_shape(self, input_shape):
+        alpha_shape, gamma_shape, mu_shape, d_shape, L_shape = inputs_shape
+        return [tf.TensorShape([None, alpha_shape[1], self.n_channels]),
+                tf.TensorShape([None, alpha_shape[1], self.n_channels, self.n_channels])
+        ]
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_modes": self.n_modes,
+                "n_channels": self.n_channels,
+                "learn_alpha_scaling": self.learn_alpha_scaling,
+                "learn_beta_scaling": self.learn_beta_scaling,
+                "learn_gamma_scaling": self.learn_gamma_scaling,
+            }
+        )
+        return config
+
+class KLsum(layers.Layer):
+    """
+    Layer to sum up the KL losses
+
+    Input a list of scalars and sum them up
+    """
+
+
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        return tf.add_n(inputs)
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape([1])

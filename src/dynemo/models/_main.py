@@ -9,6 +9,7 @@ from dynemo.models.ridgo import RIDGO
 from dynemo.models.rigo import RIGO
 from dynemo.models.rimaro import RIMARO
 from dynemo.models.rivqgo import RIVQGO
+from dynemo.models.mrigo import MRIGO
 
 
 def Model(config):
@@ -39,14 +40,18 @@ def Model(config):
 
     if config.observation_model == "multivariate_normal":
 
-        if config.alpha_pdf == "normal":
-            if config.n_quantized_vectors is not None:
-                return RIVQGO(config)
-            else:
-                return RIGO(config)
+        if not config.multiple_scale:
+            if config.alpha_pdf == "normal":
+                if config.n_quantized_vectors is not None:
+                    return RIVQGO(config)
+                else:
+                    return RIGO(config)
 
-        elif config.alpha_pdf == "dirichlet":
-            return RIDGO(config)
+            elif config.alpha_pdf == "dirichlet":
+                return RIDGO(config)
+
+        else:
+            return MRIGO(config)
 
     elif config.observation_model == "multivariate_autoregressive":
 
