@@ -11,7 +11,7 @@ from scipy.signal.windows import dpss
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from dynemo import array_ops
-from dynemo.analysis.time_series import get_mode_time_series
+from dynemo.analysis.time_series import get_mode_time_series, regress
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -558,12 +558,11 @@ def mar_spectra(
     return f, np.squeeze(P)
 
 
-def regression_spectra(
+def spectrogram(
     data: np.ndarray,
-    alpha: np.ndarray,
     window_length: int,
     sampling_frequency: float = 1.0,
-    n_embeddings: int = None,
+    window: str = "hann",
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates a spectogram.
 
@@ -574,14 +573,12 @@ def regression_spectra(
     ----------
     data : np.ndarray
         Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
-    alpha : np.ndarray
-        Mode mixing factors. Shape must be (n_samples, n_modes).
     window_length : int
         Number of data points to use when calculating the periodogram.
+    window : str
+        Window to apply to the data before calculating the periodogram.
     sampling_frequency : float
         Sampling frequency in Hz. Optional, default is 1.0.
-    n_embeddings : int
-        Number of time embeddings used when infering alpha. Optional.
 
     Returns
     -------
@@ -592,13 +589,6 @@ def regression_spectra(
     P : np.ndarray
         Spectrogram.
     """
-
-    # Remove data points not in alpha due to time embedding the training data
-    if n_embeddings is not None:
-        data = data[n_embeddings // 2 : -(n_embeddings // 2)]
-
-    # Remove the data points lost due to separating into sequences
-    data = data[: alpha.shape[0]]
 
     # Number of samples and channels
     n_samples = data.shape[0]
@@ -614,8 +604,56 @@ def regression_spectra(
     P = np.empty([n_samples, n_channels, window_length // 2 + 1], dtype=np.float32)
     for i in trange(n_samples, desc="Calculating spectrogram", ncols=98):
         x = data[i : i + window_length].T
-        f, P[i] = periodogram(x, fs=sampling_frequency, window="hann")
+        f, P[i] = periodogram(x, fs=sampling_frequency, window=window)
 
+    # Time axis
     t = np.arange(0, n_samples / sampling_frequency, 1.0 / sampling_frequency)
 
     return t, f, P
+
+
+def regression_spectra(
+    data: np.ndarray,
+    alpha: np.ndarray,
+    window_length: int,
+    sampling_frequency: float = 1.0,
+    n_embeddings: int = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate a time-varying PSD for.
+        Shape must be (n_samples, n_channels).
+    alpha : np.ndarray
+        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
+    window_length : int
+        Number samples to use in the window to calculate a PSD.
+    sampling_frequency : float
+        Sampling_frequency in Hz. Optional.
+    n_embeddings : int
+        Number of time embeddings applied when inferring alpha. Optional.
+
+    Returns
+    -------
+    f : np.ndarray
+        Frequency axis.
+    P : np.ndarray
+        Mode PSDs.
+    """
+
+    # Remove data points not in alpha due to time embedding the training data
+    if n_embeddings is not None:
+        data = data[n_embeddings // 2 : -(n_embeddings // 2)]
+
+    # Remove the data points lost due to separating into sequences
+    data = data[: alpha.shape[0]]
+
+    # Calculate time-varying PSD
+    t, f, Pt = spectrogram(data, window_length, sampling_frequency)
+
+    # Regress the time-varying PSD with alpha to get the mode PSDs
+    Pj = regress(Pt, alpha)
+
+    return f, Pj
