@@ -3,11 +3,10 @@
 """
 
 import logging
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
-from scipy.signal import periodogram
-from scipy.signal.windows import dpss
+from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from dynemo import array_ops
@@ -16,11 +15,34 @@ from dynemo.analysis.time_series import get_mode_time_series, regress
 _logger = logging.getLogger("DyNeMo")
 
 
+def _get_frequency_args_range(frequencies: np.ndarray, frequency_range: list) -> list:
+    """Get min/max indices of a range in a frequency axis.
+
+    Parameters
+    ----------
+    frequencies : np.ndarray
+        Frequency axis.
+    frequency_range : list of len 2
+        Min/max frequency.
+
+    Returns
+    -------
+    list of len 2
+        Min/max index.
+    """
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
+    if f_max_arg <= f_min_arg:
+        raise ValueError("Cannot select requested frequency range.")
+    args_range = [f_min_arg, f_max_arg + 1]
+    return args_range
+
+
 def fourier_transform(
     data: np.ndarray,
-    sampling_frequency: float,
-    nfft: int = None,
+    nfft: int,
     args_range: list = None,
+    one_side: bool = False,
 ) -> np.ndarray:
     """Calculates a Fast Fourier Transform (FFT).
 
@@ -28,27 +50,25 @@ def fourier_transform(
     ----------
     data : np.ndarray
         Data with shape (n_samples, n_channels) to FFT.
-    sampling_frequency : float
-        Frequency used to sample the data (Hz).
     nfft : int
-        Number of points in the FFT. (Optional.)
+        Number of points in the FFT.
     args_range : list
-        Minimum and maximum indices of the FFT to keep. (Optional.)
+        Minimum and maximum indices of the FFT to keep. Optional.
+    one_side : bool
+        Should we return a one-sided FFT? Optional.
 
     Returns
     -------
     np.ndarray
         FFT data.
     """
-    # Number of data points
-    n = data.shape[-1]
-
-    # Number of FFT data points to calculate
-    if nfft is None:
-        nfft = max(256, 2 ** nextpow2(n))
 
     # Calculate the FFT
     X = np.fft.fft(data, nfft)
+
+    # Only keep the postive frequency side
+    if one_side:
+        X = X[..., : X.shape[-1] // 2]
 
     # Only keep the desired frequency range
     if args_range is not None:
@@ -195,25 +215,12 @@ def mode_covariance_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
-
-    if f_max_arg <= f_min_arg:
-        raise ValueError("Cannot select requested frequency range.")
-
-    args_range = [f_min_arg, f_max_arg + 1]
+    args_range = _get_frequency_args_range(frequencies, frequency_range)
     frequencies = frequencies[args_range[0] : args_range[1]]
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
-    power_spectra = abs(
-        fourier_transform(
-            autocorrelation_function,
-            sampling_frequency,
-            nfft=nfft,
-            args_range=args_range,
-        )
-    )
+    power_spectra = abs(fourier_transform(autocorrelation_function, nfft, args_range))
 
     # Normalise the power spectra
     power_spectra /= nfft ** 2
@@ -287,7 +294,7 @@ def multitaper(
     data = data[np.newaxis, :, :] * tapers[:, np.newaxis, :]
 
     # Calculate the FFT, X, which has shape [n_tapers, n_channels, n_f]
-    X = fourier_transform(data, sampling_frequency, nfft=nfft, args_range=args_range)
+    X = fourier_transform(data, nfft, args_range)
     X /= sampling_frequency
 
     # Number of frequency bins in the FFT
@@ -409,7 +416,7 @@ def multitaper_spectra(
 
     segment_length = int(segment_length)
 
-    if frequency_range is None:
+    if frequency_range is none:
         frequency_range = [0, sampling_frequency / 2]
 
     # Use the mode mixing factors to get a time series for each mode
@@ -423,10 +430,7 @@ def multitaper_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
-    frequencies = frequencies[f_min_arg : f_max_arg + 1]
-    args_range = [f_min_arg, f_max_arg + 1]
+    args_range = _get_frequency_args_range(frequencies, frequency_range)
 
     # Number of frequency bins
     n_f = args_range[1] - args_range[0]
@@ -562,11 +566,12 @@ def spectrogram(
     data: np.ndarray,
     window_length: int,
     sampling_frequency: float = 1.0,
-    window: str = "hann",
+    frequency_range: list = None,
+    desc: str = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates a spectogram.
 
-    The data is segmented into overlapping windows which is then used to calculate
+    The data is segmented into overlapping windows which are then used to calculate
     a periodogram.
 
     Parameters
@@ -575,10 +580,10 @@ def spectrogram(
         Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
     window_length : int
         Number of data points to use when calculating the periodogram.
-    window : str
-        Window to apply to the data before calculating the periodogram.
     sampling_frequency : float
-        Sampling frequency in Hz. Optional, default is 1.0.
+        Sampling frequency in Hz. Optional.
+    desc : str
+        Description for the progress bar.
 
     Returns
     -------
@@ -590,6 +595,10 @@ def spectrogram(
         Spectrogram.
     """
 
+    # Validation
+    if desc is None:
+        desc = "Calculating spectrogram"
+
     # Number of samples and channels
     n_samples = data.shape[0]
     n_channels = data.shape[1]
@@ -597,41 +606,62 @@ def spectrogram(
     # First pad the data so we have enough data points to estimate the periodogram
     # for time points at the start/end of the data
     data = np.pad(data, window_length // 2)[
-        :, window_length // 2 : (window_length // 2) + n_channels
+        :, window_length // 2 : window_length // 2 + n_channels
     ]
 
-    # Calculate the periodogram for each segment of the data
-    P = np.empty([n_samples, n_channels, window_length // 2 + 1], dtype=np.float32)
-    for i in trange(n_samples, desc="Calculating spectrogram", ncols=98):
-        x = data[i : i + window_length].T
-        f, P[i] = periodogram(x, fs=sampling_frequency, window=window)
+    # Window to apply to the data before calculating the Fourier transform
+    window = hann(window_length)
 
-    # Time axis
-    t = np.arange(0, n_samples / sampling_frequency, 1.0 / sampling_frequency)
+    # Scaling for the periodogram
+    scale = 1.0 / (sampling_frequency * np.sum(window ** 2))
+
+    # Number of data points in the FFT
+    nfft = max(256, 2 ** nextpow2(window_length))
+
+    # Time and frequency axis
+    t = np.arange(n_samples) / sampling_frequency
+    f = np.arange(nfft // 2) * sampling_frequency / nfft
+
+    # Only keep a particular frequency range
+    args_range = _get_frequency_args_range(f, frequency_range)
+    f = f[args_range[0] : args_range[1]]
+
+    # Number of frequency bins
+    n_f = args_range[1] - args_range[0]
+
+    # Calculate the periodogram for each segment of the data
+    P = np.empty([n_samples, n_channels, n_f], dtype=np.float32)
+    for i in trange(n_samples, desc=desc, ncols=98):
+        x = data[i : i + window_length].T * window[np.newaxis, ...]
+        X = fourier_transform(x, nfft, args_range)
+        XX = X * np.conj(X)
+        P[i] = XX.real * scale
 
     return t, f, P
 
 
 def regression_spectra(
-    data: np.ndarray,
-    alpha: np.ndarray,
+    data: Union[np.ndarray, list],
+    alpha: Union[np.ndarray, list],
     window_length: int,
     sampling_frequency: float = 1.0,
+    frequency_range: list = None,
     n_embeddings: int = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
     Parameters
     ----------
-    data : np.ndarray
-        Data to calculate a time-varying PSD for.
-        Shape must be (n_samples, n_channels).
+    data : np.ndarray or list
+        Data to calculate a time-varying PSD for. Shape must be (n_samples, n_channels).
     alpha : np.ndarray
         Inferred mode mixing factors. Shape must be (n_samples, n_modes).
     window_length : int
         Number samples to use in the window to calculate a PSD.
     sampling_frequency : float
         Sampling_frequency in Hz. Optional.
+    frequency_range : list
+        Minimum and maximum frequency to keep.
     n_embeddings : int
         Number of time embeddings applied when inferring alpha. Optional.
 
@@ -643,17 +673,52 @@ def regression_spectra(
         Mode PSDs.
     """
 
+    # Validation
+    if isinstance(data, list):
+        if not isinstance(alpha, list):
+            raise ValueError(
+                "data and alpha must both be lists or both be numpy arrays."
+            )
+
+    if isinstance(data, np.ndarray):
+        if not isinstance(alpha, np.ndarray):
+            raise ValueError(
+                "data and alpha must both be lists or both be numpy arrays."
+            )
+        data = [data]
+        alpha = [alpha]
+
+    if window_length % 2 == 0:
+        raise ValueError("window_length must be odd.")
+
+    if frequency_range is None:
+        frequency_range = [0, sampling_frequency / 2]
+
+    # Number of subjects
+    n_subjects = len(data)
+
     # Remove data points not in alpha due to time embedding the training data
     if n_embeddings is not None:
-        data = data[n_embeddings // 2 : -(n_embeddings // 2)]
+        data = [d[n_embeddings // 2 : -(n_embeddings // 2)] for d in data]
 
     # Remove the data points lost due to separating into sequences
-    data = data[: alpha.shape[0]]
+    data = [data[i][: alpha[i].shape[0]] for i in range(n_subjects)]
 
-    # Calculate time-varying PSD
-    t, f, Pt = spectrogram(data, window_length, sampling_frequency)
+    # Calculate a time-varying PSD
+    if n_subjects > 1:
+        print("Calculating spectrograms")
+    Pt = []
+    for i in range(n_subjects):
+        t, f, p = spectrogram(
+            data[i],
+            window_length,
+            sampling_frequency,
+            frequency_range,
+            desc=f"Subject {i}" if n_subjects > 1 else None,
+        )
+        Pt.append(p)
 
     # Regress the time-varying PSD with alpha to get the mode PSDs
-    Pj = regress(Pt, alpha)
+    Pj = [regress(Pt[i], alpha[i]) for i in range(n_subjects)]
 
-    return f, Pj
+    return f, np.squeeze(Pj)
