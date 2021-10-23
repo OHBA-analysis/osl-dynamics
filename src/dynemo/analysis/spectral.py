@@ -572,7 +572,7 @@ def spectrogram(
     frequency_range: list = None,
     calc_cpsd: bool = True,
     step_size: int = 1,
-    desc: str = None,
+    use_tqdm: bool = True,
     return_time_indices: bool = False,
 ) -> Union[
     Tuple[np.ndarray, np.ndarray, np.ndarray],
@@ -595,8 +595,8 @@ def spectrogram(
         Should we calculate cross spectra? Optional.
     step_size : int
         Step size for shifting the window. Optional.
-    desc : str
-        Description for the progress bar. Optional.
+    use_tqdm : bool
+        Should we use a tqdm progress bar? Optional.
     return_time_indices : bool
         Should we return the indices we calculated a periodogram for.
         Useful if the step_size isn't 1.
@@ -613,10 +613,6 @@ def spectrogram(
         Indices in the original data that we calculated a periodogram for.
         Returned if return_time_indices=True.
     """
-
-    # Validation
-    if desc is None:
-        desc = "Calculating spectrogram"
 
     # Number of samples and channels
     n_samples = data.shape[0]
@@ -652,12 +648,17 @@ def spectrogram(
     time_indices = range(0, n_samples, step_size)
     n_psds = n_samples // step_size
 
+    if use_tqdm:
+        iterator = trange(n_psds, desc="Calculating spectrograms", ncols=98)
+    else:
+        iterator = range(n_psds)
+
     if calc_cpsd:
         # Calculate cross periodograms for each segment of the data
         P = np.empty(
             [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
         )
-        for i in trange(n_psds, desc=desc, ncols=98):
+        for i in iterator:
             j = time_indices[i]
             x = data[j : j + window_length].T * window[np.newaxis, ...]
             X = fourier_transform(x, nfft, args_range)
@@ -666,7 +667,7 @@ def spectrogram(
     else:
         # Calculate the periodogram for each segment of the data
         P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
-        for i in trange(n_psds, desc=desc, ncols=98):
+        for i in iterator:
             j = time_indices[i]
             x = data[j : j + window_length].T * window[np.newaxis, ...]
             X = fourier_transform(x, nfft, args_range)
@@ -690,7 +691,6 @@ def regression_spectra(
     n_embeddings: int = None,
     psd_only: bool = False,
     step_size: int = 1,
-    regression_type: str = "pinv",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
@@ -712,8 +712,6 @@ def regression_spectra(
         Should we only calculate the PSD? Optional.
     step_size : int
         Step size for shifting the window. Optional.
-    regression_type : str
-        Type of regression to fit. Default is 'pinv'
 
     Returns
     -------
@@ -757,12 +755,18 @@ def regression_spectra(
     # Remove the data points lost due to separating into sequences
     data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-    # Calculate a time-varying PSD
+    # Info to print to the screen
     if n_subjects > 1:
-        print("Calculating spectrograms")
+        iterator = trange(n_subjects, desc="Calculating spectrograms", ncols=98)
+        use_tqdm = False
+    else:
+        iterator = range(n_subjects)
+        use_tqdm = True
+
+    # Calculate a time-varying PSD
     Pt = []
     time_indices = []
-    for i in range(n_subjects):
+    for i in iterator:
         t, f, p, t_ind = spectrogram(
             data[i],
             window_length,
@@ -770,7 +774,7 @@ def regression_spectra(
             frequency_range,
             calc_cpsd=calc_cpsd,
             step_size=step_size,
-            desc=f"Subject {i + 1}" if n_subjects > 1 else None,
+            use_tqdm=use_tqdm,
             return_time_indices=True,
         )
         Pt.append(p)
@@ -779,8 +783,27 @@ def regression_spectra(
     # Only keep alpha values at time points we have a PSD for
     alpha = [a[ti] for a, ti in zip(alpha, time_indices)]
 
+    # Info to print to screen
+    if n_subjects > 1:
+        iterator = trange(n_subjects, desc="Fitting linear regression", ncols=98)
+        print_message = False
+    else:
+        iterator = range(n_subjects)
+        print_message = True
+
     # Regress the time-varying PSD with alpha to get the mode PSDs
-    Pj = [regression.pinv(p, a) for p, a in zip(Pt, alpha)]
+    Pj = []
+    for i in iterator:
+        Pj.append(
+            regression.sklearn_linear_regression(
+                alpha[i],
+                Pt[i],
+                print_message=print_message,
+                fit_intercept=False,
+                positive=True,
+                n_jobs=-1,
+            )
+        )
 
     if psd_only:
         return f, np.squeeze(Pj)
