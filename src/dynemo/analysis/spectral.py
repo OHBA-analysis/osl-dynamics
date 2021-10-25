@@ -691,6 +691,7 @@ def regression_spectra(
     n_embeddings: int = None,
     psd_only: bool = False,
     step_size: int = 1,
+    regression_method: str = "sklearn",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
@@ -712,6 +713,9 @@ def regression_spectra(
         Should we only calculate the PSD? Optional.
     step_size : int
         Step size for shifting the window. Optional.
+    regression_method : str
+        What function should we use to calculate the regression?
+        Options are 'pinv' or 'sklearn'.
 
     Returns
     -------
@@ -741,6 +745,9 @@ def regression_spectra(
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
+
+    if regression_method not in ["pinv", "sklearn"]:
+        raise ValueError("{regression_method} unknown.")
 
     # Do we calculate cross spectral densities?
     calc_cpsd = not psd_only
@@ -794,16 +801,19 @@ def regression_spectra(
     # Regress the time-varying PSD with alpha to get the mode PSDs
     Pj = []
     for i in iterator:
-        Pj.append(
-            regression.sklearn_linear_regression(
-                alpha[i],
-                Pt[i],
-                print_message=print_message,
-                fit_intercept=False,
-                positive=True,
-                n_jobs=-1,
+        if regression_method == "sklearn":
+            Pj.append(
+                regression.sklearn_linear_regression(
+                    alpha[i],
+                    Pt[i],
+                    print_message=print_message,
+                    fit_intercept=False,
+                    positive=True,
+                    n_jobs=-1,
+                )
             )
-        )
+        else:
+            Pj.append(regression.pinv(alpha[i], Pt[i]))
 
     if psd_only:
         return f, np.squeeze(Pj)
