@@ -105,14 +105,15 @@ class IO:
 
     def delete_io_memmaps(self):
         """Deletes memmaps and removes store_dir if empty."""
-        if self.raw_data_filenames is not None:
-            for filename in self.raw_data_filenames:
-                pathlib.Path(filename).unlink(missing_ok=True)
-        if self.store_dir.exists():
-            if not any(self.store_dir.iterdir()):
-                self.store_dir.rmdir()
-        self.raw_data_memmaps = None
-        self.raw_data_filenames = None
+        if hasattr(self, "raw_data_filenames"):
+            if self.raw_data_filenames is not None:
+                for filename in self.raw_data_filenames:
+                    pathlib.Path(filename).unlink(missing_ok=True)
+            if self.store_dir.exists():
+                if not any(self.store_dir.iterdir()):
+                    self.store_dir.rmdir()
+            self.raw_data_memmaps = None
+            self.raw_data_filenames = None
 
     def load_preparation(self, inputs: str):
         """Loads a pickle file containing preparation settings.
