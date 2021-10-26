@@ -1172,6 +1172,7 @@ class MeanSquaredErrorLayer(layers.Layer):
 
         return tf.expand_dims(mse, axis=-1)
 
+
 @tf.function
 def cholesky_factor_to_full_matrix(cholesky_factor):
     """Convert a cholesky factor into a full matrix."""
@@ -1187,6 +1188,7 @@ def cholesky_factor_to_full_matrix(cholesky_factor):
     full_matrix += 1e-6 * tf.eye(full_matrix.shape[-1])
 
     return full_matrix
+
 
 class MeansVarsFcsLayer(layers.Layer):
     """Layer to learn the means, diagonal variance matrices,
@@ -1209,17 +1211,17 @@ class MeansVarsFcsLayer(layers.Layer):
     """
 
     def __init__(
-            self,
-            n_modes,
-            n_channels,
-            learn_means,
-            learn_vars,
-            learn_fcs,
-            initial_means,
-            initial_vars,
-            initial_fcs,
-            normalize_variances = False,
-            **kwargs
+        self,
+        n_modes,
+        n_channels,
+        learn_means,
+        learn_vars,
+        learn_fcs,
+        initial_means,
+        initial_vars,
+        initial_fcs,
+        normalize_variances=False,
+        **kwargs
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes
@@ -1249,7 +1251,9 @@ class MeansVarsFcsLayer(layers.Layer):
 
         # Initialisation of functional connectiviy matrices
         if initial_fcs is None:
-            self.initial_fcs = np.stack([np.eye(n_channels, dtype=np.float32)] * n_modes)
+            self.initial_fcs = np.stack(
+                [np.eye(n_channels, dtype=np.float32)] * n_modes
+            )
         else:
             self.initial_fcs = initial_fcs
 
@@ -1258,7 +1262,6 @@ class MeansVarsFcsLayer(layers.Layer):
         self.flattened_cholesky_fcs_initializer = WeightInitializer(
             self.flattened_cholesky_fcs
         )
-
 
     def build(self, input_shape):
         # Create weights for the means
@@ -1290,14 +1293,13 @@ class MeansVarsFcsLayer(layers.Layer):
 
         self.built = True
 
-
     def call(self, inputs, **kwargs):
         if self.normalize_variances:
             normalization = (
-                    tf.reduce_sum(tf.linalg.diag_part(self.covariances), axis=1)[
-                        ..., tf.newaxis
-                    ]
-                    / self.n_channels
+                tf.reduce_sum(tf.linalg.diag_part(self.covariances), axis=1)[
+                    ..., tf.newaxis
+                ]
+                / self.n_channels
             )
             self.vars = self.vars / normalization
 
@@ -1307,7 +1309,6 @@ class MeansVarsFcsLayer(layers.Layer):
         self.fcs = cholesky_factor_to_full_matrix(cholesky_fcs)
 
         return [self.means, self.vars, self.fcs]
-
 
     def compute_output_shape(self, input_shape):
         return [
@@ -1324,13 +1325,14 @@ class MeansVarsFcsLayer(layers.Layer):
                 "n_channels": self.n_channels,
                 "learn_means": self.learn_means,
                 "learn_vars": self.learn_vars,
-                "learn_fcs": self.learn_fcs
+                "learn_fcs": self.learn_fcs,
             }
         )
         return config
 
+
 class MixMeansVarsFcsLayer(layers.Layer):
-    """ Compute a probabilistic mixture of means, variances and fcs.
+    """Compute a probabilistic mixture of means, variances and fcs.
     The mixture is calculated as
 
     m_t = \sum_j \alpha_{jt} mu_j
@@ -1347,6 +1349,7 @@ class MixMeansVarsFcsLayer(layers.Layer):
     learn_alpha/beta/gamma_scaling
         Should we learn alpha/beta/gamma scaling?
     """
+
     def __init__(
         self,
         n_modes: int,
@@ -1365,7 +1368,9 @@ class MixMeansVarsFcsLayer(layers.Layer):
 
     def build(self, input_shape):
         # Initialise such that softplus(alpha_scaling) = 1
-        self.alpha_scaling_initializer = tf.keras.initializers.Constant(np.log(np.exp(1.0) - 1.0))
+        self.alpha_scaling_initializer = tf.keras.initializers.Constant(
+            np.log(np.exp(1.0) - 1.0)
+        )
         self.alpha_scaling = self.add_weight(
             "alpha_scaling",
             shape=self.n_modes,
@@ -1374,7 +1379,9 @@ class MixMeansVarsFcsLayer(layers.Layer):
             trainable=self.learn_alpha_scaling,
         )
 
-        self.beta_scaling_initializer = tf.keras.initializers.Constant(np.log(np.exp(1.0) - 1.0))
+        self.beta_scaling_initializer = tf.keras.initializers.Constant(
+            np.log(np.exp(1.0) - 1.0)
+        )
         self.beta_scaling = self.add_weight(
             "beta_scaling",
             shape=self.n_modes,
@@ -1383,7 +1390,9 @@ class MixMeansVarsFcsLayer(layers.Layer):
             trainable=self.learn_beta_scaling,
         )
 
-        self.gamma_scaling_initializer = tf.keras.initializers.Constant(np.log(np.exp(1.0) - 1.0))
+        self.gamma_scaling_initializer = tf.keras.initializers.Constant(
+            np.log(np.exp(1.0) - 1.0)
+        )
         self.gamma_scaling = self.add_weight(
             "gamma_scaling",
             shape=self.n_modes,
@@ -1414,21 +1423,21 @@ class MixMeansVarsFcsLayer(layers.Layer):
 
         # Reshape alpha and mu for multiplication
         alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.reshape(mu,(1,1,self.n_modes, self.n_channels))
+        mu = tf.reshape(mu, (1, 1, self.n_modes, self.n_channels))
 
         # Calculate the mixed mean
         m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
 
         # Reshape beta and E for multiplication
         beta = tf.expand_dims(beta, axis=-1)
-        E = tf.reshape(E, (1,1,self.n_modes, self.n_channels))
+        E = tf.reshape(E, (1, 1, self.n_modes, self.n_channels))
 
         # Calculate the mixed diagonal entries
         G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
 
         # Reshape gamma and D for multiplication
         gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
-        D = tf.reshape(D,(1,1,self.n_modes, self.n_channels, self.n_channels))
+        D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
         F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
 
         # Calculate the diagonal matrices G
@@ -1437,13 +1446,13 @@ class MixMeansVarsFcsLayer(layers.Layer):
         # Construct the covariance matrices given by C = GFG
         C = tf.matmul(G, tf.matmul(F, G))
 
-
         return [m, C]
 
     def compute_output_shape(self, input_shape):
         alpha_shape, gamma_shape, mu_shape, d_shape, L_shape = inputs_shape
-        return [tf.TensorShape([None, alpha_shape[1], self.n_channels]),
-                tf.TensorShape([None, alpha_shape[1], self.n_channels, self.n_channels])
+        return [
+            tf.TensorShape([None, alpha_shape[1], self.n_channels]),
+            tf.TensorShape([None, alpha_shape[1], self.n_channels, self.n_channels]),
         ]
 
     def get_config(self):
@@ -1459,14 +1468,13 @@ class MixMeansVarsFcsLayer(layers.Layer):
         )
         return config
 
+
 class KLsum(layers.Layer):
     """
     Layer to sum up the KL losses
 
     Input a list of scalars and sum them up
     """
-
-
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

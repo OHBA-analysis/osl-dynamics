@@ -24,6 +24,7 @@ from dynemo.models.layers import (
 )
 
 from dynemo.utils.misc import check_arguments
+
 _logger = logging.getLogger("DyNeMo")
 
 
@@ -42,8 +43,6 @@ class MRIGO(InferenceModelBase, GO):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
-
-
 
 
 def _model_structure(config):
@@ -113,28 +112,34 @@ def _model_structure(config):
     # Layers to sample theta from q(theta)
     # and to convert to state mixing factors alpha, beta, gamma
     theta_layer_mean = SampleNormalDistributionLayer(name="theta_mean")
-    theta_norm_layer_mean = NormalizationLayer(config.theta_normalization, name="theta_norm_mean")
+    theta_norm_layer_mean = NormalizationLayer(
+        config.theta_normalization, name="theta_norm_mean"
+    )
     alpha_layer = ThetaActivationLayer(
         config.alpha_xform,
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
-        name="alpha"
+        name="alpha",
     )
     theta_layer_var = SampleNormalDistributionLayer(name="theta_var")
-    theta_norm_layer_var = NormalizationLayer(config.theta_normalization, name="theta_norm_var")
+    theta_norm_layer_var = NormalizationLayer(
+        config.theta_normalization, name="theta_norm_var"
+    )
     beta_layer = ThetaActivationLayer(
         config.alpha_xform,
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
-        name="beta"
+        name="beta",
     )
     theta_layer_fc = SampleNormalDistributionLayer(name="theta_fc")
-    theta_norm_layer_fc = NormalizationLayer(config.theta_normalization, name="theta_norm_fc")
+    theta_norm_layer_fc = NormalizationLayer(
+        config.theta_normalization, name="theta_norm_fc"
+    )
     gamma_layer = ThetaActivationLayer(
         config.alpha_xform,
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
-        name="gamma"
+        name="gamma",
     )
 
     # Data flow
@@ -181,7 +186,7 @@ def _model_structure(config):
         config.learn_alpha_scaling,
         config.learn_beta_scaling,
         config.learn_gamma_scaling,
-        name="mix_means_vars_fcs"
+        name="mix_means_vars_fcs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
 
@@ -208,7 +213,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout_rate,
-        name="mod_rnn_mean"
+        name="mod_rnn_mean",
     )
     mod_mu_layer_mean = layers.Dense(config.n_modes, name="mod_mu_mean")
     mod_sigma_layer_mean = layers.Dense(
@@ -223,7 +228,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout_rate,
-        name="mod_rnn_var"
+        name="mod_rnn_var",
     )
     mod_mu_layer_var = layers.Dense(config.n_modes, name="mod_mu_var")
     mod_sigma_layer_var = layers.Dense(
@@ -238,7 +243,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout_rate,
-        name="mod_rnn_fc"
+        name="mod_rnn_fc",
     )
     mod_mu_layer_fc = layers.Dense(config.n_modes, name="mod_mu_fc")
     mod_sigma_layer_fc = layers.Dense(
@@ -253,13 +258,17 @@ def _model_structure(config):
     model_output_mean = model_output_layer_mean(model_input_dropout_mean)
     mod_mu_mean = mod_mu_layer_mean(model_output_mean)
     mod_sigma_mean = mod_sigma_layer_mean(model_output_mean)
-    kl_loss_mean = kl_loss_layer_mean([inf_mu_mean, inf_sigma_mean, mod_mu_mean, mod_sigma_mean])
+    kl_loss_mean = kl_loss_layer_mean(
+        [inf_mu_mean, inf_sigma_mean, mod_mu_mean, mod_sigma_mean]
+    )
 
     model_input_dropout_var = model_input_dropout_layer_var(theta_norm_var)
     model_output_var = model_output_layer_var(model_input_dropout_var)
     mod_mu_var = mod_mu_layer_var(model_output_var)
     mod_sigma_var = mod_sigma_layer_var(model_output_var)
-    kl_loss_var = kl_loss_layer_var([inf_mu_var, inf_sigma_var, mod_mu_var, mod_sigma_var])
+    kl_loss_var = kl_loss_layer_var(
+        [inf_mu_var, inf_sigma_var, mod_mu_var, mod_sigma_var]
+    )
 
     model_input_dropout_fc = model_input_dropout_layer_fc(theta_norm_fc)
     model_output_fc = model_output_layer_fc(model_input_dropout_fc)
@@ -270,4 +279,6 @@ def _model_structure(config):
     # Total KL loss
     kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_var, kl_loss_fc])
 
-    return Model(inputs = inputs, outputs = [ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO")
+    return Model(
+        inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"
+    )

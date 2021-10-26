@@ -92,6 +92,64 @@ class DiceCoefficientCallback(callbacks.Callback):
         print(f" - dice: {dice}", end="")
 
 
+class DiceCoefficientCallbackMultipleScale(callbacks.Callback):
+    """Multi-scale version of DiceCoefficientCallback"""
+
+    def __init__(
+        self,
+        prediction_dataset: tf.data.Dataset,
+        ground_truth_mode_time_course: np.ndarray,
+    ):
+        super().__init__()
+        self.prediction_dataset = prediction_dataset
+        self.gtstc_alpha = ground_truth_mode_time_course[:, :, 0]
+        self.gtstc_beta = ground_truth_mode_time_course[:, :, 1]
+        self.gtstc_gamma = ground_truth_mode_time_course[:, :, 2]
+        self.n_modes = ground_truth_mode_time_course.shape[1]
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+        [_, _, alpha, beta, gamma] = self.model.predict(self.prediction_dataset)
+        pstc_alpha = inference.modes.time_courses(
+            alpha, concatenate=True, n_modes=self.n_modes
+        )
+        pstc_alpha, gtstc_alpha = inference.modes.match_modes(
+            pstc_alpha, self.gtstc_alpha
+        )
+        dice_alpha = inference.metrics.dice_coefficient(pstc_alpha, gtstc_alpha)
+        logs["dice_alpha"] = dice_alpha
+
+        pstc_beta = inference.modes.time_courses(
+            beta, concatenate=True, n_modes=self.n_modes
+        )
+        pstc_beta, gtstc_beta = inference.modes.match_modes(pstc_beta, self.gtstc_beta)
+        dice_beta = inference.metrics.dice_coefficient(pstc_beta, gtstc_beta)
+        logs["dice_beta"] = dice_beta
+
+        pstc_gamma = inference.modes.time_courses(
+            gamma, concatenate=True, n_modes=self.n_modes
+        )
+        pstc_gamma, gtstc_gamma = inference.modes.match_modes(
+            pstc_gamma, self.gtstc_gamma
+        )
+        dice_gamma = inference.metrics.dice_coefficient(pstc_gamma, gtstc_gamma)
+        logs["dice_gamma"] = dice_gamma
+
+        print(
+            f" - dice_alpha: {dice_alpha} - dice_beta: {dice_beta} - dice_gamma: {dice_gamma}",
+            end="",
+        )
+
+
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
