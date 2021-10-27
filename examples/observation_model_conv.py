@@ -57,15 +57,15 @@ model.summary()
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
 
-# Mean squared error
-mse = model.loss(training_dataset)
-print("sqrt(MSE):", np.sqrt(mse))
+# Inferred standard deviation
+std_dev = model.get_std_dev()
+print("std_dev:", std_dev)
 
 # Sample from the observation model
 samples = []
 psds = []
 for alpha in range(config.n_modes):
-    sample = model.sample(2000, std_dev=np.sqrt(mse), alpha=alpha)
+    sample = model.sample(2000, std_dev=std_dev, alpha=alpha)
     f, psd = signal.welch(sample.T, fs=sim.sampling_frequency, nperseg=500)
     samples.append(sample)
     psds.append(psd[0])

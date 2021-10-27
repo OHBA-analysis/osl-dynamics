@@ -5,7 +5,7 @@
 import numpy as np
 from tqdm import trange
 from tensorflow.keras import Model, layers
-from dynemo.models.layers import WaveNetLayer, MeanSquaredErrorLayer
+from dynemo.models.layers import WaveNetLayer, StdDevLayer, LogLikelihoodLayer
 from dynemo.models.obs_mod_base import ObservationModelBase
 
 
@@ -28,7 +28,7 @@ class CNNO(ObservationModelBase):
         self.model = _model_structure(self.config)
 
     def loss(self, dataset):
-        """Mean squared error loss.
+        """Negative log-likelihood loss.
 
         Parameters
         ----------
@@ -38,10 +38,20 @@ class CNNO(ObservationModelBase):
         Returns
         -------
         float
-            Mean squared error loss.
+            Negative log-likelihood loss.
         """
         losses = self.model.predict(dataset)
         return np.mean(losses)
+
+    def get_std_dev(self):
+        """Learnt standard deviation.
+
+        Returns
+        np.ndarray
+            Standard deviation.
+        """
+        std_dev_layer = self.model.get_layer("std_dev")
+        return std_dev_layer(1).numpy()
 
     def sample(self, n_samples, std_dev, alpha):
         """Sample from the observation model.
@@ -62,7 +72,7 @@ class CNNO(ObservationModelBase):
         """
 
         # Get layer for the WaveNet model
-        cnn_layer = self.model.get_layer("wavenet")
+        cnn_layer = self.model.get_layer("means")
 
         # Historic data to input to WaveNet
         x = np.zeros(
@@ -97,16 +107,18 @@ def _model_structure(config):
     alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
 
     # Definition of layers
-    cnn_obs_layer = WaveNetLayer(
+    means_layer = WaveNetLayer(
         config.n_channels,
         config.wavenet_n_filters,
         config.wavenet_n_layers,
-        name="wavenet",
+        name="means",
     )
-    mse_layer = MeanSquaredErrorLayer(clip=1, name="mse")
+    std_devs_layer = StdDevLayer(config.n_channels, learn_std_dev=True, name="std_dev")
+    ll_loss_layer = LogLikelihoodLayer(diag_only=True, clip=1, name="ll")
 
     # Data flow
-    gen_data = cnn_obs_layer([inp_data, alpha])
-    mse = mse_layer([inp_data, gen_data])
+    means = means_layer([inp_data, alpha])
+    std_devs = std_devs_layer(inp_data)  # inp_data not used
+    ll_loss = ll_loss_layer([inp_data, means, std_devs])
 
-    return Model(inputs=[inp_data, alpha], outputs=[mse], name="CNNO")
+    return Model(inputs=[inp_data, alpha], outputs=[ll_loss], name="CNNO")

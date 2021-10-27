@@ -32,15 +32,15 @@ config = Config(
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     observation_model="wavenet",
-    wavenet_n_filters=16,
-    wavenet_n_layers=4,
+    wavenet_n_filters=4,
+    wavenet_n_layers=2,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
-    kl_annealing_sharpness=5,
-    n_kl_annealing_epochs=200,
+    kl_annealing_sharpness=10,
+    n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.005,
-    n_epochs=400,
+    learning_rate=0.01,
+    n_epochs=200,
 )
 
 # Simulate data
@@ -84,7 +84,6 @@ history = model.fit(
     training_dataset,
     epochs=config.n_epochs,
     callbacks=[dice_callback],
-    kl_annealing_callback=False,
 )
 
 # Free energy = Log Likelihood - KL Divergence

@@ -444,14 +444,26 @@ class LogLikelihoodLayer(layers.Layer):
     ----------
     diag_only : bool
         Are the covariances passed just the diagonal? Optional, default is False.
+    clip : int
+        Number of data points to clip from the means and data.
+        Optional, default is no clipping.
     """
 
-    def __init__(self, diag_only: bool = False, **kwargs):
+    def __init__(self, diag_only: bool = False, clip: int = None, **kwargs):
         super().__init__(**kwargs)
         self.diag_only = diag_only
+        self.clip = clip
 
     def call(self, inputs):
         x, mu, sigma = inputs
+
+        # Clip data, means and covariances
+        # This is neccessary if mu and sigma are one time step in the future
+        if self.clip is not None:
+            x = x[:, self.clip :]
+            mu = mu[:, : -self.clip]
+            if not self.diag_only:
+                sigma = sigma[:, : -self.clip]
 
         # Calculate the log-likelihood
         if self.diag_only:
@@ -479,7 +491,7 @@ class LogLikelihoodLayer(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({"diag_only": self.diag_only})
+        config.update({"diag_only": self.diag_only, "clip": self.clip})
         return config
 
 
@@ -1159,3 +1171,58 @@ class MeanSquaredErrorLayer(layers.Layer):
         mse = tf.reduce_mean(se)  # mean over batches, time points and channels
 
         return tf.expand_dims(mse, axis=-1)
+
+
+class StdDevLayer(layers.Layer):
+    """Layer to learn standard deviations.
+
+    Parameters
+    ----------
+    n_channels : int
+        Number of channels.
+    learn_std_dev : bool
+        Should we learn the standard deviation.
+    initial_std_dev : int
+        Initial values for the standard deviation.
+    """
+
+    def __init__(
+        self,
+        n_channels: int,
+        learn_std_dev: bool,
+        initial_std_dev: np.ndarray = None,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_channels = n_channels
+        self.learn_std_dev = learn_std_dev
+
+        # Initialisation of standard deviation
+        if initial_std_dev is None:
+            self.initial_std_dev = np.ones(n_channels, dtype=np.float32)
+        else:
+            self.initial_std_dev = initial_std_dev.astype("float32")
+        self.std_dev_initializer = WeightInitializer(self.initial_std_dev)
+
+    def build(self, input_shape):
+        self.std_dev = self.add_weight(
+            "std_dev",
+            shape=(self.n_channels),
+            dtype=tf.float32,
+            initializer=self.std_dev_initializer,
+            trainable=self.learn_std_dev,
+        )
+        self.built = True
+
+    def call(self, inputs):
+        return activations.softplus(self.std_dev)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "n_channels": self.n_channels,
+                "learn_std_dev": self.learn_std_dev,
+            }
+        )
+        return config

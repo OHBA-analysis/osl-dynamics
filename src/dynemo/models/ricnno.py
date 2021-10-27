@@ -7,11 +7,12 @@ from tensorflow.keras import Model, layers
 from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
-    MeanSquaredErrorLayer,
+    LogLikelihoodLayer,
     ModelRNNLayers,
     NormalizationLayer,
     NormalKLDivergenceLayer,
     SampleNormalDistributionLayer,
+    StdDevLayer,
     ThetaActivationLayer,
     WaveNetLayer,
 )
@@ -85,20 +86,27 @@ def _model_structure(config):
     theta_norm = theta_norm_layer(theta)
     alpha = alpha_layer(theta_norm)
 
-    # Observation model
-    #
+    # Observation model:
+    # - We use x_t ~ N(mu_t, sigma), where
+    #      - mu_t = WaveNet(x_<t, alpha_t).
+    #      - sigma = a learnable diagonal covariance matrix.
+    # - We calculate the likelihood of generating the training data with
+    #   the observation model.
+
     # Definition of layers
-    cnn_obs_layer = WaveNetLayer(
+    means_layer = WaveNetLayer(
         config.n_channels,
         config.wavenet_n_filters,
         config.wavenet_n_layers,
-        name="wavenet",
+        name="means",
     )
-    mse_layer = MeanSquaredErrorLayer(clip=1, name="mse")
+    std_devs_layer = StdDevLayer(config.n_channels, learn_std_dev=True, name="std_devs")
+    ll_loss_layer = LogLikelihoodLayer(diag_only=True, clip=1, name="ll")
 
     # Data flow
-    gen_data = cnn_obs_layer([inputs, alpha])
-    mse_loss = mse_layer([inputs, gen_data])
+    means = means_layer([inputs, alpha])
+    std_devs = std_devs_layer(inputs)  # inputs not used
+    ll_loss = ll_loss_layer([inputs, means, std_devs])
 
     # Model RNN:
     # - Learns p(theta|theta_<t) ~ N(theta | mod_mu, mod_sigma), where
@@ -131,4 +139,4 @@ def _model_structure(config):
     mod_sigma = mod_sigma_layer(model_output)
     kl_loss = kl_loss_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
-    return Model(inputs=inputs, outputs=[mse_loss, kl_loss, alpha], name="RICNNO")
+    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RICNNO")

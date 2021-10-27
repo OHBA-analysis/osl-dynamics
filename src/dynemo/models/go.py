@@ -32,7 +32,7 @@ class GO(ObservationModelBase):
 
         Parameters
         ----------
-        alpah_scale : bool
+        alpha_scale : bool
             Should we apply alpha scaling? Default is True.
 
         Returns
@@ -57,7 +57,7 @@ class GO(ObservationModelBase):
 
         Parameters
         ----------
-        alpah_scale : bool
+        alpha_scale : bool
             Should we apply alpha scaling? Default is True.
 
         Returns
