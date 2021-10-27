@@ -1023,26 +1023,15 @@ class WaveNetLayer(layers.Layer):
         Number of channels.
     n_filters : int
         Number of filters for each convolution.
-    n_residual_blocks : int
-        Number of residual blocks.
-    n_conv_layers : int
+    n_layers : int
         Number of dilated causal convolution layers in each residual block.
     """
 
-    def __init__(
-        self,
-        n_channels: int,
-        n_filters: int,
-        n_residual_blocks: int,
-        n_conv_layers: int,
-        **kwargs
-    ):
+    def __init__(self, n_channels: int, n_filters: int, n_layers: int, **kwargs):
         super().__init__(**kwargs)
-
         self.n_channels = n_channels
         self.n_filters = n_filters
-        self.n_residual_blocks = n_residual_blocks
-        self.n_conv_layers = n_conv_layers
+        self.n_layers = n_layers
 
         self.causal_conv_layer = layers.Conv1D(
             filters=n_filters,
@@ -1051,11 +1040,10 @@ class WaveNetLayer(layers.Layer):
             padding="causal",
         )
         self.residual_block_layers = []
-        for i in range(n_residual_blocks):
-            for j in range(1, n_conv_layers):
-                self.residual_block_layers.append(
-                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** j)
-                )
+        for i in range(1, n_layers):
+            self.residual_block_layers.append(
+                WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
+            )
         self.dense_layers = [
             layers.Conv1D(filters=n_channels, kernel_size=1, padding="same"),
             layers.Conv1D(filters=n_channels, kernel_size=1, padding="same"),
@@ -1081,8 +1069,7 @@ class WaveNetLayer(layers.Layer):
             {
                 "n_channels": self.n_channels,
                 "n_filters": self.n_filters,
-                "n_residual_blocks": self.n_residual_blocks,
-                "n_conv_layers": self.n_conv_layers,
+                "n_layers": self.n_layers,
             }
         )
         return config

@@ -18,8 +18,8 @@ class CNNO(ObservationModelBase):
     """
 
     def __init__(self, config):
-        if config.observation_model != "conv_net":
-            raise ValueError("Observation model must be conv_net.")
+        if config.observation_model != "wavenet":
+            raise ValueError("Observation model must be wavenet.")
 
         ObservationModelBase.__init__(self, config)
 
@@ -93,9 +93,8 @@ def _model_structure(config):
     # Definition of layers
     cnn_obs_layer = WaveNetLayer(
         config.n_channels,
-        config.n_filters,
-        config.n_residual_blocks,
-        config.n_conv_layers,
+        config.wavenet_n_filters,
+        config.wavenet_n_layers,
         name="wavenet",
     )
     mse_layer = MeanSquaredErrorLayer(clip=1, name="mse")

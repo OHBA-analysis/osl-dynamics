@@ -30,16 +30,15 @@ meg_data = data.Data(sim.time_series)
 
 # Settings
 config = Config(
-    observation_model="conv_net",
-    n_filters=4,
-    n_residual_blocks=1,
-    n_conv_layers=7,
+    observation_model="wavenet",
+    wavenet_n_filters=4,
+    wavenet_n_layers=5,
     n_modes=sim.n_modes,
     n_channels=sim.n_channels,
-    sequence_length=128,
+    sequence_length=64,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=100,
 )
 
 # Prepare dataset
@@ -59,7 +58,7 @@ history = model.fit(training_dataset, epochs=config.n_epochs)
 
 # Mean squared error
 mse = model.loss(training_dataset)
-print("MSE:", mse)
+print("sqrt(MSE):", np.sqrt(mse))
 
 # Sample from the observation model
 samples = np.empty([config.n_modes, 500, config.n_channels])

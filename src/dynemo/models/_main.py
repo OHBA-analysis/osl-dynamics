@@ -34,7 +34,7 @@ def Model(config):
         elif config.observation_model == "multivariate_autoregressive":
             return MARO(config)
 
-        elif config.observation_model == "conv_net":
+        elif config.observation_model == "wavenet":
             return CNNO(config)
 
     if config.observation_model == "multivariate_normal":
