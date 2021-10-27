@@ -5,6 +5,7 @@
 from dynemo.models.go import GO
 from dynemo.models.maro import MARO
 from dynemo.models.cnno import CNNO
+from dynemo.models.ricnno import RICNNO
 from dynemo.models.ridgo import RIDGO
 from dynemo.models.rigo import RIGO
 from dynemo.models.rimaro import RIMARO
@@ -55,6 +56,17 @@ def Model(config):
                 raise NotImplementedError("Requested config not available.")
             else:
                 return RIMARO(config)
+
+        elif config.alpha_pdf == "dirichlet":
+            raise NotImplementedError("Requested config not available.")
+
+    elif config.observation_model == "wavenet":
+
+        if config.alpha_pdf == "normal":
+            if config.n_quantized_vectors is not None:
+                raise NotImplementedError("Requested config not available.")
+            else:
+                return RICNNO(config)
 
         elif config.alpha_pdf == "dirichlet":
             raise NotImplementedError("Requested config not available.")
