@@ -16,84 +16,36 @@ from dynemo.analysis.time_series import get_mode_time_series
 _logger = logging.getLogger("DyNeMo")
 
 
-def _get_frequency_args_range(frequencies: np.ndarray, frequency_range: list) -> list:
-    """Get min/max indices of a range in a frequency axis.
+def coherence_spectra(power_spectra: np.ndarray, print_message: bool = True):
+    """Calculates coherences from (cross) power spectral densities.
 
     Parameters
     ----------
-    frequencies : np.ndarray
-        Frequency axis.
-    frequency_range : list of len 2
-        Min/max frequency.
-
-    Returns
-    -------
-    list of len 2
-        Min/max index.
-    """
-    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
-    if f_max_arg <= f_min_arg:
-        raise ValueError("Cannot select requested frequency range.")
-    args_range = [f_min_arg, f_max_arg + 1]
-    return args_range
-
-
-def fourier_transform(
-    data: np.ndarray,
-    nfft: int,
-    args_range: list = None,
-    one_side: bool = False,
-) -> np.ndarray:
-    """Calculates a Fast Fourier Transform (FFT).
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data with shape (n_samples, n_channels) to FFT.
-    nfft : int
-        Number of points in the FFT.
-    args_range : list
-        Minimum and maximum indices of the FFT to keep. Optional.
-    one_side : bool
-        Should we return a one-sided FFT? Optional.
+    power_spectra : np.ndarray
+        Power spectra. Shape is (n_modes, n_channels, n_channels, n_f).
+    print_message : bool
+        Should we print a message to screen? Optional.
 
     Returns
     -------
     np.ndarray
-        FFT data.
+        Coherence spectra for each mode.
+        Shape is (n_modes, n_channels, n_channels, n_f).
     """
+    n_modes, n_channels, n_channels, n_f = power_spectra.shape
 
-    # Calculate the FFT
-    X = np.fft.fft(data, nfft)
+    if print_message:
+        print("Calculating coherences")
 
-    # Only keep the postive frequency side
-    if one_side:
-        X = X[..., : X.shape[-1] // 2]
+    coherences = np.empty([n_modes, n_channels, n_channels, n_f])
+    for i in range(n_modes):
+        for j in range(n_channels):
+            for k in range(n_channels):
+                coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
+                    power_spectra[i, j, j].real * power_spectra[i, k, k].real
+                )
 
-    # Only keep the desired frequency range
-    if args_range is not None:
-        X = X[..., args_range[0] : args_range[1]]
-
-    return X
-
-
-def nextpow2(x: int) -> int:
-    """Next power of 2.
-
-    Parameters
-    ----------
-    x : int
-        Any integer.
-
-    Returns
-    -------
-    int
-        The smallest power of two that is greater than or equal to the absolute
-        value of x.
-    """
-    res = np.ceil(np.log2(x))
-    return res.astype("int")
+    return coherences
 
 
 def decompose_spectra(
@@ -168,6 +120,116 @@ def decompose_spectra(
     return components
 
 
+def fourier_transform(
+    data: np.ndarray,
+    nfft: int,
+    args_range: list = None,
+    one_side: bool = False,
+) -> np.ndarray:
+    """Calculates a Fast Fourier Transform (FFT).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data with shape (n_samples, n_channels) to FFT.
+    nfft : int
+        Number of points in the FFT.
+    args_range : list
+        Minimum and maximum indices of the FFT to keep. Optional.
+    one_side : bool
+        Should we return a one-sided FFT? Optional.
+
+    Returns
+    -------
+    np.ndarray
+        FFT data.
+    """
+
+    # Calculate the FFT
+    X = np.fft.fft(data, nfft)
+
+    # Only keep the postive frequency side
+    if one_side:
+        X = X[..., : X.shape[-1] // 2]
+
+    # Only keep the desired frequency range
+    if args_range is not None:
+        X = X[..., args_range[0] : args_range[1]]
+
+    return X
+
+
+def get_frequency_args_range(frequencies: np.ndarray, frequency_range: list) -> list:
+    """Get min/max indices of a range in a frequency axis.
+
+    Parameters
+    ----------
+    frequencies : np.ndarray
+        Frequency axis.
+    frequency_range : list of len 2
+        Min/max frequency.
+
+    Returns
+    -------
+    list of len 2
+        Min/max index.
+    """
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
+    if f_max_arg <= f_min_arg:
+        raise ValueError("Cannot select requested frequency range.")
+    args_range = [f_min_arg, f_max_arg + 1]
+    return args_range
+
+
+def mar_spectra(
+    coeffs: np.ndarray, covs: np.ndarray, sampling_frequency: float, n_f: int = 512
+) -> np.ndarray:
+    """Calculates cross power spectral densities from MAR model parameters.
+
+    Parameters
+    ----------
+    coeffs : np.ndarray
+        MAR coefficients. Shape must be (n_modes, n_lags, n_channels, n_channels).
+    covs : np.ndarray
+        MAR covariances. Shape must be (n_modes, n_channels, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hertz.
+    n_f : int
+        Number of frequency bins in the cross power spectral density to calculate.
+        Optional, default is 512.
+
+    Returns
+    -------
+    np.ndarray
+        Cross power spectral densities.
+        Shape is (n_f, n_modes, n_channels, n_channels) or
+        (n_f, n_channels, n_channels).
+    """
+    n_modes = coeffs.shape[0]
+    n_lags = coeffs.shape[1]
+    n_channels = coeffs.shape[-1]
+
+    # Frequencies to evaluate the PSD at
+    f = np.arange(0, sampling_frequency / 2, sampling_frequency / (2 * n_f))
+
+    # z-transform of the coefficients
+    A = np.zeros([n_f, n_modes, n_channels, n_channels], dtype=np.complex_)
+    for i in range(n_f):
+        for l in range(n_lags):
+            z = np.exp(-1j * (l + 1) * 2 * np.pi * f[i] / sampling_frequency)
+            A[i] += coeffs[:, l] * z
+
+    # Transfer function
+    I = np.identity(n_channels)[np.newaxis, np.newaxis, ...]
+    H = np.linalg.inv(I - A)
+
+    # PSDs
+    P = H @ covs[np.newaxis, ...] @ np.transpose(np.conj(H), axes=[0, 1, 3, 2])
+
+    return f, np.squeeze(P)
+
+
 def mode_covariance_spectra(
     autocorrelation_function: np.ndarray,
     sampling_frequency: float,
@@ -217,7 +279,7 @@ def mode_covariance_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    args_range = _get_frequency_args_range(frequencies, frequency_range)
+    args_range = get_frequency_args_range(frequencies, frequency_range)
     frequencies = frequencies[args_range[0] : args_range[1]]
 
     # Calculate cross power spectra as the Fourier transform of the
@@ -429,7 +491,7 @@ def multitaper_spectra(
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    args_range = _get_frequency_args_range(frequencies, frequency_range)
+    args_range = get_frequency_args_range(frequencies, frequency_range)
 
     # Number of frequency bins
     n_f = args_range[1] - args_range[0]
@@ -485,201 +547,22 @@ def multitaper_spectra(
     return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
 
 
-def coherence_spectra(power_spectra: np.ndarray, print_message: bool = True):
-    """Calculates coherences from (cross) power spectral densities.
+def nextpow2(x: int) -> int:
+    """Next power of 2.
 
     Parameters
     ----------
-    power_spectra : np.ndarray
-        Power spectra. Shape is (n_modes, n_channels, n_channels, n_f).
-    print_message : bool
-        Should we print a message to screen? Optional.
+    x : int
+        Any integer.
 
     Returns
     -------
-    np.ndarray
-        Coherence spectra for each mode.
-        Shape is (n_modes, n_channels, n_channels, n_f).
+    int
+        The smallest power of two that is greater than or equal to the absolute
+        value of x.
     """
-    n_modes, n_channels, n_channels, n_f = power_spectra.shape
-
-    if print_message:
-        print("Calculating coherences")
-
-    coherences = np.empty([n_modes, n_channels, n_channels, n_f])
-    for i in range(n_modes):
-        for j in range(n_channels):
-            for k in range(n_channels):
-                coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
-                    power_spectra[i, j, j].real * power_spectra[i, k, k].real
-                )
-
-    return coherences
-
-
-def mar_spectra(
-    coeffs: np.ndarray, covs: np.ndarray, sampling_frequency: float, n_f: int = 512
-) -> np.ndarray:
-    """Calculates cross power spectral densities from MAR model parameters.
-
-    Parameters
-    ----------
-    coeffs : np.ndarray
-        MAR coefficients. Shape must be (n_modes, n_lags, n_channels, n_channels).
-    covs : np.ndarray
-        MAR covariances. Shape must be (n_modes, n_channels, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hertz.
-    n_f : int
-        Number of frequency bins in the cross power spectral density to calculate.
-        Optional, default is 512.
-
-    Returns
-    -------
-    np.ndarray
-        Cross power spectral densities.
-        Shape is (n_f, n_modes, n_channels, n_channels) or
-        (n_f, n_channels, n_channels).
-    """
-    n_modes = coeffs.shape[0]
-    n_lags = coeffs.shape[1]
-    n_channels = coeffs.shape[-1]
-
-    # Frequencies to evaluate the PSD at
-    f = np.arange(0, sampling_frequency / 2, sampling_frequency / (2 * n_f))
-
-    # z-transform of the coefficients
-    A = np.zeros([n_f, n_modes, n_channels, n_channels], dtype=np.complex_)
-    for i in range(n_f):
-        for l in range(n_lags):
-            z = np.exp(-1j * (l + 1) * 2 * np.pi * f[i] / sampling_frequency)
-            A[i] += coeffs[:, l] * z
-
-    # Transfer function
-    I = np.identity(n_channels)[np.newaxis, np.newaxis, ...]
-    H = np.linalg.inv(I - A)
-
-    # PSDs
-    P = H @ covs[np.newaxis, ...] @ np.transpose(np.conj(H), axes=[0, 1, 3, 2])
-
-    return f, np.squeeze(P)
-
-
-def spectrogram(
-    data: np.ndarray,
-    window_length: int,
-    sampling_frequency: float = 1.0,
-    frequency_range: list = None,
-    calc_cpsd: bool = True,
-    step_size: int = 1,
-    use_tqdm: bool = True,
-    return_time_indices: bool = False,
-) -> Union[
-    Tuple[np.ndarray, np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray, range],
-]:
-    """Calculates a spectogram.
-
-    The data is segmented into overlapping windows which are then used to calculate
-    a periodogram.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
-    window_length : int
-        Number of data points to use when calculating the periodogram.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional.
-    calc_cpsd : bool
-        Should we calculate cross spectra? Optional.
-    step_size : int
-        Step size for shifting the window. Optional.
-    use_tqdm : bool
-        Should we use a tqdm progress bar? Optional.
-    return_time_indices : bool
-        Should we return the indices we calculated a periodogram for.
-        Useful if the step_size isn't 1.
-
-    Returns
-    -------
-    t : np.ndarray
-        Time axis.
-    f : np.ndarray
-        Frequency axis.
-    P : np.ndarray
-        Spectrogram.
-    time_indices : range
-        Indices in the original data that we calculated a periodogram for.
-        Returned if return_time_indices=True.
-    """
-
-    # Number of samples and channels
-    n_samples = data.shape[0]
-    n_channels = data.shape[1]
-
-    # First pad the data so we have enough data points to estimate the periodogram
-    # for time points at the start/end of the data
-    data = np.pad(data, window_length // 2)[
-        :, window_length // 2 : window_length // 2 + n_channels
-    ]
-
-    # Window to apply to the data before calculating the Fourier transform
-    window = hann(window_length)
-
-    # Number of data points in the FFT
-    nfft = max(256, 2 ** nextpow2(window_length))
-
-    # Time and frequency axis
-    t = np.arange(n_samples) / sampling_frequency
-    f = np.arange(nfft // 2) * sampling_frequency / nfft
-
-    # Only keep a particular frequency range
-    args_range = _get_frequency_args_range(f, frequency_range)
-    f = f[args_range[0] : args_range[1]]
-
-    # Number of frequency bins
-    n_f = args_range[1] - args_range[0]
-
-    # Indices of an upper triangle of an n_channels by n_channels array
-    k, l = np.triu_indices(n_channels)
-
-    # Indices of time points to calculate a periodogram for
-    time_indices = range(0, n_samples, step_size)
-    n_psds = n_samples // step_size
-
-    if use_tqdm:
-        iterator = trange(n_psds, desc="Calculating spectrograms", ncols=98)
-    else:
-        iterator = range(n_psds)
-
-    if calc_cpsd:
-        # Calculate cross periodograms for each segment of the data
-        P = np.empty(
-            [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
-        )
-        for i in iterator:
-            j = time_indices[i]
-            x = data[j : j + window_length].T * window[np.newaxis, ...]
-            X = fourier_transform(x, nfft, args_range)
-            XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
-            P[i] = XY[k, l]
-    else:
-        # Calculate the periodogram for each segment of the data
-        P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
-        for i in iterator:
-            j = time_indices[i]
-            x = data[j : j + window_length].T * window[np.newaxis, ...]
-            X = fourier_transform(x, nfft, args_range)
-            P[i] = np.real(X * np.conj(X))
-
-    # Scaling for the periodograms
-    P /= sampling_frequency * np.sum(window ** 2)
-
-    if return_time_indices:
-        return t, f, P, time_indices
-    else:
-        return t, f, P
+    res = np.ceil(np.log2(x))
+    return res.astype("int")
 
 
 def regression_spectra(
@@ -691,7 +574,6 @@ def regression_spectra(
     n_embeddings: int = None,
     psd_only: bool = False,
     step_size: int = 1,
-    regression_method: str = "sklearn",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
@@ -713,9 +595,6 @@ def regression_spectra(
         Should we only calculate the PSD? Optional.
     step_size : int
         Step size for shifting the window. Optional.
-    regression_method : str
-        What function should we use to calculate the regression?
-        Options are 'pinv' or 'sklearn'.
 
     Returns
     -------
@@ -746,9 +625,6 @@ def regression_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    if regression_method not in ["pinv", "sklearn"]:
-        raise ValueError("{regression_method} unknown.")
-
     # Do we calculate cross spectral densities?
     calc_cpsd = not psd_only
 
@@ -765,55 +641,39 @@ def regression_spectra(
     # Info to print to the screen
     if n_subjects > 1:
         iterator = trange(n_subjects, desc="Calculating spectrograms", ncols=98)
-        use_tqdm = False
+        use_tqdm_in_spectrogram = False
     else:
         iterator = range(n_subjects)
-        use_tqdm = True
+        use_tqdm_in_spectrogram = True
 
     # Calculate a time-varying PSD
     Pt = []
-    time_indices = []
+    at = []
     for i in iterator:
-        t, f, p, t_ind = spectrogram(
+        t, f, p, a = spectrogram(
             data[i],
             window_length,
             sampling_frequency,
             frequency_range,
             calc_cpsd=calc_cpsd,
             step_size=step_size,
-            use_tqdm=use_tqdm,
-            return_time_indices=True,
+            use_tqdm=use_tqdm_in_spectrogram,
+            alpha=alpha[i],
         )
         Pt.append(p)
-        time_indices.append(t_ind)
-
-    # Only keep alpha values at time points we have a PSD for
-    alpha = [a[ti] for a, ti in zip(alpha, time_indices)]
+        at.append(a)
 
     # Info to print to screen
     if n_subjects > 1:
         iterator = trange(n_subjects, desc="Fitting linear regression", ncols=98)
-        print_message = False
     else:
         iterator = range(n_subjects)
-        print_message = True
+        print("Fitting linear regression")
 
     # Regress the time-varying PSD with alpha to get the mode PSDs
     Pj = []
     for i in iterator:
-        if regression_method == "sklearn":
-            Pj.append(
-                regression.sklearn_linear_regression(
-                    alpha[i],
-                    Pt[i],
-                    print_message=print_message,
-                    fit_intercept=False,
-                    positive=True,
-                    n_jobs=-1,
-                )
-            )
-        else:
-            Pj.append(regression.pinv(alpha[i], Pt[i]))
+        Pj.append(regression.linear(at[i], Pt[i], fit_intercept=True, normalize=True))
 
     if psd_only:
         return f, np.squeeze(Pj)
@@ -840,3 +700,144 @@ def regression_spectra(
         coh.append(coherence_spectra(p, print_message=False))
 
     return f, np.squeeze(psd), np.squeeze(coh)
+
+
+def spectrogram(
+    data: np.ndarray,
+    window_length: int,
+    sampling_frequency: float = 1.0,
+    frequency_range: list = None,
+    calc_cpsd: bool = True,
+    step_size: int = 1,
+    use_tqdm: bool = True,
+    alpha: np.ndarray = None,
+) -> Union[
+    Tuple[np.ndarray, np.ndarray, np.ndarray],
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+]:
+    """Calculates a spectogram.
+
+    The data is segmented into overlapping windows which are then used to calculate
+    a periodogram.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
+    window_length : int
+        Number of data points to use when calculating the periodogram.
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional.
+    calc_cpsd : bool
+        Should we calculate cross spectra? Optional.
+    step_size : int
+        Step size for shifting the window. Optional.
+    use_tqdm : bool
+        Should we use a tqdm progress bar? Optional.
+    alpha : np.ndarray
+        Alpha fitted to the data. Optional. Useful to pass if you want to regress
+        the spectrogram with alpha.
+
+    Returns
+    -------
+    t : np.ndarray
+        Time axis.
+    f : np.ndarray
+        Frequency axis.
+    P : np.ndarray
+        Spectrogram.
+    a : np.ndarray
+        Alpha values corresponding to each periodogram.
+        Returned if alpha is passed.
+    """
+
+    # Number of samples, channels and modes
+    n_samples = data.shape[0]
+    n_channels = data.shape[1]
+    if alpha is not None:
+        n_modes = alpha.shape[1]
+
+    # First pad the data so we have enough data points to estimate the periodogram
+    # for time points at the start/end of the data
+    data = np.pad(data, window_length // 2)[
+        :, window_length // 2 : window_length // 2 + n_channels
+    ]
+    if alpha is not None:
+        alpha = np.pad(alpha, window_length // 2)[
+            :, window_length // 2 : window_length // 2 + n_modes
+        ]
+
+    # Window to apply to the data before calculating the Fourier transform
+    window = hann(window_length)
+
+    # Number of data points in the FFT
+    nfft = max(256, 2 ** nextpow2(window_length))
+
+    # Time and frequency axis
+    t = np.arange(n_samples) / sampling_frequency
+    f = np.arange(nfft // 2) * sampling_frequency / nfft
+
+    # Only keep a particular frequency range
+    args_range = get_frequency_args_range(f, frequency_range)
+    f = f[args_range[0] : args_range[1]]
+
+    # Number of frequency bins
+    n_f = args_range[1] - args_range[0]
+
+    # Indices of an upper triangle of an n_channels by n_channels array
+    k, l = np.triu_indices(n_channels)
+
+    # Indices of time points to calculate a periodogram for
+    time_indices = range(0, n_samples, step_size)
+    n_psds = n_samples // step_size
+
+    # Progress bar
+    if use_tqdm:
+        iterator = trange(n_psds, desc="Calculating spectrograms", ncols=98)
+    else:
+        iterator = range(n_psds)
+
+    if alpha is not None:
+        # Array to hold mean of alpha multiplied by the windowing function
+        a = np.empty([n_psds, n_modes])
+
+    if calc_cpsd:
+        # Calculate cross periodograms for each segment of the data
+        P = np.empty(
+            [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
+        )
+        for i in iterator:
+            j = time_indices[i]
+
+            # Cross periodograms
+            x = data[j : j + window_length].T * window[np.newaxis, ...]
+            X = fourier_transform(x, nfft, args_range)
+            XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
+            P[i] = XY[k, l]
+
+            # Alpha
+            aw = alpha[j : j + window_length] * window[..., np.newaxis]
+            a[i] = np.mean(aw, axis=0)
+
+    else:
+        # Calculate the periodogram for each segment of the data
+        P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
+        for i in iterator:
+            j = time_indices[i]
+
+            # Periodograms
+            x = data[j : j + window_length].T * window[np.newaxis, ...]
+            X = fourier_transform(x, nfft, args_range)
+            P[i] = np.real(X * np.conj(X))
+
+            # Alpha
+            aw = alpha[j : j + window_length] * window[..., np.newaxis]
+            a[i] = np.mean(aw, axis=0)
+
+    # Scaling for the periodograms
+    P /= sampling_frequency * np.sum(window ** 2)
+
+    if alpha is not None:
+        return t, f, P, a
+    else:
+        return t, f, P
