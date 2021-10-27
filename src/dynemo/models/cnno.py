@@ -60,26 +60,32 @@ class CNNO(ObservationModelBase):
         np.ndarray
             Sample from the observation model.
         """
+
+        # Get layer for the WaveNet model
         cnn_layer = self.model.get_layer("wavenet")
 
+        # Historic data to input to WaveNet
         x = np.zeros(
             [1, self.config.sequence_length, self.config.n_channels], dtype=np.float32
         )
         x[0, -1] = np.random.normal(size=self.config.n_channels)
 
+        # Mode mixing factor vector for local conditioning,
+        # we select one mode to be active
         a = np.zeros(
             [1, self.config.sequence_length, self.config.n_modes], dtype=np.float32
         )
-        a[:, alpha] = 1
+        a[0, :, alpha] = 1
 
-        d = np.empty([n_samples, self.config.n_channels])
+        # Generate a sample
+        s = np.empty([n_samples, self.config.n_channels])
         for i in trange(n_samples, desc=f"Sampling mode {alpha}", ncols=98):
             y = cnn_layer([x, a])[0, -1]
             x = np.roll(x, shift=-1, axis=1)
             x[0, -1] = y + np.random.normal(scale=std_dev)
-            d[i] = y.numpy()
+            s[i] = y.numpy()
 
-        return d
+        return s
 
 
 def _model_structure(config):

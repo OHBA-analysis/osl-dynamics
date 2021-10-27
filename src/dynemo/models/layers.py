@@ -1029,6 +1029,7 @@ class WaveNetLayer(layers.Layer):
 
     def __init__(self, n_channels: int, n_filters: int, n_layers: int, **kwargs):
         super().__init__(**kwargs)
+
         self.n_channels = n_channels
         self.n_filters = n_filters
         self.n_layers = n_layers
