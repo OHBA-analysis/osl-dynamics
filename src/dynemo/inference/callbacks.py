@@ -146,7 +146,7 @@ class DiceCoefficientCallbackMultipleScale(callbacks.Callback):
 
         print(
             f" - dice_alpha: {dice_alpha} - dice_beta: {dice_beta} - dice_gamma: {dice_gamma}",
-            end="",
+            end="\n",
         )
 
 

@@ -1348,6 +1348,8 @@ class MixMeansVarsFcsLayer(layers.Layer):
         number of channels.
     learn_alpha/beta/gamma_scaling
         Should we learn alpha/beta/gamma scaling?
+    fix_variance
+        Do we want to fix the variance time course?
     """
 
     def __init__(
@@ -1357,6 +1359,7 @@ class MixMeansVarsFcsLayer(layers.Layer):
         learn_alpha_scaling: bool,
         learn_beta_scaling: bool,
         learn_gamma_scaling: bool,
+        fix_variance: bool,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -1365,6 +1368,7 @@ class MixMeansVarsFcsLayer(layers.Layer):
         self.learn_alpha_scaling = learn_alpha_scaling
         self.learn_beta_scaling = learn_beta_scaling
         self.learn_gamma_scaling = learn_gamma_scaling
+        self.fix_variance = fix_variance
 
     def build(self, input_shape):
         # Initialise such that softplus(alpha_scaling) = 1
@@ -1408,8 +1412,8 @@ class MixMeansVarsFcsLayer(layers.Layer):
         # - beta.shape = (None, sequence_length, n_modes)
         # - gamma.shape = (None, sequence_length, n_modes)
         # - mu.shape = (n_modes, n_channels)
-        # - d.shape = (n_modes, n_channels)
-        # - F.shape = (n_modes, n_channels, n_channels)
+        # - E.shape = (n_modes, n_channels)
+        # - D.shape = (n_modes, n_channels, n_channels)
         alpha, beta, gamma, mu, E, D = inputs
 
         # Make sure the variances are positive
@@ -1418,7 +1422,8 @@ class MixMeansVarsFcsLayer(layers.Layer):
 
         # Rescale the mode mixing factors
         alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
-        beta = tf.multiply(beta, activations.softplus(self.beta_scaling))
+        if not self.fix_variance:
+            beta = tf.multiply(beta, activations.softplus(self.beta_scaling))
         gamma = tf.multiply(gamma, activations.softplus(self.gamma_scaling))
 
         # Reshape alpha and mu for multiplication
@@ -1434,6 +1439,7 @@ class MixMeansVarsFcsLayer(layers.Layer):
 
         # Calculate the mixed diagonal entries
         G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
+        G = tf.linalg.diag(G)
 
         # Reshape gamma and D for multiplication
         gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
@@ -1441,7 +1447,6 @@ class MixMeansVarsFcsLayer(layers.Layer):
         F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
 
         # Calculate the diagonal matrices G
-        G = tf.linalg.diag(G)
 
         # Construct the covariance matrices given by C = GFG
         C = tf.matmul(G, tf.matmul(F, G))
@@ -1487,3 +1492,17 @@ class KLsum(layers.Layer):
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape([1])
+
+
+class FillConstant(layers.Layer):
+    """
+    Layer to create tensor with the same shape of the input,
+    But filled with a constant
+    """
+
+    def __init__(self, constant, **kwargs):
+        super().__init__(**kwargs)
+        self.constant = constant
+
+    def call(self, inputs, **kwargs):
+        return tf.fill(tf.shape(inputs), self.constant)

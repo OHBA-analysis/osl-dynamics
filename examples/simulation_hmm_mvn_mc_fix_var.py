@@ -22,9 +22,9 @@ cov = np.load(files.example.path / "hmm_cov.npy")
 # cov.shape = (n_modes, n_channels, n_channels)
 
 # set the means so that they are of the same scale as the variances
-mean_rng = np.random.default_rng(1234)
-mean_scale = np.sqrt(np.mean(np.trace(cov, axis1=1, axis2=2) / cov.shape[-1]))
-true_means = mean_rng.normal(scale=mean_scale, size=[cov.shape[0], cov.shape[-1]])
+# mean_rng = np.random.default_rng(1234)
+# mean_scale = np.sqrt(np.mean(np.trace(cov, axis1=1, axis2=2) / cov.shape[-1]))
+# true_means = mean_rng.normal(scale=mean_scale, size=[cov.shape[0], cov.shape[-1]])
 
 
 # Settings
@@ -35,8 +35,10 @@ print("Simulating data")
 sim = simulation.HMM_MVN(
     n_samples=n_samples,
     trans_prob=trans_prob,
-    means=true_means,
-    covariances=cov,
+    means="random",
+    n_modes=cov.shape[0],
+    n_channels=cov.shape[-1],
+    covariances="random",
     observation_error=observation_error,
     random_seed=123,
     multiple_scale=True,
@@ -46,13 +48,13 @@ sim.standardize()
 meg_data = data.Data(sim.time_series)
 
 # standardizing the data also changes the true variances
-sim_covs = np.empty([cov.shape[0], cov.shape[1], cov.shape[1]])
-for i in range(cov.shape[0]):
-    sim_covs[i] = cov[i] / np.outer(sim.standard_deviations, sim.standard_deviations)
-
-initial_vars = np.zeros([cov.shape[0], cov.shape[1]])
-for mode in range(cov.shape[0]):
-    initial_vars[mode] = np.sqrt(np.diag(sim_covs[0]))
+# sim_covs = np.empty([cov.shape[0], cov.shape[1], cov.shape[1]])
+# for i in range(cov.shape[0]):
+#     sim_covs[i] = cov[i] / np.outer(sim.standard_deviations, sim.standard_deviations)
+# 
+# initial_vars = np.zeros([cov.shape[0], cov.shape[1]])
+# for mode in range(cov.shape[0]):
+#     initial_vars[mode] = np.sqrt(np.diag(sim_covs[0]))
 
 config = Config(
     multiple_scale=True,
@@ -69,7 +71,7 @@ config = Config(
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=True,
-    learn_vars=False,
+    learn_vars=True,
     learn_fcs=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
@@ -78,7 +80,8 @@ config = Config(
     batch_size=16,
     learning_rate=0.01,
     n_epochs=200,
-    initial_vars=initial_vars,
+    # initial_vars=initial_vars,
+    fix_variance=True,
 )
 
 
@@ -181,13 +184,23 @@ history_dict = history.history
 loss_history = history_dict["loss"]
 kl_loss_history = history_dict["kl_loss"]
 ll_loss_history = history_dict["ll_loss"]
+dice_alpha_history = history_dict["dice_alpha"]
+dice_beta_history = history_dict["dice_beta"]
+dice_gamma_history = history_dict["dice_gamma"]
 
 plt.figure()
 plt.plot(loss_history, label="loss")
 plt.plot(ll_loss_history, label="ll_loss")
+plt.title("total loss and ll loss against epoch")
 plt.legend()
 plt.savefig("figures/total_loss_history.png")
 
+plt.figure()
+plt.plot(dice_alpha_history, label="dice_alpha")
+plt.plot(dice_gamma_history, label="dice_gamma")
+plt.title("dice score of inferred mean (alpha) and fc (gamma) time courses against epoch")
+plt.legend()
+plt.savefig("figures/dice_history.png")
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

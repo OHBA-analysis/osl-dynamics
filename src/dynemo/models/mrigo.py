@@ -21,6 +21,7 @@ from dynemo.models.layers import (
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
     KLsum,
+    FillConstant,
 )
 
 from dynemo.utils.misc import check_arguments
@@ -73,23 +74,24 @@ def _model_structure(config):
         config.n_modes, activation="softplus", name="inf_sigma_mean"
     )
 
-    # Mode time course for the variances
-    inference_input_dropout_layer_var = layers.Dropout(
-        config.inference_dropout_rate, name="data_drop_var"
-    )
-    inference_output_layers_var = InferenceRNNLayers(
-        config.inference_rnn,
-        config.inference_normalization,
-        config.inference_activation,
-        config.inference_n_layers,
-        config.inference_n_units,
-        config.inference_dropout_rate,
-        name="inf_rnn_var",
-    )
-    inf_mu_layer_var = layers.Dense(config.n_modes, name="inf_mu_var")
-    inf_sigma_layer_var = layers.Dense(
-        config.n_modes, activation="softplus", name="inf_sigma_var"
-    )
+    if not config.fix_variance:
+        # Mode time course for the variances
+        inference_input_dropout_layer_var = layers.Dropout(
+            config.inference_dropout_rate, name="data_drop_var"
+        )
+        inference_output_layers_var = InferenceRNNLayers(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout_rate,
+            name="inf_rnn_var",
+        )
+        inf_mu_layer_var = layers.Dense(config.n_modes, name="inf_mu_var")
+        inf_sigma_layer_var = layers.Dense(
+            config.n_modes, activation="softplus", name="inf_sigma_var"
+        )
 
     # Mode time course for the fcs
     inference_input_dropout_layer_fc = layers.Dropout(
@@ -121,16 +123,21 @@ def _model_structure(config):
         config.learn_alpha_temperature,
         name="alpha",
     )
-    theta_layer_var = SampleNormalDistributionLayer(name="theta_var")
-    theta_norm_layer_var = NormalizationLayer(
-        config.theta_normalization, name="theta_norm_var"
-    )
-    beta_layer = ThetaActivationLayer(
-        config.alpha_xform,
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="beta",
-    )
+
+    if not config.fix_variance:
+        theta_layer_var = SampleNormalDistributionLayer(name="theta_var")
+        theta_norm_layer_var = NormalizationLayer(
+            config.theta_normalization, name="theta_norm_var"
+        )
+        beta_layer = ThetaActivationLayer(
+            config.alpha_xform,
+            config.initial_alpha_temperature,
+            config.learn_alpha_temperature,
+            name="beta",
+        )
+    else:
+        beta_layer = FillConstant(1 / config.n_modes, name="beta")
+
     theta_layer_fc = SampleNormalDistributionLayer(name="theta_fc")
     theta_norm_layer_fc = NormalizationLayer(
         config.theta_normalization, name="theta_norm_fc"
@@ -151,13 +158,16 @@ def _model_structure(config):
     theta_norm_mean = theta_norm_layer_mean(theta_mean)
     alpha = alpha_layer(theta_norm_mean)
 
-    inference_input_dropout_var = inference_input_dropout_layer_var(inputs)
-    inference_output_var = inference_output_layers_var(inference_input_dropout_var)
-    inf_mu_var = inf_mu_layer_var(inference_output_var)
-    inf_sigma_var = inf_sigma_layer_var(inference_output_var)
-    theta_var = theta_layer_var([inf_mu_var, inf_sigma_var])
-    theta_norm_var = theta_norm_layer_var(theta_var)
-    beta = beta_layer(theta_norm_var)
+    if not config.fix_variance:
+        inference_input_dropout_var = inference_input_dropout_layer_var(inputs)
+        inference_output_var = inference_output_layers_var(inference_input_dropout_var)
+        inf_mu_var = inf_mu_layer_var(inference_output_var)
+        inf_sigma_var = inf_sigma_layer_var(inference_output_var)
+        theta_var = theta_layer_var([inf_mu_var, inf_sigma_var])
+        theta_norm_var = theta_norm_layer_var(theta_var)
+        beta = beta_layer(theta_norm_var)
+    else:
+        beta = beta_layer(alpha)
 
     inference_input_dropout_fc = inference_input_dropout_layer_fc(inputs)
     inference_output_fc = inference_output_layers_fc(inference_input_dropout_fc)
@@ -186,6 +196,7 @@ def _model_structure(config):
         config.learn_alpha_scaling,
         config.learn_beta_scaling,
         config.learn_gamma_scaling,
+        config.fix_variance,
         name="mix_means_vars_fcs",
     )
     ll_loss_layer = LogLikelihoodLayer(name="ll")
@@ -262,13 +273,14 @@ def _model_structure(config):
         [inf_mu_mean, inf_sigma_mean, mod_mu_mean, mod_sigma_mean]
     )
 
-    model_input_dropout_var = model_input_dropout_layer_var(theta_norm_var)
-    model_output_var = model_output_layer_var(model_input_dropout_var)
-    mod_mu_var = mod_mu_layer_var(model_output_var)
-    mod_sigma_var = mod_sigma_layer_var(model_output_var)
-    kl_loss_var = kl_loss_layer_var(
-        [inf_mu_var, inf_sigma_var, mod_mu_var, mod_sigma_var]
-    )
+    if not config.fix_variance:
+        model_input_dropout_var = model_input_dropout_layer_var(theta_norm_var)
+        model_output_var = model_output_layer_var(model_input_dropout_var)
+        mod_mu_var = mod_mu_layer_var(model_output_var)
+        mod_sigma_var = mod_sigma_layer_var(model_output_var)
+        kl_loss_var = kl_loss_layer_var(
+            [inf_mu_var, inf_sigma_var, mod_mu_var, mod_sigma_var]
+        )
 
     model_input_dropout_fc = model_input_dropout_layer_fc(theta_norm_fc)
     model_output_fc = model_output_layer_fc(model_input_dropout_fc)
@@ -277,8 +289,10 @@ def _model_structure(config):
     kl_loss_fc = kl_loss_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
 
     # Total KL loss
-    kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_var, kl_loss_fc])
-
+    if not config.fix_variance:
+        kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_var, kl_loss_fc])
+    else:
+        kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_fc])
     return Model(
         inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"
     )

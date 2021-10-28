@@ -167,6 +167,7 @@ class Config:
     alpha_pdf: str = "normal"
     observation_model: str = "multivariate_normal"
     multiple_scale: bool = False
+    fix_variance: bool = False
 
     # Dimension parameters
     n_modes: int = None
