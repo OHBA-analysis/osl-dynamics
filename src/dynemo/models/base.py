@@ -34,6 +34,7 @@ class Base:
     def __init__(self, config):
         self._identifier = np.random.randint(100000)
         self.config = config
+        self.__getattr__ = __model_attr__
 
         # Build and compile the model
         self.model = None
@@ -42,7 +43,7 @@ class Base:
         self.compile()
 
     # Allow access to the keras model attributes
-    def __getattr__(self, attr):
+    def __model_attr__(self, attr):
         return getattr(self.model, attr)
 
     @abstractmethod
