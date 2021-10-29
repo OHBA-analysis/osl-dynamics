@@ -15,6 +15,7 @@ __pycache__/*
 */.ipynb_checkpoints/*
 .DS_Store
 Icon[^M]
+*.sh
 
 # Project files
 .ropeproject

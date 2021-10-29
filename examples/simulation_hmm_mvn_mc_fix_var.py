@@ -51,7 +51,7 @@ meg_data = data.Data(sim.time_series)
 # sim_covs = np.empty([cov.shape[0], cov.shape[1], cov.shape[1]])
 # for i in range(cov.shape[0]):
 #     sim_covs[i] = cov[i] / np.outer(sim.standard_deviations, sim.standard_deviations)
-# 
+#
 # initial_vars = np.zeros([cov.shape[0], cov.shape[1]])
 # for mode in range(cov.shape[0]):
 #     initial_vars[mode] = np.sqrt(np.diag(sim_covs[0]))
@@ -76,11 +76,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=150,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=200,
-    # initial_vars=initial_vars,
     fix_variance=True,
 )
 
@@ -198,7 +197,9 @@ plt.savefig("figures/total_loss_history.png")
 plt.figure()
 plt.plot(dice_alpha_history, label="dice_alpha")
 plt.plot(dice_gamma_history, label="dice_gamma")
-plt.title("dice score of inferred mean (alpha) and fc (gamma) time courses against epoch")
+plt.title(
+    "dice score of inferred mean (alpha) and fc (gamma) time courses against epoch"
+)
 plt.legend()
 plt.savefig("figures/dice_history.png")
 
