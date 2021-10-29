@@ -5,7 +5,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, layers
+from tensorflow.keras import activations, layers, regularizers
 from dynemo.inference.initializers import WeightInitializer
 
 tfb = tfp.bijectors
@@ -978,40 +978,37 @@ class VectorQuantizerLayer(layers.Layer):
         input_shape = tf.shape(inputs)
 
         # Flatten the inputs keeping vector_dim intact
-        flattened = tf.reshape(inputs, [-1, self.vector_dim])
+        flattened_inputs = tf.reshape(inputs, [-1, self.vector_dim])
+
+        # Calculate L2-normalized distance between the inputs and the codes
+        distances = (
+            tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
+            + tf.reduce_sum(self.quantized_vectors ** 2, axis=0, keepdims=True)
+            - 2 * tf.matmul(flattened_inputs, self.quantized_vectors)
+        )
+
+        # Derive the indices for minimum distances
+        encoding_indices = tf.argmin(distances, axis=1)
+        encoding_indices = tf.reshape(encoding_indices, tf.shape(inputs)[:-1])
 
         # Quantization
-        encoding_indices = self.get_code_indices(flattened)
-        encodings = tf.one_hot(encoding_indices, self.n_vectors)
-        quantized = tf.matmul(encodings, self.quantized_vectors, transpose_b=True)
-        quantized = tf.reshape(quantized, input_shape)
+        w = tf.transpose(self.quantized_vectors, perm=[1, 0])
+        quantized = tf.nn.embedding_lookup(w, encoding_indices)
 
-        # Calculate vector quantization loss and add that to the layer
+        # Add codebook loss to the total loss
+        codebook_loss = tf.reduce_mean((quantized - tf.stop_gradient(inputs)) ** 2)
+        self.add_loss(codebook_loss)
+
+        # Add the commitment loss to the total loss
         commitment_loss = self.beta * tf.reduce_mean(
             (tf.stop_gradient(quantized) - inputs) ** 2
         )
-        codebook_loss = tf.reduce_mean((quantized - tf.stop_gradient(inputs)) ** 2)
-        self.add_loss(commitment_loss + codebook_loss)
+        self.add_loss(commitment_loss)
 
         # Straight-through estimator
         quantized = inputs + tf.stop_gradient(quantized - inputs)
 
         return quantized
-
-    def get_code_indices(self, flattened_inputs):
-
-        # Calculate L2-normalized distance between the inputs and the codes
-        similarity = tf.matmul(flattened_inputs, self.quantized_vectors)
-        distances = (
-            tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
-            + tf.reduce_sum(self.quantized_vectors ** 2, axis=0)
-            - 2 * similarity
-        )
-
-        # Derive the indices for minimum distances
-        encoding_indices = tf.argmin(distances, axis=1)
-
-        return encoding_indices
 
     def get_config(self):
         config = super().get_config()
@@ -1051,6 +1048,8 @@ class WaveNetLayer(layers.Layer):
             kernel_size=2,
             dilation_rate=1,
             padding="causal",
+            kernel_regularizer=regularizers.l2(),
+            bias_regularizer=regularizers.l2(),
         )
         self.residual_block_layers = []
         for i in range(1, n_layers):
@@ -1058,8 +1057,20 @@ class WaveNetLayer(layers.Layer):
                 WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
             )
         self.dense_layers = [
-            layers.Conv1D(filters=n_channels, kernel_size=1, padding="same"),
-            layers.Conv1D(filters=n_channels, kernel_size=1, padding="same"),
+            layers.Conv1D(
+                filters=n_channels,
+                kernel_size=1,
+                padding="same",
+                kernel_regularizer=regularizers.l2(),
+                bias_regularizer=regularizers.l2(),
+            ),
+            layers.Conv1D(
+                filters=n_channels,
+                kernel_size=1,
+                padding="same",
+                kernel_regularizer=regularizers.l2(),
+                bias_regularizer=regularizers.l2(),
+            ),
         ]
 
     def call(self, inputs, training=None, **kwargs):
@@ -1105,6 +1116,7 @@ class WaveNetResidualBlockLayer(layers.Layer):
         self.x_filter_layer = layers.Conv1D(
             filters,
             kernel_size=2,
+            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="causal",
             use_bias=False,
@@ -1112,6 +1124,7 @@ class WaveNetResidualBlockLayer(layers.Layer):
         self.y_filter_layer = layers.Conv1D(
             filters,
             kernel_size=1,
+            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="same",
             use_bias=False,
@@ -1119,6 +1132,7 @@ class WaveNetResidualBlockLayer(layers.Layer):
         self.x_gate_layer = layers.Conv1D(
             filters,
             kernel_size=2,
+            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="causal",
             use_bias=False,
@@ -1126,12 +1140,27 @@ class WaveNetResidualBlockLayer(layers.Layer):
         self.y_gate_layer = layers.Conv1D(
             filters,
             kernel_size=1,
+            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="same",
             use_bias=False,
         )
-        self.res_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
-        self.skip_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
+        self.res_layer = layers.Conv1D(
+            filters=filters,
+            kernel_size=1,
+            padding="same",
+            kernel_regularizer=regularizers.l2(),
+            bias_regularizer=regularizers.l2(),
+        )
+        self.skip_layer = layers.Conv1D(
+            filters=filters,
+            kernel_size=1,
+            padding="same",
+            kernel_regularizer=regularizers.l2(),
+            bias_regularizer=regularizers.l2(),
+        )
+        self.skip_dropout_layer = layers.Dropout(0.0)
+        self.res_dropout_layer = layers.Dropout(0.0)
 
     def call(self, inputs, training=None, **kwargs):
         x, h = inputs
@@ -1142,8 +1171,10 @@ class WaveNetResidualBlockLayer(layers.Layer):
         y_gate = self.y_gate_layer(y)
         z = tf.tanh(x_filter + y_filter) * tf.sigmoid(x_gate + y_gate)
         residual = self.res_layer(z)
+        residual = self.res_dropout_layer(x + residual)
         skip = self.skip_layer(z)
-        return x + residual, skip
+        skip = self.skip_dropout_layer(skip)
+        return residual, skip
 
 
 class MeanSquaredErrorLayer(layers.Layer):
