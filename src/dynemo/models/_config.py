@@ -84,8 +84,7 @@ class Config:
     ----------------------------
     observation_model : str
         Type of observation model.
-        Either 'multivariate_normal', 'multivariate_autoregressive' or
-        'conv_net'.
+        Either 'multivariate_normal', 'multivariate_autoregressive' or 'wavenet'.
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
         Pass if model='multivariate_normal'.
@@ -116,12 +115,10 @@ class Config:
     diag_covs : bool
         Should we learn diagonal covariances?
         Pass if model='multivariate_autoregressive'.
-    n_filters : int
-        Number of filters in the each convolulation layer.
-    n_residual_blocks : int
-        Number of residual blocks in WaveNet.
-    n_conv_layers : int
-        Number of layers in each residual block.
+    wavenet_n_filters : int
+        Number of filters in the each convolutional layer.
+    wavenet_n_layers : int
+        Number of dilated causal convolution layers.
 
     KL Annealing Parameters
     -----------------------
@@ -220,9 +217,8 @@ class Config:
     initial_covs: np.ndarray = None
     diag_covs: bool = None
 
-    n_filters: int = None
-    n_residual_blocks: int = None
-    n_conv_layers: int = None
+    wavenet_n_filters: int = None
+    wavenet_n_layers: int = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None
@@ -262,11 +258,11 @@ class Config:
         if self.observation_model not in [
             "multivariate_normal",
             "multivariate_autoregressive",
-            "conv_net",
+            "wavenet",
         ]:
             raise ValueError(
                 "observation_model must be 'multivariate_normal', "
-                + "'multivariate_autoregressive' or 'conv_net'."
+                + "'multivariate_autoregressive' or 'wavenet'."
             )
 
     def validate_rnn_parameters(self):

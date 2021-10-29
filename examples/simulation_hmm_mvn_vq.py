@@ -1,14 +1,13 @@
 """Example script for running inference using a vector quantized version of DyNeMo
  on simulated HMM-MVN data.
 
-- Achieves a dice of ~0.75.
-- There is a large run-to-run variability.
+- Achieves a dice of ~0.99.
 """
 
 print("Setting up")
 import numpy as np
 from dynemo import data, simulation
-from dynemo.inference import metrics, modes, tf_ops
+from dynemo.inference import metrics, modes, tf_ops, callbacks
 from dynemo.models import Config, Model
 
 # GPU settings
@@ -18,7 +17,7 @@ tf_ops.gpu_growth()
 n_samples = 25600
 
 config = Config(
-    n_modes=5,
+    n_modes=6,
     n_channels=80,
     sequence_length=100,
     inference_rnn="lstm",
@@ -27,9 +26,9 @@ config = Config(
     model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization=None,
-    n_quantized_vectors=5,
-    alpha_xform="gumbel-softmax",
+    theta_normalization="batch",
+    n_quantized_vectors=6,
+    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_covariances=True,
@@ -37,7 +36,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=50,
-    batch_size=8,
+    batch_size=16,
     learning_rate=0.01,
     n_epochs=100,
 )
@@ -73,10 +72,16 @@ prediction_dataset = meg_data.dataset(
 model = Model(config)
 model.summary()
 
+# Callbacks
+dice_callback = callbacks.DiceCoefficientCallback(
+    prediction_dataset, sim.mode_time_course
+)
+
 print("Training model")
 history = model.fit(
     training_dataset,
     epochs=config.n_epochs,
+    callbacks=[dice_callback],
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
 )
