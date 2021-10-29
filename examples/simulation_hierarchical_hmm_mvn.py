@@ -1,10 +1,11 @@
 """Example script for running inference on a hierarchical HMM simulation.
 
+- Achieves a dice of ~0.99.
 """
 
 print("Setting up")
 import numpy as np
-from dynemo import data, files, simulation
+from dynemo import data, simulation
 from dynemo.inference import metrics, modes, tf_ops
 from dynemo.models import Config, Model
 
@@ -39,9 +40,7 @@ config = Config(
     n_epochs=100,
 )
 
-# Load mode transition probability matrix and covariances of each mode
-cov = np.load(files.example.path / "hmm_cov.npy")
-
+# Transition probability matrices
 top_level_trans_prob = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
 bottom_level_trans_probs = [
     np.array(
@@ -79,7 +78,7 @@ sim = simulation.HierarchicalHMM_MVN(
     top_level_trans_prob=top_level_trans_prob,
     bottom_level_trans_probs=bottom_level_trans_probs,
     means="zero",
-    covariances=cov,
+    covariances="random",
     observation_error=observation_error,
     top_level_random_seed=123,
     bottom_level_random_seeds=[124, 126, 127],
