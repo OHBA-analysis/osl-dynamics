@@ -1,5 +1,4 @@
-"""Model class for a generative model with a convolutional neural network observation
-model.
+"""Model class for a generative model with a WaveNet observation model.
 
 """
 
@@ -15,6 +14,7 @@ from dynemo.models.layers import (
     StdDevLayer,
     ThetaActivationLayer,
     WaveNetLayer,
+    VectorQuantizerLayer,
 )
 from dynemo.models.cnno import CNNO
 
@@ -70,6 +70,15 @@ def _model_structure(config):
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
+    if config.n_quantized_vectors:
+        quant_theta_norm_layer = VectorQuantizerLayer(
+            config.n_quantized_vectors,
+            config.n_modes,
+            config.quantized_vector_beta,
+            config.initial_quantized_vectors,
+            config.learn_quantized_vectors,
+            name="quant_theta_norm",
+        )
     alpha_layer = ThetaActivationLayer(
         config.alpha_xform,
         config.initial_alpha_temperature,
@@ -84,6 +93,8 @@ def _model_structure(config):
     inf_sigma = inf_sigma_layer(inference_output)
     theta = theta_layer([inf_mu, inf_sigma])
     theta_norm = theta_norm_layer(theta)
+    if config.n_quantized_vectors:
+        theta_norm = quant_theta_norm_layer(theta_norm)
     alpha = alpha_layer(theta_norm)
 
     # Observation model:

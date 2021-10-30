@@ -9,14 +9,14 @@ from dynemo.models.ricnno import RICNNO
 from dynemo.models.ridgo import RIDGO
 from dynemo.models.rigo import RIGO
 from dynemo.models.rimaro import RIMARO
-from dynemo.models.rivqgo import RIVQGO
 
 
 def Model(config):
     """Main DyNeMo model.
 
-    Selects either an observation model (GO or MARO) or joint inference
-    and observation model (RIGO, RIDGO, RIMARO) based on the passed config.
+    Selects either an observation model (GO, MARO or CNNO) or joint inference
+    and observation model (RIGO, RIDGO, RIMARO, RICNNO) based on the passed
+    config.
 
     Parameters
     ----------
@@ -41,10 +41,7 @@ def Model(config):
     if config.observation_model == "multivariate_normal":
 
         if config.alpha_pdf == "normal":
-            if config.n_quantized_vectors is not None:
-                return RIVQGO(config)
-            else:
-                return RIGO(config)
+            return RIGO(config)
 
         elif config.alpha_pdf == "dirichlet":
             return RIDGO(config)
@@ -52,10 +49,7 @@ def Model(config):
     elif config.observation_model == "multivariate_autoregressive":
 
         if config.alpha_pdf == "normal":
-            if config.n_quantized_vectors is not None:
-                raise NotImplementedError("Requested config not available.")
-            else:
-                return RIMARO(config)
+            return RIMARO(config)
 
         elif config.alpha_pdf == "dirichlet":
             raise NotImplementedError("Requested config not available.")
@@ -63,10 +57,7 @@ def Model(config):
     elif config.observation_model == "wavenet":
 
         if config.alpha_pdf == "normal":
-            if config.n_quantized_vectors is not None:
-                raise NotImplementedError("Requested config not available.")
-            else:
-                return RICNNO(config)
+            return RICNNO(config)
 
         elif config.alpha_pdf == "dirichlet":
             raise NotImplementedError("Requested config not available.")

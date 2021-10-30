@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, layers, regularizers
-from dynemo.inference.initializers import WeightInitializer
+from dynemo.inference.initializers import WeightInitializer, CopyTensorInitializer
 
 tfb = tfp.bijectors
 
@@ -782,7 +782,6 @@ class CoeffsCovsLayer(layers.Layer):
         if self.diag_covs:
             # Ensure covariances contain variances that are positive
             self.covs = activations.softplus(self.diagonal_covs)
-            self.covs = tf.linalg.diag(self.covs)
         else:
             # Calculate the covariance matrix from the cholesky factor
             self.covs = self.bijector(self.flattened_cholesky_covs)
@@ -935,6 +934,10 @@ class VectorQuantizerLayer(layers.Layer):
         Initial values for the quantized vectors.
     learn_quantized_vectors : bool
         Should we learn the quantized vectors?
+    gamma : float
+        Decay for the exponential moving average. Optional.
+    epsilon : float
+        Small error for numerical stability. Optional.
     """
 
     def __init__(
@@ -944,37 +947,59 @@ class VectorQuantizerLayer(layers.Layer):
         beta: float,
         initial_quantized_vectors: np.ndarray,
         learn_quantized_vectors: bool,
+        gamma: float = 0.99,
+        epsilon: float = 1e-5,
         **kwargs
     ):
         super().__init__(**kwargs)
         self.n_vectors = n_vectors
         self.vector_dim = vector_dim
         self.beta = beta
+        if not 0 <= gamma <= 1:
+            raise ValueError("gamma must be between 0 and 1.")
+        self.gamma = gamma
+        self.epsilon = epsilon
         self.initial_quantized_vectors = initial_quantized_vectors
         self.learn_quantized_vectors = learn_quantized_vectors
 
-        # Initialiser for the quantised vectors
+        # Tensor for quantised vectors
         if self.initial_quantized_vectors is None:
             self.quantized_vectors_initializer = tf.random_uniform_initializer()
         else:
             self.quantized_vectors_initializer = WeightInitializer(
                 self.initial_quantized_vectors
             )
-
-    def build(self, input_shape):
-
-        # Trainable weights for the quantised vectors
-        self.quantized_vectors = self.add_weight(
-            "quantized_vectors",
-            shape=(self.vector_dim, self.n_vectors),
-            dtype=tf.float32,
-            initializer=self.quantized_vectors_initializer,
-            trainable=self.learn_quantized_vectors,
+        self.quantized_vectors = tf.Variable(
+            initial_value=self.quantized_vectors_initializer(
+                shape=(self.vector_dim, self.n_vectors),
+                dtype=tf.float32,
+            ),
+            trainable=False,
+            name="quantized_vectors",
         )
 
-        self.built = True
+        # Tensor for cluster size exponential moving average
+        self.cluster_size_initializer = tf.zeros_initializer()
+        self.cluster_size = tf.Variable(
+            initial_value=self.cluster_size_initializer(
+                shape=(self.n_vectors,),
+                dtype=tf.float32,
+            ),
+            trainable=False,
+            name="cluster_size",
+        )
 
-    def call(self, inputs):
+        # Tensor for quantised vector exponential moving average
+        self.quantized_vector_average_initializer = CopyTensorInitializer(
+            self.quantized_vectors
+        )
+        self.quantized_vector_average = tf.Variable(
+            initial_value=self.quantized_vector_average_initializer(),
+            trainable=False,
+            name="quantized_vector_average",
+        )
+
+    def call(self, inputs, training=None):
         input_shape = tf.shape(inputs)
 
         # Flatten the inputs keeping vector_dim intact
@@ -989,15 +1014,42 @@ class VectorQuantizerLayer(layers.Layer):
 
         # Derive the indices for minimum distances
         encoding_indices = tf.argmin(distances, axis=1)
+        encodings = tf.one_hot(encoding_indices, self.n_vectors)
         encoding_indices = tf.reshape(encoding_indices, tf.shape(inputs)[:-1])
 
         # Quantization
         w = tf.transpose(self.quantized_vectors, perm=[1, 0])
         quantized = tf.nn.embedding_lookup(w, encoding_indices)
 
-        # Add codebook loss to the total loss
-        codebook_loss = tf.reduce_mean((quantized - tf.stop_gradient(inputs)) ** 2)
-        self.add_loss(codebook_loss)
+        if training and self.learn_quantized_vectors:
+            # Update codebook
+
+            # Calculate exponential moving average for the cluster size, N
+            encodings_sum = tf.reduce_sum(encodings, axis=0)
+            self.cluster_size.assign(
+                self.cluster_size * self.gamma + encodings_sum * (1 - self.gamma)
+            )
+
+            # Calculate exponential moving average for the quantised vectors, m
+            quantized_vector_sum = tf.matmul(
+                flattened_inputs, encodings, transpose_a=True
+            )
+            self.quantized_vector_average.assign(
+                self.quantized_vector_average * self.gamma
+                + quantized_vector_sum * (1 - self.gamma)
+            )
+            n = tf.reduce_sum(self.cluster_size)
+            cluster_size = (
+                (self.cluster_size + self.epsilon)
+                / (n + self.n_vectors * self.epsilon)
+                * n
+            )
+
+            # Calculate the new codebook quantised vectors
+            quantized_vectors_normalized = self.quantized_vector_average / tf.reshape(
+                cluster_size, [1, -1]
+            )
+            self.quantized_vectors.assign(quantized_vectors_normalized)
 
         # Add the commitment loss to the total loss
         commitment_loss = self.beta * tf.reduce_mean(
@@ -1017,6 +1069,7 @@ class VectorQuantizerLayer(layers.Layer):
                 "n_vectors": self.n_vectors,
                 "vector_dim": self.vector_dim,
                 "beta": self.beta,
+                "gamma": self.gamma,
                 "learn_quantized_vectors": self.learn_quantized_vectors,
             }
         )
@@ -1048,8 +1101,8 @@ class WaveNetLayer(layers.Layer):
             kernel_size=2,
             dilation_rate=1,
             padding="causal",
+            use_bias=False,
             kernel_regularizer=regularizers.l2(),
-            bias_regularizer=regularizers.l2(),
         )
         self.residual_block_layers = []
         for i in range(1, n_layers):
@@ -1116,34 +1169,34 @@ class WaveNetResidualBlockLayer(layers.Layer):
         self.x_filter_layer = layers.Conv1D(
             filters,
             kernel_size=2,
-            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="causal",
             use_bias=False,
+            kernel_regularizer=regularizers.l2(),
         )
         self.y_filter_layer = layers.Conv1D(
             filters,
             kernel_size=1,
-            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="same",
             use_bias=False,
+            kernel_regularizer=regularizers.l2(),
         )
         self.x_gate_layer = layers.Conv1D(
             filters,
             kernel_size=2,
-            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="causal",
             use_bias=False,
+            kernel_regularizer=regularizers.l2(),
         )
         self.y_gate_layer = layers.Conv1D(
             filters,
             kernel_size=1,
-            kernel_regularizer=regularizers.l2(),
             dilation_rate=dilation_rate,
             padding="same",
             use_bias=False,
+            kernel_regularizer=regularizers.l2(),
         )
         self.res_layer = layers.Conv1D(
             filters=filters,
@@ -1159,8 +1212,6 @@ class WaveNetResidualBlockLayer(layers.Layer):
             kernel_regularizer=regularizers.l2(),
             bias_regularizer=regularizers.l2(),
         )
-        self.skip_dropout_layer = layers.Dropout(0.0)
-        self.res_dropout_layer = layers.Dropout(0.0)
 
     def call(self, inputs, training=None, **kwargs):
         x, h = inputs
@@ -1171,10 +1222,8 @@ class WaveNetResidualBlockLayer(layers.Layer):
         y_gate = self.y_gate_layer(y)
         z = tf.tanh(x_filter + y_filter) * tf.sigmoid(x_gate + y_gate)
         residual = self.res_layer(z)
-        residual = self.res_dropout_layer(x + residual)
         skip = self.skip_layer(z)
-        skip = self.skip_dropout_layer(skip)
-        return residual, skip
+        return x + residual, skip
 
 
 class MeanSquaredErrorLayer(layers.Layer):

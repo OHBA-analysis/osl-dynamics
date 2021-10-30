@@ -321,3 +321,19 @@ class InferenceModelBase:
         alpha_layer = self.model.get_layer("alpha")
         alpha_temperature = alpha_layer.alpha_temperature.numpy()
         return alpha_temperature
+
+    def get_quantized_alpha(self) -> np.ndarray:
+        """Inferred quantized alpha vectors.
+
+        Returns
+        -------
+        np.ndarray
+            Quantized alpha vectors. Shape is (n_vectors, vector_dim).
+        """
+        if self.config.n_quantized_vectors is None:
+            raise ValueError("Vector quantization was not used.")
+        vec_quant_layer = self.model.get_layer("quant_theta_norm")
+        alpha_layer = self.model.get_layer("alpha")
+        quantized_vectors = vec_quant_layer.quantized_vectors
+        quantized_alpha = alpha_layer(quantized_vectors[np.newaxis, ...])
+        return np.squeeze(quantized_alpha)

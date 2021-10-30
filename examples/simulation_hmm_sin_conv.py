@@ -13,7 +13,7 @@ tf_ops.gpu_growth()
 
 # Settings
 n_samples = 25600
-amplitudes = np.array([[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1]])
+amplitudes = np.array([[1, 1, 1, 1], [2, 2, 2, 2], [1, 1, 1, 1], [2, 2, 2, 2]])
 frequencies = np.array(
     [[10, 10, 10, 10], [30, 30, 30, 30], [50, 50, 50, 50], [70, 70, 70, 70]]
 )
@@ -27,19 +27,20 @@ config = Config(
     model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization=None,
+    theta_normalization="batch",
     alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
+    n_quantized_vectors=4,
     observation_model="wavenet",
-    wavenet_n_filters=4,
-    wavenet_n_layers=2,
+    wavenet_n_filters=1,
+    wavenet_n_layers=5,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.01,
+    learning_rate=0.001,
     n_epochs=200,
 )
 

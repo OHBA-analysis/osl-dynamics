@@ -1,4 +1,4 @@
-"""Class for a convolutional neural network observation model.
+"""Class for a WaveNet observation model.
 
 """
 

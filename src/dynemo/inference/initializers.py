@@ -26,11 +26,27 @@ class WeightInitializer(Initializer):
         return self.initial_value
 
 
+class CopyTensorInitializer(Initializer):
+    """Initialize weights to another Tensor's value.
+
+    Parameters
+    ----------
+    tensor : tf.Tensor
+        Tensor to copy.
+    """
+
+    def __init__(self, tensor: tf.Tensor):
+        self.tensor = tensor
+
+    def __call__(self):
+        return self.tensor.read_value()
+
+
 def reinitialize_layer_weights(layer: tf.keras.layers.Layer):
     """Re-initializes the weights in a particular layer.
 
     This function relies on each layer having an initializer attribute.
-    Therefore, you must specific a self.*_initializer attribute in custom
+    Therefore, you must specify a self.*_initializer attribute in custom
     layers, otherwise this function will break.
 
     Parameters
