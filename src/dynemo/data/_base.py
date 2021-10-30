@@ -47,7 +47,7 @@ class Data(IO, Manipulation, TensorFlowDataset):
         keep_memmaps_on_close: bool = False,
     ):
         # Unique identifier for the Data object
-        self._identifier = id(inputs)
+        self._identifier = id(self)
 
         # Load data by initialising an IO object
         IO.__init__(
