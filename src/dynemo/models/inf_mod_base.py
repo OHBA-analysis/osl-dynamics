@@ -334,6 +334,6 @@ class InferenceModelBase:
             raise ValueError("Vector quantization was not used.")
         vec_quant_layer = self.model.get_layer("quant_theta_norm")
         alpha_layer = self.model.get_layer("alpha")
-        quantized_vectors = vec_quant_layer.quantized_vectors
+        quantized_vectors = vec_quant_layer.embeddings
         quantized_alpha = alpha_layer(quantized_vectors[np.newaxis, ...])
         return np.squeeze(quantized_alpha)

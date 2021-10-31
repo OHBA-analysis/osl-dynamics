@@ -924,15 +924,15 @@ class VectorQuantizerLayer(layers.Layer):
 
     Parameters
     ----------
-    n_vectors : int
+    n_embeddings : int
         Number of vectors.
-    vector_dim : int
+    embedding_dim : int
         Dimensionality of the vectors.
     beta : float
         Weighting term for the commitment loss.
-    initial_quantized_vectors : np.ndarray
+    initial_embeddings : np.ndarray
         Initial values for the quantized vectors.
-    learn_quantized_vectors : bool
+    learn_embeddings : bool
         Should we learn the quantized vectors?
     gamma : float
         Decay for the exponential moving average. Optional.
@@ -942,117 +942,115 @@ class VectorQuantizerLayer(layers.Layer):
 
     def __init__(
         self,
-        n_vectors: int,
-        vector_dim: int,
+        n_embeddings: int,
+        embedding_dim: int,
         beta: float,
-        initial_quantized_vectors: np.ndarray,
-        learn_quantized_vectors: bool,
+        initial_embeddings: np.ndarray,
+        learn_embeddings: bool,
         gamma: float = 0.99,
         epsilon: float = 1e-5,
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.n_vectors = n_vectors
-        self.vector_dim = vector_dim
+        self.n_embeddings = n_embeddings
+        self.embedding_dim = embedding_dim
         self.beta = beta
         if not 0 <= gamma <= 1:
             raise ValueError("gamma must be between 0 and 1.")
         self.gamma = gamma
         self.epsilon = epsilon
-        self.initial_quantized_vectors = initial_quantized_vectors
-        self.learn_quantized_vectors = learn_quantized_vectors
+        self.initial_embeddings = initial_embeddings
+        self.learn_embeddings = learn_embeddings
 
         # Tensor for quantised vectors
-        if self.initial_quantized_vectors is None:
-            self.quantized_vectors_initializer = tf.random_uniform_initializer()
+        if self.initial_embeddings is None:
+            self.embeddings_initializer = tf.random_uniform_initializer()
         else:
-            self.quantized_vectors_initializer = WeightInitializer(
-                self.initial_quantized_vectors
-            )
-        self.quantized_vectors = tf.Variable(
-            initial_value=self.quantized_vectors_initializer(
-                shape=(self.vector_dim, self.n_vectors),
+            self.embeddings_initializer = WeightInitializer(self.initial_embeddings)
+        self.embeddings = tf.Variable(
+            initial_value=self.embeddings_initializer(
+                shape=(embedding_dim, n_embeddings),
                 dtype=tf.float32,
             ),
             trainable=False,
-            name="quantized_vectors",
+            name="embeddings",
         )
 
         # Tensor for cluster size exponential moving average
-        self.cluster_size_initializer = tf.zeros_initializer()
-        self.cluster_size = tf.Variable(
-            initial_value=self.cluster_size_initializer(
-                shape=(self.n_vectors,),
+        self.cluster_size_ema_initializer = tf.zeros_initializer()
+        self.cluster_size_ema = tf.Variable(
+            initial_value=self.cluster_size_ema_initializer(
+                shape=(n_embeddings,),
                 dtype=tf.float32,
             ),
             trainable=False,
-            name="cluster_size",
+            name="cluster_size_ema",
         )
 
         # Tensor for quantised vector exponential moving average
-        self.quantized_vector_average_initializer = CopyTensorInitializer(
-            self.quantized_vectors
-        )
-        self.quantized_vector_average = tf.Variable(
-            initial_value=self.quantized_vector_average_initializer(
-                shape=(self.vector_dim, self.n_vectors),
+        self.embeddings_ema_initializer = CopyTensorInitializer(self.embeddings)
+        self.embeddings_ema = tf.Variable(
+            initial_value=self.embeddings_ema_initializer(
+                shape=(embedding_dim, n_embeddings),
                 dtype=tf.float32,
             ),
             trainable=False,
-            name="quantized_vector_average",
+            name="embeddings_ema",
         )
 
     def call(self, inputs, training=None):
-        input_shape = tf.shape(inputs)
 
-        # Flatten the inputs keeping vector_dim intact
-        flattened_inputs = tf.reshape(inputs, [-1, self.vector_dim])
+        # Flatten the inputs keeping embedding_dim intact
+        flattened_inputs = tf.reshape(inputs, [-1, self.embedding_dim])
 
-        # Calculate L2-normalized distance between the inputs and the codes
+        # Calculate L2 distance between the inputs and the embeddings
         distances = (
             tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
-            + tf.reduce_sum(self.quantized_vectors ** 2, axis=0, keepdims=True)
-            - 2 * tf.matmul(flattened_inputs, self.quantized_vectors)
+            + tf.reduce_sum(self.embeddings ** 2, axis=0, keepdims=True)
+            - 2 * tf.matmul(flattened_inputs, self.embeddings)
         )
 
         # Derive the indices for minimum distances
-        encoding_indices = tf.argmin(distances, axis=1)
-        encodings = tf.one_hot(encoding_indices, self.n_vectors)
-        encoding_indices = tf.reshape(encoding_indices, tf.shape(inputs)[:-1])
+        embedding_indices = tf.argmin(distances, axis=1)
+
+        # One hot vectors containing classifications of each vector
+        one_hot_embeddings = tf.one_hot(embedding_indices, self.n_embeddings)
 
         # Quantization
-        w = tf.transpose(self.quantized_vectors, perm=[1, 0])
-        quantized = tf.nn.embedding_lookup(w, encoding_indices)
+        embedding_indices = tf.reshape(embedding_indices, tf.shape(inputs)[:-1])
+        quantized = tf.nn.embedding_lookup(
+            tf.transpose(self.embeddings), embedding_indices
+        )
 
-        if training and self.learn_quantized_vectors:
+        if training and self.learn_embeddings:
             # Update codebook
 
-            # Calculate exponential moving average for the cluster size, N
-            encodings_sum = tf.reduce_sum(encodings, axis=0)
-            self.cluster_size.assign(
-                self.cluster_size * self.gamma + encodings_sum * (1 - self.gamma)
+            # Calculate exponential moving average for the cluster size
+            one_hot_embeddings_sum = tf.reduce_sum(one_hot_embeddings, axis=0)
+            self.cluster_size_ema.assign(
+                self.cluster_size_ema * self.gamma
+                + one_hot_embeddings_sum * (1 - self.gamma)
             )
 
-            # Calculate exponential moving average for the quantised vectors, m
-            quantized_vector_sum = tf.matmul(
-                flattened_inputs, encodings, transpose_a=True
+            # Calculate exponential moving average for the quantised vectors
+            embeddings_sum = tf.matmul(
+                flattened_inputs, one_hot_embeddings, transpose_a=True
             )
-            self.quantized_vector_average.assign(
-                self.quantized_vector_average * self.gamma
-                + quantized_vector_sum * (1 - self.gamma)
+            self.embeddings_ema.assign(
+                self.embeddings_ema * self.gamma + embeddings_sum * (1 - self.gamma)
             )
-            n = tf.reduce_sum(self.cluster_size)
-            cluster_size = (
-                (self.cluster_size + self.epsilon)
-                / (n + self.n_vectors * self.epsilon)
+            n = tf.reduce_sum(self.cluster_size_ema)
+            cluster_size_ema = (
+                (self.cluster_size_ema + self.epsilon)
+                / (n + self.n_embeddings * self.epsilon)
                 * n
             )
 
             # Calculate the new codebook quantised vectors
-            quantized_vectors_normalized = self.quantized_vector_average / tf.reshape(
-                cluster_size, [1, -1]
+            normalized_embeddings = self.embeddings_ema / tf.reshape(
+                cluster_size_ema, [1, -1]
             )
-            self.quantized_vectors.assign(quantized_vectors_normalized)
+            self.embeddings.assign(normalized_embeddings)
 
         # Add the commitment loss to the total loss
         commitment_loss = self.beta * tf.reduce_mean(
@@ -1069,11 +1067,11 @@ class VectorQuantizerLayer(layers.Layer):
         config = super().get_config()
         config.update(
             {
-                "n_vectors": self.n_vectors,
-                "vector_dim": self.vector_dim,
+                "n_embeddings": self.n_embeddings,
+                "embedding_dim": self.embedding_dim,
                 "beta": self.beta,
                 "gamma": self.gamma,
-                "learn_quantized_vectors": self.learn_quantized_vectors,
+                "learn_embeddings": self.learn_embeddings,
             }
         )
         return config
