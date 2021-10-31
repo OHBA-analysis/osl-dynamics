@@ -38,7 +38,7 @@ class CopyTensorInitializer(Initializer):
     def __init__(self, tensor: tf.Tensor):
         self.tensor = tensor
 
-    def __call__(self):
+    def __call__(self, shape, dtype=None):
         return self.tensor.read_value()
 
 

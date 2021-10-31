@@ -994,7 +994,10 @@ class VectorQuantizerLayer(layers.Layer):
             self.quantized_vectors
         )
         self.quantized_vector_average = tf.Variable(
-            initial_value=self.quantized_vector_average_initializer(),
+            initial_value=self.quantized_vector_average_initializer(
+                shape=(self.vector_dim, self.n_vectors),
+                dtype=tf.float32,
+            ),
             trainable=False,
             name="quantized_vector_average",
         )
