@@ -154,13 +154,28 @@ print(
 # Scatter plot of dice scores
 plt.figure()
 plt.scatter(dice_alpha_list, dice_gamma_list)
-plt.xlim(0.0, 1.0)
-plt.ylim(0.0, 1.0)
 plt.xlabel("dice_mean")
 plt.ylabel("dice_fc")
 plt.title("scatter plot of dice scores")
 plt.tight_layout()
 plt.savefig("figures/dice_scatter_plot.png")
+
+# plot showing free energy and dice for each run
+fig, ax1 = plt.subplots()
+x = np.arange(N_runs) + 1
+
+ax1.set_xlabel("runs")
+ax1.set_ylabel("dice scores")
+ax1.bar(x - 0.1, dice_alpha_list, width=0.2, color="r", align="center", label="dice_alpha")
+ax1.bar(x + 0.1, dice_gamma_list, width=0.2, color="b", align="center", label="dice_gamma")
+
+ax2 = ax1.twinx()
+ax2.set_ylabel("free energy")
+ax2.plot(x, free_energy_list, color="k", label="free energy")
+ax2.set_title("plot comparing result from each run")
+fig.legend()
+fig.tight_layout()
+fig.savefig("figures/compare_runs.png")
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
