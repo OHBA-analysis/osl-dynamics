@@ -21,11 +21,6 @@ cov = np.load(files.example.path / "hmm_cov.npy")
 
 # cov.shape = (n_modes, n_channels, n_channels)
 
-# set the means so that they are of the same scale as the variances
-# mean_rng = np.random.default_rng(1234)
-# mean_scale = np.sqrt(np.mean(np.trace(cov, axis1=1, axis2=2) / cov.shape[-1]))
-# true_means = mean_rng.normal(scale=mean_scale, size=[cov.shape[0], cov.shape[-1]])
-
 
 # Settings
 n_samples = 25600
@@ -47,14 +42,7 @@ sim = simulation.HMM_MVN(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
-# standardizing the data also changes the true variances
-# sim_covs = np.empty([cov.shape[0], cov.shape[1], cov.shape[1]])
-# for i in range(cov.shape[0]):
-#     sim_covs[i] = cov[i] / np.outer(sim.standard_deviations, sim.standard_deviations)
-#
-# initial_vars = np.zeros([cov.shape[0], cov.shape[1]])
-# for mode in range(cov.shape[0]):
-#     initial_vars[mode] = np.sqrt(np.diag(sim_covs[0]))
+
 
 config = Config(
     multiple_scale=True,

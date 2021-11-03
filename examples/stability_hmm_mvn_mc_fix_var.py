@@ -37,6 +37,7 @@ sim = simulation.HMM_MVN(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
+# Set up the model
 config = Config(
     multiple_scale=True,
     n_modes=5,
