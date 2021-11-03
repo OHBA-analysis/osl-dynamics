@@ -27,6 +27,9 @@ class MVN:
         Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for the random number generator.
+    uni_variance : bool
+        Do we want uni variance across all channels? True only effective in 
+        multi-scale model.
     """
 
     def __init__(
@@ -37,6 +40,7 @@ class MVN:
         n_channels: int = None,
         observation_error: float = 0.0,
         random_seed: int = None,
+        uni_variance: bool=False,
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
@@ -88,11 +92,14 @@ class MVN:
             raise ValueError("means and covariance arugments not passed correctly.")
 
         # Get the var and fc from self.covariance
-        self.variances = np.zeros([self.n_modes, self.n_channels])
-        for i in range(self.n_modes):
-            self.variances[i] = np.sqrt(np.diag(self.covariances[i]))
-        # enforce positive variance
-        self.variances = np.maximum(self.variances, 1e-6)
+        if not uni_variance:
+            self.variances = np.zeros([self.n_modes, self.n_channels])
+            for i in range(self.n_modes):
+                self.variances[i] = np.sqrt(np.diag(self.covariances[i]))
+            # enforce positive variance
+            self.variances = np.maximum(self.variances, 1e-6)
+        else:
+            self.variances = np.ones([self.n_modes, self.n_channels])
 
         self.fcs = np.zeros([self.n_modes, self.n_channels, self.n_channels])
         for i in range(self.n_modes):

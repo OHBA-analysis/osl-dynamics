@@ -231,6 +231,10 @@ class HMM_MVN(Simulation):
         Do we want to simulate different time courses for mean, variance, and fc?
     random_seed : int
         Seed for random number generator. Optional.
+    fix_variance: bool
+        Do we want to remove dependency of loss function on variance time course?
+    uni_variance: bool
+        Do we want uni variance across channels? Only effective in multi-scale inference.
     """
 
     def __init__(
@@ -246,6 +250,7 @@ class HMM_MVN(Simulation):
         multiple_scale: bool = False,
         random_seed: int = None,
         fix_variance: bool = False,
+        uni_variance: bool = False,
     ):
         # Observation model
         self.obs_mod = MVN(
@@ -255,6 +260,7 @@ class HMM_MVN(Simulation):
             n_channels=n_channels,
             observation_error=observation_error,
             random_seed=random_seed,
+            uni_variance=uni_variance,
         )
 
         self.n_modes = self.obs_mod.n_modes
