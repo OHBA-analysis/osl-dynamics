@@ -190,14 +190,14 @@ def mar_spectra(
     Parameters
     ----------
     coeffs : np.ndarray
-        MAR coefficients. Shape must be (n_modes, n_lags, n_channels, n_channels).
+        MAR coefficients.
     covs : np.ndarray
-        MAR covariances. Shape must be (n_modes, n_channels, n_channels).
+        MAR covariances.
     sampling_frequency : float
         Sampling frequency in Hertz.
     n_f : int
         Number of frequency bins in the cross power spectral density to calculate.
-        Optional, default is 512.
+        Optional.
 
     Returns
     -------
@@ -206,6 +206,35 @@ def mar_spectra(
         Shape is (n_f, n_modes, n_channels, n_channels) or
         (n_f, n_channels, n_channels).
     """
+    # Validation
+    if covs.shape[-1] != covs.shape[-2]:
+        if covs.ndim == 2:
+            covs = [np.diag(c) for c in covs]
+        else:
+            covs = np.diag(covs)
+    error_message = (
+        "covs must be a numpy array with shape "
+        + "(n_modes, n_channels, n_channels), "
+        + "(n_channels, n_channels) or (n_channels,)."
+    )
+    covs = array_ops.validate(
+        covs,
+        correct_dimensionality=3,
+        allow_dimensions=[2],
+        error_message=error_message,
+    )
+    error_message = (
+        "coeffs must be a numpy array with shape "
+        + "(n_modes, n_lags, n_channels, n_channels), "
+        + "(n_lags, n_channels, n_channels)."
+    )
+    coeffs = array_ops.validate(
+        coeffs,
+        correct_dimensionality=4,
+        allow_dimensions=[3],
+        error_message=error_message,
+    )
+
     n_modes = coeffs.shape[0]
     n_lags = coeffs.shape[1]
     n_channels = coeffs.shape[-1]
