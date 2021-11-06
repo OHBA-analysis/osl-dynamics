@@ -1346,7 +1346,9 @@ def plot_alpha(
     else:
         plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
-    if isinstance(y_labels, str):
+    if y_labels is None:
+        y_labels = [None]
+    elif isinstance(y_labels, str):
         y_labels = [y_labels] * n_alphas
     elif len(y_labels) != n_alphas:
         raise ValueError("Incorrect number of y_labels passed.")

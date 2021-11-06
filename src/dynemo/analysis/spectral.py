@@ -521,6 +521,7 @@ def multitaper_spectra(
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
     args_range = get_frequency_args_range(frequencies, frequency_range)
+    frequencies = frequencies[args_range[0] : args_range[1]]
 
     # Number of frequency bins
     n_f = args_range[1] - args_range[0]
@@ -718,16 +719,16 @@ def regression_spectra(
     i, j = np.triu_indices(n_parcels)
 
     # Create a n_parcels by n_parcels array
-    P = np.empty([n_subjects, n_modes, n_parcels, n_parcels, n_f], dtype=np.complex_)
+    P = np.empty([n_subjects, n_modes, n_parcels, n_parcels, n_f])
     P[:, :, i, j] = Pj
-    P[:, :, j, i] = np.conj(Pj)
+    P[:, :, j, i] = Pj
 
     # PSDs and coherences for each mode
     psd = []
     coh = []
     for i in range(n_subjects):
         p = P[i]  # subject specific cross spectra
-        psd.append(p[:, range(n_parcels), range(n_parcels)].real)
+        psd.append(p[:, range(n_parcels), range(n_parcels)])
         coh.append(coherence_spectra(p, print_message=False))
 
     return f, np.squeeze(psd), np.squeeze(coh)
