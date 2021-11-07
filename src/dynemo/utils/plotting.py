@@ -605,6 +605,107 @@ def plot_bar_chart(
         save(fig, filename)
 
 
+def plot_gmm(
+    data: np.ndarray,
+    amplitudes: np.ndarray,
+    means: np.ndarray,
+    variances: np.ndarray,
+    bins=50,
+    x_range: list = None,
+    y_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
+    title: str = None,
+    plot_kwargs: dict = None,
+    fig_kwargs: dict = None,
+    ax: matplotlib.axes.Axes = None,
+    filename: str = None,
+):
+    """Plot a two component Gaussian mixture model.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Raw data to plot as a histogram.
+    means : np.ndarray
+        Mean of each Gaussian component.
+    variances : np.ndarray
+        Variance of each Gaussian component.
+    bins : list of int
+        Number of bins for the historgram. Optional.
+    x_range : list
+        Minimum and maximum for x-axis. Optional.
+    y_range : list
+        Minimum and maximum for y-axis. Optional.
+    x_label : str
+        Label for x-axis. Optional.
+    y_label : str
+        Label for y-axis. Optional.
+    title : str
+        Figure title. Optional.
+    plot_kwargs : dict
+        Arguments to pass to the ax.hist method. Optional.
+    fig_kwargs : dict
+        Arguments to pass to plt.subplots. Optional.
+    ax : matplotlib.axes.Axes
+        Axis object to plot on. Optional.
+    filename : str
+        Output filename. Optional.
+    """
+
+    # Validation
+    if x_range is None:
+        x_range = [None, None]
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    default_fig_kwargs = {"figsize": (7, 4)}
+    if fig_kwargs is None:
+        fig_kwargs = default_fig_kwargs
+    else:
+        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
+    # Create figure
+    if ax is None:
+        fig, ax = create_figure(**fig_kwargs)
+
+    # Plot histogram
+    ax.hist(data, bins=bins, histtype="step", density=True)
+
+    # Plot Gaussian components
+    x = np.arange(min(data), max(data), (max(data) - min(data)) / bins)
+    y1 = amplitudes[0] * np.exp(-((x - means[0]) ** 2) / (2 * variances[0] ** 2))
+    y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * variances[1] ** 2))
+    ax.plot(x, y1)
+    ax.plot(x, y2)
+
+    # Set axis range
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # Save the figure if a filename has been pass
+    if filename is not None:
+        save(fig, filename)
+
+
 def plot_violin(
     data: np.ndarray,
     show_mean: bool = True,
