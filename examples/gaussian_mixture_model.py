@@ -18,4 +18,6 @@ X[component == 1] = np.random.normal(0, 0.5, size=n1)
 X[component == 0] = np.random.normal(2, 1, size=n2)
 
 # Fit a Gaussian mixture model
-fit_gmm(X, n_fits=10, plot_filename="gmm.png")
+y = fit_gmm(X, n_fits=10, plot_filename="gmm.png")
+
+print("Accuracy:", np.count_nonzero(y == component) / n_samples)

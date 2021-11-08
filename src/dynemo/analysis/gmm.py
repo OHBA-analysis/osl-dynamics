@@ -2,17 +2,19 @@
 
 """
 
-from typing import Tuple
-
 import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
 from dynemo.data.manipulation import standardize
 from dynemo.utils import plotting
 
 
-def fit_gmm(
-    X: np.ndarray, n_fits: int = 1, max_iter: int = 1000, plot_filename: str = None
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def fit_gaussian_mixture(
+    X: np.ndarray,
+    n_fits: int = 1,
+    max_iter: int = 1000,
+    plot_filename: str = None,
+    print_message: bool = True,
+) -> np.ndarray:
     """Fits a two component Bayesian Gaussian mixture model.
 
     Parameters
@@ -25,17 +27,16 @@ def fit_gmm(
         Maximum number of iterations. Optional.
     plot_filename : str
         Filename to save a plot of the Gaussian mixture model. Optional.
+    print_message : bool
+        Should we print a message? Optional.
 
     Returns
     -------
-    amplitudes : np.ndarray
-        Amplitude of Gaussian components.
-    means : np.ndarray
-        Mean of Gaussian components.
-    variances : np.ndarray
-        Variance of Gaussian components.
+    np.ndarray
+        Class of each data point.
     """
-    print("Fitting GMM")
+    if print_message:
+        print("Fitting GMM")
 
     # Validation
     if X.ndim == 1:
@@ -63,7 +64,10 @@ def fit_gmm(
             lower_bound = bgm.lower_bound_
 
     # Plots
-    if plot_filename:
+    if plot_filename is not None:
         plotting.plot_gmm(X[:, 0], amplitudes, means, variances, filename=plot_filename)
 
-    return amplitudes, means, variances
+    # Which component does each data point correspond to
+    y = bgm.predict(X)
+
+    return y

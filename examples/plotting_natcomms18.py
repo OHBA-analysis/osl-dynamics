@@ -3,6 +3,7 @@
 """
 
 print("Setting up")
+import numpy as np
 from dynemo.analysis import connectivity, power, spectral
 from dynemo.data import OSL_HMM, Data, io
 from dynemo.utils import plotting
@@ -12,7 +13,7 @@ hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
 )
 cov = hmm.covariances
-alp = hmm.alpha(concatenate=True)
+alp = hmm.alpha()
 
 n_embeddings = 15
 pca_components = io.loadmat(
@@ -27,26 +28,32 @@ parcellation_file = (
     "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
 )
 
-# Calculate PSDs and coherence using multitaper method
+# Load source reconstructed data
 preprocessed_data = Data(
     [
         f"/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec/subject{i}.mat"
         for i in range(1, 56)
     ]
 )
-ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings, concatenate=True)
+ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings)
 
-f, psd, coh = spectral.multitaper_spectra(
+# Calculate subject-specific PSDs and coherence using multitaper method
+f, psd, coh, w = spectral.multitaper_spectra(
     data=ts,
     alpha=alp,
     sampling_frequency=sampling_frequency,
     time_half_bandwidth=4,
     n_tapers=7,
     frequency_range=frequency_range,
+    return_weights=True,
 )
 
+# Group average PSD and coherence
+gpsd = np.average(psd, axis=0, weights=w)
+gcoh = np.average(coh, axis=0, weights=w)
+
 # Non-frequency specific power maps
-power_map = power.variance_from_spectra(f, psd)
+power_map = power.variance_from_spectra(f, gpsd)
 power.save(
     power_map=power_map,
     filename="mt_fullrange_power_.png",
@@ -56,20 +63,22 @@ power.save(
 )
 
 # Non-frequency specific connectivity
-conn_map = connectivity.covariance_from_spectra(f, psd)
+conn_map = connectivity.covariance_from_spectra(f, gpsd)
 connectivity.save(
     connectivity_map=conn_map,
-    threshold=0.98,
+    threshold=0.95,
     filename="mt_fullrange_conn_.png",
     parcellation_file=parcellation_file,
 )
 
-# Fit two spectral components to the coherence
+# Fit two spectral components to the subject-specific coherence
 wideband_components = spectral.decompose_spectra(coh, n_components=2)
 plotting.plot_line([f, f], wideband_components, filename="wideband.png")
 
-power_map = power.variance_from_spectra(f, psd, wideband_components)
-conn_map = connectivity.mean_coherence_from_spectra(f, coh, wideband_components)
+power_map = power.variance_from_spectra(f, gpsd, wideband_components)
+conn_map = connectivity.mean_coherence_from_spectra(
+    f, gcoh, wideband_components, fit_gmm=True
+)
 for component in range(2):
     power.save(
         power_map=power_map,
@@ -81,18 +90,20 @@ for component in range(2):
     )
     connectivity.save(
         connectivity_map=conn_map,
-        threshold=0.98,
+        threshold=0.95,
         filename=f"mt_wideband{component}_conn_.png",
         parcellation_file=parcellation_file,
         component=component,
     )
 
-# Fit four spectral components to the coherence
+# Fit four spectral components to the subject-specific coherence
 narrowband_components = spectral.decompose_spectra(coh, n_components=4)
 plotting.plot_line([f, f, f, f], narrowband_components, filename="narrowband.png")
 
-power_map = power.variance_from_spectra(f, psd, narrowband_components)
-conn_map = connectivity.mean_coherence_from_spectra(f, coh, narrowband_components)
+power_map = power.variance_from_spectra(f, gpsd, narrowband_components)
+conn_map = connectivity.mean_coherence_from_spectra(
+    f, gcoh, narrowband_components, fit_gmm=True
+)
 for component in range(4):
     power.save(
         power_map=power_map,
@@ -104,7 +115,7 @@ for component in range(4):
     )
     connectivity.save(
         connectivity_map=conn_map,
-        threshold=0.98,
+        threshold=0.95,
         filename=f"mt_narrowband{component}_conn_.png",
         parcellation_file=parcellation_file,
         component=component,

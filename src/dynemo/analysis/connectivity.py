@@ -8,6 +8,7 @@ import numpy as np
 from nilearn import plotting
 from tqdm import trange
 from dynemo import array_ops
+from dynemo.analysis.gmm import fit_gaussian_mixture
 from dynemo.utils.parcellation import Parcellation
 
 
@@ -103,6 +104,7 @@ def mean_coherence_from_spectra(
     coherence: np.ndarray,
     components: np.ndarray = None,
     frequency_range: list = None,
+    fit_gmm: bool = False,
 ) -> np.ndarray:
     """Calculates mean coherence from spectra.
 
@@ -116,8 +118,10 @@ def mean_coherence_from_spectra(
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Optional: default is full
-        range.
+        Frequency range to integrate the PSD over (Hz). Optional.
+    fit_gmm : bool
+        Should we fit a two component Gaussian mixture model and only keep
+        one of the components. Optional.
 
     Returns
     -------
@@ -180,6 +184,21 @@ def mean_coherence_from_spectra(
 
         coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)
+
+    # Fit a two component Gaussian mixture model
+    if fit_gmm:
+        mean_coh = np.mean(coh, axis=1)
+        for i in range(n_components):
+            for j in range(n_modes):
+                c = coh[i, j] - mean_coh[i]
+                c = c.flatten()
+                mixture_label = fit_gaussian_mixture(
+                    c,
+                    n_fits=5,
+                    print_message=False,
+                )
+                c[mixture_label == 0] = 0
+                coh[i, j] = c.reshape(n_channels, n_channels)
 
     return np.squeeze(coh)
 
