@@ -38,6 +38,7 @@ sim = simulation.HMM_MVN(
     random_seed=123,
     multiple_scale=True,
     fix_variance=True,
+    uni_variance=True,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
@@ -49,11 +50,13 @@ config = Config(
     n_modes=5,
     sequence_length=200,
     inference_rnn="lstm",
-    inference_n_units=64,
+    inference_n_units=128,
     inference_normalization="layer",
+    inference_dropout_rate=0.4,
     model_rnn="lstm",
-    model_n_units=64,
+    model_n_units=128,
     model_normalization="layer",
+    model_dropout_rate=0.4,
     theta_normalization="layer",
     alpha_xform="softmax",
     learn_alpha_temperature=True,
@@ -66,8 +69,8 @@ config = Config(
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=150,
     batch_size=16,
-    learning_rate=0.01,
-    n_epochs=200,
+    learning_rate=0.005,
+    n_epochs=300,
     fix_variance=True,
 )
 
@@ -178,7 +181,7 @@ dice_gamma_history = history_dict["dice_gamma"]
 plt.figure()
 plt.plot(loss_history, label="loss")
 plt.plot(ll_loss_history, label="ll_loss")
-plt.title("total loss and ll loss against epoch")
+plt.title(f"total loss and ll loss against epoch \n lr={config.learning_rate}, n_units={config.inference_n_units}, n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate}, \n n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}")
 plt.legend()
 plt.savefig("figures/total_loss_history.png")
 
@@ -186,7 +189,7 @@ plt.figure()
 plt.plot(dice_alpha_history, label="dice_alpha")
 plt.plot(dice_gamma_history, label="dice_gamma")
 plt.title(
-    "dice score of inferred mean (alpha) and fc (gamma) time courses against epoch"
+    f"dice scores against epoch \n lr={config.learning_rate}, n_units={config.inference_n_units}, n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate}, \n n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}"
 )
 plt.legend()
 plt.savefig("figures/dice_history.png")

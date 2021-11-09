@@ -33,6 +33,7 @@ sim = simulation.HMM_MVN(
     random_seed=123,
     multiple_scale=True,
     fix_variance=True,
+    uni_variance=True,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
@@ -58,10 +59,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=150,
     batch_size=16,
-    learning_rate=0.01,
-    n_epochs=200,
+    learning_rate=0.005,
+    n_epochs=300,
     fix_variance=True,
 )
 
@@ -128,7 +129,7 @@ for run in range(N_runs):
 
 
 # Statistics for the results
-
+print("Model config:", f"lr={config.learning_rate}, n_units={config.inference_n_units}, n_layers={config.inference_n_layers}, dropout={config.inference_dropout_rate}, n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}")
 print("Total number of runs: ", N_runs)
 
 # Free energy
@@ -173,10 +174,10 @@ ax1.bar(x + 0.1, dice_gamma_list, width=0.2, color="b", align="center", label="d
 ax2 = ax1.twinx()
 ax2.set_ylabel("free energy")
 ax2.plot(x, free_energy_list, color="k", label="free energy")
-ax2.set_title("plot comparing result from each run")
+ax2.set_title(f"lr={config.learning_rate}, n_units={config.inference_n_units}, n_layers={config.inference_n_layers}, dropout={config.inference_dropout_rate}, \n n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}")
 fig.legend()
 fig.tight_layout()
-fig.savefig("figures/compare_runs.png")
+fig.savefig("figures/compare_runs1.png")
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
