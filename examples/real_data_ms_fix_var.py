@@ -38,15 +38,15 @@ config = Config(
     n_modes=6,
     sequence_length=200,
     inference_rnn="lstm",
-    inference_n_units=64,
-    inference_n_layers=1,
+    inference_n_units=128,
+    inference_n_layers=2,
     inference_normalization="layer",
-    inference_dropout_rate=0.0,
+    inference_dropout_rate=0.2,
     model_rnn="lstm",
-    model_n_units=64,
-    model_n_layers=1,
+    model_n_units=128,
+    model_n_layers=2,
     model_normalization="layer",
-    model_dropout_rate=0.0,
+    model_dropout_rate=0.2,
     theta_normalization="layer",
     alpha_xform="softmax",
     learn_alpha_temperature=True,
@@ -57,20 +57,21 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=300,
     batch_size=64,
-    learning_rate=0.01,
-    n_epochs=200,
+    learning_rate=0.005,
+    n_epochs=400,
     fix_variance=True,
 )
 
 # Read MEG data
 print("Reading MEG data")
 prepared_data = Data(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/prepared_data/subject1.mat",
-    sampling_frequency=250,
-    n_embeddings=15,
+    "/well/woolrich/projects/uk_meg_notts/eo/summer21/prepared_data/subject1.mat",
 )
+
+# Standardise the data
+prepared_data.prepare()
 
 config.n_channels = prepared_data.n_channels
 
@@ -88,7 +89,7 @@ prediction_dataset = prepared_data.dataset(
 
 # Initialise variances and fc with the final HMM covariances
 hmm = OSL_HMM(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-1_K-6/hmm.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo/summer21/results/Subj1-1_K-6_zeroMean-0/hmm.mat"
 )
 initial_covariances = hmm.covariances
 
@@ -103,9 +104,21 @@ for i in range(config.n_modes):
     initial_fcs[i] = cov2corr(initial_covariances[i])
 config.initial_fcs = initial_fcs
 
+# Set the multi-start parameters
+config.n_init=10
+config.n_init_epochs=config.n_epochs // 10
+
+
 # Build model
 model = Model(config)
 model.summary()
+
+print("Initializing the model")
+model.initialize(
+    training_dataset,
+    epochs=config.n_init_epochs,
+    n_init=config.n_init,
+)
 
 print("Training model")
 history = model.fit(

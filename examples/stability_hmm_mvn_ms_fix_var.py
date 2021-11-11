@@ -83,6 +83,10 @@ prediction_dataset = meg_data.dataset(
 # Set the number of runs for training the model.
 N_runs = 10
 
+# Set the multi-start parameters
+config.n_init=10
+config.n_init_epochs=config.n_epochs // 10
+
 # Set up a dictionary for storing results for each run.
 stability_dict = {
     "free_energy": [],
@@ -94,6 +98,14 @@ for run in range(N_runs):
     print(f"Starting run {run + 1} of {N_runs} runs......")
     print("Building Model")
     model = Model(config)
+
+    print("Initializing the model")
+    model.initialize(
+        training_dataset,
+        epochs=config.n_init_epochs,
+        n_init=config.n_init,
+        verbose=0,
+    )
 
     print("Training model")
     history = model.fit(

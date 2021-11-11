@@ -1328,7 +1328,7 @@ class MeansVarsFcsLayer(layers.Layer):
         else:
             self.initial_vars = initial_vars
 
-        self.diags_initializer = WeightInitializer(self.initial_vars)
+        self.vars_initializer = WeightInitializer(self.initial_vars)
 
         # Initialisation of functional connectiviy matrices
         if initial_fcs is None:
@@ -1359,7 +1359,7 @@ class MeansVarsFcsLayer(layers.Layer):
             "vars",
             shape=(self.n_modes, self.n_channels),
             dtype=tf.float32,
-            initializer=self.diags_initializer,
+            initializer=self.vars_initializer,
             trainable=self.learn_vars,
         )
 
