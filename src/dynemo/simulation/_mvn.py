@@ -5,6 +5,7 @@
 from typing import Union
 
 import numpy as np
+from statsmodels.stats.moment_helpers import cov2corr
 
 
 class MVN:
@@ -26,6 +27,9 @@ class MVN:
         Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for the random number generator.
+    uni_variance : bool
+        Do we want uni variance across all channels? True only effective in 
+        multi-scale model.
     """
 
     def __init__(
@@ -36,6 +40,7 @@ class MVN:
         n_channels: int = None,
         observation_error: float = 0.0,
         random_seed: int = None,
+        uni_variance: bool=False,
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
@@ -85,6 +90,20 @@ class MVN:
 
         else:
             raise ValueError("means and covariance arugments not passed correctly.")
+
+        # Get the var and fc from self.covariance
+        if not uni_variance:
+            self.variances = np.zeros([self.n_modes, self.n_channels])
+            for i in range(self.n_modes):
+                self.variances[i] = np.sqrt(np.diag(self.covariances[i]))
+            # enforce positive variance
+            self.variances = np.maximum(self.variances, 1e-6)
+        else:
+            self.variances = np.ones([self.n_modes, self.n_channels])
+
+        self.fcs = np.zeros([self.n_modes, self.n_channels, self.n_channels])
+        for i in range(self.n_modes):
+            self.fcs[i] = cov2corr(self.covariances[i])
 
     def create_means(self, option):
         if option == "zero":
@@ -148,5 +167,41 @@ class MVN:
 
         # Add an error to the data at all time points
         data += self._rng.normal(scale=self.observation_error, size=data.shape)
+
+        return data.astype(np.float32)
+
+    def simulate_data_multiple_scales(self, state_time_courses):
+
+        # Here state_time_courses.shape = (n_samples, n_modes, 3)
+        # It contains 3 different time courses for mean, variance, and fc
+
+        n_samples = state_time_courses.shape[0]
+
+        # Initialise array to hold data
+        data = np.zeros([n_samples, self.n_channels])
+
+        # Loop through all unique combinations of states
+        for time_courses in np.unique(state_time_courses, axis=0):
+            # Extract the 3 different time courses
+            alpha = time_courses[:, 0]
+            beta = time_courses[:, 1]
+            gamma = time_courses[:, 2]
+
+            # Mean, variance, fc for this combination of 3 time courses
+            mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
+            G = np.diag(np.sum(self.variances * beta[:, np.newaxis], axis=0))
+            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+
+            sigma = np.matmul(G, np.matmul(F, G))
+
+            # Generate data for the time points that this combination of states is active
+            data[
+                np.all(state_time_courses == time_courses, axis = (1,2))
+            ] = self._rng.multivariate_normal(
+                mu, sigma, size = np.count_nonzero(np.all(state_time_courses == time_courses, axis = (1,2)))
+            )
+
+        # Add an error to the data at all time points
+        data += self._rng.normal(scale=self.observation_error, size = data.shape)
 
         return data.astype(np.float32)

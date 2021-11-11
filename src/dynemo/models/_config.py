@@ -172,6 +172,8 @@ class Config:
     # Parameters related to the model choice
     alpha_pdf: str = "normal"
     observation_model: str = "multivariate_normal"
+    multiple_scale: bool = False
+    fix_variance: bool = False
 
     # Dimension parameters
     n_modes: int = None
@@ -214,10 +216,17 @@ class Config:
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
+    learn_vars: np.ndarray = None
+    learn_fcs: np.ndarray = None
+
     learn_alpha_scaling: bool = False
+    learn_beta_scaling: bool = False
+    learn_gamma_scaling: bool = False
     normalize_covariances: bool = False
     initial_covariances: np.ndarray = None
     initial_means: np.ndarray = None
+    initial_vars: np.ndarray = None
+    initial_fcs: np.ndarray = None
 
     n_lags: int = None
     learn_coeffs: bool = None
