@@ -315,7 +315,7 @@ class HMM_MVN(Simulation):
     def standardize(self):
         super().standardize()
         if not self.multiple_scale:
-            self.obs_mod.covariances = cov2corr(self.obs_mod_covariances)
+            self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
 
 
 class HierarchicalHMM_MVN(Simulation):

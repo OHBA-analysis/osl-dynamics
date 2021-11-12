@@ -95,7 +95,7 @@ class MVN:
         if uni_variance:
             self.variances = np.ones([self.n_modes, self.n_channels])
         else:
-            self.variances = array_ops.cov2sd(cov)
+            self.variances = array_ops.cov2sd(self.covariances)
         self.fcs = array_ops.cov2corr(self.covariances)
 
     def create_means(self, option):

@@ -92,8 +92,8 @@ model = Model(config)
 model.summary()
 
 # Callbacks
-dice_callback = callbacks.DiceCoefficientCallbackMultipleScale(
-    prediction_dataset, sim.mode_time_course
+dice_callback = callbacks.DiceCoefficientCallback(
+    prediction_dataset, sim.mode_time_course, mode_names=["alpha", "beta", "gamma"]
 )
 
 print("Training model")
