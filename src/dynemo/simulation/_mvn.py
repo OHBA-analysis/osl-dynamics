@@ -5,7 +5,7 @@
 from typing import Union
 
 import numpy as np
-from statsmodels.stats.moment_helpers import cov2corr
+from dynemo import array_ops
 
 
 class MVN:
@@ -28,7 +28,7 @@ class MVN:
     random_seed : int
         Seed for the random number generator.
     uni_variance : bool
-        Do we want uni variance across all channels? True only effective in 
+        Do we want uni variance across all channels? True only effective in
         multi-scale model.
     """
 
@@ -40,7 +40,7 @@ class MVN:
         n_channels: int = None,
         observation_error: float = 0.0,
         random_seed: int = None,
-        uni_variance: bool=False,
+        uni_variance: bool = False,
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
@@ -92,18 +92,11 @@ class MVN:
             raise ValueError("means and covariance arugments not passed correctly.")
 
         # Get the var and fc from self.covariance
-        if not uni_variance:
-            self.variances = np.zeros([self.n_modes, self.n_channels])
-            for i in range(self.n_modes):
-                self.variances[i] = np.sqrt(np.diag(self.covariances[i]))
-            # enforce positive variance
-            self.variances = np.maximum(self.variances, 1e-6)
-        else:
+        if uni_variance:
             self.variances = np.ones([self.n_modes, self.n_channels])
-
-        self.fcs = np.zeros([self.n_modes, self.n_channels, self.n_channels])
-        for i in range(self.n_modes):
-            self.fcs[i] = cov2corr(self.covariances[i])
+        else:
+            self.variances = array_ops.cov2sd(cov)
+        self.fcs = array_ops.cov2corr(self.covariances)
 
     def create_means(self, option):
         if option == "zero":
@@ -115,7 +108,6 @@ class MVN:
         return means
 
     def create_covariances(self, option, eps=1e-6):
-
         if option == "random":
             # Randomly sample the elements of W from a normal distribution
             W = self._rng.normal(
@@ -136,7 +128,6 @@ class MVN:
                     self._rng.integers(0, self.n_channels, size=n_active_channels)
                 )
                 covariances[i, active_channels, active_channels] += 0.25
-
         else:
             raise ValueError("covariances must be a np.ndarray or 'random'.")
 
@@ -196,12 +187,16 @@ class MVN:
 
             # Generate data for the time points that this combination of states is active
             data[
-                np.all(state_time_courses == time_courses, axis = (1,2))
+                np.all(state_time_courses == time_courses, axis=(1, 2))
             ] = self._rng.multivariate_normal(
-                mu, sigma, size = np.count_nonzero(np.all(state_time_courses == time_courses, axis = (1,2)))
+                mu,
+                sigma,
+                size=np.count_nonzero(
+                    np.all(state_time_courses == time_courses, axis=(1, 2))
+                ),
             )
 
         # Add an error to the data at all time points
-        data += self._rng.normal(scale=self.observation_error, size = data.shape)
+        data += self._rng.normal(scale=self.observation_error, size=data.shape)
 
         return data.astype(np.float32)

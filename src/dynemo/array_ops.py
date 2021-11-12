@@ -108,25 +108,57 @@ def align_arrays(*sequences, alignment: str = "left") -> List[np.ndarray]:
         raise ValueError("Alignment must be left, right or center.")
 
 
-def from_cholesky(cholesky_matrix: np.ndarray):
-    """Given a Cholesky matrix return the recomposed matrix.
-
-    Operates on the assumption that cholesky_matrix is a valid Cholesky decomposition
-    A = LL* and performs LL^T to recover A.
+def cov2corr(cov: np.ndarray) -> np.ndarray:
+    """Converts a covariance matrix into a correlation matrix.
 
     Parameters
     ----------
-    cholesky_matrix: numpy.ndarray
-        A valid Cholesky decomposition.
+    cov : np.ndarray
+        Covariance matrix. Can be 2D or 3D.
 
     Returns
     -------
-    full_matrix: numpy.ndarray
-        A = LL^T where L is the Cholesky decomposition of A.
+    np.ndarray
+        Correlation matrix.
     """
-    if cholesky_matrix.ndim == 2:
-        return cholesky_matrix @ cholesky_matrix.transpose()
-    return cholesky_matrix @ cholesky_matrix.transpose((0, 2, 1))
+    cov = np.array(cov)
+    if cov.ndim == 3:
+        for i in range(cov.shape[0]):
+            std_dev = np.sqrt(np.diag(cov[i]))
+            cov[i] /= np.outer(std_dev, std_dev)
+    elif cov.ndim == 2:
+        std_dev = np.sqrt(np.diag(cov))
+        cov /= np.outer(std_dev, std_dev)
+    else:
+        raise ValueError("cov must be a 2D or 3D numpy array.")
+    return cov
+
+
+def cov2sd(cov: np.ndarray) -> np.ndarray:
+    """Gets the standard deviation from a covariance matrix.
+
+    Parameters
+    ----------
+    cov : np.ndarray
+        Covariance matrix. Can be 2D or 3D.
+
+    Returns
+    -------
+    np.ndarray
+        Standard deviations for each channel.
+    """
+    cov = np.array(cov)
+    if cov.ndim == 3:
+        std_dev = np.empty(cov.shape[:2], dtype=cov.dtype)
+        for i in range(cov.shape[0]):
+            std_dev[i] = np.sqrt(np.diag(cov[i]))
+    elif cov.ndim == 2:
+        std_dev = np.sqrt(np.diag(cov))
+    else:
+        raise ValueError("cov must be a 2D or 3D numpy array.")
+    if np.isnan(std_dev).any():
+        raise ValueError("cov contains invalid entries on the diagonal.")
+    return std_dev
 
 
 def mean_diagonal(array: np.ndarray):

@@ -6,7 +6,7 @@ import logging
 from typing import Union
 
 import numpy as np
-from dynemo.array_ops import get_one_hot
+from dynemo.array_ops import get_one_hot, cov2corr
 from dynemo.simulation import MAR, MVN, SingleSine, Simulation
 
 _logger = logging.getLogger("DyNeMo")
@@ -274,23 +274,20 @@ class HMM_MVN(Simulation):
             n_modes=self.n_modes,
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
-        # placeholder for standard deviation for the simulated data
-        self.standard_deviations = None
+
+        self.multiple_scale = multiple_scale
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        if not multiple_scale:
-            self.mode_time_course = self.hmm.generate_modes(self.n_samples)
-            self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
-        else:
+        if multiple_scale:
             self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
             for i in range(3):
                 self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
             if fix_variance:
-                # if fix_variance, then generate the variance time course with identity transition
-                # probability matrix.
+                # if fix_variance, then generate the variance time course with
+                # identity transition probability matrix.
                 self.hmm_fix_variance = HMM(
                     trans_prob=np.eye(self.n_modes),
                     stay_prob=stay_prob,
@@ -303,6 +300,9 @@ class HMM_MVN(Simulation):
             self.time_series = self.obs_mod.simulate_data_multiple_scales(
                 self.mode_time_course
             )
+        else:
+            self.mode_time_course = self.hmm.generate_modes(self.n_samples)
+            self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
@@ -313,11 +313,9 @@ class HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        self.standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(
-            self.standard_deviations, self.standard_deviations
-        )[np.newaxis, ...]
+        if not self.multiple_scale:
+            self.obs_mod.covariances = cov2corr(self.obs_mod_covariances)
 
 
 class HierarchicalHMM_MVN(Simulation):
@@ -435,11 +433,8 @@ class HierarchicalHMM_MVN(Simulation):
         return stc
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
-            np.newaxis, ...
-        ]
+        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
 
 
 class HMM_Sine(Simulation):

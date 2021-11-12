@@ -1,38 +1,38 @@
-"""
-Example script for running inference on simulated HMM-MVN data.
-Multiple scales version for simulation_hmm_mvn.py
-But now we vary the mean, fix the variance.
+"""Example script for running inference on simulated HMM-MVN data.
+
+- Multiple scale version for simulation_hmm_mvn.py
+- We vary the mean, fix the variance.
 """
 print("Setting up")
 import numpy as np
 from dynemo import data, files, simulation
 from dynemo.inference import metrics, modes, tf_ops
 from dynemo.models import Config, Model
-import matplotlib.pyplot as plt
 from dynemo.inference import callbacks
+from dynemo.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
 
+# Settings
+n_samples = 25600
+observation_error = 0.2
 
 # Load mode transition probability matrix and covariances of each mode
 trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
 cov = np.load(files.example.path / "hmm_cov.npy")
 
-# cov.shape = (n_modes, n_channels, n_channels)
-
-
-# Settings
-n_samples = 25600
-observation_error = 0.2
+# Number of modes and channels
+n_modes = cov.shape[0]
+n_channels = cov.shape[-1]
 
 print("Simulating data")
 sim = simulation.HMM_MVN(
     n_samples=n_samples,
     trans_prob=trans_prob,
     means="random",
-    n_modes=cov.shape[0],
-    n_channels=cov.shape[-1],
+    n_modes=n_modes,
+    n_channels=n_channels,
     covariances="random",
     observation_error=observation_error,
     random_seed=123,
@@ -43,11 +43,11 @@ sim = simulation.HMM_MVN(
 sim.standardize()
 meg_data = data.Data(sim.time_series)
 
-
-
+# Hyperparameters
 config = Config(
     multiple_scale=True,
-    n_modes=5,
+    n_modes=n_modes,
+    n_channels=n_channels,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=128,
@@ -74,9 +74,6 @@ config = Config(
     fix_variance=True,
 )
 
-
-config.n_channels = meg_data.n_channels
-
 # Prepare dataset
 training_dataset = meg_data.dataset(
     config.sequence_length,
@@ -88,17 +85,18 @@ prediction_dataset = meg_data.dataset(
     config.batch_size,
     shuffle=False,
 )
+
 # Build model
 print("Building Model")
 model = Model(config)
 model.summary()
 
-print("Training model")
-
+# Callbacks
 dice_callback = callbacks.DiceCoefficientCallbackMultipleScale(
     prediction_dataset, sim.mode_time_course
 )
 
+print("Training model")
 history = model.fit(
     training_dataset,
     epochs=config.n_epochs,
@@ -168,31 +166,37 @@ print(
     modes.fractional_occupancies(inf_stc_gamma),
 )
 
-# plotting the loss over epochs
-history_dict = history.history
+# Plot training history
+history = history.history
 
-loss_history = history_dict["loss"]
-kl_loss_history = history_dict["kl_loss"]
-ll_loss_history = history_dict["ll_loss"]
-dice_alpha_history = history_dict["dice_alpha"]
-dice_beta_history = history_dict["dice_beta"]
-dice_gamma_history = history_dict["dice_gamma"]
+loss = history["loss"]
+kl_loss = history["kl_loss"]
+ll_loss = history["ll_loss"]
+dice_alpha = history["dice_alpha"]
+dice_beta = history["dice_beta"]
+dice_gamma = history["dice_gamma"]
 
-plt.figure()
-plt.plot(loss_history, label="loss")
-plt.plot(ll_loss_history, label="ll_loss")
-plt.title(f"total loss and ll loss against epoch \n lr={config.learning_rate}, n_units={config.inference_n_units}, n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate}, \n n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}")
-plt.legend()
-plt.savefig("figures/total_loss_history.png")
-
-plt.figure()
-plt.plot(dice_alpha_history, label="dice_alpha")
-plt.plot(dice_gamma_history, label="dice_gamma")
-plt.title(
-    f"dice scores against epoch \n lr={config.learning_rate}, n_units={config.inference_n_units}, n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate}, \n n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}"
+plotting.plot_line(
+    [range(config.n_epochs), range(config.n_epochs)],
+    [loss, ll_loss],
+    labels=["loss", "ll_loss"],
+    title=f"total loss and ll loss against epoch\n "
+    + "lr={config.learning_rate}, n_units={config.inference_n_units}, "
+    + "n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
+    + "n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
+    filename="figures/loss.png",
 )
-plt.legend()
-plt.savefig("figures/dice_history.png")
+
+plotting.plot_line(
+    [range(config.n_epochs), range(config.n_epochs)],
+    [dice_alpha, dice_gamma],
+    labels=["dice_alpha", "dice_gamma"],
+    title=f"dice scores against epoch\n"
+    + "lr={config.learning_rate}, n_units={config.inference_n_units}, "
+    + "n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
+    + "n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
+    filename="figures/dice.png",
+)
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()
