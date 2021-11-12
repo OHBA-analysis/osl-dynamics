@@ -1,7 +1,7 @@
 """Example script for running inference on simulated HMM-MVN data.
 
 - Multiple scale version for simulation_hmm_mvn.py
-- We vary the mean, fix the variance.
+- We vary the mean, fix the standard deviation.
 """
 print("Setting up")
 import numpy as np
@@ -37,8 +37,8 @@ sim = simulation.HMM_MVN(
     observation_error=observation_error,
     random_seed=123,
     multiple_scale=True,
-    fix_variance=True,
-    uni_variance=True,
+    fix_std=True,
+    uni_std=True,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
@@ -62,7 +62,7 @@ config = Config(
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=True,
-    learn_vars=True,
+    learn_stds=True,
     learn_fcs=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
@@ -71,7 +71,7 @@ config = Config(
     batch_size=16,
     learning_rate=0.005,
     n_epochs=300,
-    fix_variance=True,
+    fix_std=True,
 )
 
 # Prepare dataset
@@ -129,7 +129,7 @@ print(
     "Dice coefficient for mean:", metrics.dice_coefficient(sim_stc_alpha, inf_stc_alpha)
 )
 print(
-    "Dice coefficient for variance:",
+    "Dice coefficient for standard deviation:",
     metrics.dice_coefficient(sim_stc_beta, inf_stc_beta),
 )
 print(
@@ -148,11 +148,11 @@ print(
 
 
 print(
-    "Fractional occupancies variance (Simulation):",
+    "Fractional occupancies standard deviation (Simulation):",
     modes.fractional_occupancies(sim_stc_beta),
 )
 print(
-    "Fractional occupancies variance (DyNeMo):      ",
+    "Fractional occupancies standard deviation (DyNeMo):      ",
     modes.fractional_occupancies(inf_stc_beta),
 )
 
@@ -181,9 +181,9 @@ plotting.plot_line(
     [loss, ll_loss],
     labels=["loss", "ll_loss"],
     title=f"total loss and ll loss against epoch\n "
-    + "lr={config.learning_rate}, n_units={config.inference_n_units}, "
-    + "n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
-    + "n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
+    + f"lr={config.learning_rate}, n_units={config.inference_n_units}, "
+    + f"n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
+    + f"n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
     filename="figures/loss.png",
 )
 
@@ -192,9 +192,9 @@ plotting.plot_line(
     [dice_alpha, dice_gamma],
     labels=["dice_alpha", "dice_gamma"],
     title=f"dice scores against epoch\n"
-    + "lr={config.learning_rate}, n_units={config.inference_n_units}, "
-    + "n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
-    + "n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
+    + f"lr={config.learning_rate}, n_units={config.inference_n_units}, "
+    + f"n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
+    + f"n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
     filename="figures/dice.png",
 )
 

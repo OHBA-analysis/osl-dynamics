@@ -1164,11 +1164,11 @@ def cholesky_factor_to_full_matrix(cholesky_factor):
     return full_matrix
 
 
-class MeansVarsFcsLayer(layers.Layer):
-    """Layer to learn the means, diagonal variance matrices,
+class MeansStdsFcsLayer(layers.Layer):
+    """Layer to learn the means, diagonal standard deviation matrices,
     and functional connectivities of the modes
 
-    Outputs the mean vector, the variances, and correlation (fc) matrix of each mode.
+    Outputs the mean vector, the standard deviations, and correlation (fc) matrix of each mode.
 
     Paramters
     ---------
@@ -1176,12 +1176,10 @@ class MeansVarsFcsLayer(layers.Layer):
         Number of modes.
     n_channels: int
         Number of channels.
-    learn_means/vars/fcs
-        Should we learn the means/variances/fcs?
-    initial_means/vars/fcs
-        Initial values of the mean/variance/fc of each mode
-    normalize_variances
-        Should we normalize the variances according to the total variance?
+    learn_means/stds/fcs
+        Should we learn the means/standard deviations/fcs?
+    initial_means/stds/fcs
+        Initial values of the mean/standard deviations/fc of each mode
     """
 
     def __init__(
@@ -1189,21 +1187,19 @@ class MeansVarsFcsLayer(layers.Layer):
         n_modes,
         n_channels,
         learn_means,
-        learn_vars,
+        learn_stds,
         learn_fcs,
         initial_means,
-        initial_vars,
+        initial_stds,
         initial_fcs,
-        normalize_variances=False,
         **kwargs
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes
         self.n_channels = n_channels
         self.learn_means = learn_means
-        self.learn_vars = learn_vars
+        self.learn_stds = learn_stds
         self.learn_fcs = learn_fcs
-        self.normalize_variances = normalize_variances
 
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
@@ -1216,12 +1212,12 @@ class MeansVarsFcsLayer(layers.Layer):
         self.means_initializer = WeightInitializer(self.initial_means)
 
         # Initialisation of diagonal entries
-        if initial_vars is None:
-            self.initial_vars = np.ones([n_modes, n_channels], dtype=np.float32)
+        if initial_stds is None:
+            self.initial_stds = np.ones([n_modes, n_channels], dtype=np.float32)
         else:
-            self.initial_vars = initial_vars
+            self.initial_stds = initial_stds
 
-        self.vars_initializer = WeightInitializer(self.initial_vars)
+        self.stds_initializer = WeightInitializer(self.initial_stds)
 
         # Initialisation of functional connectiviy matrices
         if initial_fcs is None:
@@ -1248,12 +1244,12 @@ class MeansVarsFcsLayer(layers.Layer):
         )
 
         # Create weights for the diagonal entries
-        self.vars = self.add_weight(
-            "vars",
+        self.stds = self.add_weight(
+            "stds",
             shape=(self.n_modes, self.n_channels),
             dtype=tf.float32,
-            initializer=self.vars_initializer,
-            trainable=self.learn_vars,
+            initializer=self.stds_initializer,
+            trainable=self.learn_stds,
         )
 
         # Create weights for the lower triangular entries
@@ -1268,25 +1264,16 @@ class MeansVarsFcsLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        if self.normalize_variances:
-            normalization = (
-                tf.reduce_sum(tf.linalg.diag_part(self.covariances), axis=1)[
-                    ..., tf.newaxis
-                ]
-                / self.n_channels
-            )
-            self.vars = self.vars / normalization
-
         cholesky_fcs = tfp.math.fill_triangular(self.flattened_cholesky_fcs)
         # normalize so that fcs are correlation matrices
         cholesky_fcs = tf.linalg.normalize(cholesky_fcs, axis=2)[0]
         self.fcs = cholesky_factor_to_full_matrix(cholesky_fcs)
 
-        return [self.means, self.vars, self.fcs]
+        return [self.means, self.stds, self.fcs]
 
 
-class MixMeansVarsFcsLayer(layers.Layer):
-    """Compute a probabilistic mixture of means, variances and fcs.
+class MixMeansStdsFcsLayer(layers.Layer):
+    """Compute a probabilistic mixture of means, standard deviations and fcs.
     The mixture is calculated as
 
     m_t = \sum_j \alpha_{jt} mu_j
@@ -1302,8 +1289,8 @@ class MixMeansVarsFcsLayer(layers.Layer):
         number of channels.
     learn_alpha/beta/gamma_scaling
         Should we learn alpha/beta/gamma scaling?
-    fix_variance
-        Do we want to fix the variance time course?
+    fix_std
+        Do we want to fix the standard deviation time course?
     """
 
     def __init__(
@@ -1313,7 +1300,7 @@ class MixMeansVarsFcsLayer(layers.Layer):
         learn_alpha_scaling: bool,
         learn_beta_scaling: bool,
         learn_gamma_scaling: bool,
-        fix_variance: bool,
+        fix_std: bool,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -1322,7 +1309,7 @@ class MixMeansVarsFcsLayer(layers.Layer):
         self.learn_alpha_scaling = learn_alpha_scaling
         self.learn_beta_scaling = learn_beta_scaling
         self.learn_gamma_scaling = learn_gamma_scaling
-        self.fix_variance = fix_variance
+        self.fix_std = fix_std
 
     def build(self, input_shape):
         # Initialise such that softplus(alpha_scaling) = 1
@@ -1370,13 +1357,13 @@ class MixMeansVarsFcsLayer(layers.Layer):
         # - D.shape = (n_modes, n_channels, n_channels)
         alpha, beta, gamma, mu, E, D = inputs
 
-        # Make sure the variances are positive
+        # Make sure the standard deviations are positive
         # with softplus
         E = tf.math.softplus(E)
 
         # Rescale the mode mixing factors
         alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
-        if not self.fix_variance:
+        if not self.fix_std:
             beta = tf.multiply(beta, activations.softplus(self.beta_scaling))
         gamma = tf.multiply(gamma, activations.softplus(self.gamma_scaling))
 

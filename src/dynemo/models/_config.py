@@ -100,6 +100,12 @@ class Config:
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
         Pass if model='multivariate_normal'.
+    learn_stds: bool
+        Should we make the standard deviation for each mode trainable?
+        Only specify if multiple_scale=True.
+    learn_fcs: bool
+        Should we make the functional connectivity for each mode trainable?
+        Only specify if multiple_scale=True.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha? Pass if model='multivariate_normal'.
     normalize_covariances : bool
@@ -109,6 +115,10 @@ class Config:
         Initialisation for mean vectors. Pass if model='multivariate_normal'.
     initial_covariances : np.ndarray
         Initialisation for mode covariances. Pass if model='multivariate_normal'.
+    initial_stds: np.ndarray
+        Initialisation for mode standard deviations. Only specify if multiple_scale =True.
+    initial_fcs: np.ndarray
+        Initialisation for mode functional connectivity matrices. Only specify if multiple_scale= True.
     n_lags : int
         Number of autoregressive lags. Pass if model='multivariate_autoregressive'.
     learn_coeffs : bool
@@ -173,7 +183,7 @@ class Config:
     alpha_pdf: str = "normal"
     observation_model: str = "multivariate_normal"
     multiple_scale: bool = False
-    fix_variance: bool = False
+    fix_std: bool = False
 
     # Dimension parameters
     n_modes: int = None
@@ -216,8 +226,8 @@ class Config:
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
-    learn_vars: np.ndarray = None
-    learn_fcs: np.ndarray = None
+    learn_stds: bool = None
+    learn_fcs: bool = None
 
     learn_alpha_scaling: bool = False
     learn_beta_scaling: bool = False
@@ -225,7 +235,7 @@ class Config:
     normalize_covariances: bool = False
     initial_covariances: np.ndarray = None
     initial_means: np.ndarray = None
-    initial_vars: np.ndarray = None
+    initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
 
     n_lags: int = None

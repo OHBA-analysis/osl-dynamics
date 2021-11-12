@@ -228,13 +228,13 @@ class HMM_MVN(Simulation):
     observation_error : float
         Standard deviation of the error added to the generated data.
     multiple_scale: bool
-        Do we want to simulate different time courses for mean, variance, and fc?
+        Do we want to simulate different time courses for mean, standard deviation, and fc?
     random_seed : int
         Seed for random number generator. Optional.
-    fix_variance: bool
-        Do we want to remove dependency of loss function on variance time course?
-    uni_variance: bool
-        Do we want uni variance across channels? Only effective in multi-scale inference.
+    fix_std: bool
+        Do we want to remove dependency of loss function on standard deviation time course?
+    uni_std: bool
+        Do we want uni std across channels? Only effective in multi-scale inference.
     """
 
     def __init__(
@@ -249,8 +249,8 @@ class HMM_MVN(Simulation):
         observation_error: float = 0.0,
         multiple_scale: bool = False,
         random_seed: int = None,
-        fix_variance: bool = False,
-        uni_variance: bool = False,
+        fix_std: bool = False,
+        uni_std: bool = False,
     ):
         # Observation model
         self.obs_mod = MVN(
@@ -260,7 +260,7 @@ class HMM_MVN(Simulation):
             n_channels=n_channels,
             observation_error=observation_error,
             random_seed=random_seed,
-            uni_variance=uni_variance,
+            uni_std=uni_std,
         )
 
         self.n_modes = self.obs_mod.n_modes
@@ -285,16 +285,16 @@ class HMM_MVN(Simulation):
             self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
             for i in range(3):
                 self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
-            if fix_variance:
-                # if fix_variance, then generate the variance time course with
+            if fix_std:
+                # if fix_std, then generate the standard deviation time course with
                 # identity transition probability matrix.
-                self.hmm_fix_variance = HMM(
+                self.hmm_fix_std = HMM(
                     trans_prob=np.eye(self.n_modes),
                     stay_prob=stay_prob,
                     n_modes=self.n_modes,
                     random_seed=random_seed if random_seed is None else random_seed + 1,
                 )
-                self.mode_time_course[:, :, 1] = self.hmm_fix_variance.generate_modes(
+                self.mode_time_course[:, :, 1] = self.hmm_fix_std.generate_modes(
                     self.n_samples
                 )
             self.time_series = self.obs_mod.simulate_data_multiple_scales(

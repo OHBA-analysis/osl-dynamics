@@ -27,8 +27,8 @@ class MVN:
         Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for the random number generator.
-    uni_variance : bool
-        Do we want uni variance across all channels? True only effective in
+    uni_std : bool
+        Do we want uni standard deviation across all channels? True only effective in
         multi-scale model.
     """
 
@@ -40,7 +40,7 @@ class MVN:
         n_channels: int = None,
         observation_error: float = 0.0,
         random_seed: int = None,
-        uni_variance: bool = False,
+        uni_std: bool = False,
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
@@ -91,11 +91,11 @@ class MVN:
         else:
             raise ValueError("means and covariance arugments not passed correctly.")
 
-        # Get the var and fc from self.covariance
-        if uni_variance:
-            self.variances = np.ones([self.n_modes, self.n_channels])
+        # Get the std and fc from self.covariance
+        if uni_std:
+            self.std = np.ones([self.n_modes, self.n_channels])
         else:
-            self.variances = array_ops.cov2sd(self.covariances)
+            self.std = array_ops.cov2sd(self.covariances)
         self.fcs = array_ops.cov2corr(self.covariances)
 
     def create_means(self, option):
@@ -164,7 +164,7 @@ class MVN:
     def simulate_data_multiple_scales(self, state_time_courses):
 
         # Here state_time_courses.shape = (n_samples, n_modes, 3)
-        # It contains 3 different time courses for mean, variance, and fc
+        # It contains 3 different time courses for mean, standard deviations, and fc
 
         n_samples = state_time_courses.shape[0]
 
@@ -178,9 +178,9 @@ class MVN:
             beta = time_courses[:, 1]
             gamma = time_courses[:, 2]
 
-            # Mean, variance, fc for this combination of 3 time courses
+            # Mean, standard deviation, fc for this combination of 3 time courses
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
-            G = np.diag(np.sum(self.variances * beta[:, np.newaxis], axis=0))
+            G = np.diag(np.sum(self.std * beta[:, np.newaxis], axis=0))
             F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
 
             sigma = np.matmul(G, np.matmul(F, G))
