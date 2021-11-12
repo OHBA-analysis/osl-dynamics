@@ -274,13 +274,12 @@ class InferenceModelBase:
 
                 if concatenate or len(outputs_beta) == 1:
                     outputs_beta = np.concatenate(outputs_beta)
-        
+
                 if concatenate or len(outputs_gamma) == 1:
                     outputs_gamma = np.concatenate(outputs_gamma)
 
             if concatenate or len(outputs_alpha) == 1:
                 outputs_alpha = np.concatenate(outputs_alpha)
-        
 
         if self.config.multiple_scale:
             return [outputs_alpha, outputs_beta, outputs_gamma]

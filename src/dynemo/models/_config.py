@@ -283,6 +283,13 @@ class Config:
                 + "'multivariate_autoregressive' or 'wavenet'."
             )
 
+        if self.multiple_scale:
+            if (
+                self.alpha_pdf != "normal"
+                or self.observation_model != "multivariate_normal"
+            ):
+                raise NotImplemented("No model for requested config.")
+
     def validate_rnn_parameters(self):
 
         if self.inference_rnn is None and (

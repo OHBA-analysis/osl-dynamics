@@ -1,13 +1,8 @@
-"""Model class for a generative model with Gaussian observations.
+"""Model class for a multi-time-scale generative model with Gaussian observations.
 
 """
 
-import logging
-from operator import lt
-
-import numpy as np
 from tensorflow.keras import Model, layers
-from tqdm import trange
 from dynemo.models.go import GO
 from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.layers import (
@@ -20,17 +15,14 @@ from dynemo.models.layers import (
     NormalKLDivergenceLayer,
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
-    KLsum,
+    Sum,
     FillConstant,
 )
 
-from dynemo.utils.misc import check_arguments
-
-_logger = logging.getLogger("DyNeMo")
-
 
 class MRIGO(InferenceModelBase, GO):
-    """RNN Inference/model network and Gaussian Observations (RIGO).
+    """Multi-time-scale RNN Inference/model network and Gaussian
+    Observations (MRIGO).
 
     Parameters
     ----------
@@ -53,10 +45,10 @@ def _model_structure(config):
         shape=(config.sequence_length, config.n_channels), name="data"
     )
 
-    ## Definition of the inference layers
-
+    #
+    # Inference RNN
+    #
     # Mode time course for the mean
-
     inference_input_dropout_layer_mean = layers.Dropout(
         config.inference_dropout_rate, name="data_drop_mean"
     )
@@ -177,7 +169,9 @@ def _model_structure(config):
     theta_norm_fc = theta_norm_layer_fc(theta_fc)
     gamma = gamma_layer(theta_norm_fc)
 
-    # Next the observation model
+    #
+    # Observation model
+    #
     means_vars_fcs_layer = MeansVarsFcsLayer(
         config.n_modes,
         config.n_channels,
@@ -206,7 +200,9 @@ def _model_structure(config):
     m, C = mix_means_vars_fcs_layer([alpha, beta, gamma, mu, E, D])
     ll_loss = ll_loss_layer([inputs, m, C])
 
-    # Definition of layers of the model (prior)
+    #
+    # Model RNN
+    #
     model_input_dropout_layer_mean = layers.Dropout(
         config.model_dropout_rate, name="theta_norm_drop_mean"
     )
@@ -262,7 +258,7 @@ def _model_structure(config):
     )
     kl_loss_layer_fc = NormalKLDivergenceLayer(name="kl_fc")
 
-    kl_sum_layer = KLsum(name="kl")
+    kl_sum_layer = Sum(name="kl")
 
     # Data flow
     model_input_dropout_mean = model_input_dropout_layer_mean(theta_norm_mean)
@@ -293,6 +289,7 @@ def _model_structure(config):
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_var, kl_loss_fc])
     else:
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_fc])
+
     return Model(
         inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"
     )
