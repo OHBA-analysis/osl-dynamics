@@ -224,15 +224,12 @@ class InferenceModelBase:
         dict
             Dictionary with labels for each prediction.
         """
-        if not self.config.multiple_scale:
-            predictions = self.model.predict(*args, *kwargs)
-            return_names = ["ll_loss", "kl_loss", "alpha"]
-            predictions_dict = dict(zip(return_names, predictions))
+        predictions = self.model.predict(*args, *kwargs)
+        return_names = ["ll_loss", "kl_loss", "alpha"]
+        if self.config.multiple_scale:
+            return_names += ["beta", "gamma"]
+        predictions_dict = dict(zip(return_names, predictions))
 
-        else:
-            predictions = self.model.predict(*args, *kwargs)
-            return_names = ["ll_loss", "kl_loss", "alpha", "beta", "gamma"]
-            predictions_dict = dict(zip(return_names, predictions))
         return predictions_dict
 
     def get_alpha(
@@ -250,40 +247,85 @@ class InferenceModelBase:
 
         Returns
         -------
-        np.ndarray
-            Mode mixing factors with shape (n_subjects, n_samples,
-            n_modes) or (n_samples, n_modes).
+        list or np.ndarray
+            Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
         """
+        if self.config.multiple_scale:
+            return self.get_mode_time_courses(
+                inputs, *args, concatenate=concatenate, **kwargs
+            )
+
         inputs = self._make_dataset(inputs)
+        outputs = []
+        for dataset in inputs:
+            alpha = self.predict(dataset, *args, **kwargs)["alpha"]
+            alpha = np.concatenate(alpha)
+            outputs.append(alpha)
+
+        if concatenate or len(outputs) == 1:
+            outputs = np.concatenate(outputs)
+
+        return outputs
+
+    def get_mode_time_courses(
+        self, inputs, *args, concatenate: bool = False, **kwargs
+    ) -> Tuple[
+        Union[list, np.ndarray], Union[list, np.ndarray], Union[list, np.ndarray]
+    ]:
+        """Get mode time courses.
+
+        This method is used to get mode time courses for the multi-time-scale model.
+
+        Parameters
+        ----------
+        inputs : tensorflow.data.Dataset
+            Prediction dataset.
+        concatenate : bool
+            Should we concatenate alpha for each subject? Optional, default
+            is False.
+
+        Returns
+        -------
+        list or np.ndarray
+            Alpha with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Beta with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Gamma factors with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        """
+        if not self.config.multiple_scale:
+            raise ValueError("Please use get_alpha for a single time scale model.")
+
+        inputs = self._make_dataset(inputs)
+
         outputs_alpha = []
         outputs_beta = []
         outputs_gamma = []
         for dataset in inputs:
-            predictions_dict = self.predict(dataset, *args, **kwargs)
-            alpha = predictions_dict["alpha"]
+            predictions = self.predict(dataset, *args, **kwargs)
+
+            alpha = predictions["alpha"]
+            beta = predictions["beta"]
+            gamma = predictions["gamma"]
+
             alpha = np.concatenate(alpha)
+            beta = np.concatenate(beta)
+            gamma = np.concatenate(gamma)
+
             outputs_alpha.append(alpha)
+            outputs_beta.append(beta)
+            outputs_gamma.append(gamma)
 
-            if self.config.multiple_scale:
-                beta = predictions_dict["beta"]
-                gamma = predictions_dict["gamma"]
-                beta = np.concatenate(beta)
-                gamma = np.concatenate(gamma)
-                outputs_beta.append(beta)
-                outputs_gamma.append(gamma)
+        if concatenate or len(outputs_alpha) == 1:
+            outputs_alpha = np.concatenate(outputs_alpha)
+            outputs_beta = np.concatenate(outputs_beta)
+            outputs_gamma = np.concatenate(outputs_gamma)
 
-                if concatenate or len(outputs_beta) == 1:
-                    outputs_beta = np.concatenate(outputs_beta)
-
-                if concatenate or len(outputs_gamma) == 1:
-                    outputs_gamma = np.concatenate(outputs_gamma)
-
-            if concatenate or len(outputs_alpha) == 1:
-                outputs_alpha = np.concatenate(outputs_alpha)
-
-        if self.config.multiple_scale:
-            return [outputs_alpha, outputs_beta, outputs_gamma]
-        return outputs_alpha
+        return outputs_alpha, outputs_beta, outputs_gamma
 
     def losses(self, dataset, return_sum: bool = False) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.

@@ -117,7 +117,7 @@ print("stds:", stds)
 print("fcs:", fcs)
 
 # Inferred mode mixing factors and mode time course
-inf_alpha, inf_beta, inf_gamma = model.get_alpha(prediction_dataset)
+inf_alpha, inf_beta, inf_gamma = model.get_mode_time_courses(prediction_dataset)
 
 inf_stc_alpha = modes.time_courses(inf_alpha)
 inf_stc_beta = modes.time_courses(inf_beta)
