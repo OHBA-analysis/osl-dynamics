@@ -230,8 +230,6 @@ class Config:
     learn_fcs: bool = None
 
     learn_alpha_scaling: bool = False
-    learn_beta_scaling: bool = False
-    learn_gamma_scaling: bool = False
     normalize_covariances: bool = False
     initial_covariances: np.ndarray = None
     initial_means: np.ndarray = None

@@ -140,7 +140,7 @@ class DiceCoefficientCallback(callbacks.Callback):
                 logs[key] = dices[i]
                 message.append(f" - {key}: {dices[i]}")
             message = "".join(message)
-        print(message, end="")
+        print(message)
 
 
 class KLAnnealingCallback(callbacks.Callback):

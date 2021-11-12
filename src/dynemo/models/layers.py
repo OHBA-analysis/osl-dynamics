@@ -1120,304 +1120,6 @@ class WaveNetResidualBlockLayer(layers.Layer):
         return x + residual, skip
 
 
-class MeanSquaredErrorLayer(layers.Layer):
-    """Layer for calculating the mean squared error.
-
-    Parameters
-    ----------
-    clip : int
-        Number of data points to clip from each input.
-        Optional, default is no clipping.
-    """
-
-    def __init__(self, clip: int = None, **kwargs):
-        super().__init__(**kwargs)
-        self.clip = clip
-
-    def call(self, inputs, training=None, **kwargs):
-        training_data, generated_data = inputs
-
-        if self.clip is not None:
-            training_data = training_data[:, self.clip :]
-            generated_data = generated_data[:, : -self.clip]
-
-        se = tf.math.squared_difference(training_data, generated_data)
-        mse = tf.reduce_mean(se)  # mean over batches, time points and channels
-
-        return tf.expand_dims(mse, axis=-1)
-
-
-@tf.function
-def cholesky_factor_to_full_matrix(cholesky_factor):
-    """Convert a cholesky factor into a full matrix."""
-
-    # The upper triangle is trainable but we should zero it because the array
-    # is the cholesky factor of the full covariance
-    cholesky_factor = tf.linalg.band_part(cholesky_factor, -1, 0)
-
-    # Calculate the full matrix
-    full_matrix = tf.matmul(cholesky_factor, tf.transpose(cholesky_factor, (0, 2, 1)))
-
-    # Add a more error to the diagonal to ensure matrix is positive semi-definite
-    full_matrix += 1e-6 * tf.eye(full_matrix.shape[-1])
-
-    return full_matrix
-
-
-class MeansStdsFcsLayer(layers.Layer):
-    """Layer to learn the means, diagonal standard deviation matrices,
-    and functional connectivities of the modes
-
-    Outputs the mean vector, the standard deviations, and correlation (fc) matrix of each mode.
-
-    Paramters
-    ---------
-    n_modes: int
-        Number of modes.
-    n_channels: int
-        Number of channels.
-    learn_means/stds/fcs
-        Should we learn the means/standard deviations/fcs?
-    initial_means/stds/fcs
-        Initial values of the mean/standard deviations/fc of each mode
-    """
-
-    def __init__(
-        self,
-        n_modes,
-        n_channels,
-        learn_means,
-        learn_stds,
-        learn_fcs,
-        initial_means,
-        initial_stds,
-        initial_fcs,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-        self.learn_means = learn_means
-        self.learn_stds = learn_stds
-        self.learn_fcs = learn_fcs
-
-        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
-
-        # Initialisation of means
-        if initial_means is None:
-            self.initial_means = np.zeros([n_modes, n_channels], dtype=np.float32)
-        else:
-            self.initial_means = initial_means
-
-        self.means_initializer = WeightInitializer(self.initial_means)
-
-        # Initialisation of diagonal entries
-        if initial_stds is None:
-            self.initial_stds = np.ones([n_modes, n_channels], dtype=np.float32)
-        else:
-            self.initial_stds = initial_stds
-
-        self.stds_initializer = WeightInitializer(self.initial_stds)
-
-        # Initialisation of functional connectiviy matrices
-        if initial_fcs is None:
-            self.initial_fcs = np.stack(
-                [np.eye(n_channels, dtype=np.float32)] * n_modes
-            )
-        else:
-            self.initial_fcs = initial_fcs
-
-        self.flattened_cholesky_fcs = self.bijector.inverse(self.initial_fcs)
-
-        self.flattened_cholesky_fcs_initializer = WeightInitializer(
-            self.flattened_cholesky_fcs
-        )
-
-    def build(self, input_shape):
-        # Create weights for the means
-        self.means = self.add_weight(
-            "means",
-            shape=(self.n_modes, self.n_channels),
-            dtype=tf.float32,
-            initializer=self.means_initializer,
-            trainable=self.learn_means,
-        )
-
-        # Create weights for the diagonal entries
-        self.stds = self.add_weight(
-            "stds",
-            shape=(self.n_modes, self.n_channels),
-            dtype=tf.float32,
-            initializer=self.stds_initializer,
-            trainable=self.learn_stds,
-        )
-
-        # Create weights for the lower triangular entries
-        self.flattened_cholesky_fcs = self.add_weight(
-            "flattened_cholesky_fcs",
-            shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
-            dtype=tf.float32,
-            initializer=self.flattened_cholesky_fcs_initializer,
-            trainable=self.learn_fcs,
-        )
-
-        self.built = True
-
-    def call(self, inputs, **kwargs):
-        cholesky_fcs = tfp.math.fill_triangular(self.flattened_cholesky_fcs)
-        # normalize so that fcs are correlation matrices
-        cholesky_fcs = tf.linalg.normalize(cholesky_fcs, axis=2)[0]
-        self.fcs = cholesky_factor_to_full_matrix(cholesky_fcs)
-
-        return [self.means, self.stds, self.fcs]
-
-
-class MixMeansStdsFcsLayer(layers.Layer):
-    """Compute a probabilistic mixture of means, standard deviations and fcs.
-    The mixture is calculated as
-
-    m_t = \sum_j \alpha_{jt} mu_j
-    diag(G_t) = \sum_j \beta_{jt} E_j
-    F_t = \sum_j \gamma_{jt} D_j
-    C_t = G_t F_t G_t
-
-    Parameters:
-    ----------
-    n_modes: int
-        number of modes.
-    n_channels: int
-        number of channels.
-    learn_alpha/beta/gamma_scaling
-        Should we learn alpha/beta/gamma scaling?
-    fix_std
-        Do we want to fix the standard deviation time course?
-    """
-
-    def __init__(
-        self,
-        n_modes: int,
-        n_channels: int,
-        learn_alpha_scaling: bool,
-        learn_beta_scaling: bool,
-        learn_gamma_scaling: bool,
-        fix_std: bool,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-        self.learn_alpha_scaling = learn_alpha_scaling
-        self.learn_beta_scaling = learn_beta_scaling
-        self.learn_gamma_scaling = learn_gamma_scaling
-        self.fix_std = fix_std
-
-    def build(self, input_shape):
-        # Initialise such that softplus(alpha_scaling) = 1
-        self.alpha_scaling_initializer = tf.keras.initializers.Constant(
-            np.log(np.exp(1.0) - 1.0)
-        )
-        self.alpha_scaling = self.add_weight(
-            "alpha_scaling",
-            shape=self.n_modes,
-            dtype=tf.float32,
-            initializer=self.alpha_scaling_initializer,
-            trainable=self.learn_alpha_scaling,
-        )
-
-        self.beta_scaling_initializer = tf.keras.initializers.Constant(
-            np.log(np.exp(1.0) - 1.0)
-        )
-        self.beta_scaling = self.add_weight(
-            "beta_scaling",
-            shape=self.n_modes,
-            dtype=tf.float32,
-            initializer=self.beta_scaling_initializer,
-            trainable=self.learn_beta_scaling,
-        )
-
-        self.gamma_scaling_initializer = tf.keras.initializers.Constant(
-            np.log(np.exp(1.0) - 1.0)
-        )
-        self.gamma_scaling = self.add_weight(
-            "gamma_scaling",
-            shape=self.n_modes,
-            dtype=tf.float32,
-            initializer=self.gamma_scaling_initializer,
-            trainable=self.learn_gamma_scaling,
-        )
-        self.built = True
-
-    def call(self, inputs, **kwargs):
-        # Unpack the inputs:
-        # - alpha.shape = (None, sequence_length, n_modes)
-        # - beta.shape = (None, sequence_length, n_modes)
-        # - gamma.shape = (None, sequence_length, n_modes)
-        # - mu.shape = (n_modes, n_channels)
-        # - E.shape = (n_modes, n_channels)
-        # - D.shape = (n_modes, n_channels, n_channels)
-        alpha, beta, gamma, mu, E, D = inputs
-
-        # Make sure the standard deviations are positive
-        # with softplus
-        E = tf.math.softplus(E)
-
-        # Rescale the mode mixing factors
-        alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
-        if not self.fix_std:
-            beta = tf.multiply(beta, activations.softplus(self.beta_scaling))
-        gamma = tf.multiply(gamma, activations.softplus(self.gamma_scaling))
-
-        # Reshape alpha and mu for multiplication
-        alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.reshape(mu, (1, 1, self.n_modes, self.n_channels))
-
-        # Calculate the mixed mean
-        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-
-        # Reshape beta and E for multiplication
-        beta = tf.expand_dims(beta, axis=-1)
-        E = tf.reshape(E, (1, 1, self.n_modes, self.n_channels))
-
-        # Calculate the mixed diagonal entries
-        G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
-        G = tf.linalg.diag(G)
-
-        # Reshape gamma and D for multiplication
-        gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
-        D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
-        F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
-
-        # Calculate the diagonal matrices G
-
-        # Construct the covariance matrices given by C = GFG
-        C = tf.matmul(G, tf.matmul(F, G))
-
-        return [m, C]
-
-
-class Sum(layers.Layer):
-    """Layer to sum a set of tensors.
-
-    This layer is a wrapper for tensorflow.add_n.
-    """
-
-    def call(self, inputs, **kwargs):
-        return tf.add_n(inputs)
-
-
-class FillConstant(layers.Layer):
-    """Layer to create tensor with the same shape of the input,
-    but filled with a constant.
-    """
-
-    def __init__(self, constant, **kwargs):
-        super().__init__(**kwargs)
-        self.constant = constant
-
-    def call(self, inputs, **kwargs):
-        return tf.fill(tf.shape(inputs), self.constant)
-
-
 class StdDevLayer(layers.Layer):
     """Layer to learn standard deviations.
 
@@ -1461,3 +1163,240 @@ class StdDevLayer(layers.Layer):
 
     def call(self, inputs):
         return activations.softplus(self.std_dev)
+
+
+class MeanSquaredErrorLayer(layers.Layer):
+    """Layer for calculating the mean squared error.
+
+    Parameters
+    ----------
+    clip : int
+        Number of data points to clip from each input.
+        Optional, default is no clipping.
+    """
+
+    def __init__(self, clip: int = None, **kwargs):
+        super().__init__(**kwargs)
+        self.clip = clip
+
+    def call(self, inputs, training=None, **kwargs):
+        training_data, generated_data = inputs
+
+        if self.clip is not None:
+            training_data = training_data[:, self.clip :]
+            generated_data = generated_data[:, : -self.clip]
+
+        se = tf.math.squared_difference(training_data, generated_data)
+        mse = tf.reduce_mean(se)  # mean over batches, time points and channels
+
+        return tf.expand_dims(mse, axis=-1)
+
+
+class MeansStdsFcsLayer(layers.Layer):
+    """Layer to learn the means, diagonal standard deviation matrices,
+    and functional connectivities of modes.
+
+    Outputs the mean vector, the standard deviations, and correlation (fc) matrix
+    of each mode.
+
+    Paramters
+    ---------
+    n_modes: int
+        Number of modes.
+    n_channels: int
+        Number of channels.
+    learn_means : bool
+        Should we learn the means?
+    learn_stds : bool
+        Should we learn the standard deviations?
+    learn_fcs : bool
+        Should we learn the functional connectivities?
+    initial_means : np.ndarray
+        Initial value of the mean each of mode. Optional.
+    initial_stds: np.ndarray
+        Initial value of the standard deviation of each model. Optional.
+    initial_fcs : np.ndarray
+        Initial values of the functional connectivity of each mode. Optional.
+    """
+
+    def __init__(
+        self,
+        n_modes: int,
+        n_channels: int,
+        learn_means: bool,
+        learn_stds: bool,
+        learn_fcs: bool,
+        initial_means: np.ndarray,
+        initial_stds: np.ndarray,
+        initial_fcs: np.ndarray,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.learn_means = learn_means
+        self.learn_stds = learn_stds
+        self.learn_fcs = learn_fcs
+
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
+        # Initialisation of means
+        if initial_means is None:
+            self.initial_means = np.zeros([n_modes, n_channels], dtype=np.float32)
+        else:
+            self.initial_means = initial_means
+
+        self.means_initializer = WeightInitializer(self.initial_means)
+
+        # Initialisation of standard deviations
+        if initial_stds is None:
+            self.initial_stds = np.ones([n_modes, n_channels], dtype=np.float32)
+        else:
+            self.initial_stds = initial_stds
+
+        self.stds_initializer = WeightInitializer(self.initial_stds)
+
+        # Initialisation of functional connectiviy matrices
+        if initial_fcs is None:
+            self.initial_fcs = np.stack(
+                [np.eye(n_channels, dtype=np.float32)] * n_modes
+            )
+        else:
+            self.initial_fcs = initial_fcs
+
+        self.flattened_cholesky_fcs = self.bijector.inverse(self.initial_fcs)
+
+        self.flattened_cholesky_fcs_initializer = WeightInitializer(
+            self.flattened_cholesky_fcs
+        )
+
+    def build(self, input_shape):
+
+        # Create weights for the means
+        self.means = self.add_weight(
+            "means",
+            shape=(self.n_modes, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.means_initializer,
+            trainable=self.learn_means,
+        )
+
+        # Create weights for the diagonal entries
+        self.stds = self.add_weight(
+            "stds",
+            shape=(self.n_modes, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.stds_initializer,
+            trainable=self.learn_stds,
+        )
+
+        # Create weights for the lower triangular entries
+        self.flattened_cholesky_fcs = self.add_weight(
+            "flattened_cholesky_fcs",
+            shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
+            dtype=tf.float32,
+            initializer=self.flattened_cholesky_fcs_initializer,
+            trainable=self.learn_fcs,
+        )
+
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+
+        # Make sure standard deviations are positive
+        stds = activations.softplus(self.stds)
+
+        # Calculate functional connectivity matrix from flattened vector
+        fcs = self.bijector(self.flattened_cholesky_fcs)
+
+        # Normalise so that FCs are correlation matrices
+        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(fcs)), axis=-1)
+        fcs /= tf.matmul(sd, sd, transpose_b=True)
+
+        return [self.means, stds, fcs]
+
+
+class MixMeansStdsFcsLayer(layers.Layer):
+    """Compute a probabilistic mixture of means, standard deviations and functional
+    connectivies.
+
+    The mixture is calculated as
+
+    m_t       = Sum_j alpha_jt mu_j
+    diag(G_t) = Sum_j beta_jt E_j
+    F_t       = Sum_j gamma_jt D_j
+    C_t       = G_t F_t G_t
+
+    Parameters
+    ----------
+    n_modes: int
+        number of modes.
+    n_channels: int
+        number of channels.
+    fix_std : bool
+        Do we want to fix the standard deviation time course?
+    """
+
+    def __init__(self, n_modes: int, n_channels: int, fix_std: bool, **kwargs):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.fix_std = fix_std
+
+    def call(self, inputs, **kwargs):
+        # Unpack the inputs:
+        # - alpha.shape = (None, sequence_length, n_modes)
+        # - beta.shape = (None, sequence_length, n_modes)
+        # - gamma.shape = (None, sequence_length, n_modes)
+        # - mu.shape = (n_modes, n_channels)
+        # - E.shape = (n_modes, n_channels)
+        # - D.shape = (n_modes, n_channels, n_channels)
+        alpha, beta, gamma, mu, E, D = inputs
+
+        # Reshape alpha and mu for multiplication
+        alpha = tf.expand_dims(alpha, axis=-1)
+        mu = tf.reshape(mu, (1, 1, self.n_modes, self.n_channels))
+
+        # Calculate the mixed mean
+        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
+
+        # Reshape beta and E for multiplication
+        beta = tf.expand_dims(beta, axis=-1)
+        E = tf.reshape(E, (1, 1, self.n_modes, self.n_channels))
+
+        # Calculate the mixed diagonal entries
+        G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
+        G = tf.linalg.diag(G)
+
+        # Reshape gamma and D for multiplication
+        gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
+        D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
+        F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
+
+        # Construct the covariance matrices given by C = GFG
+        C = tf.matmul(G, tf.matmul(F, G))
+
+        return [m, C]
+
+
+class Sum(layers.Layer):
+    """Layer to sum a set of tensors.
+
+    This layer is a wrapper for tensorflow.add_n.
+    """
+
+    def call(self, inputs, **kwargs):
+        return tf.add_n(inputs)
+
+
+class FillConstant(layers.Layer):
+    """Layer to create tensor with the same shape of the input,
+    but filled with a constant.
+    """
+
+    def __init__(self, constant, **kwargs):
+        super().__init__(**kwargs)
+        self.constant = constant
+
+    def call(self, inputs, **kwargs):
+        return tf.fill(tf.shape(inputs), self.constant)

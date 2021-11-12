@@ -3,8 +3,8 @@
 """
 
 from tensorflow.keras import Model, layers
-from dynemo.models.go import GO
 from dynemo.models.inf_mod_base import InferenceModelBase
+from dynemo.models.obs_mod_base import ObservationModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLayer,
@@ -20,7 +20,7 @@ from dynemo.models.layers import (
 )
 
 
-class MRIGO(InferenceModelBase, GO):
+class MRIGO(InferenceModelBase, ObservationModelBase):
     """Multi-time-scale RNN Inference/model network and Gaussian
     Observations (MRIGO).
 
@@ -31,11 +31,28 @@ class MRIGO(InferenceModelBase, GO):
 
     def __init__(self, config):
         InferenceModelBase.__init__(self, config)
-        GO.__init__(self, config)
+        ObservationModelBase.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def get_means_stds_fcs(self):
+        """Get the mean, standard devation and functional connectivity of each mode.
+
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means.
+        stds : np.ndarray
+            Mode standard deviations.
+        fcs : np.ndarray
+            Mode functional connectivities.
+        """
+        means_stds_fcs_layer = self.model.get_layer("means_stds_fcs")
+        means, stds, fcs = means_stds_fcs_layer(1)
+        return means.numpy(), stds.numpy(), fcs.numpy()
 
 
 def _model_structure(config):
@@ -187,9 +204,6 @@ def _model_structure(config):
     mix_means_stds_fcs_layer = MixMeansStdsFcsLayer(
         config.n_modes,
         config.n_channels,
-        config.learn_alpha_scaling,
-        config.learn_beta_scaling,
-        config.learn_gamma_scaling,
         config.fix_std,
         name="mix_means_stds_fcs",
     )
@@ -285,10 +299,10 @@ def _model_structure(config):
     kl_loss_fc = kl_loss_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
 
     # Total KL loss
-    if not config.fix_std:
-        kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_std, kl_loss_fc])
-    else:
+    if config.fix_std:
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_fc])
+    else:
+        kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_std, kl_loss_fc])
 
     return Model(
         inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"

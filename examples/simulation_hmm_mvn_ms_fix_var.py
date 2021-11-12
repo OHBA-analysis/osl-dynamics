@@ -109,6 +109,13 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
+# Infered means, standard deviations and functional connectivities
+means, stds, fcs = model.get_means_stds_fcs()
+
+print("means:", means)
+print("stds:", stds)
+print("fcs:", fcs)
+
 # Inferred mode mixing factors and mode time course
 inf_alpha, inf_beta, inf_gamma = model.get_alpha(prediction_dataset)
 
