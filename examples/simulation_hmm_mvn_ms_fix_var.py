@@ -36,7 +36,7 @@ sim = simulation.HMM_MVN(
     covariances="random",
     observation_error=observation_error,
     random_seed=123,
-    multiple_scale=True,
+    multiple_scales=True,
     fix_std=True,
     uni_std=True,
 )
@@ -45,7 +45,7 @@ meg_data = data.Data(sim.time_series)
 
 # Hyperparameters
 config = Config(
-    multiple_scale=True,
+    multiple_scales=True,
     n_modes=n_modes,
     n_channels=n_channels,
     sequence_length=200,

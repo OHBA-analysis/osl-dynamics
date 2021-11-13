@@ -94,18 +94,13 @@ class Config:
     observation_model : str
         Type of observation model.
         Either 'multivariate_normal', 'multivariate_autoregressive' or 'wavenet'.
+
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
         Pass if model='multivariate_normal'.
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
         Pass if model='multivariate_normal'.
-    learn_stds: bool
-        Should we make the standard deviation for each mode trainable?
-        Only specify if multiple_scale=True.
-    learn_fcs: bool
-        Should we make the functional connectivity for each mode trainable?
-        Only specify if multiple_scale=True.
     learn_alpha_scaling : bool
         Should we learn a scaling for alpha? Pass if model='multivariate_normal'.
     normalize_covariances : bool
@@ -115,10 +110,20 @@ class Config:
         Initialisation for mean vectors. Pass if model='multivariate_normal'.
     initial_covariances : np.ndarray
         Initialisation for mode covariances. Pass if model='multivariate_normal'.
+
+    learn_stds: bool
+        Should we make the standard deviation for each mode trainable?
+        Only specify if multiple_scales=True.
+    learn_fcs: bool
+        Should we make the functional connectivity for each mode trainable?
+        Only specify if multiple_scales=True.
     initial_stds: np.ndarray
-        Initialisation for mode standard deviations. Only specify if multiple_scale =True.
+        Initialisation for mode standard deviations.
+        Only specify if multiple_scales=True.
     initial_fcs: np.ndarray
-        Initialisation for mode functional connectivity matrices. Only specify if multiple_scale= True.
+        Initialisation for mode functional connectivity matrices.
+        Only specify if multiple_scales=True.
+
     n_lags : int
         Number of autoregressive lags. Pass if model='multivariate_autoregressive'.
     learn_coeffs : bool
@@ -134,6 +139,7 @@ class Config:
     diag_covs : bool
         Should we learn diagonal covariances?
         Pass if model='multivariate_autoregressive'.
+
     wavenet_n_filters : int
         Number of filters in the each convolutional layer.
     wavenet_n_layers : int
@@ -182,7 +188,7 @@ class Config:
     # Parameters related to the model choice
     alpha_pdf: str = "normal"
     observation_model: str = "multivariate_normal"
-    multiple_scale: bool = False
+    multiple_scales: bool = False
     fix_std: bool = False
 
     # Dimension parameters
@@ -291,7 +297,7 @@ class Config:
                 + "'multivariate_autoregressive' or 'wavenet'."
             )
 
-        if self.multiple_scale:
+        if self.multiple_scales:
             if (
                 self.alpha_pdf != "normal"
                 or self.observation_model != "multivariate_normal"

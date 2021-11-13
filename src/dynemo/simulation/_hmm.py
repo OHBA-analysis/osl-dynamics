@@ -227,7 +227,7 @@ class HMM_MVN(Simulation):
         Optional.
     observation_error : float
         Standard deviation of the error added to the generated data.
-    multiple_scale: bool
+    multiple_scales: bool
         Do we want to simulate different time courses for mean, standard deviation, and fc?
     random_seed : int
         Seed for random number generator. Optional.
@@ -247,7 +247,7 @@ class HMM_MVN(Simulation):
         n_channels: int = None,
         stay_prob: float = None,
         observation_error: float = 0.0,
-        multiple_scale: bool = False,
+        multiple_scales: bool = False,
         random_seed: int = None,
         fix_std: bool = False,
         uni_std: bool = False,
@@ -275,13 +275,13 @@ class HMM_MVN(Simulation):
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
-        self.multiple_scale = multiple_scale
+        self.multiple_scales = multiple_scales
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        if multiple_scale:
+        if multiple_scales:
             self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
             for i in range(3):
                 self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
@@ -314,7 +314,7 @@ class HMM_MVN(Simulation):
 
     def standardize(self):
         super().standardize()
-        if not self.multiple_scale:
+        if not self.multiple_scales:
             self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
 
 

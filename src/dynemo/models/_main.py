@@ -42,7 +42,7 @@ def Model(config):
     if config.observation_model == "multivariate_normal":
 
         if config.alpha_pdf == "normal":
-            if config.multiple_scale:
+            if config.multiple_scales:
                 return MRIGO(config)
             else:
                 return RIGO(config)
