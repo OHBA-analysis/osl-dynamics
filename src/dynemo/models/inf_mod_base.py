@@ -56,14 +56,14 @@ class InferenceModelBase:
     def fit(
         self,
         *args,
-        kl_annealing_callback=None,
-        alpha_temperature_annealing_callback=None,
-        use_tqdm=False,
+        kl_annealing_callback: bool = None,
+        alpha_temperature_annealing_callback: bool = None,
+        use_tqdm: bool = False,
         tqdm_class=None,
-        use_tensorboard=None,
-        tensorboard_dir=None,
-        save_best_after=None,
-        save_filepath=None,
+        use_tensorboard: bool = None,
+        tensorboard_dir: str = None,
+        save_best_after: int = None,
+        save_filepath: str = None,
         **kwargs,
     ):
         """Wrapper for the standard keras fit method.
@@ -102,6 +102,7 @@ class InferenceModelBase:
         additional_callbacks = []
 
         if kl_annealing_callback is None:
+            # Check config to see if we should do KL annealing
             kl_annealing_callback = self.config.do_kl_annealing
 
         if kl_annealing_callback:
@@ -115,6 +116,7 @@ class InferenceModelBase:
             additional_callbacks.append(kl_annealing_callback)
 
         if alpha_temperature_annealing_callback is None:
+            # Check config to see if we should do alpha temperature annealing
             alpha_temperature_annealing_callback = (
                 self.config.do_alpha_temperature_annealing
             )
@@ -129,6 +131,7 @@ class InferenceModelBase:
             )
             additional_callbacks.append(alpha_temperature_annealing_callback)
 
+        # Update arguments to pass to the fit method
         args, kwargs = replace_argument(
             func=self.model.fit,
             name="callbacks",
@@ -151,14 +154,14 @@ class InferenceModelBase:
     def initialize(
         self,
         training_dataset,
-        epochs,
-        n_init,
+        epochs: int,
+        n_init: int,
         **kwargs,
     ):
-        """Initialize the means and covariances.
+        """Multi-start training.
 
-        The model is trained for a few epochs and the model with the best
-        free energy is chosen.
+        The model is trained for a few epochs with different random initializations
+        for weights and the model with the best free energy is kept.
 
         Parameters
         ----------
@@ -207,8 +210,14 @@ class InferenceModelBase:
 
         return best_history
 
-    def reset_weights(self, keep=None):
-        """Reset the model as if you've built a new model."""
+    def reset_weights(self, keep: list = None):
+        """Reset the model as if you've built a new model.
+
+        Parameters
+        ----------
+        keep : list of str
+            Layer names to NOT reset. Optional.
+        """
         initializers.reinitialize_model_weights(self.model, keep)
         if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
@@ -288,13 +297,13 @@ class InferenceModelBase:
         Returns
         -------
         list or np.ndarray
-            Alpha with shape (n_subjects, n_samples, n_modes) or
+            Alpha time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         list or np.ndarray
-            Beta with shape (n_subjects, n_samples, n_modes) or
+            Beta time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         list or np.ndarray
-            Gamma factors with shape (n_subjects, n_samples, n_modes) or
+            Gamma time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if not self.config.multiple_scales:
