@@ -105,6 +105,7 @@ def mean_coherence_from_spectra(
     components: np.ndarray = None,
     frequency_range: list = None,
     fit_gmm: bool = False,
+    gmm_filename: str = None,
 ) -> np.ndarray:
     """Calculates mean coherence from spectra.
 
@@ -122,6 +123,8 @@ def mean_coherence_from_spectra(
     fit_gmm : bool
         Should we fit a two component Gaussian mixture model and only keep
         one of the components. Optional.
+    gmm_filename : str
+        Filename to save GMM plot. Optional. Only used if fit_gmm=True.
 
     Returns
     -------
@@ -196,6 +199,7 @@ def mean_coherence_from_spectra(
                     c,
                     n_fits=5,
                     print_message=False,
+                    plot_filename=gmm_filename,
                 )
                 c[mixture_label == 0] = 0
                 coh[i, j] = c.reshape(n_channels, n_channels)

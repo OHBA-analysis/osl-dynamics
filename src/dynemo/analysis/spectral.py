@@ -516,6 +516,8 @@ def multitaper_spectra(
     power_spectra = []
     coherences = []
     for n in range(n_subjects):
+        if n_subjects > 1:
+            print(f"Subject {n}:")
 
         # Use the mode mixing factors to get a time series for each mode
         mode_time_series = get_mode_time_series(data[n], alpha[n])
@@ -533,18 +535,10 @@ def multitaper_spectra(
         # Number of segments in the time series
         n_segments = round(n_samples / segment_length)
 
-        # Info to print to screen
-        if n_subjects > 1:
-            mode_iterator = trange(n_modes, desc=f"Subject {n}", ncols=98)
-            segment_iterator = range(n_segments)
-        else:
-            mode_iterator = range(n_modes)
-            segment_iterator = trange(n_segments, desc=f"Mode {i}", ncols=98)
-
         # Power spectra for each mode
         p = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex_)
-        for i in mode_iterator:
-            for j in segment_iterator:
+        for i in range(n_modes):
+            for j in trange(n_segments, desc=f"Mode {i}", ncols=98):
 
                 # Time series for mode i and segment j
                 time_series_segment = mode_time_series[
@@ -685,18 +679,10 @@ def regression_spectra(
     # Remove the data points lost due to separating into sequences
     data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-    # Info to print to the screen
-    if n_subjects > 1:
-        iterator = trange(n_subjects, desc="Calculating spectrograms", ncols=98)
-        use_tqdm_in_spectrogram = False
-    else:
-        iterator = range(n_subjects)
-        use_tqdm_in_spectrogram = True
-
     # Calculate a time-varying PSD
     Pt = []
     at = []
-    for i in iterator:
+    for i in trange(n_subjects, desc="Calculating spectrograms", ncols=98):
         t, f, p, a = spectrogram(
             data[i],
             window_length,
@@ -704,22 +690,14 @@ def regression_spectra(
             frequency_range,
             calc_cpsd=calc_cpsd,
             step_size=step_size,
-            use_tqdm=use_tqdm_in_spectrogram,
             alpha=alpha[i],
         )
         Pt.append(p)
         at.append(a)
 
-    # Info to print to screen
-    if n_subjects > 1:
-        iterator = trange(n_subjects, desc="Fitting linear regression", ncols=98)
-    else:
-        iterator = range(n_subjects)
-        print("Fitting linear regression")
-
     # Regress the time-varying PSD with alpha to get the mode PSDs
     Pj = []
-    for i in iterator:
+    for i in trange(n_subjects, desc="Fitting linear regression", ncols=98):
         if calc_cpsd:
             Pt[i] = abs(Pt[i])
         Pj.append(regression.linear(at[i], Pt[i], fit_intercept=True, normalize=True))
@@ -758,7 +736,6 @@ def spectrogram(
     frequency_range: list = None,
     calc_cpsd: bool = True,
     step_size: int = 1,
-    use_tqdm: bool = True,
     alpha: np.ndarray = None,
 ) -> Union[
     Tuple[np.ndarray, np.ndarray, np.ndarray],
@@ -781,8 +758,6 @@ def spectrogram(
         Should we calculate cross spectra? Optional.
     step_size : int
         Step size for shifting the window. Optional.
-    use_tqdm : bool
-        Should we use a tqdm progress bar? Optional.
     alpha : np.ndarray
         Alpha fitted to the data. Optional. Useful to pass if you want to regress
         the spectrogram with alpha.
@@ -840,12 +815,6 @@ def spectrogram(
     time_indices = range(0, n_samples, step_size)
     n_psds = n_samples // step_size
 
-    # Progress bar
-    if use_tqdm:
-        iterator = trange(n_psds, desc="Calculating spectrograms", ncols=98)
-    else:
-        iterator = range(n_psds)
-
     if alpha is not None:
         # Array to hold mean of alpha multiplied by the windowing function
         a = np.empty([n_psds, n_modes])
@@ -855,7 +824,7 @@ def spectrogram(
         P = np.empty(
             [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
         )
-        for i in iterator:
+        for i in range(n_psds):
             j = time_indices[i]
 
             # Cross periodograms
@@ -871,7 +840,7 @@ def spectrogram(
     else:
         # Calculate the periodogram for each segment of the data
         P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
-        for i in iterator:
+        for i in range(n_psds):
             j = time_indices[i]
 
             # Periodograms
