@@ -58,7 +58,7 @@ def decompose_spectra(
     """Performs spectral decomposition using coherences.
 
     Uses non-negative matrix factorization to decompose spectra.
-    Follows the same procedure as the OSL funciton HMM-MAR/spectral/spectdecompose.m
+    Follows the same procedure as the OSL function HMM-MAR/spectral/spectdecompose.m
 
     Parameters
     ----------
@@ -615,7 +615,12 @@ def regression_spectra(
     n_embeddings: int = None,
     psd_only: bool = False,
     step_size: int = 1,
-) -> Tuple[np.ndarray, np.ndarray]:
+    n_sub_windows: int = 1,
+    return_weights: bool = False,
+) -> Union[
+    Tuple[np.ndarray, np.ndarray, np.ndarray],
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+]:
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
     Parameters
@@ -636,13 +641,23 @@ def regression_spectra(
         Should we only calculate the PSD? Optional.
     step_size : int
         Step size for shifting the window. Optional.
+    n_sub_windows : int
+        Should we split the window into a set of sub-windows and average the
+        spectra for each sub-window. Optional.
+    return_weights : bool
+        Should we return the weights for subject-specific PSDs?
+        Useful for calculating the group average PSD. Optional.
 
     Returns
     -------
     f : np.ndarray
         Frequency axis.
-    P : np.ndarray
+    psd : np.ndarray
         Mode PSDs.
+    coh : np.ndarray
+        Mode coherences.
+    w : np.ndarray
+        Weight for each subject-specific PSD. Only returned if return_weights=True.
     """
 
     # Validation
@@ -659,9 +674,6 @@ def regression_spectra(
             )
         data = [data]
         alpha = [alpha]
-
-    if window_length % 2 == 0:
-        raise ValueError("window_length must be odd.")
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
@@ -682,7 +694,9 @@ def regression_spectra(
     # Calculate a time-varying PSD
     Pt = []
     at = []
-    for i in trange(n_subjects, desc="Calculating spectrograms", ncols=98):
+    for i in range(n_subjects):
+        if n_subjects > 1:
+            print(f"Subject {i}:")
         t, f, p, a = spectrogram(
             data[i],
             window_length,
@@ -691,6 +705,7 @@ def regression_spectra(
             calc_cpsd=calc_cpsd,
             step_size=step_size,
             alpha=alpha[i],
+            n_sub_windows=n_sub_windows,
         )
         Pt.append(p)
         at.append(a)
@@ -726,7 +741,14 @@ def regression_spectra(
         psd.append(p[:, range(n_parcels), range(n_parcels)])
         coh.append(coherence_spectra(p, print_message=False))
 
-    return f, np.squeeze(psd), np.squeeze(coh)
+    # Weights for calculating the group average PSD
+    n_samples = [d.shape[0] for d in data]
+    weights = np.array(n_samples) / np.sum(n_samples)
+
+    if return_weights:
+        return f, np.squeeze(psd), np.squeeze(coh), weights
+    else:
+        return f, np.squeeze(psd), np.squeeze(coh)
 
 
 def spectrogram(
@@ -737,6 +759,7 @@ def spectrogram(
     calc_cpsd: bool = True,
     step_size: int = 1,
     alpha: np.ndarray = None,
+    n_sub_windows: int = 1,
 ) -> Union[
     Tuple[np.ndarray, np.ndarray, np.ndarray],
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
@@ -761,6 +784,9 @@ def spectrogram(
     alpha : np.ndarray
         Alpha fitted to the data. Optional. Useful to pass if you want to regress
         the spectrogram with alpha.
+    n_sub_windows : int
+        Should we split the window into a set of sub-windows and average the
+        spectra for each sub-window. Optional.
 
     Returns
     -------
@@ -792,10 +818,10 @@ def spectrogram(
         ]
 
     # Window to apply to the data before calculating the Fourier transform
-    window = hann(window_length)
+    window = hann(window_length // n_sub_windows)
 
     # Number of data points in the FFT
-    nfft = max(256, 2 ** nextpow2(window_length))
+    nfft = max(256, 2 ** nextpow2(window_length // n_sub_windows))
 
     # Time and frequency axis
     t = np.arange(n_samples) / sampling_frequency
@@ -809,7 +835,7 @@ def spectrogram(
     n_f = args_range[1] - args_range[0]
 
     # Indices of an upper triangle of an n_channels by n_channels array
-    k, l = np.triu_indices(n_channels)
+    m, n = np.triu_indices(n_channels)
 
     # Indices of time points to calculate a periodogram for
     time_indices = range(0, n_samples, step_size)
@@ -824,33 +850,105 @@ def spectrogram(
         P = np.empty(
             [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
         )
-        for i in range(n_psds):
+        XY_sub_window = np.empty(
+            [n_sub_windows, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
+        )
+        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+        for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
             j = time_indices[i]
 
-            # Cross periodograms
-            x = data[j : j + window_length].T * window[np.newaxis, ...]
-            X = fourier_transform(x, nfft, args_range)
-            XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
-            P[i] = XY[k, l]
+            # Data and alpha in the window
+            x_window = data[j : j + window_length].T
+            a_window = alpha[j : j + window_length]
 
-            # Alpha
-            aw = alpha[j : j + window_length] * window[..., np.newaxis]
-            a[i] = np.mean(aw, axis=0)
+            # Loop through sub-windows
+            for k in range(n_sub_windows):
+
+                # Data in the sub-window with the windowing function applied
+                x_sub_window = (
+                    x_window[
+                        :,
+                        k
+                        * window_length
+                        // n_sub_windows : (k + 1)
+                        * window_length
+                        // n_sub_windows,
+                    ]
+                    * window[np.newaxis, ...]
+                )
+
+                # Calculate cross spectra for the sub-window
+                X = fourier_transform(x_sub_window, nfft, args_range)
+                XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
+                XY_sub_window[k] = XY[m, n]
+
+                # Calculate alpha for the sub-window by taking the mean
+                # over time after applying the windowing function
+                a_sub_window[k] = np.mean(
+                    a_window[
+                        k
+                        * window_length
+                        // n_sub_windows : (k + 1)
+                        * window_length
+                        // n_sub_windows
+                    ]
+                    * window[..., np.newaxis],
+                    axis=0,
+                )
+
+            # Average the cross spectra and alpha for each sub-window
+            P[i] = np.mean(XY_sub_window, axis=0)
+            a[i] = np.mean(a_sub_window, axis=0)
 
     else:
         # Calculate the periodogram for each segment of the data
         P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
-        for i in range(n_psds):
+        XX_sub_window = np.empty([n_sub_windows, n_channels, n_f], dtype=np.float32)
+        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+        for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
             j = time_indices[i]
 
-            # Periodograms
-            x = data[j : j + window_length].T * window[np.newaxis, ...]
-            X = fourier_transform(x, nfft, args_range)
-            P[i] = np.real(X * np.conj(X))
+            # Data and alpha in the window
+            x_window = data[j : j + window_length].T
+            a_window = alpha[j : j + window_length]
 
-            # Alpha
-            aw = alpha[j : j + window_length] * window[..., np.newaxis]
-            a[i] = np.mean(aw, axis=0)
+            # Loop through sub-windows
+            for k in range(n_sub_windows):
+
+                # Data in the sub-window with the windowing function applied
+                x_sub_window = (
+                    x_window[
+                        :,
+                        k
+                        * window_length
+                        // n_sub_windows : (k + 1)
+                        * window_length
+                        // n_sub_windows,
+                    ]
+                    * window[np.newaxis, ...]
+                )
+
+                # Calculate PSD for the sub-window
+                X = fourier_transform(x_sub_window, nfft, args_range)
+                XX_sub_window[k] = np.real(X * np.conj(X))
+
+                # Calculate alpha for the sub-window by taking the mean
+                # over time after applying the windowing function
+                a_sub_window[k] = np.mean(
+                    a_window[
+                        k
+                        * window_length
+                        // n_sub_windows : (k + 1)
+                        * window_length
+                        // n_sub_windows
+                    ]
+                    * window[..., np.newaxis],
+                    axis=0,
+                )
+
+            # Average the cross spectra and alpha for each sub-window
+            P[i] = np.mean(XX_sub_window, axis=0)
+            a[i] = np.mean(a_sub_window, axis=0)
 
     # Scaling for the periodograms
     P /= sampling_frequency * np.sum(window ** 2)

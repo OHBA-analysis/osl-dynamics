@@ -10,6 +10,7 @@ from tqdm import trange
 from dynemo import array_ops
 from dynemo.analysis.gmm import fit_gaussian_mixture
 from dynemo.utils.parcellation import Parcellation
+from dynemo.utils.misc import override_dict_defaults
 
 
 def covariance_from_spectra(
@@ -188,19 +189,39 @@ def mean_coherence_from_spectra(
         coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)
 
-    # Fit a two component Gaussian mixture model
     if fit_gmm:
+        # Mean coherence over modes
         mean_coh = np.mean(coh, axis=1)
+
+        # Loop over components and modes
         for i in range(n_components):
             for j in range(n_modes):
+
+                # Coherence values to fit a GMM to
                 c = coh[i, j] - mean_coh[i]
                 c = c.flatten()
+
+                # Fit a GMM
+                if gmm_filename is not None:
+                    plot_filename = (
+                        "{fn.parent}/{fn.stem}{i:0{w1}d}_{j:0{w2}d}{fn.suffix}".format(
+                            fn=Path(gmm_filename),
+                            i=i,
+                            j=j,
+                            w1=len(str(n_components)),
+                            w2=len(str(n_modes)),
+                        )
+                    )
+                else:
+                    plot_filename = None
                 mixture_label = fit_gaussian_mixture(
                     c,
-                    n_fits=5,
                     print_message=False,
-                    plot_filename=gmm_filename,
+                    plot_filename=plot_filename,
                 )
+
+                # Only keep the second mixture component
+                c = coh[i, j].flatten()
                 c[mixture_label == 0] = 0
                 coh[i, j] = c.reshape(n_channels, n_channels)
 
@@ -231,6 +252,8 @@ def save(
         Name of parcellation file used.
     component : int
         Spectral component to save. Optional.
+    plot_kwargs
+        Keyword arguments to pass to nilearn.plotting.plot_connectome.
     """
     # Validation
     error_message = (
@@ -250,7 +273,19 @@ def save(
     if component is None:
         component = 0
 
+    # Load parcellation file
     parcellation = Parcellation(parcellation_file)
+
+    # Default plotting settings
+    default_plot_kwargs = {
+        "node_size": 10,
+        "node_color": "black",
+        "edge_vmin": 0,
+        "edge_vmax": connectivity_map[component].max(),
+    }
+
+    # Overwrite keyword arguments if passed
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     # Plot maps
     n_modes = connectivity_map.shape[1]
@@ -263,7 +298,6 @@ def save(
         plotting.plot_connectome(
             conn_map,
             parcellation.roi_centers(),
-            colorbar=True,
             edge_threshold=f"{threshold * 100}%",
             output_file=output_file,
             **plot_kwargs,

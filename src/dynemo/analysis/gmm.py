@@ -10,8 +10,6 @@ from dynemo.utils import plotting
 
 def fit_gaussian_mixture(
     X: np.ndarray,
-    n_fits: int = 1,
-    max_iter: int = 1000,
     plot_filename: str = None,
     print_message: bool = True,
 ) -> np.ndarray:
@@ -21,10 +19,6 @@ def fit_gaussian_mixture(
     ----------
     X : np.ndarray
         Data to fit Gaussian mixture model to.
-    n_fits : int
-        How many times should we fit the Gaussian mixture model. Optional.
-    max_iter : int
-        Maximum number of iterations. Optional.
     plot_filename : str
         Filename to save a plot of the Gaussian mixture model. Optional.
     print_message : bool
@@ -48,20 +42,15 @@ def fit_gaussian_mixture(
     X = standardize(X)
 
     # Fit a Gaussian mixture model
-    lower_bound = np.Inf
-    for i in range(n_fits):
-        bgm = BayesianGaussianMixture(n_components=2, max_iter=max_iter)
-        bgm.fit(X)
-        if bgm.lower_bound_ < lower_bound:
-            # Inferred parameters
-            amplitudes = np.squeeze(bgm.weights_) / np.sqrt(
-                2 * np.pi * np.squeeze(bgm.covariances_)
-            )
-            means = np.squeeze(bgm.means_)
-            variances = np.sqrt(np.squeeze(bgm.covariances_))
+    bgm = BayesianGaussianMixture(n_components=2, max_iter=5000, n_init=10)
+    bgm.fit(X)
 
-            # Update best lower bound
-            lower_bound = bgm.lower_bound_
+    # Inferred parameters
+    amplitudes = np.squeeze(bgm.weights_) / np.sqrt(
+        2 * np.pi * np.squeeze(bgm.covariances_)
+    )
+    means = np.squeeze(bgm.means_)
+    variances = np.sqrt(np.squeeze(bgm.covariances_))
 
     # Plots
     if plot_filename is not None:
