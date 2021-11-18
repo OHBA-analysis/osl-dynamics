@@ -369,7 +369,7 @@ def plot_scatter(
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    colors = get_colors(len(x), colormap=None)
+    colors = get_colors(len(x), colormap="tab10")
 
     # Create figure
     if ax is None:
@@ -377,7 +377,14 @@ def plot_scatter(
 
     # Plot data
     for i in range(len(x)):
-        ax.scatter(x[i], y[i], label=labels[i], marker=markers[i], **plot_kwargs)
+        ax.scatter(
+            x[i],
+            y[i],
+            label=labels[i],
+            marker=markers[i],
+            color=colors[i],
+            **plot_kwargs,
+        )
         if errors[i] is not None:
             ax.errorbar(x[i], y[i], yerr=errors[i], fmt="none", c=colors[i])
 
