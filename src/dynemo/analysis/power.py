@@ -27,13 +27,13 @@ def variance_from_spectra(
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if frequency_range is given.
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape is (n_modes, n_channels,
-        n_channels, n_f).
+        Power/cross spectra for each channel.
+        Can be an (n_channels, n_channels) array or (n_channels,) array.
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Optional: default is full
-        range.
+        Frequency range to integrate the PSD over (Hz).
+        Optional: default is full range.
 
     Returns
     -------
@@ -43,18 +43,40 @@ def variance_from_spectra(
     """
 
     # Validation
-    error_message = (
-        "A (n_channels, n_channels, n_frequency_bins), "
-        + "(n_modes, n_channels, n_channels, n_frequency_bins) or "
-        + "(n_subjects, n_modes, n_channels, n_channels, n_frequency_bins) "
-        + "array must be passed."
-    )
-    power_spectra = array_ops.validate(
-        power_spectra,
-        correct_dimensionality=5,
-        allow_dimensions=[3, 4],
-        error_message=error_message,
-    )
+    if power_spectra.ndim == 2:
+        # PSDs were passed
+        power_spectra = power_spectra[np.newaxis, np.newaxis, ...]
+        n_subjects, n_modes, n_channels, n_f = power_spectra.shape
+
+    elif power_spectra.shape[-2] != power_spectra.shape[-3]:
+        # PSDs were passed, check dimensionality
+        error_message = (
+            "A (n_channels, n_f), (n_modes, n_channels, n_f) or "
+            + "(n_subjects, n_modes, n_channels, n_f) array must be passed."
+        )
+        power_spectra = array_ops.validate(
+            power_spectra,
+            correct_dimensionality=4,
+            allow_dimensions=[2, 3],
+            error_message=error_message,
+        )
+        n_subjects, n_modes, n_channels, n_f = power_spectra.shape
+
+    else:
+        # Cross spectra were passed, check dimensionality
+        error_message = (
+            "A (n_channels, n_channels, n_f), "
+            + "(n_modes, n_channels, n_channels, n_f) or "
+            + "(n_subjects, n_modes, n_channels, n_channels, n_f) "
+            + "array must be passed."
+        )
+        power_spectra = array_ops.validate(
+            power_spectra,
+            correct_dimensionality=5,
+            allow_dimensions=[3, 4],
+            error_message=error_message,
+        )
+        n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
 
     if components is not None and frequency_range is not None:
         raise ValueError(
@@ -66,8 +88,7 @@ def variance_from_spectra(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
-    # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
+    # Number of spectral components
     if components is None:
         n_components = 1
     else:
@@ -77,10 +98,18 @@ def variance_from_spectra(
     var = []
     for i in range(n_subjects):
 
-        # Remove cross-spectral densities from the power spectra array
-        # and concatenate over modes
-        psd = power_spectra[i, :, range(n_channels), range(n_channels)]
+        # Get PSDs
+        if power_spectra.shape[-2] == power_spectra.shape[-3]:
+            # Cross-spectra densities were passed
+            psd = power_spectra[i, :, range(n_channels), range(n_channels)]
+        else:
+            # Only the PSDs were passed
+            psd = power_spectra[i]
+
+        # Swap mode and channel dimensions
         psd = np.swapaxes(psd, 0, 1)
+
+        # Concatenate over modes
         psd = psd.reshape(-1, n_f)
         psd = psd.real
 
@@ -91,13 +120,13 @@ def variance_from_spectra(
         else:
             # Integrate over the given frequency range
             if frequency_range is None:
-                p = np.sum(psd, axis=-1)
+                p = np.mean(psd, axis=-1)
             else:
                 f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
                 f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
                 if f_max_arg < f_min_arg:
                     raise ValueError("Cannot select the specified frequency range.")
-                p = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+                p = np.mean(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
 
