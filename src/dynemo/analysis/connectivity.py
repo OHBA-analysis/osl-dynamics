@@ -193,13 +193,18 @@ def mean_coherence_from_spectra(
         # Mean coherence over modes
         mean_coh = np.mean(coh, axis=1)
 
+        # Indices for off diagonal elements
+        m, n = np.triu_indices(n_channels, k=1)
+
         # Loop over components and modes
         for i in range(n_components):
             for j in range(n_modes):
 
-                # Coherence values to fit a GMM to
-                c = coh[i, j] - mean_coh[i]
-                c = c.flatten()
+                # Off diagonal coherence values to fit a GMM to
+                c = coh[i, j, m, n] - mean_coh[i, m, n]
+
+                # Replace nans with mean value so that they don't affect the GMM fit
+                c[np.isnan(c)] = np.mean(c[~np.isnan(c)])
 
                 # Fit a GMM
                 if gmm_filename is not None:
@@ -220,10 +225,12 @@ def mean_coherence_from_spectra(
                     plot_filename=plot_filename,
                 )
 
-                # Only keep the second mixture component
-                c = coh[i, j].flatten()
+                # Only keep the second mixture component and remove nan connections
+                c = coh[i, j, m, n]
                 c[mixture_label == 0] = 0
-                coh[i, j] = c.reshape(n_channels, n_channels)
+                c[np.isnan(c)] = 0
+                coh[i, j, m, n] = c
+                coh[i, j, n, m] = c
 
     return np.squeeze(coh)
 
@@ -276,27 +283,32 @@ def save(
     # Load parcellation file
     parcellation = Parcellation(parcellation_file)
 
+    # Select the component we're plotting
+    conn_map = connectivity_map[component]
+
+    # Remove perfect connections so the colorbar has a reasonable range
+    conn_map[conn_map > 0.999] = 0
+
     # Default plotting settings
     default_plot_kwargs = {
         "node_size": 10,
         "node_color": "black",
         "edge_vmin": 0,
-        "edge_vmax": connectivity_map[component].max(),
+        "edge_vmax": conn_map.max(),
+        "colorbar": True,
     }
 
     # Overwrite keyword arguments if passed
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     # Plot maps
-    n_modes = connectivity_map.shape[1]
+    n_modes = conn_map.shape[0]
     for i in trange(n_modes, desc="Saving images", ncols=98):
-        conn_map = connectivity_map[component, i].copy()
-        np.fill_diagonal(conn_map, 0)
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
             fn=Path(filename), i=i, w=len(str(n_modes))
         )
         plotting.plot_connectome(
-            conn_map,
+            conn_map[i],
             parcellation.roi_centers(),
             edge_threshold=f"{threshold * 100}%",
             output_file=output_file,
