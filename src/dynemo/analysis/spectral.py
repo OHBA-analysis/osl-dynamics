@@ -717,8 +717,15 @@ def regression_spectra(
             Pt[i] = abs(Pt[i])
         Pj.append(regression.linear(at[i], Pt[i], fit_intercept=True, normalize=True))
 
+    # Weights for calculating the group average PSD
+    n_samples = [d.shape[0] for d in data]
+    weights = np.array(n_samples) / np.sum(n_samples)
+
     if psd_only:
-        return f, np.squeeze(Pj)
+        if return_weights:
+            return f, np.squeeze(Pj), weights
+        else:
+            return f, np.squeeze(Pj)
 
     # Number of parcels and freqency bins
     n_parcels = data[0].shape[1]
@@ -740,10 +747,6 @@ def regression_spectra(
         p = P[i]  # subject specific cross spectra
         psd.append(p[:, range(n_parcels), range(n_parcels)])
         coh.append(coherence_spectra(p, print_message=False))
-
-    # Weights for calculating the group average PSD
-    n_samples = [d.shape[0] for d in data]
-    weights = np.array(n_samples) / np.sum(n_samples)
 
     if return_weights:
         return f, np.squeeze(psd), np.squeeze(coh), weights
