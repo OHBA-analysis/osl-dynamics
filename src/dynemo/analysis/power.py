@@ -10,6 +10,7 @@ import numpy as np
 from nilearn import plotting
 from tqdm import trange
 from dynemo import array_ops, files
+from dynemo.analysis.spectral import get_frequency_args_range
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -106,9 +107,6 @@ def variance_from_spectra(
             # Only the PSDs were passed
             psd = power_spectra[i]
 
-        # Swap mode and channel dimensions
-        psd = np.swapaxes(psd, 0, 1)
-
         # Concatenate over modes
         psd = psd.reshape(-1, n_f)
         psd = psd.real
@@ -122,10 +120,9 @@ def variance_from_spectra(
             if frequency_range is None:
                 p = np.mean(psd, axis=-1)
             else:
-                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-                if f_max_arg < f_min_arg:
-                    raise ValueError("Cannot select the specified frequency range.")
+                [f_min_arg, f_max_arg] = get_frequency_args_range(
+                    frequencies, frequency_range
+                )
                 p = np.mean(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
