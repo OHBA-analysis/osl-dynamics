@@ -27,9 +27,6 @@ class MVN:
         Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for the random number generator.
-    uni_std : bool
-        Do we want uni standard deviation across all channels? True only effective in
-        multi-scale model.
     """
 
     def __init__(
@@ -40,7 +37,6 @@ class MVN:
         n_channels: int = None,
         observation_error: float = 0.0,
         random_seed: int = None,
-        uni_std: bool = False,
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
@@ -90,13 +86,6 @@ class MVN:
 
         else:
             raise ValueError("means and covariance arugments not passed correctly.")
-
-        # Get the std and fc from self.covariance
-        if uni_std:
-            self.std = np.ones([self.n_modes, self.n_channels])
-        else:
-            self.std = array_ops.cov2sd(self.covariances)
-        self.fcs = array_ops.cov2corr(self.covariances)
 
     def create_means(self, option):
         if option == "zero":
@@ -161,11 +150,77 @@ class MVN:
 
         return data.astype(np.float32)
 
-    def simulate_data_multiple_scales(self, state_time_courses):
 
-        # Here state_time_courses.shape = (n_samples, n_modes, 3)
-        # It contains 3 different time courses for mean, standard deviations, and fc
+class MS_MVN(MVN):
+    """Class that generates data from a multivariate normal distribution.
 
+    Multi-time-scale version of MVN.
+
+    Parameters
+    ----------
+    n_channels : int
+        Number of channels.
+    n_modes : int
+        Number of modes.
+    means : np.ndarray or str
+        Mean vector for each mode, shape should be (n_modes, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Covariance matrix for each mode, shape should be (n_modes,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for the random number generator.
+    uni_std : bool
+        Do we want the same standard deviation across channels? Optional.
+    """
+
+    def __init__(
+        self,
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_modes: int = None,
+        n_channels: int = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+        uni_std: bool = False,
+    ):
+        super().__init__(
+            means=means,
+            covariances=covariances,
+            n_modes=n_modes,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        # Get the std and FC from self.covariance
+        if uni_std:
+            self.std = np.ones([self.n_modes, self.n_channels])
+        else:
+            self.std = array_ops.cov2sd(self.covariances)
+        self.fc = array_ops.cov2corr(self.covariances)
+
+    def simulate_data(self, state_time_courses: np.ndarray) -> np.ndarray:
+        """Simulates data.
+
+        Parameters
+        ----------
+        state_time_courses : np.ndarray
+            It contains 3 different time courses for mean, standard deviations
+            and FC. Shape is (3, n_samples, n_modes).
+
+        Returns
+        -------
+        np.ndarray
+            Simulated data. Shape is (n_samples, n_channels).
+        """
+        # Reshape state_time_courses so that the multi-time-scale dimension
+        # is last
+        state_time_courses = np.rollaxis(state_time_courses, 0, 3)
+
+        # Number of samples to simulate
         n_samples = state_time_courses.shape[0]
 
         # Initialise array to hold data
@@ -173,19 +228,22 @@ class MVN:
 
         # Loop through all unique combinations of states
         for time_courses in np.unique(state_time_courses, axis=0):
+
             # Extract the 3 different time courses
             alpha = time_courses[:, 0]
             beta = time_courses[:, 1]
             gamma = time_courses[:, 2]
 
-            # Mean, standard deviation, fc for this combination of 3 time courses
+            # Mean, standard deviation, FC for this combination of 3 time courses
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
             G = np.diag(np.sum(self.std * beta[:, np.newaxis], axis=0))
-            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+            F = np.sum(self.fc * gamma[:, np.newaxis, np.newaxis], axis=0)
 
-            sigma = np.matmul(G, np.matmul(F, G))
+            # Calculate covariance matrix from the standard deviation and FC
+            sigma = G @ F @ G
 
-            # Generate data for the time points that this combination of states is active
+            # Generate data for the time points that this combination of states
+            # is active
             data[
                 np.all(state_time_courses == time_courses, axis=(1, 2))
             ] = self._rng.multivariate_normal(

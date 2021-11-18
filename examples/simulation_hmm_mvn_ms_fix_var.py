@@ -75,11 +75,6 @@ config = Config(
     fix_std=True,
 )
 
-
-# Set the multi-start parameters
-config.n_init=10
-config.n_init_epochs=config.n_epochs // 10
-
 # Prepare dataset
 training_dataset = meg_data.dataset(
     config.sequence_length,
@@ -96,6 +91,10 @@ prediction_dataset = meg_data.dataset(
 print("Building Model")
 model = Model(config)
 model.summary()
+
+# Multi-start training
+config.n_init = 10
+config.n_init_epochs = config.n_epochs // 10
 
 print("Initializing the model")
 model.initialize(
@@ -129,62 +128,47 @@ print("means:", means)
 print("stds:", stds)
 print("fcs:", fcs)
 
-# Inferred mode mixing factors and mode time course
+# Inferred mode mixing factors
 inf_alpha, inf_beta, inf_gamma = model.get_mode_time_courses(prediction_dataset)
 
-inf_stc_alpha = modes.time_courses(inf_alpha)
-inf_stc_beta = modes.time_courses(inf_beta)
-inf_stc_gamma = modes.time_courses(inf_gamma)
+inf_alpha = modes.time_courses(inf_alpha)
+inf_beta = modes.time_courses(inf_beta)
+inf_gamma = modes.time_courses(inf_gamma)
 
-sim_stc = sim.mode_time_course
-sim_stc_alpha = sim_stc[:, :, 0]
-sim_stc_beta = sim_stc[:, :, 1]
-sim_stc_gamma = sim_stc[:, :, 2]
+# Simulated mode mixing factors
+sim_alpha, sim_beta, sim_gamma = sim.mode_time_course
 
-sim_stc_alpha, inf_stc_alpha = modes.match_modes(sim_stc_alpha, inf_stc_alpha)
-sim_stc_beta, inf_stc_beta = modes.match_modes(sim_stc_beta, inf_stc_beta)
-sim_stc_gamma, inf_stc_gamma = modes.match_modes(sim_stc_gamma, inf_stc_gamma)
+# Match the inferred and simulated mixing factors
+sim_alpha, inf_alpha = modes.match_modes(sim_alpha, inf_alpha)
+sim_beta, inf_beta = modes.match_modes(sim_beta, inf_beta)
+sim_gamma, inf_gamma = modes.match_modes(sim_gamma, inf_gamma)
 
-print(
-    "Dice coefficient for mean:", metrics.dice_coefficient(sim_stc_alpha, inf_stc_alpha)
-)
-print(
-    "Dice coefficient for standard deviation:",
-    metrics.dice_coefficient(sim_stc_beta, inf_stc_beta),
-)
-print(
-    "Dice coefficient for fc:", metrics.dice_coefficient(sim_stc_gamma, inf_stc_gamma)
-)
+# Dice coefficients
+dice_alpha = metrics.dice_coefficients(sim_alpha, inf_alpha)
+dice_beta = metrics.dice_coefficients(sim_beta, inf_beta)
+dice_gamma = metrics.dice_coefficients(sim_gamma, inf_gamma)
+
+print("Dice coefficient for mean:", dice_alpha)
+print("Dice coefficient for std:", dice_beta)
+print("Dice coefficient for fc:", dice_gamma)
 
 # Fractional occupancies
-print(
-    "Fractional occupancies mean (Simulation):",
-    modes.fractional_occupancies(sim_stc_alpha),
-)
-print(
-    "Fractional occupancies mean (DyNeMo):      ",
-    modes.fractional_occupancies(inf_stc_alpha),
-)
+fo_sim_alpha = modes.fractional_occupancies(sim_alpha)
+fo_sim_beta = modes.fractional_occupancies(sim_beta)
+fo_sim_gamma = modes.fractional_occupancies(sim_gamma)
 
+fo_inf_alpha = modes.fractional_occupancies(inf_alpha)
+fo_inf_beta = modes.fractional_occupancies(inf_beta)
+fo_inf_gamma = modes.fractional_occupancies(inf_gamma)
 
-print(
-    "Fractional occupancies standard deviation (Simulation):",
-    modes.fractional_occupancies(sim_stc_beta),
-)
-print(
-    "Fractional occupancies standard deviation (DyNeMo):      ",
-    modes.fractional_occupancies(inf_stc_beta),
-)
+print("Fractional occupancies mean (Simulation):", fo_sim_alpha)
+print("Fractional occupancies mean (DyNeMo):    ", fo_inf_alpha)
 
+print("Fractional occupancies std (Simulation):", fo_sim_beta)
+print("Fractional occupancies std (DyNeMo):    ", fo_inf_beta)
 
-print(
-    "Fractional occupancies fc (Simulation):",
-    modes.fractional_occupancies(sim_stc_gamma),
-)
-print(
-    "Fractional occupancies fc (DyNeMo):      ",
-    modes.fractional_occupancies(inf_stc_gamma),
-)
+print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
+print("Fractional occupancies fc (DyNeMo):    ", fo_inf_gamma)
 
 # Plot training history
 history = history.history

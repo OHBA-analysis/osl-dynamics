@@ -83,18 +83,22 @@ class DiceCoefficientCallback(callbacks.Callback):
         if ground_truth_mode_time_course.ndim == 2:
             # We're training a single time scale model
             self.n_time_courses = 1
-            self.gtmtc = ground_truth_mode_time_course[..., np.newaxis]
-        else:
+            self.gtmtc = ground_truth_mode_time_course[np.newaxis, ...]
+        elif ground_truth_mode_time_course.ndim == 3:
             # We're training a multi-time-scale model
-            self.n_time_courses = ground_truth_mode_time_course.shape[2]
+            self.n_time_courses = ground_truth_mode_time_course.shape[0]
             self.gtmtc = ground_truth_mode_time_course
+        else:
+            raise ValueError(
+                "A 2D or 3D numpy array must be pass for ground_truth_mode_time_course."
+            )
         if mode_names is not None:
             if len(mode_names) != self.n_time_courses:
                 raise ValueError(
                     "Mismatch between the number of mode_names and time courses."
                 )
         self.mode_names = mode_names
-        self.n_modes = ground_truth_mode_time_course.shape[1]
+        self.n_modes = ground_truth_mode_time_course.shape[-1]
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -122,7 +126,7 @@ class DiceCoefficientCallback(callbacks.Callback):
             pmtc = inference.modes.time_courses(
                 tc[i], concatenate=True, n_modes=self.n_modes
             )
-            pmtc, gtmtc = inference.modes.match_modes(pmtc, self.gtmtc[:, :, i])
+            pmtc, gtmtc = inference.modes.match_modes(pmtc, self.gtmtc[i])
             dice = inference.metrics.dice_coefficient(pmtc, gtmtc)
             dices.append(dice)
 

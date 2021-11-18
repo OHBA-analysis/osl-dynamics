@@ -7,7 +7,7 @@ from typing import Union
 
 import numpy as np
 from dynemo.array_ops import get_one_hot, cov2corr
-from dynemo.simulation import MAR, MVN, SingleSine, Simulation
+from dynemo.simulation import MAR, MS_MVN, MVN, SingleSine, Simulation
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -284,9 +284,11 @@ class HMM_MVN(Simulation):
         super().standardize()
         self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
 
+
 class MS_HMM_MVN(Simulation):
     """Simulate an HMM with a mulitvariate normal observation model.
-        Multi-scale version of HMM_MVN
+
+    Multi-time-scale version of HMM_MVN.
 
     Parameters
     ----------
@@ -313,9 +315,10 @@ class MS_HMM_MVN(Simulation):
     random_seed : int
         Seed for random number generator. Optional.
     fix_std: bool
-        Do we want to remove dependency of loss function on standard deviation time course?
+        Do we want to remove dependency of loss function on standard deviation
+        time course? Optional.
     uni_std: bool
-        Do we want uni std across channels? Only effective in multi-scale inference.
+        Do we want the same standard deviation across channels? Optional.
     """
 
     def __init__(
@@ -333,7 +336,7 @@ class MS_HMM_MVN(Simulation):
         uni_std: bool = False,
     ):
         # Observation model
-        self.obs_mod = MVN(
+        self.obs_mod = MS_MVN(
             means=means,
             covariances=covariances,
             n_modes=n_modes,
@@ -346,45 +349,45 @@ class MS_HMM_MVN(Simulation):
         self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
 
-        # HMM object
+        # HMM objects for sampling state time courses
         # N.b. we use a different random seed to the observation model
-        self.hmm = HMM(
+        self.alpha_hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_modes=self.n_modes,
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
-
+        self.beta_hmm = HMM(
+            trans_prob=np.eye(self.n_modes) if fix_std else trans_prob,
+            stay_prob=stay_prob,
+            n_modes=self.n_modes,
+            random_seed=random_seed if random_seed is None else random_seed + 2,
+        )
+        self.gamma_hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_modes=self.n_modes,
+            random_seed=random_seed if random_seed is None else random_seed + 3,
+        )
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
 
-        # Simulate data
-        self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
-        for i in range(3):
-            self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
-        if fix_std:
-            # if fix_std, then generate the standard deviation time course with
-            # identity transition probability matrix.
-            self.hmm_fix_std = HMM(
-                trans_prob=np.eye(self.n_modes),
-                stay_prob=stay_prob,
-                n_modes=self.n_modes,
-                random_seed=random_seed if random_seed is None else random_seed + 1,
-            )
-            self.mode_time_course[:, :, 1] = self.hmm_fix_std.generate_modes(
-                self.n_samples
-            )
-        self.time_series = self.obs_mod.simulate_data_multiple_scales(
-            self.mode_time_course
+        # Simulate state time courses
+        self.mode_time_course = np.array(
+            [
+                self.alpha_hmm.generate_modes(self.n_samples),
+                self.beta_hmm.generate_modes(self.n_samples),
+                self.gamma_hmm.generate_modes(self.n_samples),
+            ]
         )
 
+        # Simulate data
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hmm):
-            return getattr(self.hmm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
