@@ -227,8 +227,89 @@ class HMM_MVN(Simulation):
         Optional.
     observation_error : float
         Standard deviation of the error added to the generated data.
-    multiple_scales: bool
-        Do we want to simulate different time courses for mean, standard deviation, and fc?
+    random_seed : int
+        Seed for random number generator. Optional.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str, None],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_modes: int = None,
+        n_channels: int = None,
+        stay_prob: float = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+    ):
+        # Observation model
+        self.obs_mod = MVN(
+            means=means,
+            covariances=covariances,
+            n_modes=n_modes,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        self.n_modes = self.obs_mod.n_modes
+        self.n_channels = self.obs_mod.n_channels
+
+        # HMM object
+        # N.b. we use a different random seed to the observation model
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_modes=self.n_modes,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.mode_time_course = self.hmm.generate_modes(self.n_samples)
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hmm):
+            return getattr(self.hmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+    def standardize(self):
+        super().standardize()
+        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
+
+class MS_HMM_MVN(Simulation):
+    """Simulate an HMM with a mulitvariate normal observation model.
+        Multi-scale version of HMM_MVN
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    means : np.ndarray or str
+        Mean vector for each mode, shape should be (n_modes, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Covariance matrix for each mode, shape should be (n_modes,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+        Optional.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for random number generator. Optional.
     fix_std: bool
@@ -247,7 +328,6 @@ class HMM_MVN(Simulation):
         n_channels: int = None,
         stay_prob: float = None,
         observation_error: float = 0.0,
-        multiple_scales: bool = False,
         random_seed: int = None,
         fix_std: bool = False,
         uni_std: bool = False,
@@ -275,34 +355,30 @@ class HMM_MVN(Simulation):
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
-        self.multiple_scales = multiple_scales
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
-        if multiple_scales:
-            self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
-            for i in range(3):
-                self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
-            if fix_std:
-                # if fix_std, then generate the standard deviation time course with
-                # identity transition probability matrix.
-                self.hmm_fix_std = HMM(
-                    trans_prob=np.eye(self.n_modes),
-                    stay_prob=stay_prob,
-                    n_modes=self.n_modes,
-                    random_seed=random_seed if random_seed is None else random_seed + 1,
-                )
-                self.mode_time_course[:, :, 1] = self.hmm_fix_std.generate_modes(
-                    self.n_samples
-                )
-            self.time_series = self.obs_mod.simulate_data_multiple_scales(
-                self.mode_time_course
+        self.mode_time_course = np.zeros([self.n_samples, self.n_modes, 3], int)
+        for i in range(3):
+            self.mode_time_course[:, :, i] = self.hmm.generate_modes(self.n_samples)
+        if fix_std:
+            # if fix_std, then generate the standard deviation time course with
+            # identity transition probability matrix.
+            self.hmm_fix_std = HMM(
+                trans_prob=np.eye(self.n_modes),
+                stay_prob=stay_prob,
+                n_modes=self.n_modes,
+                random_seed=random_seed if random_seed is None else random_seed + 1,
             )
-        else:
-            self.mode_time_course = self.hmm.generate_modes(self.n_samples)
-            self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
+            self.mode_time_course[:, :, 1] = self.hmm_fix_std.generate_modes(
+                self.n_samples
+            )
+        self.time_series = self.obs_mod.simulate_data_multiple_scales(
+            self.mode_time_course
+        )
+
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
@@ -311,11 +387,6 @@ class HMM_MVN(Simulation):
             return getattr(self.hmm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
-
-    def standardize(self):
-        super().standardize()
-        if not self.multiple_scales:
-            self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
 
 
 class HierarchicalHMM_MVN(Simulation):

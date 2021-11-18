@@ -27,7 +27,7 @@ n_modes = cov.shape[0]
 n_channels = cov.shape[-1]
 
 print("Simulating data")
-sim = simulation.HMM_MVN(
+sim = simulation.MS_HMM_MVN(
     n_samples=n_samples,
     trans_prob=trans_prob,
     means="random",
@@ -36,7 +36,6 @@ sim = simulation.HMM_MVN(
     covariances="random",
     observation_error=observation_error,
     random_seed=123,
-    multiple_scales=True,
     fix_std=True,
     uni_std=True,
 )
@@ -51,12 +50,14 @@ config = Config(
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=128,
+    inference_n_layers=2,
     inference_normalization="layer",
-    inference_dropout_rate=0.4,
+    inference_dropout_rate=0.2,
     model_rnn="lstm",
     model_n_units=128,
+    model_n_layers=2,
     model_normalization="layer",
-    model_dropout_rate=0.4,
+    model_dropout_rate=0.2,
     theta_normalization="layer",
     alpha_xform="softmax",
     learn_alpha_temperature=True,
@@ -67,12 +68,17 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=150,
+    n_kl_annealing_epochs=300,
     batch_size=16,
     learning_rate=0.005,
-    n_epochs=300,
+    n_epochs=400,
     fix_std=True,
 )
+
+
+# Set the multi-start parameters
+config.n_init=10
+config.n_init_epochs=config.n_epochs // 10
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
@@ -90,6 +96,13 @@ prediction_dataset = meg_data.dataset(
 print("Building Model")
 model = Model(config)
 model.summary()
+
+print("Initializing the model")
+model.initialize(
+    training_dataset,
+    epochs=config.n_init_epochs,
+    n_init=config.n_init,
+)
 
 # Callbacks
 dice_callback = callbacks.DiceCoefficientCallback(
