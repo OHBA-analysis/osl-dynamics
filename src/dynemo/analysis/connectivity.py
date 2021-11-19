@@ -6,9 +6,11 @@ from pathlib import Path
 
 import numpy as np
 from nilearn import plotting
+from nilearn.plotting.cm import _cmap_d as cm
 from tqdm import trange
 from dynemo import array_ops
 from dynemo.analysis.gmm import fit_gaussian_mixture
+from dynemo.analysis.spectral import get_frequency_args_range
 from dynemo.utils.parcellation import Parcellation
 from dynemo.utils.misc import override_dict_defaults
 
@@ -82,17 +84,16 @@ def covariance_from_spectra(
         if components is not None:
             # Calculate PSD for each spectral component
             c = components @ csd.T
+            for j in range(n_components):
+                c[j] /= np.sum(components[j])
 
         else:
             # Integrate over the given frequency range
             if frequency_range is None:
                 c = np.sum(csd, axis=-1)
             else:
-                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-                if f_max_arg < f_min_arg:
-                    raise ValueError("Cannot select the specified frequency range.")
-                c = np.sum(csd[..., f_min_arg : f_max_arg + 1], axis=-1)
+                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
+                c = np.sum(csd[..., f_min:f_max], axis=-1)
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         covar.append(c)
@@ -174,17 +175,16 @@ def mean_coherence_from_spectra(
         if components is not None:
             # Coherence for each spectral component
             coh = components @ coh.T
+            for j in range(n_components):
+                coh[j] /= np.sum(components[j])
 
         else:
             # Mean over the given frequency range
             if frequency_range is None:
                 coh = np.mean(coh, axis=-1)
             else:
-                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-                if f_max_arg < f_min_arg:
-                    raise ValueError("Cannot select the specified frequency range.")
-                coh = np.mean(coh[..., f_min_arg : f_max_arg + 1], axis=-1)
+                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
+                coh = np.mean(coh[..., f_min:f_max], axis=-1)
 
         coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)
@@ -286,8 +286,9 @@ def save(
     # Select the component we're plotting
     conn_map = connectivity_map[component]
 
-    # Remove perfect connections so the colorbar has a reasonable range
-    conn_map[conn_map > 0.999] = 0
+    if conn_map.max() <= 1:
+        # Remove perfect connections so the colorbar has a reasonable range
+        conn_map[conn_map > 0.999] = 0
 
     # Default plotting settings
     default_plot_kwargs = {
@@ -295,6 +296,7 @@ def save(
         "node_color": "black",
         "edge_vmin": 0,
         "edge_vmax": conn_map.max(),
+        "edge_cmap": cm["red_transparent_full_alpha_range"],
         "colorbar": True,
     }
 

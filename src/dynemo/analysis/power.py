@@ -103,6 +103,7 @@ def variance_from_spectra(
         if power_spectra.shape[-2] == power_spectra.shape[-3]:
             # Cross-spectra densities were passed
             psd = power_spectra[i, :, range(n_channels), range(n_channels)]
+            psd = np.swapaxes(psd, 0, 1)
         else:
             # Only the PSDs were passed
             psd = power_spectra[i]
@@ -114,6 +115,8 @@ def variance_from_spectra(
         if components is not None:
             # Calculate PSD for each spectral component
             p = components @ psd.T
+            for j in range(n_components):
+                p[j] /= np.sum(components[j])
 
         else:
             # Integrate over the given frequency range

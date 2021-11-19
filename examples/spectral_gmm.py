@@ -1,5 +1,7 @@
 """Simulates a Gaussian Mixture Model and infers its parameters.
 
+- This method is often used to select connections in coherence maps
+  that have an abnormally high value.
 """
 
 import numpy as np
