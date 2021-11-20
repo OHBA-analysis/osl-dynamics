@@ -307,14 +307,16 @@ f, psd, coh, w = analysis.spectral.regression_spectra(
     step_size=20,
     n_sub_windows=8,
     return_weights=True,
+    return_coef_int=True,
 )
 
 # Average subject-specific PSDs to get the group-level mode PSDs
 gpsd = np.average(psd, axis=0, weights=w)
 
-# Plot mean over channels
-p = np.mean(gpsd, axis=1)
-e = np.std(gpsd, axis=1) / np.sqrt(gpsd.shape[1])
+# Sum regression coefficients and intercept and calculate mean over channels
+P = np.sum(gpsd, axis=0)
+p = np.mean(P, axis=1)
+e = np.std(P, axis=1) / np.sqrt(P.shape[1])
 
 plotting.plot_line(
     [f] * p.shape[0],
@@ -327,8 +329,10 @@ plotting.plot_line(
     filename=f"{analysis_dir}/psd1.png",
 )
 
-# Plot mode PSDs relative to the mean
-p -= np.mean(p, axis=0)
+# Just plot the regression coefficients averaged over channels
+P = gpsd[0]
+p = np.mean(P, axis=1)
+e = np.std(P, axis=1) / np.sqrt(P.shape[1])
 
 plotting.plot_line(
     [f] * p.shape[0],
@@ -354,7 +358,7 @@ parcellation_file = (
 )
 
 # Calculate relative power maps using the mode PSDs
-power_map = analysis.power.variance_from_spectra(f, gpsd)
+power_map = analysis.power.variance_from_spectra(f, gpsd.sum(axis=0))
 analysis.power.save(
     power_map=power_map,
     mask_file=mask_file,

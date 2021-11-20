@@ -617,10 +617,8 @@ def regression_spectra(
     step_size: int = 1,
     n_sub_windows: int = 1,
     return_weights: bool = False,
-) -> Union[
-    Tuple[np.ndarray, np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-]:
+    return_coef_int: bool = False,
+):
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
     Parameters
@@ -647,13 +645,18 @@ def regression_spectra(
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD. Optional.
+    return_coef_int : bool
+        Should we return the regression coefficients and intercept
+        separately for the PSDs? Optional.
 
     Returns
     -------
     f : np.ndarray
         Frequency axis.
     psd : np.ndarray
-        Mode PSDs.
+        Mode PSDs. A numpy array with shape (n_subjects, 2, n_modes, n_channels, n_f)
+        where the first axis is the coefficients/intercept if return_coef_int=True,
+        otherwise shape is (n_subjects, n_modes, n_channels, n_f).
     coh : np.ndarray
         Mode coherences.
     w : np.ndarray
@@ -713,9 +716,15 @@ def regression_spectra(
     # Regress the time-varying PSD with alpha to get the mode PSDs
     Pj = []
     for i in trange(n_subjects, desc="Fitting linear regression", ncols=98):
-        if calc_cpsd:
-            Pt[i] = abs(Pt[i])
-        Pj.append(regression.linear(at[i], Pt[i], fit_intercept=True, normalize=True))
+        Pt[i] = abs(Pt[i])  # sklearn LinearRegression doesn't accept complex numbers
+        coefs, intercept = regression.linear(
+            at[i], Pt[i], fit_intercept=True, normalize=True
+        )
+        if return_coef_int:
+            Pj.append([coefs, intercept])
+        else:
+            Pj.append([coefs + intercept[np.newaxis, ...]])
+    Pj = np.array(Pj, dtype=object)
 
     # Weights for calculating the group average PSD
     n_samples = [d.shape[0] for d in data]
@@ -730,23 +739,32 @@ def regression_spectra(
     # Number of parcels and freqency bins
     n_parcels = data[0].shape[1]
     n_modes = alpha[0].shape[1]
-    n_f = Pj[0].shape[-1]
+    n_f = Pj[0][0].shape[-1]
 
     # Indices of the upper triangle of an n_parcels by n_parcels array
-    i, j = np.triu_indices(n_parcels)
+    m, n = np.triu_indices(n_parcels)
 
     # Create a n_parcels by n_parcels array
-    P = np.empty([n_subjects, n_modes, n_parcels, n_parcels, n_f])
-    P[:, :, i, j] = Pj
-    P[:, :, j, i] = Pj
+    P = []
+    for i in range(n_subjects):
+        P.append([])
+        for j in range(len(Pj[i])):
+            p = np.empty([n_modes, n_parcels, n_parcels, n_f])
+            p[:, m, n] = Pj[i][j]
+            p[:, n, m] = Pj[i][j]
+            P[i].append(p)
+    P = np.array(P)
 
     # PSDs and coherences for each mode
     psd = []
     coh = []
     for i in range(n_subjects):
-        p = P[i]  # subject specific cross spectra
-        psd.append(p[:, range(n_parcels), range(n_parcels)])
-        coh.append(coherence_spectra(p, print_message=False))
+        p = P[i, :, :, range(n_parcels), range(n_parcels)]
+        p = np.rollaxis(p, 0, 3)
+        c = np.sum(P[i], axis=0)  # sum coefs and intercept
+        c = coherence_spectra(c, print_message=False)
+        psd.append(p)
+        coh.append(c)
 
     if return_weights:
         return f, np.squeeze(psd), np.squeeze(coh), weights
