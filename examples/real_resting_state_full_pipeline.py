@@ -259,7 +259,7 @@ lt = inference.modes.lifetimes(
 intv = inference.modes.intervals(
     argmax_a_NW, sampling_frequency=training_data.sampling_frequency
 )
-fo = inference.modes.fractional_occupancies(argmax_a_NW)
+fo = np.array(inference.modes.fractional_occupancies(argmax_a_NW))
 
 mean_lt = np.array([np.mean(lifetimes) for lifetimes in lt])
 mean_intv = np.array([np.mean(interval) for interval in intv])
@@ -270,19 +270,21 @@ print("mean_intv:", mean_intv)
 print("mean_fo:", mean_fo)
 
 plotting.plot_violin(
-    lt,
+    [1e3 * l for l in lt],
+    y_range=[0, 200],
     x_label="Mode",
     y_label="Lifetime (ms)",
     filename=f"{analysis_dir}/lt.png",
 )
 plotting.plot_violin(
     intv,
+    y_range=[-0.2, 10],
     x_label="Mode",
     y_label="Interval (s)",
     filename=f"{analysis_dir}/intv.png",
 )
 plotting.plot_violin(
-    fo,
+    [f for f in fo.T],
     x_label="Mode",
     y_label="Fractional Occupancy",
     filename=f"{analysis_dir}/fo.png",

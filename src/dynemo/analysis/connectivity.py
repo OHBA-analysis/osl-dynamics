@@ -223,6 +223,9 @@ def mean_coherence_from_spectra(
                     c,
                     print_message=False,
                     plot_filename=plot_filename,
+                    bayesian=True,
+                    max_iter=5000,
+                    n_init=10,
                 )
 
                 # Only keep the second mixture component and remove nan connections
@@ -294,8 +297,6 @@ def save(
     default_plot_kwargs = {
         "node_size": 10,
         "node_color": "black",
-        "edge_vmin": 0,
-        "edge_vmax": conn_map.max(),
         "edge_cmap": cm["red_transparent_full_alpha_range"],
         "colorbar": True,
     }
@@ -309,6 +310,9 @@ def save(
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
             fn=Path(filename), i=i, w=len(str(n_modes))
         )
+        if "edge_vmin" not in plot_kwargs:
+            plot_kwargs["edge_vmin"] = 0
+            plot_kwargs["edge_vmax"] = conn_map[i].max()
         plotting.plot_connectome(
             conn_map[i],
             parcellation.roi_centers(),

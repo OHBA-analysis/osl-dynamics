@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-from sklearn.mixture import BayesianGaussianMixture
+from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from dynemo.data.manipulation import standardize
 from dynemo.utils import plotting
 
@@ -12,6 +12,8 @@ def fit_gaussian_mixture(
     X: np.ndarray,
     plot_filename: str = None,
     print_message: bool = True,
+    bayesian: bool = True,
+    **kwargs,
 ) -> np.ndarray:
     """Fits a two component Bayesian Gaussian mixture model.
 
@@ -23,6 +25,10 @@ def fit_gaussian_mixture(
         Filename to save a plot of the Gaussian mixture model. Optional.
     print_message : bool
         Should we print a message? Optional.
+    bayesian : bool
+        Should we fit a Bayesian GMM? Optional.
+    **kwargs
+        Keyword argument to pass to the sklearn class. Optional.
 
     Returns
     -------
@@ -42,21 +48,24 @@ def fit_gaussian_mixture(
     X = standardize(X)
 
     # Fit a Gaussian mixture model
-    bgm = BayesianGaussianMixture(n_components=2, max_iter=5000, n_init=10)
-    bgm.fit(X)
+    if bayesian:
+        gm = BayesianGaussianMixture(n_components=2, **kwargs)
+    else:
+        gm = GaussianMixture(n_components=2, **kwargs)
+    gm.fit(X)
 
     # Inferred parameters
-    amplitudes = np.squeeze(bgm.weights_) / np.sqrt(
-        2 * np.pi * np.squeeze(bgm.covariances_)
+    amplitudes = np.squeeze(gm.weights_) / np.sqrt(
+        2 * np.pi * np.squeeze(gm.covariances_)
     )
-    means = np.squeeze(bgm.means_)
-    variances = np.sqrt(np.squeeze(bgm.covariances_))
+    means = np.squeeze(gm.means_)
+    variances = np.sqrt(np.squeeze(gm.covariances_))
 
     # Plots
     if plot_filename is not None:
         plotting.plot_gmm(X[:, 0], amplitudes, means, variances, filename=plot_filename)
 
     # Which component does each data point correspond to
-    y = bgm.predict(X)
+    y = gm.predict(X)
 
     return y
