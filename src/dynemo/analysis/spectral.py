@@ -12,7 +12,7 @@ from tqdm import trange
 from dynemo import array_ops
 from dynemo.analysis import regression
 from dynemo.analysis.time_series import get_mode_time_series
-from dynemo.data.manipulation import standardize
+from dynemo.data import manipulation
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -519,7 +519,7 @@ def multitaper_spectra(
 
     # Standardise before calculating the multitaper
     if standardize:
-        data = [standardize(d) for d in data]
+        data = [manipulation.standardize(d) for d in data]
 
     print("Calculating power spectra")
     power_spectra = []
@@ -702,7 +702,7 @@ def regression_spectra(
 
     # Standardise before calculating the spectrogram
     if standardize:
-        data = [standardize(d) for d in data]
+        data = [manipulation.standardize(d) for d in data]
 
     # Remove data points not in alpha due to time embedding the training data
     if n_embeddings is not None:
