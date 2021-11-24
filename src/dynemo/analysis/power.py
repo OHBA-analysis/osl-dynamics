@@ -150,12 +150,12 @@ def power_map_grid(
 
     # Validation
     error_message = (
-        f"Dimensionality of power_map must be 2, 3, or 4, got ndim={power_map.ndim}."
+        f"Dimensionality of power_map must be 2 or 3 got ndim={power_map.ndim}."
     )
     power_map = array_ops.validate(
         power_map,
-        correct_dimensionality=4,
-        allow_dimensions=[2, 3],
+        correct_dimensionality=3,
+        allow_dimensions=[2],
         error_message=error_message,
     )
 
@@ -183,9 +183,7 @@ def power_map_grid(
     n_modes = power_map.shape[1]
     spatial_map_values = np.empty([n_voxels, n_modes])
     for i in range(n_modes):
-        spatial_map_values[:, i] = voxel_weights @ np.diag(
-            np.squeeze(power_map[component, i])
-        )
+        spatial_map_values[:, i] = voxel_weights @ power_map[component, i]
 
     # Subtract weighted mean
     if subtract_mean:
@@ -221,7 +219,8 @@ def save(
     ----------
     power_map : np.ndarray
         Power map to save.
-        Shape must be (n_components, n_modes, n_channels, n_channels).
+        Shape must be (n_components, n_modes, n_channels, n_channels)
+        or (n_components, n_modes, n_channels).
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png, it is saved as images.
@@ -236,6 +235,9 @@ def save(
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
         Optional, default is equal weighting.
+    plot_kwargs : dict
+        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        Optional.
     """
     # Validation
     if ".nii.gz" not in filename and ".png" not in filename:
@@ -244,6 +246,10 @@ def save(
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
+
+    if power_map.shape[-1] == power_map.shape[-2]:
+        # A n_channels by n_channels array hav been pass, extract PSDs
+        power_map = np.diagonal(power_map, axis1=-2, axis2=-1)
 
     # Calculate power maps
     power_map = power_map_grid(

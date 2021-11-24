@@ -262,7 +262,7 @@ def save(
         Name of parcellation file used.
     component : int
         Spectral component to save. Optional.
-    plot_kwargs
+    plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_connectome.
     """
     # Validation
