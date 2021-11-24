@@ -289,10 +289,6 @@ def save(
     # Select the component we're plotting
     conn_map = connectivity_map[component]
 
-    if conn_map.max() <= 1:
-        # Remove perfect connections so the colorbar has a reasonable range
-        conn_map[conn_map > 0.999] = 0
-
     # Default plotting settings
     default_plot_kwargs = {
         "node_size": 10,
@@ -310,9 +306,6 @@ def save(
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
             fn=Path(filename), i=i, w=len(str(n_modes))
         )
-        if "edge_vmin" not in plot_kwargs:
-            plot_kwargs["edge_vmin"] = 0
-            plot_kwargs["edge_vmax"] = conn_map[i].max()
         plotting.plot_connectome(
             conn_map[i],
             parcellation.roi_centers(),
