@@ -12,6 +12,7 @@ from tqdm import trange
 from dynemo import array_ops
 from dynemo.analysis import regression
 from dynemo.analysis.time_series import get_mode_time_series
+from dynemo.data.manipulation import standardize
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -414,6 +415,7 @@ def multitaper_spectra(
     segment_length: int = None,
     frequency_range: list = None,
     return_weights: bool = False,
+    standardize: bool = False,
 ) -> Union[
     Tuple[np.ndarray, np.ndarray, np.ndarray],
     Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
@@ -444,6 +446,9 @@ def multitaper_spectra(
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD. Optional.
+    standardize : bool
+        Should we standardize the data before calculating the multitaper?
+        Optional.
 
     Returns
     -------
@@ -511,6 +516,10 @@ def multitaper_spectra(
 
     # Number of frequency bins
     n_f = args_range[1] - args_range[0]
+
+    # Standardise before calculating the multitaper
+    if standardize:
+        data = [standardize(d) for d in data]
 
     print("Calculating power spectra")
     power_spectra = []
@@ -618,6 +627,7 @@ def regression_spectra(
     n_sub_windows: int = 1,
     return_weights: bool = False,
     return_coef_int: bool = False,
+    standardize: bool = False,
 ):
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
@@ -648,6 +658,9 @@ def regression_spectra(
     return_coef_int : bool
         Should we return the regression coefficients and intercept
         separately for the PSDs? Optional.
+    standardize : bool
+        Should we standardize the data before calculating the spectrogram?
+        Optional.
 
     Returns
     -------
@@ -686,6 +699,10 @@ def regression_spectra(
 
     # Number of subjects
     n_subjects = len(data)
+
+    # Standardise before calculating the spectrogram
+    if standardize:
+        data = [standardize(d) for d in data]
 
     # Remove data points not in alpha due to time embedding the training data
     if n_embeddings is not None:
