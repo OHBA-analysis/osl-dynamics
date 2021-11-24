@@ -1264,10 +1264,10 @@ class MeansStdsFcsLayer(layers.Layer):
         else:
             self.initial_fcs = initial_fcs
 
-        self.flattened_cholesky_fcs = self.bijector.inverse(self.initial_fcs)
+        self.initial_flattened_cholesky_fcs = self.bijector.inverse(self.initial_fcs)
 
         self.flattened_cholesky_fcs_initializer = WeightInitializer(
-            self.flattened_cholesky_fcs
+            self.initial_flattened_cholesky_fcs
         )
 
     def build(self, input_shape):

@@ -54,6 +54,47 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
         means, stds, fcs = means_stds_fcs_layer(1)
         return means.numpy(), stds.numpy(), fcs.numpy()
 
+    def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
+        """
+        Set the means, stds, fcs of each mode.
+
+        Parameters
+        ----------
+        means: np.ndarray
+            Mode means with shape (n_modes, n_channels).
+        stds: np.ndarray
+            Mode standard deviations with shape (n_modes, n_channels).
+        fcs: np.ndarray
+            Mode functional connectivities with shape (n_modes, n_channels, n_channels).
+        update_initializer: bool
+            Do we want to use the passed parameters when we re_initialize 
+            the model? Optional, default is True.
+        """
+        means = means.astype(np.float32)
+        stds = stds.astype(np.float32)
+        fcs = fcs.astype(np.float32)
+
+        means_stds_fcs_layer = self.model.get_layer("means_stds_fcs")
+        layer_means = means_stds_fcs_layer.means
+        layer_stds = means_stds_fcs_layer.stds
+        layer_flattened_cholesky_fcs = means_stds_fcs_layer.flattened_cholesky_fcs
+
+        flattened_cholesky_fcs = means_stds_fcs_layer.bijector.inverse(fcs)
+
+        layer_means.assign(means)
+        layer_stds.assign(stds)
+        layer_flattened_cholesky_fcs.assign(flattened_cholesky_fcs)
+
+        if update_initializer:
+            means_stds_fcs_layer.initial_means = means
+            means_stds_fcs_layer.initial_stds = stds
+            means_stds_fcs_layer.initial_fcs = fcs
+            means_stds_fcs_layer.initial_flattened_cholesky_fcs = flattened_cholesky_fcs
+
+            means_stds_fcs_layer.means_initializer.initial_value = means
+            means_stds_fcs_layer.stds_initializer.initial_value = stds
+            means_stds_fcs_layer.flattened_cholesky_fcs_initializer.initial_value = flattened_cholesky_fcs
+
 
 def _model_structure(config):
 
