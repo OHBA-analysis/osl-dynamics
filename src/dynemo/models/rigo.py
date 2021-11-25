@@ -95,13 +95,16 @@ class RIGO(InferenceModelBase, GO):
             alpha_layer.trainable = True
             self.compile()
 
-    def sample_alpha(self, n_samples: int) -> np.ndarray:
+    def sample_alpha(self, n_samples: int, theta_norm=None) -> np.ndarray:
         """Uses the model RNN to sample mode mixing factors, alpha.
 
         Parameters
         ----------
         n_samples : int
             Number of samples to take.
+        theta_norm : np.ndarray
+            Normalized logits to initialise the sampling with. Shape must be
+            (sequence_length, n_modes). Optional.
 
         Returns
         -------
@@ -115,19 +118,20 @@ class RIGO(InferenceModelBase, GO):
         theta_norm_layer = self.model.get_layer("theta_norm")
         alpha_layer = self.model.get_layer("alpha")
 
-        # Sequence of the underlying logits theta
-        theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes],
-            dtype=np.float32,
-        )
-
         # Normally distributed random numbers used to sample the logits theta
         epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
             np.float32
         )
 
-        # Activate the first mode for the first sample
-        theta_norm[-1, 0] = 1
+        if theta_norm is None:
+            # Sequence of the underlying logits theta
+            theta_norm = np.zeros(
+                [self.config.sequence_length, self.config.n_modes],
+                dtype=np.float32,
+            )
+
+            # Randomly sample the first time step
+            theta_norm[-1] = np.random.normal(size=self.config.n_modes)
 
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
