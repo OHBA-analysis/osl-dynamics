@@ -146,6 +146,8 @@ def plot_line(
     y_range: list = None,
     x_label: str = None,
     y_label: str = None,
+    log_xscale: bool = False,
+    log_yscale: bool = False,
     title: str = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
@@ -174,6 +176,10 @@ def plot_line(
         Label for x-axis. Optional.
     y_label : str
         Label for y-axis. Optional.
+    log_xscale : bool
+        Should we log the x-axis? Optional.
+    log_yscale : bool
+        Should we log the y-axis? Optional.
     title : str
         Figure title. Optional.
     plot_kwargs : dict
@@ -258,6 +264,12 @@ def plot_line(
     ax.set_title(title)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+
+    # Log scale axes
+    if log_xscale:
+        ax.set_xscale("log")
+    if log_yscale:
+        ax.set_yscale("log")
 
     # Add a legend
     if add_legend:
