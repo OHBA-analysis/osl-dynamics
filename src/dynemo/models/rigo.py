@@ -95,7 +95,9 @@ class RIGO(InferenceModelBase, GO):
             alpha_layer.trainable = True
             self.compile()
 
-    def sample_alpha(self, n_samples: int, theta_norm=None) -> np.ndarray:
+    def sample_alpha(
+        self, n_samples: int, theta_norm: np.ndarray = None, rescale_sigma: float = 1.0
+    ) -> np.ndarray:
         """Uses the model RNN to sample mode mixing factors, alpha.
 
         Parameters
@@ -105,6 +107,8 @@ class RIGO(InferenceModelBase, GO):
         theta_norm : np.ndarray
             Normalized logits to initialise the sampling with. Shape must be
             (sequence_length, n_modes). Optional.
+        rescale_sigma : float
+            Factor to rescale the standard deviation of theta by. Optional.
 
         Returns
         -------
@@ -153,7 +157,7 @@ class RIGO(InferenceModelBase, GO):
             theta_norm = np.roll(theta_norm, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta = mod_mu + mod_sigma * epsilon[i]
+            theta = mod_mu + mod_sigma * epsilon[i] * rescale_sigma
             theta_norm[-1] = theta_norm_layer(theta[np.newaxis, np.newaxis, :])[0]
 
             # Calculate the mode mixing factors

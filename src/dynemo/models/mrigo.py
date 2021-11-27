@@ -67,7 +67,7 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
         fcs: np.ndarray
             Mode functional connectivities with shape (n_modes, n_channels, n_channels).
         update_initializer: bool
-            Do we want to use the passed parameters when we re_initialize 
+            Do we want to use the passed parameters when we re_initialize
             the model? Optional, default is True.
         """
         means = means.astype(np.float32)
@@ -93,7 +93,9 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
 
             means_stds_fcs_layer.means_initializer.initial_value = means
             means_stds_fcs_layer.stds_initializer.initial_value = stds
-            means_stds_fcs_layer.flattened_cholesky_fcs_initializer.initial_value = flattened_cholesky_fcs
+            means_stds_fcs_layer.flattened_cholesky_fcs_initializer.initial_value = (
+                flattened_cholesky_fcs
+            )
 
 
 def _model_structure(config):

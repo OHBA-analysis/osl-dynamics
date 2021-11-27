@@ -115,7 +115,7 @@ class TrainableVariablesLayer(layers.Layer):
 class SampleNormalDistributionLayer(layers.Layer):
     """Layer for sampling from a normal distribution.
 
-    This layer accepts the mean and (log of) the standard deviation and
+    This layer accepts the mean and the standard deviation and
     outputs samples from a normal distribution.
     """
 
