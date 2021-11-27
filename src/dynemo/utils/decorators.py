@@ -5,7 +5,6 @@ from time import time
 
 import numpy as np
 import yaml
-from dynemo.utils.misc import time_axis_first
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -59,54 +58,6 @@ def doublewrap(f):
             return lambda realf: f(realf, *args, **kwargs)
 
     return new_dec
-
-
-@doublewrap
-def transpose(f, *arguments):
-    """Decorator to automatically place the longest dimension on the first axis.
-
-    By providing a series of positional and keyword arguments, this decorator
-    automatically determines which should be transposed to provide a [Time x other]
-    array.
-
-    Parameters
-    ----------
-    f : func
-        Function being decorated.
-    arguments : list
-        Arguments to be checked.
-
-    Returns
-    -------
-    wrap : func
-        Decorated function.
-
-    """
-    try:
-        iter(arguments)
-    except TypeError:
-        arguments = [arguments]
-    finally:
-        positional_arguments = [a for a in arguments if isinstance(a, int)]
-        keyword_arguments = [a for a in arguments if isinstance(a, str)]
-
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        args = [*args]
-        for i in positional_arguments:
-            try:
-                args[i] = time_axis_first(args[i])
-            except IndexError:
-                _logger.debug(f"Positional argument {i} not in args.")
-        for k in keyword_arguments:
-            try:
-                kwargs[k] = time_axis_first(kwargs[k])
-            except KeyError:
-                _logger.debug(f"Argument {k} not found in kwargs.")
-
-        return f(*args, **kwargs)
-
-    return wrap
 
 
 def get_params(me, args, kwargs):

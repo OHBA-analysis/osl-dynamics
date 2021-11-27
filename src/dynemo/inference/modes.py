@@ -9,7 +9,6 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from dynemo import array_ops
 from dynemo.inference import metrics
-from dynemo.utils.decorators import transpose
 
 _logger = logging.getLogger("DyNeMo")
 _rng = np.random.default_rng()
@@ -66,7 +65,6 @@ def time_courses(
     return stcs
 
 
-@transpose
 def correlate_modes(
     mode_time_course_1: np.ndarray, mode_time_course_2: np.ndarray
 ) -> np.ndarray:
@@ -162,7 +160,6 @@ def match_covariances(
         return tuple(matched_covariances)
 
 
-@transpose
 def match_modes(
     *mode_time_courses: np.ndarray, return_order: bool = False
 ) -> List[np.ndarray]:
@@ -207,7 +204,6 @@ def match_modes(
         return matched_mode_time_courses
 
 
-@transpose(0, "mode_time_course")
 def mode_activation(mode_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate mode activations for a mode time course.
 
@@ -257,7 +253,6 @@ def mode_activation(mode_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarra
     return mode_on, mode_off
 
 
-@transpose(0, "mode_time_course")
 def reduce_mode_time_course(mode_time_course: np.ndarray) -> np.ndarray:
     """Remove empty modes from a mode time course.
 

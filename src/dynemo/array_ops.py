@@ -5,7 +5,6 @@ import logging
 from typing import List, Union
 
 import numpy as np
-from dynemo.utils.decorators import transpose
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -63,7 +62,6 @@ def get_one_hot(values: np.ndarray, n_modes: int = None):
     return res.reshape(list(values.shape) + [n_modes])
 
 
-@transpose(0, "sequence_1", 1, "sequence_2")
 def align_arrays(*sequences, alignment: str = "left") -> List[np.ndarray]:
     """Given a list of sequences, return the sequences trimmed to equal length.
 
