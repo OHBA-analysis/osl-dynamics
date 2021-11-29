@@ -8,6 +8,8 @@ from typing import Union
 import numpy as np
 from dynemo.array_ops import get_one_hot, cov2corr
 from dynemo.simulation import MAR, MS_MVN, MVN, SingleSine, Simulation
+from dynemo.simulation._hsmm import HSMM
+
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -402,10 +404,11 @@ class HierarchicalHMM_MVN(Simulation):
     ----------
     n_samples : int
         Number of samples to draw from the model.
-    top_level_trans_prob : np.ndarray
+    top_level_trans_prob : np.ndarray or str
         Transition probability matrix of the top level HMM, which
-        selects the bottom level HMM at each time point.
-    bottom_level_trans_prob : list of np.ndarray
+        selects the bottom level HMM at each time point. Used when
+        top_level_hmm_type = 'hmm'
+    bottom_level_trans_prob : list of np.ndarray or str
         Transitions probability matrices for the bottom level HMMs,
         which generate the observed data.
     means : np.ndarray or str
@@ -426,6 +429,20 @@ class HierarchicalHMM_MVN(Simulation):
         Random seeds for the bottom level HMMs.
     data_random_seed : int
         Random seed for generating the observed data.
+    top_level_stay_prob : float
+        The stay_prob for the top level HMM. Used if top_level_trans_prob is 
+        a str. Used when top_level_hmm_type = 'hmm'.
+    bottom_level_stay_probs : list of float
+        The list of stay_prob values for the bottom level HMMs. Used when the 
+        correspondining entry in bottom_level_trans_prob is a str.
+    top_level_hmm_type: str
+        The type of HMM to use at the top level -- either hmm or hsmm.
+    top_level_gamma_shape: float
+        The shape parameter for the gamma distribution used by 
+        the top level hmm when top_level_hmm_type = 'hsmm'.
+    top_level_gamma_scale: float = None
+        The scale parameter for the gamma distribution used by 
+        the top level hmm when top_level_hmm_type = 'hsmm'.
     """
 
     def __init__(
@@ -441,6 +458,11 @@ class HierarchicalHMM_MVN(Simulation):
         top_level_random_seed: int = None,
         bottom_level_random_seeds: list = None,
         data_random_seed: int = None,
+        top_level_stay_prob: float = None,
+        bottom_level_stay_probs: list = None,
+        top_level_hmm_type: str = 'hmm',
+        top_level_gamma_shape: float = None,
+        top_level_gamma_scale: float = None
     ):
         # Observation model
         self.obs_mod = MVN(
@@ -460,10 +482,23 @@ class HierarchicalHMM_MVN(Simulation):
 
         # Top level HMM
         # This will select the bottom level HMM at each time point
-        self.top_level_hmm = HMM(
-            trans_prob=top_level_trans_prob,
-            random_seed=top_level_random_seed,
-        )
+        if top_level_hmm_type.lower() == 'hmm':
+            self.top_level_hmm = HMM(
+                trans_prob=top_level_trans_prob,
+                random_seed=top_level_random_seed,
+                stay_prob=top_level_stay_prob,
+                n_modes=len(bottom_level_trans_probs)
+            )
+        elif top_level_hmm_type.lower() == 'hsmm':
+            self.top_level_hmm = HSMM(
+                gamma_shape=top_level_gamma_shape,
+                gamma_scale=top_level_gamma_scale,
+                n_modes=len(bottom_level_trans_probs),
+                random_seed=top_level_random_seed,
+            )
+
+        else:
+            raise ValueError(f"Unsupported top_level_hmm_type: {top_level_hmm_type}")
 
         # The bottom level HMMs
         # These will generate the data
@@ -472,6 +507,8 @@ class HierarchicalHMM_MVN(Simulation):
             HMM(
                 trans_prob=bottom_level_trans_probs[i],
                 random_seed=bottom_level_random_seeds[i],
+                stay_prob=bottom_level_stay_probs[i],
+                n_modes=n_modes
             )
             for i in range(self.n_bottom_level_hmms)
         ]
