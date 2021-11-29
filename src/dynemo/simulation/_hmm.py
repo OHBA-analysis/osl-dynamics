@@ -6,9 +6,10 @@ import logging
 from typing import Union
 
 import numpy as np
-from dynemo.array_ops import get_one_hot
-from dynemo.simulation import MAR, MVN, SingleSine, Simulation
+from dynemo.array_ops import get_one_hot, cov2corr
+from dynemo.simulation import MAR, MS_MVN, MVN, SingleSine, Simulation
 from dynemo.simulation._hsmm import HSMM
+
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -89,9 +90,7 @@ class HMM:
                         "If trans_prob is 'sequence', stay_prob and n_modes "
                         + "must be passed."
                     )
-                self.trans_prob = self.construct_sequence_trans_prob(
-                    stay_prob, n_modes
-                )
+                self.trans_prob = self.construct_sequence_trans_prob(stay_prob, n_modes)
 
             # Uniform transition probability matrix
             elif trans_prob == "uniform":
@@ -128,6 +127,7 @@ class HMM:
         return trans_prob
 
     def generate_modes(self, n_samples):
+        # Here the time course always start from mode 0
         rands = [
             iter(self._rng.choice(self.n_modes, size=n_samples, p=self.trans_prob[i]))
             for i in range(self.n_modes)
@@ -283,11 +283,117 @@ class HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
-            np.newaxis, ...
-        ]
+        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
+
+
+class MS_HMM_MVN(Simulation):
+    """Simulate an HMM with a mulitvariate normal observation model.
+
+    Multi-time-scale version of HMM_MVN.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    means : np.ndarray or str
+        Mean vector for each mode, shape should be (n_modes, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Covariance matrix for each mode, shape should be (n_modes,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+        Optional.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for random number generator. Optional.
+    fix_std: bool
+        Do we want to remove dependency of loss function on standard deviation
+        time course? Optional.
+    uni_std: bool
+        Do we want the same standard deviation across channels? Optional.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str, None],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_modes: int = None,
+        n_channels: int = None,
+        stay_prob: float = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+        fix_std: bool = False,
+        uni_std: bool = False,
+    ):
+        # Observation model
+        self.obs_mod = MS_MVN(
+            means=means,
+            covariances=covariances,
+            n_modes=n_modes,
+            n_channels=n_channels,
+            observation_error=observation_error,
+            random_seed=random_seed,
+            uni_std=uni_std,
+        )
+
+        self.n_modes = self.obs_mod.n_modes
+        self.n_channels = self.obs_mod.n_channels
+
+        # HMM objects for sampling state time courses
+        # N.b. we use a different random seed to the observation model
+        self.alpha_hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_modes=self.n_modes,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
+        )
+        self.beta_hmm = HMM(
+            trans_prob=np.eye(self.n_modes) if fix_std else trans_prob,
+            stay_prob=stay_prob,
+            n_modes=self.n_modes,
+            random_seed=random_seed if random_seed is None else random_seed + 2,
+        )
+        self.gamma_hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_modes=self.n_modes,
+            random_seed=random_seed if random_seed is None else random_seed + 3,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate state time courses
+        self.mode_time_course = np.array(
+            [
+                self.alpha_hmm.generate_modes(self.n_samples),
+                self.beta_hmm.generate_modes(self.n_samples),
+                self.gamma_hmm.generate_modes(self.n_samples),
+            ]
+        )
+
+        # Simulate data
+        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+
 class HierarchicalHMM_MVN(Simulation):
     """Hierarchical two-level HMM simulation.
 
@@ -438,11 +544,8 @@ class HierarchicalHMM_MVN(Simulation):
         return stc
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
-            np.newaxis, ...
-        ]
+        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
 
 
 class HMM_Sine(Simulation):

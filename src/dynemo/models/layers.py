@@ -111,21 +111,11 @@ class TrainableVariablesLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         return self.activation(self.values)
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_units": self.n_units,
-                "activation": activations.serialize(self.activation),
-            }
-        )
-        return config
-
 
 class SampleNormalDistributionLayer(layers.Layer):
     """Layer for sampling from a normal distribution.
 
-    This layer accepts the mean and (log of) the standard deviation and
+    This layer accepts the mean and the standard deviation and
     outputs samples from a normal distribution.
     """
 
@@ -216,16 +206,6 @@ class ThetaActivationLayer(layers.Layer):
             alpha = gumbel_softmax_distribution.sample()
 
         return alpha
-
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "alpha_xform": self.alpha_xform,
-                "initial_alpha_temperature": self.initial_alpha_temperature,
-            }
-        )
-        return config
 
 
 class MeansCovsLayer(layers.Layer):
@@ -342,19 +322,6 @@ class MeansCovsLayer(layers.Layer):
 
         return [self.means, self.covariances]
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_modes": self.n_modes,
-                "n_channels": self.n_channels,
-                "learn_means": self.learn_means,
-                "learn_covariances": self.learn_covariances,
-                "normalize_covariances": self.normalize_covariances,
-            }
-        )
-        return config
-
 
 class MixMeansCovsLayer(layers.Layer):
     """Compute a probabilistic mixture of means and covariances.
@@ -422,17 +389,6 @@ class MixMeansCovsLayer(layers.Layer):
 
         return [m, C]
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_modes": self.n_modes,
-                "n_channels": self.n_channels,
-                "learn_alpha_scaling": self.learn_alpha_scaling,
-            }
-        )
-        return config
-
 
 class LogLikelihoodLayer(layers.Layer):
     """Layer to calculate the negative log likelihood.
@@ -488,11 +444,6 @@ class LogLikelihoodLayer(layers.Layer):
         nll_loss = -ll_loss
 
         return tf.expand_dims(nll_loss, axis=-1)
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"diag_only": self.diag_only, "clip": self.clip})
-        return config
 
 
 class NormalKLDivergenceLayer(layers.Layer):
@@ -597,11 +548,6 @@ class InferenceRNNLayers(layers.Layer):
             inputs = layer(inputs, **kwargs)
         return inputs
 
-    def get_config(self):
-        config = super().get_config()
-        config.update({"n_units": self.n_units})
-        return config
-
 
 class ModelRNNLayers(layers.Layer):
     """RNN generative model.
@@ -648,11 +594,6 @@ class ModelRNNLayers(layers.Layer):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"n_units": self.n_units})
-        return config
 
 
 class CoeffsCovsLayer(layers.Layer):
@@ -788,20 +729,6 @@ class CoeffsCovsLayer(layers.Layer):
 
         return [self.coeffs, self.covs]
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_modes": self.n_modes,
-                "n_channels": self.n_channels,
-                "n_lags": self.n_lags,
-                "learn_coeffs": self.learn_coeffs,
-                "learn_covs": self.learn_covs,
-                "diag_covs": diag_covs,
-            }
-        )
-        return config
-
 
 class MixCoeffsCovsLayer(layers.Layer):
     """Mixes the MAR coefficients and covariances.
@@ -857,11 +784,6 @@ class MixCoeffsCovsLayer(layers.Layer):
 
         return coeffs_lt, cov_t
 
-    def get_config(self):
-        config = super().get_config()
-        config.update({"diag_covs": diag_covs})
-        return config
-
 
 class MARMeansCovsLayer(layers.Layer):
     """Calculates the time-vaying mean and covariance for observing MAR data.
@@ -912,11 +834,6 @@ class MARMeansCovsLayer(layers.Layer):
         sigma_t = sigma_t[:, self.n_lags : -1]
 
         return x_t, mu_t, sigma_t
-
-    def get_config(self):
-        config = super().get_config()
-        config.update({"n_lags": self.n_lags})
-        return config
 
 
 class VectorQuantizerLayer(layers.Layer):
@@ -1063,19 +980,6 @@ class VectorQuantizerLayer(layers.Layer):
 
         return quantized
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_embeddings": self.n_embeddings,
-                "embedding_dim": self.embedding_dim,
-                "beta": self.beta,
-                "gamma": self.gamma,
-                "learn_embeddings": self.learn_embeddings,
-            }
-        )
-        return config
-
 
 class WaveNetLayer(layers.Layer):
     """Layer for generating data using a WaveNet architecture.
@@ -1140,17 +1044,6 @@ class WaveNetLayer(layers.Layer):
             out = activations.selu(out)
             out = layer(out)
         return out
-
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_channels": self.n_channels,
-                "n_filters": self.n_filters,
-                "n_layers": self.n_layers,
-            }
-        )
-        return config
 
 
 class WaveNetResidualBlockLayer(layers.Layer):
@@ -1227,33 +1120,6 @@ class WaveNetResidualBlockLayer(layers.Layer):
         return x + residual, skip
 
 
-class MeanSquaredErrorLayer(layers.Layer):
-    """Layer for calculating the mean squared error.
-
-    Parameters
-    ----------
-    clip : int
-        Number of data points to clip from each input.
-        Optional, default is no clipping.
-    """
-
-    def __init__(self, clip: int = None, **kwargs):
-        super().__init__(**kwargs)
-        self.clip = clip
-
-    def call(self, inputs, training=None, **kwargs):
-        training_data, generated_data = inputs
-
-        if self.clip is not None:
-            training_data = training_data[:, self.clip :]
-            generated_data = generated_data[:, : -self.clip]
-
-        se = tf.math.squared_difference(training_data, generated_data)
-        mse = tf.reduce_mean(se)  # mean over batches, time points and channels
-
-        return tf.expand_dims(mse, axis=-1)
-
-
 class StdDevLayer(layers.Layer):
     """Layer to learn standard deviations.
 
@@ -1298,12 +1164,239 @@ class StdDevLayer(layers.Layer):
     def call(self, inputs):
         return activations.softplus(self.std_dev)
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "n_channels": self.n_channels,
-                "learn_std_dev": self.learn_std_dev,
-            }
+
+class MeanSquaredErrorLayer(layers.Layer):
+    """Layer for calculating the mean squared error.
+
+    Parameters
+    ----------
+    clip : int
+        Number of data points to clip from each input.
+        Optional, default is no clipping.
+    """
+
+    def __init__(self, clip: int = None, **kwargs):
+        super().__init__(**kwargs)
+        self.clip = clip
+
+    def call(self, inputs, training=None, **kwargs):
+        training_data, generated_data = inputs
+
+        if self.clip is not None:
+            training_data = training_data[:, self.clip :]
+            generated_data = generated_data[:, : -self.clip]
+
+        se = tf.math.squared_difference(training_data, generated_data)
+        mse = tf.reduce_mean(se)  # mean over batches, time points and channels
+
+        return tf.expand_dims(mse, axis=-1)
+
+
+class MeansStdsFcsLayer(layers.Layer):
+    """Layer to learn the means, diagonal standard deviation matrices,
+    and functional connectivities of modes.
+
+    Outputs the mean vector, the standard deviations, and correlation (fc) matrix
+    of each mode.
+
+    Paramters
+    ---------
+    n_modes: int
+        Number of modes.
+    n_channels: int
+        Number of channels.
+    learn_means : bool
+        Should we learn the means?
+    learn_stds : bool
+        Should we learn the standard deviations?
+    learn_fcs : bool
+        Should we learn the functional connectivities?
+    initial_means : np.ndarray
+        Initial value of the mean each of mode. Optional.
+    initial_stds: np.ndarray
+        Initial value of the standard deviation of each model. Optional.
+    initial_fcs : np.ndarray
+        Initial values of the functional connectivity of each mode. Optional.
+    """
+
+    def __init__(
+        self,
+        n_modes: int,
+        n_channels: int,
+        learn_means: bool,
+        learn_stds: bool,
+        learn_fcs: bool,
+        initial_means: np.ndarray,
+        initial_stds: np.ndarray,
+        initial_fcs: np.ndarray,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.learn_means = learn_means
+        self.learn_stds = learn_stds
+        self.learn_fcs = learn_fcs
+
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
+        # Initialisation of means
+        if initial_means is None:
+            self.initial_means = np.zeros([n_modes, n_channels], dtype=np.float32)
+        else:
+            self.initial_means = initial_means
+
+        self.means_initializer = WeightInitializer(self.initial_means)
+
+        # Initialisation of standard deviations
+        if initial_stds is None:
+            self.initial_stds = np.ones([n_modes, n_channels], dtype=np.float32)
+        else:
+            self.initial_stds = initial_stds
+
+        self.stds_initializer = WeightInitializer(self.initial_stds)
+
+        # Initialisation of functional connectiviy matrices
+        if initial_fcs is None:
+            self.initial_fcs = np.stack(
+                [np.eye(n_channels, dtype=np.float32)] * n_modes
+            )
+        else:
+            self.initial_fcs = initial_fcs
+
+        self.initial_flattened_cholesky_fcs = self.bijector.inverse(self.initial_fcs)
+
+        self.flattened_cholesky_fcs_initializer = WeightInitializer(
+            self.initial_flattened_cholesky_fcs
         )
-        return config
+
+    def build(self, input_shape):
+
+        # Create weights for the means
+        self.means = self.add_weight(
+            "means",
+            shape=(self.n_modes, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.means_initializer,
+            trainable=self.learn_means,
+        )
+
+        # Create weights for the diagonal entries
+        self.stds = self.add_weight(
+            "stds",
+            shape=(self.n_modes, self.n_channels),
+            dtype=tf.float32,
+            initializer=self.stds_initializer,
+            trainable=self.learn_stds,
+        )
+
+        # Create weights for the lower triangular entries
+        self.flattened_cholesky_fcs = self.add_weight(
+            "flattened_cholesky_fcs",
+            shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
+            dtype=tf.float32,
+            initializer=self.flattened_cholesky_fcs_initializer,
+            trainable=self.learn_fcs,
+        )
+
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+
+        # Make sure standard deviations are positive
+        stds = activations.softplus(self.stds)
+
+        # Calculate functional connectivity matrix from flattened vector
+        fcs = self.bijector(self.flattened_cholesky_fcs)
+
+        # Normalise so that FCs are correlation matrices
+        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(fcs)), axis=-1)
+        fcs /= tf.matmul(sd, sd, transpose_b=True)
+
+        return [self.means, stds, fcs]
+
+
+class MixMeansStdsFcsLayer(layers.Layer):
+    """Compute a probabilistic mixture of means, standard deviations and functional
+    connectivies.
+
+    The mixture is calculated as
+
+    m_t       = Sum_j alpha_jt mu_j
+    diag(G_t) = Sum_j beta_jt E_j
+    F_t       = Sum_j gamma_jt D_j
+    C_t       = G_t F_t G_t
+
+    Parameters
+    ----------
+    n_modes: int
+        number of modes.
+    n_channels: int
+        number of channels.
+    fix_std : bool
+        Do we want to fix the standard deviation time course?
+    """
+
+    def __init__(self, n_modes: int, n_channels: int, fix_std: bool, **kwargs):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.fix_std = fix_std
+
+    def call(self, inputs, **kwargs):
+        # Unpack the inputs:
+        # - alpha.shape = (None, sequence_length, n_modes)
+        # - beta.shape = (None, sequence_length, n_modes)
+        # - gamma.shape = (None, sequence_length, n_modes)
+        # - mu.shape = (n_modes, n_channels)
+        # - E.shape = (n_modes, n_channels)
+        # - D.shape = (n_modes, n_channels, n_channels)
+        alpha, beta, gamma, mu, E, D = inputs
+
+        # Reshape alpha and mu for multiplication
+        alpha = tf.expand_dims(alpha, axis=-1)
+        mu = tf.reshape(mu, (1, 1, self.n_modes, self.n_channels))
+
+        # Calculate the mixed mean
+        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
+
+        # Reshape beta and E for multiplication
+        beta = tf.expand_dims(beta, axis=-1)
+        E = tf.reshape(E, (1, 1, self.n_modes, self.n_channels))
+
+        # Calculate the mixed diagonal entries
+        G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
+        G = tf.linalg.diag(G)
+
+        # Reshape gamma and D for multiplication
+        gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
+        D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
+        F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
+
+        # Construct the covariance matrices given by C = GFG
+        C = tf.matmul(G, tf.matmul(F, G))
+
+        return [m, C]
+
+
+class Sum(layers.Layer):
+    """Layer to sum a set of tensors.
+
+    This layer is a wrapper for tensorflow.add_n.
+    """
+
+    def call(self, inputs, **kwargs):
+        return tf.add_n(inputs)
+
+
+class FillConstant(layers.Layer):
+    """Layer to create tensor with the same shape of the input,
+    but filled with a constant.
+    """
+
+    def __init__(self, constant, **kwargs):
+        super().__init__(**kwargs)
+        self.constant = constant
+
+    def call(self, inputs, **kwargs):
+        return tf.fill(tf.shape(inputs), self.constant)

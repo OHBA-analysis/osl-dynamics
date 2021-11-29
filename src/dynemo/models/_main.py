@@ -9,6 +9,7 @@ from dynemo.models.ricnno import RICNNO
 from dynemo.models.ridgo import RIDGO
 from dynemo.models.rigo import RIGO
 from dynemo.models.rimaro import RIMARO
+from dynemo.models.mrigo import MRIGO
 
 
 def Model(config):
@@ -41,7 +42,10 @@ def Model(config):
     if config.observation_model == "multivariate_normal":
 
         if config.alpha_pdf == "normal":
-            return RIGO(config)
+            if config.multiple_scales:
+                return MRIGO(config)
+            else:
+                return RIGO(config)
 
         elif config.alpha_pdf == "dirichlet":
             return RIDGO(config)

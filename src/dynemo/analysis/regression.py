@@ -2,6 +2,8 @@
 
 """
 
+from typing import Tuple, Union
+
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from dynemo.data.manipulation import standardize
@@ -9,7 +11,7 @@ from dynemo.data.manipulation import standardize
 
 def linear(
     X: np.ndarray, y: np.ndarray, fit_intercept: bool, normalize: bool = False
-) -> np.ndarray:
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """Wrapper for sklearn's LinearRegression.
 
 
@@ -27,8 +29,11 @@ def linear(
 
     Returns
     -------
-    b : np.ndarray
-        2D or higher dimension matrix. Regression coefficients.
+    coefs : np.ndarray
+        2D or higher dimension array. Regression coefficients.
+    intercept : np.ndarray
+        1D or higher dimension array. Regression intercept.
+        Returned if fit_intercept=True.
     """
 
     # Reshape in case non 2D matrices were passed
@@ -44,14 +49,13 @@ def linear(
     reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=-1)
     reg.fit(X, y)
 
-    # Return regression coefficients
-    b = reg.coef_
+    # Return regression coefficients and intercept
+    coefs = reg.coef_.T.reshape(new_shape)
     if fit_intercept:
-        b += reg.intercept_[:, np.newaxis]
-    b = b.T
-    b = b.reshape(new_shape)
-
-    return b
+        intercept = reg.intercept_.reshape(new_shape[1:])
+        return coefs, intercept
+    else:
+        return coefs
 
 
 def pinv(X: np.ndarray, y: np.ndarray) -> np.ndarray:

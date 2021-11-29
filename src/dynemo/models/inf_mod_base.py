@@ -56,14 +56,14 @@ class InferenceModelBase:
     def fit(
         self,
         *args,
-        kl_annealing_callback=None,
-        alpha_temperature_annealing_callback=None,
-        use_tqdm=False,
+        kl_annealing_callback: bool = None,
+        alpha_temperature_annealing_callback: bool = None,
+        use_tqdm: bool = False,
         tqdm_class=None,
-        use_tensorboard=None,
-        tensorboard_dir=None,
-        save_best_after=None,
-        save_filepath=None,
+        use_tensorboard: bool = None,
+        tensorboard_dir: str = None,
+        save_best_after: int = None,
+        save_filepath: str = None,
         **kwargs,
     ):
         """Wrapper for the standard keras fit method.
@@ -102,6 +102,7 @@ class InferenceModelBase:
         additional_callbacks = []
 
         if kl_annealing_callback is None:
+            # Check config to see if we should do KL annealing
             kl_annealing_callback = self.config.do_kl_annealing
 
         if kl_annealing_callback:
@@ -115,6 +116,7 @@ class InferenceModelBase:
             additional_callbacks.append(kl_annealing_callback)
 
         if alpha_temperature_annealing_callback is None:
+            # Check config to see if we should do alpha temperature annealing
             alpha_temperature_annealing_callback = (
                 self.config.do_alpha_temperature_annealing
             )
@@ -129,6 +131,7 @@ class InferenceModelBase:
             )
             additional_callbacks.append(alpha_temperature_annealing_callback)
 
+        # Update arguments to pass to the fit method
         args, kwargs = replace_argument(
             func=self.model.fit,
             name="callbacks",
@@ -151,14 +154,14 @@ class InferenceModelBase:
     def initialize(
         self,
         training_dataset,
-        epochs,
-        n_init,
+        epochs: int,
+        n_init: int,
         **kwargs,
     ):
-        """Initialize the means and covariances.
+        """Multi-start training.
 
-        The model is trained for a few epochs and the model with the best
-        free energy is chosen.
+        The model is trained for a few epochs with different random initializations
+        for weights and the model with the best free energy is kept.
 
         Parameters
         ----------
@@ -207,8 +210,14 @@ class InferenceModelBase:
 
         return best_history
 
-    def reset_weights(self, keep=None):
-        """Reset the model as if you've built a new model."""
+    def reset_weights(self, keep: list = None):
+        """Reset the model as if you've built a new model.
+
+        Parameters
+        ----------
+        keep : list of str
+            Layer names to NOT reset. Optional.
+        """
         initializers.reinitialize_model_weights(self.model, keep)
         if self.config.do_kl_annealing:
             self.kl_annealing_factor.assign(0.0)
@@ -226,7 +235,10 @@ class InferenceModelBase:
         """
         predictions = self.model.predict(*args, *kwargs)
         return_names = ["ll_loss", "kl_loss", "alpha"]
+        if self.config.multiple_scales:
+            return_names += ["beta", "gamma"]
         predictions_dict = dict(zip(return_names, predictions))
+
         return predictions_dict
 
     def get_alpha(
@@ -244,19 +256,85 @@ class InferenceModelBase:
 
         Returns
         -------
-        np.ndarray
-            Mode mixing factors with shape (n_subjects, n_samples,
-            n_modes) or (n_samples, n_modes).
+        list or np.ndarray
+            Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
         """
+        if self.config.multiple_scales:
+            return self.get_mode_time_courses(
+                inputs, *args, concatenate=concatenate, **kwargs
+            )
+
         inputs = self._make_dataset(inputs)
         outputs = []
         for dataset in inputs:
             alpha = self.predict(dataset, *args, **kwargs)["alpha"]
             alpha = np.concatenate(alpha)
             outputs.append(alpha)
+
         if concatenate or len(outputs) == 1:
             outputs = np.concatenate(outputs)
+
         return outputs
+
+    def get_mode_time_courses(
+        self, inputs, *args, concatenate: bool = False, **kwargs
+    ) -> Tuple[
+        Union[list, np.ndarray], Union[list, np.ndarray], Union[list, np.ndarray]
+    ]:
+        """Get mode time courses.
+
+        This method is used to get mode time courses for the multi-time-scale model.
+
+        Parameters
+        ----------
+        inputs : tensorflow.data.Dataset
+            Prediction dataset.
+        concatenate : bool
+            Should we concatenate alpha for each subject? Optional, default
+            is False.
+
+        Returns
+        -------
+        list or np.ndarray
+            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Beta time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Gamma time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        """
+        if not self.config.multiple_scales:
+            raise ValueError("Please use get_alpha for a single time scale model.")
+
+        inputs = self._make_dataset(inputs)
+
+        outputs_alpha = []
+        outputs_beta = []
+        outputs_gamma = []
+        for dataset in inputs:
+            predictions = self.predict(dataset, *args, **kwargs)
+
+            alpha = predictions["alpha"]
+            beta = predictions["beta"]
+            gamma = predictions["gamma"]
+
+            alpha = np.concatenate(alpha)
+            beta = np.concatenate(beta)
+            gamma = np.concatenate(gamma)
+
+            outputs_alpha.append(alpha)
+            outputs_beta.append(beta)
+            outputs_gamma.append(gamma)
+
+        if concatenate or len(outputs_alpha) == 1:
+            outputs_alpha = np.concatenate(outputs_alpha)
+            outputs_beta = np.concatenate(outputs_beta)
+            outputs_gamma = np.concatenate(outputs_gamma)
+
+        return outputs_alpha, outputs_beta, outputs_gamma
 
     def losses(self, dataset, return_sum: bool = False) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.

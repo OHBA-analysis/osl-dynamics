@@ -146,6 +146,8 @@ def plot_line(
     y_range: list = None,
     x_label: str = None,
     y_label: str = None,
+    log_xscale: bool = False,
+    log_yscale: bool = False,
     title: str = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
@@ -174,6 +176,10 @@ def plot_line(
         Label for x-axis. Optional.
     y_label : str
         Label for y-axis. Optional.
+    log_xscale : bool
+        Should we log the x-axis? Optional.
+    log_yscale : bool
+        Should we log the y-axis? Optional.
     title : str
         Figure title. Optional.
     plot_kwargs : dict
@@ -258,6 +264,12 @@ def plot_line(
     ax.set_title(title)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+
+    # Log scale axes
+    if log_xscale:
+        ax.set_xscale("log")
+    if log_yscale:
+        ax.set_yscale("log")
 
     # Add a legend
     if add_legend:
@@ -369,7 +381,7 @@ def plot_scatter(
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    colors = get_colors(len(x), colormap=None)
+    colors = get_colors(len(x), colormap="tab10")
 
     # Create figure
     if ax is None:
@@ -377,7 +389,14 @@ def plot_scatter(
 
     # Plot data
     for i in range(len(x)):
-        ax.scatter(x[i], y[i], label=labels[i], marker=markers[i], **plot_kwargs)
+        ax.scatter(
+            x[i],
+            y[i],
+            label=labels[i],
+            marker=markers[i],
+            color=colors[i],
+            **plot_kwargs,
+        )
         if errors[i] is not None:
             ax.errorbar(x[i], y[i], yerr=errors[i], fmt="none", c=colors[i])
 
@@ -590,6 +609,107 @@ def plot_bar_chart(
 
     # Plot bar chart
     ax.bar(x, counts, **plot_kwargs)
+
+    # Set axis range
+    ax.set_xlim(x_range[0], x_range[1])
+    ax.set_ylim(y_range[0], y_range[1])
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # Save the figure if a filename has been pass
+    if filename is not None:
+        save(fig, filename)
+
+
+def plot_gmm(
+    data: np.ndarray,
+    amplitudes: np.ndarray,
+    means: np.ndarray,
+    variances: np.ndarray,
+    bins=50,
+    x_range: list = None,
+    y_range: list = None,
+    x_label: str = None,
+    y_label: str = None,
+    title: str = None,
+    plot_kwargs: dict = None,
+    fig_kwargs: dict = None,
+    ax: matplotlib.axes.Axes = None,
+    filename: str = None,
+):
+    """Plot a two component Gaussian mixture model.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Raw data to plot as a histogram.
+    means : np.ndarray
+        Mean of each Gaussian component.
+    variances : np.ndarray
+        Variance of each Gaussian component.
+    bins : list of int
+        Number of bins for the historgram. Optional.
+    x_range : list
+        Minimum and maximum for x-axis. Optional.
+    y_range : list
+        Minimum and maximum for y-axis. Optional.
+    x_label : str
+        Label for x-axis. Optional.
+    y_label : str
+        Label for y-axis. Optional.
+    title : str
+        Figure title. Optional.
+    plot_kwargs : dict
+        Arguments to pass to the ax.hist method. Optional.
+    fig_kwargs : dict
+        Arguments to pass to plt.subplots. Optional.
+    ax : matplotlib.axes.Axes
+        Axis object to plot on. Optional.
+    filename : str
+        Output filename. Optional.
+    """
+
+    # Validation
+    if x_range is None:
+        x_range = [None, None]
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    default_fig_kwargs = {"figsize": (7, 4)}
+    if fig_kwargs is None:
+        fig_kwargs = default_fig_kwargs
+    else:
+        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
+    # Create figure
+    if ax is None:
+        fig, ax = create_figure(**fig_kwargs)
+
+    # Plot histogram
+    ax.hist(data, bins=bins, histtype="step", density=True)
+
+    # Plot Gaussian components
+    x = np.arange(min(data), max(data), (max(data) - min(data)) / bins)
+    y1 = amplitudes[0] * np.exp(-((x - means[0]) ** 2) / (2 * variances[0] ** 2))
+    y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * variances[1] ** 2))
+    ax.plot(x, y1)
+    ax.plot(x, y2)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
@@ -1346,7 +1466,9 @@ def plot_alpha(
     else:
         plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
-    if isinstance(y_labels, str):
+    if y_labels is None:
+        y_labels = [None]
+    elif isinstance(y_labels, str):
         y_labels = [y_labels] * n_alphas
     elif len(y_labels) != n_alphas:
         raise ValueError("Incorrect number of y_labels passed.")

@@ -10,6 +10,7 @@ import numpy as np
 from nilearn import plotting
 from tqdm import trange
 from dynemo import array_ops, files
+from dynemo.analysis.spectral import get_frequency_args_range
 
 _logger = logging.getLogger("DyNeMo")
 
@@ -27,13 +28,13 @@ def variance_from_spectra(
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if frequency_range is given.
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape is (n_modes, n_channels,
-        n_channels, n_f).
+        Power/cross spectra for each channel.
+        Can be an (n_channels, n_channels) array or (n_channels,) array.
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Optional: default is full
-        range.
+        Frequency range to integrate the PSD over (Hz).
+        Optional: default is full range.
 
     Returns
     -------
@@ -43,18 +44,40 @@ def variance_from_spectra(
     """
 
     # Validation
-    error_message = (
-        "A (n_channels, n_channels, n_frequency_bins), "
-        + "(n_modes, n_channels, n_channels, n_frequency_bins) or "
-        + "(n_subjects, n_modes, n_channels, n_channels, n_frequency_bins) "
-        + "array must be passed."
-    )
-    power_spectra = array_ops.validate(
-        power_spectra,
-        correct_dimensionality=5,
-        allow_dimensions=[3, 4],
-        error_message=error_message,
-    )
+    if power_spectra.ndim == 2:
+        # PSDs were passed
+        power_spectra = power_spectra[np.newaxis, np.newaxis, ...]
+        n_subjects, n_modes, n_channels, n_f = power_spectra.shape
+
+    elif power_spectra.shape[-2] != power_spectra.shape[-3]:
+        # PSDs were passed, check dimensionality
+        error_message = (
+            "A (n_channels, n_f), (n_modes, n_channels, n_f) or "
+            + "(n_subjects, n_modes, n_channels, n_f) array must be passed."
+        )
+        power_spectra = array_ops.validate(
+            power_spectra,
+            correct_dimensionality=4,
+            allow_dimensions=[2, 3],
+            error_message=error_message,
+        )
+        n_subjects, n_modes, n_channels, n_f = power_spectra.shape
+
+    else:
+        # Cross spectra were passed, check dimensionality
+        error_message = (
+            "A (n_channels, n_channels, n_f), "
+            + "(n_modes, n_channels, n_channels, n_f) or "
+            + "(n_subjects, n_modes, n_channels, n_channels, n_f) "
+            + "array must be passed."
+        )
+        power_spectra = array_ops.validate(
+            power_spectra,
+            correct_dimensionality=5,
+            allow_dimensions=[3, 4],
+            error_message=error_message,
+        )
+        n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
 
     if components is not None and frequency_range is not None:
         raise ValueError(
@@ -66,8 +89,7 @@ def variance_from_spectra(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
-    # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
+    # Number of spectral components
     if components is None:
         n_components = 1
     else:
@@ -77,27 +99,34 @@ def variance_from_spectra(
     var = []
     for i in range(n_subjects):
 
-        # Remove cross-spectral densities from the power spectra array
-        # and concatenate over modes
-        psd = power_spectra[i, :, range(n_channels), range(n_channels)]
-        psd = np.swapaxes(psd, 0, 1)
+        # Get PSDs
+        if power_spectra.shape[-2] == power_spectra.shape[-3]:
+            # Cross-spectra densities were passed
+            psd = power_spectra[i, :, range(n_channels), range(n_channels)]
+            psd = np.swapaxes(psd, 0, 1)
+        else:
+            # Only the PSDs were passed
+            psd = power_spectra[i]
+
+        # Concatenate over modes
         psd = psd.reshape(-1, n_f)
         psd = psd.real
 
         if components is not None:
             # Calculate PSD for each spectral component
             p = components @ psd.T
+            for j in range(n_components):
+                p[j] /= np.sum(components[j])
 
         else:
             # Integrate over the given frequency range
             if frequency_range is None:
-                p = np.sum(psd, axis=-1)
+                p = np.mean(psd, axis=-1)
             else:
-                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-                if f_max_arg < f_min_arg:
-                    raise ValueError("Cannot select the specified frequency range.")
-                p = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+                [f_min_arg, f_max_arg] = get_frequency_args_range(
+                    frequencies, frequency_range
+                )
+                p = np.mean(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
 
@@ -121,12 +150,12 @@ def power_map_grid(
 
     # Validation
     error_message = (
-        f"Dimensionality of power_map must be 2, 3, or 4, got ndim={power_map.ndim}."
+        f"Dimensionality of power_map must be 2 or 3 got ndim={power_map.ndim}."
     )
     power_map = array_ops.validate(
         power_map,
-        correct_dimensionality=4,
-        allow_dimensions=[2, 3],
+        correct_dimensionality=3,
+        allow_dimensions=[2],
         error_message=error_message,
     )
 
@@ -154,9 +183,7 @@ def power_map_grid(
     n_modes = power_map.shape[1]
     spatial_map_values = np.empty([n_voxels, n_modes])
     for i in range(n_modes):
-        spatial_map_values[:, i] = voxel_weights @ np.diag(
-            np.squeeze(power_map[component, i])
-        )
+        spatial_map_values[:, i] = voxel_weights @ power_map[component, i]
 
     # Subtract weighted mean
     if subtract_mean:
@@ -192,7 +219,8 @@ def save(
     ----------
     power_map : np.ndarray
         Power map to save.
-        Shape must be (n_components, n_modes, n_channels, n_channels).
+        Shape must be (n_components, n_modes, n_channels, n_channels)
+        or (n_components, n_modes, n_channels).
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png, it is saved as images.
@@ -207,6 +235,9 @@ def save(
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
         Optional, default is equal weighting.
+    plot_kwargs : dict
+        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        Optional.
     """
     # Validation
     if ".nii.gz" not in filename and ".png" not in filename:
@@ -215,6 +246,10 @@ def save(
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
+
+    if power_map.shape[-1] == power_map.shape[-2]:
+        # A n_channels by n_channels array hav been pass, extract PSDs
+        power_map = np.diagonal(power_map, axis1=-2, axis2=-1)
 
     # Calculate power maps
     power_map = power_map_grid(

@@ -6,9 +6,13 @@ from pathlib import Path
 
 import numpy as np
 from nilearn import plotting
+from nilearn.plotting.cm import _cmap_d as cm
 from tqdm import trange
 from dynemo import array_ops
+from dynemo.analysis.gmm import fit_gaussian_mixture
+from dynemo.analysis.spectral import get_frequency_args_range
 from dynemo.utils.parcellation import Parcellation
+from dynemo.utils.misc import override_dict_defaults
 
 
 def covariance_from_spectra(
@@ -80,17 +84,16 @@ def covariance_from_spectra(
         if components is not None:
             # Calculate PSD for each spectral component
             c = components @ csd.T
+            for j in range(n_components):
+                c[j] /= np.sum(components[j])
 
         else:
             # Integrate over the given frequency range
             if frequency_range is None:
                 c = np.sum(csd, axis=-1)
             else:
-                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-                if f_max_arg < f_min_arg:
-                    raise ValueError("Cannot select the specified frequency range.")
-                c = np.sum(csd[..., f_min_arg : f_max_arg + 1], axis=-1)
+                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
+                c = np.sum(csd[..., f_min:f_max], axis=-1)
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         covar.append(c)
@@ -103,6 +106,8 @@ def mean_coherence_from_spectra(
     coherence: np.ndarray,
     components: np.ndarray = None,
     frequency_range: list = None,
+    fit_gmm: bool = False,
+    gmm_filename: str = None,
 ) -> np.ndarray:
     """Calculates mean coherence from spectra.
 
@@ -116,8 +121,12 @@ def mean_coherence_from_spectra(
     components : np.ndarray
         Spectral components. Shape is (n_components, n_f). Optional.
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Optional: default is full
-        range.
+        Frequency range to integrate the PSD over (Hz). Optional.
+    fit_gmm : bool
+        Should we fit a two component Gaussian mixture model and only keep
+        one of the components. Optional.
+    gmm_filename : str
+        Filename to save GMM plot. Optional. Only used if fit_gmm=True.
 
     Returns
     -------
@@ -166,20 +175,65 @@ def mean_coherence_from_spectra(
         if components is not None:
             # Coherence for each spectral component
             coh = components @ coh.T
+            for j in range(n_components):
+                coh[j] /= np.sum(components[j])
 
         else:
             # Mean over the given frequency range
             if frequency_range is None:
                 coh = np.mean(coh, axis=-1)
             else:
-                f_min_arg = np.argwhere(frequencies > frequency_range[0])[0, 0]
-                f_max_arg = np.argwhere(frequencies < frequency_range[1])[-1, 0]
-                if f_max_arg < f_min_arg:
-                    raise ValueError("Cannot select the specified frequency range.")
-                coh = np.mean(coh[..., f_min_arg : f_max_arg + 1], axis=-1)
+                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
+                coh = np.mean(coh[..., f_min:f_max], axis=-1)
 
         coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)
+
+    if fit_gmm:
+        # Mean coherence over modes
+        mean_coh = np.mean(coh, axis=1)
+
+        # Indices for off diagonal elements
+        m, n = np.triu_indices(n_channels, k=1)
+
+        # Loop over components and modes
+        for i in range(n_components):
+            for j in range(n_modes):
+
+                # Off diagonal coherence values to fit a GMM to
+                c = coh[i, j, m, n] - mean_coh[i, m, n]
+
+                # Replace nans with mean value so that they don't affect the GMM fit
+                c[np.isnan(c)] = np.mean(c[~np.isnan(c)])
+
+                # Fit a GMM
+                if gmm_filename is not None:
+                    plot_filename = (
+                        "{fn.parent}/{fn.stem}{i:0{w1}d}_{j:0{w2}d}{fn.suffix}".format(
+                            fn=Path(gmm_filename),
+                            i=i,
+                            j=j,
+                            w1=len(str(n_components)),
+                            w2=len(str(n_modes)),
+                        )
+                    )
+                else:
+                    plot_filename = None
+                mixture_label = fit_gaussian_mixture(
+                    c,
+                    print_message=False,
+                    plot_filename=plot_filename,
+                    bayesian=True,
+                    max_iter=5000,
+                    n_init=10,
+                )
+
+                # Only keep the second mixture component and remove nan connections
+                c = coh[i, j, m, n]
+                c[mixture_label == 0] = 0
+                c[np.isnan(c)] = 0
+                coh[i, j, m, n] = c
+                coh[i, j, n, m] = c
 
     return np.squeeze(coh)
 
@@ -208,6 +262,8 @@ def save(
         Name of parcellation file used.
     component : int
         Spectral component to save. Optional.
+    plot_kwargs : dict
+        Keyword arguments to pass to nilearn.plotting.plot_connectome.
     """
     # Validation
     error_message = (
@@ -227,20 +283,32 @@ def save(
     if component is None:
         component = 0
 
+    # Load parcellation file
     parcellation = Parcellation(parcellation_file)
 
+    # Select the component we're plotting
+    conn_map = connectivity_map[component]
+
+    # Default plotting settings
+    default_plot_kwargs = {
+        "node_size": 10,
+        "node_color": "black",
+        "edge_cmap": cm["red_transparent_full_alpha_range"],
+        "colorbar": True,
+    }
+
+    # Overwrite keyword arguments if passed
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
     # Plot maps
-    n_modes = connectivity_map.shape[1]
+    n_modes = conn_map.shape[0]
     for i in trange(n_modes, desc="Saving images", ncols=98):
-        conn_map = connectivity_map[component, i].copy()
-        np.fill_diagonal(conn_map, 0)
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
             fn=Path(filename), i=i, w=len(str(n_modes))
         )
         plotting.plot_connectome(
-            conn_map,
+            conn_map[i],
             parcellation.roi_centers(),
-            colorbar=True,
             edge_threshold=f"{threshold * 100}%",
             output_file=output_file,
             **plot_kwargs,

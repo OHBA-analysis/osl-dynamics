@@ -13,12 +13,12 @@ hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
 cov = hmm.covariances
-alp = hmm.alpha(concatenate=True)
+alp = hmm.alpha()
 
 n_embeddings = 15
 pca_components = io.loadmat(
-    "/well/woolrich/projects/uk_meg_notts/eo/"
-    "natcomms18/prepared_data/pca_components.mat"
+    "/well/woolrich/projects/uk_meg_notts/eo"
+    + "/natcomms18/prepared_data/pca_components.mat"
 )
 sampling_frequency = 250
 frequency_range = [1, 45]
@@ -50,13 +50,13 @@ acf = modes.autocorrelation_functions(
     n_embeddings=n_embeddings,
     pca_components=pca_components,
 )
-_, psd, _ = spectral.mode_covariance_spectra(
+_, csd, _ = spectral.mode_covariance_spectra(
     acf,
     sampling_frequency=sampling_frequency,
     frequency_range=frequency_range,
 )
 
-conn_map = abs(np.sum(psd, axis=-1))
+conn_map = abs(np.sum(csd, axis=-1))
 connectivity.save(
     connectivity_map=conn_map,
     threshold=0.98,
@@ -71,21 +71,28 @@ preprocessed_data = Data(
         for i in range(1, 11)
     ]
 )
-ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings, concatenate=True)
+ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings)
 
-f, psd, coh = spectral.multitaper_spectra(
+# Subject-specific PSDs and coherences
+f, psd, coh, w = spectral.multitaper_spectra(
     data=ts,
     alpha=alp,
     sampling_frequency=sampling_frequency,
     time_half_bandwidth=4,
     n_tapers=7,
     frequency_range=frequency_range,
+    return_weights=True,
 )
 
+# Group-level coherence matrix
+gcoh = np.average(coh, axis=0, weights=w)
+
+# Calculate spectral components using subject-specific coherences
 wideband_components = spectral.decompose_spectra(coh, n_components=2)
 plotting.plot_line([f, f], wideband_components, filename="wideband.png")
 
-conn_map = connectivity.covariance_from_spectra(f, psd, wideband_components)
+# Plot connectivity map
+conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, wideband_components)
 connectivity.save(
     connectivity_map=conn_map,
     threshold=0.98,

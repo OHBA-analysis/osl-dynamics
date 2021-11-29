@@ -1,4 +1,4 @@
-"""Example script for running inference on resting-mode MEG data for one subject.
+"""Example script for running inference on resting-state MEG data for one subject.
 
 - The data is stored on the BMRC cluster: /well/woolrich/projects/uk_meg_notts
 - Uses the final covariances inferred by an HMM fit from OSL for the covariance of each

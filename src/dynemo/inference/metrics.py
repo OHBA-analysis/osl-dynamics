@@ -9,7 +9,6 @@ import tensorflow_probability as tfp
 from scipy.linalg import eigvalsh
 from sklearn.metrics import confusion_matrix as sklearn_confusion
 from tqdm import trange
-from dynemo.utils.decorators import transpose
 
 
 def alpha_correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
@@ -39,7 +38,6 @@ def alpha_correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
     return corr
 
 
-@transpose("mode_time_course_1", 0, "mode_time_course_2", 1)
 def confusion_matrix(
     mode_time_course_1: np.ndarray, mode_time_course_2: np.ndarray
 ) -> np.ndarray:
@@ -109,7 +107,6 @@ def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float
     return 2 * ((sequence_1 == sequence_2).sum()) / (len(sequence_1) + len(sequence_2))
 
 
-@transpose(0, 1, "sequence_1", "sequence_2")
 def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     """Wrapper method for `dice_coefficient`.
 

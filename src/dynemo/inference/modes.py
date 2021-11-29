@@ -9,7 +9,6 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from dynemo import array_ops
 from dynemo.inference import metrics
-from dynemo.utils.decorators import transpose
 
 _logger = logging.getLogger("DyNeMo")
 _rng = np.random.default_rng()
@@ -66,7 +65,6 @@ def time_courses(
     return stcs
 
 
-@transpose
 def correlate_modes(
     mode_time_course_1: np.ndarray, mode_time_course_2: np.ndarray
 ) -> np.ndarray:
@@ -162,7 +160,6 @@ def match_covariances(
         return tuple(matched_covariances)
 
 
-@transpose
 def match_modes(
     *mode_time_courses: np.ndarray, return_order: bool = False
 ) -> List[np.ndarray]:
@@ -207,7 +204,6 @@ def match_modes(
         return matched_mode_time_courses
 
 
-@transpose(0, "mode_time_course")
 def mode_activation(mode_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate mode activations for a mode time course.
 
@@ -257,7 +253,6 @@ def mode_activation(mode_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarra
     return mode_on, mode_off
 
 
-@transpose(0, "mode_time_course")
 def reduce_mode_time_course(mode_time_course: np.ndarray) -> np.ndarray:
     """Remove empty modes from a mode time course.
 
@@ -276,9 +271,8 @@ def reduce_mode_time_course(mode_time_course: np.ndarray) -> np.ndarray:
     return mode_time_course[:, ~np.all(mode_time_course == 0, axis=0)]
 
 
-@transpose(0, "mode_time_course")
 def lifetimes(
-    mode_time_course: np.ndarray, sampling_frequency: float = None
+    mode_time_course: Union[list, np.ndarray], sampling_frequency: float = None
 ) -> List[np.ndarray]:
     """Calculate mode lifetimes for a mode time course.
 
@@ -299,6 +293,8 @@ def lifetimes(
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
+    if isinstance(mode_time_course, list):
+        mode_time_course = np.concatenate(mode_time_course)
     ons, offs = mode_activation(mode_time_course)
     lts = offs - ons
     if sampling_frequency is not None:
@@ -313,7 +309,7 @@ def lifetime_statistics(
 
     Parameters
     ----------
-    mode_time_course : np.ndarray
+    mode_time_course : list or np.ndarray
         Mode time course. Shape is (n_samples, n_modes).
     sampling_frequency : float
         Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
@@ -331,7 +327,9 @@ def lifetime_statistics(
     return mean, std
 
 
-def intervals(mode_time_course: np.ndarray, sampling_frequency: float = None):
+def intervals(
+    mode_time_course: Union[list, np.ndarray], sampling_frequency: float = None
+) -> List[np.ndarray]:
     """Calculate mode intervals for a mode time course.
 
     An interval is the duration between successive visits for a particular
@@ -339,7 +337,7 @@ def intervals(mode_time_course: np.ndarray, sampling_frequency: float = None):
 
     Parameters
     ----------
-    mode_time_course : numpy.ndarray
+    mode_time_course : list or numpy.ndarray
         Mode time course (strictly binary).
     sampling_frequency : float
         Sampling frequency in Hz. Optional. If passed returns the intervals in seconds.
@@ -351,6 +349,8 @@ def intervals(mode_time_course: np.ndarray, sampling_frequency: float = None):
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
+    if isinstance(mode_time_course, list):
+        mode_time_course = np.concatenate(mode_time_course)
     ons, offs = mode_activation(mode_time_course)
     intvs = []
     for on, off in zip(ons, offs):
@@ -360,12 +360,14 @@ def intervals(mode_time_course: np.ndarray, sampling_frequency: float = None):
     return intvs
 
 
-def fractional_occupancies(mode_time_course: np.ndarray) -> np.ndarray:
+def fractional_occupancies(
+    mode_time_course: Union[list, np.ndarray]
+) -> Union[list, np.ndarray]:
     """Calculates the fractional occupancy.
 
     Parameters
     ----------
-    mode_time_course : np.ndarray
+    mode_time_course : list or np.ndarray
         Mode time course. Shape is (n_samples, n_modes).
 
     Returns
@@ -373,4 +375,8 @@ def fractional_occupancies(mode_time_course: np.ndarray) -> np.ndarray:
     np.ndarray
         The fractional occupancy of each mode.
     """
-    return np.sum(mode_time_course, axis=0) / mode_time_course.shape[0]
+    if isinstance(mode_time_course, list):
+        fo = [np.sum(mtc, axis=0) / mtc.shape[0] for mtc in mode_time_course]
+    else:
+        fo = np.sum(mode_time_course, axis=0) / mode_time_course.shape[0]
+    return fo
