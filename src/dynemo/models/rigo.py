@@ -161,7 +161,7 @@ class RIGO(InferenceModelBase, GO):
             theta_norm[-1] = theta_norm_layer(theta[np.newaxis, np.newaxis, :])[0]
 
             # Calculate the mode mixing factors
-            alpha[i] = alpha_layer(theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
+            alpha[i] = alpha_layer(mod_mu[np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha
 
