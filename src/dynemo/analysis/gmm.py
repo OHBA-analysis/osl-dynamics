@@ -61,11 +61,18 @@ def fit_gaussian_mixture(
     means = np.squeeze(gm.means_)
     variances = np.sqrt(np.squeeze(gm.covariances_))
 
+    means_order = np.argsort(means)
+
     # Plots
     if plot_filename is not None:
-        plotting.plot_gmm(X[:, 0], amplitudes, means, variances, filename=plot_filename)
+        plotting.plot_gmm(X[:, 0], amplitudes[means_order], means[means_order], variances[means_order], filename=plot_filename)
 
     # Which component does each data point correspond to
     y = gm.predict(X)
+
+    # Deal with label switching
+    if means[0] > means[1]:
+        # 1 -> 0; 0 -> 1 
+        y = (1-y).astype(int)
 
     return y

@@ -18,6 +18,7 @@ from dynemo.models.layers import (
     Sum,
     FillConstant,
 )
+import numpy as np
 
 
 class MRIGO(InferenceModelBase, ObservationModelBase):
