@@ -1429,8 +1429,6 @@ def plot_alpha(
         A matplotlib colormap string.
     sampling_frequency : float
         The sampling frequency of the data in Hertz.
-    fig_kwargs : dict
-        Any parameters to be passed to the matplotlib.pyplot.subplots constructor.
     y_labels : str
         Labels for the y-axis of each alpha time series.
     title : str

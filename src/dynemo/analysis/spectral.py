@@ -891,7 +891,8 @@ def spectrogram(
         XY_sub_window = np.empty(
             [n_sub_windows, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
         )
-        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+        if alpha is not None:
+            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
         for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
             j = time_indices[i]
 
@@ -920,19 +921,20 @@ def spectrogram(
                 XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
                 XY_sub_window[k] = XY[m, n]
 
-                # Calculate alpha for the sub-window by taking the mean
-                # over time after applying the windowing function
-                a_sub_window[k] = np.mean(
-                    a_window[
-                        k
-                        * window_length
-                        // n_sub_windows : (k + 1)
-                        * window_length
-                        // n_sub_windows
-                    ]
-                    * window[..., np.newaxis],
-                    axis=0,
-                )
+                if alpha is not None:
+                    # Calculate alpha for the sub-window by taking the mean
+                    # over time after applying the windowing function
+                    a_sub_window[k] = np.mean(
+                        a_window[
+                            k
+                            * window_length
+                            // n_sub_windows : (k + 1)
+                            * window_length
+                            // n_sub_windows
+                        ]
+                        * window[..., np.newaxis],
+                        axis=0,
+                    )
 
             # Average the cross spectra and alpha for each sub-window
             P[i] = np.mean(XY_sub_window, axis=0)
@@ -942,13 +944,15 @@ def spectrogram(
         # Calculate the periodogram for each segment of the data
         P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
         XX_sub_window = np.empty([n_sub_windows, n_channels, n_f], dtype=np.float32)
-        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+        if alpha is not None:
+            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
         for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
             j = time_indices[i]
 
             # Data and alpha in the window
             x_window = data[j : j + window_length].T
-            a_window = alpha[j : j + window_length]
+            if alpha is not None:
+                a_window = alpha[j : j + window_length]
 
             # Loop through sub-windows
             for k in range(n_sub_windows):
@@ -970,23 +974,25 @@ def spectrogram(
                 X = fourier_transform(x_sub_window, nfft, args_range)
                 XX_sub_window[k] = np.real(X * np.conj(X))
 
-                # Calculate alpha for the sub-window by taking the mean
-                # over time after applying the windowing function
-                a_sub_window[k] = np.mean(
-                    a_window[
-                        k
-                        * window_length
-                        // n_sub_windows : (k + 1)
-                        * window_length
-                        // n_sub_windows
-                    ]
-                    * window[..., np.newaxis],
-                    axis=0,
-                )
+                if alpha is not None:
+                    # Calculate alpha for the sub-window by taking the mean
+                    # over time after applying the windowing function
+                    a_sub_window[k] = np.mean(
+                        a_window[
+                            k
+                            * window_length
+                            // n_sub_windows : (k + 1)
+                            * window_length
+                            // n_sub_windows
+                        ]
+                        * window[..., np.newaxis],
+                        axis=0,
+                    )
 
             # Average the cross spectra and alpha for each sub-window
             P[i] = np.mean(XX_sub_window, axis=0)
-            a[i] = np.mean(a_sub_window, axis=0)
+            if alpha is not None:
+                a[i] = np.mean(a_sub_window, axis=0)
 
     # Scaling for the periodograms
     P /= sampling_frequency * np.sum(window ** 2)
