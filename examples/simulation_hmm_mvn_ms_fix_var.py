@@ -144,9 +144,9 @@ sim_beta, inf_beta = modes.match_modes(sim_beta, inf_beta)
 sim_gamma, inf_gamma = modes.match_modes(sim_gamma, inf_gamma)
 
 # Dice coefficients
-dice_alpha = metrics.dice_coefficients(sim_alpha, inf_alpha)
-dice_beta = metrics.dice_coefficients(sim_beta, inf_beta)
-dice_gamma = metrics.dice_coefficients(sim_gamma, inf_gamma)
+dice_alpha = metrics.dice_coefficient(sim_alpha, inf_alpha)
+dice_beta = metrics.dice_coefficient(sim_beta, inf_beta)
+dice_gamma = metrics.dice_coefficient(sim_gamma, inf_gamma)
 
 print("Dice coefficient for mean:", dice_alpha)
 print("Dice coefficient for std:", dice_beta)

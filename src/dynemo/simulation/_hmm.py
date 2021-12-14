@@ -336,6 +336,7 @@ class MS_HMM_MVN(Simulation):
         random_seed: int = None,
         fix_std: bool = False,
         uni_std: bool = False,
+        tie_mean_std: bool = False,
     ):
         # Observation model
         self.obs_mod = MS_MVN(
@@ -376,11 +377,15 @@ class MS_HMM_MVN(Simulation):
         super().__init__(n_samples=n_samples)
 
         # Simulate state time courses
+        alpha = self.alpha_hmm.generate_modes(self.n_samples)
+        beta = self.beta_hmm.generate_modes(self.n_samples)
+        gamma = self.gamma_hmm.generate_modes(self.n_samples)
+        
         self.mode_time_course = np.array(
             [
-                self.alpha_hmm.generate_modes(self.n_samples),
-                self.beta_hmm.generate_modes(self.n_samples),
-                self.gamma_hmm.generate_modes(self.n_samples),
+                alpha,
+                beta if not tie_mean_std else alpha,
+                gamma
             ]
         )
 

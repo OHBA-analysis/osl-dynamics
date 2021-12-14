@@ -47,6 +47,15 @@ class Config:
         Initial values for quantized vectors.
     learn_quantized_vectors : bool
         Should we learn the quantized vectors?
+    
+    Parameters for multi-scale model
+    --------------------------------
+    multiple_scales: bool
+        Should we use the multi-scale model?
+    fix_std: bool
+        Should we have constant std across modes and time?
+    tie_mean_std: bool
+        Should we tie up the time courses of mean and std?
 
     Dimension Parameters
     --------------------
@@ -190,6 +199,7 @@ class Config:
     observation_model: str = "multivariate_normal"
     multiple_scales: bool = False
     fix_std: bool = False
+    tie_mean_std: bool = False
 
     # Dimension parameters
     n_modes: int = None

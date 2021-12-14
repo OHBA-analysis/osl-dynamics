@@ -17,6 +17,7 @@ from dynemo.models.layers import (
     ThetaActivationLayer,
     Sum,
     FillConstant,
+    DummyLayer
 )
 import numpy as np
 
@@ -127,7 +128,7 @@ def _model_structure(config):
         config.n_modes, activation="softplus", name="inf_sigma_mean"
     )
 
-    if not config.fix_std:
+    if not (config.fix_std or config.tie_mean_std):
         # Mode time course for the standard deviations
         inference_input_dropout_layer_std = layers.Dropout(
             config.inference_dropout_rate, name="data_drop_std"
@@ -177,7 +178,13 @@ def _model_structure(config):
         name="alpha",
     )
 
-    if not config.fix_std:
+    if config.fix_std:
+        beta_layer = FillConstant(1 / config.n_modes, name="beta")
+
+    elif config.tie_mean_std:
+        beta_layer = DummyLayer(name="beta")
+    
+    else:
         theta_layer_std = SampleNormalDistributionLayer(name="theta_std")
         theta_norm_layer_std = NormalizationLayer(
             config.theta_normalization, name="theta_norm_std"
@@ -188,8 +195,6 @@ def _model_structure(config):
             config.learn_alpha_temperature,
             name="beta",
         )
-    else:
-        beta_layer = FillConstant(1 / config.n_modes, name="beta")
 
     theta_layer_fc = SampleNormalDistributionLayer(name="theta_fc")
     theta_norm_layer_fc = NormalizationLayer(
@@ -211,7 +216,10 @@ def _model_structure(config):
     theta_norm_mean = theta_norm_layer_mean(theta_mean)
     alpha = alpha_layer(theta_norm_mean)
 
-    if not config.fix_std:
+    if (config.fix_std or config.tie_mean_std):
+        beta = beta_layer(alpha)
+
+    else:
         inference_input_dropout_std = inference_input_dropout_layer_std(inputs)
         inference_output_std = inference_output_layers_std(inference_input_dropout_std)
         inf_mu_std = inf_mu_layer_std(inference_output_std)
@@ -219,8 +227,7 @@ def _model_structure(config):
         theta_std = theta_layer_std([inf_mu_std, inf_sigma_std])
         theta_norm_std = theta_norm_layer_std(theta_std)
         beta = beta_layer(theta_norm_std)
-    else:
-        beta = beta_layer(alpha)
+
 
     inference_input_dropout_fc = inference_input_dropout_layer_fc(inputs)
     inference_output_fc = inference_output_layers_fc(inference_input_dropout_fc)
@@ -327,7 +334,7 @@ def _model_structure(config):
         [inf_mu_mean, inf_sigma_mean, mod_mu_mean, mod_sigma_mean]
     )
 
-    if not config.fix_std:
+    if not (config.fix_std or config.tie_mean_std):
         model_input_dropout_std = model_input_dropout_layer_std(theta_norm_std)
         model_output_std = model_output_layer_std(model_input_dropout_std)
         mod_mu_std = mod_mu_layer_std(model_output_std)
@@ -343,7 +350,7 @@ def _model_structure(config):
     kl_loss_fc = kl_loss_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
 
     # Total KL loss
-    if config.fix_std:
+    if (config.fix_std or config.tie_mean_std):
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_fc])
     else:
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_std, kl_loss_fc])
