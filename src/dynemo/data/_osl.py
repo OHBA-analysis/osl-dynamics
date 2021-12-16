@@ -72,7 +72,7 @@ class OSL_HMM:
         return f"OSL HMM object from file {self.filename}"
 
     def alpha(
-        self, concatenate: bool = False, pad_n_embeddings: int = None
+        self, concatenate: bool = False, pad: int = None
     ) -> Union[list, np.ndarray]:
         """Alpha for each subject.
 
@@ -83,21 +83,21 @@ class OSL_HMM:
         concatenate : bool
             Should we concatenate the alphas for each subejcts? Optional, default is
             False.
-        pad_n_embeddings : int
+        pad : int
             Pad the alpha for each subject with zeros to replace the data points lost
             by performing n_embeddings. Optional, default is no padding.
         """
         if self.gamma is None:
             return None
 
-        if pad_n_embeddings is None:
+        if pad is None:
             if concatenate or len(self.discontinuities) == 1:
                 return self.gamma
             else:
                 return np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
         else:
             padded_alpha = [
-                np.pad(alpha, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
+                np.pad(alpha, [[pad, pad], [0, 0]])
                 for alpha in np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
             ]
             if concatenate:
@@ -117,7 +117,7 @@ class OSL_HMM:
         return modes.fractional_occupancies(stc)
 
     def mode_time_course(
-        self, concatenate: bool = False, pad_n_embeddings: int = None
+        self, concatenate: bool = False, pad: int = None
     ) -> Union[list, np.ndarray]:
         """Mode time course for each subject.
 
@@ -126,21 +126,21 @@ class OSL_HMM:
         concatenate : bool
             Should we concatenate the mode time course for each subjects? Optional,
             default is False.
-        pad_n_embeddings : int
+        pad : int
             Pad the mode time course for each subject with zeros to replace the data
             points lost by performing n_embeddings. Optional, default is no padding.
         """
         if self.vpath is None:
             return None
 
-        if pad_n_embeddings is None:
+        if pad is None:
             if concatenate or len(self.discontinuities) == 1:
                 return self.vpath
             else:
                 return np.split(self.vpath, np.cumsum(self.discontinuities[:-1]))
         else:
             padded_stc = [
-                np.pad(self.vpath, [[pad_n_embeddings, pad_n_embeddings], [0, 0]])
+                np.pad(self.vpath, [[pad, pad], [0, 0]])
                 for stc in np.split(self.vpath, np.cumsum(self.discontinuities[:-1]))
             ]
             if concatenate:
