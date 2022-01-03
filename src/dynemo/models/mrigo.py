@@ -12,12 +12,12 @@ from dynemo.models.layers import (
     MixMeansStdsFcsLayer,
     ModelRNNLayers,
     NormalizationLayer,
-    NormalKLDivergenceLayer,
+    KLDivergenceLayer,
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
     Sum,
     FillConstant,
-    DummyLayer
+    DummyLayer,
 )
 import numpy as np
 
@@ -183,7 +183,7 @@ def _model_structure(config):
 
     elif config.tie_mean_std:
         beta_layer = DummyLayer(name="beta")
-    
+
     else:
         theta_layer_std = SampleNormalDistributionLayer(name="theta_std")
         theta_norm_layer_std = NormalizationLayer(
@@ -216,7 +216,7 @@ def _model_structure(config):
     theta_norm_mean = theta_norm_layer_mean(theta_mean)
     alpha = alpha_layer(theta_norm_mean)
 
-    if (config.fix_std or config.tie_mean_std):
+    if config.fix_std or config.tie_mean_std:
         beta = beta_layer(alpha)
 
     else:
@@ -227,7 +227,6 @@ def _model_structure(config):
         theta_std = theta_layer_std([inf_mu_std, inf_sigma_std])
         theta_norm_std = theta_norm_layer_std(theta_std)
         beta = beta_layer(theta_norm_std)
-
 
     inference_input_dropout_fc = inference_input_dropout_layer_fc(inputs)
     inference_output_fc = inference_output_layers_fc(inference_input_dropout_fc)
@@ -291,7 +290,7 @@ def _model_structure(config):
     mod_sigma_layer_mean = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma_mean"
     )
-    kl_loss_layer_mean = NormalKLDivergenceLayer(name="kl_mean")
+    kl_loss_layer_mean = KLDivergenceLayer(name="kl_mean")
 
     model_output_layer_std = ModelRNNLayers(
         config.model_rnn,
@@ -306,7 +305,7 @@ def _model_structure(config):
     mod_sigma_layer_std = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma_std"
     )
-    kl_loss_layer_std = NormalKLDivergenceLayer(name="kl_std")
+    kl_loss_layer_std = KLDivergenceLayer(name="kl_std")
 
     model_output_layer_fc = ModelRNNLayers(
         config.model_rnn,
@@ -321,7 +320,7 @@ def _model_structure(config):
     mod_sigma_layer_fc = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma_fc"
     )
-    kl_loss_layer_fc = NormalKLDivergenceLayer(name="kl_fc")
+    kl_loss_layer_fc = KLDivergenceLayer(name="kl_fc")
 
     kl_sum_layer = Sum(name="kl")
 
@@ -350,7 +349,7 @@ def _model_structure(config):
     kl_loss_fc = kl_loss_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
 
     # Total KL loss
-    if (config.fix_std or config.tie_mean_std):
+    if config.fix_std or config.tie_mean_std:
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_fc])
     else:
         kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_std, kl_loss_fc])

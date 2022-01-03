@@ -9,8 +9,8 @@ from dynemo.models.layers import WaveNetLayer, StdDevLayer, LogLikelihoodLayer
 from dynemo.models.obs_mod_base import ObservationModelBase
 
 
-class CNNO(ObservationModelBase):
-    """Convoluational Neural Network Observations (CNNO) model.
+class WNO(ObservationModelBase):
+    """WaveNet Observations (WNO) model.
 
     Parameters
     ----------
@@ -121,4 +121,4 @@ def _model_structure(config):
     std_devs = std_devs_layer(inp_data)  # inp_data not used
     ll_loss = ll_loss_layer([inp_data, means, std_devs])
 
-    return Model(inputs=[inp_data, alpha], outputs=[ll_loss], name="CNNO")
+    return Model(inputs=[inp_data, alpha], outputs=[ll_loss], name="WNO")

@@ -9,18 +9,18 @@ from dynemo.models.layers import (
     LogLikelihoodLayer,
     ModelRNNLayers,
     NormalizationLayer,
-    NormalKLDivergenceLayer,
+    KLDivergenceLayer,
     SampleNormalDistributionLayer,
     StdDevLayer,
     ThetaActivationLayer,
     WaveNetLayer,
     VectorQuantizerLayer,
 )
-from dynemo.models.cnno import CNNO
+from dynemo.models.wno import WNO
 
 
-class RICNNO(InferenceModelBase, CNNO):
-    """RNN Inference/model network and CNN Observations (RICNNO).
+class RIWNO(InferenceModelBase, WNO):
+    """RNN Inference/model network and WaveNet Observations (RIWNO).
 
     Parameters
     ----------
@@ -29,7 +29,7 @@ class RICNNO(InferenceModelBase, CNNO):
 
     def __init__(self, config):
         InferenceModelBase.__init__(self, config)
-        CNNO.__init__(self, config)
+        WNO.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""
@@ -141,7 +141,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_loss_layer = NormalKLDivergenceLayer(name="kl")
+    kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
@@ -150,4 +150,4 @@ def _model_structure(config):
     mod_sigma = mod_sigma_layer(model_output)
     kl_loss = kl_loss_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
-    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RICNNO")
+    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RIWNO")

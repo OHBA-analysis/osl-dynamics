@@ -15,48 +15,6 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 class Config:
     """Settings for a model in DyNeMo.
 
-    Alpha Parameters
-    ----------------
-    alpha_pdf : str
-        Probability distribution used to generate alpha. Either 'normal' or
-        'dirichlet'.
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
-    initial_alpha_temperature : float
-        Initial value for the alpha temperature if it is being learnt or if
-        we are performing alpha temperature annealing
-    learn_alpha_temperature : bool
-        Should we learn the alpha temperature when alpha_xform = 'softmax' or
-        'gumbel-softmax'?
-    do_alpha_temperature_annealing : bool
-        Should we perform alpha temperature annealing. Can be used when
-        alpha_xform = 'softmax' or 'gumbel-softmax'.
-    final_alpha_temperature : bool
-        Final value for the alpha temperature if we are annealing.
-    n_alpha_temperature_annealing_epochs : int
-        Number of alpha temperature annealing epochs.
-    n_quantized_vectors : int
-        Number of quantized vectors. If passed, vector quantization will
-        be applied to the theta vectors.
-    quantized_vector_beta : float
-        Beta value for commitment loss. Default is 0.25.
-    initial_quantized_vectors : np.ndarray
-        Initial values for quantized vectors.
-    learn_quantized_vectors : bool
-        Should we learn the quantized vectors?
-    
-    Parameters for multi-scale model
-    --------------------------------
-    multiple_scales: bool
-        Should we use the multi-scale model?
-    fix_std: bool
-        Should we have constant std across modes and time?
-    tie_mean_std: bool
-        Should we tie up the time courses of mean and std?
-
     Dimension Parameters
     --------------------
     n_modes : int
@@ -97,6 +55,36 @@ class Config:
         E.g. 'relu', 'elu', etc.
     model_dropout_rate : float
         Dropout rate.
+
+    Alpha Parameters
+    ----------------
+    theta_normalization : str
+        Type of normalization to apply to the posterior samples, theta.
+        Either 'layer', 'batch' or None.
+    alpha_xform : str
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+    initial_alpha_temperature : float
+        Initial value for the alpha temperature if it is being learnt or if
+        we are performing alpha temperature annealing
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature when alpha_xform = 'softmax' or
+        'gumbel-softmax'?
+    do_alpha_temperature_annealing : bool
+        Should we perform alpha temperature annealing. Can be used when
+        alpha_xform = 'softmax' or 'gumbel-softmax'.
+    final_alpha_temperature : bool
+        Final value for the alpha temperature if we are annealing.
+    n_alpha_temperature_annealing_epochs : int
+        Number of alpha temperature annealing epochs.
+    n_quantized_vectors : int
+        Number of quantized vectors. If passed, vector quantization will
+        be applied to the theta vectors.
+    quantized_vector_beta : float
+        Beta value for commitment loss. Default is 0.25.
+    initial_quantized_vectors : np.ndarray
+        Initial values for quantized vectors.
+    learn_quantized_vectors : bool
+        Should we learn the quantized vectors?
 
     Observation Model Parameters
     ----------------------------
@@ -154,6 +142,15 @@ class Config:
     wavenet_n_layers : int
         Number of dilated causal convolution layers.
 
+    Parameters for Multi-Scale Model
+    --------------------------------
+    multiple_scales: bool
+        Should we use the multi-scale model?
+    fix_std: bool
+        Should we have constant std across modes and time?
+    tie_mean_std: bool
+        Should we tie up the time courses of mean and std?
+
     KL Annealing Parameters
     -----------------------
     do_kl_annealing : bool
@@ -194,13 +191,6 @@ class Config:
         Strategy for distributed learning.
     """
 
-    # Parameters related to the model choice
-    alpha_pdf: str = "normal"
-    observation_model: str = "multivariate_normal"
-    multiple_scales: bool = False
-    fix_std: bool = False
-    tie_mean_std: bool = False
-
     # Dimension parameters
     n_modes: int = None
     n_channels: int = None
@@ -240,6 +230,8 @@ class Config:
     learn_quantized_vectors: bool = True
 
     # Observation model parameters
+    observation_model: str = "multivariate_normal"
+
     learn_means: bool = None
     learn_covariances: bool = None
     learn_stds: bool = None
@@ -261,6 +253,10 @@ class Config:
 
     wavenet_n_filters: int = None
     wavenet_n_layers: int = None
+
+    multiple_scales: bool = False
+    fix_std: bool = False
+    tie_mean_std: bool = False
 
     # KL annealing parameters
     do_kl_annealing: bool = None
@@ -294,9 +290,6 @@ class Config:
 
     def validate_model_choice_parameters(self):
 
-        if self.alpha_pdf not in ["normal", "dirichlet"]:
-            raise ValueError("alpha_pdf must be 'normal' or 'dirichlet'.")
-
         if self.observation_model not in [
             "multivariate_normal",
             "multivariate_autoregressive",
@@ -306,13 +299,6 @@ class Config:
                 "observation_model must be 'multivariate_normal', "
                 + "'multivariate_autoregressive' or 'wavenet'."
             )
-
-        if self.multiple_scales:
-            if (
-                self.alpha_pdf != "normal"
-                or self.observation_model != "multivariate_normal"
-            ):
-                raise NotImplemented("No model for requested config.")
 
     def validate_rnn_parameters(self):
 

@@ -4,9 +4,8 @@
 
 from dynemo.models.go import GO
 from dynemo.models.maro import MARO
-from dynemo.models.cnno import CNNO
-from dynemo.models.ricnno import RICNNO
-from dynemo.models.ridgo import RIDGO
+from dynemo.models.wno import WNO
+from dynemo.models.riwno import RIWNO
 from dynemo.models.rigo import RIGO
 from dynemo.models.rimaro import RIMARO
 from dynemo.models.mrigo import MRIGO
@@ -15,8 +14,8 @@ from dynemo.models.mrigo import MRIGO
 def Model(config):
     """Main DyNeMo model.
 
-    Selects either an observation model (GO, MARO or CNNO) or joint inference
-    and observation model (RIGO, RIDGO, RIMARO, RICNNO) based on the passed
+    Selects either an observation model (GO, MARO or WNO) or joint inference
+    and observation model (RIGO, RIMARO, RIWNO) based on the passed
     config.
 
     Parameters
@@ -37,31 +36,18 @@ def Model(config):
             return MARO(config)
 
         elif config.observation_model == "wavenet":
-            return CNNO(config)
+            return WNO(config)
 
     if config.observation_model == "multivariate_normal":
 
-        if config.alpha_pdf == "normal":
-            if config.multiple_scales:
-                return MRIGO(config)
-            else:
-                return RIGO(config)
+        if config.multiple_scales:
+            return MRIGO(config)
 
-        elif config.alpha_pdf == "dirichlet":
-            return RIDGO(config)
+        else:
+            return RIGO(config)
 
     elif config.observation_model == "multivariate_autoregressive":
-
-        if config.alpha_pdf == "normal":
-            return RIMARO(config)
-
-        elif config.alpha_pdf == "dirichlet":
-            raise NotImplementedError("Requested config not available.")
+        return RIMARO(config)
 
     elif config.observation_model == "wavenet":
-
-        if config.alpha_pdf == "normal":
-            return RICNNO(config)
-
-        elif config.alpha_pdf == "dirichlet":
-            raise NotImplementedError("Requested config not available.")
+        return RIWNO(config)

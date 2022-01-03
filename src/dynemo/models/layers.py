@@ -128,23 +128,6 @@ class SampleNormalDistributionLayer(layers.Layer):
             return mu
 
 
-class SampleDirichletDistributionLayer(layers.Layer):
-    """Layer for sampling from a Dirichlet distribution.
-
-    This layer accepts the parameters of a Dirichlet distribution and
-    outputs a sample.
-    """
-
-    def call(self, concentration, training=None, **kwargs):
-        if training:
-            D = tfp.distributions.Dirichlet(concentration)
-            return D.sample()
-        else:
-            sum_concentration = tf.reduce_sum(concentration, axis=-1)
-            sum_concentration = tf.expand_dims(sum_concentration, axis=-1)
-            return tf.divide(concentration, sum_concentration)
-
-
 class ThetaActivationLayer(layers.Layer):
     """Layer for applying an activation function to theta.
 
@@ -446,7 +429,7 @@ class LogLikelihoodLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class NormalKLDivergenceLayer(layers.Layer):
+class KLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two Normal distributions."""
 
     def call(self, inputs, **kwargs):
@@ -469,29 +452,6 @@ class NormalKLDivergenceLayer(layers.Layer):
 
         # Sum the KL loss for each mode and time point and average over batches
         kl_loss = tf.reduce_sum(kl_loss, axis=2)
-        kl_loss = tf.reduce_sum(kl_loss, axis=1)
-        kl_loss = tf.reduce_mean(kl_loss, axis=0)
-
-        return tf.expand_dims(kl_loss, axis=-1)
-
-
-class DirichletKLDivergenceLayer(layers.Layer):
-    """Layer to calculate a KL divergence between two Dirichlet distributions."""
-
-    def call(self, inputs, **kwargs):
-        inference_concentration, model_concentration = inputs
-
-        # The Model RNN predicts one time step into the future compared to the
-        # inference RNN. We clip its last value, and first value of the inference RNN.
-        model_concentration = model_concentration[:, :-1]
-        inference_concentration = inference_concentration[:, 1:]
-
-        # Calculate the KL divergence between the posterior and prior
-        prior = tfp.distributions.Dirichlet(model_concentration)
-        posterior = tfp.distributions.Dirichlet(inference_concentration)
-        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
-
-        # Sum the KL loss for each time point and average over batches
         kl_loss = tf.reduce_sum(kl_loss, axis=1)
         kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
@@ -1199,7 +1159,7 @@ class MeansStdsFcsLayer(layers.Layer):
     Outputs the mean vector, the standard deviations, and correlation (fc) matrix
     of each mode.
 
-    Paramters
+    Parameters
     ---------
     n_modes: int
         Number of modes.
@@ -1320,7 +1280,7 @@ class MixMeansStdsFcsLayer(layers.Layer):
     """Compute a probabilistic mixture of means, standard deviations and functional
     connectivies.
 
-    The mixture is calculated as
+    The mixture is calculated as:
 
     m_t       = Sum_j alpha_jt mu_j
     diag(G_t) = Sum_j beta_jt E_j
@@ -1392,9 +1352,14 @@ class Sum(layers.Layer):
 class FillConstant(layers.Layer):
     """Layer to create tensor with the same shape of the input,
     but filled with a constant.
+
+    Parameters
+    ----------
+    constant : float
+        Value to full tensor with.
     """
 
-    def __init__(self, constant, **kwargs):
+    def __init__(self, constant: float, **kwargs):
         super().__init__(**kwargs)
         self.constant = constant
 

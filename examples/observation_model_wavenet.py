@@ -1,4 +1,4 @@
-"""Example script for fitting a convolutional neural network observation model to data.
+"""Example script for fitting a WaveNet observation model to data.
 
 - Simulates multiple sine waves at different frequencies and trains a WaveNet model.
 - The trained model is then sampled from.

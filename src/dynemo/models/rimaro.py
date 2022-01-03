@@ -13,7 +13,7 @@ from dynemo.models.layers import (
     MixCoeffsCovsLayer,
     ModelRNNLayers,
     NormalizationLayer,
-    NormalKLDivergenceLayer,
+    KLDivergenceLayer,
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
     VectorQuantizerLayer,
@@ -151,7 +151,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_loss_layer = NormalKLDivergenceLayer(name="kl")
+    kl_loss_layer = KLDivergenceLayer(name="kl")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
