@@ -711,6 +711,7 @@ class CovsLayer(layers.Layer):
         **kwargs
     ):
         super().__init__(**kwargs)
+
         self.n_modes = n_modes
         self.n_channels = n_channels
         self.diag_only = diag_only

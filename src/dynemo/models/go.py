@@ -18,9 +18,6 @@ class GO(ObservationModelBase):
     """
 
     def __init__(self, config):
-        if config.observation_model != "multivariate_normal":
-            raise ValueError("Observation model must be multivariate_normal.")
-
         ObservationModelBase.__init__(self, config)
 
     def build_model(self):

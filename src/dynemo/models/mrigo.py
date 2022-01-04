@@ -147,7 +147,7 @@ def _model_structure(config):
             config.n_modes, activation="softplus", name="inf_sigma_std"
         )
 
-    # Mode time course for the fcs
+    # Mode time course for the FCs
     inference_input_dropout_layer_fc = layers.Dropout(
         config.inference_dropout_rate, name="data_drop_fc"
     )
@@ -166,7 +166,7 @@ def _model_structure(config):
     )
 
     # Layers to sample theta from q(theta)
-    # and to convert to state mixing factors alpha, beta, gamma
+    # and to convert to mode mixing factors alpha, beta, gamma
     theta_layer_mean = SampleNormalDistributionLayer(name="theta_mean")
     theta_norm_layer_mean = NormalizationLayer(
         config.theta_normalization, name="theta_norm_mean"

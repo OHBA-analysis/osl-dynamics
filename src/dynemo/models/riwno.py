@@ -87,11 +87,9 @@ def _model_structure(config):
     alpha = alpha_layer(theta_norm)
 
     # Observation model:
-    # - We use x_t ~ N(mu_t, sigma), where
+    # - We use x_t ~ N(mu_t, sigma_t), where
     #      - mu_t = WaveNet(x_<t, alpha_t).
-    #      - sigma = a learnable diagonal covariance matrix.
-    # - We calculate the likelihood of generating the training data with
-    #   the observation model.
+    #      - sigma_t = Sum_j alpha_jt D_j
 
     # Definition of layers
     mean_layer = WaveNetLayer(

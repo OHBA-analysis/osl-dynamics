@@ -56,6 +56,23 @@ class Config:
     model_dropout_rate : float
         Dropout rate.
 
+    Multi-Time-Scale Model Parameters
+    ---------------------------------
+    multiple_scales: bool
+        Should we use the multi-scale model?
+    fix_std: bool
+        Should we have constant std across modes and time?
+    tie_mean_std: bool
+        Should we tie up the time courses of mean and std?
+    learn_stds: bool
+        Should we make the standard deviation for each mode trainable?
+    learn_fcs: bool
+        Should we make the functional connectivity for each mode trainable?
+    initial_stds: np.ndarray
+        Initialisation for mode standard deviations.
+    initial_fcs: np.ndarray
+        Initialisation for mode functional connectivity matrices.
+
     Alpha Parameters
     ----------------
     theta_normalization : str
@@ -99,23 +116,7 @@ class Config:
         Initialisation for mode covariances.
     diag_covs : bool
         Should we learn diagonal covariances?
-
-    Multi-Time-Scale Model Parameters
-    ---------------------------------
-    multiple_scales: bool
-        Should we use the multi-scale model?
-    fix_std: bool
-        Should we have constant std across modes and time?
-    tie_mean_std: bool
-        Should we tie up the time courses of mean and std?
-    learn_stds: bool
-        Should we make the standard deviation for each mode trainable?
-    learn_fcs: bool
-        Should we make the functional connectivity for each mode trainable?
-    initial_stds: np.ndarray
-        Initialisation for mode standard deviations.
-    initial_fcs: np.ndarray
-        Initialisation for mode functional connectivity matrices.
+        Only used if observation_model='wavenet'.
 
     KL Annealing Parameters
     -----------------------
@@ -178,13 +179,20 @@ class Config:
     model_activation: str = None
     model_dropout_rate: float = 0.0
 
+    # Multi-time-scale model parameters
+    multiple_scales: bool = False
+    fix_std: bool = False
+    tie_mean_std: bool = False
+    learn_stds: bool = None
+    learn_fcs: bool = None
+    initial_stds: np.ndarray = None
+    initial_fcs: np.ndarray = None
+
     # Alpha parameters
     theta_normalization: Literal[None, "batch", "layer"] = None
     alpha_xform: Literal["gumbel-softmax", "softmax", "softplus"] = None
-
     learn_alpha_temperature: bool = None
     initial_alpha_temperature: float = None
-
     do_alpha_temperature_annealing: bool = None
     final_alpha_temperature: float = None
     n_alpha_temperature_annealing_epochs: int = None
@@ -200,15 +208,6 @@ class Config:
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
     diag_covs: bool = False
-
-    # Multi-time-scale model parameters
-    multiple_scales: bool = False
-    fix_std: bool = False
-    tie_mean_std: bool = False
-    learn_stds: bool = None
-    learn_fcs: bool = None
-    initial_stds: np.ndarray = None
-    initial_fcs: np.ndarray = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None

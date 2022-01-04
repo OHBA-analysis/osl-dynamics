@@ -23,9 +23,6 @@ class WNO(ObservationModelBase):
     """
 
     def __init__(self, config):
-        if config.observation_model != "wavenet":
-            raise ValueError("Observation model must be 'wavenet'.")
-
         ObservationModelBase.__init__(self, config)
 
     def build_model(self):
