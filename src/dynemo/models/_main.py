@@ -5,16 +5,16 @@
 from dynemo.models.go import GO
 from dynemo.models.maro import MARO
 from dynemo.models.wno import WNO
-from dynemo.models.riwno import RIWNO
 from dynemo.models.rigo import RIGO
 from dynemo.models.rimaro import RIMARO
+from dynemo.models.riwno import RIWNO
 from dynemo.models.mrigo import MRIGO
 
 
 def Model(config):
     """Main DyNeMo model.
 
-    Selects either an observation model (GO, MARO or WNO) or joint inference
+    Selects either an observation model (GO, MARO, WNO) or joint inference
     and observation model (RIGO, RIMARO, RIWNO) based on the passed
     config.
 

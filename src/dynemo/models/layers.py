@@ -381,16 +381,13 @@ class LogLikelihoodLayer(layers.Layer):
 
     Parameters
     ----------
-    diag_only : bool
-        Are the covariances passed just the diagonal? Optional, default is False.
     clip : int
         Number of data points to clip from the means and data.
         Optional, default is no clipping.
     """
 
-    def __init__(self, diag_only: bool = False, clip: int = None, **kwargs):
+    def __init__(self, clip: int = None, **kwargs):
         super().__init__(**kwargs)
-        self.diag_only = diag_only
         self.clip = clip
 
     def call(self, inputs):
@@ -401,22 +398,14 @@ class LogLikelihoodLayer(layers.Layer):
         if self.clip is not None:
             x = x[:, self.clip :]
             mu = mu[:, : -self.clip]
-            if not self.diag_only:
-                sigma = sigma[:, : -self.clip]
+            sigma = sigma[:, : -self.clip]
 
         # Calculate the log-likelihood
-        if self.diag_only:
-            mvn = tfp.distributions.MultivariateNormalDiag(
-                loc=mu,
-                scale_diag=sigma,
-                allow_nan_stats=False,
-            )
-        else:
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=mu,
-                scale_tril=tf.linalg.cholesky(sigma),
-                allow_nan_stats=False,
-            )
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
+        )
         ll_loss = mvn.log_prob(x)
 
         # Sum over time dimension and average over the batch dimension
@@ -1080,76 +1069,126 @@ class WaveNetResidualBlockLayer(layers.Layer):
         return x + residual, skip
 
 
-class StdDevLayer(layers.Layer):
-    """Layer to learn standard deviations.
+class CovsLayer(layers.Layer):
+    """Layer to learn covariances.
 
     Parameters
     ----------
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
-    learn_std_dev : bool
-        Should we learn the standard deviation.
-    initial_std_dev : int
-        Initial values for the standard deviation.
+    diag_only : bool
+        Should we learn diagonal covariances?
+    learn_covariances : bool
+        Should we learn the covariances.
+    initial_covariances : np.ndarray
+        Initial values for the covariances.
     """
 
     def __init__(
         self,
+        n_modes: int,
         n_channels: int,
-        learn_std_dev: bool,
-        initial_std_dev: np.ndarray = None,
+        diag_only: bool,
+        learn_covariances: bool,
+        initial_covariances: np.ndarray,
         **kwargs
     ):
         super().__init__(**kwargs)
+        self.n_modes = n_modes
         self.n_channels = n_channels
-        self.learn_std_dev = learn_std_dev
+        self.diag_only = diag_only
+        self.learn_covariances = learn_covariances
 
-        # Initialisation of standard deviation
-        if initial_std_dev is None:
-            self.initial_std_dev = np.ones(n_channels, dtype=np.float32)
+        if diag_only:
+            # Learn a vector for the diagonal of each covariance matrix
+
+            # Initialisation of covariances
+            if initial_covariances is None:
+                self.initial_covariances = np.ones(
+                    [n_modes, n_channels], dtype=np.float32
+                )
+            else:
+                self.initial_covariances = initial_covariances.astype("float32")
+            self.covariances_initializer = WeightIniitalizer(self.initial_covariances)
+
         else:
-            self.initial_std_dev = initial_std_dev.astype("float32")
-        self.std_dev_initializer = WeightInitializer(self.initial_std_dev)
+            # Learn the cholesky factor of the full matrix
+
+            # Bijector used to transform covariance matrices to a learnable vector
+            self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
+            # Initialisation of covariances
+            if initial_covariances is None:
+                self.initial_covariances = np.stack(
+                    [np.eye(n_channels, dtype=np.float32)] * n_modes
+                )
+            else:
+                self.initial_covariances = initial_covariances.astype("float32")
+            self.initial_flattened_cholesky_covariances = self.bijector.inverse(
+                self.initial_covariances
+            )
+            self.flattened_cholesky_covariances_initializer = WeightInitializer(
+                self.initial_flattened_cholesky_covariances
+            )
 
     def build(self, input_shape):
-        self.std_dev = self.add_weight(
-            "std_dev",
-            shape=(self.n_channels),
-            dtype=tf.float32,
-            initializer=self.std_dev_initializer,
-            trainable=self.learn_std_dev,
-        )
+
+        if self.diag_only:
+            # Create weights for the diagonal of the covariances
+            self.covariances = self.add_weight(
+                "covariances",
+                shape=(self.n_modes, self.n_channels),
+                dtype=tf.float32,
+                initializer=self.covariances_initializer,
+                trainable=self.learn_covariances,
+            )
+
+        else:
+            # Create weights for the cholesky decomposition of the covariances
+            self.flattened_cholesky_covariances = self.add_weight(
+                "flattened_cholesky_covariances",
+                shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
+                dtype=tf.float32,
+                initializer=self.flattened_cholesky_covariances_initializer,
+                trainable=self.learn_covariances,
+            )
+
         self.built = True
 
-    def call(self, inputs):
-        return activations.softplus(self.std_dev)
+    def call(self, alpha, **kwargs):
+
+        if self.diag_only:
+            # Make sure diagonal is positive and make a n_channels by n_channels tensor
+            D = activations.softplus(self.covariances)
+            D = tf.matrix_diagonal(D)
+
+        else:
+            # Calculate the covariance matrix from the cholesky factor
+            D = self.bijector(self.flattened_cholesky_covariances)
+
+        return D
 
 
-class MeanSquaredErrorLayer(layers.Layer):
-    """Layer for calculating the mean squared error.
+class MixCovsLayer(layers.Layer):
+    """Layer to mix covariances."""
 
-    Parameters
-    ----------
-    clip : int
-        Number of data points to clip from each input.
-        Optional, default is no clipping.
-    """
+    def call(self, inputs, **kwargs):
+        alpha, D = inputs
 
-    def __init__(self, clip: int = None, **kwargs):
-        super().__init__(**kwargs)
-        self.clip = clip
+        # Reshape alpha and D for multiplication
+        alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
+        D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
 
-    def call(self, inputs, training=None, **kwargs):
-        training_data, generated_data = inputs
+        # Calculate the covariance: C_t = Sum_j alpha_jt D_j
+        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
-        if self.clip is not None:
-            training_data = training_data[:, self.clip :]
-            generated_data = generated_data[:, : -self.clip]
+        # The means are predicted one time step in the future so we need to
+        # make sure the covariances correspond to the correct time point
+        C = tf.roll(C, shift=-1, axis=1)
 
-        se = tf.math.squared_difference(training_data, generated_data)
-        mse = tf.reduce_mean(se)  # mean over batches, time points and channels
-
-        return tf.expand_dims(mse, axis=-1)
+        return C
 
 
 class MeansStdsFcsLayer(layers.Layer):

@@ -58,14 +58,15 @@ print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
 
 # Inferred standard deviation
-std_dev = model.get_std_dev()
+covs = model.get_covariances()
+std_dev = np.squeeze(np.sqrt(covs))
 print("std_dev:", std_dev)
 
 # Sample from the observation model
 samples = []
 psds = []
 for alpha in range(config.n_modes):
-    sample = model.sample(2000, std_dev=std_dev, alpha=alpha)
+    sample = model.sample(2000, covs=covs, alpha=alpha)
     f, psd = signal.welch(sample.T, fs=sim.sampling_frequency, nperseg=500)
     samples.append(sample)
     psds.append(psd[0])

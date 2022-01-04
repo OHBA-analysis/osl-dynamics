@@ -5,7 +5,12 @@
 import numpy as np
 from tqdm import trange
 from tensorflow.keras import Model, layers
-from dynemo.models.layers import WaveNetLayer, StdDevLayer, LogLikelihoodLayer
+from dynemo.models.layers import (
+    WaveNetLayer,
+    CovsLayer,
+    MixCovsLayer,
+    LogLikelihoodLayer,
+)
 from dynemo.models.obs_mod_base import ObservationModelBase
 
 
@@ -19,7 +24,7 @@ class WNO(ObservationModelBase):
 
     def __init__(self, config):
         if config.observation_model != "wavenet":
-            raise ValueError("Observation model must be wavenet.")
+            raise ValueError("Observation model must be 'wavenet'.")
 
         ObservationModelBase.__init__(self, config)
 
@@ -43,25 +48,26 @@ class WNO(ObservationModelBase):
         losses = self.model.predict(dataset)
         return np.mean(losses)
 
-    def get_std_dev(self):
-        """Learnt standard deviation.
+    def get_covariances(self):
+        """Learnt covariances.
 
         Returns
+        -------
         np.ndarray
-            Standard deviation.
+            Covariance.
         """
-        std_dev_layer = self.model.get_layer("std_dev")
-        return std_dev_layer(1).numpy()
+        covs_layer = self.model.get_layer("covs")
+        return covs_layer(1).numpy()
 
-    def sample(self, n_samples, std_dev, alpha):
+    def sample(self, n_samples, covs, alpha):
         """Sample from the observation model.
 
         Parameters
         ----------
         n_samples : int
             Number of samples.
-        std_dev : float
-            Standard deviation to use for sampling.
+        covs : float
+            Covariances to use for sampling.
         alpha : int
             Index for mode to sample.
 
@@ -72,7 +78,7 @@ class WNO(ObservationModelBase):
         """
 
         # Get layer for the WaveNet model
-        cnn_layer = self.model.get_layer("means")
+        cnn_layer = self.model.get_layer("mean")
 
         # Historic data to input to WaveNet
         x = np.zeros(
@@ -86,14 +92,15 @@ class WNO(ObservationModelBase):
             [1, self.config.sequence_length, self.config.n_modes], dtype=np.float32
         )
         a[0, :, alpha] = 1
+        cov = covs[alpha]
 
         # Generate a sample
         s = np.empty([n_samples, self.config.n_channels])
         for i in trange(n_samples, desc=f"Sampling mode {alpha}", ncols=98):
-            y = cnn_layer([x, a])[0, -1]
+            mean = cnn_layer([x, a])[0, -1]
             x = np.roll(x, shift=-1, axis=1)
-            x[0, -1] = y + np.random.normal(scale=std_dev)
-            s[i] = y.numpy()
+            x[0, -1] = np.random.normal(mean, cov)
+            s[i] = mean.numpy()
 
         return s
 
@@ -107,18 +114,27 @@ def _model_structure(config):
     alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
 
     # Definition of layers
-    means_layer = WaveNetLayer(
+    mean_layer = WaveNetLayer(
         config.n_channels,
         config.wavenet_n_filters,
         config.wavenet_n_layers,
-        name="means",
+        name="mean",
     )
-    std_devs_layer = StdDevLayer(config.n_channels, learn_std_dev=True, name="std_dev")
-    ll_loss_layer = LogLikelihoodLayer(diag_only=True, clip=1, name="ll")
+    covs_layer = CovsLayer(
+        config.n_modes,
+        config.n_channels,
+        config.diag_covs,
+        config.learn_covariances,
+        config.initial_covariances,
+        name="covs",
+    )
+    mix_covs_layer = MixCovsLayer(name="cov")
+    ll_loss_layer = LogLikelihoodLayer(clip=1, name="ll")
 
     # Data flow
-    means = means_layer([inp_data, alpha])
-    std_devs = std_devs_layer(inp_data)  # inp_data not used
-    ll_loss = ll_loss_layer([inp_data, means, std_devs])
+    mean = mean_layer([inp_data, alpha])
+    covs = covs_layer(inp_data)  # inp_data not used
+    cov = mix_covs_layer([alpha, covs])
+    ll_loss = ll_loss_layer([inp_data, mean, cov])
 
     return Model(inputs=[inp_data, alpha], outputs=[ll_loss], name="WNO")

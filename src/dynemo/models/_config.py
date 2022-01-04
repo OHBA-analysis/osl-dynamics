@@ -94,62 +94,52 @@ class Config:
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
-        Pass if model='multivariate_normal'.
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
-        Pass if model='multivariate_normal'.
     learn_alpha_scaling : bool
-        Should we learn a scaling for alpha? Pass if model='multivariate_normal'.
+        Should we learn a scaling for alpha?
     normalize_covariances : bool
-        Should we trace normalize the mode covariances? Pass if
-        model='multivariate_normal'.
+        Should we trace normalize the mode covariances?
     initial_means : np.ndarray
-        Initialisation for mean vectors. Pass if model='multivariate_normal'.
+        Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances. Pass if model='multivariate_normal'.
-
-    learn_stds: bool
-        Should we make the standard deviation for each mode trainable?
-        Only specify if multiple_scales=True.
-    learn_fcs: bool
-        Should we make the functional connectivity for each mode trainable?
-        Only specify if multiple_scales=True.
-    initial_stds: np.ndarray
-        Initialisation for mode standard deviations.
-        Only specify if multiple_scales=True.
-    initial_fcs: np.ndarray
-        Initialisation for mode functional connectivity matrices.
-        Only specify if multiple_scales=True.
+        Initialisation for mode covariances.
 
     n_lags : int
-        Number of autoregressive lags. Pass if model='multivariate_autoregressive'.
+        Number of autoregressive lags.
     learn_coeffs : bool
-        Should we learn the autoregressive coefficients? Pass if
-        model='multivariate_autoregressive'.
+        Should we learn the autoregressive coefficients?
     learn_covs : bool
-        Should we learn the covariances? Pass if model='multivariate_autoregressive'.
+        Should we learn the covariances?
     initial_coeffs : np.ndarray
-        Initialisation for autoregressive coefficients. Pass if
-        model='multivariate_autoregressive'.
+        Initialisation for autoregressive coefficients.
     initial_covs : np.ndarray
-        Initialisation for covariances. Pass if model='multivariate_autoregressive'.
+        Initialisation for covariances.
+
     diag_covs : bool
         Should we learn diagonal covariances?
-        Pass if model='multivariate_autoregressive'.
 
     wavenet_n_filters : int
         Number of filters in the each convolutional layer.
     wavenet_n_layers : int
         Number of dilated causal convolution layers.
 
-    Parameters for Multi-Scale Model
-    --------------------------------
+    Multi-Time-Scale Model Parameters
+    ---------------------------------
     multiple_scales: bool
         Should we use the multi-scale model?
     fix_std: bool
         Should we have constant std across modes and time?
     tie_mean_std: bool
         Should we tie up the time courses of mean and std?
+    learn_stds: bool
+        Should we make the standard deviation for each mode trainable?
+    learn_fcs: bool
+        Should we make the functional connectivity for each mode trainable?
+    initial_stds: np.ndarray
+        Initialisation for mode standard deviations.
+    initial_fcs: np.ndarray
+        Initialisation for mode functional connectivity matrices.
 
     KL Annealing Parameters
     -----------------------
@@ -230,7 +220,9 @@ class Config:
     learn_quantized_vectors: bool = True
 
     # Observation model parameters
-    observation_model: str = "multivariate_normal"
+    observation_model: Literal[
+        "multivariate_normal", "multivariate_autoregressive", "wavenet"
+    ] = "multivariate_normal"
 
     learn_means: bool = None
     learn_covariances: bool = None
@@ -249,7 +241,8 @@ class Config:
     learn_covs: bool = None
     initial_coeffs: np.ndarray = None
     initial_covs: np.ndarray = None
-    diag_covs: bool = None
+
+    diag_covs: bool = False
 
     wavenet_n_filters: int = None
     wavenet_n_layers: int = None

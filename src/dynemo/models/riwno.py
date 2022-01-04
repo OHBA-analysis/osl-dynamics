@@ -11,7 +11,8 @@ from dynemo.models.layers import (
     NormalizationLayer,
     KLDivergenceLayer,
     SampleNormalDistributionLayer,
-    StdDevLayer,
+    CovsLayer,
+    MixCovsLayer,
     ThetaActivationLayer,
     WaveNetLayer,
     VectorQuantizerLayer,
@@ -105,19 +106,28 @@ def _model_structure(config):
     #   the observation model.
 
     # Definition of layers
-    means_layer = WaveNetLayer(
+    mean_layer = WaveNetLayer(
         config.n_channels,
         config.wavenet_n_filters,
         config.wavenet_n_layers,
-        name="means",
+        name="mean",
     )
-    std_devs_layer = StdDevLayer(config.n_channels, learn_std_dev=True, name="std_devs")
-    ll_loss_layer = LogLikelihoodLayer(diag_only=True, clip=1, name="ll")
+    covs_layer = CovsLayer(
+        config.n_modes,
+        config.n_channels,
+        config.diag_covs,
+        config.learn_covariances,
+        config.initial_covariances,
+        name="covs",
+    )
+    mix_covs_layer = MixCovsLayer(name="cov")
+    ll_loss_layer = LogLikelihoodLayer(clip=1, name="ll")
 
     # Data flow
-    means = means_layer([inputs, alpha])
-    std_devs = std_devs_layer(inputs)  # inputs not used
-    ll_loss = ll_loss_layer([inputs, means, std_devs])
+    mean = mean_layer([inputs, alpha])
+    covs = covs_layer(inputs)  # inputs not used
+    cov = mix_covs_layer([alpha, covs])
+    ll_loss = ll_loss_layer([inputs, mean, cov])
 
     # Model RNN:
     # - Learns p(theta|theta_<t) ~ N(theta | mod_mu, mod_sigma), where
