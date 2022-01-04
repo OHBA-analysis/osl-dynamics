@@ -80,9 +80,11 @@ class Config:
     Observation Model Parameters
     ----------------------------
     observation_model : str
-        Type of observation model.
-        Either 'multivariate_normal', 'multivariate_autoregressive' or 'wavenet'.
-
+        Type of observation model. Either 'multivariate_normal' or 'wavenet'.
+    wavenet_n_filters : int
+        Number of filters in the each convolutional layer.
+    wavenet_n_layers : int
+        Number of dilated causal convolution layers.
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
     learn_covariances : bool
@@ -95,25 +97,8 @@ class Config:
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
-
-    n_lags : int
-        Number of autoregressive lags.
-    learn_coeffs : bool
-        Should we learn the autoregressive coefficients?
-    learn_covs : bool
-        Should we learn the covariances?
-    initial_coeffs : np.ndarray
-        Initialisation for autoregressive coefficients.
-    initial_covs : np.ndarray
-        Initialisation for covariances.
-
     diag_covs : bool
         Should we learn diagonal covariances?
-
-    wavenet_n_filters : int
-        Number of filters in the each convolutional layer.
-    wavenet_n_layers : int
-        Number of dilated causal convolution layers.
 
     Multi-Time-Scale Model Parameters
     ---------------------------------
@@ -205,36 +190,25 @@ class Config:
     n_alpha_temperature_annealing_epochs: int = None
 
     # Observation model parameters
-    observation_model: Literal[
-        "multivariate_normal", "multivariate_autoregressive", "wavenet"
-    ] = "multivariate_normal"
-
-    learn_means: bool = None
-    learn_covariances: bool = None
-    learn_stds: bool = None
-    learn_fcs: bool = None
-
-    learn_alpha_scaling: bool = False
-    normalize_covariances: bool = False
-    initial_covariances: np.ndarray = None
-    initial_means: np.ndarray = None
-    initial_stds: np.ndarray = None
-    initial_fcs: np.ndarray = None
-
-    n_lags: int = None
-    learn_coeffs: bool = None
-    learn_covs: bool = None
-    initial_coeffs: np.ndarray = None
-    initial_covs: np.ndarray = None
-
-    diag_covs: bool = False
-
+    observation_model: Literal["multivariate_normal", "wavenet"] = "multivariate_normal"
     wavenet_n_filters: int = None
     wavenet_n_layers: int = None
+    learn_means: bool = None
+    learn_covariances: bool = None
+    learn_alpha_scaling: bool = False
+    normalize_covariances: bool = False
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
+    diag_covs: bool = False
 
+    # Multi-time-scale model parameters
     multiple_scales: bool = False
     fix_std: bool = False
     tie_mean_std: bool = False
+    learn_stds: bool = None
+    learn_fcs: bool = None
+    initial_stds: np.ndarray = None
+    initial_fcs: np.ndarray = None
 
     # KL annealing parameters
     do_kl_annealing: bool = None
@@ -268,14 +242,9 @@ class Config:
 
     def validate_model_choice_parameters(self):
 
-        if self.observation_model not in [
-            "multivariate_normal",
-            "multivariate_autoregressive",
-            "wavenet",
-        ]:
+        if self.observation_model not in ["multivariate_normal", "wavenet"]:
             raise ValueError(
-                "observation_model must be 'multivariate_normal', "
-                + "'multivariate_autoregressive' or 'wavenet'."
+                "observation_model must be 'multivariate_normal' or 'wavenet'."
             )
 
     def validate_rnn_parameters(self):
@@ -412,29 +381,16 @@ class Config:
     def validate_observation_model_parameters(self):
 
         if self.observation_model == "multivariate_normal":
-            if self.learn_means is None:
-                self.learn_means = False
+            if self.learn_means is None or self.learn_covariances is None:
+                raise ValueError("learn_means and learn_covariances must be passed.")
 
+        if self.observation_model == "wavenet":
+            if self.wavenet_n_filters is None or self.wavenet_n_layers is None:
+                raise ValueError(
+                    "wavenet_n_filters and wavenet_n_layers must be passed."
+                )
             if self.learn_covariances is None:
                 self.learn_covariances = True
-
-            if self.learn_alpha_scaling is None:
-                self.learn_alpha_scaling = False
-
-            if self.normalize_covariances is None:
-                self.normalize_covariances = False
-
-        elif self.observation_model == "multivariate_autoregressive":
-            if self.n_lags is None:
-                raise ValueError(
-                    "If model='multivariate_autoregressive', n_lags must be passed."
-                )
-
-            if self.learn_coeffs is None:
-                self.learn_coeffs = True
-
-            if self.learn_covs is None:
-                self.learn_covs = True
 
     def validate_initialization_parameters(self):
 
