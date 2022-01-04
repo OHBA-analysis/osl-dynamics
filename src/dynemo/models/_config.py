@@ -76,15 +76,6 @@ class Config:
         Final value for the alpha temperature if we are annealing.
     n_alpha_temperature_annealing_epochs : int
         Number of alpha temperature annealing epochs.
-    n_quantized_vectors : int
-        Number of quantized vectors. If passed, vector quantization will
-        be applied to the theta vectors.
-    quantized_vector_beta : float
-        Beta value for commitment loss. Default is 0.25.
-    initial_quantized_vectors : np.ndarray
-        Initial values for quantized vectors.
-    learn_quantized_vectors : bool
-        Should we learn the quantized vectors?
 
     Observation Model Parameters
     ----------------------------
@@ -212,12 +203,6 @@ class Config:
     do_alpha_temperature_annealing: bool = None
     final_alpha_temperature: float = None
     n_alpha_temperature_annealing_epochs: int = None
-
-    # Vector quantisation parameters
-    n_quantized_vectors: int = None
-    quantized_vector_beta: float = 0.25
-    initial_quantized_vectors: np.ndarray = None
-    learn_quantized_vectors: bool = True
 
     # Observation model parameters
     observation_model: Literal[

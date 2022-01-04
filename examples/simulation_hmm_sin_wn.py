@@ -31,7 +31,6 @@ config = Config(
     alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
-    n_quantized_vectors=4,
     observation_model="wavenet",
     wavenet_n_filters=1,
     wavenet_n_layers=5,
