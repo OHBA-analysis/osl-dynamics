@@ -12,7 +12,6 @@ from dynemo.inference import tf_ops
 from dynemo.models import Config, Model
 from dynemo.utils import plotting
 
-
 # GPU settings
 tf_ops.gpu_growth()
 
@@ -65,8 +64,8 @@ print("std_dev:", std_dev)
 # Sample from the observation model
 samples = []
 psds = []
-for alpha in range(config.n_modes):
-    sample = model.sample(2000, covs=covs, alpha=alpha)
+for mode in range(config.n_modes):
+    sample = model.sample(2000, covs=covs, mode=mode)
     f, psd = signal.welch(sample.T, fs=sim.sampling_frequency, nperseg=500)
     samples.append(sample)
     psds.append(psd[0])

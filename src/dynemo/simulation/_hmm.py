@@ -380,13 +380,9 @@ class MS_HMM_MVN(Simulation):
         alpha = self.alpha_hmm.generate_modes(self.n_samples)
         beta = self.beta_hmm.generate_modes(self.n_samples)
         gamma = self.gamma_hmm.generate_modes(self.n_samples)
-        
+
         self.mode_time_course = np.array(
-            [
-                alpha,
-                beta if not tie_mean_std else alpha,
-                gamma
-            ]
+            [alpha, beta if not tie_mean_std else alpha, gamma]
         )
 
         # Simulate data
@@ -435,18 +431,18 @@ class HierarchicalHMM_MVN(Simulation):
     data_random_seed : int
         Random seed for generating the observed data.
     top_level_stay_prob : float
-        The stay_prob for the top level HMM. Used if top_level_trans_prob is 
+        The stay_prob for the top level HMM. Used if top_level_trans_prob is
         a str. Used when top_level_hmm_type = 'hmm'.
     bottom_level_stay_probs : list of float
-        The list of stay_prob values for the bottom level HMMs. Used when the 
+        The list of stay_prob values for the bottom level HMMs. Used when the
         correspondining entry in bottom_level_trans_prob is a str.
     top_level_hmm_type: str
         The type of HMM to use at the top level -- either hmm or hsmm.
     top_level_gamma_shape: float
-        The shape parameter for the gamma distribution used by 
+        The shape parameter for the gamma distribution used by
         the top level hmm when top_level_hmm_type = 'hsmm'.
     top_level_gamma_scale: float = None
-        The scale parameter for the gamma distribution used by 
+        The scale parameter for the gamma distribution used by
         the top level hmm when top_level_hmm_type = 'hsmm'.
     """
 
@@ -465,9 +461,9 @@ class HierarchicalHMM_MVN(Simulation):
         data_random_seed: int = None,
         top_level_stay_prob: float = None,
         bottom_level_stay_probs: list = None,
-        top_level_hmm_type: str = 'hmm',
+        top_level_hmm_type: str = "hmm",
         top_level_gamma_shape: float = None,
-        top_level_gamma_scale: float = None
+        top_level_gamma_scale: float = None,
     ):
         # Observation model
         self.obs_mod = MVN(
@@ -487,14 +483,14 @@ class HierarchicalHMM_MVN(Simulation):
 
         # Top level HMM
         # This will select the bottom level HMM at each time point
-        if top_level_hmm_type.lower() == 'hmm':
+        if top_level_hmm_type.lower() == "hmm":
             self.top_level_hmm = HMM(
                 trans_prob=top_level_trans_prob,
                 random_seed=top_level_random_seed,
                 stay_prob=top_level_stay_prob,
-                n_modes=len(bottom_level_trans_probs)
+                n_modes=len(bottom_level_trans_probs),
             )
-        elif top_level_hmm_type.lower() == 'hsmm':
+        elif top_level_hmm_type.lower() == "hsmm":
             self.top_level_hmm = HSMM(
                 gamma_shape=top_level_gamma_shape,
                 gamma_scale=top_level_gamma_scale,
@@ -513,7 +509,7 @@ class HierarchicalHMM_MVN(Simulation):
                 trans_prob=bottom_level_trans_probs[i],
                 random_seed=bottom_level_random_seeds[i],
                 stay_prob=bottom_level_stay_probs[i],
-                n_modes=n_modes
+                n_modes=n_modes,
             )
             for i in range(self.n_bottom_level_hmms)
         ]

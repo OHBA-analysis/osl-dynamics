@@ -1,33 +1,31 @@
 """Example script for running inference on simulated HMM-Sine data.
 
+- Achieves a dices of ~0.98.
 """
 
 print("Setting up")
 import numpy as np
+from scipy import signal
 from dynemo import data, simulation
 from dynemo.inference import callbacks, tf_ops
 from dynemo.models import Config, Model
+from dynemo.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25600
-amplitudes = np.array([[1, 1, 1, 1], [2, 2, 2, 2], [1, 1, 1, 1], [2, 2, 2, 2]])
-frequencies = np.array(
-    [[10, 10, 10, 10], [30, 30, 30, 30], [50, 50, 50, 50], [70, 70, 70, 70]]
-)
-sampling_frequency = 250
-
 config = Config(
+    n_modes=8,
+    n_channels=40,
     sequence_length=128,
     inference_rnn="lstm",
-    inference_n_units=64,
-    inference_n_layers=3,
+    inference_n_units=128,
+    inference_n_layers=5,
     inference_normalization="batch",
     model_rnn="lstm",
-    model_n_units=64,
-    model_n_layers=3,
+    model_n_units=128,
+    model_n_layers=5,
     model_normalization="batch",
     theta_normalization="batch",
     alpha_xform="softmax",
@@ -40,27 +38,33 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=100,
-    batch_size=32,
+    batch_size=16,
     learning_rate=0.001,
     n_epochs=200,
 )
 
 # Simulate data
+amplitudes = np.ones([config.n_modes, config.n_channels])
+frequencies = np.array(
+    [[5 * (i + 1)] * config.n_channels for i in range(config.n_modes)]
+)
+
 print("Simulating data")
 sim = simulation.HMM_Sine(
-    n_samples=n_samples,
+    n_samples=25600,
     trans_prob="sequence",
     stay_prob=0.95,
     amplitudes=amplitudes,
     frequencies=frequencies,
-    sampling_frequency=sampling_frequency,
-    observation_error=0.05,
+    sampling_frequency=250,
+    covariances="random",
     random_seed=123,
 )
+sim.standardize()
 meg_data = data.Data(sim.time_series)
 
-config.n_modes = sim.n_modes
-config.n_channels = sim.n_channels
+plotting.plot_time_series(sim.time_series, n_samples=2000, filename="train_data.png")
+plotting.plot_alpha(sim.mode_time_course, n_samples=2000, filename="sim_alp.png")
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
@@ -85,9 +89,31 @@ print("Training model")
 history = model.fit(
     training_dataset,
     epochs=config.n_epochs,
+    save_best_after=config.n_kl_annealing_epochs,
+    save_filepath="model/weights",
     callbacks=[dice_callback],
 )
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
+
+# Inferred covariances
+covs = model.get_covariances()
+
+# Sample from the observation model
+psds = []
+for mode in range(config.n_modes):
+    sample = model.sample(2000, covs=covs, mode=mode)
+    f, psd = signal.welch(sample.T, fs=sim.sampling_frequency, nperseg=500)
+    psds.append(psd[0])
+
+plotting.plot_line(
+    [f] * config.n_modes,
+    psds,
+    labels=[f"Mode {i + 1}" for i in range(config.n_modes)],
+    x_range=[0, 60],
+    x_label="Frequency [Hz]",
+    y_label="PSD [a.u.]",
+    filename="psds.png",
+)

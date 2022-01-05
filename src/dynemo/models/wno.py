@@ -56,8 +56,8 @@ class WNO(ObservationModelBase):
         covs_layer = self.model.get_layer("covs")
         return covs_layer(1).numpy()
 
-    def sample(self, n_samples, covs, alpha):
-        """Sample from the observation model.
+    def sample(self, n_samples, covs, mode):
+        """Sample data from the observation model.
 
         Parameters
         ----------
@@ -65,7 +65,7 @@ class WNO(ObservationModelBase):
             Number of samples.
         covs : float
             Covariances to use for sampling.
-        alpha : int
+        mode : int
             Index for mode to sample.
 
         Returns
@@ -88,15 +88,15 @@ class WNO(ObservationModelBase):
         a = np.zeros(
             [1, self.config.sequence_length, self.config.n_modes], dtype=np.float32
         )
-        a[0, :, alpha] = 1
-        cov = covs[alpha]
+        a[0, :, mode] = 1
+        cov = covs[mode]
 
         # Generate a sample
         s = np.empty([n_samples, self.config.n_channels])
-        for i in trange(n_samples, desc=f"Sampling mode {alpha}", ncols=98):
+        for i in trange(n_samples, desc=f"Sampling mode {mode}", ncols=98):
             mean = cnn_layer([x, a])[0, -1]
             x = np.roll(x, shift=-1, axis=1)
-            x[0, -1] = np.random.normal(mean, cov)
+            x[0, -1] = np.random.multivariate_normal(mean, cov)
             s[i] = mean.numpy()
 
         return s

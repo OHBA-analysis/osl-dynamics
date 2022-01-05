@@ -2,6 +2,8 @@
 
 """
 
+from typing import Union
+
 import numpy as np
 
 
@@ -36,10 +38,12 @@ class SingleSine:
         amplitudes: np.ndarray,
         frequencies: np.ndarray,
         sampling_frequency: float,
-        covariances: np.ndarray = None,
+        covariances: Union[np.ndarray, str] = None,
         observation_error: float = 0.0,
         random_seed: int = None,
     ):
+        self._rng = np.random.default_rng(random_seed)
+
         if amplitudes.shape != frequencies.shape:
             raise ValueError(
                 "Mismatch between the number of amplitudes and frequencies."
@@ -50,6 +54,9 @@ class SingleSine:
 
         if covariances is None:
             covariances = np.zeros([self.n_modes, self.n_channels, self.n_channels])
+
+        elif isinstance(covariances, str):
+            covariances = self.create_covariances(covariances)
 
         if amplitudes.shape[0] != covariances.shape[0]:
             raise ValueError(
@@ -64,7 +71,32 @@ class SingleSine:
         self.sampling_frequency = sampling_frequency
         self.covariances = covariances
         self.observation_error = observation_error
-        self._rng = np.random.default_rng(random_seed)
+
+    def create_covariances(self, option, eps=1e-6):
+        if option == "random":
+            # Randomly sample the elements of W from a normal distribution
+            W = self._rng.normal(
+                0, 0.1, size=[self.n_modes, self.n_channels, self.n_channels]
+            )
+
+            # A small value to add to the diagonal to ensure the covariances are
+            # invertible
+            eps = np.tile(np.eye(self.n_channels), [self.n_modes, 1, 1]) * eps
+
+            # Calculate the covariances
+            covariances = W @ W.transpose([0, 2, 1]) + eps
+
+            # Add a large activation to a small number of the channels at random
+            n_active_channels = max(1, self.n_channels // self.n_modes)
+            for i in range(self.n_modes):
+                active_channels = np.unique(
+                    self._rng.integers(0, self.n_channels, size=n_active_channels)
+                )
+                covariances[i, active_channels, active_channels] += 0.25
+        else:
+            raise NotImplementedError("Please use covariances='random'.")
+
+        return covariances
 
     def simulate_data(self, mode_time_course):
         # NOTE: We assume mutually exclusive modes when generating the data
