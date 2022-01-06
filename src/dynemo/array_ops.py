@@ -132,7 +132,7 @@ def cov2corr(cov: np.ndarray) -> np.ndarray:
     return cov
 
 
-def cov2sd(cov: np.ndarray) -> np.ndarray:
+def cov2std(cov: np.ndarray) -> np.ndarray:
     """Gets the standard deviation from a covariance matrix.
 
     Parameters

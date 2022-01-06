@@ -199,7 +199,7 @@ class MS_MVN(MVN):
         if uni_std:
             self.std = np.ones([self.n_modes, self.n_channels])
         else:
-            self.std = array_ops.cov2sd(self.covariances)
+            self.std = array_ops.cov2std(self.covariances)
         self.fc = array_ops.cov2corr(self.covariances)
 
     def simulate_data(self, state_time_courses: np.ndarray) -> np.ndarray:
