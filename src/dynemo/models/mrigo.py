@@ -7,16 +7,16 @@ from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.obs_mod_base import ObservationModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
-    LogLikelihoodLayer,
+    LogLikelihoodLossLayer,
     MeansStdsFcsLayer,
     MixMeansStdsFcsLayer,
     ModelRNNLayers,
     NormalizationLayer,
     KLDivergenceLayer,
+    KLLossLayer,
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
-    Sum,
-    FillConstant,
+    FillConstantLayer,
     DummyLayer,
 )
 import numpy as np
@@ -32,7 +32,7 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
     """
 
     def __init__(self, config):
-        InferenceModelBase.__init__(self, config)
+        InferenceModelBase.__init__(self)
         ObservationModelBase.__init__(self, config)
 
     def build_model(self):
@@ -179,7 +179,7 @@ def _model_structure(config):
     )
 
     if config.fix_std:
-        beta_layer = FillConstant(1 / config.n_modes, name="beta")
+        beta_layer = FillConstantLayer(1 / config.n_modes, name="beta")
 
     elif config.tie_mean_std:
         beta_layer = DummyLayer(name="beta")
@@ -257,7 +257,7 @@ def _model_structure(config):
         config.fix_std,
         name="mix_means_stds_fcs",
     )
-    ll_loss_layer = LogLikelihoodLayer(name="ll")
+    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     mu, E, D = means_stds_fcs_layer(inputs)
@@ -290,7 +290,7 @@ def _model_structure(config):
     mod_sigma_layer_mean = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma_mean"
     )
-    kl_loss_layer_mean = KLDivergenceLayer(name="kl_mean")
+    kl_div_layer_mean = KLDivergenceLayer(name="kl_div_mean")
 
     model_output_layer_std = ModelRNNLayers(
         config.model_rnn,
@@ -305,7 +305,7 @@ def _model_structure(config):
     mod_sigma_layer_std = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma_std"
     )
-    kl_loss_layer_std = KLDivergenceLayer(name="kl_std")
+    kl_div_layer_std = KLDivergenceLayer(name="kl_div_std")
 
     model_output_layer_fc = ModelRNNLayers(
         config.model_rnn,
@@ -320,16 +320,16 @@ def _model_structure(config):
     mod_sigma_layer_fc = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma_fc"
     )
-    kl_loss_layer_fc = KLDivergenceLayer(name="kl_fc")
+    kl_div_layer_fc = KLDivergenceLayer(name="kl_div_fc")
 
-    kl_sum_layer = Sum(name="kl")
+    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
     model_input_dropout_mean = model_input_dropout_layer_mean(theta_norm_mean)
     model_output_mean = model_output_layer_mean(model_input_dropout_mean)
     mod_mu_mean = mod_mu_layer_mean(model_output_mean)
     mod_sigma_mean = mod_sigma_layer_mean(model_output_mean)
-    kl_loss_mean = kl_loss_layer_mean(
+    kl_div_mean = kl_div_layer_mean(
         [inf_mu_mean, inf_sigma_mean, mod_mu_mean, mod_sigma_mean]
     )
 
@@ -338,7 +338,7 @@ def _model_structure(config):
         model_output_std = model_output_layer_std(model_input_dropout_std)
         mod_mu_std = mod_mu_layer_std(model_output_std)
         mod_sigma_std = mod_sigma_layer_std(model_output_std)
-        kl_loss_std = kl_loss_layer_std(
+        kl_div_std = kl_div_layer_std(
             [inf_mu_std, inf_sigma_std, mod_mu_std, mod_sigma_std]
         )
 
@@ -346,13 +346,13 @@ def _model_structure(config):
     model_output_fc = model_output_layer_fc(model_input_dropout_fc)
     mod_mu_fc = mod_mu_layer_fc(model_output_fc)
     mod_sigma_fc = mod_sigma_layer_fc(model_output_fc)
-    kl_loss_fc = kl_loss_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
+    kl_div_fc = kl_div_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
 
     # Total KL loss
     if config.fix_std or config.tie_mean_std:
-        kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_fc])
+        kl_loss = kl_loss_layer([kl_div_mean, kl_div_fc])
     else:
-        kl_loss = kl_sum_layer([kl_loss_mean, kl_loss_std, kl_loss_fc])
+        kl_loss = kl_loss_layer([kl_div_mean, kl_div_std, kl_div_fc])
 
     return Model(
         inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"

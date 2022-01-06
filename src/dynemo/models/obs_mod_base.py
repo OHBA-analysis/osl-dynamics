@@ -3,7 +3,7 @@
 """
 
 from tensorflow.keras import optimizers
-from dynemo.inference import initializers, losses
+from dynemo.inference import initializers
 from dynemo.models.base import Base
 from dynemo.utils.misc import replace_argument
 
@@ -22,25 +22,17 @@ class ObservationModelBase(Base):
 
     def compile(self, optimizer=None):
         """Wrapper for the standard keras compile method."""
-
-        # Loss function
-        loss = [losses.ModelOutputLoss()]
-
-        # Optimiser
         if optimizer is None:
-            if self.config.optimizer.lower() == "adam":
-                optimizer = optimizers.Adam(
-                    learning_rate=self.config.learning_rate,
-                    clipnorm=self.config.gradient_clip,
-                )
-            elif self.config.optimizer.lower() == "rmsprop":
-                optimizer = optimizers.RMSprop(
-                    learning_rate=self.config.learning_rate,
-                    clipnorm=self.config.gradient_clip,
-                )
-
-        # Compile
-        self.model.compile(optimizer=optimizer, loss=loss)
+            optimizer = optimizers.get(
+                {
+                    "class_name": self.config.optimizer.lower(),
+                    "config": {
+                        "learning_rate": self.config.learning_rate,
+                        "clipnorm": self.config.gradient_clip,
+                    },
+                }
+            )
+        self.model.compile(optimizer)
 
     def fit(
         self,

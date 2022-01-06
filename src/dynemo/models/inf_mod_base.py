@@ -6,9 +6,8 @@ import logging
 from typing import Tuple, Union
 
 import numpy as np
-from tensorflow import Variable
 from tensorflow.keras import optimizers
-from dynemo.inference import callbacks, initializers, losses
+from dynemo.inference import callbacks, initializers
 from dynemo.utils.misc import replace_argument
 
 _logger = logging.getLogger("DyNeMo")
@@ -22,36 +21,27 @@ class InferenceModelBase:
     config : dynemo.models.Config
     """
 
-    def __init__(self, config):
-
-        # KL annealing
-        self.kl_annealing_factor = (
-            Variable(0.0) if config.do_kl_annealing else Variable(1.0)
-        )
-
     def compile(self, optimizer=None):
-        """Wrapper for the standard keras compile method."""
+        """Wrapper for the standard keras compile method.
 
-        # Loss function
-        ll_loss = losses.ModelOutputLoss()
-        kl_loss = losses.ModelOutputLoss(self.kl_annealing_factor)
-        loss = [ll_loss, kl_loss]
-
-        # Optimiser
+        Parameters
+        ----------
+        optimizer : str or tensorflow.keras.optimizers.Optimizer
+            Optimizer to use when compiling. Optional, if None
+            a new optimizer is created.
+        """
         if optimizer is None:
-            if self.config.optimizer.lower() == "adam":
-                optimizer = optimizers.Adam(
-                    learning_rate=self.config.learning_rate,
-                    clipnorm=self.config.gradient_clip,
-                )
-            elif self.config.optimizer.lower() == "rmsprop":
-                optimizer = optimizers.RMSprop(
-                    learning_rate=self.config.learning_rate,
-                    clipnorm=self.config.gradient_clip,
-                )
+            optimizer = optimizers.get(
+                {
+                    "class_name": self.config.optimizer.lower(),
+                    "config": {
+                        "learning_rate": self.config.learning_rate,
+                        "clipnorm": self.config.gradient_clip,
+                    },
+                }
+            )
 
-        # Compile
-        self.model.compile(optimizer=optimizer, loss=loss)
+        self.model.compile(optimizer)
 
     def fit(
         self,
@@ -107,7 +97,6 @@ class InferenceModelBase:
 
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
-                kl_annealing_factor=self.kl_annealing_factor,
                 curve=self.config.kl_annealing_curve,
                 annealing_sharpness=self.config.kl_annealing_sharpness,
                 n_annealing_epochs=self.config.n_kl_annealing_epochs,
@@ -220,7 +209,8 @@ class InferenceModelBase:
         """
         initializers.reinitialize_model_weights(self.model, keep)
         if self.config.do_kl_annealing:
-            self.kl_annealing_factor.assign(0.0)
+            kl_loss_layer = self.model.get_layer("kl_loss")
+            kl_loss_layer.annealing_factor.assign(0.0)
         if self.config.do_alpha_temperature_annealing:
             alpha_layer = self.model.get_layer("alpha")
             alpha_layer.alpha_temperature.assign(self.config.initial_alpha_temperature)
@@ -336,16 +326,13 @@ class InferenceModelBase:
 
         return outputs_alpha, outputs_beta, outputs_gamma
 
-    def losses(self, dataset, return_sum: bool = False) -> Tuple[float, float]:
+    def losses(self, dataset) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
             Dataset to calculate losses for.
-        return_sum : bool
-            Should we return the loss for each batch summed? Otherwise we return
-            the mean. Optional, default is False.
 
         Returns
         -------
@@ -354,37 +341,32 @@ class InferenceModelBase:
         kl_loss : float
             KL divergence loss.
         """
-        if return_sum:
-            mean_or_sum = np.sum
-        else:
-            mean_or_sum = np.mean
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
-            ll_loss = mean_or_sum([mean_or_sum(p["ll_loss"]) for p in predictions])
-            kl_loss = mean_or_sum([mean_or_sum(p["kl_loss"]) for p in predictions])
+            ll_loss = np.mean([np.mean(p["ll_loss"]) for p in predictions])
+            kl_loss = np.mean([np.mean(p["kl_loss"]) for p in predictions])
+
         else:
             predictions = self.predict(dataset)
-            ll_loss = mean_or_sum(predictions["ll_loss"])
-            kl_loss = mean_or_sum(predictions["kl_loss"])
+            ll_loss = np.mean(predictions["ll_loss"])
+            kl_loss = np.mean(predictions["kl_loss"])
+
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset, return_sum: bool = False) -> float:
+    def free_energy(self, dataset) -> float:
         """Calculates the variational free energy of a dataset.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
             Dataset to calculate the variational free energy for.
-        return_sum : bool
-            Should we return the free energy for each batch summed? Otherwise
-            we return the mean. Optional, default is False.
 
         Returns
         -------
         float
             Variational free energy for the dataset.
         """
-        ll_loss, kl_loss = self.losses(dataset, return_sum=return_sum)
+        ll_loss, kl_loss = self.losses(dataset)
         free_energy = ll_loss + kl_loss
         return free_energy
 

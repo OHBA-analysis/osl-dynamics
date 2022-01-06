@@ -150,8 +150,8 @@ class Config:
         the Keras optimizer. Cannot be used if multi_gpu=True.
     n_epochs : int
         Number of training epochs.
-    optimizer : tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. Must be 'adam' or 'rmsprop'.
+    optimizer : str or tensorflow.keras.optimizers.Optimizer
+        Optimizer to use. 'adam' is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -380,8 +380,21 @@ class Config:
     def validate_observation_model_parameters(self):
 
         if self.observation_model == "multivariate_normal":
-            if self.learn_means is None or self.learn_covariances is None:
-                raise ValueError("learn_means and learn_covariances must be passed.")
+            if self.multiple_scales:
+                if (
+                    self.learn_means is None
+                    or self.learn_stds is None
+                    or self.learn_fcs is None
+                ):
+                    raise ValueError(
+                        "learn_means, learn_stds and learn_fcs must be passed."
+                    )
+
+            else:
+                if self.learn_means is None or self.learn_covariances is None:
+                    raise ValueError(
+                        "learn_means and learn_covariances must be passed."
+                    )
 
         if self.observation_model == "wavenet":
             if self.wavenet_n_filters is None or self.wavenet_n_layers is None:

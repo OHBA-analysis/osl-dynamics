@@ -12,12 +12,13 @@ from dynemo.models.go import GO
 from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
-    LogLikelihoodLayer,
+    LogLikelihoodLossLayer,
     MeansCovsLayer,
     MixMeansCovsLayer,
     ModelRNNLayers,
     NormalizationLayer,
     KLDivergenceLayer,
+    KLLossLayer,
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
 )
@@ -35,7 +36,7 @@ class RIGO(InferenceModelBase, GO):
     """
 
     def __init__(self, config):
-        InferenceModelBase.__init__(self, config)
+        InferenceModelBase.__init__(self)
         GO.__init__(self, config)
 
     def build_model(self):
@@ -238,7 +239,7 @@ def _model_structure(config):
         config.learn_alpha_scaling,
         name="mix_means_covs",
     )
-    ll_loss_layer = LogLikelihoodLayer(name="ll")
+    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     mu, D = means_covs_layer(inputs)  # inputs not used
@@ -267,13 +268,15 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_loss_layer = KLDivergenceLayer(name="kl")
+    kl_div_layer = KLDivergenceLayer(name="kl_div")
+    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
     model_output = model_output_layers(model_input_dropout)
     mod_mu = mod_mu_layer(model_output)
     mod_sigma = mod_sigma_layer(model_output)
-    kl_loss = kl_loss_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
+    kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
+    kl_loss = kl_loss_layer(kl_div)
 
     return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RIGO")

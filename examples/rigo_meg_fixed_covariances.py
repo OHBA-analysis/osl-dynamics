@@ -29,6 +29,7 @@ config = Config(
     alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
+    learn_means=False,
     learn_covariances=False,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",

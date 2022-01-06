@@ -76,7 +76,7 @@ class TrainableVariablesLayer(layers.Layer):
         n_units: int,
         activation: str = None,
         initial_values: np.ndarray = None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_units = n_units
@@ -148,7 +148,7 @@ class ThetaActivationLayer(layers.Layer):
         alpha_xform: str,
         initial_alpha_temperature: float,
         learn_alpha_temperature: bool,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.alpha_xform = alpha_xform
@@ -221,7 +221,7 @@ class MeansCovsLayer(layers.Layer):
         normalize_covariances: bool,
         initial_means: np.ndarray,
         initial_covariances: np.ndarray,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes
@@ -373,11 +373,11 @@ class MixMeansCovsLayer(layers.Layer):
         return [m, C]
 
 
-class LogLikelihoodLayer(layers.Layer):
+class LogLikelihoodLossLayer(layers.Layer):
     """Layer to calculate the negative log likelihood.
 
     The negative log-likelihood is calculated assuming a multivariate normal
-    probability density.
+    probability density and its value is added to the loss function.
 
     Parameters
     ----------
@@ -412,10 +412,12 @@ class LogLikelihoodLayer(layers.Layer):
         ll_loss = tf.reduce_sum(ll_loss, axis=1)
         ll_loss = tf.reduce_mean(ll_loss, axis=0)
 
-        # We return the negative of the log likelihood
+        # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
+        self.add_loss(nll_loss)
+        self.add_metric(nll_loss, name=self.name)
 
-        return tf.expand_dims(nll_loss, axis=-1)
+        return nll_loss
 
 
 class KLDivergenceLayer(layers.Layer):
@@ -444,7 +446,41 @@ class KLDivergenceLayer(layers.Layer):
         kl_loss = tf.reduce_sum(kl_loss, axis=1)
         kl_loss = tf.reduce_mean(kl_loss, axis=0)
 
-        return tf.expand_dims(kl_loss, axis=-1)
+        return kl_loss
+
+
+class KLLossLayer(layers.Layer):
+    """Layer to calculate the KL loss.
+
+    This layer sums KL divergences if multiple values as passed, applies an
+    annealing factor and adds the value to the loss function.
+
+    Parameters
+    ----------
+    do_annealing : bool
+        Should we perform KL annealing?
+    """
+
+    def __init__(self, do_annealing: bool, **kwargs):
+        super().__init__(**kwargs)
+        if do_annealing:
+            self.annealing_factor = tf.Variable(0.0, trainable=False)
+        else:
+            self.annealing_factor = tf.Variable(1.0, trainable=False)
+
+    def call(self, inputs, **kwargs):
+        if isinstance(inputs, list):
+            # Sum KL divergences
+            inputs = tf.add_n(inputs)
+
+        # KL annealing
+        kl_loss = tf.multiply(inputs, self.annealing_factor)
+
+        # Add to loss
+        self.add_loss(kl_loss)
+        self.add_metric(kl_loss, name=self.name)
+
+        return kl_loss
 
 
 class InferenceRNNLayers(layers.Layer):
@@ -474,7 +510,7 @@ class InferenceRNNLayers(layers.Layer):
         n_layers: int,
         n_units: int,
         dropout_rate: float,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_units = n_units
@@ -525,7 +561,7 @@ class ModelRNNLayers(layers.Layer):
         n_layers: int,
         n_units: int,
         dropout_rate: float,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_units = n_units
@@ -708,7 +744,7 @@ class CovsLayer(layers.Layer):
         diag_only: bool,
         learn_covariances: bool,
         initial_covariances: np.ndarray,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -844,7 +880,7 @@ class MeansStdsFcsLayer(layers.Layer):
         initial_means: np.ndarray,
         initial_stds: np.ndarray,
         initial_fcs: np.ndarray,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes
@@ -994,17 +1030,7 @@ class MixMeansStdsFcsLayer(layers.Layer):
         return [m, C]
 
 
-class Sum(layers.Layer):
-    """Layer to sum a set of tensors.
-
-    This layer is a wrapper for tensorflow.add_n.
-    """
-
-    def call(self, inputs, **kwargs):
-        return tf.add_n(inputs)
-
-
-class FillConstant(layers.Layer):
+class FillConstantLayer(layers.Layer):
     """Layer to create tensor with the same shape of the input,
     but filled with a constant.
 

@@ -9,7 +9,7 @@ from dynemo.models.layers import (
     WaveNetLayer,
     CovsLayer,
     MixCovsLayer,
-    LogLikelihoodLayer,
+    LogLikelihoodLossLayer,
 )
 from dynemo.models.obs_mod_base import ObservationModelBase
 
@@ -126,7 +126,7 @@ def _model_structure(config):
         name="covs",
     )
     mix_covs_layer = MixCovsLayer(name="cov")
-    ll_loss_layer = LogLikelihoodLayer(clip=1, name="ll")
+    ll_loss_layer = LogLikelihoodLossLayer(clip=1, name="ll_loss")
 
     # Data flow
     mean = mean_layer([inp_data, alpha])

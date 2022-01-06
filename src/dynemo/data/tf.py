@@ -74,15 +74,10 @@ class TensorFlowDataset:
             subject_datasets = []
             for i in range(self.n_subjects):
                 subject = self.subjects[i]
-                subject_data = Dataset.from_tensor_slices(subject).batch(
+                dataset = Dataset.from_tensor_slices(subject).batch(
                     sequence_length, drop_remainder=True
                 )
-                subject_tracker = Dataset.from_tensor_slices(
-                    np.zeros(n_batches[i], dtype=np.float32) + i
-                )
-                # The dataset must return the input data and target
-                # We use the subject id for the target
-                subject_datasets.append(Dataset.zip((subject_data, subject_tracker)))
+                subject_datasets.append(dataset)
 
         # Dataset for learning the observation model
         else:
@@ -103,24 +98,12 @@ class TensorFlowDataset:
                         (n_alpha_embeddings - n_embeddings) // 2 : alp.shape[0]
                     ]
 
-                # Create datasets
-                alpha_data = Dataset.from_tensor_slices(alp).batch(
+                # Create dataset
+                input_data = {"data": subject, "alpha": alp}
+                dataset = Dataset.from_tensor_slices(input_data).batch(
                     sequence_length, drop_remainder=True
                 )
-                subject_data = Dataset.from_tensor_slices(subject).batch(
-                    sequence_length, drop_remainder=True
-                )
-                subject_tracker = Dataset.from_tensor_slices(
-                    np.zeros(n_batches[i], dtype=np.float32) + i
-                )
-
-                # The dataset has returns two inputs to the model: data and alpha
-                # It also returns the subject id as the target
-                subject_datasets.append(
-                    Dataset.zip(
-                        ({"data": subject_data, "alpha": alpha_data}, subject_tracker)
-                    )
-                )
+                subject_datasets.append(dataset)
 
         # Create a dataset from all the subjects concatenated
         if concatenate:

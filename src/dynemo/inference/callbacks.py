@@ -12,6 +12,8 @@ from dynemo import inference
 class AlphaTemperatureAnnealingCallback(callbacks.Callback):
     """Callback to update the alpha temperature during training.
 
+    This callback assumes there is a keras layer called 'alpha' in the model.
+
     Parameters
     ----------
     initial_alpha_temperature : float
@@ -150,10 +152,10 @@ class DiceCoefficientCallback(callbacks.Callback):
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
+    This callback assumes there is a keras layer named 'kl_loss' in the model.
+
     Parameters
     ----------
-    kl_annealing_factor : tf.Variable
-        Annealing factor for the KL term in the loss function.
     curve : str
         Shape of the annealing curve. Either 'linear' or 'tanh'.
     annealing_sharpness : float
@@ -166,7 +168,6 @@ class KLAnnealingCallback(callbacks.Callback):
 
     def __init__(
         self,
-        kl_annealing_factor: tf.Variable,
         curve: str,
         annealing_sharpness: float,
         n_annealing_epochs: int,
@@ -176,7 +177,6 @@ class KLAnnealingCallback(callbacks.Callback):
             raise NotImplementedError(curve)
 
         super().__init__()
-        self.kl_annealing_factor = kl_annealing_factor
         self.curve = curve
         self.annealing_sharpness = annealing_sharpness
         self.n_annealing_epochs = n_annealing_epochs
@@ -194,6 +194,8 @@ class KLAnnealingCallback(callbacks.Callback):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
+
+        # Calculate new value
         epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
         if epoch < self.n_annealing_epochs:
             epoch = epoch % self.n_epochs_one_cycle
@@ -209,9 +211,12 @@ class KLAnnealingCallback(callbacks.Callback):
                 )
             elif self.curve == "linear":
                 new_value = epoch / self.n_epochs_one_cycle
-            self.kl_annealing_factor.assign(new_value)
         else:
-            self.kl_annealing_factor.assign(1.0)
+            new_value = 1.0
+
+        # Update the annealing factor in the layer that calculates the KL loss
+        kl_loss_layer = self.model.get_layer("kl_loss")
+        kl_loss_layer.annealing_factor.assign(new_value)
 
 
 class SaveBestCallback(callbacks.ModelCheckpoint):

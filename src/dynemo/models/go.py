@@ -5,7 +5,11 @@
 import numpy as np
 from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
-from dynemo.models.layers import LogLikelihoodLayer, MeansCovsLayer, MixMeansCovsLayer
+from dynemo.models.layers import (
+    LogLikelihoodLossLayer,
+    MeansCovsLayer,
+    MixMeansCovsLayer,
+)
 from dynemo.models.obs_mod_base import ObservationModelBase
 
 
@@ -164,7 +168,7 @@ def _model_structure(config):
         config.learn_alpha_scaling,
         name="mix_means_covs",
     )
-    ll_loss_layer = LogLikelihoodLayer(name="ll")
+    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     mu, D = means_covs_layer(data)  # data not used
