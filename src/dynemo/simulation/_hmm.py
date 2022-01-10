@@ -478,6 +478,9 @@ class HierarchicalHMM_MVN(Simulation):
         self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
 
+        if bottom_level_stay_probs is None:
+            bottom_level_stay_probs = [None] * len(bottom_level_trans_probs)
+
         if bottom_level_random_seeds is None:
             bottom_level_random_seeds = [None] * len(bottom_level_trans_probs)
 
@@ -497,7 +500,6 @@ class HierarchicalHMM_MVN(Simulation):
                 n_modes=len(bottom_level_trans_probs),
                 random_seed=top_level_random_seed,
             )
-
         else:
             raise ValueError(f"Unsupported top_level_hmm_type: {top_level_hmm_type}")
 
@@ -533,11 +535,11 @@ class HierarchicalHMM_MVN(Simulation):
         stc = np.empty([n_samples, self.n_modes])
 
         # Top level HMM to select the bottom level HMM at each time point
-        top_level_stc = self.top_level_hmm.generate_modes(n_samples)
+        self.top_level_stc = self.top_level_hmm.generate_modes(n_samples)
 
         # Generate mode time courses when each bottom level HMM is activate
         for i in range(self.n_bottom_level_hmms):
-            time_points_active = np.argwhere(top_level_stc[:, i] == 1)[:, 0]
+            time_points_active = np.argwhere(self.top_level_stc[:, i] == 1)[:, 0]
             stc[time_points_active] = self.bottom_level_hmms[i].generate_modes(
                 n_samples
             )[: len(time_points_active)]
