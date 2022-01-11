@@ -383,7 +383,9 @@ def fractional_occupancies(
 
 
 def fano_factor(
-    time_courses: Union[list, np.ndarray], window_lengths: Union[list, np.ndarray]
+    time_courses: Union[list, np.ndarray],
+    window_lengths: Union[list, np.ndarray],
+    sampling_frequency: float = 1.0,
 ) -> Union[list, np.ndarray]:
     """Calculates the FANO factor.
 
@@ -391,6 +393,10 @@ def fano_factor(
     ----------
     time_courses : list or np.ndarray
         State/mode activation time courses.
+    window_lengths : list or np.ndarray
+        Window lengths to use.
+    sampling_frequency : float
+        Sampling frequency of the time courses. Optional.
 
     Returns
     -------
@@ -403,23 +409,24 @@ def fano_factor(
     F = []
     for subject in time_courses:
         n_samples = subject.shape[0]
+        n_modes = subject.shape[1]
         F.append([])
 
         # Loop through window lengths
         for window_length in window_lengths:
-            w = int(window_length * 250)
+            w = int(window_length * sampling_frequency)
             n_windows = n_samples // w
             tc = subject[: n_windows * w]
-            tc = tc.reshape(n_windows, w, 10)
+            tc = tc.reshape(n_windows, w, n_modes)
 
             # Loop through windows
             counts = []
             for window in tc:
 
-                # Number of mode activations
+                # Number of activations
                 d = np.diff(window, axis=0)
                 c = []
-                for i in range(10):
+                for i in range(n_modes):
                     c.append(len(d[:, i][d[:, i] == 1]))
                 counts.append(c)
 
@@ -427,4 +434,4 @@ def fano_factor(
             counts = np.array(counts)
             F[-1].append(np.std(counts, axis=0) ** 2 / np.mean(counts, axis=0))
 
-    return np.array(F)
+    return np.squeeze(F)
