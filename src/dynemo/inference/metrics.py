@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from scipy.linalg import eigvalsh
+from scipy.linalg import eigvalsh, inv
 from sklearn.metrics import confusion_matrix as sklearn_confusion
 from tqdm import trange
 
@@ -313,7 +313,7 @@ def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
     -------
     np.ndarray
     """
-    d = np.sqrt(np.sum((np.log(eigvalsh(M1, M2)) ** 2)))
+    d = np.sqrt(np.sum((np.log(np.maximum(eigvalsh(M1 @ inv(M2)), 1e-3)) ** 2)))
     return d
 
 
