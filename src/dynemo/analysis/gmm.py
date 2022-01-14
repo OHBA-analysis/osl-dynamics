@@ -13,6 +13,7 @@ def fit_gaussian_mixture(
     plot_filename: str = None,
     print_message: bool = True,
     bayesian: bool = True,
+    label_order: str = "mean",
     **kwargs,
 ) -> np.ndarray:
     """Fits a two component Bayesian Gaussian mixture model.
@@ -27,6 +28,8 @@ def fit_gaussian_mixture(
         Should we print a message? Optional.
     bayesian : bool
         Should we fit a Bayesian GMM? Optional.
+    label_order: str
+        How do we order the inferred classes?
     **kwargs
         Keyword argument to pass to the sklearn class. Optional.
 
@@ -60,19 +63,27 @@ def fit_gaussian_mixture(
     )
     means = np.squeeze(gm.means_)
     variances = np.sqrt(np.squeeze(gm.covariances_))
-
-    means_order = np.argsort(means)
+    if label_order == "mean":
+        order = np.argsort(means)
+    elif label_order == "variance":
+        order = np.argsort(variances)
+    else:
+        raise NotImplementedError(label_order)
 
     # Plots
     if plot_filename is not None:
-        plotting.plot_gmm(X[:, 0], amplitudes[means_order], means[means_order], variances[means_order], filename=plot_filename)
+        plotting.plot_gmm(X[:, 0], amplitudes[order], means[order], variances[order], filename=plot_filename)
 
     # Which component does each data point correspond to
     y = gm.predict(X)
 
     # Deal with label switching
-    if means[0] > means[1]:
-        # 1 -> 0; 0 -> 1 
-        y = (1-y).astype(int)
+    if label_order == "mean":
+        if means[0] > means[1]:
+            # 1 -> 0; 0 -> 1 
+            y = (1-y).astype(int)
+    if label_order == "variance":
+        if variances[0] > variances[1]:
+            y = (1-y).astype(int)
 
     return y

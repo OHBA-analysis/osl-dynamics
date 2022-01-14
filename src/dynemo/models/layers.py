@@ -957,14 +957,18 @@ class MeansStdsFcsLayer(layers.Layer):
         # Make sure standard deviations are positive
         stds = activations.softplus(self.stds)
 
+        # The L2 norm of cholesky vectors for penalisation in the loss
+        L2norm_cholesky = tf.reduce_sum(tf.norm(self.flattened_cholesky_fcs, axis=1))
+        L2norm_cholesky = tf.expand_dims(L2norm_cholesky, axis=0)
+        
         # Calculate functional connectivity matrix from flattened vector
         fcs = self.bijector(self.flattened_cholesky_fcs)
 
-        # Normalise so that FCs are correlation matrices
-        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(fcs)), axis=-1)
-        fcs /= tf.matmul(sd, sd, transpose_b=True)
+        # # Normalise so that FCs are correlation matrices
+        # sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(fcs)), axis=-1)
+        # fcs /= tf.matmul(sd, sd, transpose_b=True)
 
-        return [self.means, stds, fcs]
+        return [self.means, stds, fcs, L2norm_cholesky]
 
 
 class MixMeansStdsFcsLayer(layers.Layer):
@@ -1023,6 +1027,10 @@ class MixMeansStdsFcsLayer(layers.Layer):
         gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
         D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
         F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
+
+        # Normalise F so that it is a valid correlation matrix
+        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(F)), axis=-1)
+        F /= tf.matmul(sd, sd, transpose_b=True)
 
         # Construct the covariance matrices given by C = GFG
         C = tf.matmul(G, tf.matmul(F, G))

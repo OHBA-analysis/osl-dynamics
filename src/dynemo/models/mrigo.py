@@ -53,7 +53,7 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
             Mode functional connectivities.
         """
         means_stds_fcs_layer = self.model.get_layer("means_stds_fcs")
-        means, stds, fcs = means_stds_fcs_layer(1)
+        means, stds, fcs, L2norm_cholesky = means_stds_fcs_layer(1)
         return means.numpy(), stds.numpy(), fcs.numpy()
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
@@ -260,7 +260,7 @@ def _model_structure(config):
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
-    mu, E, D = means_stds_fcs_layer(inputs)
+    mu, E, D, L2norm_cholesky = means_stds_fcs_layer(inputs)
     m, C = mix_means_stds_fcs_layer([alpha, beta, gamma, mu, E, D])
     ll_loss = ll_loss_layer([inputs, m, C])
 
