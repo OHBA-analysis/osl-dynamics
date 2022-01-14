@@ -244,6 +244,7 @@ def save(
     filename: str,
     parcellation_file: str,
     component: int = None,
+    gmm: bool = False,
     **plot_kwargs,
 ):
     """Save connectivity maps.
@@ -279,7 +280,7 @@ def save(
 
     if threshold > 1 or threshold < 0:
         raise ValueError("threshold must be between 0 and 1.")
-
+    
     if component is None:
         component = 0
 
@@ -288,6 +289,10 @@ def save(
 
     # Select the component we're plotting
     conn_map = connectivity_map[component]
+
+
+    if gmm:
+        threshold = gmm_threshold(conn_map, threshold, plot_filename = f"{filename}")
 
     # Default plotting settings
     default_plot_kwargs = {
@@ -306,10 +311,62 @@ def save(
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
             fn=Path(filename), i=i, w=len(str(n_modes))
         )
-        plotting.plot_connectome(
-            conn_map[i],
-            parcellation.roi_centers(),
-            edge_threshold=f"{threshold * 100}%",
-            output_file=output_file,
-            **plot_kwargs,
+        if gmm:
+            plotting.plot_connectome(
+                conn_map[i],
+                parcellation.roi_centers(),
+                edge_threshold=f"{threshold[i] * 100}%",
+                output_file=output_file,
+                **plot_kwargs,
+            )
+        else:
+            plotting.plot_connectome(
+                conn_map[i],
+                parcellation.roi_centers(),
+                edge_threshold=f"{threshold * 100}%",
+                output_file=output_file,
+                **plot_kwargs,
+            )
+
+
+def gmm_threshold(connectivity_map, threshold, plot_filename):
+    """ Fit a 2 component GMM to the connectivities.
+    Let the class with smaller variance be the background distribution.
+
+
+    Returns
+    -------
+    Threshold for each mode
+    """
+    n_modes = connectivity_map.shape[0]
+    n_channels = connectivity_map.shape[-1]
+
+    m, n = np.tril_indices(n_channels, -1)
+    gmm_threshold = np.zeros([n_modes])
+
+    for i in range(n_modes):
+        flattened_connectivity_map = connectivity_map[i][m,n]
+
+        gmm_plot_filename = "{fn.parent}/{fn.stem}fit_{i:0{w}d}{fn.suffix}".format(
+            fn=Path(plot_filename), i=i, w=len(str(n_modes))
         )
+        connectivity_label = fit_gaussian_mixture(
+            flattened_connectivity_map,
+            print_message=False,
+            plot_filename=gmm_plot_filename,
+            label_order="variance",
+            bayesian=True,
+            max_iter=5000,
+            n_init=10,
+        )
+        background_connectivities = flattened_connectivity_map[connectivity_label == 0]
+        upper_threshold = np.quantile(background_connectivities, 1 - (1 - threshold) / 2)
+        lower_threshold = np.quantile(background_connectivities, (1 - threshold) / 2)
+        
+        upper_quantile = np.mean(connectivity_map[i] > upper_threshold)
+        lower_quantile = np.mean(connectivity_map[i] < lower_threshold)
+        
+        # We want to be conservative and show less edges
+        gmm_threshold[i] = 1 - 2 * np.minimum(upper_quantile, lower_quantile)
+
+    return gmm_threshold
