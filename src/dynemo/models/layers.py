@@ -868,6 +868,9 @@ class MeansStdsFcsLayer(layers.Layer):
         Initial value of the standard deviation of each model. Optional.
     initial_fcs : np.ndarray
         Initial values of the functional connectivity of each mode. Optional.
+    regularize_fcs : bool
+        Should we add an L2 loss for the cholesky factors of the functional
+        connectivities.
     """
 
     def __init__(
@@ -880,6 +883,7 @@ class MeansStdsFcsLayer(layers.Layer):
         initial_means: np.ndarray,
         initial_stds: np.ndarray,
         initial_fcs: np.ndarray,
+        regularize_fcs: bool,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -921,6 +925,12 @@ class MeansStdsFcsLayer(layers.Layer):
             self.initial_flattened_cholesky_fcs
         )
 
+        # Regulariser for the cholesky factor of the functional connectivities
+        if regularize_fcs:
+            self.flattened_cholesky_fcs_regularizer = regularizers.l2()
+        else:
+            self.flattened_cholesky_fcs_regularizer = None
+
     def build(self, input_shape):
 
         # Create weights for the means
@@ -948,6 +958,7 @@ class MeansStdsFcsLayer(layers.Layer):
             dtype=tf.float32,
             initializer=self.flattened_cholesky_fcs_initializer,
             trainable=self.learn_fcs,
+            regularizer=self.flattened_cholesky_fcs_regularizer,
         )
 
         self.built = True
@@ -957,18 +968,14 @@ class MeansStdsFcsLayer(layers.Layer):
         # Make sure standard deviations are positive
         stds = activations.softplus(self.stds)
 
-        # The L2 norm of cholesky vectors for penalisation in the loss
-        L2norm_cholesky = tf.reduce_sum(tf.norm(self.flattened_cholesky_fcs, axis=1))
-        L2norm_cholesky = tf.expand_dims(L2norm_cholesky, axis=0)
-        
         # Calculate functional connectivity matrix from flattened vector
         fcs = self.bijector(self.flattened_cholesky_fcs)
 
-        # # Normalise so that FCs are correlation matrices
+        # Normalise so that FCs are correlation matrices
         # sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(fcs)), axis=-1)
         # fcs /= tf.matmul(sd, sd, transpose_b=True)
 
-        return [self.means, stds, fcs, L2norm_cholesky]
+        return [self.means, stds, fcs]
 
 
 class MixMeansStdsFcsLayer(layers.Layer):
