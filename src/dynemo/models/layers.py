@@ -191,186 +191,213 @@ class ThetaActivationLayer(layers.Layer):
         return alpha
 
 
-class MeansCovsLayer(layers.Layer):
-    """Layer to learn the mean and covariance of each mode.
-
-    Outputs the mean vector and covariance matrix of each mode.
+class VectorsLayer(layers.Layer):
+    """Layer to learn vectors.
 
     Parameters
     ----------
-    n_modes : int
-        Number of modes.
-    n_channels : int
-        Number of channels.
-    learn_means : bool
-        Should we learn the means?
-    learn_covariances : bool
-        Should we learn the covariances?
-    initial_means : np.ndarray
-        Initial values for the mean of each mode.
-    initial_covariances : np.ndarray
-        Initial values for the covariance of each mode. Must be dtype float32
+    n : int
+        Number of vectors.
+    m : int
+        Number of elements.
+    learn : bool
+        Should we learn the vectors?
+    initial_value : np.ndarray
+        Initial value for the vectors.
     """
 
     def __init__(
         self,
-        n_modes: int,
-        n_channels: int,
-        learn_means: bool,
-        learn_covariances: bool,
-        normalize_covariances: bool,
-        initial_means: np.ndarray,
-        initial_covariances: np.ndarray,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-        self.learn_means = learn_means
-        self.learn_covariances = learn_covariances
-        self.normalize_covariances = normalize_covariances
-
-        # Bijector used to transform covariance matrices to a learnable vector
-        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
-
-        # Initialisation of means
-        if initial_means is None:
-            self.initial_means = np.zeros([n_modes, n_channels], dtype=np.float32)
+        self.n = n
+        self.m = m
+        self.learn = learn
+        if initial_value is None:
+            self.initial_value = np.zeros([n, m], dtype=np.float32)
         else:
-            self.initial_means = initial_means.astype("float32")
-
-        self.means_initializer = WeightInitializer(self.initial_means)
-
-        # Initialisation of covariances
-        if initial_covariances is None:
-            self.initial_covariances = np.stack(
-                [np.eye(n_channels, dtype=np.float32)] * n_modes
-            )
-        else:
-            self.initial_covariances = initial_covariances.astype("float32")
-
-        if normalize_covariances:
-            normalization = (
-                tf.reduce_sum(tf.linalg.diag_part(self.initial_covariances), axis=1)[
-                    ..., tf.newaxis, tf.newaxis
-                ]
-                / n_channels
-            )
-            self.initial_covariances = self.initial_covariances / normalization
-
-        self.initial_flattened_cholesky_covariances = self.bijector.inverse(
-            self.initial_covariances
-        )
-
-        self.flattened_cholesky_covariances_initializer = WeightInitializer(
-            self.initial_flattened_cholesky_covariances
-        )
+            self.initial_value = initial_value.astype("float32")
+        self.vectors_initializer = WeightInitializer(self.initial_value)
 
     def build(self, input_shape):
-
-        # Create weights the means
-        self.means = self.add_weight(
-            "means",
-            shape=(self.n_modes, self.n_channels),
+        self.vectors = self.add_weight(
+            "vectors",
+            shape=(self.n, self.m),
             dtype=tf.float32,
-            initializer=self.means_initializer,
-            trainable=self.learn_means,
+            initializer=self.vectors_initializer,
+            trainable=self.learn,
         )
-
-        # Create weights for the cholesky decomposition of the covariances
-        self.flattened_cholesky_covariances = self.add_weight(
-            "flattened_cholesky_covariances",
-            shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
-            dtype=tf.float32,
-            initializer=self.flattened_cholesky_covariances_initializer,
-            trainable=self.learn_covariances,
-        )
-
         self.built = True
 
     def call(self, inputs, **kwargs):
-
-        # Calculate the covariance matrix from the cholesky factor
-        self.covariances = self.bijector(self.flattened_cholesky_covariances)
-
-        # Normalise the covariance by the trace
-        if self.normalize_covariances:
-            normalization = (
-                tf.reduce_sum(tf.linalg.diag_part(self.covariances), axis=1)[
-                    ..., tf.newaxis, tf.newaxis
-                ]
-                / self.n_channels
-            )
-            self.covariances = self.covariances / normalization
-
-        return [self.means, self.covariances]
+        return self.vectors
 
 
-class MixMeansCovsLayer(layers.Layer):
-    """Compute a probabilistic mixture of means and covariances.
-
-    The mixture is calculated as  m_t = Sum_j alpha_jt mu_j and
-    C_t = Sum_j alpha_jt D_j.
+class MatricesLayer(layers.Layer):
+    """Layer to learn a set of matrices.
 
     Parameters
     ----------
-    n_modes : int
-        Number of modes.
-    n_channels : int
-        Number of channels.
-    learn_alpha_scaling : bool
-        Should we learn an alpha scaling?
+    n : int
+        Number of matrices.
+    m : int
+        Number of rows/columns.
+    learn : bool
+        Should the matrices be learnable?
+    initial_value : np.ndarray
+        Initial values for the matrices.
+    diag_only : bool
+        Should we learn diagonal matrices?
     """
 
     def __init__(
-        self, n_modes: int, n_channels: int, learn_alpha_scaling: bool, **kwargs
+        self,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
+        diag_only: bool,
+        **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-        self.learn_alpha_scaling = learn_alpha_scaling
+
+        self.n = n
+        self.m = m
+        self.diag_only = diag_only
+        self.learn = learn
+
+        if diag_only:
+            # Learn a vector for the diagonal of each matrix
+
+            # Initialisation of matrices
+            if initial_value is None:
+                self.initial_value = np.ones([n, m], dtype=np.float32)
+            else:
+                self.initial_value = initial_value.astype("float32")
+            self.matrices_initializer = WeightIniitalizer(self.initial_value)
+
+        else:
+            # Learn the cholesky factor of the full matrix
+
+            # Bijector used to transform covariance matrices to a learnable vector
+            self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
+            # Initialisation of matrices
+            if initial_value is None:
+                self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
+            else:
+                self.initial_value = initial_value.astype("float32")
+            self.initial_flattened_cholesky_matrices = self.bijector.inverse(
+                self.initial_value
+            )
+            self.flattened_cholesky_matrices_initializer = WeightInitializer(
+                self.initial_flattened_cholesky_matrices
+            )
 
     def build(self, input_shape):
 
-        # Initialise such that softplus(alpha_scaling) = 1
-        self.alpha_scaling_initializer = tf.keras.initializers.Constant(
-            np.log(np.exp(1.0) - 1.0)
-        )
-        self.alpha_scaling = self.add_weight(
-            "alpha_scaling",
-            shape=self.n_modes,
-            dtype=tf.float32,
-            initializer=self.alpha_scaling_initializer,
-            trainable=self.learn_alpha_scaling,
-        )
+        if self.diag_only:
+            # Create weights for the diagonal of the matrices
+            self.matrices = self.add_weight(
+                "matrices",
+                shape=(self.n, self.m),
+                dtype=tf.float32,
+                initializer=self.matrices_initializer,
+                trainable=self.learn,
+            )
+
+        else:
+            # Create weights for the cholesky decomposition of the matrices
+            self.flattened_cholesky_matrices = self.add_weight(
+                "flattened_cholesky_matrices",
+                shape=(self.n, self.m * (self.m + 1) // 2),
+                dtype=tf.float32,
+                initializer=self.flattened_cholesky_matrices_initializer,
+                trainable=self.learn,
+            )
+
         self.built = True
+
+    def call(self, alpha, **kwargs):
+
+        if self.diag_only:
+            # Make sure diagonal is positive and make a m by m tensor
+            D = activations.softplus(self.matrices)
+            D = tf.matrix_diagonal(D)
+
+        else:
+            # Calculate the covariance matrix from the cholesky factor
+            D = self.bijector(self.flattened_cholesky_matrices)
+
+        return D
+
+
+class MixVectorsLayer(layers.Layer):
+    """Mix a set of vectors.
+
+    The mixture is calculated as m_t = Sum_j alpha_jt mu_j,
+    where mu_j are the vectors and alpha_jt are mixing coefficients.
+    """
 
     def call(self, inputs, **kwargs):
 
         # Unpack the inputs:
         # - alpha.shape = (None, sequence_length, n_modes)
         # - mu.shape    = (n_modes, n_channels)
-        # - D.shape     = (n_modes, n_channels, n_channels)
-        alpha, mu, D = inputs
+        alpha, mu = inputs
 
-        # Rescale the mode mixing factors
-        alpha = tf.multiply(alpha, activations.softplus(self.alpha_scaling))
-
-        # Reshape alpha and mu for multiplication
+        # Reshape for multiplication
         alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.reshape(mu, (1, 1, self.n_modes, self.n_channels))
+        mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
 
         # Calculate the mean: m_t = Sum_j alpha_jt mu_j
         m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
 
+        return m
+
+
+class MixMatricesLayer(layers.Layer):
+    """Layer to mix matrices.
+
+    The mixture is calculated as C_t = Sum_j alpha_jt D_j,
+    where D_j are the matrices and alpha_jt are mixing coefficients.
+
+    Parameters
+    ----------
+    shift : bool
+        Do the mixing coefficients correspond to one time step in the future?
+        If so, we roll the mixed matrices.
+    """
+
+    def __init__(self, shift: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.shift = shift
+
+    def call(self, inputs, **kwargs):
+
+        # Unpack the inputs:
+        # - alpha.shape = (None, sequence_length, n_modes)
+        # - D.shape     = (n_modes, n_channels, n_channels)
+        alpha, D = inputs
+
         # Reshape alpha and D for multiplication
-        alpha = tf.expand_dims(alpha, axis=-1)
-        D = tf.reshape(D, (1, 1, self.n_modes, self.n_channels, self.n_channels))
+        alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
+        D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
 
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
-        return [m, C]
+        if self.shift:
+            # The means are predicted one time step in the future so we need to
+            # make sure the covariances correspond to the correct time point
+            C = tf.roll(C, shift=-1, axis=1)
+
+        return C
 
 
 class LogLikelihoodLossLayer(layers.Layer):
@@ -718,129 +745,6 @@ class WaveNetResidualBlockLayer(layers.Layer):
         residual = self.res_layer(z)
         skip = self.skip_layer(z)
         return x + residual, skip
-
-
-class CovsLayer(layers.Layer):
-    """Layer to learn covariances.
-
-    Parameters
-    ----------
-    n_modes : int
-        Number of modes.
-    n_channels : int
-        Number of channels.
-    diag_only : bool
-        Should we learn diagonal covariances?
-    learn_covariances : bool
-        Should we learn the covariances.
-    initial_covariances : np.ndarray
-        Initial values for the covariances.
-    """
-
-    def __init__(
-        self,
-        n_modes: int,
-        n_channels: int,
-        diag_only: bool,
-        learn_covariances: bool,
-        initial_covariances: np.ndarray,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-        self.diag_only = diag_only
-        self.learn_covariances = learn_covariances
-
-        if diag_only:
-            # Learn a vector for the diagonal of each covariance matrix
-
-            # Initialisation of covariances
-            if initial_covariances is None:
-                self.initial_covariances = np.ones(
-                    [n_modes, n_channels], dtype=np.float32
-                )
-            else:
-                self.initial_covariances = initial_covariances.astype("float32")
-            self.covariances_initializer = WeightIniitalizer(self.initial_covariances)
-
-        else:
-            # Learn the cholesky factor of the full matrix
-
-            # Bijector used to transform covariance matrices to a learnable vector
-            self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
-
-            # Initialisation of covariances
-            if initial_covariances is None:
-                self.initial_covariances = np.stack(
-                    [np.eye(n_channels, dtype=np.float32)] * n_modes
-                )
-            else:
-                self.initial_covariances = initial_covariances.astype("float32")
-            self.initial_flattened_cholesky_covariances = self.bijector.inverse(
-                self.initial_covariances
-            )
-            self.flattened_cholesky_covariances_initializer = WeightInitializer(
-                self.initial_flattened_cholesky_covariances
-            )
-
-    def build(self, input_shape):
-
-        if self.diag_only:
-            # Create weights for the diagonal of the covariances
-            self.covariances = self.add_weight(
-                "covariances",
-                shape=(self.n_modes, self.n_channels),
-                dtype=tf.float32,
-                initializer=self.covariances_initializer,
-                trainable=self.learn_covariances,
-            )
-
-        else:
-            # Create weights for the cholesky decomposition of the covariances
-            self.flattened_cholesky_covariances = self.add_weight(
-                "flattened_cholesky_covariances",
-                shape=(self.n_modes, self.n_channels * (self.n_channels + 1) // 2),
-                dtype=tf.float32,
-                initializer=self.flattened_cholesky_covariances_initializer,
-                trainable=self.learn_covariances,
-            )
-
-        self.built = True
-
-    def call(self, alpha, **kwargs):
-
-        if self.diag_only:
-            # Make sure diagonal is positive and make a n_channels by n_channels tensor
-            D = activations.softplus(self.covariances)
-            D = tf.matrix_diagonal(D)
-
-        else:
-            # Calculate the covariance matrix from the cholesky factor
-            D = self.bijector(self.flattened_cholesky_covariances)
-
-        return D
-
-
-class MixCovsLayer(layers.Layer):
-    """Layer to mix covariances."""
-
-    def call(self, inputs, **kwargs):
-        alpha, D = inputs
-
-        # Reshape alpha and D for multiplication
-        alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
-        D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
-
-        # Calculate the covariance: C_t = Sum_j alpha_jt D_j
-        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
-
-        # The means are predicted one time step in the future so we need to
-        # make sure the covariances correspond to the correct time point
-        C = tf.roll(C, shift=-1, axis=1)
-
-        return C
 
 
 class MeansStdsFcsLayer(layers.Layer):

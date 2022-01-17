@@ -7,8 +7,8 @@ from tqdm import trange
 from tensorflow.keras import Model, layers
 from dynemo.models.layers import (
     WaveNetLayer,
-    CovsLayer,
-    MixCovsLayer,
+    MatricesLayer,
+    MixMatricesLayer,
     LogLikelihoodLossLayer,
 )
 from dynemo.models.obs_mod_base import ObservationModelBase
@@ -117,15 +117,15 @@ def _model_structure(config):
         config.wavenet_n_layers,
         name="mean",
     )
-    covs_layer = CovsLayer(
+    covs_layer = MatricesLayer(
         config.n_modes,
         config.n_channels,
-        config.diag_covs,
         config.learn_covariances,
         config.initial_covariances,
+        config.diag_covs,
         name="covs",
     )
-    mix_covs_layer = MixCovsLayer(name="cov")
+    mix_covs_layer = MixMatricesLayer(shift=True, name="cov")
     ll_loss_layer = LogLikelihoodLossLayer(clip=1, name="ll_loss")
 
     # Data flow

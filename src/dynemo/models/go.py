@@ -7,8 +7,10 @@ from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
 from dynemo.models.layers import (
     LogLikelihoodLossLayer,
-    MeansCovsLayer,
-    MixMeansCovsLayer,
+    VectorsLayer,
+    MatricesLayer,
+    MixVectorsLayer,
+    MixMatricesLayer,
 )
 from dynemo.models.obs_mod_base import ObservationModelBase
 
@@ -28,38 +30,20 @@ class GO(ObservationModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-    def get_covariances(self, alpha_scale=True):
+    def get_covariances(self):
         """Get the covariances of each mode.
-
-        Parameters
-        ----------
-        alpha_scale : bool
-            Should we apply alpha scaling? Default is True.
 
         Returns
         -------
         np.ndarary
             Mode covariances.
         """
-        # Get the means and covariances from the MeansCovsLayer
-        means_covs_layer = self.model.get_layer("means_covs")
-        _, covariances = means_covs_layer(1)
-        covariances = covariances.numpy()
+        covs_layer = self.model.get_layer("covs")
+        covs = covs_layer(1)
+        return covs.numpy()
 
-        # Apply alpha scaling
-        if alpha_scale:
-            alpha_scaling = self.get_alpha_scaling()
-            covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
-
-        return covariances
-
-    def get_means_covariances(self, alpha_scale=True):
+    def get_means_covariances(self):
         """Get the means and covariances of each mode.
-
-        Parameters
-        ----------
-        alpha_scale : bool
-            Should we apply alpha scaling? Default is True.
 
         Returns
         -------
@@ -68,16 +52,11 @@ class GO(ObservationModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        # Get the means and covariances from the MeansCovsLayer
-        means_covs_layer = self.model.get_layer("means_covs")
-        means, covariances = means_covs_layer(1)
-
-        # Apply alpha scaling
-        if alpha_scale:
-            alpha_scaling = self.get_alpha_scaling()
-            covariances *= alpha_scaling[:, np.newaxis, np.newaxis]
-
-        return means.numpy(), covariances.numpy()
+        means_layer = self.model.get_layer("means")
+        covs_layer = self.model.get_layer("covs")
+        means = means_layer(1)
+        covs = covs_layer(1)
+        return means.numpy(), covs.numpy()
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
@@ -91,13 +70,13 @@ class GO(ObservationModelBase):
             the model? Optional, default is True.
         """
         means = means.astype(np.float32)
-        means_covs_layer = self.model.get_layer("means_covs")
-        layer_weights = means_covs_layer.means
+        means_layer = self.model.get_layer("means")
+        layer_weights = means_layer.means
         layer_weights.assign(means)
 
         if update_initializer:
-            means_covs_layer.initial_means = means
-            means_covs_layer.means_initializer.initial_value = means
+            means_layer.initial_value = means
+            means_covs_layer.vectors_initializer.initial_value = means
 
     def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each mode.
@@ -111,32 +90,19 @@ class GO(ObservationModelBase):
             the model? Optional, default is True.
         """
         covariances = covariances.astype(np.float32)
-        means_covs_layer = self.model.get_layer("means_covs")
-        layer_weights = means_covs_layer.flattened_cholesky_covariances
-        flattened_cholesky_covariances = means_covs_layer.bijector.inverse(covariances)
-        layer_weights.assign(flattened_cholesky_covariances)
+        covs_layer = self.model.get_layer("covs")
+        layer_weights = covs_layer.flattened_cholesky_matrices
+        flattened_cholesky_matrices = covs_layer.bijector.inverse(covariances)
+        layer_weights.assign(flattened_cholesky_matrices)
 
         if update_initializer:
-            means_covs_layer.initial_covariances = covariances
-            means_covs_layer.initial_flattened_cholesky_covariances = (
-                flattened_cholesky_covariances
+            covs_layer.initial_value = covariances
+            covs_layer.initial_flattened_cholesky_matrices = (
+                flattened_cholesky_matricecs
             )
-            means_covs_layer.flattened_cholesky_covariances_initializer.initial_value = (
-                flattened_cholesky_covariances
+            covs_layer.flattened_cholesky_matrices_initializer.initial_value = (
+                flattened_cholesky_matrices
             )
-
-    def get_alpha_scaling(self):
-        """Get the alpha scaling of each mode.
-
-        Returns
-        ----------
-        bool
-            Alpha scaling for each mode.
-        """
-        mix_means_covs_layer = self.model.get_layer("mix_means_covs")
-        alpha_scaling = mix_means_covs_layer.alpha_scaling.numpy()
-        alpha_scaling = softplus(alpha_scaling).numpy()
-        return alpha_scaling
 
 
 def _model_structure(config):
@@ -152,27 +118,30 @@ def _model_structure(config):
     #   and the observation model.
 
     # Definition of layers
-    means_covs_layer = MeansCovsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
-        learn_means=config.learn_means,
-        learn_covariances=config.learn_covariances,
-        normalize_covariances=config.normalize_covariances,
-        initial_means=config.initial_means,
-        initial_covariances=config.initial_covariances,
-        name="means_covs",
+        config.learn_means,
+        config.initial_means,
+        name="means",
     )
-    mix_means_covs_layer = MixMeansCovsLayer(
+    covs_layer = MatricesLayer(
         config.n_modes,
         config.n_channels,
-        config.learn_alpha_scaling,
-        name="mix_means_covs",
+        config.learn_covariances,
+        config.initial_covariances,
+        diag_only=False,
+        name="covs",
     )
+    mix_means_layer = MixVectorsLayer(name="mix_means")
+    mix_covs_layer = MixMatricesLayer(name="mix_covs")
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
-    mu, D = means_covs_layer(data)  # data not used
-    m, C = mix_means_covs_layer([alpha, mu, D])
+    mu = means_layer(data)  # data not used
+    D = covs_layer(data)  # data not used
+    m = mix_means_layer([alpha, mu])
+    C = mix_covs_layer([alpha, D])
     ll_loss = ll_loss_layer([data, m, C])
 
     return Model(inputs=[data, alpha], outputs=[ll_loss], name="GO")

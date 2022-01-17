@@ -13,8 +13,10 @@ from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLossLayer,
-    MeansCovsLayer,
-    MixMeansCovsLayer,
+    VectorsLayer,
+    MatricesLayer,
+    MixVectorsLayer,
+    MixMatricesLayer,
     ModelRNNLayers,
     NormalizationLayer,
     KLDivergenceLayer,
@@ -72,8 +74,10 @@ class RIGO(InferenceModelBase, GO):
 
         # Make means and covariances non-trainable and compile
         if not learn_means_covariances:
-            means_covs_layer = self.model.get_layer("means_covs")
-            means_covs_layer.trainable = False
+            means_layer = self.model.get_layer("means")
+            covs_layer = self.model.get_layer("covs")
+            means_layer.trainable = False
+            covs_layer.trainable = False
             self.compile()
 
         # Make alpha temperature non-trainable and compile
@@ -87,7 +91,8 @@ class RIGO(InferenceModelBase, GO):
 
         # Make means and covariances trainable again and compile
         if not learn_means_covariances:
-            means_covs_layer.trainable = True
+            means_layer.trainable = True
+            covs_layer.trainable = True
             self.compile()
 
         # Make alpha temperature trainable again and compile
@@ -219,27 +224,30 @@ def _model_structure(config):
     #   and the observation model.
 
     # Definition of layers
-    means_covs_layer = MeansCovsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
-        learn_means=config.learn_means,
-        learn_covariances=config.learn_covariances,
-        normalize_covariances=config.normalize_covariances,
-        initial_means=config.initial_means,
-        initial_covariances=config.initial_covariances,
-        name="means_covs",
+        config.learn_means,
+        config.initial_means,
+        name="means",
     )
-    mix_means_covs_layer = MixMeansCovsLayer(
+    covs_layer = MatricesLayer(
         config.n_modes,
         config.n_channels,
-        config.learn_alpha_scaling,
-        name="mix_means_covs",
+        config.learn_covariances,
+        config.initial_covariances,
+        diag_only=False,
+        name="covs",
     )
+    mix_means_layer = MixVectorsLayer(name="mix_means")
+    mix_covs_layer = MixMatricesLayer(name="mix_covs")
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
-    mu, D = means_covs_layer(inputs)  # inputs not used
-    m, C = mix_means_covs_layer([alpha, mu, D])
+    mu = means_layer(inputs)  # inputs not used
+    D = covs_layer(inputs)  # inputs not used
+    m = mix_means_layer([alpha, mu])
+    C = mix_covs_layer([alpha, D])
     ll_loss = ll_loss_layer([inputs, m, C])
 
     # Model RNN:

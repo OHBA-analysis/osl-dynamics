@@ -109,10 +109,6 @@ class Config:
         Should we make the mean vectors for each mode trainable?
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
-    learn_alpha_scaling : bool
-        Should we learn a scaling for alpha?
-    normalize_covariances : bool
-        Should we trace normalize the mode covariances?
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
@@ -207,8 +203,6 @@ class Config:
     wavenet_n_layers: int = None
     learn_means: bool = None
     learn_covariances: bool = None
-    learn_alpha_scaling: bool = False
-    normalize_covariances: bool = False
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
     diag_covs: bool = False
