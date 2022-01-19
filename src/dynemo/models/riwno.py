@@ -2,6 +2,7 @@
 
 """
 
+import tensorflow as tf
 from tensorflow.keras import Model, layers
 from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.layers import (
@@ -107,14 +108,15 @@ def _model_structure(config):
         config.diag_covs,
         name="covs",
     )
-    mix_covs_layer = MixMatricesLayer(shift=True, name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(clip=1, name="ll_loss")
+    mix_covs_layer = MixMatricesLayer(name="cov")
+    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     mean = mean_layer([inputs, alpha])
     covs = covs_layer(inputs)  # inputs not used
     cov = mix_covs_layer([alpha, covs])
-    ll_loss = ll_loss_layer([inputs, mean, cov])
+    cov = tf.roll(cov, shift=-1, axis=1)
+    ll_loss = ll_loss_layer([inputs[:, 1:], mean[:, :-1], cov[:, :-1]])
 
     # Model RNN:
     # - Learns p(theta|theta_<t) ~ N(theta | mod_mu, mod_sigma), where

@@ -366,17 +366,7 @@ class MixMatricesLayer(layers.Layer):
 
     The mixture is calculated as C_t = Sum_j alpha_jt D_j,
     where D_j are the matrices and alpha_jt are mixing coefficients.
-
-    Parameters
-    ----------
-    shift : bool
-        Do the mixing coefficients correspond to one time step in the future?
-        If so, we roll the mixed matrices.
     """
-
-    def __init__(self, shift: bool = False, **kwargs):
-        super().__init__(**kwargs)
-        self.shift = shift
 
     def call(self, inputs, **kwargs):
 
@@ -392,11 +382,6 @@ class MixMatricesLayer(layers.Layer):
         # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
-        if self.shift:
-            # The means are predicted one time step in the future so we need to
-            # make sure the covariances correspond to the correct time point
-            C = tf.roll(C, shift=-1, axis=1)
-
         return C
 
 
@@ -405,27 +390,10 @@ class LogLikelihoodLossLayer(layers.Layer):
 
     The negative log-likelihood is calculated assuming a multivariate normal
     probability density and its value is added to the loss function.
-
-    Parameters
-    ----------
-    clip : int
-        Number of data points to clip from the means and data.
-        Optional, default is no clipping.
     """
-
-    def __init__(self, clip: int = None, **kwargs):
-        super().__init__(**kwargs)
-        self.clip = clip
 
     def call(self, inputs):
         x, mu, sigma = inputs
-
-        # Clip data, means and covariances
-        # This is neccessary if mu and sigma are one time step in the future
-        if self.clip is not None:
-            x = x[:, self.clip :]
-            mu = mu[:, : -self.clip]
-            sigma = sigma[:, : -self.clip]
 
         # Calculate the log-likelihood
         mvn = tfp.distributions.MultivariateNormalTriL(
