@@ -113,9 +113,6 @@ class Config:
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
-    diag_covs : bool
-        Should we learn diagonal covariances?
-        Only used if observation_model='wavenet'.
 
     KL Annealing Parameters
     -----------------------
@@ -205,7 +202,6 @@ class Config:
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
-    diag_covs: bool = False
 
     # KL annealing parameters
     do_kl_annealing: bool = None

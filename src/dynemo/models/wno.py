@@ -3,11 +3,12 @@
 """
 
 import numpy as np
+import tensorflow as tf
 from tqdm import trange
 from tensorflow.keras import Model, layers
 from dynemo.models.layers import (
     WaveNetLayer,
-    MatricesLayer,
+    CovarianceMatricesLayer,
     MixMatricesLayer,
     LogLikelihoodLossLayer,
 )
@@ -117,21 +118,21 @@ def _model_structure(config):
         config.wavenet_n_layers,
         name="mean",
     )
-    covs_layer = MatricesLayer(
+    covs_layer = CovarianceMatricesLayer(
         config.n_modes,
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.diag_covs,
         name="covs",
     )
-    mix_covs_layer = MixMatricesLayer(shift=True, name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(clip=1, name="ll_loss")
+    mix_covs_layer = MixMatricesLayer(name="cov")
+    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     mean = mean_layer([inp_data, alpha])
     covs = covs_layer(inp_data)  # inp_data not used
     cov = mix_covs_layer([alpha, covs])
-    ll_loss = ll_loss_layer([inp_data, mean, cov])
+    cov = tf.roll(cov, shift=-1, axis=1)
+    ll_loss = ll_loss_layer([inp_data[:, 1:], mean[:, :-1], cov[:, :-1]])
 
     return Model(inputs=[inp_data, alpha], outputs=[ll_loss], name="WNO")

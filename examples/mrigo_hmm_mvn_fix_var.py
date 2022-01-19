@@ -2,6 +2,7 @@
 
 - Multiple scale version for simulation_hmm_mvn.py
 - We vary the mean, fix the standard deviation.
+- Should achieve a dice of close to one for alpha, beta and gamma.
 """
 print("Setting up")
 import numpy as np
@@ -88,20 +89,8 @@ prediction_dataset = meg_data.dataset(
 )
 
 # Build model
-print("Building Model")
 model = Model(config)
 model.summary()
-
-# Multi-start training
-config.n_init = 10
-config.n_init_epochs = config.n_epochs // 10
-
-print("Initializing the model")
-model.initialize(
-    training_dataset,
-    epochs=config.n_init_epochs,
-    n_init=config.n_init,
-)
 
 # Callbacks
 dice_callback = callbacks.DiceCoefficientCallback(

@@ -13,7 +13,7 @@ from dynemo.models.layers import (
     KLDivergenceLayer,
     KLLossLayer,
     SampleNormalDistributionLayer,
-    MatricesLayer,
+    CovarianceMatricesLayer,
     MixMatricesLayer,
     ThetaActivationLayer,
     WaveNetLayer,
@@ -100,12 +100,11 @@ def _model_structure(config):
         config.wavenet_n_layers,
         name="mean",
     )
-    covs_layer = MatricesLayer(
+    covs_layer = CovarianceMatricesLayer(
         config.n_modes,
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.diag_covs,
         name="covs",
     )
     mix_covs_layer = MixMatricesLayer(name="cov")

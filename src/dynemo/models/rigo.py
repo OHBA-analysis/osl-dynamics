@@ -13,8 +13,8 @@ from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLossLayer,
-    VectorsLayer,
-    MatricesLayer,
+    MeanVectorsLayer,
+    CovarianceMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
     ModelRNNLayers,
@@ -224,19 +224,18 @@ def _model_structure(config):
     #   and the observation model.
 
     # Definition of layers
-    means_layer = VectorsLayer(
+    means_layer = MeanVectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,
         config.initial_means,
         name="means",
     )
-    covs_layer = MatricesLayer(
+    covs_layer = CovarianceMatricesLayer(
         config.n_modes,
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        diag_only=False,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")

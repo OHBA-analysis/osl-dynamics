@@ -2,13 +2,17 @@
 
 """
 
+import numpy as np
+import tensorflow as tf
 from tensorflow.keras import Model, layers
 from dynemo.models.inf_mod_base import InferenceModelBase
 from dynemo.models.obs_mod_base import ObservationModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLossLayer,
-    MeansStdsFcsLayer,
+    MeanVectorsLayer,
+    DiagonalMatricesLayer,
+    CovarianceMatricesLayer,
     MixMeansStdsFcsLayer,
     ModelRNNLayers,
     NormalizationLayer,
@@ -19,7 +23,6 @@ from dynemo.models.layers import (
     FillConstantLayer,
     DummyLayer,
 )
-import numpy as np
 
 
 class MRIGO(InferenceModelBase, ObservationModelBase):
@@ -42,7 +45,6 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
     def get_means_stds_fcs(self):
         """Get the mean, standard devation and functional connectivity of each mode.
 
-
         Returns
         -------
         means : np.ndarray
@@ -52,51 +54,63 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
         fcs : np.ndarray
             Mode functional connectivities.
         """
-        means_stds_fcs_layer = self.model.get_layer("means_stds_fcs")
-        means, stds, fcs = means_stds_fcs_layer(1)
+        means_layer = self.model.get_layer("means")
+        stds_layer = self.model.get_layer("stds")
+        fcs_layer = self.model.get_layer("fcs")
+        means = means_layer(1)
+        stds = stds_layer(1)
+        fcs = fcs_layer(1)
         return means.numpy(), stds.numpy(), fcs.numpy()
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
-        """
-        Set the means, stds, fcs of each mode.
+        """Set the means, standard deviations, functional connectivities of each mode.
 
         Parameters
         ----------
         means: np.ndarray
             Mode means with shape (n_modes, n_channels).
         stds: np.ndarray
-            Mode standard deviations with shape (n_modes, n_channels).
+            Mode standard deviations with shape (n_modes, n_channels) or
+            (n_modes, n_channels, n_channels).
         fcs: np.ndarray
             Mode functional connectivities with shape (n_modes, n_channels, n_channels).
         update_initializer: bool
             Do we want to use the passed parameters when we re_initialize
-            the model? Optional, default is True.
+            the model? Optional.
         """
+        if stds.ndim == 3:
+            # Only keep the diagonal as a vector
+            stds = np.diagonal(stds, axis1=1, axis2=2)
+
         means = means.astype(np.float32)
         stds = stds.astype(np.float32)
         fcs = fcs.astype(np.float32)
 
-        means_stds_fcs_layer = self.model.get_layer("means_stds_fcs")
-        layer_means = means_stds_fcs_layer.means
-        layer_stds = means_stds_fcs_layer.stds
-        layer_flattened_cholesky_fcs = means_stds_fcs_layer.flattened_cholesky_fcs
+        # Transform the matrices to layer weights
+        stds = stds_layer.bijector.inverse(stds)
+        flattened_cholesky_factors = fcs_layer.bijector.inverse(fcs)
 
-        flattened_cholesky_fcs = means_stds_fcs_layer.bijector.inverse(fcs)
+        # Get layers
+        means_layer = self.model.get_layer("means")
+        stds_layer = self.model.get_layer("stds")
+        fcs_layer = self.model.get_layer("fcs")
 
-        layer_means.assign(means)
-        layer_stds.assign(stds)
-        layer_flattened_cholesky_fcs.assign(flattened_cholesky_fcs)
+        # Set values
+        means_layer.vectors.assign(means)
+        stds_layer.diagonals.assign(stds)
+        fcs_layer.flattened_cholesky_factors.assign(flattened_cholesky_factors)
 
+        # Update initialisers
         if update_initializer:
-            means_stds_fcs_layer.initial_means = means
-            means_stds_fcs_layer.initial_stds = stds
-            means_stds_fcs_layer.initial_fcs = fcs
-            means_stds_fcs_layer.initial_flattened_cholesky_fcs = flattened_cholesky_fcs
+            means_layer.initial_value = means
+            stds_layer.initial_value = stds
+            fcs_layer.initial_value = fcs
+            fcs_layer.initial_flattened_cholesky_factors = flattened_cholesky_factors
 
-            means_stds_fcs_layer.means_initializer.initial_value = means
-            means_stds_fcs_layer.stds_initializer.initial_value = stds
-            means_stds_fcs_layer.flattened_cholesky_fcs_initializer.initial_value = (
-                flattened_cholesky_fcs
+            means_layer.vectors_initializer.initial_value = means
+            stds_layer.diagonals_initializer.initial_value = stds
+            fcs_layer.flattened_cholesky_factors_initializer.initial_value = (
+                flattened_cholesky_factors
             )
 
 
@@ -110,11 +124,12 @@ def _model_structure(config):
     #
     # Inference RNN
     #
-    # Mode time course for the mean
-    inference_input_dropout_layer_mean = layers.Dropout(
+
+    # Layers
+    inference_input_dropout_layer = layers.Dropout(
         config.inference_dropout_rate, name="data_drop_mean"
     )
-    inference_output_layers_mean = InferenceRNNLayers(
+    inference_output_layers = InferenceRNNLayers(
         config.inference_rnn,
         config.inference_normalization,
         config.inference_activation,
@@ -123,53 +138,23 @@ def _model_structure(config):
         config.inference_dropout_rate,
         name="inf_rnn_mean",
     )
-    inf_mu_layer_mean = layers.Dense(config.n_modes, name="inf_mu_mean")
-    inf_sigma_layer_mean = layers.Dense(
-        config.n_modes, activation="softplus", name="inf_sigma_mean"
-    )
 
-    if not (config.fix_std or config.tie_mean_std):
-        # Mode time course for the standard deviations
-        inference_input_dropout_layer_std = layers.Dropout(
-            config.inference_dropout_rate, name="data_drop_std"
-        )
-        inference_output_layers_std = InferenceRNNLayers(
-            config.inference_rnn,
-            config.inference_normalization,
-            config.inference_activation,
-            config.inference_n_layers,
-            config.inference_n_units,
-            config.inference_dropout_rate,
-            name="inf_rnn_std",
-        )
-        inf_mu_layer_std = layers.Dense(config.n_modes, name="inf_mu_std")
-        inf_sigma_layer_std = layers.Dense(
-            config.n_modes, activation="softplus", name="inf_sigma_std"
-        )
+    # Data flow
+    inference_input_dropout = inference_input_dropout_layer(inputs)
+    inference_output = inference_output_layers(inference_input_dropout)
 
-    # Mode time course for the FCs
-    inference_input_dropout_layer_fc = layers.Dropout(
-        config.inference_dropout_rate, name="data_drop_fc"
-    )
-    inference_output_layers_fc = InferenceRNNLayers(
-        config.inference_rnn,
-        config.inference_normalization,
-        config.inference_activation,
-        config.inference_n_layers,
-        config.inference_n_units,
-        config.inference_dropout_rate,
-        name="inf_rnn_fc",
-    )
-    inf_mu_layer_fc = layers.Dense(config.n_modes, name="inf_mu_fc")
-    inf_sigma_layer_fc = layers.Dense(
-        config.n_modes, activation="softplus", name="inf_sigma_fc"
-    )
+    #
+    # Mode time course for the mean
+    #
 
-    # Layers to sample theta from q(theta)
-    # and to convert to mode mixing factors alpha, beta, gamma
-    theta_layer_mean = SampleNormalDistributionLayer(name="theta_mean")
-    theta_norm_layer_mean = NormalizationLayer(
-        config.theta_normalization, name="theta_norm_mean"
+    # Layers
+    mean_inf_mu_layer = layers.Dense(config.n_modes, name="mean_inf_mu")
+    mean_inf_sigma_layer = layers.Dense(
+        config.n_modes, activation="softplus", name="mean_inf_sigma"
+    )
+    mean_theta_layer = SampleNormalDistributionLayer(name="mean_theta")
+    mean_theta_norm_layer = NormalizationLayer(
+        config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = ThetaActivationLayer(
         config.alpha_xform,
@@ -178,16 +163,30 @@ def _model_structure(config):
         name="alpha",
     )
 
+    # Data flow
+    mean_inf_mu = mean_inf_mu_layer(inference_output)
+    mean_inf_sigma = mean_inf_sigma_layer(inference_output)
+    mean_theta = mean_theta_layer([mean_inf_mu, mean_inf_sigma])
+    mean_theta_norm = mean_theta_norm_layer(mean_theta)
+    alpha = alpha_layer(mean_theta_norm)
+
+    #
+    # Mode time course for the standard deviation
+    #
+
+    # Layers
     if config.fix_std:
         beta_layer = FillConstantLayer(1 / config.n_modes, name="beta")
-
     elif config.tie_mean_std:
         beta_layer = DummyLayer(name="beta")
-
     else:
-        theta_layer_std = SampleNormalDistributionLayer(name="theta_std")
-        theta_norm_layer_std = NormalizationLayer(
-            config.theta_normalization, name="theta_norm_std"
+        std_inf_mu_layer = layers.Dense(config.n_modes, name="std_inf_mu")
+        std_inf_sigma_layer = layers.Dense(
+            config.n_modes, activation="softplus", name="std_inf_sigma"
+        )
+        std_theta_layer = SampleNormalDistributionLayer(name="std_theta")
+        std_theta_norm_layer = NormalizationLayer(
+            config.theta_normalization, name="std_theta_norm"
         )
         beta_layer = ThetaActivationLayer(
             config.alpha_xform,
@@ -196,9 +195,28 @@ def _model_structure(config):
             name="beta",
         )
 
-    theta_layer_fc = SampleNormalDistributionLayer(name="theta_fc")
-    theta_norm_layer_fc = NormalizationLayer(
-        config.theta_normalization, name="theta_norm_fc"
+    # Data flow
+    if config.fix_std or config.tie_mean_std:
+        beta = beta_layer(alpha)
+    else:
+        std_inf_mu = std_inf_mu_layer(inference_output)
+        std_inf_sigma = std_inf_sigma_layer(inference_output)
+        std_theta = std_theta_layer([std_inf_mu, std_inf_sigma])
+        std_theta_norm = std_theta_norm_layer(std_theta)
+        beta = beta_layer(std_theta_norm)
+
+    #
+    # Mode time course for the FCs
+    #
+
+    # Layers
+    fc_inf_mu_layer = layers.Dense(config.n_modes, name="fc_inf_mu")
+    fc_inf_sigma_layer = layers.Dense(
+        config.n_modes, activation="softplus", name="fc_inf_sigma"
+    )
+    fc_theta_layer = SampleNormalDistributionLayer(name="fc_theta")
+    fc_theta_norm_layer = NormalizationLayer(
+        config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = ThetaActivationLayer(
         config.alpha_xform,
@@ -208,77 +226,58 @@ def _model_structure(config):
     )
 
     # Data flow
-    inference_input_dropout_mean = inference_input_dropout_layer_mean(inputs)
-    inference_output_mean = inference_output_layers_mean(inference_input_dropout_mean)
-    inf_mu_mean = inf_mu_layer_mean(inference_output_mean)
-    inf_sigma_mean = inf_sigma_layer_mean(inference_output_mean)
-    theta_mean = theta_layer_mean([inf_mu_mean, inf_sigma_mean])
-    theta_norm_mean = theta_norm_layer_mean(theta_mean)
-    alpha = alpha_layer(theta_norm_mean)
-
-    if config.fix_std or config.tie_mean_std:
-        beta = beta_layer(alpha)
-
-    else:
-        inference_input_dropout_std = inference_input_dropout_layer_std(inputs)
-        inference_output_std = inference_output_layers_std(inference_input_dropout_std)
-        inf_mu_std = inf_mu_layer_std(inference_output_std)
-        inf_sigma_std = inf_sigma_layer_std(inference_output_std)
-        theta_std = theta_layer_std([inf_mu_std, inf_sigma_std])
-        theta_norm_std = theta_norm_layer_std(theta_std)
-        beta = beta_layer(theta_norm_std)
-
-    inference_input_dropout_fc = inference_input_dropout_layer_fc(inputs)
-    inference_output_fc = inference_output_layers_fc(inference_input_dropout_fc)
-    inf_mu_fc = inf_mu_layer_fc(inference_output_fc)
-    inf_sigma_fc = inf_sigma_layer_fc(inference_output_fc)
-    theta_fc = theta_layer_fc([inf_mu_fc, inf_sigma_fc])
-    theta_norm_fc = theta_norm_layer_fc(theta_fc)
-    gamma = gamma_layer(theta_norm_fc)
+    fc_inf_mu = fc_inf_mu_layer(inference_output)
+    fc_inf_sigma = fc_inf_sigma_layer(inference_output)
+    fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
+    fc_theta_norm = fc_theta_norm_layer(fc_theta)
+    gamma = gamma_layer(fc_theta_norm)
 
     #
     # Observation model
     #
-    means_stds_fcs_layer = MeansStdsFcsLayer(
-        config.n_modes,
-        config.n_channels,
-        learn_means=config.learn_means,
-        learn_stds=config.learn_stds,
-        learn_fcs=config.learn_fcs,
-        initial_means=config.initial_means,
-        initial_stds=config.initial_stds,
-        initial_fcs=config.initial_fcs,
-        regularize_fcs=config.regularize_fcs,
-        name="means_stds_fcs",
-    )
 
-    mix_means_stds_fcs_layer = MixMeansStdsFcsLayer(
+    # Layers
+    means_layer = MeanVectorsLayer(
         config.n_modes,
         config.n_channels,
-        config.fix_std,
-        name="mix_means_stds_fcs",
+        config.learn_means,
+        config.initial_means,
+        name="means",
     )
+    stds_layer = DiagonalMatricesLayer(
+        config.n_modes,
+        config.n_channels,
+        config.learn_stds,
+        config.initial_stds,
+        name="stds",
+    )
+    fcs_layer = CovarianceMatricesLayer(
+        config.n_modes,
+        config.n_channels,
+        config.learn_fcs,
+        config.initial_fcs,
+        regularize=config.regularize_fcs,
+        name="fcs",
+    )
+    mix_means_stds_fcs_layer = MixMeansStdsFcsLayer(name="mix_means_stds_fcs")
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
-    mu, E, D = means_stds_fcs_layer(inputs)
+    mu = means_layer(inputs)  # inputs not used
+    E = stds_layer(inputs)  # inputs not used
+    D = fcs_layer(inputs)  # inputs not used
     m, C = mix_means_stds_fcs_layer([alpha, beta, gamma, mu, E, D])
     ll_loss = ll_loss_layer([inputs, m, C])
 
     #
     # Model RNN
     #
-    model_input_dropout_layer_mean = layers.Dropout(
-        config.model_dropout_rate, name="theta_norm_drop_mean"
-    )
-    model_input_dropout_layer_std = layers.Dropout(
-        config.model_dropout_rate, name="theta_norm_drop_std"
-    )
-    model_input_dropout_layer_fc = layers.Dropout(
-        config.model_dropout_rate, name="theta_norm_drop_fc"
-    )
 
-    model_output_layer_mean = ModelRNNLayers(
+    # Layers
+    model_input_dropout_layer = layers.Dropout(
+        config.model_dropout_rate, name="theta_norm_drop"
+    )
+    model_output_layer = ModelRNNLayers(
         config.model_rnn,
         config.model_normalization,
         config.model_activation,
@@ -287,73 +286,76 @@ def _model_structure(config):
         config.model_dropout_rate,
         name="mod_rnn_mean",
     )
-    mod_mu_layer_mean = layers.Dense(config.n_modes, name="mod_mu_mean")
-    mod_sigma_layer_mean = layers.Dense(
-        config.n_modes, activation="softplus", name="mod_sigma_mean"
-    )
-    kl_div_layer_mean = KLDivergenceLayer(name="kl_div_mean")
-
-    model_output_layer_std = ModelRNNLayers(
-        config.model_rnn,
-        config.model_normalization,
-        config.model_activation,
-        config.model_n_layers,
-        config.model_n_units,
-        config.model_dropout_rate,
-        name="mod_rnn_std",
-    )
-    mod_mu_layer_std = layers.Dense(config.n_modes, name="mod_mu_std")
-    mod_sigma_layer_std = layers.Dense(
-        config.n_modes, activation="softplus", name="mod_sigma_std"
-    )
-    kl_div_layer_std = KLDivergenceLayer(name="kl_div_std")
-
-    model_output_layer_fc = ModelRNNLayers(
-        config.model_rnn,
-        config.model_normalization,
-        config.model_activation,
-        config.model_n_layers,
-        config.model_n_units,
-        config.model_dropout_rate,
-        name="mod_rnn_fc",
-    )
-    mod_mu_layer_fc = layers.Dense(config.n_modes, name="mod_mu_fc")
-    mod_sigma_layer_fc = layers.Dense(
-        config.n_modes, activation="softplus", name="mod_sigma_fc"
-    )
-    kl_div_layer_fc = KLDivergenceLayer(name="kl_div_fc")
-
-    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
-    model_input_dropout_mean = model_input_dropout_layer_mean(theta_norm_mean)
-    model_output_mean = model_output_layer_mean(model_input_dropout_mean)
-    mod_mu_mean = mod_mu_layer_mean(model_output_mean)
-    mod_sigma_mean = mod_sigma_layer_mean(model_output_mean)
-    kl_div_mean = kl_div_layer_mean(
-        [inf_mu_mean, inf_sigma_mean, mod_mu_mean, mod_sigma_mean]
+    if config.fix_std or config.tie_mean_std:
+        theta_norm = tf.concat([mean_theta_norm, fc_theta_norm], axis=2)
+    else:
+        theta_norm = tf.concat([mean_theta_norm, std_theta_norm, fc_theta_norm], axis=2)
+    model_input_dropout = model_input_dropout_layer(theta_norm)
+    model_output = model_output_layer(model_input_dropout)
+
+    #
+    # Mode time course for the mean
+    #
+
+    # Layers
+    mean_mod_mu_layer = layers.Dense(config.n_modes, name="mean_mod_mu")
+    mean_mod_sigma_layer = layers.Dense(
+        config.n_modes, activation="softplus", name="mean_mod_sigma"
+    )
+    kl_div_layer_mean = KLDivergenceLayer(name="mean_kl_div")
+
+    # Data flow
+    mean_mod_mu = mean_mod_mu_layer(model_output)
+    mean_mod_sigma = mean_mod_sigma_layer(model_output)
+    mean_kl_div = kl_div_layer_mean(
+        [mean_inf_mu, mean_inf_sigma, mean_mod_mu, mean_mod_sigma]
     )
 
+    #
+    # Mode time course for the standard deviation
+    #
+
     if not (config.fix_std or config.tie_mean_std):
-        model_input_dropout_std = model_input_dropout_layer_std(theta_norm_std)
-        model_output_std = model_output_layer_std(model_input_dropout_std)
-        mod_mu_std = mod_mu_layer_std(model_output_std)
-        mod_sigma_std = mod_sigma_layer_std(model_output_std)
-        kl_div_std = kl_div_layer_std(
-            [inf_mu_std, inf_sigma_std, mod_mu_std, mod_sigma_std]
+        # Layers
+        std_mod_mu_layer = layers.Dense(config.n_modes, name="std_mod_mu")
+        std_mod_sigma_layer = layers.Dense(
+            config.n_modes, activation="softplus", name="std_mod_sigma"
+        )
+        std_kl_div_layer = KLDivergenceLayer(name="std_kl_div")
+
+        # Data flow
+        std_mod_mu = std_mod_mu_layer(model_output)
+        std_mod_sigma = std_mod_sigma_layer(model_output)
+        std_kl_div = std_kl_div_layer(
+            [std_inf_mu, std_inf_sigma, std_mod_mu, std_mod_sigma]
         )
 
-    model_input_dropout_fc = model_input_dropout_layer_fc(theta_norm_fc)
-    model_output_fc = model_output_layer_fc(model_input_dropout_fc)
-    mod_mu_fc = mod_mu_layer_fc(model_output_fc)
-    mod_sigma_fc = mod_sigma_layer_fc(model_output_fc)
-    kl_div_fc = kl_div_layer_fc([inf_mu_fc, inf_sigma_fc, mod_mu_fc, mod_sigma_fc])
+    #
+    # Mode time course for the functional connectivity
+    #
 
+    # Layers
+    fc_mod_mu_layer = layers.Dense(config.n_modes, name="fc_mod_mu")
+    fc_mod_sigma_layer = layers.Dense(
+        config.n_modes, activation="softplus", name="fc_mod_sigma"
+    )
+    fc_kl_div_layer = KLDivergenceLayer(name="fc_kl_div")
+
+    # Data flow
+    fc_mod_mu = fc_mod_mu_layer(model_output)
+    fc_mod_sigma = fc_mod_sigma_layer(model_output)
+    fc_kl_div = fc_kl_div_layer([fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma])
+
+    #
     # Total KL loss
+    #
+    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
     if config.fix_std or config.tie_mean_std:
-        kl_loss = kl_loss_layer([kl_div_mean, kl_div_fc])
+        kl_loss = kl_loss_layer([mean_kl_div, fc_kl_div])
     else:
-        kl_loss = kl_loss_layer([kl_div_mean, kl_div_std, kl_div_fc])
+        kl_loss = kl_loss_layer([mean_kl_div, std_kl_div, fc_kl_div])
 
     return Model(
         inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"

@@ -7,8 +7,8 @@ from tensorflow.keras import Model, layers
 from tensorflow.nn import softplus
 from dynemo.models.layers import (
     LogLikelihoodLossLayer,
-    VectorsLayer,
-    MatricesLayer,
+    MeanVectorsLayer,
+    CovarianceMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
 )
@@ -67,7 +67,7 @@ class GO(ObservationModelBase):
             Mode covariances.
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
-            the model? Optional, default is True.
+            the model? Optional.
         """
         means = means.astype(np.float32)
         means_layer = self.model.get_layer("means")
@@ -87,7 +87,7 @@ class GO(ObservationModelBase):
             Mode covariances.
         update_initializer : bool
             Do we want to use the passed covariances when we re-initialize
-            the model? Optional, default is True.
+            the model? Optional.
         """
         covariances = covariances.astype(np.float32)
         covs_layer = self.model.get_layer("covs")
@@ -118,19 +118,18 @@ def _model_structure(config):
     #   and the observation model.
 
     # Definition of layers
-    means_layer = VectorsLayer(
+    means_layer = MeanVectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,
         config.initial_means,
         name="means",
     )
-    covs_layer = MatricesLayer(
+    covs_layer = CovarianceMatricesLayer(
         config.n_modes,
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        diag_only=False,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
