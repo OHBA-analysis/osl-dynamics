@@ -55,61 +55,22 @@ class DummyLayer(layers.Layer):
         return inputs
 
 
-class TrainableVariablesLayer(layers.Layer):
-    """Generic trainable variables layer.
-
-    Setup trainable parameter/weight tensors of a certain shape.
-    Parameters/weights are outputted by the layer.
+class FillConstantLayer(layers.Layer):
+    """Layer to create tensor with the same shape of the input,
+    but filled with a constant.
 
     Parameters
     ----------
-    n_units : int
-        Number of units/neurons in the layer.
-    activation : str
-        Activation function to apply to the output of the layer.
-    initial_values : np.ndarray
-        Initial values for the trainable parameters/weights.
+    constant : float
+        Value to full tensor with.
     """
 
-    def __init__(
-        self,
-        n_units: int,
-        activation: str = None,
-        initial_values: np.ndarray = None,
-        **kwargs,
-    ):
+    def __init__(self, constant: float, **kwargs):
         super().__init__(**kwargs)
-        self.n_units = n_units
-        self.initial_values = initial_values
-        self.activation = activations.get(activation)
-
-    def build(self, input_shape):
-
-        # If no initial values have been passed, initialise with zeros
-        if self.initial_values is None:
-            self.values_initializer = tf.keras.initializers.Zeros()
-
-        # Otherwise, initialise with the variables passed
-        else:
-
-            def variables_initializer(shape, dtype=None):
-                return self.initial_values
-
-            self.values_initializer = variables_initializer
-
-        # Create trainable weights
-        self.values = self.add_weight(
-            "values",
-            shape=(self.n_units,),
-            dtype=tf.float32,
-            initializer=self.values_initializer,
-            trainable=True,
-        )
-
-        self.built = True
+        self.constant = constant
 
     def call(self, inputs, **kwargs):
-        return self.activation(self.values)
+        return tf.fill(tf.shape(inputs), self.constant)
 
 
 class SampleNormalDistributionLayer(layers.Layer):
@@ -915,21 +876,3 @@ class MixMeansStdsFcsLayer(layers.Layer):
         C = tf.matmul(G, tf.matmul(F, G))
 
         return [m, C]
-
-
-class FillConstantLayer(layers.Layer):
-    """Layer to create tensor with the same shape of the input,
-    but filled with a constant.
-
-    Parameters
-    ----------
-    constant : float
-        Value to full tensor with.
-    """
-
-    def __init__(self, constant: float, **kwargs):
-        super().__init__(**kwargs)
-        self.constant = constant
-
-    def call(self, inputs, **kwargs):
-        return tf.fill(tf.shape(inputs), self.constant)
