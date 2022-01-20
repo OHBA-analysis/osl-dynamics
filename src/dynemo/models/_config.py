@@ -72,9 +72,6 @@ class Config:
         Initialisation for mode standard deviations.
     initial_fcs: np.ndarray
         Initialisation for mode functional connectivity matrices.
-    regularize_fcs : bool
-        Should we regularize the cholesky factor of the functional connectivity
-        matrices? An L2 norm is used. Optional.
 
     Alpha Parameters
     ----------------
@@ -183,7 +180,6 @@ class Config:
     learn_fcs: bool = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
-    regularize_fcs: bool = False
 
     # Alpha parameters
     theta_normalization: Literal[None, "batch", "layer"] = None

@@ -266,7 +266,7 @@ class CovarianceMatricesLayer(layers.Layer):
         self.m = m
         self.learn = learn
 
-        # Bijector used to transform covariance matrices to a learnable vector
+        # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
         # Initialisation of matrices
@@ -291,10 +291,70 @@ class CovarianceMatricesLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, alpha, **kwargs):
-        # Calculate the covariance matrix from the cholesky factor
-        D = self.bijector(self.flattened_cholesky_factors)
-        return D
+    def call(self, inputs, **kwargs):
+        return self.bijector(self.flattened_cholesky_factors)
+
+
+class CorrelationMatricesLayer(layers.Layer):
+    """Layer to learn a set of correlation matrices.
+
+    A cholesky factor is learnt as a vector of free parameters and used to
+    calculate a correlation matrix.
+
+    Parameters
+    ----------
+    n : int
+        Number of matrices.
+    m : int
+        Number of rows/columns.
+    learn : bool
+        Should the matrices be learnable?
+    initial_value : np.ndarray
+        Initial values for the matrices.
+    """
+
+    def __init__(
+        self,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.n = n
+        self.m = m
+        self.learn = learn
+
+        # Bijector used to transform learnable vectors to correlation matrices
+        self.bijector = tfb.Chain(
+            [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
+        )
+
+        # Initialisation of matrices
+        if initial_value is None:
+            self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
+        else:
+            self.initial_value = initial_value.astype("float32")
+        self.initial_flattened_cholesky_factors = self.bijector.inverse(
+            self.initial_value
+        )
+        self.flattened_cholesky_factors_initializer = WeightInitializer(
+            self.initial_flattened_cholesky_factors
+        )
+
+    def build(self, input_shape):
+        self.flattened_cholesky_factors = self.add_weight(
+            "flattened_cholesky_factors",
+            shape=(self.n, self.m * (self.m - 1) // 2),
+            dtype=tf.float32,
+            initializer=self.flattened_cholesky_factors_initializer,
+            trainable=self.learn,
+        )
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        return self.bijector(self.flattened_cholesky_factors)
 
 
 class DiagonalMatricesLayer(layers.Layer):
@@ -370,11 +430,9 @@ class MixVectorsLayer(layers.Layer):
         # - mu.shape    = (n_modes, n_channels)
         alpha, mu = inputs
 
-        # Reshape for multiplication
+        # Calculate the mean: m_t = Sum_j alpha_jt mu_j
         alpha = tf.expand_dims(alpha, axis=-1)
         mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
-
-        # Calculate the mean: m_t = Sum_j alpha_jt mu_j
         m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
 
         return m
@@ -394,23 +452,12 @@ class MixMatricesLayer(layers.Layer):
         # - D.shape     = (n_modes, n_channels, n_channels)
         alpha, D = inputs
 
-        # Reshape alpha and D for multiplication
+        # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
         D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
-
-        # Calculate the covariance: C_t = Sum_j alpha_jt D_j
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
         return C
-
-
-class Cov2CorrMatricesLayer(layers.Layer):
-    """Normalizes a set of covariance matrices to give correlation matrices."""
-
-    def call(self, inputs, **kwargs):
-        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(inputs)), axis=-1)
-        inputs /= tf.matmul(sd, sd, transpose_b=True)
-        return inputs
 
 
 class LogLikelihoodLossLayer(layers.Layer):

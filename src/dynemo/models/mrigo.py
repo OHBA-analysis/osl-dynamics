@@ -12,8 +12,7 @@ from dynemo.models.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     DiagonalMatricesLayer,
-    CovarianceMatricesLayer,
-    Cov2CorrMatricesLayer,
+    CorrelationMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
     ModelRNNLayers,
@@ -255,7 +254,7 @@ def _model_structure(config):
         config.initial_stds,
         name="stds",
     )
-    fcs_layer = CovarianceMatricesLayer(
+    fcs_layer = CorrelationMatricesLayer(
         config.n_modes,
         config.n_channels,
         config.learn_fcs,
@@ -265,7 +264,6 @@ def _model_structure(config):
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
-    cov2corr_layer = Cov2CorrMatricesLayer(name="cov2corr")
     matmul_layer = MatMulLayer(name="cov")
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
@@ -277,7 +275,6 @@ def _model_structure(config):
     m = mix_means_layer([alpha, mu])
     G = mix_stds_layer([beta, E])
     F = mix_fcs_layer([gamma, D])
-    F = cov2corr_layer(F)
     C = matmul_layer([G, F, G])
 
     ll_loss = ll_loss_layer([inputs, m, C])
