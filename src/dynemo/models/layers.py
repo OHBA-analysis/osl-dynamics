@@ -55,6 +55,39 @@ class DummyLayer(layers.Layer):
         return inputs
 
 
+class ConcatenateLayer(layers.Layer):
+    """Concatenates a set of tensors.
+
+    Wrapper for tf.concat().
+
+    Parameters
+    ----------
+    axis : int
+        Axis to concatenate along.
+    """
+
+    def __init__(self, axis: int, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+
+    def call(self, inputs, **kwargs):
+        return tf.concat(inputs, axis=self.axis)
+
+
+class MatMulLayer(layers.Layer):
+    """Multiplies a set of matrices.
+
+    Wrapper for tf.matmul().
+    """
+
+    def call(self, inputs, **kwargs):
+        # If [A, B, C] is passed, we return matmul(A, matmul(B, C))
+        out = inputs[-1]
+        for tensor in inputs[len(inputs) - 2 :: -1]:
+            out = tf.matmul(tensor, out)
+        return out
+
+
 class FillConstantLayer(layers.Layer):
     """Layer to create tensor with the same shape of the input,
     but filled with a constant.
@@ -218,8 +251,6 @@ class CovarianceMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
-    regularize : bool
-        Should we add L2 regularization? Optional.
     """
 
     def __init__(
@@ -228,7 +259,6 @@ class CovarianceMatricesLayer(layers.Layer):
         m: int,
         learn: bool,
         initial_value: np.ndarray,
-        regularize: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -372,6 +402,15 @@ class MixMatricesLayer(layers.Layer):
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
         return C
+
+
+class Cov2CorrMatricesLayer(layers.Layer):
+    """Normalizes a set of covariance matrices to give correlation matrices."""
+
+    def call(self, inputs, **kwargs):
+        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(inputs)), axis=-1)
+        inputs /= tf.matmul(sd, sd, transpose_b=True)
+        return inputs
 
 
 class LogLikelihoodLossLayer(layers.Layer):
@@ -702,54 +741,3 @@ class WaveNetResidualBlockLayer(layers.Layer):
         residual = self.res_layer(z)
         skip = self.skip_layer(z)
         return x + residual, skip
-
-
-class MixMeansStdsFcsLayer(layers.Layer):
-    """Compute a probabilistic mixture of means, standard deviations and functional
-    connectivies.
-
-    The mixture is calculated as:
-    m_t       = Sum_j alpha_jt mu_j
-    diag(G_t) = Sum_j beta_jt E_j
-    F_t       = Sum_j gamma_jt D_j
-    C_t       = G_t F_t G_t
-    """
-
-    def call(self, inputs, **kwargs):
-
-        # Unpack the inputs:
-        # - alpha.shape = (None, sequence_length, n_modes)
-        # - beta.shape = (None, sequence_length, n_modes)
-        # - gamma.shape = (None, sequence_length, n_modes)
-        # - mu.shape = (n_modes, n_channels)
-        # - E.shape = (n_modes, n_channels, n_channels)
-        # - D.shape = (n_modes, n_channels, n_channels)
-        alpha, beta, gamma, mu, E, D = inputs
-
-        # Reshape alpha and mu for multiplication
-        alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
-
-        # Calculate the mixed mean
-        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-
-        # Reshape beta and E for multiplication
-        beta = tf.expand_dims(tf.expand_dims(beta, axis=-1), axis=-1)
-        E = tf.expand_dims(tf.expand_dims(E, axis=0), axis=0)
-
-        # Calculate the mixed diagonal entries
-        G = tf.reduce_sum(tf.multiply(beta, E), axis=2)
-
-        # Reshape gamma and D for multiplication
-        gamma = tf.expand_dims(tf.expand_dims(gamma, axis=-1), axis=-1)
-        D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
-        F = tf.reduce_sum(tf.multiply(gamma, D), axis=2)
-
-        # Normalise F so that it is a valid correlation matrix
-        sd = tf.expand_dims(tf.sqrt(tf.linalg.diag_part(F)), axis=-1)
-        F /= tf.matmul(sd, sd, transpose_b=True)
-
-        # Construct the covariance matrices given by C = GFG
-        C = tf.matmul(G, tf.matmul(F, G))
-
-        return m, C

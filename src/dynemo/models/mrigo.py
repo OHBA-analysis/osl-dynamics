@@ -13,7 +13,9 @@ from dynemo.models.layers import (
     MeanVectorsLayer,
     DiagonalMatricesLayer,
     CovarianceMatricesLayer,
-    MixMeansStdsFcsLayer,
+    Cov2CorrMatricesLayer,
+    MixVectorsLayer,
+    MixMatricesLayer,
     ModelRNNLayers,
     NormalizationLayer,
     KLDivergenceLayer,
@@ -21,6 +23,8 @@ from dynemo.models.layers import (
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
     FillConstantLayer,
+    ConcatenateLayer,
+    MatMulLayer,
     DummyLayer,
 )
 
@@ -256,17 +260,26 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
-        regularize=config.regularize_fcs,
         name="fcs",
     )
-    mix_means_stds_fcs_layer = MixMeansStdsFcsLayer(name="mix_means_stds_fcs")
+    mix_means_layer = MixVectorsLayer(name="mix_means")
+    mix_stds_layer = MixMatricesLayer(name="mix_stds")
+    mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
+    cov2corr_layer = Cov2CorrMatricesLayer(name="cov2corr")
+    matmul_layer = MatMulLayer(name="cov")
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
     E = stds_layer(inputs)  # inputs not used
     D = fcs_layer(inputs)  # inputs not used
-    m, C = mix_means_stds_fcs_layer([alpha, beta, gamma, mu, E, D])
+
+    m = mix_means_layer([alpha, mu])
+    G = mix_stds_layer([beta, E])
+    F = mix_fcs_layer([gamma, D])
+    F = cov2corr_layer(F)
+    C = matmul_layer([G, F, G])
+
     ll_loss = ll_loss_layer([inputs, m, C])
 
     #
@@ -274,6 +287,7 @@ def _model_structure(config):
     #
 
     # Layers
+    concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
     model_input_dropout_layer = layers.Dropout(
         config.model_dropout_rate, name="theta_norm_drop"
     )
@@ -289,9 +303,9 @@ def _model_structure(config):
 
     # Data flow
     if config.fix_std or config.tie_mean_std:
-        theta_norm = tf.concat([mean_theta_norm, fc_theta_norm], axis=2)
+        theta_norm = concatenate_layer([mean_theta_norm, fc_theta_norm])
     else:
-        theta_norm = tf.concat([mean_theta_norm, std_theta_norm, fc_theta_norm], axis=2)
+        theta_norm = concatenate_layer([mean_theta_norm, std_theta_norm, fc_theta_norm])
     model_input_dropout = model_input_dropout_layer(theta_norm)
     model_output = model_output_layer(model_input_dropout)
 
