@@ -129,55 +129,49 @@ class ThetaActivationLayer(layers.Layer):
 
     Parameters
     ----------
-    alpha_xform : str
+    xform : str
         The functional form of the activation used to convert from theta to alpha.
-    initial_alpha_temperature : float
+    initial_temperature : float
         Temperature parameter for the softmax or Gumbel-Softmax.
-    learn_alpha_temperature : bool
+    learn_temperature : bool
         Should we learn the alpha temperature?
     """
 
     def __init__(
         self,
-        alpha_xform: str,
-        initial_alpha_temperature: float,
-        learn_alpha_temperature: bool,
+        xform: str,
+        initial_temperature: float,
+        learn_temperature: bool,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.alpha_xform = alpha_xform
-        self.initial_alpha_temperature = initial_alpha_temperature
-        self.learn_alpha_temperature = learn_alpha_temperature
-
-    def build(self, input_shape):
+        self.xform = xform
+        self.initial_temperature = initial_temperature
+        self.learn_temperature = learn_temperature
 
         # Initialiser for the a learnable alpha temperature
-        def alpha_temperature_initializer(shape, dtype=None):
-            return self.initial_alpha_temperature
+        self.temperature_initializer = WeightInitializer(self.initial_temperature)
 
-        self.alpha_temperature_initializer = alpha_temperature_initializer
-
-        # Create trainable alpha temperature
-        self.alpha_temperature = self.add_weight(
-            "alpha_temperature",
+    def build(self, input_shape):
+        self.temperature = self.add_weight(
+            "temperature",
             shape=(),
             dtype=tf.float32,
-            initializer=self.alpha_temperature_initializer,
-            trainable=self.learn_alpha_temperature,
+            initializer=self.temperature_initializer,
+            trainable=self.learn_temperature,
         )
-
         self.built = True
 
     def call(self, theta, **kwargs):
-
-        # Calculate alpha from theta
-        if self.alpha_xform == "softplus":
+        if self.xform == "softplus":
             alpha = activations.softplus(theta)
-        elif self.alpha_xform == "softmax":
-            alpha = activations.softmax(theta / self.alpha_temperature, axis=2)
-        elif self.alpha_xform == "gumbel-softmax":
+
+        elif self.xform == "softmax":
+            alpha = activations.softmax(theta / self.temperature, axis=2)
+
+        elif self.xform == "gumbel-softmax":
             gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.alpha_temperature,
+                temperature=self.temperature,
                 logits=theta,
             )
             alpha = gumbel_softmax_distribution.sample()
@@ -372,8 +366,6 @@ class DiagonalMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
-    regularize : bool
-        Should we add L2 regularization? Optional.
     """
 
     def __init__(
@@ -382,7 +374,6 @@ class DiagonalMatricesLayer(layers.Layer):
         m: int,
         learn: bool,
         initial_value: np.ndarray,
-        regularize: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -398,7 +389,8 @@ class DiagonalMatricesLayer(layers.Layer):
             self.initial_value = np.ones([n, m], dtype=np.float32)
         else:
             self.initial_value = initial_value.astype("float32")
-        self.diagonals_initializer = WeightInitializer(self.initial_value)
+        self.initial_diagonals = self.bijector.inverse(self.initial_value)
+        self.diagonals_initializer = WeightInitializer(self.initial_diagonals)
 
     def build(self, input_shape):
         self.diagonals = self.add_weight(
@@ -430,7 +422,7 @@ class MixVectorsLayer(layers.Layer):
         # - mu.shape    = (n_modes, n_channels)
         alpha, mu = inputs
 
-        # Calculate the mean: m_t = Sum_j alpha_jt mu_j
+        # Calculate the mixture: m_t = Sum_j alpha_jt mu_j
         alpha = tf.expand_dims(alpha, axis=-1)
         mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
         m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
@@ -452,7 +444,7 @@ class MixMatricesLayer(layers.Layer):
         # - D.shape     = (n_modes, n_channels, n_channels)
         alpha, D = inputs
 
-        # Calculate the covariance: C_t = Sum_j alpha_jt D_j
+        # Calculate the mixture: C_t = Sum_j alpha_jt D_j
         alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
         D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)

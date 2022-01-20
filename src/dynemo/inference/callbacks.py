@@ -55,9 +55,9 @@ class AlphaTemperatureAnnealingCallback(callbacks.Callback):
             new_value = (
                 self.initial_alpha_temperature + epoch * self.alpha_temperature_gradient
             )
-            alpha_layer.alpha_temperature.assign(new_value)
+            alpha_layer.temperature.assign(new_value)
         else:
-            alpha_layer.alpha_temperature.assign(self.final_alpha_temperature)
+            alpha_layer.temperature.assign(self.final_alpha_temperature)
 
 
 class DiceCoefficientCallback(callbacks.Callback):

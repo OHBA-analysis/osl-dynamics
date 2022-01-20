@@ -213,7 +213,7 @@ class InferenceModelBase:
             kl_loss_layer.annealing_factor.assign(0.0)
         if self.config.do_alpha_temperature_annealing:
             alpha_layer = self.model.get_layer("alpha")
-            alpha_layer.alpha_temperature.assign(self.config.initial_alpha_temperature)
+            alpha_layer.temperature.assign(self.config.initial_alpha_temperature)
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
@@ -379,5 +379,5 @@ class InferenceModelBase:
             Alpha temperature.
         """
         alpha_layer = self.model.get_layer("alpha")
-        alpha_temperature = alpha_layer.alpha_temperature.numpy()
-        return alpha_temperature
+        temperature = alpha_layer.temperature.numpy()
+        return temperature

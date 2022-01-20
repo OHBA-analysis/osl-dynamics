@@ -90,7 +90,7 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
         fcs = fcs.astype(np.float32)
 
         # Transform the matrices to layer weights
-        stds = stds_layer.bijector.inverse(stds)
+        diagonals = stds_layer.bijector.inverse(stds)
         flattened_cholesky_factors = fcs_layer.bijector.inverse(fcs)
 
         # Get layers
@@ -100,7 +100,7 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
 
         # Set values
         means_layer.vectors.assign(means)
-        stds_layer.diagonals.assign(stds)
+        stds_layer.diagonals.assign(diagonals)
         fcs_layer.flattened_cholesky_factors.assign(flattened_cholesky_factors)
 
         # Update initialisers
@@ -108,10 +108,12 @@ class MRIGO(InferenceModelBase, ObservationModelBase):
             means_layer.initial_value = means
             stds_layer.initial_value = stds
             fcs_layer.initial_value = fcs
+
+            stds_layer.initial_diagonals = diagonals
             fcs_layer.initial_flattened_cholesky_factors = flattened_cholesky_factors
 
             means_layer.vectors_initializer.initial_value = means
-            stds_layer.diagonals_initializer.initial_value = stds
+            stds_layer.diagonals_initializer.initial_value = diagonals
             fcs_layer.flattened_cholesky_factors_initializer.initial_value = (
                 flattened_cholesky_factors
             )
