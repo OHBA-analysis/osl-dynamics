@@ -3,18 +3,15 @@
 """
 
 from dynemo.models.go import GO
-from dynemo.models.wno import WNO
 from dynemo.models.rigo import RIGO
 from dynemo.models.mrigo import MRIGO
-from dynemo.models.riwno import RIWNO
 
 
 def Model(config):
     """Main DyNeMo model.
 
-    Selects either an observation model (GO, WNO) or joint inference
-    and observation model (RIGO, MRIGO, RIWNO) based on the passed
-    config.
+    Selects either an observation model (GO) or joint inference
+    and observation model (RIGO, MRIGO) based on the passed config.
 
     Parameters
     ----------
@@ -26,20 +23,11 @@ def Model(config):
     """
 
     if config.inference_rnn is None:
+        return GO(config)
 
-        if config.observation_model == "multivariate_normal":
-            return GO(config)
 
-        elif config.observation_model == "wavenet":
-            return WNO(config)
+    if config.multiple_scales:
+        return MRIGO(config)
 
-    if config.observation_model == "multivariate_normal":
-
-        if config.multiple_scales:
-            return MRIGO(config)
-
-        else:
-            return RIGO(config)
-
-    elif config.observation_model == "wavenet":
-        return RIWNO(config)
+    else:
+        return RIGO(config)

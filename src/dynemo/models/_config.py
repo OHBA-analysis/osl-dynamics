@@ -96,12 +96,6 @@ class Config:
 
     Observation Model Parameters
     ----------------------------
-    observation_model : str
-        Type of observation model. Either 'multivariate_normal' or 'wavenet'.
-    wavenet_n_filters : int
-        Number of filters in the each convolutional layer.
-    wavenet_n_layers : int
-        Number of dilated causal convolution layers.
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
     learn_covariances : bool
@@ -191,9 +185,6 @@ class Config:
     n_alpha_temperature_annealing_epochs: int = None
 
     # Observation model parameters
-    observation_model: Literal["multivariate_normal", "wavenet"] = "multivariate_normal"
-    wavenet_n_filters: int = None
-    wavenet_n_layers: int = None
     learn_means: bool = None
     learn_covariances: bool = None
     initial_means: np.ndarray = None
@@ -220,7 +211,6 @@ class Config:
     strategy: str = None
 
     def __post_init__(self):
-        self.validate_model_choice_parameters()
         self.validate_dimension_parameters()
         self.validate_rnn_parameters()
         self.validate_alpha_parameters()
@@ -228,13 +218,6 @@ class Config:
         self.validate_kl_annealing_parameters()
         self.validate_initialization_parameters()
         self.validate_training_parameters()
-
-    def validate_model_choice_parameters(self):
-
-        if self.observation_model not in ["multivariate_normal", "wavenet"]:
-            raise ValueError(
-                "observation_model must be 'multivariate_normal' or 'wavenet'."
-            )
 
     def validate_rnn_parameters(self):
 
@@ -369,30 +352,21 @@ class Config:
 
     def validate_observation_model_parameters(self):
 
-        if self.observation_model == "multivariate_normal":
-            if self.multiple_scales:
-                if (
-                    self.learn_means is None
-                    or self.learn_stds is None
-                    or self.learn_fcs is None
-                ):
-                    raise ValueError(
-                        "learn_means, learn_stds and learn_fcs must be passed."
-                    )
-
-            else:
-                if self.learn_means is None or self.learn_covariances is None:
-                    raise ValueError(
-                        "learn_means and learn_covariances must be passed."
-                    )
-
-        if self.observation_model == "wavenet":
-            if self.wavenet_n_filters is None or self.wavenet_n_layers is None:
+        if self.multiple_scales:
+            if (
+                self.learn_means is None
+                or self.learn_stds is None
+                or self.learn_fcs is None
+            ):
                 raise ValueError(
-                    "wavenet_n_filters and wavenet_n_layers must be passed."
+                    "learn_means, learn_stds and learn_fcs must be passed."
                 )
-            if self.learn_covariances is None:
-                self.learn_covariances = True
+
+        else:
+            if self.learn_means is None or self.learn_covariances is None:
+                raise ValueError(
+                    "learn_means and learn_covariances must be passed."
+                )
 
     def validate_initialization_parameters(self):
 
