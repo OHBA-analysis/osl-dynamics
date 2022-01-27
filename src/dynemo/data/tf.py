@@ -32,7 +32,7 @@ class TensorFlowDataset:
         alpha: list = None,
         n_alpha_embeddings: int = 1,
         concatenate: bool = True,
-        step: int = None,
+        subj_id: bool = False,
     ) -> tensorflow.data.Dataset:
         """Create a tensorflow dataset for training or evaluation.
 
@@ -57,9 +57,8 @@ class TensorFlowDataset:
         concatenate : bool
             Should we concatenate the datasets for each subject? Optional, the
             default is True.
-        step : int
-            Number of samples to slide the sequence window when generating
-            the dataset. Optional.
+        subj_id : bool
+            Should we include the subject id in the dataset? Optional.
 
         Returns
         -------
@@ -69,9 +68,6 @@ class TensorFlowDataset:
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
-        self.step = step or sequence_length
-
-        n_batches = self.count_batches(sequence_length)
         n_embeddings = self.n_embeddings or 1
 
         # Dataset for learning alpha and the observation model
@@ -79,13 +75,11 @@ class TensorFlowDataset:
             subject_datasets = []
             for i in range(self.n_subjects):
                 subject = self.subjects[i]
+                if subj_id:
+                    subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
+                    subject = {"data": subject, "subj_id": subject_tracker}
                 dataset = Dataset.from_tensor_slices(subject)
-                dataset = dataset.window(
-                    size=sequence_length, shift=step, drop_remainder=True
-                )
-                dataset = dataset.flat_map(
-                    lambda window: window.batch(sequence_length, drop_remainder=True)
-                )
+                dataset = dataset.batch(sequence_length, drop_remainder=True)
                 subject_datasets.append(dataset)
 
         # Dataset for learning the observation model
@@ -100,6 +94,7 @@ class TensorFlowDataset:
                     # embedded data
                     alp = alpha[i][(n_embeddings - n_alpha_embeddings) // 2 :]
                     subject = self.subjects[i][: alp.shape[0]]
+
                 else:
                     # We remove the data points that are not in alpha
                     alp = alpha[i]
@@ -109,13 +104,12 @@ class TensorFlowDataset:
 
                 # Create dataset
                 input_data = {"data": subject, "alpha": alp}
+                if subj_id:
+                    input_data["subj_id"] = (
+                        np.zeros(subject.shape[0], dtype=np.float32) + i
+                    )
                 dataset = Dataset.from_tensor_slices(input_data)
-                dataset = dataset.window(
-                    size=sequence_length, shift=step, drop_remainder=True
-                )
-                dataset = dataset.flat_map(
-                    lambda window: window.batch(sequence_length, drop_remainder=True)
-                )
+                dataset = dataset.batch(sequence_length, drop_remainder=True)
                 subject_datasets.append(dataset)
 
         # Create a dataset from all the subjects concatenated
