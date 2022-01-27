@@ -32,6 +32,7 @@ class TensorFlowDataset:
         alpha: list = None,
         n_alpha_embeddings: int = 1,
         concatenate: bool = True,
+        step: int = None,
     ) -> tensorflow.data.Dataset:
         """Create a tensorflow dataset for training or evaluation.
 
@@ -56,6 +57,9 @@ class TensorFlowDataset:
         concatenate : bool
             Should we concatenate the datasets for each subject? Optional, the
             default is True.
+        step : int
+            Number of samples to slide the sequence window when generating
+            the dataset. Optional.
 
         Returns
         -------
@@ -65,6 +69,7 @@ class TensorFlowDataset:
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
+        self.step = step or sequence_length
 
         n_batches = self.count_batches(sequence_length)
         n_embeddings = self.n_embeddings or 1
@@ -74,8 +79,12 @@ class TensorFlowDataset:
             subject_datasets = []
             for i in range(self.n_subjects):
                 subject = self.subjects[i]
-                dataset = Dataset.from_tensor_slices(subject).batch(
-                    sequence_length, drop_remainder=True
+                dataset = Dataset.from_tensor_slices(subject)
+                dataset = dataset.window(
+                    size=sequence_length, shift=step, drop_remainder=True
+                )
+                dataset = dataset.flat_map(
+                    lambda window: window.batch(sequence_length, drop_remainder=True)
                 )
                 subject_datasets.append(dataset)
 
@@ -100,8 +109,12 @@ class TensorFlowDataset:
 
                 # Create dataset
                 input_data = {"data": subject, "alpha": alp}
-                dataset = Dataset.from_tensor_slices(input_data).batch(
-                    sequence_length, drop_remainder=True
+                dataset = Dataset.from_tensor_slices(input_data)
+                dataset = dataset.window(
+                    size=sequence_length, shift=step, drop_remainder=True
+                )
+                dataset = dataset.flat_map(
+                    lambda window: window.batch(sequence_length, drop_remainder=True)
                 )
                 subject_datasets.append(dataset)
 
