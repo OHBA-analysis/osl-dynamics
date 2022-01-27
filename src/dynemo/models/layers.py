@@ -658,7 +658,6 @@ class WaveNetLayer(layers.Layer):
 
     def __init__(self, n_channels: int, n_filters: int, n_layers: int, **kwargs):
         super().__init__(**kwargs)
-
         self.n_channels = n_channels
         self.n_filters = n_filters
         self.n_layers = n_layers
@@ -694,12 +693,10 @@ class WaveNetLayer(layers.Layer):
         ]
 
     def call(self, inputs, training=None, **kwargs):
-        x, alpha = inputs
-        alpha = tf.roll(alpha, shift=-1, axis=1)
-        out = self.causal_conv_layer(x)
+        out = self.causal_conv_layer(inputs)
         skips = []
         for layer in self.residual_block_layers:
-            out, skip = layer([out, alpha])
+            out, skip = layer(out)
             skips.append(skip)
         out = tf.add_n(skips)
         for layer in self.dense_layers:
@@ -721,8 +718,7 @@ class WaveNetResidualBlockLayer(layers.Layer):
 
     def __init__(self, filters: int, dilation_rate: int, **kwargs):
         super().__init__(**kwargs)
-        self.h_transform_layer = layers.Conv1D(filters, kernel_size=1, padding="same")
-        self.x_filter_layer = layers.Conv1D(
+        self.filter_layer = layers.Conv1D(
             filters,
             kernel_size=2,
             dilation_rate=dilation_rate,
@@ -730,27 +726,11 @@ class WaveNetResidualBlockLayer(layers.Layer):
             use_bias=False,
             kernel_regularizer=regularizers.l2(),
         )
-        self.y_filter_layer = layers.Conv1D(
-            filters,
-            kernel_size=1,
-            dilation_rate=dilation_rate,
-            padding="same",
-            use_bias=False,
-            kernel_regularizer=regularizers.l2(),
-        )
-        self.x_gate_layer = layers.Conv1D(
+        self.gate_layer = layers.Conv1D(
             filters,
             kernel_size=2,
             dilation_rate=dilation_rate,
             padding="causal",
-            use_bias=False,
-            kernel_regularizer=regularizers.l2(),
-        )
-        self.y_gate_layer = layers.Conv1D(
-            filters,
-            kernel_size=1,
-            dilation_rate=dilation_rate,
-            padding="same",
             use_bias=False,
             kernel_regularizer=regularizers.l2(),
         )
@@ -770,13 +750,9 @@ class WaveNetResidualBlockLayer(layers.Layer):
         )
 
     def call(self, inputs, training=None, **kwargs):
-        x, h = inputs
-        y = self.h_transform_layer(h)
-        x_filter = self.x_filter_layer(x)
-        y_filter = self.y_filter_layer(y)
-        x_gate = self.x_gate_layer(x)
-        y_gate = self.y_gate_layer(y)
-        z = tf.tanh(x_filter + y_filter) * tf.sigmoid(x_gate + y_gate)
+        filter_ = self.filter_layer(inputs)
+        gate = self.gate_layer(inputs)
+        z = tf.tanh(filter_) * tf.sigmoid(gate)
         residual = self.res_layer(z)
         skip = self.skip_layer(z)
-        return x + residual, skip
+        return inputs + residual, skip
