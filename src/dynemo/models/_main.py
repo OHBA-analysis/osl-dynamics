@@ -25,9 +25,7 @@ def Model(config):
     if config.inference_rnn is None:
         return GO(config)
 
-
     if config.multiple_scales:
         return MRIGO(config)
-
     else:
         return RIGO(config)

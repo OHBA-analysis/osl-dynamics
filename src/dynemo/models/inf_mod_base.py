@@ -40,14 +40,12 @@ class InferenceModelBase:
                     },
                 }
             )
-
         self.model.compile(optimizer)
 
     def fit(
         self,
         *args,
         kl_annealing_callback: bool = None,
-        alpha_temperature_annealing_callback: bool = None,
         use_tqdm: bool = False,
         tqdm_class=None,
         use_tensorboard: bool = None,
@@ -64,8 +62,6 @@ class InferenceModelBase:
         ----------
         kl_annealing_callback : bool
             Should we update the KL annealing factor during training?
-        alpha_temperature_annealing_callback : bool
-            Should we update the alpha temperature annealing factor during training?
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -103,22 +99,6 @@ class InferenceModelBase:
                 n_cycles=self.config.n_kl_annealing_cycles,
             )
             additional_callbacks.append(kl_annealing_callback)
-
-        if alpha_temperature_annealing_callback is None:
-            # Check config to see if we should do alpha temperature annealing
-            alpha_temperature_annealing_callback = (
-                self.config.do_alpha_temperature_annealing
-            )
-
-        if alpha_temperature_annealing_callback:
-            alpha_temperature_annealing_callback = (
-                callbacks.AlphaTemperatureAnnealingCallback(
-                    initial_alpha_temperature=self.config.initial_alpha_temperature,
-                    final_alpha_temperature=self.config.final_alpha_temperature,
-                    n_annealing_epochs=self.config.n_alpha_temperature_annealing_epochs,
-                )
-            )
-            additional_callbacks.append(alpha_temperature_annealing_callback)
 
         # Update arguments to pass to the fit method
         args, kwargs = replace_argument(

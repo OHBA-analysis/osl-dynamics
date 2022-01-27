@@ -80,19 +80,11 @@ class Config:
         Either 'layer', 'batch' or None.
     alpha_xform : str
         Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
-    initial_alpha_temperature : float
-        Initial value for the alpha temperature if it is being learnt or if
-        we are performing alpha temperature annealing
     learn_alpha_temperature : bool
         Should we learn the alpha temperature when alpha_xform = 'softmax' or
         'gumbel-softmax'?
-    do_alpha_temperature_annealing : bool
-        Should we perform alpha temperature annealing. Can be used when
-        alpha_xform = 'softmax' or 'gumbel-softmax'.
-    final_alpha_temperature : bool
-        Final value for the alpha temperature if we are annealing.
-    n_alpha_temperature_annealing_epochs : int
-        Number of alpha temperature annealing epochs.
+    initial_alpha_temperature : float
+        Initial value for the alpha temperature.
 
     Observation Model Parameters
     ----------------------------
@@ -180,9 +172,6 @@ class Config:
     alpha_xform: Literal["gumbel-softmax", "softmax", "softplus"] = None
     learn_alpha_temperature: bool = None
     initial_alpha_temperature: float = None
-    do_alpha_temperature_annealing: bool = None
-    final_alpha_temperature: float = None
-    n_alpha_temperature_annealing_epochs: int = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -245,53 +234,15 @@ class Config:
             )
 
         if "softmax" in self.alpha_xform:
-            if (
-                self.learn_alpha_temperature is None
-                and self.do_alpha_temperature_annealing is None
-            ):
-                raise ValueError(
-                    "Either learn_alpha_temperature or do_alpha_temperature_annealing "
-                    + "must be passed."
-                )
-
             if self.initial_alpha_temperature is None:
                 raise ValueError("initial_alpha_temperature must be passed.")
 
             if self.initial_alpha_temperature <= 0:
                 raise ValueError("initial_alpha_temperature must be greater than zero.")
 
-            if self.learn_alpha_temperature:
-                self.do_alpha_temperature_annealing = False
-
-            if self.do_alpha_temperature_annealing:
-                self.learn_alpha_temperature = False
-
-                if self.final_alpha_temperature is None:
-                    raise ValueError(
-                        "If we are performing alpha temperature annealing, "
-                        + "final_alpha_temperature must be passed."
-                    )
-
-                if self.final_alpha_temperature <= 0:
-                    raise ValueError(
-                        "final_alpha_temperature must be greater than zero."
-                    )
-
-                if self.n_alpha_temperature_annealing_epochs is None:
-                    raise ValueError(
-                        "If we are performing alpha temperature annealing, "
-                        + "n_alpha_temperature_annealing_epochs must be passed."
-                    )
-
-                if self.n_alpha_temperature_annealing_epochs < 1:
-                    raise ValueError(
-                        "n_alpha_temperature_annealing_epochs must be one or above."
-                    )
-
         elif self.alpha_xform == "softplus":
             self.initial_alpha_temperature = 1.0  # not used in the model
             self.learn_alpha_temperature = False
-            self.do_alpha_temperature_annealing = False
 
     def validate_dimension_parameters(self):
 
@@ -364,9 +315,7 @@ class Config:
 
         else:
             if self.learn_means is None or self.learn_covariances is None:
-                raise ValueError(
-                    "learn_means and learn_covariances must be passed."
-                )
+                raise ValueError("learn_means and learn_covariances must be passed.")
 
     def validate_initialization_parameters(self):
 

@@ -9,57 +9,6 @@ from tensorflow.python.keras import callbacks
 from dynemo import inference
 
 
-class AlphaTemperatureAnnealingCallback(callbacks.Callback):
-    """Callback to update the alpha temperature during training.
-
-    This callback assumes there is a keras layer called 'alpha' in the model.
-
-    Parameters
-    ----------
-    initial_alpha_temperature : float
-        Alpha temperature for the theta activation function.
-    final_alpha_temperature : float
-        Final value for the alpha temperature.
-    n_annealing_epochs : int
-        Number of epochs to apply annealing.
-    """
-
-    def __init__(
-        self,
-        initial_alpha_temperature: float,
-        final_alpha_temperature: float,
-        n_annealing_epochs: int,
-    ):
-        super().__init__()
-        self.initial_alpha_temperature = initial_alpha_temperature
-        self.final_alpha_temperature = final_alpha_temperature
-        self.n_annealing_epochs = n_annealing_epochs
-        self.alpha_temperature_gradient = (
-            final_alpha_temperature - initial_alpha_temperature
-        ) / n_annealing_epochs
-
-    def on_epoch_end(self, epoch, logs=None):
-        """Action to perform at the end of an epoch.
-
-        Parameters
-        ---------
-        epochs : int
-            Integer, index of epoch.
-        logs : dict
-            Results for this training epoch, and for the validation epoch if
-            validation is performed.
-        """
-        alpha_layer = self.model.get_layer("alpha")
-        epoch += 1  # epoch goes from 0 to n_epochs - 1, so we add 1
-        if epoch < self.n_annealing_epochs:
-            new_value = (
-                self.initial_alpha_temperature + epoch * self.alpha_temperature_gradient
-            )
-            alpha_layer.temperature.assign(new_value)
-        else:
-            alpha_layer.temperature.assign(self.final_alpha_temperature)
-
-
 class DiceCoefficientCallback(callbacks.Callback):
     """Callback to calculate a dice coefficient during training.
 

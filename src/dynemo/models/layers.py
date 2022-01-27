@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import activations, layers, regularizers
-from dynemo.inference.initializers import WeightInitializer, CopyTensorInitializer
+from dynemo.inference.initializers import WeightInitializer
 
 tfb = tfp.bijectors
 
