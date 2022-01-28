@@ -230,26 +230,6 @@ class Base:
     def _repr_html_(self):
         return self.html_summary()
 
-    def get_all_model_info(self, prediction_dataset, file=None):
-        # Inferred mode mixing factors and mode time courses
-        alpha = self.get_alpha(prediction_dataset)
-        history = self.history.history
-
-        info = dict(
-            free_energy=self.free_energy(prediction_dataset),
-            alpha=alpha,
-            covs=self.get_covariances(),
-            history=history,
-        )
-
-        if file:
-            path = Path(file)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("wb") as f:
-                pickle.dump(info, f)
-
-        return info
-
     @classmethod
     def from_yaml(cls, file, **kwargs):
         return class_from_yaml(cls, file, kwargs)
@@ -260,7 +240,7 @@ class Base:
 
         results_file = settings.pop("results_file", None)
 
-        history = self.fit(
+        self.history = self.fit(
             training_dataset,
             **settings,
         )
@@ -275,7 +255,7 @@ class Base:
             except AttributeError:
                 pass
 
-        return history
+        return self.history
 
 
 @dataclass
