@@ -77,8 +77,8 @@ class Config(BaseConfig, InferenceModelConfig):
     model_dropout_rate : float
         Dropout rate.
 
-    Alpha Parameters
-    ----------------
+    Alpha, Beta, Gamma Parameters
+    -----------------------------
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
@@ -89,7 +89,6 @@ class Config(BaseConfig, InferenceModelConfig):
         'gumbel-softmax'?
     initial_alpha_temperature : float
         Initial value for the alpha temperature.
-
     The same parameters are used for beta and gamma time courses.
 
     Observation Model Parameters
@@ -98,6 +97,8 @@ class Config(BaseConfig, InferenceModelConfig):
         Should we have constant std across modes and time?
     tie_mean_std: bool
         Should we tie up the time courses of mean and std?
+    learn_means : bool
+        Should we make the standard deviation for each mode trainable?
     learn_stds: bool
         Should we make the standard deviation for each mode trainable?
     learn_fcs: bool
@@ -174,7 +175,7 @@ class Config(BaseConfig, InferenceModelConfig):
 
     def __post_init__(self):
         self.validate_rnn_parameters()
-        # TODO: add observation model parameters validation
+        self.validate_observation_model_parameters()
         self.validate_alpha_parameters()
         self.validate_kl_annealing_parameters()
         self.validate_initialization_parameters()
@@ -182,17 +183,22 @@ class Config(BaseConfig, InferenceModelConfig):
         self.validate_training_parameters()
 
     def validate_rnn_parameters(self):
-        if self.inference_rnn is None:
-            raise ValueError("Please pass inference_rnn.")
-
-        if self.model_rnn is None:
-            raise ValueError("Please pass model_rnn.")
+        if self.inference_rnn is None or self.model_rnn is None:
+            raise ValueError("Please pass inference_rnn and model_rnn.")
 
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
 
         if self.model_n_units is None:
             raise ValueError("Please pass model_n_units.")
+
+    def validate_observation_model_parameters(self):
+        if (
+            self.learn_means is None
+            or self.learn_stds is None
+            or self.learn_fcs is None
+        ):
+            raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
 
 
 class Model(InferenceModelBase, ObservationModelBase):

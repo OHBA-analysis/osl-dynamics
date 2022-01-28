@@ -168,11 +168,8 @@ class Config(BaseConfig, InferenceModelConfig):
         self.validate_training_parameters()
 
     def validate_rnn_parameters(self):
-        if self.inference_rnn is None:
-            raise ValueError("Please pass inference_rnn.")
-
-        if self.model_rnn is None:
-            raise ValueError("Please pass model_rnn.")
+        if self.inference_rnn is None or self.model_rnn is None:
+            raise ValueError("Please pass inference_rnn and model_rnn.")
 
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
