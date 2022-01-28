@@ -30,6 +30,8 @@ class TensorFlowDataset:
         shuffle: bool = True,
         validation_split: float = None,
         alpha: list = None,
+        beta: list = None,
+        gamma: list = None,
         n_alpha_embeddings: int = 1,
         concatenate: bool = True,
         subj_id: bool = False,
@@ -50,6 +52,12 @@ class TensorFlowDataset:
             List of mode mixing factors for each subject.
             If passed, we create a dataset that includes alpha at each time point.
             Such a dataset can be used to train the observation model.
+        beta : list of np.ndarray
+            List of mode mixing factors for the standard deviation.
+            Used with a multi-time-scale model.
+        gamma : list of np.ndarray
+            List of mode mixing factors for the functional connectivity.
+            Used with a multi-time-scale model.
         n_alpha_embeddings : int
             Number of embeddings used when inferring alpha.
         concatenate : bool
@@ -90,17 +98,29 @@ class TensorFlowDataset:
                     # We remove data points in alpha that are not in the new time
                     # embedded data
                     alp = alpha[i][(n_embeddings - n_alpha_embeddings) // 2 :]
+                    if beta is not None:
+                        bet = beta[i][(n_embeddings - n_alpha_embeddings) // 2 :]
+                    if gamma is not None:
+                        gam = gamma[i][(n_embeddings - n_alpha_embeddings) // 2 :]
                     subject = self.subjects[i][: alp.shape[0]]
 
                 else:
                     # We remove the data points that are not in alpha
                     alp = alpha[i]
+                    if beta is not None:
+                        bet = beta[i]
+                    if gamma is not None:
+                        gam = gamma[i]
                     subject = self.subjects[i][
                         (n_alpha_embeddings - n_embeddings) // 2 : alp.shape[0]
                     ]
 
                 # Create dataset
                 input_data = {"data": subject, "alpha": alp}
+                if beta is not None:
+                    input_data["beta"] = bet
+                if gamma is not None:
+                    input_data["gamma"] = gam
                 if subj_id:
                     input_data["subj_id"] = (
                         np.zeros(subject.shape[0], dtype=np.float32) + i
