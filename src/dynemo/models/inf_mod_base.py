@@ -3,7 +3,8 @@
 """
 
 import logging
-from typing import Tuple, Union
+from dataclasses import dataclass
+from typing import Tuple, Union, Literal
 
 import numpy as np
 from tensorflow.keras import optimizers
@@ -96,7 +97,6 @@ class InferenceModelBase:
                 curve=self.config.kl_annealing_curve,
                 annealing_sharpness=self.config.kl_annealing_sharpness,
                 n_annealing_epochs=self.config.n_kl_annealing_epochs,
-                n_cycles=self.config.n_kl_annealing_cycles,
             )
             additional_callbacks.append(kl_annealing_callback)
 
@@ -361,3 +361,89 @@ class InferenceModelBase:
         alpha_layer = self.model.get_layer("alpha")
         temperature = alpha_layer.temperature.numpy()
         return temperature
+
+
+@dataclass
+class InferenceModelConfig:
+    """Settings needed for the inference model."""
+
+    # Alpha parameters
+    theta_normalization: Literal[None, "batch", "layer"] = None
+    alpha_xform: Literal["gumbel-softmax", "softmax", "softplus"] = None
+    learn_alpha_temperature: bool = None
+    initial_alpha_temperature: float = None
+
+    # KL annealing parameters
+    do_kl_annealing: bool = None
+    kl_annealing_curve: Literal["linear", "tanh"] = None
+    kl_annealing_sharpness: float = None
+    n_kl_annealing_epochs: int = None
+
+    # Initialisation parameters
+    n_init: int = None
+    n_init_epochs: int = None
+
+    def validate_alpha_parameters(self):
+        if self.alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
+            raise ValueError(
+                "alpha_xform must be 'gumbel-softmax', 'softmax' or 'softplus'."
+            )
+
+        if "softmax" in self.alpha_xform:
+            if self.initial_alpha_temperature is None:
+                raise ValueError("initial_alpha_temperature must be passed.")
+
+            if self.initial_alpha_temperature <= 0:
+                raise ValueError("initial_alpha_temperature must be greater than zero.")
+
+        elif self.alpha_xform == "softplus":
+            self.initial_alpha_temperature = 1.0  # not used in the model
+            self.learn_alpha_temperature = False
+
+    def validate_kl_annealing_parameters(self):
+        if self.do_kl_annealing is None:
+            raise ValueError("do_kl_annealing must be passed.")
+
+        if self.do_kl_annealing:
+            if self.kl_annealing_curve is None:
+                raise ValueError(
+                    "If we are performing KL annealing, "
+                    "kl_annealing_curve must be passed."
+                )
+
+            if self.kl_annealing_curve not in ["linear", "tanh"]:
+                raise ValueError("KL annealing curve must be 'linear' or 'tanh'.")
+
+            if self.kl_annealing_curve == "tanh":
+                if self.kl_annealing_sharpness is None:
+                    raise ValueError(
+                        "kl_annealing_sharpness must be passed if "
+                        + "kl_annealing_curve='tanh'."
+                    )
+
+                if self.kl_annealing_sharpness < 0:
+                    raise ValueError("KL annealing sharpness must be positive.")
+
+            if self.n_kl_annealing_epochs is None:
+                raise ValueError(
+                    "If we are performing KL annealing, n_kl_annealing_epochs must be "
+                    + "passed."
+                )
+
+            if self.n_kl_annealing_epochs < 1:
+                raise ValueError(
+                    "Number of KL annealing epochs must be greater than zero."
+                )
+
+    def validate_initialization_parameters(self):
+        if self.n_init is not None:
+            if self.n_init < 1:
+                raise ValueError("n_init must be one or greater.")
+
+            if self.n_init_epochs is None:
+                raise ValueError(
+                    "If we are initializing the model, n_init_epochs must be passed."
+                )
+
+            if self.n_init_epochs < 1:
+                raise ValueError("n_init_epochs must be one or greater.")

@@ -113,6 +113,7 @@ class KLAnnealingCallback(callbacks.Callback):
         Number of epochs to apply annealing.
     n_cycles : int
         Number of times to perform KL annealing with n_annealing_epochs.
+        Optional.
     """
 
     def __init__(
@@ -120,7 +121,7 @@ class KLAnnealingCallback(callbacks.Callback):
         curve: str,
         annealing_sharpness: float,
         n_annealing_epochs: int,
-        n_cycles: int,
+        n_cycles: int = 1,
     ):
         if curve not in ["linear", "tanh"]:
             raise NotImplementedError(curve)

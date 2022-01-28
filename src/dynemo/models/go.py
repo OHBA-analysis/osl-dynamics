@@ -2,9 +2,12 @@
 
 """
 
+from dataclasses import dataclass
+
 import numpy as np
-from tensorflow.keras import Model, layers
-from tensorflow.nn import softplus
+import tensorflow as tf
+from tensorflow.keras import layers
+from dynemo.models.base import BaseConfig
 from dynemo.models.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -15,7 +18,67 @@ from dynemo.models.layers import (
 from dynemo.models.obs_mod_base import ObservationModelBase
 
 
-class GO(ObservationModelBase):
+@dataclass
+class Config(BaseConfig):
+    """Settings for GO.
+
+    Dimension Parameters
+    --------------------
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Length of sequence passed to the generative model.
+
+    Observation Model Parameters
+    ----------------------------
+    learn_means : bool
+        Should we make the mean vectors for each mode trainable?
+    learn_covariances : bool
+        Should we make the covariance matrix for each mode trainable?
+    initial_means : np.ndarray
+        Initialisation for mean vectors.
+    initial_covariances : np.ndarray
+        Initialisation for mode covariances.
+
+    Training Parameters
+    -------------------
+    batch_size : int
+        Mini-batch size.
+    learning_rate : float
+        Learning rate.
+    gradient_clip : float
+        Value to clip gradients by. This is the clipnorm argument passed to
+        the Keras optimizer. Cannot be used if multi_gpu=True.
+    n_epochs : int
+        Number of training epochs.
+    optimizer : str or tensorflow.keras.optimizers.Optimizer
+        Optimizer to use. 'adam' is recommended.
+    multi_gpu : bool
+        Should be use multiple GPUs for training?
+    strategy : str
+        Strategy for distributed learning.
+    """
+
+    # Observation model parameters
+    multiple_scales: bool = False
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
+
+    def __post_init__(self):
+        self.validate_observation_model_parameters()
+        self.validate_dimension_parameters()
+        self.validate_training_parameters()
+
+    def validate_observation_model_parameters(self):
+        if self.learn_means is None or self.learn_covariances is None:
+            raise ValueError("learn_means and learn_covariances must be passed.")
+
+
+class Model(ObservationModelBase):
     """Gaussian Observations (GO) model.
 
     Parameters
@@ -143,4 +206,4 @@ def _model_structure(config):
     C = mix_covs_layer([alpha, D])
     ll_loss = ll_loss_layer([data, m, C])
 
-    return Model(inputs=[data, alpha], outputs=[ll_loss], name="GO")
+    return tf.keras.Model(inputs=[data, alpha], outputs=[ll_loss], name="GO")

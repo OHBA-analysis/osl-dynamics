@@ -7,11 +7,15 @@ import re
 from abc import abstractmethod
 from io import StringIO
 from pathlib import Path
+from dataclasses import dataclass
 
 import numpy as np
 import yaml
+import tensorflow
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
+from tensorflow.python.distribute.distribution_strategy_context import get_strategy
+from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from dynemo.data import Data
@@ -140,9 +144,7 @@ class Base:
                     def __init__(self, *args, **kwargs):
                         super().__init__(*args, **kwargs, ncols=98)
 
-                # Create tqdm callback
                 tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-
             additional_callbacks.append(tqdm_callback)
 
         # Callback for Tensorboard visulisation
@@ -165,7 +167,6 @@ class Base:
                 save_best_after=save_best_after,
                 filepath=save_filepath,
             )
-
             additional_callbacks.append(save_best_callback)
 
         return additional_callbacks
@@ -275,3 +276,62 @@ class Base:
                 pass
 
         return history
+
+
+@dataclass
+class BaseConfig:
+    """Base class for setting for any DyNeMo model."""
+
+    # Training parameters
+    batch_size: int = None
+    learning_rate: float = None
+    gradient_clip: float = None
+    n_epochs: int = None
+    optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
+    multi_gpu: bool = False
+    strategy: str = None
+
+    # Dimension parameters
+    n_modes: int = None
+    n_channels: int = None
+    sequence_length: int = None
+
+    def validate_training_parameters(self):
+        if self.batch_size is None:
+            raise ValueError("batch_size must be passed.")
+
+        if self.batch_size < 1:
+            raise ValueError("batch_size must be one or greater.")
+
+        if self.n_epochs is None:
+            raise ValueError("n_epochs must be passed.")
+
+        if self.n_epochs < 1:
+            raise ValueError("n_epochs must be one or greater.")
+
+        if self.learning_rate is None:
+            raise ValueError("learning_rate must be passed.")
+
+        if self.learning_rate < 0:
+            raise ValueError("learning_rate must be greater than zero.")
+
+        # Strategy for distributed learning
+        if self.multi_gpu:
+            self.strategy = MirroredStrategy()
+        elif self.strategy is None:
+            self.strategy = get_strategy()
+
+    def validate_dimension_parameters(self):
+        if self.sequence_length is None:
+            raise ValueError("sequence_length must be passed.")
+
+        if self.n_modes is not None:
+            if self.n_modes < 1:
+                raise ValueError("n_modes must be one or greater.")
+
+        if self.n_channels is not None:
+            if self.n_channels < 1:
+                raise ValueError("n_channels must be one or greater.")
+
+        if self.sequence_length < 1:
+            raise ValueError("sequence_length must be one or greater.")

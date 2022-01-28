@@ -8,7 +8,7 @@ print("Setting up")
 import numpy as np
 from dynemo import data, files, simulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models import Config, Model
+from dynemo.models.mrigo import Config, Model
 from dynemo.inference import callbacks
 from dynemo.utils import plotting
 

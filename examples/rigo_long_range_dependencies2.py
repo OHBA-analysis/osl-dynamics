@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from dynemo import array_ops
 from dynemo.data import Data
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models import Config, Model
+from dynemo.models.rigo import Config, Model
 from dynemo.simulation import HierarchicalHMM_MVN
 from dynemo.utils import plotting
 

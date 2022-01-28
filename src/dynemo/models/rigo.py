@@ -3,13 +3,17 @@
 """
 
 import logging
+from dataclasses import dataclass
 from operator import lt
+from typing import Literal
 
 import numpy as np
-from tensorflow.keras import Model, layers
+import tensorflow as tf
+from tensorflow.keras import layers
 from tqdm import trange
-from dynemo.models.go import GO
-from dynemo.models.inf_mod_base import InferenceModelBase
+from dynemo.models.base import BaseConfig
+from dynemo.models.go import Model as GO
+from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.models.layers import (
     InferenceRNNLayers,
     LogLikelihoodLossLayer,
@@ -29,12 +33,169 @@ from dynemo.utils.misc import check_arguments
 _logger = logging.getLogger("DyNeMo")
 
 
-class RIGO(InferenceModelBase, GO):
+@dataclass
+class Config(BaseConfig, InferenceModelConfig):
+    """Settings for RIGO.
+
+    Dimension Parameters
+    --------------------
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Length of sequence passed to the inference network and generative model.
+
+    Inference Network Parameters
+    ----------------------------
+    inference_rnn : str
+        RNN to use, either 'gru' or 'lstm'.
+    inference_n_layers : int
+        Number of layers.
+    inference_n_units : int
+        Number of units.
+    inference_normalization : str
+        Type of normalization to use. Either None, 'batch' or 'layer'.
+    inference_activation : str
+        Type of activation to use after normalization and before dropout.
+        E.g. 'relu', 'elu', etc.
+    inference_dropout_rate : float
+        Dropout rate.
+
+    Model Network Parameters
+    ------------------------
+    model_rnn : str
+        RNN to use, either 'gru' or 'lstm'.
+    model_n_layers : int
+        Number of layers.
+    model_n_units : int
+        Number of units.
+    model_normalization : str
+        Type of normalization to use. Either None, 'batch' or 'layer'.
+    model_activation : str
+        Type of activation to use after normalization and before dropout.
+        E.g. 'relu', 'elu', etc.
+    model_dropout_rate : float
+        Dropout rate.
+
+    Alpha Parameters
+    ----------------
+    theta_normalization : str
+        Type of normalization to apply to the posterior samples, theta.
+        Either 'layer', 'batch' or None.
+    alpha_xform : str
+        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+    learn_alpha_temperature : bool
+        Should we learn the alpha temperature when alpha_xform='softmax' or
+        'gumbel-softmax'?
+    initial_alpha_temperature : float
+        Initial value for the alpha temperature.
+
+    Observation Model Parameters
+    ----------------------------
+    learn_means : bool
+        Should we make the mean vectors for each mode trainable?
+    learn_covariances : bool
+        Should we make the covariance matrix for each mode trainable?
+    initial_means : np.ndarray
+        Initialisation for mean vectors.
+    initial_covariances : np.ndarray
+        Initialisation for mode covariances.
+
+    KL Annealing Parameters
+    -----------------------
+    do_kl_annealing : bool
+        Should we use KL annealing during training?
+    kl_annealing_curve : str
+        Type of KL annealing curve. Either 'linear' or 'tanh'.
+    kl_annealing_sharpness : float
+        Parameter to control the shape of the annealing curve if
+        kl_annealing_curve='tanh'.
+    n_kl_annealing_epochs : int
+        Number of epochs to perform KL annealing.
+
+    Initialization Parameters
+    -------------------------
+    n_init : int
+        Number of initializations.
+    n_init_epochs : int
+        Number of epochs to train each initialization.
+
+    Training Parameters
+    -------------------
+    batch_size : int
+        Mini-batch size.
+    learning_rate : float
+        Learning rate.
+    gradient_clip : float
+        Value to clip gradients by. This is the clipnorm argument passed to
+        the Keras optimizer. Cannot be used if multi_gpu=True.
+    n_epochs : int
+        Number of training epochs.
+    optimizer : str or tensorflow.keras.optimizers.Optimizer
+        Optimizer to use. 'adam' is recommended.
+    multi_gpu : bool
+        Should be use multiple GPUs for training?
+    strategy : str
+        Strategy for distributed learning.
+    """
+
+    # Inference network parameters
+    inference_rnn: Literal["gru", "lstm"] = None
+    inference_n_layers: int = 1
+    inference_n_units: int = None
+    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_activation: str = None
+    inference_dropout_rate: float = 0.0
+
+    # Model network parameters
+    model_rnn: Literal["gru", "lstm"] = None
+    model_n_layers: int = 1
+    model_n_units: int = None
+    model_normalization: Literal[None, "batch", "layer"] = None
+    model_activation: str = None
+    model_dropout_rate: float = 0.0
+
+    # Observation model parameters
+    multiple_scales: bool = False
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
+
+    def __post_init__(self):
+        self.validate_rnn_parameters()
+        self.validate_observation_model_parameters()
+        self.validate_alpha_parameters()
+        self.validate_kl_annealing_parameters()
+        self.validate_initialization_parameters()
+        self.validate_dimension_parameters()
+        self.validate_training_parameters()
+
+    def validate_rnn_parameters(self):
+        if self.inference_rnn is None:
+            raise ValueError("Please pass inference_rnn.")
+
+        if self.model_rnn is None:
+            raise ValueError("Please pass model_rnn.")
+
+        if self.inference_n_units is None:
+            raise ValueError("Please pass inference_n_units.")
+
+        if self.model_n_units is None:
+            raise ValueError("Please pass model_n_units.")
+
+    def validate_observation_model_parameters(self):
+        if self.learn_means is None or self.learn_covariances is None:
+            raise ValueError("learn_means and learn_covariances must be passed.")
+
+
+class Model(InferenceModelBase, GO):
     """RNN Inference/model network and Gaussian Observations (RIGO).
 
     Parameters
     ----------
-    config : dynemo.models.Config
+    config : dynemo.models.rigo.Config
     """
 
     def __init__(self, config):
@@ -282,4 +443,4 @@ def _model_structure(config):
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
     kl_loss = kl_loss_layer(kl_div)
 
-    return Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RIGO")
+    return tf.keras.Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RIGO")

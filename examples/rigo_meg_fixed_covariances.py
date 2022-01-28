@@ -10,7 +10,7 @@
 print("Setting up")
 from dynemo.data import OSL_HMM, Data, manipulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models import Config, Model
+from dynemo.models.rigo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()

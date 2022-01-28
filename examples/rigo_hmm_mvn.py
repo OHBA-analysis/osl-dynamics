@@ -8,7 +8,7 @@ print("Setting up")
 import numpy as np
 from dynemo import data, files, simulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models import Config, Model
+from dynemo.models.rigo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()

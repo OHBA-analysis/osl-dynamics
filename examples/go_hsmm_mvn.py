@@ -6,7 +6,7 @@ print("Setting up")
 import numpy as np
 from dynemo import data, files, simulation
 from dynemo.inference import tf_ops
-from dynemo.models import Config, Model
+from dynemo.models.go import Config, Model
 from dynemo.utils import plotting
 
 # GPU settings

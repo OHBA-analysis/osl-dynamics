@@ -17,7 +17,7 @@ print("Setting up")
 import numpy as np
 import pickle
 from dynemo import analysis, data, inference
-from dynemo.models import Config, Model
+from dynemo.models.rigo import Config, Model
 from dynemo.utils import plotting
 
 # -------- #
