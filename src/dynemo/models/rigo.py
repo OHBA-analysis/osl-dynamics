@@ -264,25 +264,6 @@ class Model(InferenceModelBase, GO):
 
         return alpha
 
-    def get_all_model_info(self, prediction_dataset, file=None):
-        alpha = self.get_alpha(prediction_dataset)
-        history = self.history.history
-
-        info = dict(
-            free_energy=self.free_energy(prediction_dataset),
-            alpha=alpha,
-            covs=self.get_covariances(),
-            history=history,
-        )
-
-        if file:
-            path = Path(file)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("wb") as f:
-                pickle.dump(info, f)
-
-        return info
-
 
 def _model_structure(config):
 

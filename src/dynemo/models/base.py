@@ -2,15 +2,12 @@
 
 """
 
-import pickle
 import re
 from abc import abstractmethod
 from io import StringIO
-from pathlib import Path
 from dataclasses import dataclass
 
 import numpy as np
-import yaml
 import tensorflow
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
@@ -21,7 +18,7 @@ from tqdm.keras import TqdmCallback
 from dynemo.data import Data
 from dynemo.inference import callbacks
 from dynemo.inference.tf_ops import tensorboard_run_logdir
-from dynemo.utils.misc import check_iterable_type, class_from_yaml
+from dynemo.utils.misc import check_iterable_type
 from dynemo.utils.model import HTMLTable, LatexTable
 
 
@@ -229,33 +226,6 @@ class Base:
 
     def _repr_html_(self):
         return self.html_summary()
-
-    @classmethod
-    def from_yaml(cls, file, **kwargs):
-        return class_from_yaml(cls, file, kwargs)
-
-    def fit_yaml(self, training_dataset, file, prediction_dataset=None):
-        with open(file) as f:
-            settings = yaml.load(f, Loader=yaml.Loader)
-
-        results_file = settings.pop("results_file", None)
-
-        self.history = self.fit(
-            training_dataset,
-            **settings,
-        )
-
-        save_filepath = settings.get("save_filepath", None)
-        if save_filepath:
-            self.load_weights(save_filepath)
-
-        if results_file and prediction_dataset:
-            try:
-                self.get_all_model_info(prediction_dataset, results_file)
-            except AttributeError:
-                pass
-
-        return self.history
 
 
 @dataclass
