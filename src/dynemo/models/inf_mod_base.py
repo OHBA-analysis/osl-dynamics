@@ -359,8 +359,7 @@ class InferenceModelBase:
             Alpha temperature.
         """
         alpha_layer = self.model.get_layer("alpha")
-        temperature = alpha_layer.temperature.numpy()
-        return temperature
+        return alpha_layer.temperature.numpy()
 
 
 @dataclass

@@ -83,7 +83,7 @@ class Model(ObservationModelBase):
 
     Parameters
     ----------
-    config : dynemo.models.Config
+    config : dynemo.models.go.Config
     """
 
     def __init__(self, config):

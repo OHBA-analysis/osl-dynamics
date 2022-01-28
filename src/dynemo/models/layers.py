@@ -457,17 +457,35 @@ class LogLikelihoodLossLayer(layers.Layer):
 
     The negative log-likelihood is calculated assuming a multivariate normal
     probability density and its value is added to the loss function.
+
+    Parameters
+    ----------
+    diag_cov : bool
+        Are the covariances diagonal? Optional.
     """
+
+    def __init__(self, diag_cov: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.diag_cov = diag_cov
 
     def call(self, inputs):
         x, mu, sigma = inputs
 
+        # Multivariate normal distribution
+        if self.diag_cov:
+            mvn = tfp.distributions.MultivariateNormalDiag(
+                loc=mu,
+                scale_diag=sigma,
+                allow_nan_stats=False,
+            )
+        else:
+            mvn = tfp.distributions.MultivariateNormalTriL(
+                loc=mu,
+                scale_tril=tf.linalg.cholesky(sigma),
+                allow_nan_stats=False,
+            )
+
         # Calculate the log-likelihood
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
-        )
         ll_loss = mvn.log_prob(x)
 
         # Sum over time dimension and average over the batch dimension
@@ -560,7 +578,7 @@ class InferenceRNNLayers(layers.Layer):
         Number of layers.
     n_units : int
         Number of units/neurons per layer.
-    dropout_rate : float
+    drop_rate : float
         Dropout rate for the output of each layer.
     """
 
@@ -571,11 +589,10 @@ class InferenceRNNLayers(layers.Layer):
         act_type: str,
         n_layers: int,
         n_units: int,
-        dropout_rate: float,
+        drop_rate: float,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n_units = n_units
 
         self.layers = []
         for n in range(n_layers):
@@ -588,7 +605,7 @@ class InferenceRNNLayers(layers.Layer):
             )
             self.layers.append(NormalizationLayer(norm_type))
             self.layers.append(layers.Activation(act_type))
-            self.layers.append(layers.Dropout(dropout_rate))
+            self.layers.append(layers.Dropout(drop_rate))
 
     def call(self, inputs, **kwargs):
         for layer in self.layers:
@@ -611,7 +628,7 @@ class ModelRNNLayers(layers.Layer):
         Number of layers.
     n_units : int
         Number of units/neurons per layer.
-    dropout_rate : float
+    drop_rate : float
         Dropout rate for the output of each layer.
     """
 
@@ -622,11 +639,10 @@ class ModelRNNLayers(layers.Layer):
         act_type: str,
         n_layers: int,
         n_units: int,
-        dropout_rate: float,
+        drop_rate: float,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n_units = n_units
 
         self.layers = []
         for n in range(n_layers):
@@ -635,7 +651,7 @@ class ModelRNNLayers(layers.Layer):
             )
             self.layers.append(NormalizationLayer(norm_type))
             self.layers.append(layers.Activation(act_type))
-            self.layers.append(layers.Dropout(dropout_rate))
+            self.layers.append(layers.Dropout(drop_rate))
 
     def call(self, inputs, **kwargs):
         for layer in self.layers:
@@ -692,7 +708,7 @@ class WaveNetLayer(layers.Layer):
             ),
         ]
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, **kwargs):
         out = self.causal_conv_layer(inputs)
         skips = []
         for layer in self.residual_block_layers:
@@ -749,10 +765,51 @@ class WaveNetResidualBlockLayer(layers.Layer):
             bias_regularizer=regularizers.l2(),
         )
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, **kwargs):
         filter_ = self.filter_layer(inputs)
         gate = self.gate_layer(inputs)
         z = tf.tanh(filter_) * tf.sigmoid(gate)
         residual = self.res_layer(z)
         skip = self.skip_layer(z)
         return inputs + residual, skip
+
+
+class MultiLayerPerceptronLayer(layers.Layer):
+    """Multi-layer perceptron.
+
+    Parameters
+    ----------
+    n_layers : int
+        Number of layers.
+    n_units : int
+        Number of units/neurons per layer.
+    norm_type : str
+        Either 'layer', 'batch' or None.
+    act_type : 'str'
+        Activation type, e.g. 'relu', 'elu', etc.
+    drop_rate : float
+        Dropout rate for the output of each layer.
+    """
+
+    def __init__(
+        self,
+        n_layers: int,
+        n_units: int,
+        norm_type: str,
+        act_type: str,
+        drop_rate: float,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.layers = []
+        for n in range(n_layers):
+            self.layers.append(layers.Dense(n_units))
+            self.layers.append(NormalizationLayer(norm_type))
+            self.layers.append(layers.Activation(act_type))
+            self.layers.append(layers.Dropout(drop_rate))
+
+    def call(self, inputs, **kwargs):
+        for layer in self.layers:
+            inputs = layer(inputs, **kwargs)
+        return inputs
