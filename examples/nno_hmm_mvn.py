@@ -22,7 +22,7 @@ config = Config(
     mlp_activation="selu",
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=100,
+    n_epochs=200,
 )
 
 # Simulate data

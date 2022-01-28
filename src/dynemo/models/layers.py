@@ -563,7 +563,7 @@ class KLLossLayer(layers.Layer):
         return kl_loss
 
 
-class InferenceRNNLayers(layers.Layer):
+class InferenceRNNLayer(layers.Layer):
     """RNN inference network.
 
     Parameters
@@ -613,7 +613,7 @@ class InferenceRNNLayers(layers.Layer):
         return inputs
 
 
-class ModelRNNLayers(layers.Layer):
+class ModelRNNLayer(layers.Layer):
     """RNN generative model.
 
     Parameters

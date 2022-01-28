@@ -1,4 +1,4 @@
-"""Model class for a generative model with Gaussian observations.
+"""Model class for an LSTM generative model with Gaussian observations.
 
 """
 
@@ -9,17 +9,17 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from tqdm import trange
-from dynemo.models.base import BaseConfig
-from dynemo.models.go import Model as GO
+from dynemo.models import go
+from dynemo.models.mod_base import BaseConfig
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.models.layers import (
-    InferenceRNNLayers,
+    InferenceRNNLayer,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
-    ModelRNNLayers,
+    ModelRNNLayer,
     NormalizationLayer,
     KLDivergenceLayer,
     KLLossLayer,
@@ -182,7 +182,7 @@ class Config(BaseConfig, InferenceModelConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
 
-class Model(InferenceModelBase, GO):
+class Model(InferenceModelBase):
     """RNN Inference/model network and Gaussian Observations (RIGO).
 
     Parameters
@@ -191,12 +191,59 @@ class Model(InferenceModelBase, GO):
     """
 
     def __init__(self, config):
-        InferenceModelBase.__init__(self)
-        GO.__init__(self, config)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def get_covariances(self):
+        """Get the covariances of each mode.
+
+        Returns
+        -------
+        np.ndarary
+            Mode covariances.
+        """
+        return go.get_covariances(self.model)
+
+    def get_means_covariances(self):
+        """Get the means and covariances of each mode.
+
+        Returns
+        -------
+        means : np.ndarary
+            Mode means.
+        covariances : np.ndarray
+            Mode covariances.
+        """
+        return go.get_means_covariances(self.model)
+
+    def set_means(self, means, update_initializer=True):
+        """Set the means of each mode.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed means when we re-initialize
+            the model? Optional.
+        """
+        go.set_means(self.model, means, update_initializer)
+
+    def set_covariances(self, covariances, update_initializer=True):
+        """Set the covariances of each mode.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed covariances when we re-initialize
+            the model? Optional.
+        """
+        go.set_covariances(self.model, covariances, update_initializer)
 
     def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
         """Uses the model RNN to sample mode mixing factors, alpha.
@@ -281,7 +328,7 @@ def _model_structure(config):
     inference_input_dropout_layer = layers.Dropout(
         config.inference_dropout_rate, name="data_drop"
     )
-    inference_output_layers = InferenceRNNLayers(
+    inference_output_layers = InferenceRNNLayer(
         config.inference_rnn,
         config.inference_normalization,
         config.inference_activation,
@@ -356,7 +403,7 @@ def _model_structure(config):
     model_input_dropout_layer = layers.Dropout(
         config.model_dropout_rate, name="theta_norm_drop"
     )
-    model_output_layers = ModelRNNLayers(
+    model_output_layers = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
         config.model_activation,

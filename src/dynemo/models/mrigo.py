@@ -8,18 +8,17 @@ from typing import Literal
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from dynemo.models.base import BaseConfig
+from dynemo.models.mod_base import BaseConfig, ModelBase
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
-from dynemo.models.obs_mod_base import ObservationModelBase
 from dynemo.models.layers import (
-    InferenceRNNLayers,
+    InferenceRNNLayer,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     DiagonalMatricesLayer,
     CorrelationMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
-    ModelRNNLayers,
+    ModelRNNLayer,
     NormalizationLayer,
     KLDivergenceLayer,
     KLLossLayer,
@@ -201,7 +200,7 @@ class Config(BaseConfig, InferenceModelConfig):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
 
 
-class Model(InferenceModelBase, ObservationModelBase):
+class Model(InferenceModelBase):
     """Multi-time-scale RNN Inference/model network and Gaussian Observations (MRIGO).
 
     Parameters
@@ -210,8 +209,7 @@ class Model(InferenceModelBase, ObservationModelBase):
     """
 
     def __init__(self, config):
-        InferenceModelBase.__init__(self)
-        ObservationModelBase.__init__(self, config)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
@@ -232,10 +230,7 @@ class Model(InferenceModelBase, ObservationModelBase):
         means_layer = self.model.get_layer("means")
         stds_layer = self.model.get_layer("stds")
         fcs_layer = self.model.get_layer("fcs")
-        means = means_layer(1)
-        stds = stds_layer(1)
-        fcs = fcs_layer(1)
-        return means.numpy(), stds.numpy(), fcs.numpy()
+        return means_layer(1).numpy(), stds_layer(1).numpy(), fcs_layer(1).numpy()
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
@@ -261,14 +256,14 @@ class Model(InferenceModelBase, ObservationModelBase):
         stds = stds.astype(np.float32)
         fcs = fcs.astype(np.float32)
 
-        # Transform the matrices to layer weights
-        diagonals = stds_layer.bijector.inverse(stds)
-        flattened_cholesky_factors = fcs_layer.bijector.inverse(fcs)
-
         # Get layers
         means_layer = self.model.get_layer("means")
         stds_layer = self.model.get_layer("stds")
         fcs_layer = self.model.get_layer("fcs")
+
+        # Transform the matrices to layer weights
+        diagonals = stds_layer.bijector.inverse(stds)
+        flattened_cholesky_factors = fcs_layer.bijector.inverse(fcs)
 
         # Set values
         means_layer.vectors.assign(means)
@@ -306,7 +301,7 @@ def _model_structure(config):
     inference_input_dropout_layer = layers.Dropout(
         config.inference_dropout_rate, name="data_drop_mean"
     )
-    inference_output_layers = InferenceRNNLayers(
+    inference_output_layers = InferenceRNNLayer(
         config.inference_rnn,
         config.inference_normalization,
         config.inference_activation,
@@ -462,7 +457,7 @@ def _model_structure(config):
     model_input_dropout_layer = layers.Dropout(
         config.model_dropout_rate, name="theta_norm_drop"
     )
-    model_output_layer = ModelRNNLayers(
+    model_output_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
         config.model_activation,

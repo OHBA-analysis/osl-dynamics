@@ -7,8 +7,7 @@ from dataclasses import dataclass
 
 import tensorflow as tf
 from tensorflow.keras import layers
-from dynemo.models.base import BaseConfig
-from dynemo.models.obs_mod_base import ObservationModelBase
+from dynemo.models.mod_base import BaseConfig, ModelBase
 from dynemo.models.layers import MultiLayerPerceptronLayer, LogLikelihoodLossLayer
 
 
@@ -74,7 +73,7 @@ class Config(BaseConfig):
             raise ValueError("Please pass mlp_n_units.")
 
 
-class Model(ObservationModelBase):
+class Model(ModelBase):
     """Multi-layer perceptron observation model (NNO).
 
     Parameters
@@ -83,7 +82,7 @@ class Model(ObservationModelBase):
     """
 
     def __init__(self, config):
-        ObservationModelBase.__init__(self, config)
+        ModelBase.__init__(self, config)
 
     def build_model(self):
         """Builds a keras model."""

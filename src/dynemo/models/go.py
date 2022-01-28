@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from dynemo.models.base import BaseConfig
+from dynemo.models.mod_base import BaseConfig, ModelBase
 from dynemo.models.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -15,7 +15,6 @@ from dynemo.models.layers import (
     MixVectorsLayer,
     MixMatricesLayer,
 )
-from dynemo.models.obs_mod_base import ObservationModelBase
 
 
 @dataclass
@@ -78,7 +77,7 @@ class Config(BaseConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
 
-class Model(ObservationModelBase):
+class Model(ModelBase):
     """Gaussian Observations (GO) model.
 
     Parameters
@@ -87,7 +86,7 @@ class Model(ObservationModelBase):
     """
 
     def __init__(self, config):
-        ObservationModelBase.__init__(self, config)
+        super().__init__(config)
 
     def build_model(self):
         """Builds a keras model."""
@@ -101,9 +100,7 @@ class Model(ObservationModelBase):
         np.ndarary
             Mode covariances.
         """
-        covs_layer = self.model.get_layer("covs")
-        covs = covs_layer(1)
-        return covs.numpy()
+        return get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -115,11 +112,7 @@ class Model(ObservationModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        means_layer = self.model.get_layer("means")
-        covs_layer = self.model.get_layer("covs")
-        means = means_layer(1)
-        covs = covs_layer(1)
-        return means.numpy(), covs.numpy()
+        return get_means_covariances(self.model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
@@ -132,14 +125,7 @@ class Model(ObservationModelBase):
             Do we want to use the passed means when we re-initialize
             the model? Optional.
         """
-        means = means.astype(np.float32)
-        means_layer = self.model.get_layer("means")
-        layer_weights = means_layer.means
-        layer_weights.assign(means)
-
-        if update_initializer:
-            means_layer.initial_value = means
-            means_covs_layer.vectors_initializer.initial_value = means
+        set_means(self.model, means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each mode.
@@ -152,20 +138,7 @@ class Model(ObservationModelBase):
             Do we want to use the passed covariances when we re-initialize
             the model? Optional.
         """
-        covariances = covariances.astype(np.float32)
-        covs_layer = self.model.get_layer("covs")
-        layer_weights = covs_layer.flattened_cholesky_matrices
-        flattened_cholesky_matrices = covs_layer.bijector.inverse(covariances)
-        layer_weights.assign(flattened_cholesky_matrices)
-
-        if update_initializer:
-            covs_layer.initial_value = covariances
-            covs_layer.initial_flattened_cholesky_matrices = (
-                flattened_cholesky_matricecs
-            )
-            covs_layer.flattened_cholesky_matrices_initializer.initial_value = (
-                flattened_cholesky_matrices
-            )
+        set_covariances(self.model, covariances, update_initializer)
 
 
 def _model_structure(config):
@@ -207,3 +180,40 @@ def _model_structure(config):
     ll_loss = ll_loss_layer([data, m, C])
 
     return tf.keras.Model(inputs=[data, alpha], outputs=[ll_loss], name="GO")
+
+
+def get_covariances(model):
+    covs_layer = model.get_layer("covs")
+    return covs_layer(1).numpy()
+
+
+def get_means_covariances(model):
+    means_layer = model.get_layer("means")
+    covs_layer = model.get_layer("covs")
+    return means_layer(1).numpy(), covs_layer(1).numpy()
+
+
+def set_means(model, means, update_initializer=True):
+    means = means.astype(np.float32)
+    means_layer = model.get_layer("means")
+    layer_weights = means_layer.means
+    layer_weights.assign(means)
+
+    if update_initializer:
+        means_layer.initial_value = means
+        means_covs_layer.vectors_initializer.initial_value = means
+
+
+def set_covariances(model, covariances, update_initializer=True):
+    covariances = covariances.astype(np.float32)
+    covs_layer = model.get_layer("covs")
+    layer_weights = covs_layer.flattened_cholesky_matrices
+    flattened_cholesky_matrices = covs_layer.bijector.inverse(covariances)
+    layer_weights.assign(flattened_cholesky_matrices)
+
+    if update_initializer:
+        covs_layer.initial_value = covariances
+        covs_layer.initial_flattened_cholesky_matrices = flattened_cholesky_matricecs
+        covs_layer.flattened_cholesky_matrices_initializer.initial_value = (
+            flattened_cholesky_matrices
+        )

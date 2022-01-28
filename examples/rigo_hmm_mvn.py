@@ -77,12 +77,7 @@ model = Model(config)
 model.summary()
 
 print("Training model")
-history = model.fit(
-    training_dataset,
-    epochs=config.n_epochs,
-    save_best_after=config.n_kl_annealing_epochs,
-    save_filepath="tmp/weights",
-)
+history = model.fit(training_dataset, epochs=config.n_epochs)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
@@ -99,6 +94,3 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
-
-# Delete temporary directory
-meg_data.delete_dir()

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import tensorflow
+from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -16,20 +17,16 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from dynemo.data import Data
-from dynemo.inference import callbacks
+from dynemo.inference import callbacks, initializers
 from dynemo.inference.tf_ops import tensorboard_run_logdir
-from dynemo.utils.misc import check_iterable_type
+from dynemo.utils.misc import check_iterable_type, replace_argument
 from dynemo.utils.model import HTMLTable, LatexTable
 
 
-class Base:
+class ModelBase:
     """Base class for all models.
 
     Acts as a wrapper for a standard Keras model.
-
-    Parameters
-    ----------
-    config : dynemo.models.Config
     """
 
     def __init__(self, config):
@@ -51,10 +48,131 @@ class Base:
         """Build a keras model."""
         pass
 
-    @abstractmethod
-    def compile(self):
-        """Wrapper for the standard keras compile method."""
-        pass
+    def compile(self, optimizer: str = None):
+        """Compile the model.
+
+        Parameters
+        ----------
+        optimizer : str or tensorflow.keras.optimizers.Optimizer
+            Optimizer to use when compiling. Optional, if None
+            a new optimizer is created.
+        """
+        if optimizer is None:
+            optimizer = optimizers.get(
+                {
+                    "class_name": self.config.optimizer.lower(),
+                    "config": {
+                        "learning_rate": self.config.learning_rate,
+                        "clipnorm": self.config.gradient_clip,
+                    },
+                }
+            )
+        self.model.compile(optimizer)
+
+    def fit(
+        self,
+        *args,
+        use_tqdm: bool = False,
+        tqdm_class: TqdmCallback = None,
+        use_tensorboard: bool = None,
+        tensorboard_dir: str = None,
+        save_best_after: int = None,
+        save_filepath: str = None,
+        **kwargs,
+    ):
+        """Wrapper for the standard keras fit method.
+
+        Adds callbacks and then trains the model.
+
+        Parameters
+        ----------
+        use_tqdm : bool
+            Should we use a tqdm progress bar instead of the usual output from
+            tensorflow.
+        tqdm_class : TqdmCallback
+            Class for the tqdm progress bar.
+        use_tensorboard : bool
+            Should we use TensorBoard?
+        tensorboard_dir : str
+            Path to the location to save the TensorBoard log files.
+        save_best_after : int
+            Epoch number after which we should save the best model. The best model is
+            that which achieves the lowest loss.
+        save_filepath : str
+            Path to save the best model to.
+        additional_callbacks : list
+            List of keras callback objects. Optional.
+
+        Returns
+        -------
+        history
+            The training history.
+        """
+        additional_callbacks = []
+
+        # Callback to display a progress bar with tqdm
+        if use_tqdm:
+            if tqdm_class is not None:
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+            else:
+                # Create a tqdm class with a progress bar width of 98 characters
+                class tqdm_class(tqdm_auto):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs, ncols=98)
+
+                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+            additional_callbacks.append(tqdm_callback)
+
+        # Callback for Tensorboard visulisation
+        if use_tensorboard:
+            if tensorboard_dir is not None:
+                tensorboard_cb = TensorBoard(
+                    tensorboard_dir, histogram_freq=1, profile_batch="2,10"
+                )
+            else:
+                tensorboard_cb = TensorBoard(
+                    tensorboard_run_logdir(), histogram_freq=1, profile_batch="2,10"
+                )
+            additional_callbacks.append(tensorboard_cb)
+
+        # Callback to save the best model after a certain number of epochs
+        if save_best_after is not None:
+            if save_filepath is None:
+                save_filepath = f"/tmp/model_weights/best_{self._identifier}"
+            save_best_callback = callbacks.SaveBestCallback(
+                save_best_after=save_best_after,
+                filepath=save_filepath,
+            )
+            additional_callbacks.append(save_best_callback)
+
+        # Update arguments/keyword arguments to pass to the fit method
+        args, kwargs = replace_argument(
+            self.model.fit,
+            "callbacks",
+            additional_callbacks,
+            args,
+            kwargs,
+            append=True,
+        )
+        if use_tqdm:
+            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+
+        return self.model.fit(*args, **kwargs)
+
+    def load_weights(self, filepath: str):
+        """Load weights of the model from a file.
+
+        Parameters
+        ----------
+        str
+            Path to file containing model weights.
+        """
+        with self.config.strategy.scope():
+            self.model.load_weights(filepath)
+
+    def reset_weights(self):
+        """Reset the model as if you've built a new model."""
+        initializers.reinitialize_model_weights(self.model)
 
     def _make_dataset(self, inputs: Data):
         """Make a dataset.
@@ -93,91 +211,6 @@ class Base:
                 for subject in inputs
             ]
             return datasets
-
-    def create_callbacks(
-        self,
-        use_tqdm: bool,
-        tqdm_class,
-        use_tensorboard: bool,
-        tensorboard_dir: str,
-        save_best_after: int,
-        save_filepath: str,
-        additional_callbacks: list,
-    ):
-        """Create callbacks for training.
-
-        Parameters
-        ----------
-        use_tqdm : bool
-            Should we use a tqdm progress bar instead of the usual output from
-            tensorflow.
-        tqdm_class : tqdm
-            Class for the tqdm progress bar.
-        use_tensorboard : bool
-            Should we use TensorBoard?
-        tensorboard_dir : str
-            Path to the location to save the TensorBoard log files.
-        save_best_after : int
-            Epoch number after which we should save the best model. The best model is
-            that which achieves the lowest loss.
-        save_filepath : str
-            Path to save the best model to.
-        additional_callbacks : list
-            Callbacks to include during training.
-
-        Returns
-        -------
-        list
-            A list of callbacks to use during training.
-        """
-        # Callback to display a progress bar with tqdm
-        if use_tqdm:
-            if tqdm_class is not None:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-
-            else:
-                # Create a tqdm class with a progress bar width of 98 characters
-                class tqdm_class(tqdm_auto):
-                    def __init__(self, *args, **kwargs):
-                        super().__init__(*args, **kwargs, ncols=98)
-
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-            additional_callbacks.append(tqdm_callback)
-
-        # Callback for Tensorboard visulisation
-        if use_tensorboard:
-            if tensorboard_dir is not None:
-                tensorboard_cb = TensorBoard(
-                    tensorboard_dir, histogram_freq=1, profile_batch="2,10"
-                )
-            else:
-                tensorboard_cb = TensorBoard(
-                    tensorboard_run_logdir(), histogram_freq=1, profile_batch="2,10"
-                )
-            additional_callbacks.append(tensorboard_cb)
-
-        # Callback to save the best model after a certain number of epochs
-        if save_best_after is not None:
-            if save_filepath is None:
-                save_filepath = f"/tmp/model_weights/best_{self._identifier}"
-            save_best_callback = callbacks.SaveBestCallback(
-                save_best_after=save_best_after,
-                filepath=save_filepath,
-            )
-            additional_callbacks.append(save_best_callback)
-
-        return additional_callbacks
-
-    def load_weights(self, filepath: str):
-        """Load weights of the model from a file.
-
-        Parameters
-        ----------
-        str
-            Path to file containing model weights.
-        """
-        with self.config.strategy.scope():
-            self.model.load_weights(filepath)
 
     def summary_string(self):
         stringio = StringIO()
