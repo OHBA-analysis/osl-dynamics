@@ -90,8 +90,10 @@ class Config(BaseConfig, InferenceModelConfig):
         Initial value for the alpha temperature.
     The same parameters are used for beta and gamma time courses.
 
-    Observation Model Parameters
-    ----------------------------
+    Multi-time-scale and Observation Model Parameters
+    -------------------------------------------------
+    separate_rnns : bool
+        Should we have a separate RNN for each time scale?
     fix_std: bool
         Should we have constant std across modes and time?
     tie_mean_std: bool
@@ -163,6 +165,7 @@ class Config(BaseConfig, InferenceModelConfig):
 
     # Observation model parameters
     multiple_scales: bool = True
+    separate_rnns: bool = True
     fix_std: bool = False
     tie_mean_std: bool = False
     learn_means: bool = None
@@ -288,6 +291,20 @@ class Model(InferenceModelBase):
 
 def _model_structure(config):
 
+    # Number of time courses to learn
+    if config.fix_std:
+        # Learn alpha and gamma
+        n_tcs = 2
+    else:
+        # Learn alpha, beta and gamma
+        n_tcs = 3
+
+    # Number of RNNs
+    if config.separate_rnns:
+        n_rnns = n_tcs
+    else:
+        n_rnns = 1
+
     # Layer for input
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
@@ -298,22 +315,47 @@ def _model_structure(config):
     #
 
     # Layers
-    inference_input_dropout_layer = layers.Dropout(
-        config.inference_dropout_rate, name="data_drop_mean"
-    )
-    inference_output_layers = InferenceRNNLayer(
-        config.inference_rnn,
-        config.inference_normalization,
-        config.inference_activation,
-        config.inference_n_layers,
-        config.inference_n_units,
-        config.inference_dropout_rate,
-        name="inf_rnn_mean",
-    )
+    inference_input_dropout_layers = [
+        layers.Dropout(config.inference_dropout_rate, name=f"data_drop_{i}")
+        for i in range(n_rnns)
+    ]
+    inference_output_layers = [
+        InferenceRNNLayer(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout_rate,
+            name=f"inf_rnn_{i}",
+        )
+        for i in range(n_rnns)
+    ]
 
     # Data flow
-    inference_input_dropout = inference_input_dropout_layer(inputs)
-    inference_output = inference_output_layers(inference_input_dropout)
+    inference_input_dropout = [
+        inference_input_dropout_layers[i](inputs) for i in range(n_rnns)
+    ]
+    inference_output = [
+        inference_output_layers[i](inference_input_dropout[i]) for i in range(n_rnns)
+    ]
+    if n_tcs == 2:
+        if n_rnns == 2:
+            mean_inference_output = inference_output[0]
+            fc_inference_output = inference_output[1]
+        else:
+            mean_inference_output = inference_output[0]
+            std_inference_output = inference_output[0]
+            fc_inference_output = inference_output[0]
+    elif n_tcs == 3:
+        if n_rnns == 3:
+            mean_inference_output = inference_output[0]
+            std_inference_output = inference_output[1]
+            fc_inference_output = inference_output[2]
+        else:
+            mean_inference_output = inference_output[0]
+            std_inference_output = inference_output[0]
+            fc_inference_output = inference_output[0]
 
     #
     # Mode time course for the mean
@@ -336,8 +378,8 @@ def _model_structure(config):
     )
 
     # Data flow
-    mean_inf_mu = mean_inf_mu_layer(inference_output)
-    mean_inf_sigma = mean_inf_sigma_layer(inference_output)
+    mean_inf_mu = mean_inf_mu_layer(mean_inference_output)
+    mean_inf_sigma = mean_inf_sigma_layer(mean_inference_output)
     mean_theta = mean_theta_layer([mean_inf_mu, mean_inf_sigma])
     mean_theta_norm = mean_theta_norm_layer(mean_theta)
     alpha = alpha_layer(mean_theta_norm)
@@ -371,8 +413,8 @@ def _model_structure(config):
     if config.fix_std or config.tie_mean_std:
         beta = beta_layer(alpha)
     else:
-        std_inf_mu = std_inf_mu_layer(inference_output)
-        std_inf_sigma = std_inf_sigma_layer(inference_output)
+        std_inf_mu = std_inf_mu_layer(std_inference_output)
+        std_inf_sigma = std_inf_sigma_layer(std_inference_output)
         std_theta = std_theta_layer([std_inf_mu, std_inf_sigma])
         std_theta_norm = std_theta_norm_layer(std_theta)
         beta = beta_layer(std_theta_norm)
@@ -398,8 +440,8 @@ def _model_structure(config):
     )
 
     # Data flow
-    fc_inf_mu = fc_inf_mu_layer(inference_output)
-    fc_inf_sigma = fc_inf_sigma_layer(inference_output)
+    fc_inf_mu = fc_inf_mu_layer(fc_inference_output)
+    fc_inf_sigma = fc_inf_sigma_layer(fc_inference_output)
     fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
     fc_theta_norm = fc_theta_norm_layer(fc_theta)
     gamma = gamma_layer(fc_theta_norm)
@@ -452,28 +494,58 @@ def _model_structure(config):
     # Model RNN
     #
 
+    # Keep sampled theta separate or concatenate depending on the number of RNNs
+    if n_tcs == 2:
+        theta_norm = [mean_theta_norm, fc_theta_norm]
+    else:
+        theta_norm = [mean_theta_norm, std_theta_norm, fc_theta_norm]
+
+    if n_rnns == 1:
+        concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
+        theta_norm = [concatenate_layer(theta_norm)]
+
     # Layers
-    concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
-    model_input_dropout_layer = layers.Dropout(
-        config.model_dropout_rate, name="theta_norm_drop"
-    )
-    model_output_layer = ModelRNNLayer(
-        config.model_rnn,
-        config.model_normalization,
-        config.model_activation,
-        config.model_n_layers,
-        config.model_n_units,
-        config.model_dropout_rate,
-        name="mod_rnn_mean",
-    )
+    model_input_dropout_layers = [
+        layers.Dropout(config.model_dropout_rate, name=f"theta_norm_drop_{i}")
+        for i in range(n_rnns)
+    ]
+    model_output_layers = [
+        ModelRNNLayer(
+            config.model_rnn,
+            config.model_normalization,
+            config.model_activation,
+            config.model_n_layers,
+            config.model_n_units,
+            config.model_dropout_rate,
+            name=f"mod_rnn_{i}",
+        )
+        for i in range(n_rnns)
+    ]
 
     # Data flow
-    if config.fix_std or config.tie_mean_std:
-        theta_norm = concatenate_layer([mean_theta_norm, fc_theta_norm])
+    model_input_dropout = [
+        model_input_dropout_layers[i](theta_norm[i]) for i in range(n_rnns)
+    ]
+    model_output = [
+        model_output_layers[i](model_input_dropout[i]) for i in range(n_rnns)
+    ]
+
+    if n_rnns == 1:
+        if n_tcs == 2:
+            mean_model_output = model_output[0]
+            fc_model_output = model_output[0]
+        else:
+            mean_model_output = model_output[0]
+            std_model_output = model_output[0]
+            fc_model_output = model_output[0]
     else:
-        theta_norm = concatenate_layer([mean_theta_norm, std_theta_norm, fc_theta_norm])
-    model_input_dropout = model_input_dropout_layer(theta_norm)
-    model_output = model_output_layer(model_input_dropout)
+        if n_tcs == 2:
+            mean_model_output = model_output[0]
+            fc_model_output = model_output[1]
+        else:
+            mean_model_output = model_output[0]
+            std_model_output = model_output[1]
+            fc_model_output = model_output[2]
 
     #
     # Mode time course for the mean
@@ -487,8 +559,8 @@ def _model_structure(config):
     kl_div_layer_mean = KLDivergenceLayer(name="mean_kl_div")
 
     # Data flow
-    mean_mod_mu = mean_mod_mu_layer(model_output)
-    mean_mod_sigma = mean_mod_sigma_layer(model_output)
+    mean_mod_mu = mean_mod_mu_layer(mean_model_output)
+    mean_mod_sigma = mean_mod_sigma_layer(mean_model_output)
     mean_kl_div = kl_div_layer_mean(
         [mean_inf_mu, mean_inf_sigma, mean_mod_mu, mean_mod_sigma]
     )
@@ -506,8 +578,8 @@ def _model_structure(config):
         std_kl_div_layer = KLDivergenceLayer(name="std_kl_div")
 
         # Data flow
-        std_mod_mu = std_mod_mu_layer(model_output)
-        std_mod_sigma = std_mod_sigma_layer(model_output)
+        std_mod_mu = std_mod_mu_layer(std_model_output)
+        std_mod_sigma = std_mod_sigma_layer(std_model_output)
         std_kl_div = std_kl_div_layer(
             [std_inf_mu, std_inf_sigma, std_mod_mu, std_mod_sigma]
         )
@@ -524,8 +596,8 @@ def _model_structure(config):
     fc_kl_div_layer = KLDivergenceLayer(name="fc_kl_div")
 
     # Data flow
-    fc_mod_mu = fc_mod_mu_layer(model_output)
-    fc_mod_sigma = fc_mod_sigma_layer(model_output)
+    fc_mod_mu = fc_mod_mu_layer(fc_model_output)
+    fc_mod_sigma = fc_mod_sigma_layer(fc_model_output)
     fc_kl_div = fc_kl_div_layer([fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma])
 
     #

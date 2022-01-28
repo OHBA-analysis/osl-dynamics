@@ -328,7 +328,7 @@ def _model_structure(config):
     inference_input_dropout_layer = layers.Dropout(
         config.inference_dropout_rate, name="data_drop"
     )
-    inference_output_layers = InferenceRNNLayer(
+    inference_output_layer = InferenceRNNLayer(
         config.inference_rnn,
         config.inference_normalization,
         config.inference_activation,
@@ -355,7 +355,7 @@ def _model_structure(config):
 
     # Data flow
     inference_input_dropout = inference_input_dropout_layer(inputs)
-    inference_output = inference_output_layers(inference_input_dropout)
+    inference_output = inference_output_layer(inference_input_dropout)
     inf_mu = inf_mu_layer(inference_output)
     inf_sigma = inf_sigma_layer(inference_output)
     theta = theta_layer([inf_mu, inf_sigma])
@@ -403,7 +403,7 @@ def _model_structure(config):
     model_input_dropout_layer = layers.Dropout(
         config.model_dropout_rate, name="theta_norm_drop"
     )
-    model_output_layers = ModelRNNLayer(
+    model_output_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
         config.model_activation,
@@ -421,7 +421,7 @@ def _model_structure(config):
 
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
-    model_output = model_output_layers(model_input_dropout)
+    model_output = model_output_layer(model_input_dropout)
     mod_mu = mod_mu_layer(model_output)
     mod_sigma = mod_sigma_layer(model_output)
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])

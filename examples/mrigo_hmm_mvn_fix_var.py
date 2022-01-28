@@ -45,7 +45,6 @@ meg_data = data.Data(sim.time_series)
 
 # Hyperparameters
 config = Config(
-    multiple_scales=True,
     n_modes=n_modes,
     n_channels=n_channels,
     sequence_length=200,
@@ -74,6 +73,7 @@ config = Config(
     learning_rate=0.005,
     n_epochs=400,
     fix_std=True,
+    separate_rnns=False,
 )
 
 # Prepare dataset
