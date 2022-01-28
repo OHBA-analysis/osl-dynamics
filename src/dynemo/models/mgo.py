@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from dynemo.models.mod_base import BaseConfig, ModelBase
-from dynemo.models.layers import (
+from dynemo.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     DiagonalMatricesLayer,
@@ -23,8 +23,8 @@ from dynemo.models.layers import (
 class Config(BaseConfig):
     """Settings for MGO.
 
-    Dimension Parameters
-    --------------------
+    Parameters
+    ----------
     n_modes : int
         Number of modes.
     n_channels : int
@@ -32,8 +32,6 @@ class Config(BaseConfig):
     sequence_length : int
         Length of sequence passed to the generative model.
 
-    Observation Model Parameters
-    ----------------------------
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
     learn_covariances : bool
@@ -43,8 +41,6 @@ class Config(BaseConfig):
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
 
-    Training Parameters
-    -------------------
     batch_size : int
         Mini-batch size.
     learning_rate : float

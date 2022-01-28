@@ -11,7 +11,7 @@ from tensorflow.keras import layers
 from dynemo.models import mgo
 from dynemo.models.mod_base import BaseConfig, ModelBase
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
-from dynemo.models.layers import (
+from dynemo.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -35,8 +35,8 @@ from dynemo.models.layers import (
 class Config(BaseConfig, InferenceModelConfig):
     """Settings for MRIGO.
 
-    Dimension Parameters
-    --------------------
+    Parameters
+    ----------
     n_modes : int
         Number of modes.
     n_channels : int
@@ -44,8 +44,6 @@ class Config(BaseConfig, InferenceModelConfig):
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
 
-    Inference Network Parameters
-    ----------------------------
     inference_rnn : str
         RNN to use, either 'gru' or 'lstm'.
     inference_n_layers : int
@@ -60,8 +58,6 @@ class Config(BaseConfig, InferenceModelConfig):
     inference_dropout_rate : float
         Dropout rate.
 
-    Model Network Parameters
-    ------------------------
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
     model_n_layers : int
@@ -76,8 +72,6 @@ class Config(BaseConfig, InferenceModelConfig):
     model_dropout_rate : float
         Dropout rate.
 
-    Alpha, Beta, Gamma Parameters
-    -----------------------------
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
@@ -90,8 +84,6 @@ class Config(BaseConfig, InferenceModelConfig):
         Initial value for the alpha temperature.
     The same parameters are used for beta and gamma time courses.
 
-    Observation Model Parameters
-    ----------------------------
     learn_means : bool
         Should we make the standard deviation for each mode trainable?
     learn_stds: bool
@@ -103,8 +95,6 @@ class Config(BaseConfig, InferenceModelConfig):
     initial_fcs: np.ndarray
         Initialisation for mode functional connectivity matrices.
 
-    KL Annealing Parameters
-    -----------------------
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
@@ -115,15 +105,11 @@ class Config(BaseConfig, InferenceModelConfig):
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
-    Initialization Parameters
-    -------------------------
     n_init : int
         Number of initializations.
     n_init_epochs : int
         Number of epochs to train each initialization.
 
-    Training Parameters
-    -------------------
     batch_size : int
         Mini-batch size.
     learning_rate : float

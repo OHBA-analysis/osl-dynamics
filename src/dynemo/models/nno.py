@@ -8,15 +8,15 @@ from dataclasses import dataclass
 import tensorflow as tf
 from tensorflow.keras import layers
 from dynemo.models.mod_base import BaseConfig, ModelBase
-from dynemo.models.layers import MultiLayerPerceptronLayer, LogLikelihoodLossLayer
+from dynemo.inference.layers import MultiLayerPerceptronLayer, LogLikelihoodLossLayer
 
 
 @dataclass
 class Config(BaseConfig):
     """Settings for NNO.
 
-    Dimension Parameters
-    --------------------
+    Parameters
+    ----------
     n_modes : int
         Number of modes.
     n_channels : int
@@ -24,8 +24,6 @@ class Config(BaseConfig):
     sequence_length : int
         Length of sequence passed to the generative model.
 
-    Observation Model Parameters
-    ----------------------------
     mlp_n_layers : int
         Number of layers.
     mlp_n_units : int
@@ -37,8 +35,6 @@ class Config(BaseConfig):
     mlp_dropout_rate : str
         Dropout rate.
 
-    Training Parameters
-    -------------------
     batch_size : int
         Mini-batch size.
     learning_rate : float
