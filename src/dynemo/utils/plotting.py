@@ -165,31 +165,31 @@ def plot_line(
     labels : list of str
         Legend labels for each line.
     legend_loc : int
-        Matplotlib legend location identifier. Optional. Default is top right.
+        Matplotlib legend location identifier. Default is top right.
     errors : list with 2 items
-        Min and max errors. Optional.
+        Min and max errors.
     x_range : list
-        Minimum and maximum for x-axis. Optional.
+        Minimum and maximum for x-axis.
     y_range : list
-        Minimum and maximum for y-axis. Optional.
+        Minimum and maximum for y-axis.
     x_label : str
-        Label for x-axis. Optional.
+        Label for x-axis.
     y_label : str
-        Label for y-axis. Optional.
+        Label for y-axis.
     log_xscale : bool
-        Should we log the x-axis? Optional.
+        Should we log the x-axis?
     log_yscale : bool
-        Should we log the y-axis? Optional.
+        Should we log the y-axis?
     title : str
-        Figure title. Optional.
+        Figure title.
     plot_kwargs : dict
-        Arguments to pass to the ax.plot method. Optional.
+        Arguments to pass to the ax.plot method.
     fig_kwargs : dict
-        Arguments to pass to plt.subplots. Optional.
+        Arguments to pass to plt.subplots.
     ax : matplotlib.axes.axes
-        Axis object to plot on. Optional.
+        Axis object to plot on.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
 
     # Validation
@@ -308,29 +308,29 @@ def plot_scatter(
     labels : list of str
         Legend labels for each line.
     legend_loc : int
-        Matplotlib legend location identifier. Optional. Default is top right.
+        Matplotlib legend location identifier. Default is top right.
     errors : list
-        Error bars. Optional.
+        Error bars.
     x_range : list
-        Minimum and maximum for x-axis. Optional.
+        Minimum and maximum for x-axis.
     y_range : list
-        Minimum and maximum for y-axis. Optional.
+        Minimum and maximum for y-axis.
     x_label : str
-        Label for x-axis. Optional.
+        Label for x-axis.
     y_label : str
-        Label for y-axis. Optional.
+        Label for y-axis.
     title : str
-        Figure title. Optional.
+        Figure title.
     markers : list of str
-        Markers to used for each set of data points. Optional.
+        Markers to used for each set of data points.
     plot_kwargs : dict
-        Arguments to pass to the ax.scatter method. Optional.
+        Arguments to pass to the ax.scatter method.
     fig_kwargs : dict
-        Arguments to pass to plt.subplots. Optional.
+        Arguments to pass to plt.subplots.
     ax : matplotlib.axes.Axes
-        Axis object to plot on. Optional.
+        Axis object to plot on.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
 
     # Validation
@@ -444,25 +444,25 @@ def plot_hist(
     labels : list of str
         Legend labels for each line.
     legend_loc : int
-        Matplotlib legend location identifier. Optional. Default is top right.
+        Matplotlib legend location identifier. Default is top right.
     x_range : list
-        Minimum and maximum for x-axis. Optional.
+        Minimum and maximum for x-axis.
     y_range : list
-        Minimum and maximum for y-axis. Optional.
+        Minimum and maximum for y-axis.
     x_label : str
-        Label for x-axis. Optional.
+        Label for x-axis.
     y_label : str
-        Label for y-axis. Optional.
+        Label for y-axis.
     title : str
-        Figure title. Optional.
+        Figure title.
     plot_kwargs : dict
-        Arguments to pass to the ax.hist method. Optional.
+        Arguments to pass to the ax.hist method.
     fig_kwargs : dict
-        Arguments to pass to plt.subplots. Optional.
+        Arguments to pass to plt.subplots.
     ax : matplotlib.axes.Axes
-        Axis object to plot on. Optional.
+        Axis object to plot on.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
 
     # Validation
@@ -550,25 +550,25 @@ def plot_bar_chart(
     counts : list of np.ndarray
         Data to plot.
     x : list or np.ndarray
-        x-values for counts. Optional.
+        x-values for counts.
     x_range : list
-        Minimum and maximum for x-axis. Optional.
+        Minimum and maximum for x-axis.
     y_range : list
-        Minimum and maximum for y-axis. Optional.
+        Minimum and maximum for y-axis.
     x_label : str
-        Label for x-axis. Optional.
+        Label for x-axis.
     y_label : str
-        Label for y-axis. Optional.
+        Label for y-axis.
     title : str
-        Figure title. Optional.
+        Figure title.
     plot_kwargs : dict
-        Arguments to pass to the ax.bar method. Optional.
+        Arguments to pass to the ax.bar method.
     fig_kwargs : dict
-        Arguments to pass to plt.subplots. Optional.
+        Arguments to pass to plt.subplots.
     ax : matplotlib.axes.Axes
-        Axis object to plot on. Optional.
+        Axis object to plot on.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
 
     # Validation
@@ -651,25 +651,25 @@ def plot_gmm(
     variances : np.ndarray
         Variance of each Gaussian component.
     bins : list of int
-        Number of bins for the historgram. Optional.
+        Number of bins for the historgram.
     x_range : list
-        Minimum and maximum for x-axis. Optional.
+        Minimum and maximum for x-axis.
     y_range : list
-        Minimum and maximum for y-axis. Optional.
+        Minimum and maximum for y-axis.
     x_label : str
-        Label for x-axis. Optional.
+        Label for x-axis.
     y_label : str
-        Label for y-axis. Optional.
+        Label for y-axis.
     title : str
-        Figure title. Optional.
+        Figure title.
     plot_kwargs : dict
-        Arguments to pass to the ax.hist method. Optional.
+        Arguments to pass to the ax.hist method.
     fig_kwargs : dict
-        Arguments to pass to plt.subplots. Optional.
+        Arguments to pass to plt.subplots.
     ax : matplotlib.axes.Axes
-        Axis object to plot on. Optional.
+        Axis object to plot on.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
 
     # Validation
@@ -748,31 +748,31 @@ def plot_violin(
     data : list of np.ndarray
         Data to plot.
     show_mean : bool
-        Should we show the mean? Default is True.
+        Should we show the mean?
     show_median : bool
-        Should we show the median? Default is True.
+        Should we show the median?
     legend_loc : int
-        Position for the legend. Optional.
+        Position for the legend.
     x : list or np.ndarray
-        x-values for data. Optional.
+        x-values for data.
     x_range : list
-        Minimum and maximum for x-axis. Optional.
+        Minimum and maximum for x-axis.
     y_range : list
-        Minimum and maximum for y-axis. Optional.
+        Minimum and maximum for y-axis.
     x_label : str
-        Label for x-axis. Optional.
+        Label for x-axis.
     y_label : str
-        Label for y-axis. Optional.
+        Label for y-axis.
     title : str
-        Figure title. Optional.
+        Figure title.
     plot_kwargs : dict
-        Arguments to pass to the ax.violinplot method. Optional.
+        Arguments to pass to the ax.violinplot method.
     fig_kwargs : dict
-        Arguments to pass to plt.subplots. Optional.
+        Arguments to pass to plt.subplots.
     ax : matplotlib.axes.axes
-        Axis object to plot on. Optional.
+        Axis object to plot on.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
 
     # Validation
@@ -1020,7 +1020,7 @@ def plot_epoched_time_series(
     post : int
         The integer number of samples to include after the trigger.
     legend : bool
-        Should a legend be created. Optional, default is True.
+        Should a legend be created.
     legend_loc : int
         Location of the legend.
     title : str
@@ -1114,9 +1114,9 @@ def plot_matrices(
     cmap: str
         Matplotlib colormap.
     nan_color: str
-        Matplotlib color to use for NaN values. Default is white.
+        Matplotlib color to use for NaN values.
     log_norm: bool
-        Should we show the elements on a log scale? Default is False.
+        Should we show the elements on a log scale?
     filename: str
         A file to which to save the figure.
     """
@@ -1379,11 +1379,11 @@ def topoplot(
     axis: matplotlib.pyplot.Axes
         matplotlib axis to plot on.
     cmap: str
-        matplotlib colourmap. Defaults to 'plasma'
+        matplotlib colourmap.
     n_contours: int
-        number of field isolines to show on the plot. Defaults to 10.
+        number of field isolines to show on the plot.
     filename : str
-        Output filename. Optional.
+        Output filename.
     """
     topology = Topology(layout)
 

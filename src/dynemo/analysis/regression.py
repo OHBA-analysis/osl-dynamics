@@ -25,7 +25,7 @@ def linear(
     fit_intercept : bool
         Should we fit an intercept?
     normalize : bool
-        Should we z-transform the regressors? Optional.
+        Should we z-transform the regressors?
 
     Returns
     -------

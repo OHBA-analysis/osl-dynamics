@@ -123,7 +123,7 @@ class Model(ModelBase):
             Mode covariances.
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
-            the model? Optional.
+            the model?
         """
         set_means(self.model, means, update_initializer)
 
@@ -136,7 +136,7 @@ class Model(ModelBase):
             Mode covariances.
         update_initializer : bool
             Do we want to use the passed covariances when we re-initialize
-            the model? Optional.
+            the model?
         """
         set_covariances(self.model, covariances, update_initializer)
 

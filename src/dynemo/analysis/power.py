@@ -31,10 +31,9 @@ def variance_from_spectra(
         Power/cross spectra for each channel.
         Can be an (n_channels, n_channels) array or (n_channels,) array.
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f). Optional.
+        Spectral components. Shape is (n_components, n_f).
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz).
-        Optional: default is full range.
+        Frequency range to integrate the PSD over (Hz). Default is full range.
 
     Returns
     -------
@@ -229,15 +228,14 @@ def save(
     parcellation_file : str
         Parcellation file used to parcelate the training data.
     component : int
-        Spectral component to save. Optional.
+        Spectral component to save.
     subtract_mean : bool
-        Should we subtract the mean power across modes? Optional: default is False.
+        Should we subtract the mean power across modes?
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
-        Optional, default is equal weighting.
+        Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
-        Optional.
     """
     # Validation
     if ".nii.gz" not in filename and ".png" not in filename:

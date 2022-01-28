@@ -30,9 +30,8 @@ def time_courses(
         or (n_samples, n_modes).
     concatenate : bool
         If alpha is a list, should we concatenate the mode time course?
-        Optional, default is True.
     n_modes : int
-        Number of modes there should be. Optional.
+        Number of modes there should be.
 
     Returns
     -------
@@ -105,10 +104,9 @@ def match_covariances(
         Each covariance must be (n_modes, n_channel, n_channels).
     comparison : str
         Either 'rv_coefficient', 'correlation' or 'frobenius'.
-        Optional, default is 'rv_coefficient'.
+        Default is 'rv_coefficient'.
     return_order : bool
         Should we return the order instead of the covariances?
-        Optional, default is False.
 
     Returns
     -------
@@ -284,7 +282,7 @@ def lifetimes(
     mode_time_course : numpy.ndarray
         Mode time course (strictly binary).
     sampling_frequency : float
-        Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
+        Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
     -------
@@ -312,7 +310,7 @@ def lifetime_statistics(
     mode_time_course : list or np.ndarray
         Mode time course. Shape is (n_samples, n_modes).
     sampling_frequency : float
-        Sampling frequency in Hz. Optional. If passed returns the lifetimes in seconds.
+        Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
     -------
@@ -340,7 +338,7 @@ def intervals(
     mode_time_course : list or numpy.ndarray
         Mode time course (strictly binary).
     sampling_frequency : float
-        Sampling frequency in Hz. Optional. If passed returns the intervals in seconds.
+        Sampling frequency in Hz. If passed returns the intervals in seconds.
 
     Returns
     -------
@@ -396,7 +394,7 @@ def fano_factor(
     window_lengths : list or np.ndarray
         Window lengths to use.
     sampling_frequency : float
-        Sampling frequency of the time courses. Optional.
+        Sampling frequency of the time courses.
 
     Returns
     -------

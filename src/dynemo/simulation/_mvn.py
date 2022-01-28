@@ -173,7 +173,7 @@ class MS_MVN(MVN):
     random_seed : int
         Seed for the random number generator.
     uni_std : bool
-        Do we want the same standard deviation across channels? Optional.
+        Do we want the same standard deviation across channels?
     """
 
     def __init__(

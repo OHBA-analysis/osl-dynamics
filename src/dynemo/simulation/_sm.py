@@ -109,7 +109,7 @@ class MixedSine_MVN(Simulation):
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
-        Seed for random number generator. Optional.
+        Seed for random number generator.
     """
 
     def __init__(

@@ -125,14 +125,13 @@ class Manipulation:
         Parameters
         ----------
         n_embeddings : int
-            Number of data points to embed the data. Optional, default is 1.
+            Number of data points to embed the data.
         n_pca_components : int
-            Number of PCA components to keep. Optional, default is no PCA.
+            Number of PCA components to keep. Default is no PCA.
         pca_components : np.ndarray
             PCA components to apply if they have already been calculated.
-            Optional.
         whiten : bool
-            Should we whiten the PCA'ed data? Optional, default is False.
+            Should we whiten the PCA'ed data?
         """
         if self.prepared:
             _logger.warning("Previously prepared data will be overwritten.")
@@ -255,8 +254,7 @@ class Manipulation:
         n_embeddings : int
             Number of data points to embed the data.
         concatenate : bool
-            Should we concatenate the data for each subject? Optional, default
-            is False.
+            Should we concatenate the data for each subject?
 
         Returns
         -------
@@ -314,7 +312,7 @@ def standardize(
         Axis on which to perform the transformation.
     create_copy : bool
         Should we return a new array containing the standardized data or modify
-        the original time series array? Optional, default is True.
+        the original time series array?
     """
     mean = np.mean(time_series, axis=axis)
     std = np.std(time_series, axis=axis)
@@ -372,11 +370,10 @@ def trim_time_series(
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
     discontinuities : list of int
-        Length of each subject's data. Optional. If nothing is passed we
-        assume the entire time series is continuous.
+        Length of each subject's data. If nothing is passed we assume the entire
+        time series is continuous.
     concatenate : bool
-        Should we concatenate the data for segment? Optional, default
-        is False.
+        Should we concatenate the data for segment?
 
     Returns
     -------

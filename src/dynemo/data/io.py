@@ -23,15 +23,15 @@ class IO:
         Filenames to be read.
     data_field : str
         If a MATLAB filename is passed, this is the field that corresponds to the
-        data. Optional. By default we read the field 'X'.
+        data. By default we read the field 'X'.
     sampling_frequency : float
-        Sampling frequency of the data in Hz. Optional.
+        Sampling frequency of the data in Hz.
     store_dir : str
-        Directory to save results and intermediate steps to. Optional, default is /tmp.
+        Directory to save results and intermediate steps to. Default is /tmp.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)?
     keep_memmaps_on_close : bool
-        Should we keep the memmaps? Optional, default is False.
+        Should we keep the memmaps?
     """
 
     def __init__(
@@ -179,7 +179,7 @@ class IO:
         Parameters
         ----------
         output_dir : str
-            Path to save data files to. Optional, default is the current working
+            Path to save data files to. Default is the current working
             directory.
         """
         output_dir = pathlib.Path(output_dir)
@@ -226,7 +226,7 @@ def list_dir(path: str, keep_ext: Union[str, list] = None) -> list:
     path : str
         Directory to list.
     keep_ext : str or list
-        Extensions of files to include in the returned list. Optional, default
+        Extensions of files to include in the returned list. Default
         is to include add files.
 
     Returns
@@ -267,7 +267,7 @@ def load_data(
     mmap_location : str
         Filename to save the data as a numpy memory map.
     mmap_mode : str
-        Mode to load memory maps in. Optional, default is 'r+'.
+        Mode to load memory maps in. Default is 'r+'.
 
     Returns
     -------
@@ -361,7 +361,7 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[dict, np.ndarray]
     filename : str
         Filename of MATLAB file to read.
     return_dict : bool
-        If there's only one field should we return a dictionary. Optional.
+        If there's only one field should we return a dictionary.
         Default is to return a numpy array if there is only one field.
         If there are multiple fields, a dictionary is always returned.
 

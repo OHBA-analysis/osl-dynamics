@@ -26,12 +26,11 @@ class HMM:
         'uniform') to generate a transition probability matrix.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
-        Optional.
     n_modes : int
         Number of modes. Needed when trans_prob is a str to construct the
-        transition probability matrix. Optional.
+        transition probability matrix.
     random_seed : int
-        Seed for random number generator. Optional.
+        Seed for random number generator.
     """
 
     def __init__(
@@ -155,9 +154,8 @@ class HMM_MAR(Simulation):
         Variance of eps_t. Shape must be (n_modes, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
-        Optional.
     random_seed : int
-        Seed for random number generator. Optional.
+        Seed for random number generator.
     """
 
     def __init__(
@@ -226,11 +224,10 @@ class HMM_MVN(Simulation):
         Number of channels.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
-        Optional.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
-        Seed for random number generator. Optional.
+        Seed for random number generator.
     """
 
     def __init__(
@@ -311,16 +308,15 @@ class MS_HMM_MVN(Simulation):
         Number of channels.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
-        Optional.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
-        Seed for random number generator. Optional.
+        Seed for random number generator.
     fix_std: bool
         Do we want to remove dependency of loss function on standard deviation
-        time course? Optional.
+        time course?
     uni_std: bool
-        Do we want the same standard deviation across channels? Optional.
+        Do we want the same standard deviation across channels?
     """
 
     def __init__(
@@ -574,11 +570,10 @@ class HMM_Sine(Simulation):
         or (n_modes, n_channels, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
-        Optional.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
-        Seed for random number generator. Optional.
+        Seed for random number generator.
     """
 
     def __init__(

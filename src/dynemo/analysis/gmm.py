@@ -23,15 +23,15 @@ def fit_gaussian_mixture(
     X : np.ndarray
         Data to fit Gaussian mixture model to.
     plot_filename : str
-        Filename to save a plot of the Gaussian mixture model. Optional.
+        Filename to save a plot of the Gaussian mixture model.
     print_message : bool
-        Should we print a message? Optional.
+        Should we print a message?
     bayesian : bool
-        Should we fit a Bayesian GMM? Optional.
+        Should we fit a Bayesian GMM?
     label_order: str
         How do we order the inferred classes?
     **kwargs
-        Keyword argument to pass to the sklearn class. Optional.
+        Keyword argument to pass to the sklearn class.
 
     Returns
     -------
@@ -72,7 +72,13 @@ def fit_gaussian_mixture(
 
     # Plots
     if plot_filename is not None:
-        plotting.plot_gmm(X[:, 0], amplitudes[order], means[order], variances[order], filename=plot_filename)
+        plotting.plot_gmm(
+            X[:, 0],
+            amplitudes[order],
+            means[order],
+            variances[order],
+            filename=plot_filename,
+        )
 
     # Which component does each data point correspond to
     y = gm.predict(X)
@@ -80,10 +86,10 @@ def fit_gaussian_mixture(
     # Deal with label switching
     if label_order == "mean":
         if means[0] > means[1]:
-            # 1 -> 0; 0 -> 1 
-            y = (1-y).astype(int)
+            # 1 -> 0; 0 -> 1
+            y = (1 - y).astype(int)
     if label_order == "variance":
         if variances[0] > variances[1]:
-            y = (1-y).astype(int)
+            y = (1 - y).astype(int)
 
     return y

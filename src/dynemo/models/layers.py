@@ -461,7 +461,7 @@ class LogLikelihoodLossLayer(layers.Layer):
     Parameters
     ----------
     diag_cov : bool
-        Are the covariances diagonal? Optional.
+        Are the covariances diagonal?
     """
 
     def __init__(self, diag_cov: bool = False, **kwargs):

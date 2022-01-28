@@ -44,21 +44,18 @@ class TensorFlowDataset:
             Number sequences in each mini-batch which is used to train the model.
         shuffle : bool
             Should we shuffle sequences (within a batch) and batches.
-            Optional, default is True.
         validation_split : float
             Ratio to split the dataset into a training and validation set.
-            Optional, default returns the entire data.
         alpha : list of np.ndarray
-            List of mode mixing factors for each subject. Optional.
+            List of mode mixing factors for each subject.
             If passed, we create a dataset that includes alpha at each time point.
             Such a dataset can be used to train the observation model.
         n_alpha_embeddings : int
-            Number of embeddings used when inferring alpha. Optional.
+            Number of embeddings used when inferring alpha.
         concatenate : bool
-            Should we concatenate the datasets for each subject? Optional, the
-            default is True.
+            Should we concatenate the datasets for each subject?
         subj_id : bool
-            Should we include the subject id in the dataset? Optional.
+            Should we include the subject id in the dataset?
 
         Returns
         -------
@@ -233,7 +230,6 @@ def concatenate_datasets(
         List of Tensorflow datasets.
     Shuffle : bool
         Should we shuffle the final concatenated dataset?
-        Optional, default is True.
 
     Returns
     -------

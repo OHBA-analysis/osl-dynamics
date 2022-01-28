@@ -85,7 +85,7 @@ def raw_covariances(
         PCA components used for dimensionality reduction.
     zero_lag : bool
         Should we return just the zero-lag elements? Otherwise, we return
-        the mean over time lags. Optional, default is False.
+        the mean over time lags.
 
     Returns
     -------

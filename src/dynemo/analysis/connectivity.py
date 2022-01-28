@@ -31,10 +31,9 @@ def covariance_from_spectra(
         Power/cross spectra for each channel. Shape is (n_modes, n_channels,
         n_channels, n_f).
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f). Optional.
+        Spectral components. Shape is (n_components, n_f).
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Optional: default is full
-        range.
+        Frequency range to integrate the PSD over (Hz). Default is full range.
 
     Returns
     -------
@@ -119,14 +118,14 @@ def mean_coherence_from_spectra(
         Coherence for each channel. Shape is (n_modes, n_channels,
         n_channels, n_f).
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f). Optional.
+        Spectral components. Shape is (n_components, n_f).
     frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Optional.
+        Frequency range to integrate the PSD over (Hz).
     fit_gmm : bool
         Should we fit a two component Gaussian mixture model and only keep
-        one of the components. Optional.
+        one of the components.
     gmm_filename : str
-        Filename to save GMM plot. Optional. Only used if fit_gmm=True.
+        Filename to save GMM plot. Only used if fit_gmm=True.
 
     Returns
     -------
@@ -262,7 +261,7 @@ def save(
     parcellation_file : str
         Name of parcellation file used.
     component : int
-        Spectral component to save. Optional.
+        Spectral component to save.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_connectome.
     """
@@ -280,7 +279,7 @@ def save(
 
     if threshold > 1 or threshold < 0:
         raise ValueError("threshold must be between 0 and 1.")
-    
+
     if component is None:
         component = 0
 
@@ -290,9 +289,8 @@ def save(
     # Select the component we're plotting
     conn_map = connectivity_map[component]
 
-
     if gmm:
-        threshold = gmm_threshold(conn_map, threshold, plot_filename = f"{filename}")
+        threshold = gmm_threshold(conn_map, threshold, plot_filename=f"{filename}")
 
     # Default plotting settings
     default_plot_kwargs = {
@@ -330,7 +328,7 @@ def save(
 
 
 def gmm_threshold(connectivity_map, threshold, plot_filename):
-    """ Fit a 2 component GMM to the connectivities.
+    """Fit a 2 component GMM to the connectivities.
     Let the class with smaller variance be the background distribution.
 
 
@@ -345,7 +343,7 @@ def gmm_threshold(connectivity_map, threshold, plot_filename):
     gmm_threshold = np.zeros([n_modes])
 
     for i in range(n_modes):
-        flattened_connectivity_map = connectivity_map[i][m,n]
+        flattened_connectivity_map = connectivity_map[i][m, n]
 
         gmm_plot_filename = "{fn.parent}/{fn.stem}fit_{i:0{w}d}{fn.suffix}".format(
             fn=Path(plot_filename), i=i, w=len(str(n_modes))
@@ -360,12 +358,14 @@ def gmm_threshold(connectivity_map, threshold, plot_filename):
             n_init=10,
         )
         background_connectivities = flattened_connectivity_map[connectivity_label == 0]
-        upper_threshold = np.quantile(background_connectivities, 1 - (1 - threshold) / 2)
+        upper_threshold = np.quantile(
+            background_connectivities, 1 - (1 - threshold) / 2
+        )
         lower_threshold = np.quantile(background_connectivities, (1 - threshold) / 2)
-        
+
         upper_quantile = np.mean(connectivity_map[i] > upper_threshold)
         lower_quantile = np.mean(connectivity_map[i] < lower_threshold)
-        
+
         # We want to be conservative and show less edges
         gmm_threshold[i] = 1 - 2 * np.minimum(upper_quantile, lower_quantile)
 

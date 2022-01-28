@@ -20,7 +20,7 @@ class DiceCoefficientCallback(callbacks.Callback):
         2D or 3D numpy array containing the ground truth mode time
         course of the training data.
     mode_names : list of str
-        Names for the mode time courses. Optional.
+        Names for the mode time courses.
     """
 
     def __init__(
@@ -113,7 +113,6 @@ class KLAnnealingCallback(callbacks.Callback):
         Number of epochs to apply annealing.
     n_cycles : int
         Number of times to perform KL annealing with n_annealing_epochs.
-        Optional.
     """
 
     def __init__(

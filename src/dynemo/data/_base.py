@@ -23,17 +23,17 @@ class Data(IO, Manipulation, TensorFlowDataset):
         Filenames to be read.
     matlab_field : str
         If a MATLAB filename is passed, this is the field that corresponds to the data.
-        Optional. By default we read the field 'X'.
+        By default we read the field 'X'.
     sampling_frequency : float
-        Sampling frequency of the data in Hz. Optional.
+        Sampling frequency of the data in Hz.
     store_dir : str
-        Directory to save results and intermediate steps to. Optional, default is /tmp.
+        Directory to save results and intermediate steps to. Default is /tmp.
     n_embeddings : int
-        Number of embeddings. Optional. Can be passed if data has already been prepared.
+        Number of embeddings. Can be passed if data has already been prepared.
     time_axis_first : bool
-        Is the input data of shape (n_samples, n_channels)? Optional, default is True.
+        Is the input data of shape (n_samples, n_channels)?
     keep_memmaps_on_close : bool
-        Should we keep the memmaps? Optional, default is False.
+        Should we keep the memmaps?
     """
 
     def __init__(
@@ -117,7 +117,6 @@ class Data(IO, Manipulation, TensorFlowDataset):
         ----------
         concatenate : bool
             Should we return the time series for each subject concatenated?
-            Optional, default is False.
 
         Returns
         -------

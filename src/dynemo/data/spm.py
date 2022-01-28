@@ -10,7 +10,7 @@ class SPM:
     filename : str
         Path to SPM file.
     load_data : bool
-        Should we load the data? Optional, default is True.
+        Should we load the data?
     """
 
     def __init__(self, filename: str, load_data: bool = True):

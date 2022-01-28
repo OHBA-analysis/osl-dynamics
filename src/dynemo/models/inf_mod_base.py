@@ -34,7 +34,7 @@ class InferenceModelBase(ModelBase):
         *args
             Arguments for ModelBase.fit().
         kl_annealing_callback : bool
-            Should we update the KL annealing factor during training? Optional.
+            Should we update the KL annealing factor during training?
         **kwargs
             Keyword arguments for ModelBase.fit()
 
@@ -131,7 +131,7 @@ class InferenceModelBase(ModelBase):
         Parameters
         ----------
         keep : list of str
-            Layer names to NOT reset. Optional.
+            Layer names to NOT reset.
         """
         initializers.reinitialize_model_weights(self.model, keep)
         if self.config.do_kl_annealing:
@@ -167,8 +167,7 @@ class InferenceModelBase(ModelBase):
         inputs : tensorflow.data.Dataset
             Prediction dataset.
         concatenate : bool
-            Should we concatenate alpha for each subject? Optional, default
-            is False.
+            Should we concatenate alpha for each subject?
 
         Returns
         -------
@@ -207,8 +206,7 @@ class InferenceModelBase(ModelBase):
         inputs : tensorflow.data.Dataset
             Prediction dataset.
         concatenate : bool
-            Should we concatenate alpha for each subject? Optional, default
-            is False.
+            Should we concatenate alpha for each subject?
 
         Returns
         -------

@@ -228,7 +228,7 @@ class Model(InferenceModelBase):
             Mode covariances.
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
-            the model? Optional.
+            the model?
         """
         go.set_means(self.model, means, update_initializer)
 
@@ -241,7 +241,7 @@ class Model(InferenceModelBase):
             Mode covariances.
         update_initializer : bool
             Do we want to use the passed covariances when we re-initialize
-            the model? Optional.
+            the model?
         """
         go.set_covariances(self.model, covariances, update_initializer)
 
@@ -254,7 +254,7 @@ class Model(InferenceModelBase):
             Number of samples to take.
         theta_norm : np.ndarray
             Normalized logits to initialise the sampling with. Shape must be
-            (sequence_length, n_modes). Optional.
+            (sequence_length, n_modes).
 
         Returns
         -------

@@ -246,7 +246,7 @@ class Model(InferenceModelBase):
             Mode functional connectivities with shape (n_modes, n_channels, n_channels).
         update_initializer: bool
             Do we want to use the passed parameters when we re_initialize
-            the model? Optional.
+            the model?
         """
         if stds.ndim == 3:
             # Only keep the diagonal as a vector

@@ -81,11 +81,10 @@ class OSL_HMM:
         Parameters
         ----------
         concatenate : bool
-            Should we concatenate the alphas for each subejcts? Optional, default is
-            False.
+            Should we concatenate the alphas for each subejcts?
         pad : int
             Pad the alpha for each subject with zeros to replace the data points lost
-            by performing n_embeddings. Optional, default is no padding.
+            by performing n_embeddings. Default is no padding.
         """
         if self.gamma is None:
             return None
@@ -124,11 +123,10 @@ class OSL_HMM:
         Parameters
         ----------
         concatenate : bool
-            Should we concatenate the mode time course for each subjects? Optional,
-            default is False.
+            Should we concatenate the mode time course for each subjects?
         pad : int
             Pad the mode time course for each subject with zeros to replace the data
-            points lost by performing n_embeddings. Optional, default is no padding.
+            points lost by performing n_embeddings. Default is no padding.
         """
         if self.vpath is None:
             return None
