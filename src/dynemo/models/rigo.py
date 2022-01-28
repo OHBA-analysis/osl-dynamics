@@ -2,9 +2,7 @@
 
 """
 
-import logging
 from dataclasses import dataclass
-from operator import lt
 from typing import Literal
 
 import numpy as np
@@ -28,9 +26,6 @@ from dynemo.models.layers import (
     SampleNormalDistributionLayer,
     ThetaActivationLayer,
 )
-from dynemo.utils.misc import check_arguments
-
-_logger = logging.getLogger("DyNeMo")
 
 
 @dataclass
@@ -205,61 +200,6 @@ class Model(InferenceModelBase, GO):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
-
-    def burn_in(
-        self,
-        *args,
-        learn_means_covariances: bool = False,
-        learn_alpha_temperature: bool = False,
-        **kwargs,
-    ):
-        """Burn-in training phase.
-
-        Fits the model with means and covariances or alpha_temperature
-        non-trainable.
-
-        Parameters
-        ----------
-        learn_means_covariances : bool
-            Should we learn the means and covariances during the burn-in training?
-            Optional, default is False.
-        learn_alpha_temperature : bool
-            Should we learn the alpha temperature during the burn-in taining?
-            Optional, default is False.
-        """
-        if check_arguments(args, kwargs, 3, "epochs", 1, lt):
-            _logger.warning(
-                "Number of burn-in epochs is less than 1. Skipping burn-in."
-            )
-            return
-
-        # Make means and covariances non-trainable and compile
-        if not learn_means_covariances:
-            means_layer = self.model.get_layer("means")
-            covs_layer = self.model.get_layer("covs")
-            means_layer.trainable = False
-            covs_layer.trainable = False
-            self.compile()
-
-        # Make alpha temperature non-trainable and compile
-        if not learn_alpha_temperature:
-            alpha_layer = self.model.get_layer("alpha_layer")
-            alpha_layer.trainable = False
-            self.compile()
-
-        # Train the model
-        self.fit(*args, **kwargs)
-
-        # Make means and covariances trainable again and compile
-        if not learn_means_covariances:
-            means_layer.trainable = True
-            covs_layer.trainable = True
-            self.compile()
-
-        # Make alpha temperature trainable again and compile
-        if not learn_alpha_temperature:
-            alpha_layer.trainable = True
-            self.compile()
 
     def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
         """Uses the model RNN to sample mode mixing factors, alpha.
