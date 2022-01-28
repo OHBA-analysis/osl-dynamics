@@ -88,24 +88,6 @@ class MatMulLayer(layers.Layer):
         return out
 
 
-class FillConstantLayer(layers.Layer):
-    """Layer to create tensor with the same shape of the input,
-    but filled with a constant.
-
-    Parameters
-    ----------
-    constant : float
-        Value to full tensor with.
-    """
-
-    def __init__(self, constant: float, **kwargs):
-        super().__init__(**kwargs)
-        self.constant = constant
-
-    def call(self, inputs, **kwargs):
-        return tf.fill(tf.shape(inputs), self.constant)
-
-
 class SampleNormalDistributionLayer(layers.Layer):
     """Layer for sampling from a normal distribution.
 

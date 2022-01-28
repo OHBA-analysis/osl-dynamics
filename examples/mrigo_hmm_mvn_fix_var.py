@@ -72,8 +72,6 @@ config = Config(
     batch_size=16,
     learning_rate=0.005,
     n_epochs=400,
-    fix_std=True,
-    separate_rnns=False,
 )
 
 # Prepare dataset
