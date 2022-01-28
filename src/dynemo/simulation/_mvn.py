@@ -197,10 +197,10 @@ class MS_MVN(MVN):
 
         # Get the std and FC from self.covariance
         if uni_std:
-            self.std = np.ones([self.n_modes, self.n_channels])
+            self.stds = np.ones([self.n_modes, self.n_channels])
         else:
-            self.std = array_ops.cov2std(self.covariances)
-        self.fc = array_ops.cov2corr(self.covariances)
+            self.stds = array_ops.cov2std(self.covariances)
+        self.fcs = array_ops.cov2corr(self.covariances)
 
     def simulate_data(self, state_time_courses: np.ndarray) -> np.ndarray:
         """Simulates data.
@@ -236,8 +236,8 @@ class MS_MVN(MVN):
 
             # Mean, standard deviation, FC for this combination of 3 time courses
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
-            G = np.diag(np.sum(self.std * beta[:, np.newaxis], axis=0))
-            F = np.sum(self.fc * gamma[:, np.newaxis, np.newaxis], axis=0)
+            G = np.diag(np.sum(self.stds * beta[:, np.newaxis], axis=0))
+            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
 
             # Calculate covariance matrix from the standard deviation and FC
             sigma = G @ F @ G

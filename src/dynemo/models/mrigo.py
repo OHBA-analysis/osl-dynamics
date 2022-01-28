@@ -8,6 +8,7 @@ from typing import Literal
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+from dynemo.models import mgo
 from dynemo.models.mod_base import BaseConfig, ModelBase
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.models.layers import (
@@ -220,10 +221,7 @@ class Model(InferenceModelBase):
         fcs : np.ndarray
             Mode functional connectivities.
         """
-        means_layer = self.model.get_layer("means")
-        stds_layer = self.model.get_layer("stds")
-        fcs_layer = self.model.get_layer("fcs")
-        return means_layer(1).numpy(), stds_layer(1).numpy(), fcs_layer(1).numpy()
+        return mgo.get_means_stds_fcs(self.model)
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
@@ -241,42 +239,7 @@ class Model(InferenceModelBase):
             Do we want to use the passed parameters when we re_initialize
             the model?
         """
-        if stds.ndim == 3:
-            # Only keep the diagonal as a vector
-            stds = np.diagonal(stds, axis1=1, axis2=2)
-
-        means = means.astype(np.float32)
-        stds = stds.astype(np.float32)
-        fcs = fcs.astype(np.float32)
-
-        # Get layers
-        means_layer = self.model.get_layer("means")
-        stds_layer = self.model.get_layer("stds")
-        fcs_layer = self.model.get_layer("fcs")
-
-        # Transform the matrices to layer weights
-        diagonals = stds_layer.bijector.inverse(stds)
-        flattened_cholesky_factors = fcs_layer.bijector.inverse(fcs)
-
-        # Set values
-        means_layer.vectors.assign(means)
-        stds_layer.diagonals.assign(diagonals)
-        fcs_layer.flattened_cholesky_factors.assign(flattened_cholesky_factors)
-
-        # Update initialisers
-        if update_initializer:
-            means_layer.initial_value = means
-            stds_layer.initial_value = stds
-            fcs_layer.initial_value = fcs
-
-            stds_layer.initial_diagonals = diagonals
-            fcs_layer.initial_flattened_cholesky_factors = flattened_cholesky_factors
-
-            means_layer.vectors_initializer.initial_value = means
-            stds_layer.diagonals_initializer.initial_value = diagonals
-            fcs_layer.flattened_cholesky_factors_initializer.initial_value = (
-                flattened_cholesky_factors
-            )
+        mgo.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
 
 
 def _model_structure(config):
