@@ -322,25 +322,22 @@ class InferenceModelConfig:
     kl_annealing_sharpness: float = None
     n_kl_annealing_epochs: int = None
 
-    # Initialisation parameters
-    n_init: int = None
-    n_init_epochs: int = None
-
     def validate_alpha_parameters(self):
-        if self.alpha_xform not in ["gumbel-softmax", "softmax", "softplus"]:
+        if self.alpha_xform not in ["gumbel-softmax", "softmax", "softplus", None]:
             raise ValueError(
-                "alpha_xform must be 'gumbel-softmax', 'softmax' or 'softplus'."
+                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or None."
             )
 
-        if "softmax" in self.alpha_xform:
+        if self.alpha_xform in ["softmax", "gumbel-softmax"]:
             if self.initial_alpha_temperature is None:
                 raise ValueError("initial_alpha_temperature must be passed.")
 
             if self.initial_alpha_temperature <= 0:
                 raise ValueError("initial_alpha_temperature must be greater than zero.")
 
-        elif self.alpha_xform == "softplus":
-            self.initial_alpha_temperature = 1.0  # not used in the model
+        else:
+            # These parameters are not used by the model
+            self.initial_alpha_temperature = 1.0
             self.learn_alpha_temperature = False
 
     def validate_kl_annealing_parameters(self):
@@ -377,16 +374,3 @@ class InferenceModelConfig:
                 raise ValueError(
                     "Number of KL annealing epochs must be greater than zero."
                 )
-
-    def validate_initialization_parameters(self):
-        if self.n_init is not None:
-            if self.n_init < 1:
-                raise ValueError("n_init must be one or greater.")
-
-            if self.n_init_epochs is None:
-                raise ValueError(
-                    "If we are initializing the model, n_init_epochs must be passed."
-                )
-
-            if self.n_init_epochs < 1:
-                raise ValueError("n_init_epochs must be one or greater.")

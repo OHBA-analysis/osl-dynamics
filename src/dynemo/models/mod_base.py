@@ -262,7 +262,7 @@ class ModelBase:
 
 
 @dataclass
-class BaseConfig:
+class BaseModelConfig:
     """Base class for setting for any DyNeMo model."""
 
     # Training parameters

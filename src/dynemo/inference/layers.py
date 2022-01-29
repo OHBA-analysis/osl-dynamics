@@ -130,8 +130,6 @@ class ThetaActivationLayer(layers.Layer):
         self.xform = xform
         self.initial_temperature = initial_temperature
         self.learn_temperature = learn_temperature
-
-        # Initialiser for the a learnable alpha temperature
         self.temperature_initializer = WeightInitializer(self.initial_temperature)
 
     def build(self, input_shape):
@@ -157,6 +155,8 @@ class ThetaActivationLayer(layers.Layer):
                 logits=theta,
             )
             alpha = gumbel_softmax_distribution.sample()
+        else:
+            alpha = theta
 
         return alpha
 
@@ -575,7 +575,6 @@ class InferenceRNNLayer(layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-
         self.layers = []
         for n in range(n_layers):
             self.layers.append(
@@ -625,7 +624,6 @@ class ModelRNNLayer(layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-
         self.layers = []
         for n in range(n_layers):
             self.layers.append(
@@ -656,10 +654,6 @@ class WaveNetLayer(layers.Layer):
 
     def __init__(self, n_channels: int, n_filters: int, n_layers: int, **kwargs):
         super().__init__(**kwargs)
-        self.n_channels = n_channels
-        self.n_filters = n_filters
-        self.n_layers = n_layers
-
         self.causal_conv_layer = layers.Conv1D(
             filters=n_filters,
             kernel_size=2,
@@ -783,7 +777,6 @@ class MultiLayerPerceptronLayer(layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-
         self.layers = []
         for n in range(n_layers):
             self.layers.append(layers.Dense(n_units))

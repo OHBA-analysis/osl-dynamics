@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from dynemo.models import mgo
-from dynemo.models.mod_base import BaseConfig, ModelBase
+from dynemo.models.mod_base import BaseModelConfig, ModelBase
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.inference.layers import (
     InferenceRNNLayer,
@@ -32,7 +32,7 @@ from dynemo.inference.layers import (
 
 
 @dataclass
-class Config(BaseConfig, InferenceModelConfig):
+class Config(BaseModelConfig, InferenceModelConfig):
     """Settings for MRIGO.
 
     Parameters
@@ -104,11 +104,6 @@ class Config(BaseConfig, InferenceModelConfig):
         kl_annealing_curve='tanh'.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
-
-    n_init : int
-        Number of initializations.
-    n_init_epochs : int
-        Number of epochs to train each initialization.
 
     batch_size : int
         Mini-batch size.

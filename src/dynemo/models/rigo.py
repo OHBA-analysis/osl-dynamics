@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tqdm import trange
 from dynemo.models import go
-from dynemo.models.mod_base import BaseConfig
+from dynemo.models.mod_base import BaseModelConfig
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.inference.layers import (
     InferenceRNNLayer,
@@ -29,7 +29,7 @@ from dynemo.inference.layers import (
 
 
 @dataclass
-class Config(BaseConfig, InferenceModelConfig):
+class Config(BaseModelConfig, InferenceModelConfig):
     """Settings for RIGO.
 
     Parameters
@@ -99,11 +99,6 @@ class Config(BaseConfig, InferenceModelConfig):
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
-    n_init : int
-        Number of initializations.
-    n_init_epochs : int
-        Number of epochs to train each initialization.
-
     batch_size : int
         Mini-batch size.
     learning_rate : float
@@ -149,7 +144,6 @@ class Config(BaseConfig, InferenceModelConfig):
         self.validate_observation_model_parameters()
         self.validate_alpha_parameters()
         self.validate_kl_annealing_parameters()
-        self.validate_initialization_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 

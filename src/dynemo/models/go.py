@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from dynemo.models.mod_base import BaseConfig, ModelBase
+from dynemo.models.mod_base import BaseModelConfig, ModelBase
 from dynemo.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -18,7 +18,7 @@ from dynemo.inference.layers import (
 
 
 @dataclass
-class Config(BaseConfig):
+class Config(BaseModelConfig):
     """Settings for GO.
 
     Parameters
