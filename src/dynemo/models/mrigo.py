@@ -221,6 +221,84 @@ class Model(InferenceModelBase):
             the model?
         """
         mgo.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+    
+    def sample_time_courses(self, n_samples: int):
+        """Uses the model RNN to sample mode mixing factors, alpha, beta and gamma.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to take.
+
+        Returns
+        -------
+        List containing sampled alpha, beta, and gamma.
+        """
+        # Get layers
+        model_rnn_layer = self.model.get_layer("mod_rnn")
+        mean_mod_mu_layer = self.model.get_layer("mean_mod_mu")
+        mean_mod_sigma_layer = self.model.get_layer("mean_mod_sigma")
+        mean_theta_norm_layer = self.model.get_layer("mean_theta_norm")
+        alpha_layer = self.model.get_layer("alpha")
+        fc_mod_mu_layer = self.model.get_layer("fc_mod_mu")
+        fc_mod_sigma_layer = self.model.get_layer("fc_mod_sigma")
+        fc_theta_norm_layer = self.model.get_layer("fc_theta_norm")
+        gamma_layer = self.model.get_layer("gamma")
+        concatenate_layer = self.model.get_layer("theta_norm")
+
+        # Normally distributed random numbers used to sample the logits theta
+        mean_epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
+            np.float32
+        )
+        fc_epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
+            np.float32
+        )
+
+        # Initialise sequence of underlying logits theta
+        mean_theta_norm = np.zeros(
+            [self.config.sequence_length, self.config.n_modes],
+            dtype=np.float32,
+        )
+        mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+        fc_theta_norm = np.zeros(
+            [self.config.sequence_length, self.config.n_modes],
+            dtype=np.float32,
+        )
+        fc_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+
+        # Sample the mode time courses
+        alpha = np.empty([n_samples, self.config.n_modes])
+        gamma = np.empty([n_samples, self.config.n_modes])
+        for i in trange(n_samples, desc="Sampling mode time courses", ncols=98):
+            # If there are leading zeros we trim theta so that we don't pass the zeros
+            trimmed_mean_theta = mean_theta_norm[~np.all(mean_theta_norm == 0, axis=1)][
+                np.newaxis, :, :
+            ]
+            trimmed_fc_theta = fc_theta_norm[~np.all(fc_theta_norm == 0, axis=1)][
+                np.newaxis, :, :
+            ]
+            trimmed_theta = concatenate_layer([trimmed_mean_theta, trimmed_fc_theta])
+            # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
+            model_rnn = model_rnn_layer(trimmed_theta)
+            mean_mod_mu = mean_mod_mu_layer(model_rnn)[0, -1]
+            mean_mod_sigma = mean_mod_sigma_layer(model_rnn)[0, -1]
+            fc_mod_mu = fc_mod_mu_layer(model_rnn)[0, -1]
+            fc_mod_sigma = fc_mod_sigma_layer(model_rnn)[0, -1]
+
+            # Shift theta one time step to the left
+            mean_theta_norm = np.roll(mean_theta_norm, -1, axis=0)
+            fc_theta_norm = np.roll(fc_theta_norm, -1, axis=0)
+
+            # Sample from the probability distribution function
+            mean_theta = mean_mod_mu + mean_mod_sigma * mean_epsilon[i]
+            mean_theta_norm[-1] = mean_theta_norm_layer(mean_theta[np.newaxis, np.newaxis, :])
+            fc_theta = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
+            fc_theta_norm[-1] = fc_theta_norm_layer(fc_theta[np.newaxis, np.newaxis, :])
+
+            alpha[i] = alpha_layer(mean_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
+            gamma[i] = gamma_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
+        
+        return alpha, gamma
 
 
 def _model_structure(config):
