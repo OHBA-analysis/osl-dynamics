@@ -383,6 +383,7 @@ class MS_HMM_MVN(Simulation):
 
         # Simulate data
         self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
+        self.instantaneous_covs = self.obs_mod.instantaneous_covs
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):

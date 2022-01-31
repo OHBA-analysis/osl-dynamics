@@ -40,6 +40,7 @@ class MVN:
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
+        self.instantaneous_covs = None
 
         # Both the means and covariances were passed as numpy arrays
         if isinstance(means, np.ndarray) and isinstance(covariances, np.ndarray):
@@ -225,6 +226,7 @@ class MS_MVN(MVN):
 
         # Initialise array to hold data
         data = np.zeros([n_samples, self.n_channels])
+        instantaneous_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
 
         # Loop through all unique combinations of states
         for time_courses in np.unique(state_time_courses, axis=0):
@@ -241,6 +243,10 @@ class MS_MVN(MVN):
 
             # Calculate covariance matrix from the standard deviation and FC
             sigma = G @ F @ G
+
+            self.instantaneous_covs[
+                np.all(state_time_courses == time_courses, axis=(1, 2))
+            ] = sigma
 
             # Generate data for the time points that this combination of states
             # is active
