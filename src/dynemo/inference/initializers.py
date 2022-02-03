@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
-from dynemo import models
+from dynemo import inference
 
 
 class WeightInitializer(Initializer):
@@ -94,8 +94,8 @@ def reinitialize_model_weights(model: tf.keras.Model, keep: list = None):
         # to this function
         if (
             isinstance(layer, Model)
-            or isinstance(layer, models.layers.InferenceRNNLayer)
-            or isinstance(layer, models.layers.ModelRNNLayer)
+            or isinstance(layer, inference.layers.InferenceRNNLayer)
+            or isinstance(layer, inference.layers.ModelRNNLayer)
         ):
             for rnn_or_model_layer in layer.layers:
                 # If the layer is bidirectional we need to re-initialise the
