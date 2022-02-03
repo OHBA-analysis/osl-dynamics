@@ -226,7 +226,7 @@ class MS_MVN(MVN):
 
         # Initialise array to hold data
         data = np.zeros([n_samples, self.n_channels])
-        instantaneous_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
+        self.instantaneous_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
 
         # Loop through all unique combinations of states
         for time_courses in np.unique(state_time_courses, axis=0):

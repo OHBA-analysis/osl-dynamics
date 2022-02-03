@@ -152,7 +152,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
         self.validate_observation_model_parameters()
         self.validate_alpha_parameters()
         self.validate_kl_annealing_parameters()
-        self.validate_initialization_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
