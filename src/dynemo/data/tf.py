@@ -35,6 +35,7 @@ class TensorFlowDataset:
         n_alpha_embeddings: int = 1,
         concatenate: bool = True,
         subj_id: bool = False,
+        step_size: int = None,
     ) -> tensorflow.data.Dataset:
         """Create a tensorflow dataset for training or evaluation.
 
@@ -64,6 +65,8 @@ class TensorFlowDataset:
             Should we concatenate the datasets for each subject?
         subj_id : bool
             Should we include the subject id in the dataset?
+        step_size : int
+            Number of samples to slide the sequence across the dataset.
 
         Returns
         -------
@@ -73,6 +76,7 @@ class TensorFlowDataset:
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
+        self.step_size = step_size or sequence_length
         n_embeddings = self.n_embeddings or 1
 
         # Dataset for learning alpha and the observation model
@@ -82,9 +86,15 @@ class TensorFlowDataset:
                 subject = self.subjects[i]
                 if subj_id:
                     subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
-                    subject = {"data": subject, "subj_id": subject_tracker}
-                dataset = Dataset.from_tensor_slices(subject)
-                dataset = dataset.batch(sequence_length, drop_remainder=True)
+                    dataset = create_dataset(
+                        {"data": subject, "subj_id": subject_tracker},
+                        sequence_length,
+                        step_size,
+                    )
+                else:
+                    dataset = create_dataset(
+                        {"data": subject}, sequence_length, step_size
+                    )
                 subject_datasets.append(dataset)
 
         # Dataset for learning the observation model
@@ -125,8 +135,7 @@ class TensorFlowDataset:
                     input_data["subj_id"] = (
                         np.zeros(subject.shape[0], dtype=np.float32) + i
                     )
-                dataset = Dataset.from_tensor_slices(input_data)
-                dataset = dataset.batch(sequence_length, drop_remainder=True)
+                dataset = create_dataset(input_data, sequence_length, step_size)
                 subject_datasets.append(dataset)
 
         # Create a dataset from all the subjects concatenated
@@ -242,12 +251,12 @@ def n_batches(arr: np.ndarray, sequence_length: int, step_size: int = None) -> i
 def concatenate_datasets(
     datasets: list, shuffle: bool = True
 ) -> tensorflow.data.Dataset:
-    """Concatenates a list of Tensorflow datasets.
+    """Concatenates a list of TensorFlow datasets.
 
     Parameters
     ----------
     datasets : list
-        List of Tensorflow datasets.
+        List of TensorFlow datasets.
     Shuffle : bool
         Should we shuffle the final concatenated dataset?
 
@@ -265,3 +274,52 @@ def concatenate_datasets(
         full_dataset = full_dataset.shuffle(100000)
 
     return full_dataset
+
+
+def create_dataset(
+    data: dict,
+    sequence_length: int,
+    step_size: int,
+) -> tensorflow.data.Dataset:
+    """Creates a TensorFlow dataset of batched time series data.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing data to batch. Keys correspond to the input name
+        for the model and the value is the data.
+    sequence_length : int
+        Sequence length to batch the data.
+    step_size : int
+        Number of samples to slide the sequence across the data.
+    """
+
+    # Create a single input dataset
+    if len(data) == 1:
+        dataset = Dataset.from_tensor_slices(list(data.values())[0])
+        dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
+        dataset = dataset.flat_map(
+            lambda window: window.batch(sequence_length, drop_remainder=True)
+        )
+
+    # Create a multiple input dataset
+    else:
+
+        def batch_windows(*windows):
+            batched = [w.batch(sequence_length, drop_remainder=True) for w in windows]
+            return Dataset.zip(tuple(batched))
+
+        def tuple_to_dict(*d):
+            names = list(data.keys())
+            inputs = {}
+            for i in range(len(data)):
+                inputs[names[i]] = d[i]
+            return inputs
+
+        dataset = tuple([Dataset.from_tensor_slices(v) for v in data.values()])
+        dataset = Dataset.zip(dataset)
+        dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
+        dataset = dataset.flat_map(batch_windows)
+        dataset = dataset.map(tuple_to_dict)
+
+    return dataset
