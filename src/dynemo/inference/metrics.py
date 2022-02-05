@@ -313,7 +313,7 @@ def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
     -------
     np.ndarray
     """
-    d = np.sqrt(np.sum((np.log(np.maximum(eigvalsh(M1 @ inv(M2)), 1e-3)) ** 2)))
+    d = np.sqrt(np.sum((np.log(np.maximum(np.linalg.eigvals(M1 @ np.linalg.inv(M2)).real, 1e-3)) ** 2)))
     return d
 
 
@@ -332,13 +332,32 @@ def mode_covariance_riemannian_distances(mode_covariances: np.ndarray) -> np.nda
         Shape is (n_modes, n_modes).
     """
     n_modes = mode_covariances.shape[0]
-    riemannian_distances = np.empty([n_modes, n_modes])
-    for i in range(n_modes):
-        for j in range(n_modes):
+    riemannian_distances = np.zeros([n_modes, n_modes])
+    for i in trange(n_modes, desc="Computing Riemannian distances", ncols=98):
+        for j in range(i+1, n_modes):
             riemannian_distances[i][j] = riemannian_distance(
                 mode_covariances[i], mode_covariances[j]
             )
+    # Now only the upper triangular entries are filled
+    # and the diagonal entries are zeros
+    riemannian_distances = riemannian_distances + riemannian_distances.T
+
     return riemannian_distances
+
+def sample_pairwise_riemannian_distances(matrices: np.ndarray) -> np.ndarray:
+    """Parallelised version of mode_covariance_riemannian_distances
+    Much faster when the first dimension is large, but uses more RAM
+    """
+    inverse_matrices = np.linalg.inv(matrices)
+    pairwise_products = np.matmul(matrices[None, :, :, :], inverse_matrices[:, None, :, :])
+    # The eigenvalues of the product should be real due to Sylvester's law of inertia
+    eigenvalues = np.linalg.eigvals(pairwise_products).real
+    # threshold the negative eigenvalues due to computational instability
+    eigenvalues = np.maximum(eigenvalues, 1e-3)
+    log_eigenvalues = np.log(eigenvalues)
+    pairwise_riemannian_distances = np.sqrt(np.sum(log_eigenvalues**2, axis= -1))
+
+    return pairwise_riemannian_distances
 
 
 def rv_coefficient(M: list) -> float:
