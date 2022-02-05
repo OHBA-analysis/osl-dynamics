@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from typing import Literal
+from tqdm import trange
 
 import numpy as np
 import tensorflow as tf
@@ -297,7 +298,7 @@ class Model(InferenceModelBase):
             alpha[i] = alpha_layer(mean_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
             gamma[i] = gamma_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
         
-        return alpha, gamma
+        return alpha, alpha, gamma
 
 
 def _model_structure(config):
