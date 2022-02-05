@@ -293,3 +293,39 @@ def validate(
         raise ValueError(error_message)
 
     return array
+
+def threshold_matrices(matrices, threshold):
+    """ Set the "not interesting" connections to zero according to the threshold
+    Input
+    -----
+    matrices: functional connectivities
+        shape=(n_samples, n_channels, n_channels)
+    threshold: a number between 0 and 1
+
+    Returns
+    -------
+    thresholded matrices
+        shape = (n_samples, n_channels, n_channels)
+    """
+    n_samples = matrices.shape[0]
+    n_channels = matrices.shape[-1]
+    m, n = np.tril_indices(n_channels, -1)
+
+    # Array to hold threshold matrices
+    thresholded_matrices = np.zeros([n_samples, n_channels, n_channels])
+
+    # Take the off diagonal entries of the matrices
+    connections = matrices[:, m, n] # this has shape = (n_samples, n_channels * (n_channels - 1) // 2)
+
+    upper_threshold = np.quantile(connections, 1 - (1 - threshold) / 2, axis=1)
+    lower_threshold = np.quantile(connections, (1 - threshold) / 2, axis=1)
+
+    for i in range(n_samples):
+        matrix = matrices[i]
+        background_mask_upper = matrix < upper_threshold[i]
+        background_mask_lower = matrix > lower_threshold[i]
+        background_mask = np.all([background_mask_upper, background_mask_lower], axis=0)
+
+        matrix[background_mask] = 0
+        thresholded_matrices[i] = matrix
+    return thresholded_matrices
