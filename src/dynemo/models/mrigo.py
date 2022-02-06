@@ -221,7 +221,7 @@ class Model(InferenceModelBase):
             the model?
         """
         mgo.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
-    
+
     def sample_time_courses(self, n_samples: int):
         """Uses the model RNN to sample mode mixing factors, alpha, beta and gamma.
 
@@ -247,12 +247,12 @@ class Model(InferenceModelBase):
         concatenate_layer = self.model.get_layer("theta_norm")
 
         # Normally distributed random numbers used to sample the logits theta
-        mean_epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
-            np.float32
-        )
-        fc_epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
-            np.float32
-        )
+        mean_epsilon = np.random.normal(
+            0, 1, [n_samples + 1, self.config.n_modes]
+        ).astype(np.float32)
+        fc_epsilon = np.random.normal(
+            0, 1, [n_samples + 1, self.config.n_modes]
+        ).astype(np.float32)
 
         # Initialise sequence of underlying logits theta
         mean_theta_norm = np.zeros(
@@ -291,13 +291,15 @@ class Model(InferenceModelBase):
 
             # Sample from the probability distribution function
             mean_theta = mean_mod_mu + mean_mod_sigma * mean_epsilon[i]
-            mean_theta_norm[-1] = mean_theta_norm_layer(mean_theta[np.newaxis, np.newaxis, :])
+            mean_theta_norm[-1] = mean_theta_norm_layer(
+                mean_theta[np.newaxis, np.newaxis, :]
+            )
             fc_theta = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
             fc_theta_norm[-1] = fc_theta_norm_layer(fc_theta[np.newaxis, np.newaxis, :])
 
             alpha[i] = alpha_layer(mean_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
             gamma[i] = gamma_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
-        
+
         return alpha, alpha, gamma
 
 

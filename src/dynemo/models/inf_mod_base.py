@@ -314,7 +314,7 @@ class InferenceModelConfig:
     initial_alpha_temperature: float = None
 
     # KL annealing parameters
-    do_kl_annealing: bool = None
+    do_kl_annealing: bool = False
     kl_annealing_curve: Literal["linear", "tanh"] = None
     kl_annealing_sharpness: float = None
     n_kl_annealing_epochs: int = None
@@ -338,9 +338,6 @@ class InferenceModelConfig:
             self.learn_alpha_temperature = False
 
     def validate_kl_annealing_parameters(self):
-        if self.do_kl_annealing is None:
-            raise ValueError("do_kl_annealing must be passed.")
-
         if self.do_kl_annealing:
             if self.kl_annealing_curve is None:
                 raise ValueError(
@@ -363,8 +360,8 @@ class InferenceModelConfig:
 
             if self.n_kl_annealing_epochs is None:
                 raise ValueError(
-                    "If we are performing KL annealing, n_kl_annealing_epochs must be "
-                    + "passed."
+                    "If we are performing KL annealing, "
+                    + "n_kl_annealing_epochs must be passed."
                 )
 
             if self.n_kl_annealing_epochs < 1:

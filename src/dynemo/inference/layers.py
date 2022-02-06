@@ -444,14 +444,22 @@ class LogLikelihoodLossLayer(layers.Layer):
     ----------
     diag_cov : bool
         Are the covariances diagonal?
+    clip_start : int
+        Index to clip the sequence.
     """
 
-    def __init__(self, diag_cov: bool = False, **kwargs):
+    def __init__(self, diag_cov: bool = False, clip_start: int = 0, **kwargs):
         super().__init__(**kwargs)
         self.diag_cov = diag_cov
+        self.clip_start = clip_start
 
     def call(self, inputs):
         x, mu, sigma = inputs
+
+        # Clip the sequence
+        x = x[:, self.clip_start :]
+        mu = mu[:, self.clip_start :]
+        sigma = sigma[:, self.clip_start :]
 
         # Multivariate normal distribution
         if self.diag_cov:
@@ -483,18 +491,29 @@ class LogLikelihoodLossLayer(layers.Layer):
 
 
 class KLDivergenceLayer(layers.Layer):
-    """Layer to calculate a KL divergence between two Normal distributions."""
+    """Layer to calculate a KL divergence between two Normal distributions.
+
+    Parameters
+    ----------
+    clip_start : int
+        Index to clip the sequences inputted to this layer.
+    """
+
+    def __init__(self, clip_start: int = 0, **kwargs):
+        super().__init__(**kwargs)
+        self.clip_start = clip_start
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
 
-        # The Model RNN predicts one time step into the future compared to the
-        # inference RNN. We clip its last value, and first value of the inference RNN.
-        model_mu = model_mu[:, :-1]
-        model_sigma = model_sigma[:, :-1]
+        # The model network predicts one time step into the future compared to
+        # the inference network. We clip the sequences to ensure we are comparing
+        # the correct time points.
+        model_mu = model_mu[:, self.clip_start : -1]
+        model_sigma = model_sigma[:, self.clip_start : -1]
 
-        inference_mu = inference_mu[:, 1:]
-        inference_sigma = inference_sigma[:, 1:]
+        inference_mu = inference_mu[:, self.clip_start + 1 :]
+        inference_sigma = inference_sigma[:, self.clip_start + 1 :]
 
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Normal(loc=model_mu, scale=model_sigma)

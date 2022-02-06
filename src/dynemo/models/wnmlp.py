@@ -12,20 +12,18 @@ from tensorflow.keras import layers
 from dynemo.models.mod_base import BaseModelConfig
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.inference.layers import (
+    MultiLayerPerceptronLayer,
+    WaveNetLayer,
+    SampleNormalDistributionLayer,
     LogLikelihoodLossLayer,
-    NormalizationLayer,
     KLDivergenceLayer,
     KLLossLayer,
-    SampleNormalDistributionLayer,
-    ThetaActivationLayer,
-    WaveNetLayer,
-    MultiLayerPerceptronLayer,
 )
 
 
 @dataclass
 class Config(BaseModelConfig, InferenceModelConfig):
-    """Settings for WNINNO.
+    """Settings for WNMLP.
 
     Parameters
     ----------
@@ -36,10 +34,32 @@ class Config(BaseModelConfig, InferenceModelConfig):
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
 
-    wn_n_layers : int
-        Number of layers for both the inference WaveNet and model WaveNet.
-    wn_n_filters : int
-        Number of filters for both the inference Wavenet and model WaveNet.
+    inf_mlp_n_layers : int
+        Number of layers in the inference multi-layer perceptron.
+    inf_mlp_n_units : int
+        Number of units in the inference multi-layer perceptron.
+    inf_mlp_normalization : str
+        Normalization layer type for the inference multi-layer perceptron.
+    inf_mlp_activation : str
+        Activation function for the inference multi-layer perceptron.
+    inf_mlp_dropout_rate : float
+        Dropout rate for the inference multi-layer perceptron.
+
+    obs_mlp_n_layers : int
+        Number of layers in the observation model multi-layer perceptron.
+    obs_mlp_n_units : int
+        Number of units in the observation model multi-layer perceptron.
+    obs_mlp_normalization : str
+        Normalization layer type for the observation model multi-layer perceptron.
+    obs_mlp_activation : str
+        Activation function for the observation model multi-layer perceptron.
+    obs_mlp_dropout_rate : float
+        Dropout rate for the observation model multi-layer perceptron.
+
+    mod_wn_n_layers : int
+        Number of layers for the model WaveNet.
+    mod_wn_n_filters : int
+        Number of filters for the model WaveNet.
 
     alpha_xform : str
         Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
@@ -48,17 +68,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
         'gumbel-softmax'?
     initial_alpha_temperature : float
         Initial value for the alpha temperature.
-
-    mlp_n_layers : int
-        Number of layers in the multi-layer perceptron observation model.
-    mlp_n_units : int
-        Number of units in the multi-layer perceptron observation model.
-    mlp_normalization : str
-        Normalization layer type for the multi-layer perceptron observation model.
-    mlp_activation : str
-        Activation function for the multi-layer perceptron observation model.
-    mlp_dropout_rate : float
-        Dropout rate for the multi-layer perceptron observation model.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -87,43 +96,37 @@ class Config(BaseModelConfig, InferenceModelConfig):
         Strategy for distributed learning.
     """
 
-    wn_n_layers: int = None
-    wn_n_filters: int = None
+    inf_mlp_n_layers: int = None
+    inf_mlp_n_units: int = None
+    inf_mlp_normalization: str = "batch"
+    inf_mlp_activation: str = "selu"
+    inf_mlp_dropout_rate: float = 0.0
 
-    mlp_n_layers: int = None
-    mlp_n_units: int = None
-    mlp_normalization: str = "batch"
-    mlp_activation: str = "selu"
-    mlp_dropout_rate: float = 0.0
+    obs_mlp_n_layers: int = None
+    obs_mlp_n_units: int = None
+    obs_mlp_normalization: str = "batch"
+    obs_mlp_activation: str = "selu"
+    obs_mlp_dropout_rate: float = 0.0
+
+    mod_wn_n_layers: int = None
+    mod_wn_n_filters: int = None
 
     multiple_scales: bool = False
 
     def __post_init__(self):
-        self.validate_model_parameters()
         self.validate_alpha_parameters()
         self.validate_kl_annealing_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
-    def validate_model_parameters(self):
-        if self.wn_n_layers is None or self.wn_n_filters is None:
-            raise ValueError(
-                "Please pass WaveNet parameters: wn_n_layers and wn_n_filters."
-            )
-
-        if self.mlp_n_layers is None or self.mlp_n_units is None:
-            raise ValueError(
-                "Please pass MLP parameters: mlp_n_layers and mlp_n_units."
-            )
-
 
 class Model(InferenceModelBase):
-    """WaveNet inference/model network and a Multi-Layer Perceptron observation model
-    (WNINNO).
+    """WaveNet+Multi-Layer Perceptron observation model and Multi-Layer Perceptron
+    inference network (WNMLP).
 
     Parameters
     ----------
-    config : dynemo.models.wninno.Config
+    config : dynemo.models.wnmlp.Config
     """
 
     def __init__(self, config):
@@ -143,74 +146,75 @@ def _model_structure(config):
 
     # Inference RNN:
     # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
-    #     - inf_mu    ~ affine(WaveNet(inputs_<=t))
-    #     - inf_sigma ~ softplus(WaveNet(inputs_<=t))
+    #     - inf_mu    = affine(MLP(inputs_t))
+    #     - inf_sigma = softplus(MLP(inputs_t))
 
     # Definition of layers
-    inf_wn_layer = WaveNetLayer(
-        config.n_modes,
-        config.wn_n_filters,
-        config.wn_n_layers,
-        name="inf_wn",
+    inf_mlp_layer = MultiLayerPerceptronLayer(
+        config.inf_mlp_n_layers,
+        config.inf_mlp_n_units,
+        config.inf_mlp_normalization,
+        config.inf_mlp_activation,
+        config.inf_mlp_dropout_rate,
+        name="inf_mlp",
     )
     inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-    theta_layer = SampleNormalDistributionLayer(name="theta")
-    alpha_layer = NormalizationLayer("batch", name="alpha")
+    alpha_layer = SampleNormalDistributionLayer(name="alpha")
 
     # Data flow
-    inf_wn = inf_wn_layer(inputs)
-    inf_mu = inf_mu_layer(inf_wn)
-    inf_sigma = inf_sigma_layer(inf_wn)
-    theta = theta_layer([inf_mu, inf_sigma])
-    alpha = alpha_layer(theta)
+    inf_mlp = inf_mlp_layer(inputs)
+    inf_mu = inf_mu_layer(inf_mlp)
+    inf_sigma = inf_sigma_layer(inf_mlp)
+    alpha = alpha_layer([inf_mu, inf_sigma])
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each mode as the observation model.
-    # - We use a multi-layer perceptron to calculate the mean vector and
-    #   covariance matrix from the alphas.
-    # - We calculate the likelihood of generating the training data with alpha
-    #   and the observation model.
+    # - Learns p(X_t | alpha_t) = N(X_t | m, C), where
+    #     - m = MLP(alpha)
+    #     - C  = softplus(MLP(alpha))
 
     # Definition of layers
-    mlp_layer = MultiLayerPerceptronLayer(
-        config.mlp_n_layers,
-        config.mlp_n_units,
-        config.mlp_normalization,
-        config.mlp_activation,
-        config.mlp_dropout_rate,
-        name="mlp",
+    obs_mlp_layer = MultiLayerPerceptronLayer(
+        config.obs_mlp_n_layers,
+        config.obs_mlp_n_units,
+        config.obs_mlp_normalization,
+        config.obs_mlp_activation,
+        config.obs_mlp_dropout_rate,
+        name="obs_mlp",
     )
     mean_layer = layers.Dense(config.n_channels, name="mean")
     cov_layer = layers.Dense(config.n_channels, activation="softplus", name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(diag_cov=True, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(
+        diag_cov=True, clip_start=config.sequence_length // 2 + 1, name="ll_loss"
+    )
 
     # Data flow
-    mlp = mlp_layer(alpha)
-    m = mean_layer(mlp)
-    C = cov_layer(mlp)
+    obs_mlp = obs_mlp_layer(alpha)
+    m = mean_layer(obs_mlp)
+    C = cov_layer(obs_mlp)
     ll_loss = ll_loss_layer([inputs, m, C])
 
     # Model RNN:
-    # - Learns p(theta_t |theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
-    #     - mod_mu    ~ affine(WaveNet(theta_<t))
-    #     - mod_sigma ~ softplus(WaveNet(theta_<t))
+    # - Learns p(theta_t | theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
+    #     - mod_mu = affine(WaveNet(alpha_<t))
+    #     - mod_sigma = softplus(WaveNet(alpha_<t))
 
     # Definition of layers
     mod_wn_layer = WaveNetLayer(
-        config.n_channels,
-        config.wn_n_filters,
-        config.wn_n_layers,
+        config.mod_wn_n_filters,
+        config.mod_wn_n_filters,
+        config.mod_wn_n_layers,
         name="mod_wn",
     )
     mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_div_layer = KLDivergenceLayer(name="kl_div")
+    kl_div_layer = KLDivergenceLayer(
+        clip_start=config.sequence_length // 2, name="kl_div"
+    )
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
@@ -221,5 +225,5 @@ def _model_structure(config):
     kl_loss = kl_loss_layer(kl_div)
 
     return tf.keras.Model(
-        inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="WNINNO"
+        inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="WNMLP"
     )
