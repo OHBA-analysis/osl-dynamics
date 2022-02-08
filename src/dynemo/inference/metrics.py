@@ -173,27 +173,26 @@ def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
     return norm
 
 
-def mode_covariance_correlations(
-    mode_covariances: np.ndarray, remove_diagonal: bool = True
+def pairwise_matrix_correlations(
+    matrices: np.ndarray, remove_diagonal: bool = True
 ) -> np.ndarray:
-    """Calculate the correlation between elements of the mode covariances.
+    """Calculate the correlation between elements of covariance matrices.
 
     Parameters
     ----------
-    mode_covariances : np.ndarray
-        Mode covariances matrices.
-        Shape must be (n_modes, n_channels, n_channels).
+    matrices : np.ndarray
+        Shape must be (n_matrices, n_channels, n_channels).
 
     Returns
     -------
     np.ndarray
-        Correlation between elements of each mode covariance.
-        Shape is (n_modes, n_modes).
+        Pairwise Pearson correlation between elements of each matrix.
+        Shape is (n_matrices, n_matrices).
     """
-    n_modes = mode_covariances.shape[0]
-    mode_covariances = mode_covariances.reshape(n_modes, -1)
-    correlations = np.corrcoef(mode_covariances)
-    correlations -= np.eye(n_modes)
+    n_matrices = matrices.shape[0]
+    matrices = matrices.reshape(n_matrices, -1)
+    correlations = np.corrcoef(matrices)
+    correlations -= np.eye(n_matrices)
     return correlations
 
 
@@ -222,50 +221,55 @@ def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
     return d
 
 
-def mode_covariance_riemannian_distances(mode_covariances: np.ndarray) -> np.ndarray:
-    """Calculate the Riemannian distance between mode covariances.
+def pairwise_riemannian_distances(
+    matrices: np.ndarray, parallel: bool = False
+) -> np.ndarray:
+    """Calculate the Riemannian distance between matrices.
 
     Parameters
     ----------
-    mode_covariances : np.ndarray
-        Mode covariances. Shape must be (n_modes, n_channels, n_channels).
+    matrices : np.ndarray
+        Shape must be (n_matrices, n_channels, n_channels).
+    parallel : bool
+        Should we calculate the Riemannian distances in parallel?
+        Much faster if first dimension is large, but uses more RAM.
 
     Returns
     -------
     np.ndarray
-        Matrix containing the Riemannian distances between modes.
-        Shape is (n_modes, n_modes).
+        Matrix containing the pairwise Riemannian distances between matrices.
+        Shape is (n_matrices, n_matrices).
     """
-    n_modes = mode_covariances.shape[0]
-    riemannian_distances = np.zeros([n_modes, n_modes])
-    for i in trange(n_modes, desc="Computing Riemannian distances", ncols=98):
-        for j in range(i + 1, n_modes):
-            riemannian_distances[i][j] = riemannian_distance(
-                mode_covariances[i], mode_covariances[j]
-            )
-    # Now only the upper triangular entries are filled
-    # and the diagonal entries are zeros
-    riemannian_distances = riemannian_distances + riemannian_distances.T
+    if parallel:
+        inverse_matrices = np.linalg.inv(matrices)
+        pairwise_products = np.matmul(
+            matrices[None, :, :, :], inverse_matrices[:, None, :, :]
+        )
+
+        # The eigenvalues of the product should be real due to Sylvester's law
+        # of inertia
+        eigenvalues = np.linalg.eigvals(pairwise_products).real
+
+        # Threshold the negative eigenvalues due to computational instability
+        eigenvalues = np.maximum(eigenvalues, 1e-3)
+
+        log_eigenvalues = np.log(eigenvalues)
+        riemannian_distances = np.sqrt(np.sum(log_eigenvalues ** 2, axis=-1))
+
+    else:
+        n_matrices = matrices.shape[0]
+        riemannian_distances = np.zeros([n_matrices, n_matrices])
+        for i in trange(n_matrices, desc="Computing Riemannian distances", ncols=98):
+            for j in range(i + 1, n_matrices):
+                riemannian_distances[i][j] = riemannian_distance(
+                    matrices[i], matrices[j]
+                )
+
+        # Only the upper triangular entries are filled,
+        # the diagonal entries are zeros
+        riemannian_distances = riemannian_distances + riemannian_distances.T
 
     return riemannian_distances
-
-
-def sample_pairwise_riemannian_distances(matrices: np.ndarray) -> np.ndarray:
-    """Parallelised version of mode_covariance_riemannian_distances
-    Much faster when the first dimension is large, but uses more RAM
-    """
-    inverse_matrices = np.linalg.inv(matrices)
-    pairwise_products = np.matmul(
-        matrices[None, :, :, :], inverse_matrices[:, None, :, :]
-    )
-    # The eigenvalues of the product should be real due to Sylvester's law of inertia
-    eigenvalues = np.linalg.eigvals(pairwise_products).real
-    # threshold the negative eigenvalues due to computational instability
-    eigenvalues = np.maximum(eigenvalues, 1e-3)
-    log_eigenvalues = np.log(eigenvalues)
-    pairwise_riemannian_distances = np.sqrt(np.sum(log_eigenvalues ** 2, axis=-1))
-
-    return pairwise_riemannian_distances
 
 
 def rv_coefficient(M: list) -> float:
