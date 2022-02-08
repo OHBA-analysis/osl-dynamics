@@ -1,13 +1,9 @@
-"""metrics to analyse model performance.
+"""Metrics to analyse model performance.
 
 """
-from typing import Tuple
 
 import numpy as np
-import tensorflow as tf
-import tensorflow_probability as tfp
-from scipy.linalg import eigvalsh, inv
-from sklearn.metrics import confusion_matrix as sklearn_confusion
+from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from tqdm import trange
 
 
@@ -68,7 +64,7 @@ def confusion_matrix(
     if not ((mode_time_course_1.ndim == 1) and (mode_time_course_2.ndim == 1)):
         raise ValueError("Both mode time courses must be either 1D or 2D.")
 
-    return sklearn_confusion(mode_time_course_1, mode_time_course_2)
+    return sklearn_confusion_matrix(mode_time_course_1, mode_time_course_2)
 
 
 def dice_coefficient_1d(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
@@ -175,104 +171,6 @@ def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
             f"Shape of A and/or B is incorrect. A.shape={A.shape}, B.shape={B.shape}."
         )
     return norm
-
-
-def log_likelihood(
-    time_series: np.ndarray,
-    alpha: np.ndarray,
-    covariances: np.ndarray,
-    sequence_length: int,
-    means: np.ndarray = None,
-):
-    """Calculate the negative log-likelihood.
-
-    We calculate the negative log-likelihood using a tensorflow implementation by
-    recursively calling tf_nll because it's quicker.
-
-    Parameters
-    ----------
-    time_series : np.ndarray
-        Time series data. Shape must be (n_samples, n_channels).
-    alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
-    covariances : np.ndarray
-        Inferred mode covariances. Shape must be (n_modes, n_channels, n_channels).
-    means : np.ndarray
-        Inferred mean vectors. Shape must be (n_modes, n_channels).
-    sequence_length : int
-        Length of time series to recursively pass to tf_nll.
-    """
-    # Validation
-    if time_series.shape[0] != alpha.shape[0]:
-        raise ValueError("time_series and alpha must have the same length.")
-
-    if time_series.shape[0] % sequence_length != 0:
-        raise ValueError("time_series and alpha must be divisible by sequence_length.")
-
-    time_series = time_series.astype(np.float32)
-    alpha = alpha.astype(np.float32)
-    covariances = covariances.astype(np.float32)
-    if means is not None:
-        means = means.astype(np.float32)
-
-    #  Convert means and covariances to tensors
-    if means is None:
-        m = tf.zeros([covariances.shape[0], covariances.shape[1]])
-    else:
-        m = tf.constant(means)
-    C = tf.constant(covariances)
-
-    # Number times to call tf_nll
-    n_calls = time_series.shape[0] // sequence_length
-
-    nll = []
-    for i in trange(n_calls, desc="Calculating log-likelihood", ncols=98):
-
-        # Convert data to tensors
-        x = tf.constant(time_series[i * sequence_length : (i + 1) * sequence_length])
-        a = tf.constant(alpha[i * sequence_length : (i + 1) * sequence_length])
-
-        # Calculate the negative log-likelihood for each sequence
-        nll.append(tf_nll(x, a, m, C))
-
-    # Return the sum for all sequences
-    return np.sum(nll)
-
-
-@tf.function
-def tf_nll(x: tf.constant, alpha: tf.constant, mu: tf.constant, D: tf.constant):
-    """Calculates the negative log likelihood using a tensorflow implementation.
-
-    Parameters
-    ----------
-    x : tf.constant
-        Time series data. Shape must be (sequence_length, n_channels).
-    alpha : tf.constant
-        Mode mixing factors. Shape must be (sequence_length, n_modes).
-    mu : tf.constant
-        Mode mean vectors. Shape must be (n_modes, n_channels).
-    D : tf.constant
-        Mode covariances. Shape must be (n_modes, n_channels, n_channels).
-    """
-    # Calculate the mean: m = Sum_j alpha_jt mu_j
-    alpha = tf.expand_dims(alpha, axis=-1)
-    mu = tf.expand_dims(mu, axis=0)
-    m = tf.reduce_sum(tf.multiply(alpha, mu), axis=1)
-
-    # Calculate the covariance: C = Sum_j alpha_jt D_j
-    alpha = tf.expand_dims(alpha, axis=-1)
-    D = tf.expand_dims(D, axis=0)
-    C = tf.reduce_sum(tf.multiply(alpha, D), axis=1)
-
-    # Calculate the log-likelihood at each time point
-    mvn = tfp.distributions.MultivariateNormalTriL(
-        loc=m,
-        scale_tril=tf.linalg.cholesky(C + 1e-6 * tf.eye(C.shape[-1])),
-    )
-    ll = mvn.log_prob(x)
-
-    # Sum over time and return the negative log-likelihood
-    return -tf.reduce_sum(ll, axis=0)
 
 
 def mode_covariance_correlations(
