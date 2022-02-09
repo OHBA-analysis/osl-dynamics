@@ -3,8 +3,6 @@
 """
 
 import os
-import time
-
 import tensorflow as tf
 
 
@@ -53,16 +51,3 @@ def suppress_messages(level: int = 3):
         The level for the messages to suppress.
     """
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(level)
-
-
-def tensorboard_run_logdir():
-    """Creates a directory name to store TensorBoard logs.
-
-    Returns
-    -------
-    str
-        Path for TensorBoard log files.
-    """
-    root_logdir = os.path.join(os.curdir, "logs")
-    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
-    return os.path.join(root_logdir, run_id)

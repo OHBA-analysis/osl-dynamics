@@ -10,7 +10,6 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow
 from tensorflow.keras import optimizers
-from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
@@ -18,7 +17,6 @@ from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 from dynemo.data import Data
 from dynemo.inference import callbacks, initializers
-from dynemo.inference.tf_ops import tensorboard_run_logdir
 from dynemo.utils.misc import check_iterable_type, replace_argument
 from dynemo.utils.model import HTMLTable, LatexTable
 
@@ -54,8 +52,7 @@ class ModelBase:
         Parameters
         ----------
         optimizer : str or tensorflow.keras.optimizers.Optimizer
-            Optimizer to use when compiling. Optional, if None
-            a new optimizer is created.
+            Optimizer to use when compiling.
         """
         if optimizer is None:
             optimizer = optimizers.get(
@@ -74,8 +71,6 @@ class ModelBase:
         *args,
         use_tqdm: bool = False,
         tqdm_class: TqdmCallback = None,
-        use_tensorboard: bool = None,
-        tensorboard_dir: str = None,
         save_best_after: int = None,
         save_filepath: str = None,
         **kwargs,
@@ -91,17 +86,13 @@ class ModelBase:
             tensorflow.
         tqdm_class : TqdmCallback
             Class for the tqdm progress bar.
-        use_tensorboard : bool
-            Should we use TensorBoard?
-        tensorboard_dir : str
-            Path to the location to save the TensorBoard log files.
         save_best_after : int
             Epoch number after which we should save the best model. The best model is
             that which achieves the lowest loss.
         save_filepath : str
             Path to save the best model to.
         additional_callbacks : list
-            List of keras callback objects. Optional.
+            List of keras callback objects.
 
         Returns
         -------
@@ -119,21 +110,8 @@ class ModelBase:
                 class tqdm_class(tqdm_auto):
                     def __init__(self, *args, **kwargs):
                         super().__init__(*args, **kwargs, ncols=98)
-
                 tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
             additional_callbacks.append(tqdm_callback)
-
-        # Callback for Tensorboard visulisation
-        if use_tensorboard:
-            if tensorboard_dir is not None:
-                tensorboard_cb = TensorBoard(
-                    tensorboard_dir, histogram_freq=1, profile_batch="2,10"
-                )
-            else:
-                tensorboard_cb = TensorBoard(
-                    tensorboard_run_logdir(), histogram_freq=1, profile_batch="2,10"
-                )
-            additional_callbacks.append(tensorboard_cb)
 
         # Callback to save the best model after a certain number of epochs
         if save_best_after is not None:
