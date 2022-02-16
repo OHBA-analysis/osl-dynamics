@@ -6,7 +6,7 @@
 """
 print("Setting up")
 import numpy as np
-from dynemo import data, files, simulation
+from dynemo import data, simulation
 from dynemo.inference import metrics, modes, tf_ops
 from dynemo.models.mrigo import Config, Model
 from dynemo.inference import callbacks
@@ -16,37 +16,9 @@ from dynemo.utils import plotting
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25600
-observation_error = 0.2
-
-# Load mode transition probability matrix and covariances of each mode
-trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
-cov = np.load(files.example.path / "hmm_cov.npy")
-
-# Number of modes and channels
-n_modes = cov.shape[0]
-n_channels = cov.shape[-1]
-
-print("Simulating data")
-sim = simulation.MS_HMM_MVN(
-    n_samples=n_samples,
-    trans_prob=trans_prob,
-    means="random",
-    n_modes=n_modes,
-    n_channels=n_channels,
-    covariances="random",
-    observation_error=observation_error,
-    random_seed=123,
-    fix_std=True,
-    uni_std=True,
-)
-sim.standardize()
-meg_data = data.Data(sim.time_series)
-
-# Hyperparameters
 config = Config(
-    n_modes=n_modes,
-    n_channels=n_channels,
+    n_modes=5,
+    n_channels=11,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=128,
@@ -74,7 +46,25 @@ config = Config(
     n_epochs=400,
 )
 
-# Prepare dataset
+# Simulate data
+print("Simulating data")
+sim = simulation.MS_HMM_MVN(
+    n_samples=25600,
+    n_modes=config.n_modes,
+    n_channels=config.n_channels,
+    trans_prob="sequence",
+    stay_prob=0.9,
+    means="random",
+    covariances="random",
+    observation_error=0.2,
+    random_seed=123,
+    fix_std=True,
+    uni_std=True,
+)
+sim.standardize()
+meg_data = data.Data(sim.time_series)
+
+# Prepare datasets
 training_dataset = meg_data.dataset(
     config.sequence_length,
     config.batch_size,

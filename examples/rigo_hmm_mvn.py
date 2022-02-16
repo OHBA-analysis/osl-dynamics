@@ -6,7 +6,7 @@
 
 print("Setting up")
 import numpy as np
-from dynemo import data, files, simulation
+from dynemo import data, simulation
 from dynemo.inference import metrics, modes, tf_ops
 from dynemo.models.rigo import Config, Model
 
@@ -14,11 +14,9 @@ from dynemo.models.rigo import Config, Model
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25600
-observation_error = 0.2
-
 config = Config(
     n_modes=5,
+    n_channels=11,
     sequence_length=200,
     inference_rnn="lstm",
     inference_n_units=64,
@@ -41,24 +39,20 @@ config = Config(
     n_epochs=100,
 )
 
-# Load mode transition probability matrix and covariances of each mode
-trans_prob = np.load(files.example.path / "hmm_trans_prob.npy")
-cov = np.load(files.example.path / "hmm_cov.npy")
-
 # Simulate data
 print("Simulating data")
 sim = simulation.HMM_MVN(
-    n_samples=n_samples,
-    trans_prob=trans_prob,
+    n_samples=25600,
+    n_modes=config.n_modes,
+    n_channels=config.n_channels,
+    trans_prob="sequence",
+    stay_prob=0.9,
     means="zero",
-    covariances=cov,
-    observation_error=observation_error,
+    covariances="random",
     random_seed=123,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
-
-config.n_channels = meg_data.n_channels
 
 # Prepare dataset
 training_dataset = meg_data.dataset(

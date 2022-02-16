@@ -4,7 +4,7 @@
 
 print("Setting up")
 import numpy as np
-from dynemo import data, files, simulation
+from dynemo import data, simulation
 from dynemo.inference import tf_ops
 from dynemo.models.go import Config, Model
 from dynemo.utils import plotting
@@ -13,13 +13,16 @@ from dynemo.utils import plotting
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25600
-observation_error = 0.2
-gamma_shape = 20
-gamma_scale = 10
-
-# Load mode transition probability matrix and covariances of each mode
-cov = np.load(files.example.path / "hmm_cov.npy")
+config = Config(
+    n_modes=5,
+    n_channels=11,
+    sequence_length=200,
+    learn_means=False,
+    learn_covariances=True,
+    batch_size=16,
+    learning_rate=0.01,
+    n_epochs=20,
+)
 
 # Mixtures of modes to include in the simulation
 mixed_mode_vectors = np.array(
@@ -30,28 +33,18 @@ mixed_mode_vectors = np.array(
 print("Simulating data")
 sim = simulation.MixedHSMM_MVN(
     n_samples=n_samples,
+    n_modes=config.n_modes,
+    n_channels=config.n_channels,
     mixed_mode_vectors=mixed_mode_vectors,
-    gamma_shape=gamma_shape,
-    gamma_scale=gamma_scale,
+    gamma_shape=20,
+    gamma_scale=10,
     means="zero",
-    covariances=cov,
-    observation_error=observation_error,
+    covariances="random",
+    observation_error=0.2,
     random_seed=123,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
-
-# Settings
-config = Config(
-    n_modes=sim.n_modes,
-    n_channels=sim.n_channels,
-    sequence_length=200,
-    learn_means=False,
-    learn_covariances=True,
-    batch_size=16,
-    learning_rate=0.01,
-    n_epochs=20,
-)
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
@@ -68,5 +61,6 @@ model.summary()
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
 
+# Inferred covariances
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")
