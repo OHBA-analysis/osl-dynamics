@@ -777,7 +777,7 @@ def plot_violin(
 
     # Validation
     if x is None:
-        x = range(1, len(data) + 1)
+        x = range(len(data))
     elif len(x) != len(data):
         raise ValueError("Incorrect number of x-values or data passed.")
     else:
@@ -812,7 +812,7 @@ def plot_violin(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot violins
-    ax.violinplot(data, showextrema=False)
+    ax.violinplot(data, positions=range(len(x)), showextrema=False)
     if show_mean:
         ax.scatter(
             x, [np.mean(d) for d in data], label="Mean", marker="+", color="black"
