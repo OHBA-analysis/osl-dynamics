@@ -203,13 +203,13 @@ def set_means(model, means, update_initializer=True):
 def set_covariances(model, covariances, update_initializer=True):
     covariances = covariances.astype(np.float32)
     covs_layer = model.get_layer("covs")
-    layer_weights = covs_layer.flattened_cholesky_matrices
-    flattened_cholesky_matrices = covs_layer.bijector.inverse(covariances)
-    layer_weights.assign(flattened_cholesky_matrices)
+    layer_weights = covs_layer.flattened_cholesky_factors
+    flattened_cholesky_factors = covs_layer.bijector.inverse(covariances)
+    layer_weights.assign(flattened_cholesky_factors)
 
     if update_initializer:
         covs_layer.initial_value = covariances
-        covs_layer.initial_flattened_cholesky_matrices = flattened_cholesky_matricecs
-        covs_layer.flattened_cholesky_matrices_initializer.initial_value = (
-            flattened_cholesky_matrices
+        covs_layer.initial_flattened_cholesky_factors = flattened_cholesky_matricecs
+        covs_layer.flattened_cholesky_factors_initializer.initial_value = (
+            flattened_cholesky_factors
         )
