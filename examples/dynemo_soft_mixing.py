@@ -7,10 +7,9 @@ import os
 import numpy as np
 from dynemo import data, simulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.rigo import Config, Model
+from dynemo.models.dynemo import Config, Model
 from dynemo.utils import plotting
 from tqdm import trange
-
 
 # Create directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -21,15 +20,12 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=6,
+    n_channels=80,
     sequence_length=200,
-    inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
-    model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization=None,
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
@@ -46,8 +42,8 @@ config = Config(
 print("Simulating data")
 sim = simulation.MixedSine_MVN(
     n_samples=25600,
-    n_modes=6,
-    n_channels=80,
+    n_modes=config.n_modes,
+    n_channels=config.n_channels,
     relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
     amplitudes=[6, 5, 4, 3, 2, 1],
     frequencies=[1, 2, 3, 4, 6, 8],
@@ -58,8 +54,6 @@ sim = simulation.MixedSine_MVN(
 )
 sim_stc = sim.mode_time_course
 meg_data = data.Data(sim.time_series)
-
-config.n_channels = meg_data.n_channels
 
 # Plot ground truth logits
 plotting.plot_separate_time_series(

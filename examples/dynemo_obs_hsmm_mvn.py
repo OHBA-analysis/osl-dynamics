@@ -6,7 +6,7 @@ print("Setting up")
 import numpy as np
 from dynemo import data, simulation
 from dynemo.inference import tf_ops
-from dynemo.models.go import Config, Model
+from dynemo.models.dynemo_obs import Config, Model
 from dynemo.utils import plotting
 
 # GPU settings
@@ -21,7 +21,7 @@ config = Config(
     learn_covariances=True,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=20,
+    n_epochs=50,
 )
 
 # Mixtures of modes to include in the simulation
@@ -32,18 +32,15 @@ mixed_mode_vectors = np.array(
 # Simulate data
 print("Simulating data")
 sim = simulation.MixedHSMM_MVN(
-    n_samples=n_samples,
-    n_modes=config.n_modes,
+    n_samples=25600,
     n_channels=config.n_channels,
     mixed_mode_vectors=mixed_mode_vectors,
     gamma_shape=20,
     gamma_scale=10,
     means="zero",
     covariances="random",
-    observation_error=0.2,
     random_seed=123,
 )
-sim.standardize()
 meg_data = data.Data(sim.time_series)
 
 # Prepare dataset

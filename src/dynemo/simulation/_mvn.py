@@ -104,6 +104,14 @@ class MVN:
                 0, 0.1, size=[self.n_modes, self.n_channels, self.n_channels]
             )
 
+            # Add a large activation to a small number of the channels at random
+            n_active_channels = max(1, 2 * self.n_channels // self.n_modes)
+            for i in range(self.n_modes):
+                active_channels = np.unique(
+                    self._rng.integers(0, self.n_channels, size=n_active_channels)
+                )
+                W[i, active_channels] += 0.15
+
             # A small value to add to the diagonal to ensure the covariances are
             # invertible
             eps = np.tile(np.eye(self.n_channels), [self.n_modes, 1, 1]) * eps
@@ -111,13 +119,6 @@ class MVN:
             # Calculate the covariances
             covariances = W @ W.transpose([0, 2, 1]) + eps
 
-            # Add a large activation to a small number of the channels at random
-            n_active_channels = max(1, self.n_channels // self.n_modes)
-            for i in range(self.n_modes):
-                active_channels = np.unique(
-                    self._rng.integers(0, self.n_channels, size=n_active_channels)
-                )
-                covariances[i, active_channels, active_channels] += 0.25
         else:
             raise ValueError("covariances must be a np.ndarray or 'random'.")
 
@@ -173,8 +174,6 @@ class MS_MVN(MVN):
         Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for the random number generator.
-    uni_std : bool
-        Do we want the same standard deviation across channels?
     """
 
     def __init__(
@@ -185,7 +184,6 @@ class MS_MVN(MVN):
         n_channels: int = None,
         observation_error: float = 0.0,
         random_seed: int = None,
-        uni_std: bool = False,
     ):
         super().__init__(
             means=means,
@@ -197,10 +195,7 @@ class MS_MVN(MVN):
         )
 
         # Get the std and FC from self.covariance
-        if uni_std:
-            self.stds = np.ones([self.n_modes, self.n_channels])
-        else:
-            self.stds = array_ops.cov2std(self.covariances)
+        self.stds = array_ops.cov2std(self.covariances)
         self.fcs = array_ops.cov2corr(self.covariances)
 
     def simulate_data(self, state_time_courses: np.ndarray) -> np.ndarray:
@@ -209,8 +204,8 @@ class MS_MVN(MVN):
         Parameters
         ----------
         state_time_courses : np.ndarray
-            It contains 3 different time courses for mean, standard deviations
-            and FC. Shape is (3, n_samples, n_modes).
+            It contains 2 different time courses for mean+standard deviations
+            and functional connectiivty. Shape is (2, n_samples, n_modes).
 
         Returns
         -------
@@ -226,19 +221,20 @@ class MS_MVN(MVN):
 
         # Initialise array to hold data
         data = np.zeros([n_samples, self.n_channels])
-        self.instantaneous_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
+        self.instantaneous_covs = np.zeros(
+            [n_samples, self.n_channels, self.n_channels]
+        )
 
         # Loop through all unique combinations of states
         for time_courses in np.unique(state_time_courses, axis=0):
 
-            # Extract the 3 different time courses
+            # Extract the different time courses
             alpha = time_courses[:, 0]
-            beta = time_courses[:, 1]
-            gamma = time_courses[:, 2]
+            gamma = time_courses[:, 1]
 
-            # Mean, standard deviation, FC for this combination of 3 time courses
+            # Mean, standard deviation, FC for this combination of time courses
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
-            G = np.diag(np.sum(self.stds * beta[:, np.newaxis], axis=0))
+            G = np.diag(np.sum(self.stds * alpha[:, np.newaxis], axis=0))
             F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
 
             # Calculate covariance matrix from the standard deviation and FC

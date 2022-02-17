@@ -17,7 +17,7 @@ print("Setting up")
 import numpy as np
 import pickle
 from dynemo import analysis, data, inference
-from dynemo.models.rigo import Config, Model
+from dynemo.models.dynemo import Config, Model
 from dynemo.utils import plotting
 
 # -------- #
@@ -31,13 +31,10 @@ config = Config(
     n_modes=10,
     n_channels=80,
     sequence_length=200,
-    inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
-    model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,

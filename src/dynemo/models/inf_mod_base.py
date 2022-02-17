@@ -15,6 +15,61 @@ from dynemo.utils.misc import replace_argument
 _logger = logging.getLogger("DyNeMo")
 
 
+@dataclass
+class InferenceModelConfig:
+    """Settings needed for the inference model."""
+
+    # Alpha parameters
+    theta_normalization: Literal[None, "batch", "layer"] = None
+    learn_alpha_temperature: bool = None
+    initial_alpha_temperature: float = None
+
+    # KL annealing parameters
+    do_kl_annealing: bool = False
+    kl_annealing_curve: Literal["linear", "tanh"] = None
+    kl_annealing_sharpness: float = None
+    n_kl_annealing_epochs: int = None
+
+    def validate_alpha_parameters(self):
+        if self.initial_alpha_temperature is None:
+            raise ValueError("initial_alpha_temperature must be passed.")
+
+        if self.initial_alpha_temperature <= 0:
+            raise ValueError("initial_alpha_temperature must be greater than zero.")
+
+    def validate_kl_annealing_parameters(self):
+        if self.do_kl_annealing:
+            if self.kl_annealing_curve is None:
+                raise ValueError(
+                    "If we are performing KL annealing, "
+                    "kl_annealing_curve must be passed."
+                )
+
+            if self.kl_annealing_curve not in ["linear", "tanh"]:
+                raise ValueError("KL annealing curve must be 'linear' or 'tanh'.")
+
+            if self.kl_annealing_curve == "tanh":
+                if self.kl_annealing_sharpness is None:
+                    raise ValueError(
+                        "kl_annealing_sharpness must be passed if "
+                        + "kl_annealing_curve='tanh'."
+                    )
+
+                if self.kl_annealing_sharpness < 0:
+                    raise ValueError("KL annealing sharpness must be positive.")
+
+            if self.n_kl_annealing_epochs is None:
+                raise ValueError(
+                    "If we are performing KL annealing, "
+                    + "n_kl_annealing_epochs must be passed."
+                )
+
+            if self.n_kl_annealing_epochs < 1:
+                raise ValueError(
+                    "Number of KL annealing epochs must be greater than zero."
+                )
+
+
 class InferenceModelBase(ModelBase):
     """Base class for an inference model."""
 
@@ -149,7 +204,7 @@ class InferenceModelBase(ModelBase):
         predictions = self.model.predict(*args, *kwargs)
         return_names = ["ll_loss", "kl_loss", "alpha"]
         if self.config.multiple_scales:
-            return_names += ["beta", "gamma"]
+            return_names.append("gamma")
         predictions_dict = dict(zip(return_names, predictions))
 
         return predictions_dict
@@ -191,9 +246,7 @@ class InferenceModelBase(ModelBase):
 
     def get_mode_time_courses(
         self, inputs, *args, concatenate: bool = False, **kwargs
-    ) -> Tuple[
-        Union[list, np.ndarray], Union[list, np.ndarray], Union[list, np.ndarray]
-    ]:
+    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
         """Get mode time courses.
 
         This method is used to get mode time courses for the multi-time-scale model.
@@ -211,9 +264,6 @@ class InferenceModelBase(ModelBase):
             Alpha time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         list or np.ndarray
-            Beta time course with shape (n_subjects, n_samples, n_modes) or
-            (n_samples, n_modes).
-        list or np.ndarray
             Gamma time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
@@ -223,29 +273,24 @@ class InferenceModelBase(ModelBase):
         inputs = self._make_dataset(inputs)
 
         outputs_alpha = []
-        outputs_beta = []
         outputs_gamma = []
         for dataset in inputs:
             predictions = self.predict(dataset, *args, **kwargs)
 
             alpha = predictions["alpha"]
-            beta = predictions["beta"]
             gamma = predictions["gamma"]
 
             alpha = np.concatenate(alpha)
-            beta = np.concatenate(beta)
             gamma = np.concatenate(gamma)
 
             outputs_alpha.append(alpha)
-            outputs_beta.append(beta)
             outputs_gamma.append(gamma)
 
         if concatenate or len(outputs_alpha) == 1:
             outputs_alpha = np.concatenate(outputs_alpha)
-            outputs_beta = np.concatenate(outputs_beta)
             outputs_gamma = np.concatenate(outputs_gamma)
 
-        return outputs_alpha, outputs_beta, outputs_gamma
+        return outputs_alpha, outputs_gamma
 
     def losses(self, dataset) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.
@@ -290,81 +335,3 @@ class InferenceModelBase(ModelBase):
         ll_loss, kl_loss = self.losses(dataset)
         free_energy = ll_loss + kl_loss
         return free_energy
-
-    def get_alpha_temperature(self) -> float:
-        """Alpha temperature used in the model.
-
-        Returns
-        -------
-        float
-            Alpha temperature.
-        """
-        alpha_layer = self.model.get_layer("alpha")
-        return alpha_layer.temperature.numpy()
-
-
-@dataclass
-class InferenceModelConfig:
-    """Settings needed for the inference model."""
-
-    # Alpha parameters
-    theta_normalization: Literal[None, "batch", "layer"] = None
-    alpha_xform: Literal["gumbel-softmax", "softmax", "softplus"] = None
-    learn_alpha_temperature: bool = None
-    initial_alpha_temperature: float = None
-
-    # KL annealing parameters
-    do_kl_annealing: bool = False
-    kl_annealing_curve: Literal["linear", "tanh"] = None
-    kl_annealing_sharpness: float = None
-    n_kl_annealing_epochs: int = None
-
-    def validate_alpha_parameters(self):
-        if self.alpha_xform not in ["gumbel-softmax", "softmax", "softplus", None]:
-            raise ValueError(
-                "alpha_xform must be 'gumbel-softmax', 'softmax', 'softplus' or None."
-            )
-
-        if self.alpha_xform in ["softmax", "gumbel-softmax"]:
-            if self.initial_alpha_temperature is None:
-                raise ValueError("initial_alpha_temperature must be passed.")
-
-            if self.initial_alpha_temperature <= 0:
-                raise ValueError("initial_alpha_temperature must be greater than zero.")
-
-        else:
-            # These parameters are not used by the model
-            self.initial_alpha_temperature = 1.0
-            self.learn_alpha_temperature = False
-
-    def validate_kl_annealing_parameters(self):
-        if self.do_kl_annealing:
-            if self.kl_annealing_curve is None:
-                raise ValueError(
-                    "If we are performing KL annealing, "
-                    "kl_annealing_curve must be passed."
-                )
-
-            if self.kl_annealing_curve not in ["linear", "tanh"]:
-                raise ValueError("KL annealing curve must be 'linear' or 'tanh'.")
-
-            if self.kl_annealing_curve == "tanh":
-                if self.kl_annealing_sharpness is None:
-                    raise ValueError(
-                        "kl_annealing_sharpness must be passed if "
-                        + "kl_annealing_curve='tanh'."
-                    )
-
-                if self.kl_annealing_sharpness < 0:
-                    raise ValueError("KL annealing sharpness must be positive.")
-
-            if self.n_kl_annealing_epochs is None:
-                raise ValueError(
-                    "If we are performing KL annealing, "
-                    + "n_kl_annealing_epochs must be passed."
-                )
-
-            if self.n_kl_annealing_epochs < 1:
-                raise ValueError(
-                    "Number of KL annealing epochs must be greater than zero."
-                )

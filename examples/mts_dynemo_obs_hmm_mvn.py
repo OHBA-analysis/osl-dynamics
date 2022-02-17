@@ -1,4 +1,4 @@
-"""Example script for fitting a multivariate normal observation model to data.
+"""Example script for fitting a multi-time-scale observation model to data.
 
 """
 
@@ -6,7 +6,7 @@ print("Setting up")
 import numpy as np
 from dynemo import data, files, simulation
 from dynemo.inference import tf_ops
-from dynemo.models.mgo import Config, Model
+from dynemo.models.mts_dynemo_obs import Config, Model
 from dynemo.utils import plotting
 
 # GPU settings
@@ -15,13 +15,13 @@ tf_ops.gpu_growth()
 # Hyperparameters
 config = Config(
     n_modes=5,
-    n_channels=11,
+    n_channels=40,
     sequence_length=200,
     learn_means=True,
     learn_stds=True,
     learn_fcs=True,
     batch_size=16,
-    learning_rate=0.01,
+    learning_rate=0.005,
     n_epochs=100,
 )
 
@@ -35,8 +35,6 @@ sim = simulation.MS_HMM_MVN(
     means="random",
     covariances="random",
     random_seed=123,
-    fix_std=True,
-    uni_std=True,
 )
 meg_data = data.Data(sim.time_series)
 
@@ -45,8 +43,7 @@ training_dataset = meg_data.dataset(
     config.sequence_length,
     config.batch_size,
     alpha=[sim.mode_time_course[0]],
-    beta=[sim.mode_time_course[1]],
-    gamma=[sim.mode_time_course[2]],
+    gamma=[sim.mode_time_course[1]],
     shuffle=True,
 )
 
@@ -67,4 +64,4 @@ sim_fcs = sim.fcs
 
 plotting.plot_matrices(inf_means - sim_means, filename="means_diff.png")
 plotting.plot_matrices(inf_stds - sim_stds, filename="stds_diff.png")
-plotting.plot_matrices(inf_fcs - sim_fcs, filename="stds_fcs.png")
+plotting.plot_matrices(inf_fcs - sim_fcs, filename="fcs_diff.png")

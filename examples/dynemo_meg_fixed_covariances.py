@@ -10,7 +10,7 @@
 print("Setting up")
 from dynemo.data import OSL_HMM, Data, manipulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.rigo import Config, Model
+from dynemo.models.dynemo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -19,14 +19,11 @@ tf_ops.gpu_growth()
 config = Config(
     n_modes=6,
     sequence_length=400,
-    inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
-    model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
     theta_normalization="layer",
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,

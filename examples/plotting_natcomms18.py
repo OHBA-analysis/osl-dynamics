@@ -3,10 +3,14 @@
 """
 
 print("Setting up")
+import os
 import numpy as np
 from dynemo.analysis import connectivity, power, spectral
 from dynemo.data import OSL_HMM, Data, io
 from dynemo.utils import plotting
+
+# Make directory for plots
+os.makedirs("figures", exist_ok=True)
 
 # Load an HMM fit
 hmm = OSL_HMM(
@@ -53,7 +57,7 @@ gcoh = np.average(coh, axis=0, weights=w)
 
 # Fit two spectral components to the subject-specific coherences
 wideband_components = spectral.decompose_spectra(coh, n_components=2)
-plotting.plot_line([f, f], wideband_components, filename="wideband.png")
+plotting.plot_line([f, f], wideband_components, filename="figures/wideband.png")
 
 # Calculate power and connectivity maps using PSDs and coherences
 power_map = power.variance_from_spectra(f, gpsd, wideband_components)
@@ -67,7 +71,7 @@ conn_map = connectivity.mean_coherence_from_spectra(
 # Just plot the first component (second is noise)
 power.save(
     power_map=power_map,
-    filename=f"mt_wideband0_power_.png",
+    filename="figures/mt_wideband0_power_.png",
     mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,
@@ -76,14 +80,16 @@ power.save(
 connectivity.save(
     connectivity_map=conn_map,
     threshold=0.925,
-    filename=f"mt_wideband0_conn_.png",
+    filename="figures/mt_wideband0_conn_.png",
     parcellation_file=parcellation_file,
     component=0,
 )
 
 # Fit four spectral components to the subject-specific coherences
 narrowband_components = spectral.decompose_spectra(coh, n_components=4)
-plotting.plot_line([f, f, f, f], narrowband_components, filename="narrowband.png")
+plotting.plot_line(
+    [f, f, f, f], narrowband_components, filename="figures/narrowband.png"
+)
 
 # Calculate power and connectivity maps using PSDs and coherences
 power_map = power.variance_from_spectra(f, gpsd, narrowband_components)
@@ -95,7 +101,7 @@ conn_map = connectivity.mean_coherence_from_spectra(
 for component in range(3):
     power.save(
         power_map=power_map,
-        filename=f"mt_narrowband{component}_power_.png",
+        filename=f"figures/mt_narrowband{component}_power_.png",
         mask_file=mask_file,
         parcellation_file=parcellation_file,
         subtract_mean=True,
@@ -104,7 +110,7 @@ for component in range(3):
     connectivity.save(
         connectivity_map=conn_map,
         threshold=0.925,
-        filename=f"mt_narrowband{component}_conn_.png",
+        filename=f"figures/mt_narrowband{component}_conn_.png",
         parcellation_file=parcellation_file,
         component=component,
     )

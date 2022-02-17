@@ -9,7 +9,7 @@ import os
 import numpy as np
 from dynemo import data, simulation
 from dynemo.inference import tf_ops, modes, metrics, callbacks
-from dynemo.models.rigo import Config, Model
+from dynemo.models.dynemo import Config, Model
 from dynemo.utils import plotting
 
 # Make directory to hold plots
@@ -19,23 +19,14 @@ os.makedirs("figures", exist_ok=True)
 tf_ops.gpu_growth()
 
 # Settings
-n_samples = 25600
-observation_error = 0.0
-gamma_shape = 10
-gamma_scale = 5
-
 config = Config(
     n_modes=3,
     n_channels=11,
     sequence_length=200,
-    inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
-    model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization=None,
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
@@ -52,14 +43,14 @@ config = Config(
 # Simulate data
 print("Simulating data")
 sim = simulation.HSMM_MVN(
-    n_samples=n_samples,
+    n_samples=25600,
     n_channels=config.n_channels,
     n_modes=config.n_modes,
     means="zero",
     covariances="random",
-    observation_error=observation_error,
-    gamma_shape=gamma_shape,
-    gamma_scale=gamma_scale,
+    observation_error=0.0,
+    gamma_shape=10,
+    gamma_scale=5,
     random_seed=123,
 )
 sim.standardize()
@@ -112,11 +103,10 @@ orders = modes.match_modes(sim_stc, inf_stc, return_order=True)
 inf_stc = inf_stc[:, orders[1]]
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
-plotting.compare_mode_data(
+plotting.plot_alpha(
     sim_stc,
     inf_stc,
-    titles=["Ground Truth", "DyNeMo"],
-    x_label="Sample",
+    y_labels=["Ground Truth", "DyNeMo"],
     filename="figures/compare.png",
 )
 

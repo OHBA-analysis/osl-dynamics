@@ -1,4 +1,4 @@
-"""Class for a Gaussian observation model.
+"""Dynamic Network Modes (DyNeMo) observation model.
 
 """
 
@@ -19,7 +19,7 @@ from dynemo.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig):
-    """Settings for GO.
+    """Settings for DyNeMo observation model.
 
     Parameters
     ----------
@@ -74,11 +74,11 @@ class Config(BaseModelConfig):
 
 
 class Model(ModelBase):
-    """Gaussian Observations (GO) model.
+    """DyNeMo observation model class.
 
     Parameters
     ----------
-    config : dynemo.models.go.Config
+    config : dynemo.models.dynemo_obs.Config
     """
 
     def __init__(self, config):
@@ -175,7 +175,7 @@ def _model_structure(config):
     C = mix_covs_layer([alpha, D])
     ll_loss = ll_loss_layer([data, m, C])
 
-    return tf.keras.Model(inputs=[data, alpha], outputs=[ll_loss], name="GO")
+    return tf.keras.Model(inputs=[data, alpha], outputs=[ll_loss], name="DyNeMo-Obs")
 
 
 def get_covariances(model):

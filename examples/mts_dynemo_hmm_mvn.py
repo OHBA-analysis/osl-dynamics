@@ -1,14 +1,13 @@
-"""Example script for running inference on simulated HMM-MVN data.
+"""Example script for running inference on simulated MS-HMM-MVN data.
 
 - Multiple scale version for simulation_hmm_mvn.py
-- We vary the mean, fix the standard deviation.
-- Should achieve a dice of close to one for alpha, beta and gamma.
+- Should achieve a dice of close to one for alpha and gamma.
 """
 print("Setting up")
 import numpy as np
 from dynemo import data, simulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.mrigo import Config, Model
+from dynemo.models.mts_dynemo import Config, Model
 from dynemo.inference import callbacks
 from dynemo.utils import plotting
 
@@ -18,20 +17,15 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=5,
-    n_channels=11,
+    n_channels=40,
     sequence_length=200,
-    inference_rnn="lstm",
     inference_n_units=128,
     inference_n_layers=2,
     inference_normalization="layer",
-    inference_dropout_rate=0.2,
-    model_rnn="lstm",
     model_n_units=128,
     model_n_layers=2,
     model_normalization="layer",
-    model_dropout_rate=0.2,
     theta_normalization="layer",
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=True,
@@ -56,10 +50,7 @@ sim = simulation.MS_HMM_MVN(
     stay_prob=0.9,
     means="random",
     covariances="random",
-    observation_error=0.2,
     random_seed=123,
-    fix_std=True,
-    uni_std=True,
 )
 sim.standardize()
 meg_data = data.Data(sim.time_series)
@@ -82,7 +73,7 @@ model.summary()
 
 # Callbacks
 dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.mode_time_course, mode_names=["alpha", "beta", "gamma"]
+    prediction_dataset, sim.mode_time_course, mode_names=["alpha", "gamma"]
 )
 
 print("Training model")
@@ -98,86 +89,44 @@ history = model.fit(
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Infered means, standard deviations and functional connectivities
-means, stds, fcs = model.get_means_stds_fcs()
+# Inferred parameters
+inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
 
-print("means:", means)
-print("stds:", stds)
-print("fcs:", fcs)
+plotting.plot_matrices(sim.fcs, filename="sim_fcs.png")
+plotting.plot_matrices(inf_fcs, filename="inf_fcs.png")
 
 # Inferred mode mixing factors
-inf_alpha, inf_beta, inf_gamma = model.get_mode_time_courses(prediction_dataset)
+inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
 
 inf_alpha = modes.time_courses(inf_alpha)
-inf_beta = modes.time_courses(inf_beta)
 inf_gamma = modes.time_courses(inf_gamma)
 
 # Simulated mode mixing factors
-sim_alpha, sim_beta, sim_gamma = sim.mode_time_course
+sim_alpha, sim_gamma = sim.mode_time_course
 
 # Match the inferred and simulated mixing factors
 sim_alpha, inf_alpha = modes.match_modes(sim_alpha, inf_alpha)
-sim_beta, inf_beta = modes.match_modes(sim_beta, inf_beta)
 sim_gamma, inf_gamma = modes.match_modes(sim_gamma, inf_gamma)
 
 # Dice coefficients
 dice_alpha = metrics.dice_coefficient(sim_alpha, inf_alpha)
-dice_beta = metrics.dice_coefficient(sim_beta, inf_beta)
 dice_gamma = metrics.dice_coefficient(sim_gamma, inf_gamma)
 
 print("Dice coefficient for mean:", dice_alpha)
-print("Dice coefficient for std:", dice_beta)
 print("Dice coefficient for fc:", dice_gamma)
 
 # Fractional occupancies
 fo_sim_alpha = modes.fractional_occupancies(sim_alpha)
-fo_sim_beta = modes.fractional_occupancies(sim_beta)
 fo_sim_gamma = modes.fractional_occupancies(sim_gamma)
 
 fo_inf_alpha = modes.fractional_occupancies(inf_alpha)
-fo_inf_beta = modes.fractional_occupancies(inf_beta)
 fo_inf_gamma = modes.fractional_occupancies(inf_gamma)
 
 print("Fractional occupancies mean (Simulation):", fo_sim_alpha)
 print("Fractional occupancies mean (DyNeMo):    ", fo_inf_alpha)
 
-print("Fractional occupancies std (Simulation):", fo_sim_beta)
-print("Fractional occupancies std (DyNeMo):    ", fo_inf_beta)
-
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (DyNeMo):    ", fo_inf_gamma)
-
-# Plot training history
-history = history.history
-
-loss = history["loss"]
-kl_loss = history["kl_loss"]
-ll_loss = history["ll_loss"]
-dice_alpha = history["dice_alpha"]
-dice_beta = history["dice_beta"]
-dice_gamma = history["dice_gamma"]
-
-plotting.plot_line(
-    [range(config.n_epochs), range(config.n_epochs)],
-    [loss, ll_loss],
-    labels=["loss", "ll_loss"],
-    title=f"total loss and ll loss against epoch\n "
-    + f"lr={config.learning_rate}, n_units={config.inference_n_units}, "
-    + f"n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
-    + f"n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
-    filename="figures/loss.png",
-)
-
-plotting.plot_line(
-    [range(config.n_epochs), range(config.n_epochs)],
-    [dice_alpha, dice_gamma],
-    labels=["dice_alpha", "dice_gamma"],
-    title=f"dice scores against epoch\n"
-    + f"lr={config.learning_rate}, n_units={config.inference_n_units}, "
-    + f"n_layers={config.inference_n_layers}, drop_out={config.inference_dropout_rate},\n"
-    + f"n_epochs={config.n_epochs}, annealing_epochs={config.n_kl_annealing_epochs}",
-    filename="figures/dice.png",
-)
 
 # Delete the temporary folder holding the data
 meg_data.delete_dir()

@@ -104,15 +104,11 @@ class SampleNormalDistributionLayer(layers.Layer):
             return mu
 
 
-class ThetaActivationLayer(layers.Layer):
-    """Layer for applying an activation function to theta.
-
-    This layer accepts theta and outputs alpha.
+class SoftmaxLayer(layers.Layer):
+    """Layer for applying a softmax activation function.
 
     Parameters
     ----------
-    xform : str
-        The functional form of the activation used to convert from theta to alpha.
     initial_temperature : float
         Temperature parameter for the softmax or Gumbel-Softmax.
     learn_temperature : bool
@@ -121,13 +117,11 @@ class ThetaActivationLayer(layers.Layer):
 
     def __init__(
         self,
-        xform: str,
         initial_temperature: float,
         learn_temperature: bool,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.xform = xform
         self.initial_temperature = initial_temperature
         self.learn_temperature = learn_temperature
         self.temperature_initializer = WeightInitializer(self.initial_temperature)
@@ -142,23 +136,8 @@ class ThetaActivationLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, theta, **kwargs):
-        if self.xform == "softplus":
-            alpha = activations.softplus(theta)
-
-        elif self.xform == "softmax":
-            alpha = activations.softmax(theta / self.temperature, axis=2)
-
-        elif self.xform == "gumbel-softmax":
-            gumbel_softmax_distribution = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=self.temperature,
-                logits=theta,
-            )
-            alpha = gumbel_softmax_distribution.sample()
-        else:
-            alpha = theta
-
-        return alpha
+    def call(self, inputs, **kwargs):
+        return activations.softmax(inputs / self.temperature, axis=2)
 
 
 class MeanVectorsLayer(layers.Layer):

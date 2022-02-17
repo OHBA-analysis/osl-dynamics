@@ -312,11 +312,6 @@ class MS_HMM_MVN(Simulation):
         Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for random number generator.
-    fix_std: bool
-        Do we want to remove dependency of loss function on standard deviation
-        time course?
-    uni_std: bool
-        Do we want the same standard deviation across channels?
     """
 
     def __init__(
@@ -330,9 +325,6 @@ class MS_HMM_MVN(Simulation):
         stay_prob: float = None,
         observation_error: float = 0.0,
         random_seed: int = None,
-        fix_std: bool = False,
-        uni_std: bool = False,
-        tie_mean_std: bool = False,
     ):
         # Observation model
         self.obs_mod = MS_MVN(
@@ -342,7 +334,6 @@ class MS_HMM_MVN(Simulation):
             n_channels=n_channels,
             observation_error=observation_error,
             random_seed=random_seed,
-            uni_std=uni_std,
         )
 
         self.n_modes = self.obs_mod.n_modes
@@ -356,17 +347,11 @@ class MS_HMM_MVN(Simulation):
             n_modes=self.n_modes,
             random_seed=random_seed if random_seed is None else random_seed + 1,
         )
-        self.beta_hmm = HMM(
-            trans_prob=np.eye(self.n_modes) if fix_std else trans_prob,
-            stay_prob=stay_prob,
-            n_modes=self.n_modes,
-            random_seed=random_seed if random_seed is None else random_seed + 2,
-        )
         self.gamma_hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_modes=self.n_modes,
-            random_seed=random_seed if random_seed is None else random_seed + 3,
+            random_seed=random_seed if random_seed is None else random_seed + 2,
         )
 
         # Initialise base class
@@ -374,12 +359,9 @@ class MS_HMM_MVN(Simulation):
 
         # Simulate state time courses
         alpha = self.alpha_hmm.generate_modes(self.n_samples)
-        beta = self.beta_hmm.generate_modes(self.n_samples)
         gamma = self.gamma_hmm.generate_modes(self.n_samples)
 
-        self.mode_time_course = np.array(
-            [alpha, beta if not tie_mean_std else alpha, gamma]
-        )
+        self.mode_time_course = np.array([alpha, gamma])
 
         # Simulate data
         self.time_series = self.obs_mod.simulate_data(self.mode_time_course)

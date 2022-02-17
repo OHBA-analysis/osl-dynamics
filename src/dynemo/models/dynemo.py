@@ -1,4 +1,4 @@
-"""Model class for an LSTM generative model with Gaussian observations.
+"""Dynamic Network Modes (DyNeMo) model.
 
 """
 
@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from tqdm import trange
-from dynemo.models import go
+from dynemo.models import dynemo_obs
 from dynemo.models.mod_base import BaseModelConfig
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.inference.layers import (
@@ -24,13 +24,13 @@ from dynemo.inference.layers import (
     KLDivergenceLayer,
     KLLossLayer,
     SampleNormalDistributionLayer,
-    ThetaActivationLayer,
+    SoftmaxLayer,
 )
 
 
 @dataclass
 class Config(BaseModelConfig, InferenceModelConfig):
-    """Settings for RIGO.
+    """Settings for DyNeMo.
 
     Parameters
     ----------
@@ -72,11 +72,8 @@ class Config(BaseModelConfig, InferenceModelConfig):
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature when alpha_xform='softmax' or
-        'gumbel-softmax'?
+        Should we learn the alpha temperature?
     initial_alpha_temperature : float
         Initial value for the alpha temperature.
 
@@ -117,7 +114,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     """
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = None
+    inference_rnn: Literal["gru", "lstm"] = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
@@ -125,7 +122,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     inference_dropout_rate: float = 0.0
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = None
+    model_rnn: Literal["gru", "lstm"] = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
@@ -148,9 +145,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
         self.validate_training_parameters()
 
     def validate_rnn_parameters(self):
-        if self.inference_rnn is None or self.model_rnn is None:
-            raise ValueError("Please pass inference_rnn and model_rnn.")
-
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
 
@@ -163,11 +157,11 @@ class Config(BaseModelConfig, InferenceModelConfig):
 
 
 class Model(InferenceModelBase):
-    """RNN Inference/model network and Gaussian Observations (RIGO).
+    """DyNeMo model class.
 
     Parameters
     ----------
-    config : dynemo.models.rigo.Config
+    config : dynemo.models.DyNeMo.Config
     """
 
     def __init__(self, config):
@@ -185,7 +179,7 @@ class Model(InferenceModelBase):
         np.ndarary
             Mode covariances.
         """
-        return go.get_covariances(self.model)
+        return dynemo_obs.get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -197,7 +191,7 @@ class Model(InferenceModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return go.get_means_covariances(self.model)
+        return dynemo_obs.get_means_covariances(self.model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
@@ -210,7 +204,7 @@ class Model(InferenceModelBase):
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        go.set_means(self.model, means, update_initializer)
+        dynemo_obs.set_means(self.model, means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each mode.
@@ -223,7 +217,7 @@ class Model(InferenceModelBase):
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        go.set_covariances(self.model, covariances, update_initializer)
+        dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
     def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
         """Uses the model RNN to sample mode mixing factors, alpha.
@@ -321,13 +315,9 @@ def _model_structure(config):
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-
-    # Layers to sample theta from q(theta) and to convert to mode mixing
-    # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
-    alpha_layer = ThetaActivationLayer(
-        config.alpha_xform,
+    alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
         name="alpha",
@@ -407,4 +397,6 @@ def _model_structure(config):
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
     kl_loss = kl_loss_layer(kl_div)
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="RIGO")
+    return tf.keras.Model(
+        inputs=inputs, outputs=[ll_loss, kl_loss, alpha], name="DyNeMo"
+    )

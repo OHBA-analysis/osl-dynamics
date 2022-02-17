@@ -1,4 +1,4 @@
-"""Class for a Multi-time-scale Gaussian observation model.
+"""Multi-Time-Scale DyNeMo observation model.
 
 """
 
@@ -21,7 +21,7 @@ from dynemo.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig):
-    """Settings for MGO.
+    """Settings for MTS-DyNeMo observation model.
 
     Parameters
     ----------
@@ -82,11 +82,11 @@ class Config(BaseModelConfig):
 
 
 class Model(ModelBase):
-    """Multi-time-scale Gaussian Observations (MGO) model.
+    """MTS-DyNeMo observation model class.
 
     Parameters
     ----------
-    config : dynemo.models.go.Config
+    config : dynemo.models.mts_dynemo_obs.Config
     """
 
     def __init__(self, config):
@@ -134,7 +134,6 @@ def _model_structure(config):
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
     alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
-    beta = layers.Input(shape=(config.sequence_length, config.n_modes), name="beta")
     gamma = layers.Input(shape=(config.sequence_length, config.n_modes), name="gamma")
 
     # Observation model:
@@ -177,14 +176,14 @@ def _model_structure(config):
     D = fcs_layer(data)  # data not used
 
     m = mix_means_layer([alpha, mu])
-    G = mix_stds_layer([beta, E])
+    G = mix_stds_layer([alpha, E])
     F = mix_fcs_layer([gamma, D])
     C = matmul_layer([G, F, G])
 
     ll_loss = ll_loss_layer([data, m, C])
 
     return tf.keras.Model(
-        inputs=[data, alpha, beta, gamma], outputs=[ll_loss], name="MGO"
+        inputs=[data, alpha, gamma], outputs=[ll_loss], name="MTS-DyNeMo-Obs"
     )
 
 

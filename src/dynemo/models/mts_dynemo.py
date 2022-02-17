@@ -1,4 +1,4 @@
-"""Model class for a multi-time-scale generative model with Gaussian observations.
+"""Multi-Time-Scale DyNeMo (MTS-DyNeMo) model.
 
 """
 
@@ -9,7 +9,7 @@ from tqdm import trange
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from dynemo.models import mgo
+from dynemo.models import mts_dynemo_obs
 from dynemo.models.mod_base import BaseModelConfig, ModelBase
 from dynemo.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from dynemo.inference.layers import (
@@ -25,7 +25,7 @@ from dynemo.inference.layers import (
     KLDivergenceLayer,
     KLLossLayer,
     SampleNormalDistributionLayer,
-    ThetaActivationLayer,
+    SoftmaxLayer,
     ConcatenateLayer,
     MatMulLayer,
     DummyLayer,
@@ -34,7 +34,7 @@ from dynemo.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig, InferenceModelConfig):
-    """Settings for MRIGO.
+    """Settings for MTS-DyNeMo.
 
     Parameters
     ----------
@@ -76,21 +76,22 @@ class Config(BaseModelConfig, InferenceModelConfig):
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
+        The same parameter is used for the gamma time course.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature when alpha_xform='softmax' or
-        'gumbel-softmax'?
+        Should we learn the alpha temperature?
+        The same parameter is used for the gamma time course.
     initial_alpha_temperature : float
         Initial value for the alpha temperature.
-    The same parameters are used for beta and gamma time courses.
+        The same parameter is used for the gamma time course.
 
     learn_means : bool
-        Should we make the standard deviation for each mode trainable?
+        Should we make the mean for each mode trainable?
     learn_stds: bool
         Should we make the standard deviation for each mode trainable?
     learn_fcs: bool
         Should we make the functional connectivity for each mode trainable?
+    initial_means : np.ndarray
+        Initialisation for the mode means.
     initial_stds: np.ndarray
         Initialisation for mode standard deviations.
     initial_fcs: np.ndarray
@@ -124,7 +125,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     """
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = None
+    inference_rnn: Literal["gru", "lstm"] = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
@@ -132,7 +133,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     inference_dropout_rate: float = 0.0
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = None
+    model_rnn: Literal["gru", "lstm"] = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
@@ -157,9 +158,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
         self.validate_training_parameters()
 
     def validate_rnn_parameters(self):
-        if self.inference_rnn is None or self.model_rnn is None:
-            raise ValueError("Please pass inference_rnn and model_rnn.")
-
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
 
@@ -176,11 +174,11 @@ class Config(BaseModelConfig, InferenceModelConfig):
 
 
 class Model(InferenceModelBase):
-    """Multi-time-scale RNN Inference/model network and Gaussian Observations (MRIGO).
+    """MTS-DyNeMo model class.
 
     Parameters
     ----------
-    config : dynemo.models.mrigo.Config
+    config : dynemo.models.mts_dynemo.Config
     """
 
     def __init__(self, config):
@@ -202,7 +200,7 @@ class Model(InferenceModelBase):
         fcs : np.ndarray
             Mode functional connectivities.
         """
-        return mgo.get_means_stds_fcs(self.model)
+        return mts_dynemo_obs.get_means_stds_fcs(self.model)
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
@@ -220,10 +218,12 @@ class Model(InferenceModelBase):
             Do we want to use the passed parameters when we re_initialize
             the model?
         """
-        mgo.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+        mts_dynemo_obs.set_means_stds_fcs(
+            self.model, means, stds, fcs, update_initializer
+        )
 
     def sample_time_courses(self, n_samples: int):
-        """Uses the model RNN to sample mode mixing factors, alpha, beta and gamma.
+        """Uses the model RNN to sample mode mixing factors, alpha and gamma.
 
         Parameters
         ----------
@@ -232,7 +232,10 @@ class Model(InferenceModelBase):
 
         Returns
         -------
-        List containing sampled alpha, beta, and gamma.
+        alpha : np.ndarray
+            Sampled alpha.
+        gamma : np.ndarray
+            Sampled gamma.
         """
         # Get layers
         model_rnn_layer = self.model.get_layer("mod_rnn")
@@ -300,7 +303,7 @@ class Model(InferenceModelBase):
             alpha[i] = alpha_layer(mean_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
             gamma[i] = gamma_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
 
-        return alpha, alpha, gamma
+        return alpha, gamma
 
 
 def _model_structure(config):
@@ -333,7 +336,7 @@ def _model_structure(config):
     inference_output = inference_output_layer(inference_input_dropout)
 
     #
-    # Mode time course for the mean
+    # Mode time course for the mean and standard deviation
     #
 
     # Layers
@@ -345,8 +348,7 @@ def _model_structure(config):
     mean_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="mean_theta_norm"
     )
-    alpha_layer = ThetaActivationLayer(
-        config.alpha_xform,
+    alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
         name="alpha",
@@ -358,12 +360,6 @@ def _model_structure(config):
     mean_theta = mean_theta_layer([mean_inf_mu, mean_inf_sigma])
     mean_theta_norm = mean_theta_norm_layer(mean_theta)
     alpha = alpha_layer(mean_theta_norm)
-
-    #
-    # Mode time course for the standard deviation
-    #
-    beta_layer = DummyLayer(name="beta")
-    beta = beta_layer(alpha)
 
     #
     # Mode time course for the FCs
@@ -378,8 +374,7 @@ def _model_structure(config):
     fc_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="fc_theta_norm"
     )
-    gamma_layer = ThetaActivationLayer(
-        config.alpha_xform,
+    gamma_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
         name="gamma",
@@ -430,7 +425,7 @@ def _model_structure(config):
     D = fcs_layer(inputs)  # inputs not used
 
     m = mix_means_layer([alpha, mu])
-    G = mix_stds_layer([beta, E])
+    G = mix_stds_layer([alpha, E])
     F = mix_fcs_layer([gamma, D])
     C = matmul_layer([G, F, G])
 
@@ -501,5 +496,5 @@ def _model_structure(config):
     kl_loss = kl_loss_layer([mean_kl_div, fc_kl_div])
 
     return tf.keras.Model(
-        inputs=inputs, outputs=[ll_loss, kl_loss, alpha, beta, gamma], name="MRIGO"
+        inputs=inputs, outputs=[ll_loss, kl_loss, alpha, gamma], name="MTS-DyNeMo"
     )

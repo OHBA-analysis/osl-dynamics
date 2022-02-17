@@ -6,14 +6,19 @@ temporal dependencies.
   means the LSTM cannot learn the top-level transitions.
 """
 
+print("Setting up")
+import os
 import numpy as np
 from sklearn.cluster import KMeans
 from dynemo import array_ops
 from dynemo.data import Data
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.rigo import Config, Model
+from dynemo.models.dynemo import Config, Model
 from dynemo.simulation import HierarchicalHMM_MVN
 from dynemo.utils import plotting
+
+# Make directory to hold plots
+os.makedirs("figures", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -23,14 +28,10 @@ config = Config(
     n_modes=4,
     n_channels=11,
     sequence_length=512,
-    inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
-    model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization=None,
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
@@ -117,9 +118,6 @@ history = model.fit(
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="model/weights",
 )
-"""
-model.load_weights("model/weights")
-"""
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
@@ -134,8 +132,6 @@ sim_top_stc = sim.top_level_stc
 orders = modes.match_modes(sim_bot_stc, inf_stc, return_order=True)
 inf_stc = inf_stc[:, orders[1]]
 
-np.save("data/inf_stc.npy", inf_stc)
-
 dice = metrics.dice_coefficient(sim_bot_stc, inf_stc)
 print("Dice coefficient:", dice)
 
@@ -147,11 +143,6 @@ plotting.plot_alpha(inf_stc, n_samples=4000, filename="figures/inf_stc.png")
 sam_alp = model.sample_alpha(10000)
 sam_stc = modes.time_courses(sam_alp)
 sam_stc = sam_stc[:, orders[1]]
-
-np.save("data/sam_stc.npy", sam_stc)
-"""
-sam_stc = np.load("data/sam_stc.npy")
-"""
 
 plotting.plot_alpha(sam_stc, n_samples=4000, filename="figures/sam_stc.png")
 

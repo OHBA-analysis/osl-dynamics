@@ -1,6 +1,6 @@
 """Example script for running inference on simulated HMM-MVN data.
 
-- Should achieve a dice coefficient of ~0.96.
+- Should achieve a dice coefficient of ~0.99.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -8,7 +8,7 @@ print("Setting up")
 import numpy as np
 from dynemo import data, simulation
 from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.rigo import Config, Model
+from dynemo.models.dynemo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -18,14 +18,10 @@ config = Config(
     n_modes=5,
     n_channels=11,
     sequence_length=200,
-    inference_rnn="lstm",
     inference_n_units=64,
     inference_normalization="layer",
-    model_rnn="lstm",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization=None,
-    alpha_xform="softmax",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
