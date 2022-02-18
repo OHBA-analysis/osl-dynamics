@@ -129,8 +129,8 @@ There are two options for running DyNeMo:
 
 DyNeMo can be imported like any other python package in a script:
 ```
-from dynemo import array_ops
-from dynemo.models import Model
+from ohba_models import array_ops
+from ohba_models.models import Model
 ```
 
 The script is executed via the command line on a GPU node with `python <script>.py`.

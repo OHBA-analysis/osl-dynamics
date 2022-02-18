@@ -4,9 +4,9 @@
 
 print("Setting up")
 import numpy as np
-from dynemo.analysis import connectivity, spectral, modes
-from dynemo.data import OSL_HMM, Data, io
-from dynemo.utils import plotting
+from ohba_models.analysis import connectivity, spectral, modes
+from ohba_models.data import OSL_HMM, Data, io
+from ohba_models.utils import plotting
 
 # Load a HMM fit
 hmm = OSL_HMM(

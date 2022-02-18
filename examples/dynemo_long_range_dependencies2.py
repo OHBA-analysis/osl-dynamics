@@ -10,12 +10,12 @@ print("Setting up")
 import os
 import numpy as np
 from sklearn.cluster import KMeans
-from dynemo import array_ops
-from dynemo.data import Data
-from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.dynemo import Config, Model
-from dynemo.simulation import HierarchicalHMM_MVN
-from dynemo.utils import plotting
+from ohba_models import array_ops
+from ohba_models.data import Data
+from ohba_models.inference import metrics, modes, tf_ops
+from ohba_models.models.dynemo import Config, Model
+from ohba_models.simulation import HierarchicalHMM_MVN
+from ohba_models.utils import plotting
 
 # Make directory to hold plots
 os.makedirs("figures", exist_ok=True)

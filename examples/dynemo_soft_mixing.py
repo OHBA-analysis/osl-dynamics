@@ -5,10 +5,10 @@
 print("Setting up")
 import os
 import numpy as np
-from dynemo import data, simulation
-from dynemo.inference import metrics, modes, tf_ops
-from dynemo.models.dynemo import Config, Model
-from dynemo.utils import plotting
+from ohba_models import data, simulation
+from ohba_models.inference import metrics, modes, tf_ops
+from ohba_models.models.dynemo import Config, Model
+from ohba_models.utils import plotting
 from tqdm import trange
 
 # Create directory to hold plots

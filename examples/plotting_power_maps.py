@@ -3,9 +3,9 @@
 """
 
 print("Setting up")
-from dynemo.analysis import power, spectral, modes, workbench
-from dynemo.data import OSL_HMM, Data, io
-from dynemo.utils import plotting
+from ohba_models.analysis import power, spectral, modes, workbench
+from ohba_models.data import OSL_HMM, Data, io
+from ohba_models.utils import plotting
 
 # Load an HMM fit
 hmm = OSL_HMM(

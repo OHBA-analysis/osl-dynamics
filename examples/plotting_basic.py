@@ -3,8 +3,8 @@
 """
 
 import numpy as np
-from dynemo import simulation
-from dynemo.utils import plotting
+from ohba_models import simulation
+from ohba_models.utils import plotting
 
 
 #

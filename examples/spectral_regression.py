@@ -4,9 +4,9 @@
 
 print("Setting up")
 import numpy as np
-from dynemo import simulation
-from dynemo.analysis import spectral
-from dynemo.utils import plotting
+from ohba_models import simulation
+from ohba_models.analysis import spectral
+from ohba_models.utils import plotting
 
 # Simulate alpha
 n_samples = 25600

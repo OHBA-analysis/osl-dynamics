@@ -5,7 +5,7 @@
 """
 
 import numpy as np
-from dynemo.analysis.gmm import fit_gmm
+from ohba_models.analysis.gmm import fit_gmm
 
 # Simulate a Gaussian mixture with two components
 n_samples = 2560

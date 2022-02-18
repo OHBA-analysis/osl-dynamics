@@ -1,6 +1,6 @@
 import numpy as np
-from dynemo import files
-from dynemo.utils import plotting
+from ohba_models import files
+from ohba_models.utils import plotting
 
 # Scanner channel names
 ctf275_channel_names = np.load(files.scanner.path / "ctf275_channel_names.npy")

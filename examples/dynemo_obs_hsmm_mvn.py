@@ -4,10 +4,10 @@
 
 print("Setting up")
 import numpy as np
-from dynemo import data, simulation
-from dynemo.inference import tf_ops
-from dynemo.models.dynemo_obs import Config, Model
-from dynemo.utils import plotting
+from ohba_models import data, simulation
+from ohba_models.inference import tf_ops
+from ohba_models.models.dynemo_obs import Config, Model
+from ohba_models.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
