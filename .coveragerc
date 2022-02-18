@@ -1,7 +1,7 @@
 # .coveragerc to control coverage.py
 [run]
 branch = True
-source = dynemo
+source = ohba_models
 # omit = bad_file.py
 
 [paths]

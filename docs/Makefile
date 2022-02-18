@@ -8,8 +8,8 @@ PAPER         =
 BUILDDIR      = ../build/sphinx/
 AUTODOCDIR    = api
 AUTODOCBUILD  = sphinx-apidoc
-PROJECT       = DyNeMo
-MODULEDIR     = ../src/dynemo
+PROJECT       = OHBA-Models
+MODULEDIR     = ../src/ohba_models
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $?), 1)

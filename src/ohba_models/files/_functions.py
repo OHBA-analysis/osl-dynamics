@@ -1,4 +1,4 @@
-"""Functions used to manage files kept in DyNeMo source code.
+"""Functions used to manage files kept in OHBA-Models' source code.
 
 """
 

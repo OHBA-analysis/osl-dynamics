@@ -12,7 +12,7 @@ from ohba_models.models.mod_base import ModelBase
 from ohba_models.inference import callbacks, initializers
 from ohba_models.utils.misc import replace_argument
 
-_logger = logging.getLogger("DyNeMo")
+_logger = logging.getLogger("OHBA-Models")
 
 
 @dataclass

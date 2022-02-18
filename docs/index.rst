@@ -1,8 +1,8 @@
 ================================
-Dynamic Network Modes (DyNeMo)
+OHBA-Models
 ================================
 
-This is the documentation of DyNeMo.
+This is the documentation of OHBA-Models.
 
 Contents
 ========
