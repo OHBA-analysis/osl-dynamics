@@ -295,17 +295,19 @@ def validate(
     return array
 
 def threshold_matrices(matrices, threshold):
-    """ Set the "not interesting" connections to zero according to the threshold
-    Input
-    -----
-    matrices: functional connectivities
-        shape=(n_samples, n_channels, n_channels)
-    threshold: a number between 0 and 1
+    """Set the 'not interesting' connections to zero according to the threshold.
+
+    Parameters
+    ----------
+    matrices : np.ndarray
+        Functional connectivities. Shape is (n_samples, n_channels, n_channels).
+    threshold : float
+        Between 0 and 1.
 
     Returns
     -------
-    thresholded matrices
-        shape = (n_samples, n_channels, n_channels)
+    np.ndarray
+        Thresholded matrices. Shape is (n_samples, n_channels, n_channels).
     """
     n_samples = matrices.shape[0]
     n_channels = matrices.shape[-1]

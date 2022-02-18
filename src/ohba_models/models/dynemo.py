@@ -161,7 +161,7 @@ class Model(InferenceModelBase):
 
     Parameters
     ----------
-    config : ohba_models.models.DyNeMo.Config
+    config : ohba_models.models.dynemo.Config
     """
 
     def __init__(self, config):
