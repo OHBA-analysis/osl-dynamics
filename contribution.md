@@ -1,23 +1,23 @@
 
 # Contribution Guide
 
-This is an introductory guide to using DyNeMo on the Biomedical Research Computing (BMRC) cluster. This guide covers:
+This is an introductory guide to using OHBA-Models on the Biomedical Research Computing (BMRC) cluster. This guide covers:
 - [The BMRC Cluster](#the-bmrc-cluster)
-- [Installing DyNeMo on BMRC](#installing-dynemo-on-bmrc)
-- [Using DyNeMo on BMRC](#using-dynemo-on-bmrc)
-- [Editing DyNeMo Source Code](#editing-dynemo-source-code)
+- [Installing OHBA-Models on BMRC](#installing-ohba-models-on-bmrc)
+- [Using OHBA-Models on BMRC](#using-ohba-models-on-bmrc)
+- [Editing OHBA-Models Source Code](#editing-ohba-models-source-code)
 
 ## The BMRC Cluster
 
 Website: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/cluster-usage.
 
 ### Login
-To login: `ssh <username>@rescomp1.well.ox.ac.uk` (or `@rescomp2.well.ox.ac.uk`).
+To login: `ssh <username>@cluster1.bmrc.ox.ac.uk` (or `@cluster2.bmrc.ox.ac.uk`).
 
-To login to an interactive GPU node: `ssh <username>@compG017`.
+To login to an interactive GPU node: `ssh compG017`.
 compG017 has 2 GPUs. Can view usage with: `nvidia-smi`.
 
-To login with graphical output enabled use: `ssh -X <username>@rescomp1.well.ox.ac.uk>`. An X11 forwarding client must be installed on your local computer, e.g. XQuartz.
+To login with graphical output enabled use: `ssh -X <username>@cluster1.bmrc.ox.ac.uk>`. An X11 forwarding client must be installed on your local computer, e.g. XQuartz.
 
 ### Directories
 Your home directory is `/users/woolrich/<username>`, however, this directory is limited in space. It is recommended you work from your data directory located at `/well/woolrich/users/<username>`.
@@ -27,12 +27,12 @@ Execute `rsync` from your local machine.
 
 Copy files from your local machine to the cluster:
 ```
-rsync -Phr <filename> <username>@rescomp1.well.ox.ac.uk:/path/on/bmrc
+rsync -Phr <filename> <username>@cluster1.bmrc.ox.ac.uk:/path/on/bmrc
 ```
 
 Copy files from the cluster to your local machine:
 ```
-rsync -Phr <username>@rescomp1.well.ox.ac.uk:/path/to/file /path/on/local/machine
+rsync -Phr <username>@cluster1.bmrc.ox.ac.uk:/path/to/file /path/on/local/machine
 ```
 
 ### Submitting Jobs
@@ -57,7 +57,7 @@ To submit a non-interactive GPU job, first create a `submission.sh` file:
 # Setup your environment
 module load Anaconda3
 module load cudnn
-source activate dynemo-tf23
+source activate ohba-tf23
 
 # Run scripts
 python simulation_hmm_mvn.py
@@ -71,17 +71,17 @@ Delete all jobs: `qdel -u <username>`.
 
 Further info: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources.
 
-## Installing DyNeMo on BMRC
-It is recommended to install DyNeMo within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
+## Installing OHBA-Models on BMRC
+It is recommended to install OHBA-Models within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
 
 ### TensorFlow 2.5 (Recommended for compG017)
 ```
 module use /well/woolrich/projects/software/modulefiles
 module load Anaconda3
 module load cuda/11.2
-conda create --name dynemo-tf25 python=3.8
-conda activate dynemo-tf25
-cd DyNeMo
+conda create --name ohba-tf25 python=3.8
+conda activate ohba-tf25
+cd OHBA-Models
 pip install -e .
 ```
 
@@ -96,9 +96,9 @@ Install:
 ```
 module load Anaconda3
 module load cuDNN
-conda create --name dynemo-tf24
-conda activate dynemo-tf24
-cd DyNeMo
+conda create --name ohba-tf24
+conda activate ohba-tf24
+cd OHBA-Models
 pip install -e .
 ```
 
@@ -113,21 +113,21 @@ Install:
 ```
 module load Anaconda3
 module load cudnn
-conda create --name dynemo-tf23
-conda activate dynemo-tf23
-cd DyNeMo
+conda create --name ohba-tf23
+conda activate ohba-tf23
+cd OHBA-Models
 pip install -e .
 ```
 
-## Using DyNeMo on BMRC
+## Using OHBA-Models on BMRC
 
-There are two options for running DyNeMo:
-- In a standalone script, e.g. the scripts in `/DyNeMo/examples`.
+There are two options for running OHBA-Models:
+- In a standalone script, e.g. the scripts in `/OHBA-Models/examples`.
 - In a Jupyter Notebook setup.
 
 ### Standalone Scripts
 
-DyNeMo can be imported like any other python package in a script:
+OHBA-Models can be imported like any other python package in a script:
 ```
 from ohba_models import array_ops
 from ohba_models.models import Model
@@ -135,19 +135,19 @@ from ohba_models.models import Model
 
 The script is executed via the command line on a GPU node with `python <script>.py`.
 
-Before you can run the script you need to activate the virtual environment in which DyNeMo was installed with `conda activate <env>`.
+Before you can run the script you need to activate the virtual environment in which OHBA-Models was installed with `conda activate <env>`.
 
 ### Jupyter Notebook
 
 This is a work in progress.
 
-## Editing DyNeMo Source Code
+## Editing OHBA-Models Source Code
 
 This section gives an overview of the source code and useful tips for editing.
 
-### Overview of the DyNeMo Package
+### Overview of the OHBA-Models Package
 
-The main source code is contained in `/DyNeMo/src/dynemo`. This directory contains 7 subpackages:
+The main source code is contained in `/OHBA-Models/src/ohba_models`. This directory contains 7 subpackages:
 - `data`: Classes and functions used to load, save and manipulate data.
 - `models` and `inference`: Classes for each model type and TensorFlow functions used for inference.
 - `analysis`: Functions for analysing a fitted model.
@@ -172,7 +172,7 @@ We recommend using VSCode locally and the `Remote - SSH` extension to edit remot
 - Paste the following into the text editor with your corresponding Oxford SSO and BMRC username:
 ```
 Host vscode-rescomp1
-    HostName rescomp1.well.ox.ac.uk
+    HostName cluster1.bmrc.ox.ac.uk
     ProxyJump <oxford-sso-username>@linux.ox.ac.uk
     User <bmrc-username>
     ForwardAgent yes
