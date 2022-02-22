@@ -49,7 +49,7 @@ To submit a non-interactive GPU job, first create a `submission.sh` file:
 ```
 #!/bin/bash
 #$ -q short.qg
-#$ -l gpu=2
+#$ -l gpu=1
 #$ -cwd
 #$ -j y
 #$ -o stdout.log
@@ -60,7 +60,7 @@ module load cudnn
 source activate ohba-tf23
 
 # Run scripts
-python simulation_hmm_mvn.py
+python dynemo_hmm_mvn.py
 ```
 
 Submit with: `qsub submission.sh`.
@@ -96,7 +96,7 @@ Install:
 ```
 module load Anaconda3
 module load cuDNN
-conda create --name ohba-tf24
+conda create --name ohba-tf24 python=3.8
 conda activate ohba-tf24
 cd OHBA-Models
 pip install -e .
@@ -113,7 +113,7 @@ Install:
 ```
 module load Anaconda3
 module load cudnn
-conda create --name ohba-tf23
+conda create --name ohba-tf23 python=3.8
 conda activate ohba-tf23
 cd OHBA-Models
 pip install -e .
@@ -121,25 +121,15 @@ pip install -e .
 
 ## Using OHBA-Models on BMRC
 
-There are two options for running OHBA-Models:
-- In a standalone script, e.g. the scripts in `/OHBA-Models/examples`.
-- In a Jupyter Notebook setup.
-
-### Standalone Scripts
-
-OHBA-Models can be imported like any other python package in a script:
+OHBA-Models can be used in a standalone python script, e.g. the scripts in `/OHBA-Models/examples`. It is imported like any other python package:
 ```
 from ohba_models import array_ops
-from ohba_models.models import Model
+from ohba_models.models.dynemo import Model
 ```
 
 The script is executed via the command line on a GPU node with `python <script>.py`.
 
 Before you can run the script you need to activate the virtual environment in which OHBA-Models was installed with `conda activate <env>`.
-
-### Jupyter Notebook
-
-This is a work in progress.
 
 ## Editing OHBA-Models Source Code
 
@@ -171,14 +161,14 @@ We recommend using VSCode locally and the `Remote - SSH` extension to edit remot
 - Select the first config file, e.g. for me: `/Users/<username>/.ssh/config`.
 - Paste the following into the text editor with your corresponding Oxford SSO and BMRC username:
 ```
-Host vscode-rescomp1
+Host vscode-bmrc
     HostName cluster1.bmrc.ox.ac.uk
     ProxyJump <oxford-sso-username>@linux.ox.ac.uk
     User <bmrc-username>
     ForwardAgent yes
 ```
 - Save with `Ctrl-S`, after which the text editor can be closed.
-- To connect to the server, click the green quick configuration bottom again and click `Connect to Host...`. Then select `vscode-rescomp1`.
+- To connect to the server, click the green quick configuration bottom again and click `Connect to Host...`. Then select `vscode-bmrc`.
 - You will be asked for your SSO password then BMRC password.
 - If you are working on the university VPN, you can omit `ProxyJump <oxford-sso-username>@linux.ox.ac.uk` line.
 - You can set up SSH keys for the university linux server if you want to avoid typing two passwords every time. [Guide](https://www.ssh.com/academy/ssh/copy-id).
