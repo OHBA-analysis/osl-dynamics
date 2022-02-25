@@ -101,8 +101,8 @@ def rough_square_axes(n_plots: int) -> Tuple[int, int, int]:
     empty: int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots ** 0.5).astype(int)
-    short = np.ceil(n_plots ** 0.5).astype(int)
+    long = np.floor(n_plots**0.5).astype(int)
+    short = np.ceil(n_plots**0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -1441,7 +1441,7 @@ def plot_alpha(
         Output filename.
     """
     n_alphas = len(alpha)
-    n_modes = max(stc.shape[1] for stc in alpha)
+    n_modes = max(a.shape[1] for a in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
     if cmap in QUAL_CMAPS:
         cmap = plt.cm.get_cmap(name=cmap)
@@ -1465,7 +1465,7 @@ def plot_alpha(
         plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     if y_labels is None:
-        y_labels = [None]
+        y_labels = [None] * n_alphas
     elif isinstance(y_labels, str):
         y_labels = [y_labels] * n_alphas
     elif len(y_labels) != n_alphas:
@@ -1503,7 +1503,7 @@ def plot_alpha(
     mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     fig.subplots_adjust(right=0.94)
     cb_ax = fig.add_axes([0.95, 0.15, 0.025, 0.7])
-    cb = fig.colorbar(mappable, cax=cb_ax, ticks=np.arange(0.5, n_modes + 1, 1))
+    cb = fig.colorbar(mappable, cax=cb_ax, ticks=np.arange(0.5, n_modes, 1))
     cb.ax.set_yticklabels(range(1, n_modes + 1))
 
     # Save to file if a filename as been passed
