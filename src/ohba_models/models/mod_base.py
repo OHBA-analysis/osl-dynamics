@@ -25,6 +25,9 @@ from ohba_models.utils.model import HTMLTable, LatexTable
 class BaseModelConfig:
     """Base class for settings for all models."""
 
+    # Model choices
+    multiple_scales: bool = False
+
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
@@ -42,20 +45,17 @@ class BaseModelConfig:
     def validate_training_parameters(self):
         if self.batch_size is None:
             raise ValueError("batch_size must be passed.")
-
-        if self.batch_size < 1:
+        elif self.batch_size < 1:
             raise ValueError("batch_size must be one or greater.")
 
         if self.n_epochs is None:
             raise ValueError("n_epochs must be passed.")
-
-        if self.n_epochs < 1:
+        elif self.n_epochs < 1:
             raise ValueError("n_epochs must be one or greater.")
 
         if self.learning_rate is None:
             raise ValueError("learning_rate must be passed.")
-
-        if self.learning_rate < 0:
+        elif self.learning_rate < 0:
             raise ValueError("learning_rate must be greater than zero.")
 
         # Strategy for distributed learning
@@ -65,18 +65,19 @@ class BaseModelConfig:
             self.strategy = get_strategy()
 
     def validate_dimension_parameters(self):
+        if self.n_modes is None:
+            raise ValueError("n_modes must be passed.")
+        elif self.n_modes < 1:
+            raise ValueError("n_modes must be one or greater.")
+
+        if self.n_channels is None:
+            raise ValueError("n_channels must be passed.")
+        elif self.n_channels < 1:
+            raise ValueError("n_channels must be one or greater.")
+
         if self.sequence_length is None:
             raise ValueError("sequence_length must be passed.")
-
-        if self.n_modes is not None:
-            if self.n_modes < 1:
-                raise ValueError("n_modes must be one or greater.")
-
-        if self.n_channels is not None:
-            if self.n_channels < 1:
-                raise ValueError("n_channels must be one or greater.")
-
-        if self.sequence_length < 1:
+        elif self.sequence_length < 1:
             raise ValueError("sequence_length must be one or greater.")
 
 

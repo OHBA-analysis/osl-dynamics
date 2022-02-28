@@ -124,6 +124,8 @@ class Config(BaseModelConfig, InferenceModelConfig):
         Strategy for distributed learning.
     """
 
+    multiple_scales: bool = True
+
     # Inference network parameters
     inference_rnn: Literal["gru", "lstm"] = "lstm"
     inference_n_layers: int = 1
@@ -141,7 +143,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
     model_dropout_rate: float = 0.0
 
     # Observation model parameters
-    multiple_scales: bool = True
     learn_means: bool = None
     learn_stds: bool = None
     learn_fcs: bool = None
