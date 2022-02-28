@@ -11,22 +11,22 @@ class SingleSine:
     """Class that generates sinusoidal time series data.
 
     The time series for each channel is a singe single wave. The amplitude
-    and frequency of the sine wave can be different for different modes and
-    channels. A random phase is used each time a mode is activated.
+    and frequency of the sine wave can be different for different states and
+    channels. A random phase is used each time a state is activated.
 
     Parameters
     ----------
     amplitudes : np.ndarray
-        Amplitude for the sine wave for each mode and channel.
-        Shape must be (n_modes, n_channels).
+        Amplitude for the sine wave for each state and channel.
+        Shape must be (n_states, n_channels).
     frequenices : np.ndarray
-        Frequency for the sine wave for each mode and channel.
-        Shape must be (n_modes, n_channels).
+        Frequency for the sine wave for each state and channel.
+        Shape must be (n_states, n_channels).
     sampling_frequency : float
         Sampling frequency in Hertz.
     covariances : np.ndarray
-        Covariances for each mode. Shape must be (n_modes, n_channels)
-        or (n_modes, n_channels, n_channels).
+        Covariances for each state. Shape must be (n_states, n_channels)
+        or (n_states, n_channels, n_channels).
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
@@ -49,18 +49,18 @@ class SingleSine:
                 "Mismatch between the number of amplitudes and frequencies."
             )
 
-        self.n_modes = amplitudes.shape[0]
+        self.n_states = amplitudes.shape[0]
         self.n_channels = amplitudes.shape[1]
 
         if covariances is None:
-            covariances = np.zeros([self.n_modes, self.n_channels, self.n_channels])
+            covariances = np.zeros([self.n_states, self.n_channels, self.n_channels])
 
         elif isinstance(covariances, str):
             covariances = self.create_covariances(covariances)
 
         if amplitudes.shape[0] != covariances.shape[0]:
             raise ValueError(
-                "Mismatch between number of amplitude modes and covariance modes."
+                "Mismatch between number of amplitude states and covariance states."
             )
 
         if covariances.ndim == 2:
@@ -76,19 +76,19 @@ class SingleSine:
         if option == "random":
             # Randomly sample the elements of W from a normal distribution
             W = self._rng.normal(
-                0, 0.1, size=[self.n_modes, self.n_channels, self.n_channels]
+                0, 0.1, size=[self.n_states, self.n_channels, self.n_channels]
             )
 
             # A small value to add to the diagonal to ensure the covariances are
             # invertible
-            eps = np.tile(np.eye(self.n_channels), [self.n_modes, 1, 1]) * eps
+            eps = np.tile(np.eye(self.n_channels), [self.n_states, 1, 1]) * eps
 
             # Calculate the covariances
             covariances = W @ W.transpose([0, 2, 1]) + eps
 
             # Add a large activation to a small number of the channels at random
-            n_active_channels = max(1, self.n_channels // self.n_modes)
-            for i in range(self.n_modes):
+            n_active_channels = max(1, self.n_channels // self.n_states)
+            for i in range(self.n_states):
                 active_channels = np.unique(
                     self._rng.integers(0, self.n_channels, size=n_active_channels)
                 )
@@ -98,30 +98,28 @@ class SingleSine:
 
         return covariances
 
-    def simulate_data(self, mode_time_course):
-        # NOTE: We assume mutually exclusive modes when generating the data
-
-        n_samples = mode_time_course.shape[0]
+    def simulate_data(self, state_time_course):
+        n_samples = state_time_course.shape[0]
         data = np.empty([n_samples, self.n_channels])
 
         # Generate data
         for i in range(n_samples):
             if i == 0 or (
-                np.argmax(mode_time_course[i]) != np.argmax(mode_time_course[i - 1])
+                np.argmax(state_time_course[i]) != np.argmax(state_time_course[i - 1])
             ):
                 phases = self._rng.uniform(
-                    0, 2 * np.pi, size=(self.n_modes, self.n_channels)
+                    0, 2 * np.pi, size=(self.n_states, self.n_channels)
                 )
-            mode = np.argmax(mode_time_course[i])
+            state = np.argmax(state_time_course[i])
             for j in range(self.n_channels):
-                data[i, j] = self.amplitudes[mode, j] * np.sin(
-                    2 * np.pi * self.frequencies[mode, j] * i / self.sampling_frequency
-                    + phases[mode, j]
+                data[i, j] = self.amplitudes[state, j] * np.sin(
+                    2 * np.pi * self.frequencies[state, j] * i / self.sampling_frequency
+                    + phases[state, j]
                 )
 
         # Add noise from the covariances
-        for i in range(self.n_modes):
-            time_points_active = mode_time_course[:, i] == 1
+        for i in range(self.n_states):
+            time_points_active = state_time_course[:, i] == 1
             n_time_points_active = np.count_nonzero(time_points_active)
             data[time_points_active] += self._rng.multivariate_normal(
                 np.zeros(self.n_channels),
