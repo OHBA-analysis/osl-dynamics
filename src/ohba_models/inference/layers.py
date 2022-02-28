@@ -931,3 +931,85 @@ class VectorQuantizerLayer(layers.Layer):
         quantized = inputs + tf.stop_gradient(quantized - inputs)
 
         return quantized
+
+
+class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
+    """Layer for sampling from a Gumbel-Softmax distribution."""
+
+    def call(self, inputs, **kwargs):
+        gs = tfp.distributions.RelaxedOneHotCategorical(temperature=0.5, probs=inputs)
+        return gs.sample()
+
+
+class CategoricalKLDivergenceLayer(layers.Layer):
+    """Layer to calculate a KL divergence between two categorical distributions.
+
+    Parameters
+    ----------
+    clip_start : int
+        Index to clip the sequences inputted to this layer.
+    """
+
+    def __init__(self, clip_start: int = 0, **kwargs):
+        super().__init__(**kwargs)
+        self.clip_start = clip_start
+
+    def call(self, inputs, **kwargs):
+        inference_probs, model_probs = inputs
+
+        # The model network predicts one time step into the future compared to
+        # the inference network. We clip the sequences to ensure we are comparing
+        # the correct time points.
+        model_probs = model_probs[:, self.clip_start : -1]
+        inference_probs = inference_probs[:, self.clip_start + 1 :]
+
+        # Calculate the KL divergence between the posterior and prior
+        prior = tfp.distributions.Categorical(probs=model_probs)
+        posterior = tfp.distributions.Categorical(probs=inference_probs)
+        kl_loss = tfp.distributions.kl_divergence(
+            posterior, prior, allow_nan_stats=False
+        )
+
+        # Sum the KL loss for each time point and average over batches
+        kl_loss = tf.reduce_sum(kl_loss, axis=1)
+        kl_loss = tf.reduce_mean(kl_loss, axis=0)
+
+        return kl_loss
+
+
+class CategoricalLogLikelihoodLossLayer(layers.Layer):
+    """Layer to calculate the log-likelihood loss assuming a categorical model.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states
+    """
+
+    def __init__(self, n_states, **kwargs):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+
+    def call(self, inputs, **kwargs):
+        x, mu, sigma, probs = inputs
+
+        # Log-likelihood for each state
+        ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
+        for i in range(self.n_states):
+            mvn = tfp.distributions.MultivariateNormalTriL(
+                loc=mu[i],
+                scale_tril=tf.linalg.cholesky(sigma[i]),
+                allow_nan_stats=False,
+            )
+            ll_loss += probs[:, :, i] * mvn.log_prob(x)
+
+        # Sum over time dimension and average over the batch dimension
+        ll_loss = tf.reduce_sum(ll_loss, axis=1)
+        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+
+        # Add the negative log-likelihood to the loss
+        nll_loss = -ll_loss
+        self.add_loss(nll_loss)
+        self.add_metric(nll_loss, name=self.name)
+
+        return nll_loss

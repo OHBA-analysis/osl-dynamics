@@ -7,6 +7,7 @@ Models for analysing neuroimaging data developed by the Oxford Centre for Human 
 Models included:
     - Dynamic Network Modes (DyNeMo).
     - Multi-Time-Scale Dynamic Network Modes (MTS-DyNeMo).
+    - Hidden-State Multivariate Normal (HS-MVN).
 
 Installation
 ============

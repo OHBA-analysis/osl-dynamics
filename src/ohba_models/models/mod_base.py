@@ -39,6 +39,7 @@ class BaseModelConfig:
 
     # Dimension parameters
     n_modes: int = None
+    n_states: int = None
     n_channels: int = None
     sequence_length: int = None
 
@@ -65,10 +66,16 @@ class BaseModelConfig:
             self.strategy = get_strategy()
 
     def validate_dimension_parameters(self):
-        if self.n_modes is None:
-            raise ValueError("n_modes must be passed.")
-        elif self.n_modes < 1:
-            raise ValueError("n_modes must be one or greater.")
+        if self.n_modes is None and self.n_states is None:
+            raise ValueError("Either n_modes or n_states must be passed.")
+
+        if self.n_modes is not None:
+            if self.n_modes < 1:
+                raise ValueError("n_modes must be one or greater.")
+
+        if self.n_states is not None:
+            if self.n_states < 1:
+                raise ValueError("n_states must be one or greater.")
 
         if self.n_channels is None:
             raise ValueError("n_channels must be passed.")
