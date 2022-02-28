@@ -42,7 +42,7 @@ def time_courses(
         if n_modes is None:
             n_modes = alpha[0].shape[1]
         stcs = [a.argmax(axis=1) for a in alpha]
-        stcs = [array_ops.get_one_hot(stc, n_modes=n_modes) for stc in stcs]
+        stcs = [array_ops.get_one_hot(stc, n_states=n_modes) for stc in stcs]
         if len(stcs) == 1:
             stcs = stcs[0]
         elif concatenate:
@@ -51,7 +51,7 @@ def time_courses(
         if n_modes is None:
             n_modes = alpha.shape[-1]
         stcs = alpha.argmax(axis=2)
-        stcs = np.array([array_ops.get_one_hot(stc, n_modes=n_modes) for stc in stcs])
+        stcs = np.array([array_ops.get_one_hot(stc, n_states=n_modes) for stc in stcs])
         if len(stcs) == 1:
             stcs = stcs[0]
         elif concatenate:
@@ -60,7 +60,7 @@ def time_courses(
         if n_modes is None:
             n_modes = alpha.shape[1]
         stcs = alpha.argmax(axis=1)
-        stcs = array_ops.get_one_hot(stcs, n_modes=n_modes)
+        stcs = array_ops.get_one_hot(stcs, n_states=n_modes)
     return stcs
 
 

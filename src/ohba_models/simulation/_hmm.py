@@ -134,7 +134,7 @@ class HMM:
         modes = np.zeros(n_samples, int)
         for sample in range(1, n_samples):
             modes[sample] = next(rands[modes[sample - 1]])
-        return get_one_hot(modes, n_modes=self.n_modes)
+        return get_one_hot(modes, n_states=self.n_modes)
 
 
 class HMM_MAR(Simulation):

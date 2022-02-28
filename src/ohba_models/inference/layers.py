@@ -663,7 +663,7 @@ class WaveNetLayer(layers.Layer):
         self.residual_block_layers = []
         for i in range(1, n_layers):
             self.residual_block_layers.append(
-                WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
+                WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
             )
         self.dense_layers = [
             layers.Conv1D(
@@ -874,8 +874,8 @@ class VectorQuantizerLayer(layers.Layer):
 
         # Calculate L2 distance between the inputs and the embeddings
         distances = (
-            tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
-            + tf.reduce_sum(self.embeddings ** 2, axis=0, keepdims=True)
+            tf.reduce_sum(flattened_inputs**2, axis=1, keepdims=True)
+            + tf.reduce_sum(self.embeddings**2, axis=0, keepdims=True)
             - 2 * tf.matmul(flattened_inputs, self.embeddings)
         )
 

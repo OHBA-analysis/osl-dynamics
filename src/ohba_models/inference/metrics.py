@@ -255,7 +255,7 @@ def pairwise_riemannian_distances(
         eigenvalues = np.maximum(eigenvalues, 1e-3)
 
         log_eigenvalues = np.log(eigenvalues)
-        riemannian_distances = np.sqrt(np.sum(log_eigenvalues ** 2, axis=-1))
+        riemannian_distances = np.sqrt(np.sum(log_eigenvalues**2, axis=-1))
 
     else:
         n_matrices = matrices.shape[0]
@@ -311,8 +311,9 @@ def rv_coefficient(M: list) -> float:
 
     return C
 
+
 def principal_component_distances(matrices, distance_measure):
-    """ Calculate pairwise distance between principal eigenvectors
+    """Calculate pairwise distance between principal eigenvectors
         of the matrices with a distance measure.
         distance_measure must be one of 'l2' or 'cosine'
 
@@ -346,8 +347,9 @@ def principal_component_distances(matrices, distance_measure):
     distances = distances + distances.T
     return distances
 
+
 def degree_distances(matrices, distance_measure):
-    """ Calculate pairwise distance between degree vectors
+    """Calculate pairwise distance between degree vectors
         of the matrices with a distance measure.
         distance_measure must be one of 'l2' or 'cosine'
 
@@ -370,15 +372,13 @@ def degree_distances(matrices, distance_measure):
     # Normalise the vectors with l2-norm
     l2_norm = np.sqrt(np.sum(np.square(degrees), axis=-1))
     degrees /= l2_norm[:, None]
-    
+
     n_matrices = matrices.shape[0]
     distances = np.zeros([n_matrices, n_matrices])
     for i in range(n_matrices):
         for j in range(i + 1, n_matrices):
             if distance_measure == "l2":
-                distances[i][j] = np.sum(
-                    np.square(degrees[i] - degrees[j])
-                )
+                distances[i][j] = np.sum(np.square(degrees[i] - degrees[j]))
             elif distance_measure == "cosine":
                 distances[i][j] = cosine(degrees[i], degrees[j])
             else:

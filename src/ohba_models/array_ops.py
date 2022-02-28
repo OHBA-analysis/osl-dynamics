@@ -9,7 +9,7 @@ import numpy as np
 _logger = logging.getLogger("OHBA-Models")
 
 
-def get_one_hot(values: np.ndarray, n_modes: int = None):
+def get_one_hot(values: np.ndarray, n_states: int = None):
     """Expand a categorical variable to a series of boolean columns (one-hot encoding).
 
     +----------------------+
@@ -42,8 +42,8 @@ def get_one_hot(values: np.ndarray, n_modes: int = None):
     ----------
     values : numpy.ndarray
         Categorical variable in a 1D array. Values should be integers (i.e. mode 0, 1,
-        2, 3, ... , `n_modes`).
-    n_modes : int
+        2, 3, ... , `n_states`).
+    n_states : int
         Total number of modes in `values`. Must be at least the number of modes
         present in `values`. Default is the number of unique values in `values`.
 
@@ -56,10 +56,10 @@ def get_one_hot(values: np.ndarray, n_modes: int = None):
     if values.ndim == 2:
         _logger.info("argmax being taken on shorter axis.")
         values = values.argmax(axis=1)
-    if n_modes is None:
-        n_modes = values.max() + 1
-    res = np.eye(n_modes)[np.array(values).reshape(-1)]
-    return res.reshape(list(values.shape) + [n_modes])
+    if n_states is None:
+        n_states = values.max() + 1
+    res = np.eye(n_states)[np.array(values).reshape(-1)]
+    return res.reshape(list(values.shape) + [n_states])
 
 
 def align_arrays(*sequences, alignment: str = "left") -> List[np.ndarray]:
@@ -294,6 +294,7 @@ def validate(
 
     return array
 
+
 def threshold_matrices(matrices, threshold):
     """Set the 'not interesting' connections to zero according to the threshold.
 
@@ -317,7 +318,9 @@ def threshold_matrices(matrices, threshold):
     thresholded_matrices = np.zeros([n_samples, n_channels, n_channels])
 
     # Take the off diagonal entries of the matrices
-    connections = matrices[:, m, n] # this has shape = (n_samples, n_channels * (n_channels - 1) // 2)
+    connections = matrices[
+        :, m, n
+    ]  # this has shape = (n_samples, n_channels * (n_channels - 1) // 2)
 
     upper_threshold = np.quantile(connections, 1 - (1 - threshold) / 2, axis=1)
     lower_threshold = np.quantile(connections, (1 - threshold) / 2, axis=1)
