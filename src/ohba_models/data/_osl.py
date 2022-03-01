@@ -19,6 +19,7 @@ class OSL_HMM:
         self.filename = filename
         self.hmm = mat73.loadmat(filename, use_attrdict=True)["hmm"]
 
+        self.state = self.hmm.state
         self.mode = self.hmm.state
         self.k = int(self.hmm.K)
         self.p = self.hmm.P
@@ -28,7 +29,7 @@ class OSL_HMM:
         self.prior = self.hmm.prior
         self.train = self.hmm.train
 
-        # Mode probabilities
+        # State probabilities
         if "gamma" in self.hmm:
             self.gamma = self.hmm.gamma.astype(np.float32)
         elif "Gamma" in self.hmm:
@@ -36,22 +37,22 @@ class OSL_HMM:
         else:
             self.gamma = None
 
-        # Mode time course
+        # State time course
         if self.gamma is not None:
             vpath = self.gamma.argmax(axis=1)
             self.vpath = array_ops.get_one_hot(vpath).astype(np.float32)
         else:
             self.vpath = None
 
-        # Mode means
-        self.means = np.array([mode.W.Mu_W for mode in self.mode])
+        # State means
+        self.means = np.array([state.W.Mu_W for state in self.state])
 
-        # Mode covariances
+        # State covariances
         self.covariances = np.array(
             [
-                mode.Omega.Gam_rate
-                / (mode.Omega.Gam_shape - len(mode.Omega.Gam_rate) - 1)
-                for mode in self.mode
+                state.Omega.Gam_rate
+                / (state.Omega.Gam_shape - len(state.Omega.Gam_rate) - 1)
+                for state in self.state
             ]
         )
 
@@ -105,27 +106,27 @@ class OSL_HMM:
                 return padded_alpha
 
     def fractional_occupancies(self) -> np.ndarray:
-        """Fractional Occupancy of each mode.
+        """Fractional Occupancy of each state.
 
         Returns
         -------
         np.ndarray
             Fractional occupancies.
         """
-        stc = self.mode_time_course(concatenate=True)
+        stc = self.state_time_course(concatenate=True)
         return modes.fractional_occupancies(stc)
 
-    def mode_time_course(
+    def state_time_course(
         self, concatenate: bool = False, pad: int = None
     ) -> Union[list, np.ndarray]:
-        """Mode time course for each subject.
+        """State time course for each subject.
 
         Parameters
         ----------
         concatenate : bool
-            Should we concatenate the mode time course for each subjects?
+            Should we concatenate the state time course for each subjects?
         pad : int
-            Pad the mode time course for each subject with zeros to replace the data
+            Pad the state time course for each subject with zeros to replace the data
             points lost by performing n_embeddings. Default is no padding.
         """
         if self.vpath is None:
@@ -146,6 +147,10 @@ class OSL_HMM:
             else:
                 return padded_stc
 
+    def mode_time_course(self, *args, **kwargs):
+        """Wrapper for the state_time_course method."""
+        return self.state_time_course(*args, **kwargs)
+
     def covariance_weights(self) -> np.ndarray:
         """Calculate covariance weightings based on variance (trace).
 
@@ -154,7 +159,7 @@ class OSL_HMM:
         Returns
         -------
         weights: np.ndarray
-            Modewise weights.
+            Statewise weights.
 
         """
         return array_ops.trace_weights(self.covariances)
