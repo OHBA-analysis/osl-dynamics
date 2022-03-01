@@ -84,12 +84,12 @@ class TensorFlowDataset:
                     subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
                     dataset = create_dataset(
                         {"data": subject, "subj_id": subject_tracker},
-                        sequence_length,
-                        step_size,
+                        self.sequence_length,
+                        self.step_size,
                     )
                 else:
                     dataset = create_dataset(
-                        {"data": subject}, sequence_length, step_size
+                        {"data": subject}, self.sequence_length, self.step_size
                     )
                 subject_datasets.append(dataset)
 
@@ -125,7 +125,9 @@ class TensorFlowDataset:
                     input_data["subj_id"] = (
                         np.zeros(subject.shape[0], dtype=np.float32) + i
                     )
-                dataset = create_dataset(input_data, sequence_length, step_size)
+                dataset = create_dataset(
+                    input_data, self.sequence_length, self.step_size
+                )
                 subject_datasets.append(dataset)
 
         # Create a dataset from all the subjects concatenated
@@ -283,16 +285,21 @@ def create_dataset(
     step_size : int
         Number of samples to slide the sequence across the data.
     """
+    
+    # Generate a non-overlapping sequence dataset
+    if step_size == sequence_length:
+        dataset = Dataset.from_tensor_slices(data)
+        dataset = dataset.batch(sequence_length, drop_remainder=True)
 
-    # Create a single input dataset
-    if len(data) == 1:
+    # Create an overlapping single model input dataset
+    elif len(data) == 1:
         dataset = Dataset.from_tensor_slices(list(data.values())[0])
         dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
         dataset = dataset.flat_map(
             lambda window: window.batch(sequence_length, drop_remainder=True)
         )
 
-    # Create a multiple input dataset
+    # Create an overlapping multiple model input dataset
     else:
 
         def batch_windows(*windows):
