@@ -648,10 +648,21 @@ class WaveNetLayer(layers.Layer):
         Number of filters for each convolution.
     n_layers : int
         Number of dilated causal convolution layers in each residual block.
+    local_conditioning : bool
+        Will we condition the WaveNet on a second input?
     """
 
-    def __init__(self, n_channels: int, n_filters: int, n_layers: int, **kwargs):
+    def __init__(
+        self,
+        n_channels: int,
+        n_filters: int,
+        n_layers: int,
+        local_conditioning: bool,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
+        self.local_conditioning = local_conditioning
+
         self.causal_conv_layer = layers.Conv1D(
             filters=n_filters,
             kernel_size=2,
@@ -662,9 +673,16 @@ class WaveNetLayer(layers.Layer):
         )
         self.residual_block_layers = []
         for i in range(1, n_layers):
-            self.residual_block_layers.append(
-                WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
-            )
+            if local_conditioning:
+                self.residual_block_layers.append(
+                    LocallyConditionedWaveNetResidualBlockLayer(
+                        filters=n_filters, dilation_rate=2**i
+                    )
+                )
+            else:
+                self.residual_block_layers.append(
+                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
+                )
         self.dense_layers = [
             layers.Conv1D(
                 filters=n_channels,
@@ -683,10 +701,17 @@ class WaveNetLayer(layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
-        out = self.causal_conv_layer(inputs)
+        if self.local_conditioning:
+            x, h = inputs
+            out = self.causal_conv_layer(x)
+        else:
+            out = self.causal_conv_layer(inputs)
         skips = []
         for layer in self.residual_block_layers:
-            out, skip = layer(out)
+            if self.local_conditioning:
+                out, skip = layer([out, h])
+            else:
+                out, skip = layer(out)
             skips.append(skip)
         out = tf.add_n(skips)
         for layer in self.dense_layers:
@@ -746,6 +771,68 @@ class WaveNetResidualBlockLayer(layers.Layer):
         residual = self.res_layer(z)
         skip = self.skip_layer(z)
         return inputs + residual, skip
+
+
+class LocallyConditionedWaveNetResidualBlockLayer(layers.Layer):
+    """Layer for a residual block in WaveNet.
+
+    Parameters
+    ----------
+    filters : int
+        Number of filters for the convolutions.
+    dilation_rate : int
+        Dilation rate for the causal convolutions.
+    """
+
+    def __init__(self, filters: int, dilation_rate: int, **kwargs):
+        super().__init__(**kwargs)
+        self.h_transform_layer = layers.Conv1D(filters, kernel_size=1, padding="same")
+        self.x_filter_layer = layers.Conv1D(
+            filters,
+            kernel_size=2,
+            dilation_rate=dilation_rate,
+            padding="causal",
+            kernel_regularizer=regularizers.l2(),
+            use_bias=False,
+        )
+        self.y_filter_layer = layers.Conv1D(
+            filters,
+            kernel_size=1,
+            dilation_rate=dilation_rate,
+            padding="same",
+            kernel_regularizer=regularizers.l2(),
+            use_bias=False,
+        )
+        self.x_gate_layer = layers.Conv1D(
+            filters,
+            kernel_size=2,
+            dilation_rate=dilation_rate,
+            padding="causal",
+            kernel_regularizer=regularizers.l2(),
+            use_bias=False,
+        )
+        self.y_gate_layer = layers.Conv1D(
+            filters,
+            kernel_size=1,
+            dilation_rate=dilation_rate,
+            padding="same",
+            kernel_regularizer=regularizers.l2(),
+            use_bias=False,
+        )
+        self.res_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
+        self.skip_layer = layers.Conv1D(filters=filters, kernel_size=1, padding="same")
+
+    def call(self, inputs, training=None, **kwargs):
+        x, h = inputs
+        y = self.h_transform_layer(h)
+        x_filter = self.x_filter_layer(x)
+        y_filter = self.y_filter_layer(y)
+        x_gate = self.x_gate_layer(x)
+        y_gate = self.y_gate_layer(y)
+        z = tf.tanh(x_filter + y_filter) * tf.sigmoid(x_gate + y_gate)
+        residual = self.res_layer(z)
+        skip = self.skip_layer(z)
+        return x + residual, skip
 
 
 class MultiLayerPerceptronLayer(layers.Layer):
@@ -1013,3 +1100,21 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.add_metric(nll_loss, name=self.name)
 
         return nll_loss
+
+
+class StructuralEquationModelingLayer(layers.Layer):
+    """Structural Equation Modeling (SEM) layer.
+
+    Generative model is: y_t = M y_t + e_t.
+
+    See W. D. Penny, et al., Modelling functional integration: a comparison of
+    structural equation and dynamic causal models for more details.
+    """
+
+    def call(self, inputs, **kwargs):
+        M, R = inputs
+        M_shape = tf.shape(M)
+        I = tf.eye(M_shape[-1], batch_shape=M_shape[:-2])
+        I_M = I - M
+        inv_I_M = tf.linalg.inv(M)
+        return inv_I_M @ R @ inv_I_M
