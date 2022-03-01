@@ -116,10 +116,7 @@ class SoftmaxLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        initial_temperature: float,
-        learn_temperature: bool,
-        **kwargs,
+        self, initial_temperature: float, learn_temperature: bool, **kwargs,
     ):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
@@ -158,12 +155,7 @@ class MeanVectorsLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -223,12 +215,7 @@ class CovarianceMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -299,12 +286,7 @@ class CorrelationMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -376,12 +358,7 @@ class DiagonalMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -503,15 +480,11 @@ class LogLikelihoodLossLayer(layers.Layer):
         # Multivariate normal distribution
         if self.diag_cov:
             mvn = tfp.distributions.MultivariateNormalDiag(
-                loc=mu,
-                scale_diag=sigma,
-                allow_nan_stats=False,
+                loc=mu, scale_diag=sigma, allow_nan_stats=False,
             )
         else:
             mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=mu,
-                scale_tril=tf.linalg.cholesky(sigma),
-                allow_nan_stats=False,
+                loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
             )
 
         # Calculate the log-likelihood
@@ -736,12 +709,12 @@ class WaveNetLayer(layers.Layer):
             if local_conditioning:
                 self.residual_block_layers.append(
                     LocallyConditionedWaveNetResidualBlockLayer(
-                        filters=n_filters, dilation_rate=2**i
+                        filters=n_filters, dilation_rate=2 ** i
                     )
                 )
             else:
                 self.residual_block_layers.append(
-                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
+                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
                 )
         self.dense_layers = [
             layers.Conv1D(
@@ -985,8 +958,7 @@ class VectorQuantizerLayer(layers.Layer):
             self.embeddings_initializer = WeightInitializer(self.initial_embeddings)
         self.embeddings = tf.Variable(
             initial_value=self.embeddings_initializer(
-                shape=(embedding_dim, n_embeddings),
-                dtype=tf.float32,
+                shape=(embedding_dim, n_embeddings), dtype=tf.float32,
             ),
             trainable=False,
             name="embeddings",
@@ -996,8 +968,7 @@ class VectorQuantizerLayer(layers.Layer):
         self.cluster_size_ema_initializer = tf.zeros_initializer()
         self.cluster_size_ema = tf.Variable(
             initial_value=self.cluster_size_ema_initializer(
-                shape=(n_embeddings,),
-                dtype=tf.float32,
+                shape=(n_embeddings,), dtype=tf.float32,
             ),
             trainable=False,
             name="cluster_size_ema",
@@ -1007,8 +978,7 @@ class VectorQuantizerLayer(layers.Layer):
         self.embeddings_ema_initializer = CopyTensorInitializer(self.embeddings)
         self.embeddings_ema = tf.Variable(
             initial_value=self.embeddings_ema_initializer(
-                shape=(embedding_dim, n_embeddings),
-                dtype=tf.float32,
+                shape=(embedding_dim, n_embeddings), dtype=tf.float32,
             ),
             trainable=False,
             name="embeddings_ema",
@@ -1021,8 +991,8 @@ class VectorQuantizerLayer(layers.Layer):
 
         # Calculate L2 distance between the inputs and the embeddings
         distances = (
-            tf.reduce_sum(flattened_inputs**2, axis=1, keepdims=True)
-            + tf.reduce_sum(self.embeddings**2, axis=0, keepdims=True)
+            tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
+            + tf.reduce_sum(self.embeddings ** 2, axis=0, keepdims=True)
             - 2 * tf.matmul(flattened_inputs, self.embeddings)
         )
 
@@ -1178,6 +1148,7 @@ class StructuralEquationModelingLayer(layers.Layer):
         I_M = I - M
         inv_I_M = tf.linalg.inv(M)
         return inv_I_M @ R @ inv_I_M
+
 
 class ScalarLayer(layers.Layer):
     """Layer to learn a single scalar.

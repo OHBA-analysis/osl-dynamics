@@ -53,7 +53,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     inference_activation : str
         Type of activation to use after normalization and before dropout.
         E.g. 'relu', 'elu', etc.
-    inference_dropout_rate : float
+    inference_dropout : float
         Dropout rate.
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -66,7 +66,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     model_activation : str
         Type of activation to use after normalization and before dropout.
         E.g. 'relu', 'elu', etc.
-    model_dropout_rate : float
+    model_dropout : float
         Dropout rate.
 
     theta_normalization : str
@@ -131,7 +131,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = None
-    inference_dropout_rate: float = 0.0
+    inference_dropout: float = 0.0
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = None
@@ -139,7 +139,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = None
-    model_dropout_rate: float = 0.0
+    model_dropout: float = 0.0
 
     # Observation model parameters
     multiple_scales: bool = False
