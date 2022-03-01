@@ -1178,3 +1178,107 @@ class StructuralEquationModelingLayer(layers.Layer):
         I_M = I - M
         inv_I_M = tf.linalg.inv(M)
         return inv_I_M @ R @ inv_I_M
+
+class ScalarLayer(layers.Layer):
+    """Layer to learn a single scalar.
+    
+    Parameters
+    ----------
+    learn : bool
+        Should we learn the scalar?
+    initial_value : float
+        Initial value for the scalar.
+    """
+
+    def __init__(
+        self, learn: bool, initial_value: float, **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.learn = learn
+        if initial_value is None:
+            self.initial_value = 1
+        else:
+            self.initial_value = initial_value.astype("float32")
+        self.scalar_initializer = WeightInitializer(self.initial_value)
+
+        def build(self):
+            self.scalar = self.add_weight(
+                "Scalar",
+                dtype=tf.float32,
+                initializer=self.scalar_initializer,
+                trainable=self.learn,
+            )
+            self.built = True
+
+        def call(self, inputs, **kwargs):
+            return self.scalar
+
+
+class MixSubjectEmbeddingParametersLayer(layers.Layer):
+    """ Class for mixing means and covariances for the
+    subject embedding model.
+
+    The mixture is calculated as
+    m_t = Sum_j alpha_jt mu_j^(s_t), C_t = Sum_j alpha_jt D_j^(s_t)
+    where s_t is the subject at time t and 
+    mu_j^(s_t) is the mean of mode j of subject s_t
+
+    Here mu_j^(s_t) ~ N(mu_j + f(s_t), sigma^2)
+         D_j^(s_t) ~ N(D_j + g(s_t), sigma^2)
+    where mu_j, D_j are group parameters, f and g are affine functions.
+
+    Parameters
+    ----------
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    n_subjects : int
+        Number of subjects.
+    
+    """
+
+    def __init__(self, n_modes, n_channels, n_subjects, **kwargs):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.n_subjects = n_subjects
+
+    def call(self, inputs):
+        # alpha.shape = (None, sequence_length, n_modes)
+        # group_mu.shape = (n_modes, n_channels)
+        # group_D.shape = (n_modes, n_channels, n_channels)
+        # b_sigma -- scalar
+        # subject_embeddings.shape = (n_subjects, embedding_dim)
+        # subj_id.shape = (None, sequence_length)
+        alpha, group_mu, group_D, b_sigma, subject_embeddings, subj_id = inputs
+        subj_id = tf.cast(subj_id, tf.int32)
+
+        delta_mu = tf.reshape(
+            layers.Dense(self.n_channels)(subject_embeddings),
+            (self.n_subjects, 1, self.n_channels),
+        )
+        delta_D = tf.reshape(
+            layers.Dense(self.n_channels ** 2)(subject_embeddings),
+            (self.n_subjects, 1, self.n_channels, self.n_channels),
+        )
+        mu_mean = tf.add(group_mu, delta_mu)
+        D_mean = tf.add(group_D, delta_D)
+
+        # The subject specific parameters for each mode using the
+        # reparameterisation trick
+        mu = SampleNormalDistributionLayer()([mu_mean, b_sigma])
+        D = SampleNormalDistributionLayer()([D_mean, b_sigma])
+
+        # The parameters for each time point
+        dynamic_mu = tf.gather(mu, subj_id)
+        dynamic_D = tf.gather(D, subj_id)
+
+        # Next mix with the time course
+        alpha = tf.expand_dims(alpha, axis=-1)
+        m = tf.reduce_sum(tf.multiply(alpha, dynamic_mu), axis=2)
+
+        alpha = tf.expand_dims(alpha, axis=-1)
+        C = tf.reduce_sum(tf.multiply(alpha, dynamic_D), axis=2)
+
+        return m, C
