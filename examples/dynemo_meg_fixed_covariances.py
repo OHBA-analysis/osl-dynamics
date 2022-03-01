@@ -18,6 +18,7 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=6,
+    n_channels=80,
     sequence_length=400,
     inference_n_units=64,
     inference_normalization="layer",
@@ -44,8 +45,6 @@ prepared_data = Data(
     sampling_frequency=250,
     n_embeddings=15,
 )
-
-config.n_channels = prepared_data.n_channels
 
 # Prepare dataset
 training_dataset = prepared_data.dataset(

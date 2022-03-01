@@ -172,6 +172,20 @@ class MeanVectorsLayer(layers.Layer):
         if initial_value is None:
             self.initial_value = np.zeros([n, m], dtype=np.float32)
         else:
+            if initial_value.ndim != 2:
+                raise ValueError(
+                    "a (n_modes, n_channels) array must be passed for initial_means."
+                )
+            if initial_value.shape[-1] != m:
+                raise ValueError(
+                    f"mismatch between the number of channels ({m}) and number of "
+                    + f"elements in initial_means ({initial_value.shape[-1]})."
+                )
+            if initial_value.shape[0] != n:
+                raise ValueError(
+                    f"mismatch bettwen the number of modes and vectors in "
+                    + f"initial_means ({initial_value.shape[0]})."
+                )
             self.initial_value = initial_value.astype("float32")
         self.vectors_initializer = WeightInitializer(self.initial_value)
 
@@ -228,6 +242,22 @@ class CovarianceMatricesLayer(layers.Layer):
         if initial_value is None:
             self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
         else:
+            if initial_value.ndim != 3:
+                raise ValueError(
+                    "a (n_modes, n_channels, n_channels) array must be passed for "
+                    + "initial_covariances."
+                )
+            if initial_value.shape[-1] != m:
+                raise ValueError(
+                    f"mismatch between the number of channels ({m}) and number of "
+                    + "rows/columns in initial_covariances "
+                    + f"({initial_value.shape[-1]})."
+                )
+            if initial_value.shape[0] != n:
+                raise ValueError(
+                    f"mismatch bettwen the number of modes and matrices in "
+                    + f"initial_covariances ({initial_value.shape[0]})."
+                )
             self.initial_value = initial_value.astype("float32")
         self.initial_flattened_cholesky_factors = self.bijector.inverse(
             self.initial_value
@@ -290,6 +320,22 @@ class CorrelationMatricesLayer(layers.Layer):
         if initial_value is None:
             self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
         else:
+            if initial_value.ndim != 3:
+                raise ValueError(
+                    "a (n_modes, n_channels, n_channels) array must be passed for "
+                    + "initial_fcs."
+                )
+            if initial_value.shape[-1] != m:
+                raise ValueError(
+                    f"mismatch between the number of channels ({m}) and number of "
+                    + "rows/columns in initial_fcs "
+                    + f"({initial_value.shape[-1]})."
+                )
+            if initial_value.shape[0] != n:
+                raise ValueError(
+                    f"mismatch bettwen the number of modes and matrices in "
+                    + f"initial_fcs ({initial_value.shape[0]})."
+                )
             self.initial_value = initial_value.astype("float32")
         self.initial_flattened_cholesky_factors = self.bijector.inverse(
             self.initial_value
@@ -349,6 +395,20 @@ class DiagonalMatricesLayer(layers.Layer):
         if initial_value is None:
             self.initial_value = np.ones([n, m], dtype=np.float32)
         else:
+            if initial_value.ndim != 2:
+                raise ValueError(
+                    "a (n_modes, n_channels) array must be passed for initial_value."
+                )
+            if initial_value.shape[-1] != m:
+                raise ValueError(
+                    f"mismatch between the number of channels ({m}) and number of "
+                    + f"elements in initial_value ({initial_value.shape[-1]})."
+                )
+            if initial_value.shape[0] != n:
+                raise ValueError(
+                    f"mismatch bettwen the number of modes and vectors in "
+                    + f"initial_value ({initial_value.shape[0]})."
+                )
             self.initial_value = initial_value.astype("float32")
         self.initial_diagonals = self.bijector.inverse(self.initial_value)
         self.diagonals_initializer = WeightInitializer(self.initial_diagonals)
