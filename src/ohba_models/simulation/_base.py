@@ -34,5 +34,5 @@ class Simulation:
     def __len__(self):
         return 1
 
-    def standardize(self):
-        self.time_series = standardize(self.time_series, axis=0)
+    def standardize(self, axis=0):
+        self.time_series = standardize(self.time_series, axis=axis)

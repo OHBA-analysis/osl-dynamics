@@ -667,3 +667,105 @@ class HMM_Sine(Simulation):
             return getattr(self.hmm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
+
+class MultiSubject_HMM_MVN(Simulation):
+    """Simulate an HMM with multivariate normal observation model for each subject.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples per subject to draw from the model.
+    n_subjects : int
+        Number of subjects.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    means : np.ndarray or str
+        Group mean vector for each state, shape should be (n_states, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Group covariance matrix for each state, shape should be (n_states,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    n_states : int
+        Number of states. Can pass this argument with keyword n_modes instead.
+    n_channels : int
+        Number of channels.
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for random number generator.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        n_subjects: int,
+        trans_prob: Union[np.ndarray, str, None],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        between_subject_std: float = 1,
+        n_states: int = None,
+        n_modes: int = None,
+        n_channels: int = None,
+        stay_prob: float = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+    ):
+        if n_states is None:
+            n_states = n_modes
+
+        # Observation model
+        self.obs_mod = MultiSubject_MVN(
+            means=means,
+            covariances=covariances,
+            between_subject_std=between_subject_std,
+            n_modes=n_modes,
+            n_channels=n_channels,
+            n_subjects=n_subjects,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        self.n_states = self.obs_mod.n_modes
+        self.n_channels = self.obs_mod.n_channels
+        self.n_subjects = self.obs_mod.n_subjects
+
+        # HM object for sampling state time courses
+        # N.b. we use a different random seed to the observation model.
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_states=self.n_states,
+            random_seed=random_seed if random_seed is None else random_seed +1,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate state time courses all subjects
+        self.state_time_course = []
+        for subject in range(self.n_subjects):
+            self.state_time_course.append(self.hmm.generate_states(self.n_samples))
+        self.state_time_course = np.array(self.state_time_course)
+
+        # Simulate data
+        self.time_series = self.obs_mod.simulate_multi_subject_data(self.state_time_course)
+    
+    @property
+    def n_modes(self):
+        return self.n_states
+    
+    @property
+    def mode_time_course(self):
+        return self.state_time_course
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+    
+    def standardize(self):
+        super().standardize(axis=1)
