@@ -5,7 +5,7 @@
 import logging
 
 import numpy as np
-from ohba_models.array_ops import get_one_hot, cov2corr
+from ohba_models.array_ops import get_one_hot
 from ohba_models.simulation import MVN, Simulation
 
 _logger = logging.getLogger("OHBA-Models")
@@ -241,8 +241,11 @@ class HSMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]
 
 
 class MixedHSMM_MVN(Simulation):
@@ -365,5 +368,8 @@ class MixedHSMM_MVN(Simulation):
         )
 
     def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]

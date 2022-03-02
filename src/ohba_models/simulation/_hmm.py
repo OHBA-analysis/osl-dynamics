@@ -6,7 +6,7 @@ import logging
 from typing import Union
 
 import numpy as np
-from ohba_models.array_ops import get_one_hot, cov2corr
+from ohba_models.array_ops import get_one_hot
 from ohba_models.simulation import MAR, MS_MVN, MVN, SingleSine, Simulation
 from ohba_models.simulation._hsmm import HSMM
 
@@ -302,8 +302,11 @@ class HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]
 
 
 class MS_HMM_MVN(Simulation):
@@ -572,8 +575,11 @@ class HierarchicalHMM_MVN(Simulation):
         return stc
 
     def standardize(self):
+        standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances = cov2corr(self.obs_mod.covariances)
+        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+            np.newaxis, ...
+        ]
 
 
 class HMM_Sine(Simulation):
