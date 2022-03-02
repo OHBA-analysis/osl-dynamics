@@ -23,7 +23,7 @@ from ohba_models.inference.layers import (
     KLLossLayer,
     SampleNormalDistributionLayer,
     SoftmaxLayer,
-    ScalarLayer,
+    SubjectMeansCovsLayer,
     MixSubjectEmbeddingParametersLayer,
     ConcatenateLayer,
 )
@@ -72,11 +72,8 @@ class Config(BaseModelConfig, InferenceModelConfig):
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
-    alpha_xform : str
-        Functional form of alpha. Either 'gumbel-softmax', 'softmax' or 'softplus'.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature when alpha_xform='softmax' or
-        'gumbel-softmax'?
+        Should we learn the alpha temperature?
     initial_alpha_temperature : float
         Initial value for the alpha temperature.
 
@@ -116,17 +113,13 @@ class Config(BaseModelConfig, InferenceModelConfig):
         Strategy for distributed learning.
 
     n_subjects : int
-        Number of subjects
+        Number of subjects.
     embedding_dim : int
-        Number of dimensions for the subject embedding
-    learn_between_subject_variance : bool
-        Should we make the between_subject_variance trainable?
-    intial_between_subject_variance : float
-        Initialisation for the betwen subject variance.
+        Number of dimensions for the subject embedding.
     """
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = None
+    inference_rnn: Literal["gru", "lstm"] = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
@@ -134,7 +127,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     inference_dropout: float = 0.0
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = None
+    model_rnn: Literal["gru", "lstm"] = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
@@ -151,8 +144,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
     # Parameters specific to subject embedding model
     n_subjects: int = None
     embedding_dim: int = None
-    learn_between_subject_std: bool = None
-    initial_between_subject_std: float = None
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -164,9 +155,6 @@ class Config(BaseModelConfig, InferenceModelConfig):
         self.validate_subject_embedding_parameters()
 
     def validate_rnn_parameters(self):
-        if self.inference_rnn is None or self.model_rnn is None:
-            raise ValueError("Please pass inference_rnn and model_rnn.")
-
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
 
@@ -178,14 +166,8 @@ class Config(BaseModelConfig, InferenceModelConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
     def validate_subject_embedding_parameters(self):
-        if (
-            self.n_subjects is None
-            or self.embedding_dim is None
-            or self.learn_between_subject_std is None
-        ):
-            raise ValueError(
-                "n_subjects, embedding_dim and learn_between_subject_std must be passed."
-            )
+        if self.n_subjects is None or self.embedding_dim is None:
+            raise ValueError("n_subjects and embedding_dim must be passed.")
 
 
 class Model(InferenceModelBase):
@@ -216,7 +198,7 @@ def _model_structure(config):
 
     # Definition of layers
     inference_input_dropout_layer = layers.Dropout(
-        config.inference_dropout_rate, name="data_drop"
+        config.inference_dropout, name="data_drop"
     )
     inference_output_layer = InferenceRNNLayer(
         config.inference_rnn,
@@ -224,7 +206,7 @@ def _model_structure(config):
         config.inference_activation,
         config.inference_n_layers,
         config.inference_n_units,
-        config.inference_dropout_rate,
+        config.inference_dropout,
         name="inf_rnn",
     )
     inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
@@ -236,11 +218,8 @@ def _model_structure(config):
     # factors alpha
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
-    alpha_layer = ThetaActivationLayer(
-        config.alpha_xform,
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+    alpha_layer = SoftmaxLayer(
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow
@@ -277,23 +256,19 @@ def _model_structure(config):
         config.initial_covariances,
         name="group_covs",
     )
-    between_subject_std_layer = ScalarLayer(
-        config.learn_between_subject_std,
-        config.initial_between_subject_std,
-        name="between_subject_std",
+    subject_means_covs_layer = SubjectMeansCovsLayer(
+        config.n_modes, config.n_channels, config.n_subjects, name="subject_means_covs"
     )
-    mix_subject_embedding_parameters_layer = MixSubjectEmbeddingParametersLayer(
-        config.n_modes, config.n_channels, config.n_subjects, name="mix_se_parameters"
+    mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
+        name="mix_subject_means_covs"
     )
     ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
 
     # Data flow
     group_mu = group_means_layer(data)  # data not used
     group_D = group_covs_layer(data)  # data not used
-    b_sigma = between_subject_std_layer(data)  # data not used
-    m, C = mix_subject_embedding_parameters_layer(
-        [alpha, group_mu, group_D, b_sigma, subject_embeddings, subj_id]
-    )
+    mu, D = subject_means_covs_layer([group_mu, group_D, subject_embeddings])
+    m, C = mix_subject_means_covs_layer([alpha, mu, D, subj_id])
     ll_loss = ll_loss_layer([data, m, C])
 
     # Model RNN
@@ -303,7 +278,7 @@ def _model_structure(config):
 
     # Definition of layers
     model_input_dropout_layer = layers.Dropout(
-        config.model_dropout_rate, name="theta_norm_drop"
+        config.model_dropout, name="theta_norm_drop"
     )
     model_output_layer = ModelRNNLayer(
         config.model_rnn,
@@ -311,7 +286,7 @@ def _model_structure(config):
         config.model_activation,
         config.model_n_layers,
         config.model_n_units,
-        config.model_dropout_rate,
+        config.model_dropout,
         name="mod_rnn",
     )
     concatenate_layer = ConcatenateLayer(axis=2, name="model_concat")
