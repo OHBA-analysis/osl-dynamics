@@ -12,6 +12,7 @@ from matplotlib import patches
 from matplotlib.path import Path
 
 from ohba_models.array_ops import get_one_hot
+from ohba_models.analysis import power
 from ohba_models.data.task import epoch_mean
 from ohba_models.inference import modes
 from ohba_models.utils.misc import override_dict_defaults
@@ -1404,6 +1405,49 @@ def topoplot(
 
     if filename is not None:
         save(fig, filename)
+
+
+def plot_brain_surface(
+    values: np.ndarray,
+    filename: str,
+    mask_file: str,
+    parcellation_file: str,
+    subtract_mean: bool = False,
+    mean_weights: np.ndarray = None,
+    **plot_kwargs,
+):
+    """Plot a 2D heat map on the surface of the brain.
+
+    Parameters
+    ----------
+    values : np.ndarray
+        Data to plot. Can be of shape: (n_maps, n_channels) or (n_channels,).
+        A (..., n_channels, n_channels) array can also be passed.
+        Warning: this function cannot be used if n_maps is equal to n_channels.
+    filename : str
+        Output filename. If extension is .nii.gz the power map is saved as a
+        NIFTI file. Or if the extension is png, it is saved as images.
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcelate the training data.
+    subtract_mean : bool
+        Should we subtract the mean power across modes?
+    mean_weights: np.ndarray
+        Numpy array with weightings for each mode to use to calculate the mean.
+        Default is equal weighting.
+    plot_kwargs : dict
+        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+    """
+    power.save(
+        power_map=values,
+        filename=filename,
+        mask_file=mask_file,
+        parcellation_file=parcellation_file,
+        subtract_mean=subtract_mean,
+        mean_weights=mean_weights,
+        **plot_kwargs,
+    )
 
 
 def plot_alpha(

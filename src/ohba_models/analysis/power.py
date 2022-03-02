@@ -149,12 +149,12 @@ def power_map_grid(
 
     # Validation
     error_message = (
-        f"Dimensionality of power_map must be 2 or 3 got ndim={power_map.ndim}."
+        f"Dimensionality of power_map must be less than 4 got ndim={power_map.ndim}."
     )
     power_map = array_ops.validate(
         power_map,
         correct_dimensionality=3,
-        allow_dimensions=[2],
+        allow_dimensions=[1, 2],
         error_message=error_message,
     )
 
@@ -185,6 +185,8 @@ def power_map_grid(
         spatial_map_values[:, i] = voxel_weights @ power_map[component, i]
 
     # Subtract weighted mean
+    if n_modes == 1:
+        subtract_mean = False
     if subtract_mean:
         spatial_map_values -= np.average(
             spatial_map_values,
@@ -217,9 +219,10 @@ def save(
     Parameters
     ----------
     power_map : np.ndarray
-        Power map to save.
-        Shape must be (n_components, n_modes, n_channels, n_channels)
-        or (n_components, n_modes, n_channels).
+        Power map to save. Can be of shape: (n_components, n_modes, n_channels),
+        (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
+        array can also be passed. Warning: this function cannot be used if n_modes
+        is equal to n_channels.
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png, it is saved as images.
@@ -245,9 +248,12 @@ def save(
         parcellation_file, files.parcellation.directory
     )
 
-    if power_map.shape[-1] == power_map.shape[-2]:
-        # A n_channels by n_channels array hav been pass, extract PSDs
-        power_map = np.diagonal(power_map, axis1=-2, axis2=-1)
+    power_map = np.squeeze(power_map)
+    if power_map.ndim > 1:
+        if power_map.shape[-1] == power_map.shape[-2]:
+            # A n_channels by n_channels array has been passed,
+            # extract the diagonal
+            power_map = np.diagonal(power_map, axis1=-2, axis2=-1)
 
     # Calculate power maps
     power_map = power_map_grid(
