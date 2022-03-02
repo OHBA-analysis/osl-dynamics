@@ -1,5 +1,5 @@
 import numpy as np
-from ohba_models.data import io
+from ohba_models.data import rw
 
 
 class SPM:
@@ -14,7 +14,7 @@ class SPM:
     """
 
     def __init__(self, filename: str, load_data: bool = True):
-        D = io.loadmat(filename)
+        D = rw.loadmat(filename)
 
         self.n_samples = D["Nsamples"]
         self.n_channels = len(D["channels"])

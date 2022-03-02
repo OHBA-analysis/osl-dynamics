@@ -2,7 +2,7 @@ from typing import List, Union
 
 import numpy as np
 import yaml
-from ohba_models.data.io import IO
+from ohba_models.data.rw import RW
 from ohba_models.data.manipulation import Manipulation
 from ohba_models.data.tf import TensorFlowDataset
 from ohba_models.utils import misc
@@ -10,7 +10,7 @@ from ohba_models.utils import misc
 _rng = np.random.default_rng()
 
 
-class Data(IO, Manipulation, TensorFlowDataset):
+class Data(RW, Manipulation, TensorFlowDataset):
     """Data Class.
 
     The Data class enables the input and processing of data. When given a list of
@@ -49,8 +49,8 @@ class Data(IO, Manipulation, TensorFlowDataset):
         # Unique identifier for the Data object
         self._identifier = id(self)
 
-        # Load data by initialising an IO object
-        IO.__init__(
+        # Load data by initialising an RW object
+        RW.__init__(
             self,
             inputs,
             matlab_field,

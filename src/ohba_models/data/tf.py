@@ -285,7 +285,7 @@ def create_dataset(
     step_size : int
         Number of samples to slide the sequence across the data.
     """
-    
+
     # Generate a non-overlapping sequence dataset
     if step_size == sequence_length:
         dataset = Dataset.from_tensor_slices(data)

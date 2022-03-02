@@ -14,7 +14,7 @@ from ohba_models.data import spm
 _logger = logging.getLogger("OHBA-Models")
 
 
-class IO:
+class RW:
     """Class for reading/writing data.
 
     Parameters
