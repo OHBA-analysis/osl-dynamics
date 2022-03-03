@@ -241,8 +241,8 @@ def standardize(
         Should we return a new array containing the standardized data or modify
         the original time series array?
     """
-    mean = np.mean(time_series, axis=axis)
-    std = np.std(time_series, axis=axis)
+    mean = np.expand_dims(np.mean(time_series, axis=axis), axis=axis)
+    std = np.expand_dims(np.std(time_series, axis=axis), axis=axis)
     if create_copy:
         std_time_series = (np.copy(time_series) - mean) / std
     else:

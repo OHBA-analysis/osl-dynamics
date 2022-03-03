@@ -7,7 +7,7 @@ from typing import Union
 
 import numpy as np
 from ohba_models.array_ops import get_one_hot
-from ohba_models.simulation import MAR, MS_MVN, MVN, SingleSine, Simulation
+from ohba_models.simulation import MultiSubject_MVN, MAR, MS_MVN, MVN, SingleSine, Simulation
 from ohba_models.simulation._hsmm import HSMM
 
 
