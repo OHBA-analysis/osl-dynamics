@@ -232,7 +232,7 @@ def _model_structure(config):
     alpha = alpha_layer(theta_norm)
 
     # Subject embedding layer
-    subject_embedding_layer = layers.Embedding(config.n_subjects, config.embedding_dim)
+    subject_embedding_layer = layers.Embedding(config.n_subjects, config.embedding_dim, name="subject_embeddings")
 
     # Data flow
     subject_embeddings = subject_embedding_layer(np.arange(config.n_subjects))
@@ -256,6 +256,8 @@ def _model_structure(config):
         config.initial_covariances,
         name="group_covs",
     )
+    delta_mu_layer = layers.Dense(config.n_channels, name="delta_mu")
+    flattened_delta_D_cholesky_factors_layer = layers.Dense(config.n_channels * (config.n_channels + 1) // 2, name="flattened_delta_D_cholesky_factors")
     subject_means_covs_layer = SubjectMeansCovsLayer(
         config.n_modes, config.n_channels, config.n_subjects, name="subject_means_covs"
     )
@@ -267,7 +269,9 @@ def _model_structure(config):
     # Data flow
     group_mu = group_means_layer(data)  # data not used
     group_D = group_covs_layer(data)  # data not used
-    mu, D = subject_means_covs_layer([group_mu, group_D, subject_embeddings])
+    delta_mu = delta_mu_layer(subject_embeddings)
+    flattened_delta_D_cholesky_factors = flattened_delta_D_cholesky_factors_layer(subject_embeddings)
+    mu, D = subject_means_covs_layer([group_mu, group_D, delta_mu, flattened_delta_D_cholesky_factors])
     m, C = mix_subject_means_covs_layer([alpha, mu, D, subj_id])
     ll_loss = ll_loss_layer([data, m, C])
 

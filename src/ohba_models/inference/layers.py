@@ -1187,8 +1187,8 @@ class ScalarLayer(layers.Layer):
 
 class SubjectMeansCovsLayer(layers.Layer):
     """ Class for subject specific means and covariances
-    Here mu_j^(s_t) ~ N(mu_j + f(s_t), sigma^2)
-         D_j^(s_t) ~ N(D_j + g(s_t), sigma^2)
+    Here mu_j^(s_t) = mu_j + f(s_t)
+         D_j^(s_t) = D_j + g(s_t)
     where mu_j, D_j are group parameters, f and g are affine functions.
 
     Parameters
@@ -1207,23 +1207,28 @@ class SubjectMeansCovsLayer(layers.Layer):
         self.n_channels = n_channels
         self.n_subjects = n_subjects
 
+        # Bijector used to transform vectors to covariance matrices
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+
     def call(self, inputs):
         # group_mu.shape = (n_modes, n_channels)
         # group_D.shape = (n_modes, n_channels, n_channels)
-        # subject_embeddings.shape = (n_subjects, embedding_dim)
+        # delta_mu.shape = (n_subjects, n_channels)
+        # flattened_delta_D_cholesky_factors.shape = (n_subjects, n_channels * (n_channels + 1) // 2)
+        group_mu, group_D, delta_mu, flattened_delta_D_cholesky_factors = inputs
 
-        group_mu, group_D, subject_embeddings = inputs
-
-        delta_mu = tf.reshape(
-            layers.Dense(self.n_channels)(subject_embeddings),
-            (self.n_subjects, 1, self.n_channels),
-        )
-        delta_D = tf.reshape(
-            layers.Dense(self.n_channels ** 2)(subject_embeddings),
-            (self.n_subjects, 1, self.n_channels, self.n_channels),
-        )
+        # This has shape (n_modes, n_channels * (n_channels + 1) // 2)
+        flattened_group_D_cholesky_factors = self.bijector.inverse(group_D)
+        
+        # Match the dimensions for addition
+        group_mu = tf.expand_dims(group_mu, axis=0)
+        delta_mu = tf.expand_dims(delta_mu, axis=1)
         mu = tf.add(group_mu, delta_mu)
-        D = tf.add(group_D, delta_D)
+
+        flattened_group_D_cholesky_factors = tf.expand_dims(flattened_group_D_cholesky_factors, axis=0)
+        flattened_delta_D_cholesky_factors = tf.expand_dims(flattened_delta_D_cholesky_factors, axis=1)
+        flattened_D_cholesky_factors = tf.add(flattened_group_D_cholesky_factors, flattened_delta_D_cholesky_factors)
+        D = self.bijector(flattened_D_cholesky_factors)
 
         return mu, D
 
