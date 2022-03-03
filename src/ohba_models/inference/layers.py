@@ -1187,9 +1187,10 @@ class ScalarLayer(layers.Layer):
 
 class SubjectMeansCovsLayer(layers.Layer):
     """ Class for subject specific means and covariances
-    Here mu_j^(s_t) = mu_j + f(s_t)
-         D_j^(s_t) = D_j + g(s_t)
-    where mu_j, D_j are group parameters, f and g are affine functions.
+    Here mu_j^(s_t) = mu_j + delta_mu_j
+         D_j^(s_t) = D_j + delta_D_j
+    where mu_j, D_j are group parameters, 
+        delta_mu_j and delta_D_j are subject specific deviations from the group parameters
 
     Parameters
     ----------
@@ -1219,15 +1220,21 @@ class SubjectMeansCovsLayer(layers.Layer):
 
         # This has shape (n_modes, n_channels * (n_channels + 1) // 2)
         flattened_group_D_cholesky_factors = self.bijector.inverse(group_D)
-        
+
         # Match the dimensions for addition
         group_mu = tf.expand_dims(group_mu, axis=0)
         delta_mu = tf.expand_dims(delta_mu, axis=1)
         mu = tf.add(group_mu, delta_mu)
 
-        flattened_group_D_cholesky_factors = tf.expand_dims(flattened_group_D_cholesky_factors, axis=0)
-        flattened_delta_D_cholesky_factors = tf.expand_dims(flattened_delta_D_cholesky_factors, axis=1)
-        flattened_D_cholesky_factors = tf.add(flattened_group_D_cholesky_factors, flattened_delta_D_cholesky_factors)
+        flattened_group_D_cholesky_factors = tf.expand_dims(
+            flattened_group_D_cholesky_factors, axis=0
+        )
+        flattened_delta_D_cholesky_factors = tf.expand_dims(
+            flattened_delta_D_cholesky_factors, axis=1
+        )
+        flattened_D_cholesky_factors = tf.add(
+            flattened_group_D_cholesky_factors, flattened_delta_D_cholesky_factors
+        )
         D = self.bijector(flattened_D_cholesky_factors)
 
         return mu, D
@@ -1240,12 +1247,6 @@ class MixSubjectEmbeddingParametersLayer(layers.Layer):
     The mixture is calculated as
     m_t = Sum_j alpha_jt mu_j^(s_t), C_t = Sum_j alpha_jt D_j^(s_t)
     where s_t is the subject at time t and 
-    mu_j^(s_t) is the mean of mode j of subject s_t
-
-    Here mu_j^(s_t) = mu_j + f(s_t)
-         D_j^(s_t) = D_j + g(s_t)
-    where mu_j, D_j are group parameters, f and g are affine functions.
-
     """
 
     def __init__(self, **kwargs):

@@ -1,6 +1,6 @@
 """Example script for running inference on simulated HMM-MVN data.
-Subject embedding version of dyneme_hmm_mvn.py
-Should achieve a dice score of 0.99
+    Subject embedding version of dyneme_hmm_mvn.py
+    Should achieve a dice score of 0.99.
 """
 
 print("Setting up")
@@ -39,7 +39,7 @@ config = Config(
 # Simulate data
 print("Simulating data")
 sim = simulation.MultiSubject_HMM_MVN(
-    n_samples = 25600,
+    n_samples=25600,
     n_subjects=10,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
@@ -54,16 +54,10 @@ meg_data = data.Data([mtc for mtc in sim.time_series])
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-    subj_id=True,
+    config.sequence_length, config.batch_size, shuffle=True, subj_id=True,
 )
 prediction_dataset = meg_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-    subj_id=True,
+    config.sequence_length, config.batch_size, shuffle=False, subj_id=True,
 )
 
 # Build model
