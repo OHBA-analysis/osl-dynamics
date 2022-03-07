@@ -5,9 +5,11 @@
 
 print("Setting up")
 import numpy as np
+from sklearn.decomposition import PCA
 from ohba_models import data, simulation
 from ohba_models.inference import metrics, modes, tf_ops
 from ohba_models.models.se_dynemo import Config, Model
+from ohba_models.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -39,7 +41,7 @@ config = Config(
 # Simulate data
 print("Simulating data")
 sim = simulation.MultiSubject_HMM_MVN(
-    n_samples=25600,
+    n_samples=12800,
     n_subjects=10,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
@@ -82,5 +84,20 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
+
+# Get the subject embeddings
+subject_embeddings = model.get_subject_embeddings()
+
+# Perform PCA on the subject embeddings to visualise the embeddings
+pca = PCA(n_components=2)
+pca.fit_transform(subject_embeddings)
+print("explained variances ratio:", pca.explained_variance_ratio_)
+plotting.plot_scatter(
+    [subject_embeddings[:, 0]],
+    [subject_embeddings[:, 1]],
+    x_label="PC1",
+    y_label="PC2",
+    filename="subject_embeddings.png",
+)
 
 meg_data.delete_dir()

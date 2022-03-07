@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from tqdm import trange
-from ohba_models.models import dynemo_obs
+from ohba_models.models import se_dynemo_obs
 from ohba_models.models.mod_base import BaseModelConfig
 from ohba_models.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from ohba_models.inference.layers import (
@@ -183,6 +183,54 @@ class Model(InferenceModelBase):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def get_group_means_covariances(self):
+        """Get the group means and covariances of each mode
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means for the group.
+        covariances : np.ndarray
+            Mode covariances for the group.
+        """
+        return se_dynemo_obs.get_group_means_covariances(self.model)
+
+    def get_subject_embeddings(self):
+        """Get the subject embedding vectors
+
+        Returns
+        -------
+        subject_embeddings : np.ndarray
+            Embedding vectors for subjects. Shape is (n_subjects, embedding_dim)
+        """
+        return se_dynemo_obs.get_subject_embeddings(self.model)
+
+    def set_group_means(self, means, update_initializer=True):
+        """Set the group means of each mode.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            Mode means.
+        update_initializer : bool
+            Do we want to use the passed means when we re-initialize
+            the model?
+        """
+        se_dynemo_obs.set_group_means(self.model, means, update_initializer)
+
+    def set_group_covariances(self, covariances, update_initializer=True):
+        """Set the group covariances of each mode.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed covariances when we re-initialize
+            the model?
+        """
+        se_dynemo_obs.set_group_covariances(self.model, covariances, update_initializer)
 
 
 def _model_structure(config):
