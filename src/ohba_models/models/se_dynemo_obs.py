@@ -12,6 +12,7 @@ from ohba_models.inference.layers import (
     CovarianceMatricesLayer,
     SubjectMeansCovsLayer,
     MixSubjectEmbeddingParametersLayer,
+    TFRangeLayer,
 )
 
 
@@ -99,6 +100,54 @@ class Model(ModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def get_group_means_covariances(self):
+        """Get the group means and covariances of each mode
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means for the group.
+        covariances : np.ndarray
+            Mode covariances for the group.
+        """
+        return get_group_means_covariances(self.model)
+
+    def get_subject_embeddings(self):
+        """Get the subject embedding vectors
+
+        Returns
+        -------
+        subject_embeddings : np.ndarray
+            Embedding vectors for subjects. Shape is (n_subjects, embedding_dim)
+        """
+        return get_subject_embeddings(self.model)
+
+    def set_group_means(self, means, update_initializer=True):
+        """Set the group means of each mode.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            Mode means.
+        update_initializer : bool
+            Do we want to use the passed means when we re-initialize
+            the model?
+        """
+        set_group_means(self.model, means, update_initializer)
+
+    def set_group_covariances(self, covariances, update_initializer=True):
+        """Set the group covariances of each mode.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed covariances when we re-initialize
+            the model?
+        """
+        set_group_covariances(self.model, covariances, update_initializer)
+
 
 def _model_structure(config):
 
@@ -116,12 +165,14 @@ def _model_structure(config):
     #   and the observation model.
 
     # Subject embedding layer
+    subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
     subject_embedding_layer = layers.Embedding(
         config.n_subjects, config.embedding_dim, name="subject_embeddings"
     )
 
     # Data flow
-    subject_embeddings = subject_embedding_layer(np.arange(config.n_subjects))
+    subjects = subjects_layer(data)  # data not used here
+    subject_embeddings = subject_embedding_layer(subjects)
 
     # Definition of layers
     group_means_layer = MeanVectorsLayer(

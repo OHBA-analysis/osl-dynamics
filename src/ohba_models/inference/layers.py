@@ -1272,3 +1272,14 @@ class MixSubjectEmbeddingParametersLayer(layers.Layer):
         C = tf.reduce_sum(tf.multiply(alpha, dynamic_D), axis=2)
 
         return m, C
+
+
+class TFRangeLayer(layers.Layer):
+    """ Wrapper for tf.range"""
+
+    def __init__(self, limit, **kwargs):
+        super().__init__(**kwargs)
+        self.limit = limit
+
+    def call(self, inputs):
+        return tf.range(self.limit)

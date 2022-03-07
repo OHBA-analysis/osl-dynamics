@@ -26,6 +26,7 @@ from ohba_models.inference.layers import (
     SubjectMeansCovsLayer,
     MixSubjectEmbeddingParametersLayer,
     ConcatenateLayer,
+    TFRangeLayer,
 )
 
 
@@ -280,12 +281,14 @@ def _model_structure(config):
     alpha = alpha_layer(theta_norm)
 
     # Subject embedding layer
+    subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
     subject_embedding_layer = layers.Embedding(
         config.n_subjects, config.embedding_dim, name="subject_embeddings"
     )
 
     # Data flow
-    subject_embeddings = subject_embedding_layer(np.arange(config.n_subjects))
+    subjects = subjects_layer(data)  # data not used here
+    subject_embeddings = subject_embedding_layer(subjects)
 
     # Observation model:
     # - Like in RIGO, we use a multivariate normal, but the mean vector and the covariance
