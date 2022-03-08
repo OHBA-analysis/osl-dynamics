@@ -13,6 +13,7 @@ from ohba_models.models.inf_mod_base import InferenceModelConfig, InferenceModel
 from ohba_models.inference.layers import (
     InferenceRNNLayer,
     ModelRNNLayer,
+    SoftmaxLayer,
     SampleGumbelSoftmaxDistributionLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
@@ -162,7 +163,7 @@ def _model_structure(config):
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
 
     # Inference RNN:
-    # - q(state_t) = Cat(alpha_t), where alpha_t is the probability of each state
+    # - q(state_t) = softmax(theta_t), where theta_t is a set of logits
     inf_rnn_layer = InferenceRNNLayer(
         config.inference_rnn,
         config.inference_normalization,
@@ -172,14 +173,16 @@ def _model_structure(config):
         config.inference_dropout,
         name="inf_rnn",
     )
-    inf_alpha_layer = layers.Dense(
-        config.n_states, activation="softmax", name="inf_alpha"
+    inf_theta_layer = layers.Dense(config.n_states, name="inf_theta")
+    alpha_layer = SoftmaxLayer(
+        initial_temperature=1.0, learn_temperature=False, name="alpha"
     )
     states_layer = SampleGumbelSoftmaxDistributionLayer(name="states")
 
     inf_rnn = inf_rnn_layer(data)
-    inf_alpha = inf_alpha_layer(inf_rnn)
-    states = states_layer(inf_alpha)
+    inf_theta = inf_theta_layer(inf_rnn)
+    alpha = alpha_layer(inf_theta)
+    states = states_layer(inf_theta)
 
     # Observation model:
     # - p(x_t) = N(m_t, C_t), where m_t and C_t are state dependent
@@ -202,11 +205,11 @@ def _model_structure(config):
 
     mu = means_layer(data)  # data not used
     D = covs_layer(data)  # data not used
-    ll_loss = ll_loss_layer([data, mu, D, inf_alpha])
+    ll_loss = ll_loss_layer([data, mu, D, alpha])
 
     # Model RNN:
-    # - p(alpha_t | state_<t), predicts the probability of the next state given
-    #   a history of states
+    # - p(theta_t | state_<t), predicts logits for the next state based
+    #   on a history of states.
     mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
@@ -216,17 +219,15 @@ def _model_structure(config):
         config.model_dropout,
         name="mod_rnn",
     )
-    mod_alpha_layer = layers.Dense(
-        config.n_states, activation="softmax", name="mod_alpha"
+    mod_theta_layer = layers.Dense(
+        config.n_states, activation="softmax", name="mod_theta"
     )
     kl_div_layer = CategoricalKLDivergenceLayer(name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     mod_rnn = mod_rnn_layer(states)
-    mod_alpha = mod_alpha_layer(mod_rnn)
-    kl_div = kl_div_layer([inf_alpha, mod_alpha])
+    mod_theta = mod_theta_layer(mod_rnn)
+    kl_div = kl_div_layer([inf_theta, mod_theta])
     kl_loss = kl_loss_layer(kl_div)
 
-    return tf.keras.Model(
-        inputs=data, outputs=[ll_loss, kl_loss, inf_alpha], name="HS-MVN"
-    )
+    return tf.keras.Model(inputs=data, outputs=[ll_loss, kl_loss, alpha], name="HS-MVN")
