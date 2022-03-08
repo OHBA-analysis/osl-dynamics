@@ -102,8 +102,8 @@ def rough_square_axes(n_plots: int) -> Tuple[int, int, int]:
     empty: int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots**0.5).astype(int)
-    short = np.ceil(n_plots**0.5).astype(int)
+    long = np.floor(n_plots ** 0.5).astype(int)
+    short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -293,6 +293,7 @@ def plot_scatter(
     y_label: str = None,
     title: str = None,
     markers: list = None,
+    annotate: list = None,
     plot_kwargs: dict = None,
     fig_kwargs: dict = None,
     ax: matplotlib.axes.Axes = None,
@@ -324,6 +325,8 @@ def plot_scatter(
         Figure title.
     markers : list of str
         Markers to used for each set of data points.
+    annotate : List of array like objects
+        Annotation for each data point for each set of data points.
     plot_kwargs : dict
         Arguments to pass to the ax.scatter method.
     fig_kwargs : dict
@@ -364,6 +367,12 @@ def plot_scatter(
     else:
         markers = [None] * len(x)
 
+    if annotate is not None:
+        if len(annotate) != len(x):
+            raise ValueError("Incorrect number of data points or annotates passed.")
+    else:
+        annotate = [None] * len(x)
+
     if ax is not None:
         if filename is not None:
             raise ValueError(
@@ -400,6 +409,9 @@ def plot_scatter(
         )
         if errors[i] is not None:
             ax.errorbar(x[i], y[i], yerr=errors[i], fmt="none", c=colors[i])
+        if annotate[i] is not None:
+            for j, txt in enumerate(annotate[i]):
+                ax.annotate(txt, (x[i][j], y[i][j]))
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])

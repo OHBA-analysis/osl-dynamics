@@ -97,6 +97,7 @@ plotting.plot_scatter(
     [subject_embeddings[:, 1]],
     x_label="PC1",
     y_label="PC2",
+    annotate=[[str(i) for i in range(config.n_subjects)]],
     filename="subject_embeddings.png",
 )
 
