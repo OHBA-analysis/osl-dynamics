@@ -35,6 +35,20 @@ QUAL_CMAPS = [
 ]
 
 
+def set_style(params: dict):
+    """Sets matplotlib's style.
+
+    Wrapper for plt.rcParams.update(). List of parameters can be found here:
+    https://matplotlib.org/stable/api/matplotlib_configuration_api.html#matplotlib.rcParams
+
+    Parameters
+    ----------
+    params : dict
+        Dictionary of style parameters to update.
+    """
+    plt.rcParams.update(params)
+
+
 def create_figure(*args, **kwargs):
     """Creates matplotlib figure and axes objects.
 
@@ -102,8 +116,8 @@ def rough_square_axes(n_plots: int) -> Tuple[int, int, int]:
     empty: int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots ** 0.5).astype(int)
-    short = np.ceil(n_plots ** 0.5).astype(int)
+    long = np.floor(n_plots**0.5).astype(int)
+    short = np.ceil(n_plots**0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
