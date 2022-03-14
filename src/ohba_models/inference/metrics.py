@@ -223,7 +223,7 @@ def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
 
 
 def pairwise_riemannian_distances(
-    matrices: np.ndarray, parallel: bool = False
+    matrices: np.ndarray, parallel: bool = False, inv_matrices: np.ndarray = None,
 ) -> np.ndarray:
     """Calculate the Riemannian distance between matrices.
 
@@ -234,6 +234,8 @@ def pairwise_riemannian_distances(
     parallel : bool
         Should we calculate the Riemannian distances in parallel?
         Much faster if first dimension is large, but uses more RAM.
+    inv_matrices : np.ndarray
+        Inverse of matrices
 
     Returns
     -------
@@ -242,7 +244,10 @@ def pairwise_riemannian_distances(
         Shape is (n_matrices, n_matrices).
     """
     if parallel:
-        inverse_matrices = np.linalg.inv(matrices)
+        if inv_matrices is not None:
+            inverse_matrices = inv_matrices
+        else:
+            inverse_matrices = np.linalg.inv(matrices)
         pairwise_products = np.matmul(
             matrices[None, :, :, :], inverse_matrices[:, None, :, :]
         )
@@ -255,7 +260,7 @@ def pairwise_riemannian_distances(
         eigenvalues = np.maximum(eigenvalues, 1e-3)
 
         log_eigenvalues = np.log(eigenvalues)
-        riemannian_distances = np.sqrt(np.sum(log_eigenvalues**2, axis=-1))
+        riemannian_distances = np.sqrt(np.sum(log_eigenvalues ** 2, axis=-1))
 
     else:
         n_matrices = matrices.shape[0]
