@@ -382,3 +382,31 @@ def eigen_denoise(matrices, threshold=None, n_components=None):
         eigvec = eigvecs[i][:, : n_eigvecs[i]]
         recon_matrices[i] = eigvec @ eigval @ eigvec.T
     return recon_matrices
+
+
+def svd_denoise(matrices, n_components):
+    """Perform reconstruction of matrices with the first few svd components
+    
+    Parameters
+    ----------
+    matrices : np.ndarray
+        matrices of shape (n_samples, n_channels, n_channels).
+    n_components : int
+        number of svd components to use in the reconstruction.
+    """
+    n_samples = matrices.shape[0]
+    n_channels = matrices.shape[1]
+
+    u, s, vh = np.linalg.svd(matrices)
+
+    # Choose the first n_components components
+    u = u[:, :, :n_components]
+    s_inverse = np.array([np.diag(vec) for vec in 1 / s[:, :n_components]])
+    s = np.array([np.diag(vec) for vec in s[:, :n_components]])
+    vh = vh[:, :n_components, :]
+    recon_matrices = u @ s @ vh
+
+    recon_matrices_inverse = (
+        np.transpose(vh, axes=(0, 2, 1)) @ s_inverse @ np.transpose(u, axes=(0, 2, 1))
+    )
+    return recon_matrices, recon_matrices_inverse
