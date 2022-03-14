@@ -336,7 +336,7 @@ def threshold_matrices(matrices, threshold):
     return thresholded_matrices
 
 
-def eigen_denoise(matrices, threshold=0.8):
+def eigen_denoise(matrices, threshold=None, n_components=None):
     """Perform eigen-reconstruction each of the symmetric matrices.
     
     Parameters
@@ -345,7 +345,16 @@ def eigen_denoise(matrices, threshold=0.8):
         matrices of shape (n_samples, n_channels, n_channels)
     threshold: float
         float between 0 and 1 for the percentage of explained variance.
+    n_components: int
+        number of eigenvectors to keep in the reconstruction.
     """
+    if threshold is None and n_components is None:
+        raise ValueError("Please pass one of threshold and n_components.")
+    if threshold is not None and n_components is not None:
+        raise ValueError(
+            "threshold and n_components cannot be passed at the same time."
+        )
+
     n_samples = matrices.shape[0]
     n_channels = matrices.shape[1]
 
@@ -354,13 +363,17 @@ def eigen_denoise(matrices, threshold=0.8):
     eigvals = np.flip(eigvals, axis=-1)
     eigvecs = np.flip(eigvecs, axis=-1)
 
-    # Compute the variance explained by the first few eigenvectors
-    percent_vars = (
-        np.cumsum(eigvals, axis=-1) / np.sum(eigvals, axis=-1)[..., np.newaxis]
-    )
+    if threshold is not None:
+        # Compute the variance explained by the first few eigenvectors
+        percent_vars = (
+            np.cumsum(eigvals, axis=-1) / np.sum(eigvals, axis=-1)[..., np.newaxis]
+        )
 
-    # choose the number of eigenvectors so that variance explained exceed threshold
-    n_eigvecs = np.argmax(percent_vars > threshold, axis=-1)
+        # choose the number of eigenvectors so that variance explained exceed threshold
+        n_eigvecs = np.argmax(percent_vars > threshold, axis=-1)
+
+    if n_components is not None:
+        n_eigvecs = np.array([n_components] * n_samples)
 
     # Reconstruct the matrices
     recon_matrices = np.zeros([n_samples, n_channels, n_channels])
