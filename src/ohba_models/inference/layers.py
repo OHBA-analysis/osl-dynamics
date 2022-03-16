@@ -88,6 +88,17 @@ class MatMulLayer(layers.Layer):
         return out
 
 
+class TFRangeLayer(layers.Layer):
+    """Wrapper for tf.range"""
+
+    def __init__(self, limit, **kwargs):
+        super().__init__(**kwargs)
+        self.limit = limit
+
+    def call(self, inputs):
+        return tf.range(self.limit)
+
+
 class SampleNormalDistributionLayer(layers.Layer):
     """Layer for sampling from a normal distribution.
 
@@ -104,6 +115,14 @@ class SampleNormalDistributionLayer(layers.Layer):
             return mu
 
 
+class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
+    """Layer for sampling from a Gumbel-Softmax distribution."""
+
+    def call(self, inputs, **kwargs):
+        gs = tfp.distributions.RelaxedOneHotCategorical(temperature=0.5, logits=inputs)
+        return gs.sample()
+
+
 class SoftmaxLayer(layers.Layer):
     """Layer for applying a softmax activation function.
 
@@ -116,7 +135,10 @@ class SoftmaxLayer(layers.Layer):
     """
 
     def __init__(
-        self, initial_temperature: float, learn_temperature: bool, **kwargs,
+        self,
+        initial_temperature: float,
+        learn_temperature: bool,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
@@ -155,7 +177,12 @@ class MeanVectorsLayer(layers.Layer):
     """
 
     def __init__(
-        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
+        self,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -215,7 +242,12 @@ class CovarianceMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
+        self,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -286,7 +318,12 @@ class CorrelationMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
+        self,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -358,7 +395,12 @@ class DiagonalMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
+        self,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: np.ndarray,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -455,37 +497,17 @@ class LogLikelihoodLossLayer(layers.Layer):
 
     The negative log-likelihood is calculated assuming a multivariate normal
     probability density and its value is added to the loss function.
-
-    Parameters
-    ----------
-    diag_cov : bool
-        Are the covariances diagonal?
-    clip_start : int
-        Index to clip the sequence.
     """
-
-    def __init__(self, diag_cov: bool = False, clip_start: int = 0, **kwargs):
-        super().__init__(**kwargs)
-        self.diag_cov = diag_cov
-        self.clip_start = clip_start
 
     def call(self, inputs):
         x, mu, sigma = inputs
 
-        # Clip the sequence
-        x = x[:, self.clip_start :]
-        mu = mu[:, self.clip_start :]
-        sigma = sigma[:, self.clip_start :]
-
         # Multivariate normal distribution
-        if self.diag_cov:
-            mvn = tfp.distributions.MultivariateNormalDiag(
-                loc=mu, scale_diag=sigma, allow_nan_stats=False,
-            )
-        else:
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
-            )
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
+        )
 
         # Calculate the log-likelihood
         ll_loss = mvn.log_prob(x)
@@ -582,7 +604,7 @@ class InferenceRNNLayer(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'. Defaults to GRU.
+        Either 'lstm' or 'gru'.
     norm_type : str
         Either 'layer', 'batch' or None.
     act_type : 'str'
@@ -631,7 +653,7 @@ class ModelRNNLayer(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'. Defaults to GRU.
+        Either 'lstm' or 'gru'.
     norm_type : str
         Either 'layer', 'batch' or None.
     act_type : 'str'
@@ -709,12 +731,12 @@ class WaveNetLayer(layers.Layer):
             if local_conditioning:
                 self.residual_block_layers.append(
                     LocallyConditionedWaveNetResidualBlockLayer(
-                        filters=n_filters, dilation_rate=2 ** i
+                        filters=n_filters, dilation_rate=2**i
                     )
                 )
             else:
                 self.residual_block_layers.append(
-                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
+                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
                 )
         self.dense_layers = [
             layers.Conv1D(
@@ -908,14 +930,6 @@ class MultiLayerPerceptronLayer(layers.Layer):
         return inputs
 
 
-class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
-    """Layer for sampling from a Gumbel-Softmax distribution."""
-
-    def call(self, inputs, **kwargs):
-        gs = tfp.distributions.RelaxedOneHotCategorical(temperature=0.5, logits=inputs)
-        return gs.sample()
-
-
 class CategoricalKLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two categorical distributions.
 
@@ -1002,7 +1016,10 @@ class ScalarLayer(layers.Layer):
     """
 
     def __init__(
-        self, learn: bool, initial_value: float, **kwargs,
+        self,
+        learn: bool,
+        initial_value: float,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.learn = learn
@@ -1014,7 +1031,7 @@ class ScalarLayer(layers.Layer):
 
         def build(self):
             self.scalar = self.add_weight(
-                "Scalar",
+                "scalar",
                 dtype=tf.float32,
                 initializer=self.scalar_initializer,
                 trainable=self.learn,
@@ -1026,11 +1043,14 @@ class ScalarLayer(layers.Layer):
 
 
 class SubjectMeansCovsLayer(layers.Layer):
-    """Class for subject specific means and covariances
-    Here mu_j^(s_t) = mu_j + delta_mu_j
-         D_j^(s_t) = D_j + delta_D_j
-    where mu_j, D_j are group parameters,
-        delta_mu_j and delta_D_j are subject specific deviations from the group parameters
+    """Class for subject specific means and covariances.
+
+    Here:
+    - mu_j^(s_t) = mu_j + delta_mu_j
+    - D_j^(s_t)  = D_j  + delta_D_j
+
+    where mu_j, D_j are group parameters, delta_mu_j and delta_D_j
+    are subject specific deviations from the group parameters
 
     Parameters
     ----------
@@ -1070,12 +1090,14 @@ class SubjectMeansCovsLayer(layers.Layer):
 
         # Compute the deviation of each subject from the group
         delta_mu_subject = self.delta_mu_subject_layer(subject_embeddings)
-        flattened_delta_D_cholesky_factors_subject = self.flattened_delta_D_cholesky_factors_subject_layer(
-            subject_embeddings
+        flattened_delta_D_cholesky_factors_subject = (
+            self.flattened_delta_D_cholesky_factors_subject_layer(subject_embeddings)
         )
         delta_mu_mode = self.delta_mu_mode_layer(group_mu)
-        flattened_delta_D_cholesky_factors_mode = self.flattened_delta_D_cholesky_factors_mode_layer(
-            flattened_group_D_cholesky_factors
+        flattened_delta_D_cholesky_factors_mode = (
+            self.flattened_delta_D_cholesky_factors_mode_layer(
+                flattened_group_D_cholesky_factors
+            )
         )
 
         # Shapes:
@@ -1116,12 +1138,10 @@ class MixSubjectEmbeddingParametersLayer(layers.Layer):
     subject embedding model.
 
     The mixture is calculated as
-    m_t = Sum_j alpha_jt mu_j^(s_t), C_t = Sum_j alpha_jt D_j^(s_t)
-    where s_t is the subject at time t and
+    - m_t = Sum_j alpha_jt mu_j^(s_t)
+    - C_t = Sum_j alpha_jt D_j^(s_t)
+    where s_t is the subject at time t.
     """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def call(self, inputs):
         # alpha.shape = (None, sequence_length, n_modes)
@@ -1143,14 +1163,3 @@ class MixSubjectEmbeddingParametersLayer(layers.Layer):
         C = tf.reduce_sum(tf.multiply(alpha, dynamic_D), axis=2)
 
         return m, C
-
-
-class TFRangeLayer(layers.Layer):
-    """Wrapper for tf.range"""
-
-    def __init__(self, limit, **kwargs):
-        super().__init__(**kwargs)
-        self.limit = limit
-
-    def call(self, inputs):
-        return tf.range(self.limit)
