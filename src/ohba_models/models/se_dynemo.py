@@ -325,13 +325,8 @@ def _model_structure(config):
     # Data flow
     group_mu = group_means_layer(data)  # data not used
     group_D = group_covs_layer(data)  # data not used
-    delta_mu = delta_mu_layer(subject_embeddings)
-    flattened_delta_D_cholesky_factors = flattened_delta_D_cholesky_factors_layer(
-        subject_embeddings
-    )
-    mu, D = subject_means_covs_layer(
-        [group_mu, group_D, delta_mu, flattened_delta_D_cholesky_factors]
-    )
+
+    mu, D = subject_means_covs_layer([group_mu, group_D, subject_embeddings])
     m, C = mix_subject_means_covs_layer([alpha, mu, D, subj_id])
     ll_loss = ll_loss_layer([data, m, C])
 

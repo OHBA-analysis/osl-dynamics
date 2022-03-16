@@ -116,10 +116,7 @@ class SoftmaxLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        initial_temperature: float,
-        learn_temperature: bool,
-        **kwargs,
+        self, initial_temperature: float, learn_temperature: bool, **kwargs,
     ):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
@@ -158,12 +155,7 @@ class MeanVectorsLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -223,12 +215,7 @@ class CovarianceMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -299,12 +286,7 @@ class CorrelationMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -376,12 +358,7 @@ class DiagonalMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -503,15 +480,11 @@ class LogLikelihoodLossLayer(layers.Layer):
         # Multivariate normal distribution
         if self.diag_cov:
             mvn = tfp.distributions.MultivariateNormalDiag(
-                loc=mu,
-                scale_diag=sigma,
-                allow_nan_stats=False,
+                loc=mu, scale_diag=sigma, allow_nan_stats=False,
             )
         else:
             mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=mu,
-                scale_tril=tf.linalg.cholesky(sigma),
-                allow_nan_stats=False,
+                loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
             )
 
         # Calculate the log-likelihood
@@ -736,12 +709,12 @@ class WaveNetLayer(layers.Layer):
             if local_conditioning:
                 self.residual_block_layers.append(
                     LocallyConditionedWaveNetResidualBlockLayer(
-                        filters=n_filters, dilation_rate=2**i
+                        filters=n_filters, dilation_rate=2 ** i
                     )
                 )
             else:
                 self.residual_block_layers.append(
-                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
+                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
                 )
         self.dense_layers = [
             layers.Conv1D(
@@ -985,8 +958,7 @@ class VectorQuantizerLayer(layers.Layer):
             self.embeddings_initializer = WeightInitializer(self.initial_embeddings)
         self.embeddings = tf.Variable(
             initial_value=self.embeddings_initializer(
-                shape=(embedding_dim, n_embeddings),
-                dtype=tf.float32,
+                shape=(embedding_dim, n_embeddings), dtype=tf.float32,
             ),
             trainable=False,
             name="embeddings",
@@ -996,8 +968,7 @@ class VectorQuantizerLayer(layers.Layer):
         self.cluster_size_ema_initializer = tf.zeros_initializer()
         self.cluster_size_ema = tf.Variable(
             initial_value=self.cluster_size_ema_initializer(
-                shape=(n_embeddings,),
-                dtype=tf.float32,
+                shape=(n_embeddings,), dtype=tf.float32,
             ),
             trainable=False,
             name="cluster_size_ema",
@@ -1007,8 +978,7 @@ class VectorQuantizerLayer(layers.Layer):
         self.embeddings_ema_initializer = CopyTensorInitializer(self.embeddings)
         self.embeddings_ema = tf.Variable(
             initial_value=self.embeddings_ema_initializer(
-                shape=(embedding_dim, n_embeddings),
-                dtype=tf.float32,
+                shape=(embedding_dim, n_embeddings), dtype=tf.float32,
             ),
             trainable=False,
             name="embeddings_ema",
@@ -1021,8 +991,8 @@ class VectorQuantizerLayer(layers.Layer):
 
         # Calculate L2 distance between the inputs and the embeddings
         distances = (
-            tf.reduce_sum(flattened_inputs**2, axis=1, keepdims=True)
-            + tf.reduce_sum(self.embeddings**2, axis=0, keepdims=True)
+            tf.reduce_sum(flattened_inputs ** 2, axis=1, keepdims=True)
+            + tf.reduce_sum(self.embeddings ** 2, axis=0, keepdims=True)
             - 2 * tf.matmul(flattened_inputs, self.embeddings)
         )
 
@@ -1192,10 +1162,7 @@ class ScalarLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        learn: bool,
-        initial_value: float,
-        **kwargs,
+        self, learn: bool, initial_value: float, **kwargs,
     ):
         super().__init__(**kwargs)
         self.learn = learn
@@ -1243,30 +1210,61 @@ class SubjectMeansCovsLayer(layers.Layer):
 
         # Bijector used to transform vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+        self.delta_mu_subject_layer = layers.Dense(self.n_channels)
+        self.flattened_delta_D_cholesky_factors_subject_layer = layers.Dense(
+            self.n_channels * (self.n_channels + 1) // 2
+        )
+        self.delta_mu_mode_layer = layers.Dense(self.n_channels)
+        self.flattened_delta_D_cholesky_factors_mode_layer = layers.Dense(
+            self.n_channels * (self.n_channels + 1) // 2
+        )
 
     def call(self, inputs):
         # group_mu.shape = (n_modes, n_channels)
         # group_D.shape = (n_modes, n_channels, n_channels)
-        # delta_mu.shape = (n_subjects, n_channels)
-        # flattened_delta_D_cholesky_factors.shape = (n_subjects, n_channels * (n_channels + 1) // 2)
-        group_mu, group_D, delta_mu, flattened_delta_D_cholesky_factors = inputs
+        # subject_embeddings.shape = (n_subjects, embedding_dim)
+        group_mu, group_D, subject_embeddings = inputs
 
         # This has shape (n_modes, n_channels * (n_channels + 1) // 2)
         flattened_group_D_cholesky_factors = self.bijector.inverse(group_D)
 
+        # Compute the deviation of each subject from the group
+        delta_mu_subject = self.delta_mu_subject_layer(subject_embeddings)
+        flattened_delta_D_cholesky_factors_subject = self.flattened_delta_D_cholesky_factors_subject_layer(
+            subject_embeddings
+        )
+        delta_mu_mode = self.delta_mu_mode_layer(group_mu)
+        flattened_delta_D_cholesky_factors_mode = self.flattened_delta_D_cholesky_factors_mode_layer(
+            flattened_group_D_cholesky_factors
+        )
+
+        # Shapes:
+        # delta_mu_subject.shape = (n_subjects, n_channels)
+        # flattened_delta_D_cholesky_factors_subject.shape = (n_subjects, n_channels * (n_channels + 1) // 2)
+        # delta_mu_mode.shape = (n_modes, n_channels)
+        # flattened_delta_D_cholesky_factors_mode.shape = (n_modes, n_channels * (n_channels + 1) // 2)
+
         # Match the dimensions for addition
         group_mu = tf.expand_dims(group_mu, axis=0)
-        delta_mu = tf.expand_dims(delta_mu, axis=1)
-        mu = tf.add(group_mu, delta_mu)
+        delta_mu_mode = tf.expand_dims(delta_mu_mode, axis=0)
+        delta_mu_subject = tf.expand_dims(delta_mu_subject, axis=1)
+        mu = tf.add(tf.add(group_mu, delta_mu_mode), delta_mu_subject)
 
         flattened_group_D_cholesky_factors = tf.expand_dims(
             flattened_group_D_cholesky_factors, axis=0
         )
-        flattened_delta_D_cholesky_factors = tf.expand_dims(
-            flattened_delta_D_cholesky_factors, axis=1
+        flattened_delta_D_cholesky_factors_mode = tf.expand_dims(
+            flattened_delta_D_cholesky_factors_mode, axis=0
+        )
+        flattened_delta_D_cholesky_factors_subject = tf.expand_dims(
+            flattened_delta_D_cholesky_factors_subject, axis=1
         )
         flattened_D_cholesky_factors = tf.add(
-            flattened_group_D_cholesky_factors, flattened_delta_D_cholesky_factors
+            tf.add(
+                flattened_group_D_cholesky_factors,
+                flattened_delta_D_cholesky_factors_mode,
+            ),
+            flattened_delta_D_cholesky_factors_subject,
         )
         D = self.bijector(flattened_D_cholesky_factors)
 
