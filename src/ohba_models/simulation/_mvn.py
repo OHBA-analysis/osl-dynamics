@@ -261,6 +261,7 @@ class MS_MVN(MVN):
 
         return data.astype(np.float32)
 
+
 class MultiSubject_MVN(MVN):
     """Class that generates data from a multivariate normal distribution for multiple subjects.
 
@@ -318,7 +319,7 @@ class MultiSubject_MVN(MVN):
             scale=between_subject_std,
             size=(self.n_subjects, self.n_modes, self.n_channels, self.n_channels),
         )
-    
+
     def simulate_multi_subject_data(self, mode_time_courses: np.ndarray) -> np.ndarray:
         """Simulates data.
 
@@ -326,7 +327,7 @@ class MultiSubject_MVN(MVN):
         ----------
         mode_time_courses : np.ndarray
             It contains n_subjects time courses. Shape is (n_subjects, n_samples, n_modes).
-        
+
         Returns
         -------
         np.ndarray

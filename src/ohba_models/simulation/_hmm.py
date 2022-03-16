@@ -7,7 +7,14 @@ from typing import Union
 
 import numpy as np
 from ohba_models.array_ops import get_one_hot
-from ohba_models.simulation import MultiSubject_MVN, MAR, MS_MVN, MVN, SingleSine, Simulation
+from ohba_models.simulation import (
+    MultiSubject_MVN,
+    MAR,
+    MS_MVN,
+    MVN,
+    SingleSine,
+    Simulation,
+)
 from ohba_models.simulation._hsmm import HSMM
 
 
@@ -668,6 +675,7 @@ class HMM_Sine(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
+
 class MultiSubject_HMM_MVN(Simulation):
     """Simulate an HMM with multivariate normal observation model for each subject.
 
@@ -738,7 +746,7 @@ class MultiSubject_HMM_MVN(Simulation):
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed +1,
+            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
         # Initialise base class
@@ -751,12 +759,14 @@ class MultiSubject_HMM_MVN(Simulation):
         self.state_time_course = np.array(self.state_time_course)
 
         # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_subject_data(self.state_time_course)
-    
+        self.time_series = self.obs_mod.simulate_multi_subject_data(
+            self.state_time_course
+        )
+
     @property
     def n_modes(self):
         return self.n_states
-    
+
     @property
     def mode_time_course(self):
         return self.state_time_course
@@ -766,6 +776,6 @@ class MultiSubject_HMM_MVN(Simulation):
             return getattr(self.obs_mod, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
-    
+
     def standardize(self):
         super().standardize(axis=1)

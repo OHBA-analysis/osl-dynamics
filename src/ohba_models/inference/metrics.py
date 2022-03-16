@@ -223,7 +223,9 @@ def riemannian_distance(M1: np.ndarray, M2: np.ndarray) -> float:
 
 
 def pairwise_riemannian_distances(
-    matrices: np.ndarray, parallel: bool = False, inv_matrices: np.ndarray = None,
+    matrices: np.ndarray,
+    parallel: bool = False,
+    inv_matrices: np.ndarray = None,
 ) -> np.ndarray:
     """Calculate the Riemannian distance between matrices.
 
@@ -260,7 +262,7 @@ def pairwise_riemannian_distances(
         eigenvalues = np.maximum(eigenvalues, 1e-3)
 
         log_eigenvalues = np.log(eigenvalues)
-        riemannian_distances = np.sqrt(np.sum(log_eigenvalues ** 2, axis=-1))
+        riemannian_distances = np.sqrt(np.sum(log_eigenvalues**2, axis=-1))
 
     else:
         n_matrices = matrices.shape[0]

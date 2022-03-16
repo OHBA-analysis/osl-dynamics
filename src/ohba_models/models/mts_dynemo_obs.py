@@ -90,9 +90,6 @@ class Model(ModelBase):
     config : ohba_models.models.mts_dynemo_obs.Config
     """
 
-    def __init__(self, config):
-        super().__init__(config)
-
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)

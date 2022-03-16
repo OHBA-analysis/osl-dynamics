@@ -338,7 +338,7 @@ def threshold_matrices(matrices, threshold):
 
 def eigen_denoise(matrices, threshold=None, n_components=None):
     """Perform eigen-reconstruction each of the symmetric matrices.
-    
+
     Parameters
     ----------
     matrices : np.ndarray
@@ -386,7 +386,7 @@ def eigen_denoise(matrices, threshold=None, n_components=None):
 
 def svd_denoise(matrices, n_components):
     """Perform reconstruction of matrices with the first few svd components
-    
+
     Parameters
     ----------
     matrices : np.ndarray

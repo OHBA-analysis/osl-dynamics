@@ -317,7 +317,7 @@ def mode_covariance_spectra(
     power_spectra = abs(fourier_transform(autocorrelation_function, nfft, args_range))
 
     # Normalise the power spectra
-    power_spectra /= nfft ** 2
+    power_spectra /= nfft**2
 
     # Coherences for each mode
     coherences = coherence_spectra(power_spectra)
@@ -995,7 +995,7 @@ def spectrogram(
                 a[i] = np.mean(a_sub_window, axis=0)
 
     # Scaling for the periodograms
-    P /= sampling_frequency * np.sum(window ** 2)
+    P /= sampling_frequency * np.sum(window**2)
 
     if alpha is not None:
         return t, f, P, a

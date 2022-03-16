@@ -42,7 +42,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-    
+
     inference_rnn : str
         RNN to use, either 'gru' or 'lstm'.
     inference_n_layers : int
@@ -178,9 +178,6 @@ class Model(InferenceModelBase):
     config : dynemo.models.serigo.Config
     """
 
-    def __init__(self, config):
-        super().__init__(config)
-
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
@@ -268,7 +265,9 @@ def _model_structure(config):
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="alpha",
     )
 
     # Data flow
