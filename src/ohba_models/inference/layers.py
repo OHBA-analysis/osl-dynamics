@@ -990,24 +990,6 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         return nll_loss
 
 
-class StructuralEquationModelingLayer(layers.Layer):
-    """Structural Equation Modeling (SEM) layer.
-
-    Generative model is: y_t = M y_t + e_t.
-
-    See W. D. Penny, et al., Modelling functional integration: a comparison of
-    structural equation and dynamic causal models for more details.
-    """
-
-    def call(self, inputs, **kwargs):
-        M, R = inputs
-        M_shape = tf.shape(M)
-        I = tf.eye(M_shape[-1], batch_shape=M_shape[:-2])
-        I_M = I - M
-        inv_I_M = tf.linalg.inv(M)
-        return inv_I_M @ R @ inv_I_M
-
-
 class ScalarLayer(layers.Layer):
     """Layer to learn a single scalar.
 
