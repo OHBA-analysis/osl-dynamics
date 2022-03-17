@@ -135,10 +135,7 @@ class SoftmaxLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        initial_temperature: float,
-        learn_temperature: bool,
-        **kwargs,
+        self, initial_temperature: float, learn_temperature: bool, **kwargs,
     ):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
@@ -177,12 +174,7 @@ class MeanVectorsLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -242,12 +234,7 @@ class CovarianceMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -318,12 +305,7 @@ class CorrelationMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -395,12 +377,7 @@ class DiagonalMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n: int,
-        m: int,
-        learn: bool,
-        initial_value: np.ndarray,
-        **kwargs,
+        self, n: int, m: int, learn: bool, initial_value: np.ndarray, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -504,9 +481,7 @@ class LogLikelihoodLossLayer(layers.Layer):
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
+            loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
         )
 
         # Calculate the log-likelihood
@@ -731,12 +706,12 @@ class WaveNetLayer(layers.Layer):
             if local_conditioning:
                 self.residual_block_layers.append(
                     LocallyConditionedWaveNetResidualBlockLayer(
-                        filters=n_filters, dilation_rate=2**i
+                        filters=n_filters, dilation_rate=2 ** i
                     )
                 )
             else:
                 self.residual_block_layers.append(
-                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2**i)
+                    WaveNetResidualBlockLayer(filters=n_filters, dilation_rate=2 ** i)
                 )
         self.dense_layers = [
             layers.Conv1D(
@@ -1016,10 +991,7 @@ class ScalarLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        learn: bool,
-        initial_value: float,
-        **kwargs,
+        self, learn: bool, initial_value: float, **kwargs,
     ):
         super().__init__(**kwargs)
         self.learn = learn
@@ -1078,6 +1050,13 @@ class SubjectMeansCovsLayer(layers.Layer):
         self.flattened_delta_D_cholesky_factors_mode_layer = layers.Dense(
             self.n_channels * (self.n_channels + 1) // 2
         )
+        # attribute for initialising weights of the layers
+        self.layers = [
+            self.delta_mu_subject_layer,
+            self.flattened_delta_D_cholesky_factors_subject_layer,
+            self.delta_mu_mode_layer,
+            self.flattened_delta_D_cholesky_factors_mode_layer,
+        ]
 
     def call(self, inputs):
         # group_mu.shape = (n_modes, n_channels)
@@ -1090,14 +1069,12 @@ class SubjectMeansCovsLayer(layers.Layer):
 
         # Compute the deviation of each subject from the group
         delta_mu_subject = self.delta_mu_subject_layer(subject_embeddings)
-        flattened_delta_D_cholesky_factors_subject = (
-            self.flattened_delta_D_cholesky_factors_subject_layer(subject_embeddings)
+        flattened_delta_D_cholesky_factors_subject = self.flattened_delta_D_cholesky_factors_subject_layer(
+            subject_embeddings
         )
         delta_mu_mode = self.delta_mu_mode_layer(group_mu)
-        flattened_delta_D_cholesky_factors_mode = (
-            self.flattened_delta_D_cholesky_factors_mode_layer(
-                flattened_group_D_cholesky_factors
-            )
+        flattened_delta_D_cholesky_factors_mode = self.flattened_delta_D_cholesky_factors_mode_layer(
+            flattened_group_D_cholesky_factors
         )
 
         # Shapes:
