@@ -204,6 +204,18 @@ class Model(InferenceModelBase):
         """
         return se_dynemo_obs.get_subject_embeddings(self.model)
 
+    def get_subject_means_covariances(self):
+        """Get the means and covariances for each subject
+        
+        Returns
+        -------
+        subject_means : np.ndarray
+            Mode means for each subject
+        subject_covs : np.ndarray
+            Mode covariances for each subject
+        """
+        return se_dynemo_obs.get_subject_means_covariances(self.model)
+
     def set_group_means(self, means, update_initializer=True):
         """Set the group means of each mode.
 
@@ -265,9 +277,7 @@ def _model_structure(config):
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow

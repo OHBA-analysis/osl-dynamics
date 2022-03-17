@@ -119,6 +119,18 @@ class Model(ModelBase):
         """
         return get_subject_embeddings(self.model)
 
+    def get_subject_means_covariances(self):
+        """Get the means and covariances for each subject
+        
+        Returns
+        -------
+        subject_means : np.ndarray
+            Mode means for each subject
+        subject_covs : np.ndarray
+            Mode covariances for each subject
+        """
+        return get_subject_means_covariances(self.model)
+
     def set_group_means(self, means, update_initializer=True):
         """Set the group means of each mode.
 
@@ -227,6 +239,14 @@ def get_subject_embeddings(model):
     subject_embedding_layer = model.get_layer("subject_embeddings")
     n_subjects = subject_embedding_layer.input_dim
     return subject_embedding_layer(np.arange(n_subjects))
+
+
+def get_subject_means_covariances(model):
+    group_means, group_covs = get_group_means_covariances(model)
+    subject_embeddings = get_subject_embeddings(model)
+    subject_means_covs_layer = model.get_layer("subject_means_covs")
+    mu, D = subject_means_covs_layer([group_means, group_covs, subject_embeddings])
+    return mu.numpy(), D.numpy()
 
 
 def set_group_means(model, means, update_initializer=True):
