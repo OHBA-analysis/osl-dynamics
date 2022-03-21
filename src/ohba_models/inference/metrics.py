@@ -319,6 +319,29 @@ def rv_coefficient(M: list) -> float:
     return C
 
 
+def congruence_coefficient(M):
+    """Computes the congruence coefficient between covariance/correlation matrices
+    Parameters
+    ----------
+    M: list of np.ndarray
+        List of symmetric semi-positive definite matrices.
+
+    Returns
+    -------
+    C: np.ndarray
+        Matrix of pairwise congruence coefficients between the matrices.
+    """
+    C = np.zeros((len(M), len(M)))
+    for index, element in np.ndenumerate(C):
+        nom = np.trace(np.dot(np.transpose(M[index[0]]), M[index[1]]))
+        denom1 = np.trace(np.dot(np.transpose(M[index[0]]), M[index[0]]))
+        denom2 = np.trace(np.dot(np.transpose(M[index[1]]), M[index[1]]))
+        cc = nom / np.sqrt(np.dot(denom1, denom2))
+        C[index[0], index[1]] = cc
+
+    return C
+
+
 def principal_component_distances(matrices, distance_measure):
     """Calculate pairwise distance between principal eigenvectors
         of the matrices with a distance measure.
