@@ -102,6 +102,8 @@ class Manipulation:
             # Use SVD to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
+            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            print(f"Explained variance: {100 * explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
