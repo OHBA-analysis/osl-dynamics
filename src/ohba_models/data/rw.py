@@ -51,7 +51,9 @@ class RW:
                 self.inputs = [inputs]
 
         elif isinstance(inputs, np.ndarray):
-            if inputs.ndim == 2:
+            if inputs.ndim == 1:
+                self.inputs = [inputs[:, np.newaxis]]
+            elif inputs.ndim == 2:
                 self.inputs = [inputs]
             else:
                 self.inputs = inputs
