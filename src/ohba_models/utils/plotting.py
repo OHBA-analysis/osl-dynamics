@@ -1000,6 +1000,8 @@ def plot_separate_time_series(
 
     # Create figure
     fig, axes = create_figure(n_lines, **fig_kwargs)
+    if n_lines == 1:
+        axes = [axes]
 
     # Plot each time series
     for group in time_series:
