@@ -692,46 +692,6 @@ class ModelRNNLayer(layers.Layer):
         return inputs
 
 
-class MultiLayerPerceptronLayer(layers.Layer):
-    """Multi-layer perceptron.
-
-    Parameters
-    ----------
-    n_layers : int
-        Number of layers.
-    n_units : int
-        Number of units/neurons per layer.
-    norm_type : str
-        Either 'layer', 'batch' or None.
-    act_type : 'str'
-        Activation type, e.g. 'relu', 'elu', etc.
-    drop_rate : float
-        Dropout rate for the output of each layer.
-    """
-
-    def __init__(
-        self,
-        n_layers: int,
-        n_units: int,
-        norm_type: str,
-        act_type: str,
-        drop_rate: float,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.layers = []
-        for n in range(n_layers):
-            self.layers.append(layers.Dense(n_units))
-            self.layers.append(NormalizationLayer(norm_type))
-            self.layers.append(layers.Activation(act_type))
-            self.layers.append(layers.Dropout(drop_rate))
-
-    def call(self, inputs, **kwargs):
-        for layer in self.layers:
-            inputs = layer(inputs, **kwargs)
-        return inputs
-
-
 class CategoricalKLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two categorical distributions.
 
