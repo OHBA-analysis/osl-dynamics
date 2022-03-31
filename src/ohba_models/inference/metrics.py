@@ -232,7 +232,8 @@ def pairwise_riemannian_distances(
     Parameters
     ----------
     matrices : np.ndarray
-        Shape must be (n_matrices, n_channels, n_channels).
+        Shape must be (n_matrices, n_channels, n_channels) if parallel=False.
+        Shape can be (..., n_channels, n_channels) if parallel=True.
     parallel : bool
         Should we calculate the Riemannian distances in parallel?
         Much faster if first dimension is large, but uses more RAM.
@@ -243,7 +244,7 @@ def pairwise_riemannian_distances(
     -------
     np.ndarray
         Matrix containing the pairwise Riemannian distances between matrices.
-        Shape is (n_matrices, n_matrices).
+        Shape is (..., n_matrices, n_matrices).
     """
     if parallel:
         if inv_matrices is not None:
@@ -251,7 +252,7 @@ def pairwise_riemannian_distances(
         else:
             inverse_matrices = np.linalg.inv(matrices)
         pairwise_products = np.matmul(
-            matrices[None, :, :, :], inverse_matrices[:, None, :, :]
+            np.expand_dims(matrices, -4), np.expand_dims(inverse_matrices, -3)
         )
 
         # The eigenvalues of the product should be real due to Sylvester's law
