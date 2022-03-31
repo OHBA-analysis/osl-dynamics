@@ -448,6 +448,51 @@ class DiagonalMatricesLayer(layers.Layer):
         return D
 
 
+class MatrixLayer(layers.Layer):
+    """Layer to learn a matrix.
+
+    Parameters
+    ----------
+    m : int
+        Number of rows/columns.
+    constraint : str
+        Either 'covariance' or 'diagonal'.
+    learn : bool
+        Should the matrix be trainable?
+    initial_value : np.ndarray
+        Initial value for the matrix.
+    """
+
+    def __init__(
+        self, m: int, constraint: str, learn: bool, initial_value: np.ndarray, **kwargs
+    ):
+
+        super().__init__(**kwargs)
+        self.m = m
+        self.constraint = constraint
+        self.learn = learn
+
+        self.initial_value = initial_value
+        if initial_value is not None:
+            if initial_value.ndim != 2:
+                raise ValueError("A 2D numpy array must be passed for initial_value.")
+            if initial_value.shape[0] != m:
+                raise ValueError(
+                    "Number of rows/columns in initial_value does not match m."
+                )
+            initial_value = initial_value[np.newaxis, ...]
+
+        if constraint == "covariance":
+            self.matrix_layer = CovarianceMatricesLayer(1, m, learn, initial_value)
+        elif constraint == "diagonal":
+            self.matrix_layer = DiagonalMatricesLayer(1, m, learn, initial_value)
+        else:
+            raise ValueError("Please use constraint='diagonal' or 'covariance.'")
+
+    def call(self, inputs, **kwargs):
+        return self.matrix_layer(inputs)[0]
+
+
 class MixVectorsLayer(layers.Layer):
     """Mix a set of vectors.
 
