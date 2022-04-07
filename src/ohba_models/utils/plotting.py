@@ -834,6 +834,9 @@ def plot_violin(
     if plot_kwargs is None:
         plot_kwargs = {}
 
+    # Replace emtpy lists in data with a pair of nans
+    data = [np.array([np.nan, np.nan]) if len(d) == 0 else d for d in data]
+
     # Create figure
     if ax is None:
         fig, ax = create_figure(**fig_kwargs)
