@@ -43,6 +43,8 @@ class RW:
         time_axis_first: bool,
         keep_memmaps_on_close: bool = False,
     ):
+        self.keep_memmaps_on_close = keep_memmaps_on_close
+
         # Validate inputs
         if isinstance(inputs, str):
             if path.isdir(inputs):
@@ -76,8 +78,6 @@ class RW:
 
         if len(self.inputs) == 0:
             raise ValueError("No valid inputs were passed.")
-
-        self.keep_memmaps_on_close = keep_memmaps_on_close
 
         # Directory to store memory maps created by this class
         self.store_dir = pathlib.Path(store_dir)

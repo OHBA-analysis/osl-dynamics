@@ -5,6 +5,7 @@ from typing import Union
 import numpy as np
 import yaml
 from tqdm import tqdm
+from scipy import signal
 from ohba_models import array_ops
 from ohba_models.data.spm import SPM
 from ohba_models.utils.misc import MockArray
@@ -47,6 +48,65 @@ class Processing:
         n_pca_components: int = None,
         pca_components: np.ndarray = None,
         whiten: bool = False,
+        amplitude_envelope: bool = False,
+    ):
+        """Prepares data to train the model with.
+
+        Can be used to prepare time-delay embedded data or amplitude envelope data.
+        """
+        if self.prepared:
+            _logger.warning("Previously prepared data will be overwritten.")
+
+        if (
+            n_embeddings > 1
+            or n_pca_components is not None
+            or pca_components is not None
+        ):
+            # Prepare time-delay embedded data
+            self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
+
+        elif amplitude_envelope:
+            # Prepare amplitude envelope data
+            self.prepare_amp_env()
+
+        self.prepared = True
+
+    def prepare_amp_env(self):
+        """Prepares amplitude envelope data.
+
+        Performs a Hilbert transform, takes the absolute value and standardizes the data.
+        """
+        self.amplitude_envelope = True
+
+        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
+        self.prepare_memmap_filenames()
+
+        # Prepare the data
+        for raw_data_memmap, prepared_data_file in zip(
+            tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
+            self.prepared_data_filenames,
+        ):
+            # Hilbert transform
+            prepared_data = np.abs(signal.hilbert(raw_data_memmap))
+
+            # Create a memory map for the prepared data
+            prepared_data_memmap = MockArray.get_memmap(
+                prepared_data_file, prepared_data.shape, dtype=np.float32
+            )
+
+            # Standardise to get the final data
+            prepared_data_memmap = standardize(prepared_data, create_copy=False)
+            self.prepared_data_memmaps.append(prepared_data_memmap)
+
+        # Update subjects to return the prepared data
+        self.subjects = self.prepared_data_memmaps
+
+    def prepare_tde(
+        self,
+        n_embeddings: int = 1,
+        n_pca_components: int = None,
+        pca_components: np.ndarray = None,
+        whiten: bool = False,
     ):
         """Prepares time-delay embedded data to train the model with.
 
@@ -63,15 +123,11 @@ class Processing:
         whiten : bool
             Should we whiten the PCA'ed data?
         """
-        if self.prepared:
-            _logger.warning("Previously prepared data will be overwritten.")
-
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
         self.whiten = whiten
-        self.prepared = True
 
         if n_pca_components is not None and pca_components is not None:
             raise ValueError("Please only pass n_pca_components or pca_components.")
