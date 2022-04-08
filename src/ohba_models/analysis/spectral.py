@@ -12,7 +12,7 @@ from tqdm import trange
 from ohba_models import array_ops
 from ohba_models.analysis import regression
 from ohba_models.analysis.time_series import get_mode_time_series
-from ohba_models.data import manipulation
+from ohba_models.data import processing
 
 _logger = logging.getLogger("OHBA-Models")
 
@@ -519,7 +519,7 @@ def multitaper_spectra(
 
     # Standardise before calculating the multitaper
     if standardize:
-        data = [manipulation.standardize(d) for d in data]
+        data = [processing.standardize(d) for d in data]
 
     print("Calculating power spectra")
     power_spectra = []
@@ -702,7 +702,7 @@ def regression_spectra(
 
     # Standardise before calculating the spectrogram
     if standardize:
-        data = [manipulation.standardize(d) for d in data]
+        data = [processing.standardize(d) for d in data]
 
     # Remove data points not in alpha due to time embedding the training data
     if n_embeddings is not None:

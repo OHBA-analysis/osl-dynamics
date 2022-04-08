@@ -4,7 +4,7 @@
 
 import numpy as np
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
-from ohba_models.data.manipulation import standardize
+from ohba_models.data.processing import standardize
 from ohba_models.utils import plotting
 
 

@@ -2,7 +2,7 @@
 
 """
 
-from ohba_models.data.manipulation import standardize
+from ohba_models.data.processing import standardize
 
 
 class Simulation:

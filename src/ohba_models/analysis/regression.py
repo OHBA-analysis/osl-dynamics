@@ -6,7 +6,7 @@ from typing import Tuple, Union
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from ohba_models.data.manipulation import standardize
+from ohba_models.data.processing import standardize
 
 
 def linear(

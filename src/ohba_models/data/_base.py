@@ -3,14 +3,14 @@ from typing import List, Union
 import numpy as np
 import yaml
 from ohba_models.data.rw import RW
-from ohba_models.data.manipulation import Manipulation
+from ohba_models.data.processing import Processing
 from ohba_models.data.tf import TensorFlowDataset
 from ohba_models.utils import misc
 
 _rng = np.random.default_rng()
 
 
-class Data(RW, Manipulation, TensorFlowDataset):
+class Data(RW, Processing, TensorFlowDataset):
     """Data Class.
 
     The Data class enables the input and processing of data. When given a list of
@@ -60,9 +60,9 @@ class Data(RW, Manipulation, TensorFlowDataset):
             keep_memmaps_on_close=keep_memmaps_on_close,
         )
 
-        # Initialise a Manipulation object so we have method we can use to prepare
+        # Initialise a Processing object so we have method we can use to prepare
         # the data
-        Manipulation.__init__(
+        Processing.__init__(
             self, n_embeddings, keep_memmaps_on_close=keep_memmaps_on_close
         )
 
@@ -71,7 +71,7 @@ class Data(RW, Manipulation, TensorFlowDataset):
 
     def __del__(self):
         if not self.keep_memmaps_on_close:
-            self.delete_manipulation_memmaps()
+            self.delete_processing_memmaps()
             self.delete_io_memmaps()
 
     def __iter__(self):
