@@ -28,7 +28,6 @@ class Config(BaseModelConfig):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the generative model.
-
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
     learn_covariances : bool
@@ -40,8 +39,10 @@ class Config(BaseModelConfig):
 
     n_subjects : int
         Number of subjects.
-    embedding_dim : int
+    subject_embedding_dim : int
         Number of dimensions for the subject embedding.
+    mode_embedding_dim : int
+        Number of dimensions for the mode embedding in the spatial maps encoder.
 
     batch_size : int
         Mini-batch size.
@@ -68,7 +69,8 @@ class Config(BaseModelConfig):
 
     # Parameters specific to subject embedding model
     n_subjects: int = None
-    embedding_dim: int = None
+    subject_embedding_dim: int = None
+    mode_embedding_dim: int = None
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
@@ -81,14 +83,20 @@ class Config(BaseModelConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
     def validate_subject_embedding_parameters(self):
-        if self.n_subjects is None or self.embedding_dim is None:
-            raise ValueError("n_subjects and embedding_dim must be passed.")
+        if (
+            self.n_subjects is None
+            or self.subject_embedding_dim is None
+            or self.mode_embedding_dim is None
+        ):
+            raise ValueError(
+                "n_subjects, subject_embedding_dim and mode_embedding_dim must be passed."
+            )
 
 
 class Model(ModelBase):
     """SE-DyNeMo observation model class.
-
     Parameters
+
     ----------
     config : ohba_models.models.dynemo_obs.Config
     """
@@ -115,13 +123,13 @@ class Model(ModelBase):
         Returns
         -------
         subject_embeddings : np.ndarray
-            Embedding vectors for subjects. Shape is (n_subjects, embedding_dim)
+            Embedding vectors for subjects. Shape is (n_subjects, subject_embedding_dim)
         """
         return get_subject_embeddings(self.model)
 
     def get_subject_means_covariances(self):
         """Get the means and covariances for each subject
-        
+
         Returns
         -------
         subject_means : np.ndarray
@@ -176,7 +184,7 @@ def _model_structure(config):
     # Subject embedding layer
     subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
     subject_embedding_layer = layers.Embedding(
-        config.n_subjects, config.embedding_dim, name="subject_embeddings"
+        config.n_subjects, config.subject_embedding_dim, name="subject_embeddings"
     )
 
     # Data flow
@@ -204,7 +212,11 @@ def _model_structure(config):
         name="flattened_delta_D_cholesky_factors",
     )
     subject_means_covs_layer = SubjectMeansCovsLayer(
-        config.n_modes, config.n_channels, config.n_subjects, name="subject_means_covs"
+        config.n_modes,
+        config.n_channels,
+        config.n_subjects,
+        config.mode_embedding_dim,
+        name="subject_means_covs",
     )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
         name="mix_subject_means_covs"

@@ -867,34 +867,36 @@ class SubjectMeansCovsLayer(layers.Layer):
         Number of channels.
     n_subjects : int
         Number of subjects.
+    mode_embedding_dim : int
+        Dimension for the mode embedding encoder
     """
 
-    def __init__(self, n_modes, n_channels, n_subjects, **kwargs):
+    def __init__(self, n_modes, n_channels, n_subjects, mode_embedding_dim, **kwargs):
         super().__init__(**kwargs)
         self.n_modes = n_modes
         self.n_channels = n_channels
         self.n_subjects = n_subjects
+        self.mode_embedding_dim = mode_embedding_dim
 
         # Bijector used to transform vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
-        self.delta_mu_subject_layer = layers.Dense(self.n_channels)
-        self.flattened_delta_D_cholesky_factors_subject_layer = layers.Dense(
+
+        # Layers to encode the spatial maps for each mode
+        self.mode_mean_encoder_layer = layers.Dense(self.mode_embedding_dim)
+        self.mode_cholesky_factor_encoder_layer = layers.Dense(self.mode_embedding_dim)
+
+        # Layers for getting deviations from the group spatial maps
+        self.delta_mu_layer = layers.Dense(self.n_channels)
+        self.flattened_delta_D_cholesky_factors_layer = layers.Dense(
             self.n_channels * (self.n_channels + 1) // 2
         )
-        self.delta_mu_mode_decoder_layer = layers.Dense(3)
-        self.flattened_delta_D_cholesky_factors_mode_decoder_layer = layers.Dense(3)
-        self.delta_mu_mode_layer = layers.Dense(self.n_channels)
-        self.flattened_delta_D_cholesky_factors_mode_layer = layers.Dense(
-            self.n_channels * (self.n_channels + 1) // 2
-        )
+
         # attribute for initialising weights of the layers
         self.layers = [
-            self.delta_mu_subject_layer,
-            self.flattened_delta_D_cholesky_factors_subject_layer,
-            self.delta_mu_mode_layer,
-            self.flattened_delta_D_cholesky_factors_mode_layer,
-            self.delta_mu_mode_decoder_layer,
-            self.flattened_delta_D_cholesky_factors_mode_decoder_layer,
+            self.mode_mean_encoder_layer,
+            self.mode_cholesky_factor_encoder_layer,
+            self.delta_mu_layer,
+            self.flattened_delta_D_cholesky_factors_layer,
         ]
 
     def call(self, inputs):
@@ -902,57 +904,53 @@ class SubjectMeansCovsLayer(layers.Layer):
         # group_D.shape = (n_modes, n_channels, n_channels)
         # subject_embeddings.shape = (n_subjects, embedding_dim)
         group_mu, group_D, subject_embeddings = inputs
+        subject_embedding_dim = subject_embeddings.shape[-1]
 
         # This has shape (n_modes, n_channels * (n_channels + 1) // 2)
         flattened_group_D_cholesky_factors = self.bijector.inverse(group_D)
 
-        # Compute the deviation of each subject from the group
-        delta_mu_subject = self.delta_mu_subject_layer(subject_embeddings)
-        flattened_delta_D_cholesky_factors_subject = (
-            self.flattened_delta_D_cholesky_factors_subject_layer(subject_embeddings)
+        # Encode the spatial maps
+        mode_mean_embeddings = self.mode_mean_encoder_layer(group_mu)
+        mode_cholesky_factor_embeddings = self.mode_cholesky_factor_encoder_layer(
+            flattened_group_D_cholesky_factors
         )
 
-        decode_delta_mu_mode = self.delta_mu_mode_decoder_layer(group_mu)
-        delta_mu_mode = self.delta_mu_mode_layer(decode_delta_mu_mode)
-
-        decode_flattened_delta_D_cholesky_factors_mode = (
-            self.flattened_delta_D_cholesky_factors_mode_decoder_layer(
-                flattened_group_D_cholesky_factors
-            )
+        # Match dimensions for concatenation
+        subject_embeddings = tf.broadcast_to(
+            tf.expand_dims(subject_embeddings, axis=1),
+            [self.n_subjects, self.n_modes, subject_embedding_dim],
         )
-        flattened_delta_D_cholesky_factors_mode = (
-            self.flattened_delta_D_cholesky_factors_mode_layer(
-                decode_flattened_delta_D_cholesky_factors_mode
-            )
+        mode_mean_embeddings = tf.broadcast_to(
+            tf.expand_dims(mode_mean_embeddings, axis=0),
+            [self.n_subjects, self.n_modes, self.mode_embedding_dim],
+        )
+        mode_cholesky_factor_embeddings = tf.broadcast_to(
+            tf.expand_dims(mode_cholesky_factor_embeddings, axis=0),
+            [self.n_subjects, self.n_modes, self.mode_embedding_dim],
         )
 
-        # Shapes:
-        # delta_mu_subject.shape = (n_subjects, n_channels)
-        # flattened_delta_D_cholesky_factors_subject.shape = (n_subjects, n_channels * (n_channels + 1) // 2)
-        # delta_mu_mode.shape = (n_modes, n_channels)
-        # flattened_delta_D_cholesky_factors_mode.shape = (n_modes, n_channels * (n_channels + 1) // 2)
+        # Concatentate the embeddings
+        mean_embeddings = tf.concat([subject_embeddings, mode_mean_embeddings], -1)
+        cholesky_factor_embeddings = tf.concat(
+            [subject_embeddings, mode_cholesky_factor_embeddings], -1
+        )
+
+        # Deviations from the group spatial maps
+        delta_mu = self.delta_mu_layer(mean_embeddings)
+        flattened_delta_D_cholesky_factors = (
+            self.flattened_delta_D_cholesky_factors_layer(cholesky_factor_embeddings)
+        )
 
         # Match the dimensions for addition
         group_mu = tf.expand_dims(group_mu, axis=0)
-        delta_mu_mode = tf.expand_dims(delta_mu_mode, axis=0)
-        delta_mu_subject = tf.expand_dims(delta_mu_subject, axis=1)
-        mu = tf.add(tf.add(group_mu, delta_mu_mode), delta_mu_subject)
+        mu = tf.add(group_mu, delta_mu)
 
         flattened_group_D_cholesky_factors = tf.expand_dims(
             flattened_group_D_cholesky_factors, axis=0
         )
-        flattened_delta_D_cholesky_factors_mode = tf.expand_dims(
-            flattened_delta_D_cholesky_factors_mode, axis=0
-        )
-        flattened_delta_D_cholesky_factors_subject = tf.expand_dims(
-            flattened_delta_D_cholesky_factors_subject, axis=1
-        )
         flattened_D_cholesky_factors = tf.add(
-            tf.add(
-                flattened_group_D_cholesky_factors,
-                flattened_delta_D_cholesky_factors_mode,
-            ),
-            flattened_delta_D_cholesky_factors_subject,
+            flattened_group_D_cholesky_factors,
+            flattened_delta_D_cholesky_factors,
         )
         D = self.bijector(flattened_D_cholesky_factors)
 

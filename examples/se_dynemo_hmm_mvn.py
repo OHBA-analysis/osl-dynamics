@@ -19,7 +19,8 @@ config = Config(
     n_modes=5,
     n_channels=11,
     n_subjects=10,
-    embedding_dim=3,
+    subject_embedding_dim=8,
+    mode_embedding_dim=2,
     sequence_length=200,
     inference_n_units=64,
     inference_normalization="layer",
@@ -56,10 +57,16 @@ meg_data = data.Data([mtc for mtc in sim.time_series])
 
 # Prepare dataset
 training_dataset = meg_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=True, subj_id=True,
+    config.sequence_length,
+    config.batch_size,
+    shuffle=True,
+    subj_id=True,
 )
 prediction_dataset = meg_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=False, subj_id=True,
+    config.sequence_length,
+    config.batch_size,
+    shuffle=False,
+    subj_id=True,
 )
 
 # Build model
