@@ -49,6 +49,7 @@ class Processing:
         pca_components: np.ndarray = None,
         whiten: bool = False,
         amplitude_envelope: bool = False,
+        n_window: int = 1,
     ):
         """Prepares data to train the model with.
 
@@ -71,10 +72,17 @@ class Processing:
 
         self.prepared = True
 
-    def prepare_amp_env(self):
+    def prepare_amp_env(self, n_window: int = 1):
         """Prepares amplitude envelope data.
 
-        Performs a Hilbert transform, takes the absolute value and standardizes the data.
+        Performs a Hilbert transform, takes the absolute value and standardizes the
+        data.
+
+        Parameters
+        ----------
+        n_window : int
+            Number of data points in a sliding window to apply to the amplitude
+            envelope data.
         """
         self.amplitude_envelope = True
 
@@ -88,6 +96,16 @@ class Processing:
         ):
             # Hilbert transform
             prepared_data = np.abs(signal.hilbert(raw_data_memmap))
+
+            # Moving average filter
+            prepared_data = np.array(
+                [
+                    np.convolve(
+                        prepared_data[:, i], np.ones(n_window) / n_window, mode="same"
+                    )
+                    for i in range(prepared_data.shape[1])
+                ]
+            ).T
 
             # Create a memory map for the prepared data
             prepared_data_memmap = MockArray.get_memmap(
