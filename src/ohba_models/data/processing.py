@@ -70,6 +70,12 @@ class Processing:
             # Prepare amplitude envelope data
             self.prepare_amp_env()
 
+        else:
+            self.prepared_data_memmaps = self.raw_data_memmaps
+
+        # Standardise to get the final data
+        self.standardize()
+
         self.prepared = True
 
     def prepare_amp_env(self, n_window: int = 1):
@@ -115,9 +121,6 @@ class Processing:
             # Standardise to get the final data
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
             self.prepared_data_memmaps.append(prepared_data_memmap)
-
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
 
     def prepare_tde(
         self,
@@ -215,9 +218,6 @@ class Processing:
             # Clear intermediate data
             del std_data, te_std_data, prepared_data
 
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
-
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(self.n_subjects)), identifier=self._identifier
@@ -299,6 +299,18 @@ class Processing:
             trimmed_raw_time_series = np.concatenate(trimmed_raw_time_series)
 
         return trimmed_raw_time_series
+
+    def standardize(self):
+        standardized_prepared_data_memmaps = []
+        for prepared_data_memmaps in tqdm(
+            self.prepared_data_memmaps, desc="Standardizing data", ncols=98
+        ):
+            standardized_prepared_data_memmap = standardize(
+                prepared_data_memmaps, create_copy=False
+            )
+            standardized_prepared_data_memmaps.append(standardized_prepared_data_memmap)
+        # Update subjects to return the standardized data
+        self.subjects = standardized_prepared_data_memmaps
 
 
 def standardize(
