@@ -43,6 +43,8 @@ class Config(BaseModelConfig):
         Number of dimensions for the subject embedding.
     mode_embedding_dim : int
         Number of dimensions for the mode embedding in the spatial maps encoder.
+    mode_embedding_activation : str
+        Activation of the mode encoders.
 
     batch_size : int
         Mini-batch size.
@@ -216,6 +218,8 @@ def _model_structure(config):
         config.n_channels,
         config.n_subjects,
         config.mode_embedding_dim,
+        config.learn_means,
+        config.mode_embedding_activation,
         name="subject_means_covs",
     )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
@@ -255,6 +259,8 @@ def get_subject_embeddings(model):
 
 def get_subject_means_covariances(model):
     group_means, group_covs = get_group_means_covariances(model)
+    # Make sure covs are positive definite
+    group_covs = np.add(group_covs, 1e-3 * np.eye(group_covs.shape[-1]))
     subject_embeddings = get_subject_embeddings(model)
     subject_means_covs_layer = model.get_layer("subject_means_covs")
     mu, D = subject_means_covs_layer([group_means, group_covs, subject_embeddings])
@@ -281,6 +287,6 @@ def set_group_covariances(model, covariances, update_initializer=True):
     if update_initializer:
         group_covs_layer.initial_value = covariances
         group_covs_layer.initial_flattened_cholesky_factors = flattened_cholesky_factors
-        grooup_covs_layer.flattened_cholesky_factors_initializer.initial_value = (
+        group_covs_layer.flattened_cholesky_factors_initializer.initial_value = (
             flattened_cholesky_factors
         )

@@ -869,35 +869,64 @@ class SubjectMeansCovsLayer(layers.Layer):
         Number of subjects.
     mode_embedding_dim : int
         Dimension for the mode embedding encoder
+    mode_embedding_activation : str
+        Activation function applied to the mode encoder.
+
+    Returns
+    -------
+    mu
+        Subject means. Shape is (n_subjects, n_modes, n_channels).
+    D
+        Subject covariances. Shape is (n_subjects, n_modes, n_channels, n_channels)
     """
 
-    def __init__(self, n_modes, n_channels, n_subjects, mode_embedding_dim, **kwargs):
+    def __init__(
+        self,
+        n_modes,
+        n_channels,
+        n_subjects,
+        mode_embedding_dim,
+        learn_means,
+        mode_embedding_activation,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.n_modes = n_modes
         self.n_channels = n_channels
         self.n_subjects = n_subjects
         self.mode_embedding_dim = mode_embedding_dim
+        self.learn_means = learn_means
 
         # Bijector used to transform vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
         # Layers to encode the spatial maps for each mode
-        self.mode_mean_encoder_layer = layers.Dense(self.mode_embedding_dim)
-        self.mode_cholesky_factor_encoder_layer = layers.Dense(self.mode_embedding_dim)
+        if learn_means:
+            self.mode_mean_encoder_layer = layers.Dense(
+                self.mode_embedding_dim, activation=mode_embedding_activation
+            )
+            self.delta_mu_layer = layers.Dense(self.n_channels)
 
-        # Layers for getting deviations from the group spatial maps
-        self.delta_mu_layer = layers.Dense(self.n_channels)
+        self.mode_cholesky_factor_encoder_layer = layers.Dense(
+            self.mode_embedding_dim, activation=mode_embedding_activation
+        )
         self.flattened_delta_D_cholesky_factors_layer = layers.Dense(
             self.n_channels * (self.n_channels + 1) // 2
         )
 
         # attribute for initialising weights of the layers
-        self.layers = [
-            self.mode_mean_encoder_layer,
-            self.mode_cholesky_factor_encoder_layer,
-            self.delta_mu_layer,
-            self.flattened_delta_D_cholesky_factors_layer,
-        ]
+        if learn_means:
+            self.layers = [
+                self.mode_mean_encoder_layer,
+                self.mode_cholesky_factor_encoder_layer,
+                self.delta_mu_layer,
+                self.flattened_delta_D_cholesky_factors_layer,
+            ]
+        else:
+            self.layers = [
+                self.mode_cholesky_factor_encoder_layer,
+                self.flattened_delta_D_cholesky_factors_layer,
+            ]
 
     def call(self, inputs):
         # group_mu.shape = (n_modes, n_channels)
@@ -910,7 +939,8 @@ class SubjectMeansCovsLayer(layers.Layer):
         flattened_group_D_cholesky_factors = self.bijector.inverse(group_D)
 
         # Encode the spatial maps
-        mode_mean_embeddings = self.mode_mean_encoder_layer(group_mu)
+        if self.learn_means:
+            mode_mean_embeddings = self.mode_mean_encoder_layer(group_mu)
         mode_cholesky_factor_embeddings = self.mode_cholesky_factor_encoder_layer(
             flattened_group_D_cholesky_factors
         )
@@ -920,30 +950,38 @@ class SubjectMeansCovsLayer(layers.Layer):
             tf.expand_dims(subject_embeddings, axis=1),
             [self.n_subjects, self.n_modes, subject_embedding_dim],
         )
-        mode_mean_embeddings = tf.broadcast_to(
-            tf.expand_dims(mode_mean_embeddings, axis=0),
-            [self.n_subjects, self.n_modes, self.mode_embedding_dim],
-        )
+        if self.learn_means:
+            mode_mean_embeddings = tf.broadcast_to(
+                tf.expand_dims(mode_mean_embeddings, axis=0),
+                [self.n_subjects, self.n_modes, self.mode_embedding_dim],
+            )
         mode_cholesky_factor_embeddings = tf.broadcast_to(
             tf.expand_dims(mode_cholesky_factor_embeddings, axis=0),
             [self.n_subjects, self.n_modes, self.mode_embedding_dim],
         )
 
         # Concatentate the embeddings
-        mean_embeddings = tf.concat([subject_embeddings, mode_mean_embeddings], -1)
+        if self.learn_means:
+            mean_embeddings = tf.concat([subject_embeddings, mode_mean_embeddings], -1)
         cholesky_factor_embeddings = tf.concat(
             [subject_embeddings, mode_cholesky_factor_embeddings], -1
         )
 
         # Deviations from the group spatial maps
-        delta_mu = self.delta_mu_layer(mean_embeddings)
+        if self.learn_means:
+            delta_mu = self.delta_mu_layer(mean_embeddings)
         flattened_delta_D_cholesky_factors = (
             self.flattened_delta_D_cholesky_factors_layer(cholesky_factor_embeddings)
         )
 
         # Match the dimensions for addition
         group_mu = tf.expand_dims(group_mu, axis=0)
-        mu = tf.add(group_mu, delta_mu)
+        if self.learn_means:
+            mu = tf.add(group_mu, delta_mu)
+        else:
+            mu = tf.broadcast_to(
+                group_mu, [self.n_subjects, self.n_modes, self.n_channels]
+            )
 
         flattened_group_D_cholesky_factors = tf.expand_dims(
             flattened_group_D_cholesky_factors, axis=0

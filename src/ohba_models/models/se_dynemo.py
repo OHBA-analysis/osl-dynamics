@@ -15,8 +15,6 @@ from ohba_models.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
-    MixVectorsLayer,
-    MixMatricesLayer,
     ModelRNNLayer,
     NormalizationLayer,
     KLDivergenceLayer,
@@ -112,6 +110,8 @@ class Config(BaseModelConfig, InferenceModelConfig):
         Number of dimensions for the subject embedding.
     mode_embedding_dim : int
         Number of dimensions for the mode embedding in the spatial maps encoder.
+    mode_embedding_activation : str
+        Activation for the mode encoders. Default is no activation.
     """
 
     # Inference network parameters
@@ -141,6 +141,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
     n_subjects: int = None
     subject_embedding_dim: int = None
     mode_embedding_dim: int = None
+    mode_embedding_activation: str = None
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -318,16 +319,13 @@ def _model_structure(config):
         config.initial_covariances,
         name="group_covs",
     )
-    delta_mu_layer = layers.Dense(config.n_channels, name="delta_mu")
-    flattened_delta_D_cholesky_factors_layer = layers.Dense(
-        config.n_channels * (config.n_channels + 1) // 2,
-        name="flattened_delta_D_cholesky_factors",
-    )
     subject_means_covs_layer = SubjectMeansCovsLayer(
         config.n_modes,
         config.n_channels,
         config.n_subjects,
         config.mode_embedding_dim,
+        config.learn_means,
+        config.mode_embedding_activation,
         name="subject_means_covs",
     )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
