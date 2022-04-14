@@ -23,7 +23,7 @@ config = Config(
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.001,
+    learning_rate=0.005,
     n_epochs=200,
 )
 

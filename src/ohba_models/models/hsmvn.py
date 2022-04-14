@@ -216,9 +216,7 @@ def _model_structure(config):
         config.model_dropout,
         name="mod_rnn",
     )
-    mod_theta_layer = layers.Dense(
-        config.n_states, activation="softmax", name="mod_theta"
-    )
+    mod_theta_layer = layers.Dense(config.n_states, name="mod_theta")
     kl_div_layer = CategoricalKLDivergenceLayer(name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
