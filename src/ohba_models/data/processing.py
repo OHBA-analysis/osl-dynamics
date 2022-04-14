@@ -44,52 +44,54 @@ class Processing:
 
     def prepare(
         self,
+        amplitude_envelope: bool = False,
+        n_window: int = 1,
         n_embeddings: int = 1,
         n_pca_components: int = None,
         pca_components: np.ndarray = None,
         whiten: bool = False,
-        amplitude_envelope: bool = False,
-        n_window: int = 1,
     ):
         """Prepares data to train the model with.
 
-        Can be used to prepare time-delay embedded data or amplitude envelope data.
+        If amplitude_envelope=True, performs a Hilbert transform, takes the absolute
+        value and standardizes the data.
+
+        Otherwise, performs standardization, time embedding and principle component
+        analysis.
+
+        If no arguments are passed, the data is just standardized.
+
+        Parameters
+        ----------
+        amplitude_envelope : bool
+            Should we prepare amplitude envelope data?
+        n_window : int
+            Number of data points in a sliding window to apply to the amplitude
+            envelope data.
+        n_embeddings : int
+            Number of data points to embed the data.
+        n_pca_components : int
+            Number of PCA components to keep. Default is no PCA.
+        pca_components : np.ndarray
+            PCA components to apply if they have already been calculated.
+        whiten : bool
+            Should we whiten the PCA'ed data?
         """
         if self.prepared:
             _logger.warning("Previously prepared data will be overwritten.")
 
-        if (
-            n_embeddings > 1
-            or n_pca_components is not None
-            or pca_components is not None
-        ):
+        if amplitude_envelope:
+            # Prepare amplitude envelope data
+            self.prepare_amp_env(n_window)
+        else:
             # Prepare time-delay embedded data
             self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
-
-        elif amplitude_envelope:
-            # Prepare amplitude envelope data
-            self.prepare_amp_env()
-
-        else:
-            self.prepared_data_memmaps = self.raw_data_memmaps
-
-        # Standardise to get the final data
-        self.standardize()
 
         self.prepared = True
 
     def prepare_amp_env(self, n_window: int = 1):
-        """Prepares amplitude envelope data.
+        """Prepare amplitude envelope data."""
 
-        Performs a Hilbert transform, takes the absolute value and standardizes the
-        data.
-
-        Parameters
-        ----------
-        n_window : int
-            Number of data points in a sliding window to apply to the amplitude
-            envelope data.
-        """
         self.amplitude_envelope = True
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
@@ -122,6 +124,9 @@ class Processing:
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
             self.prepared_data_memmaps.append(prepared_data_memmap)
 
+        # Update subjects to return the prepared data
+        self.subjects = self.prepared_data_memmaps
+
     def prepare_tde(
         self,
         n_embeddings: int = 1,
@@ -129,21 +134,8 @@ class Processing:
         pca_components: np.ndarray = None,
         whiten: bool = False,
     ):
-        """Prepares time-delay embedded data to train the model with.
+        """Prepares time-delay embedded data to train the model with."""
 
-        Performs standardization, time embedding and principle component analysis.
-
-        Parameters
-        ----------
-        n_embeddings : int
-            Number of data points to embed the data.
-        n_pca_components : int
-            Number of PCA components to keep. Default is no PCA.
-        pca_components : np.ndarray
-            PCA components to apply if they have already been calculated.
-        whiten : bool
-            Should we whiten the PCA'ed data?
-        """
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
@@ -217,6 +209,9 @@ class Processing:
 
             # Clear intermediate data
             del std_data, te_std_data, prepared_data
+
+        # Update subjects to return the prepared data
+        self.subjects = self.prepared_data_memmaps
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
@@ -299,18 +294,6 @@ class Processing:
             trimmed_raw_time_series = np.concatenate(trimmed_raw_time_series)
 
         return trimmed_raw_time_series
-
-    def standardize(self):
-        standardized_prepared_data_memmaps = []
-        for prepared_data_memmaps in tqdm(
-            self.prepared_data_memmaps, desc="Standardizing data", ncols=98
-        ):
-            standardized_prepared_data_memmap = standardize(
-                prepared_data_memmaps, create_copy=False
-            )
-            standardized_prepared_data_memmaps.append(standardized_prepared_data_memmap)
-        # Update subjects to return the standardized data
-        self.subjects = standardized_prepared_data_memmaps
 
 
 def standardize(
