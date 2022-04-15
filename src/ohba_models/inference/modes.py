@@ -4,11 +4,13 @@
 
 import logging
 from typing import List, Tuple, Union
+from pathlib import Path
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from ohba_models import array_ops
 from ohba_models.inference import metrics
+from ohba_models.analysis.gmm import fit_gaussian_mixture
 
 _logger = logging.getLogger("OHBA-Models")
 _rng = np.random.default_rng()
@@ -433,3 +435,77 @@ def fano_factor(
             F[-1].append(np.std(counts, axis=0) ** 2 / np.mean(counts, axis=0))
 
     return np.squeeze(F)
+
+
+def gmm_per_subject(time_course, time_course_type, gmm_filename=None):
+    """Fit a 2 component GMM to a subject specific time course.
+
+    Parameters
+    ----------
+    time_course : np.ndarray
+        Time course to be fitted with GMM. Shape is (n_samples, n_modes)
+    time_course_type : str
+        Name of the time course. (e.g. alpha/gamma)
+    gmm_filename : str
+        Path to directory to store the GMM fit plots.
+
+    Returns
+    -------
+    time_course : np.ndarray
+        Time course in which activations are determined by fitting GMM.
+    """
+    n_modes = time_course.shape[1]
+
+    # loop over modes
+    for j in range(n_modes):
+        a = time_course[:, j]
+        a[np.isinf(a)] = np.mean(a[~np.isinf(a)])
+
+        # fit a 2 component GMM
+        if gmm_filename is not None:
+            plot_filename = "{fn.parent}/{fn.stem}/{fn.stem}_{time_course_type}_{j:0{w2}d}{fn.suffix}".format(
+                fn=Path(gmm_filename),
+                time_course_type=time_course_type,
+                j=j,
+                w2=len(str(n_modes)),
+            )
+        else:
+            plot_filename = None
+        mixture_label = fit_gaussian_mixture(
+            a,
+            print_message=False,
+            plot_filename=plot_filename,
+            bayesian=False,
+            max_iter=5000,
+            n_init=5,
+        )
+        time_course[:, j] = np.array(mixture_label)
+    return time_course
+
+
+def gmm_for_time_course(time_course, time_course_type, gmm_filename=None):
+    """Fit GMM to time course
+
+    Parameters
+    ----------
+    time_course : List of np.ndarray
+        List of time courses per subject.
+    time_course_type : str
+        Name of the time course (e.g. alpha/gamma).
+    gmm_filename : str
+        Path to directory to store the GMM fit plots.
+
+    Returns
+    -------
+    time_courses : List of np.ndarray
+        List of time courses in which activations are determined by fitting GMM.
+    """
+    # extract the positions of discontinuities
+    discontinuities = [mtc.shape[0] for mtc in time_course]
+
+    # gmm fit to the concatenated time course across subjects
+    time_course = gmm_per_subject(
+        np.concatenate(time_course), time_course_type, gmm_filename=gmm_filename
+    )
+
+    return np.split(time_course, np.cumsum(discontinuities))
