@@ -188,11 +188,11 @@ Please run `black` on any edited files before commiting changes.
 
 ### Git Workflow
 
-We use git for version control. There are two branches on the remote repo: `master` and `development`. The `development` branch is used for adding new features. We merge `development` into `master` when we have a stable version of the code. Please add new features to the `development` branch only. A standard git workflow is described below.
+We use git for version control. There is one `main` branch. To add changes:
 
-Create a branch for changes:
+Create a feature branch for changes:
 ```
-git checkout development
+git checkout main
 git pull
 git checkout -b <branch-name>
 ```
@@ -209,9 +209,9 @@ Then either push the new branch to the remote repository:
 ```
 git push --set-upstream origin <branch-name>
 ```
-or merge branch into development and push:
+and create a pull request (recommended), or merge branch into `main` and push:
 ```
-git checkout development
+git checkout main
 git merge <branch-name>
 git push
 ```
