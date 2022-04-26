@@ -123,7 +123,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
         Strategy for distributed learning.
     """
 
-    multiple_scales: bool = True
+    multiple_dynamics: bool = True
 
     # Inference network parameters
     inference_rnn: Literal["gru", "lstm"] = "lstm"

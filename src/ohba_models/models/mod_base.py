@@ -26,7 +26,7 @@ class BaseModelConfig:
     """Base class for settings for all models."""
 
     # Model choices
-    multiple_scales: bool = False
+    multiple_dynamics: bool = False
 
     # Training parameters
     batch_size: int = None

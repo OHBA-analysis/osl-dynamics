@@ -202,7 +202,7 @@ class InferenceModelBase(ModelBase):
         """
         predictions = self.model.predict(*args, *kwargs)
         return_names = ["ll_loss", "kl_loss", "alpha"]
-        if self.config.multiple_scales:
+        if self.config.multiple_dynamics:
             return_names.append("gamma")
         predictions_dict = dict(zip(return_names, predictions))
 
@@ -226,7 +226,7 @@ class InferenceModelBase(ModelBase):
             Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
-        if self.config.multiple_scales:
+        if self.config.multiple_dynamics:
             return self.get_mode_time_courses(
                 inputs, *args, concatenate=concatenate, **kwargs
             )
@@ -266,7 +266,7 @@ class InferenceModelBase(ModelBase):
             Gamma time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
-        if not self.config.multiple_scales:
+        if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
         inputs = self._make_dataset(inputs)

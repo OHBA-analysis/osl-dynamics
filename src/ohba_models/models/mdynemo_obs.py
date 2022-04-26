@@ -58,7 +58,7 @@ class Config(BaseModelConfig):
         Strategy for distributed learning.
     """
 
-    multiple_scales: bool = True
+    multiple_dynamics: bool = True
 
     # Observation model parameters
     learn_means: bool = None
