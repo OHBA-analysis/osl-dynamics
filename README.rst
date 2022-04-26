@@ -13,7 +13,7 @@ Installation
 ============
 .. code-block:: shell
 
-    git clone git@github.com:evanr70/osl-dynamics.git
+    git clone git@github.com:OHBA-analysis/osl-dynamics.git
     cd osl-dynamics
     pip install -e .
 
