@@ -566,7 +566,7 @@ class LogLikelihoodLossLayer(layers.Layer):
         self.add_loss(nll_loss)
         self.add_metric(nll_loss, name=self.name)
 
-        return nll_loss
+        return tf.expand_dims(nll_loss, axis=-1)
 
 
 class KLDivergenceLayer(layers.Layer):
@@ -640,7 +640,7 @@ class KLLossLayer(layers.Layer):
         self.add_loss(kl_loss)
         self.add_metric(kl_loss, name=self.name)
 
-        return kl_loss
+        return tf.expand_dims(kl_loss, axis=-1)
 
 
 class InferenceRNNLayer(layers.Layer):
@@ -808,4 +808,4 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.add_loss(nll_loss)
         self.add_metric(nll_loss, name=self.name)
 
-        return nll_loss
+        return tf.expand_dims(nll_loss, axis=-1)
