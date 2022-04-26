@@ -1,4 +1,4 @@
-"""Multi-Time-Scale DyNeMo (MTS-DyNeMo) model.
+"""Multi-Dynamic Network Modes (M-DyNeMo) model.
 
 """
 
@@ -9,7 +9,7 @@ from tqdm import trange
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from ohba_models.models import mts_dynemo_obs
+from ohba_models.models import mdynemo_obs
 from ohba_models.models.mod_base import BaseModelConfig
 from ohba_models.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from ohba_models.inference.layers import (
@@ -33,7 +33,7 @@ from ohba_models.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig, InferenceModelConfig):
-    """Settings for MTS-DyNeMo.
+    """Settings for M-DyNeMo.
 
     Parameters
     ----------
@@ -174,11 +174,11 @@ class Config(BaseModelConfig, InferenceModelConfig):
 
 
 class Model(InferenceModelBase):
-    """MTS-DyNeMo model class.
+    """M-DyNeMo model class.
 
     Parameters
     ----------
-    config : ohba_models.models.mts_dynemo.Config
+    config : ohba_models.models.mdynemo.Config
     """
 
     def build_model(self):
@@ -197,7 +197,7 @@ class Model(InferenceModelBase):
         fcs : np.ndarray
             Mode functional connectivities.
         """
-        return mts_dynemo_obs.get_means_stds_fcs(self.model)
+        return mdynemo_obs.get_means_stds_fcs(self.model)
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
@@ -215,9 +215,7 @@ class Model(InferenceModelBase):
             Do we want to use the passed parameters when we re_initialize
             the model?
         """
-        mts_dynemo_obs.set_means_stds_fcs(
-            self.model, means, stds, fcs, update_initializer
-        )
+        mdynemo_obs.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
 
     def sample_time_courses(self, n_samples: int):
         """Uses the model RNN to sample mode mixing factors, alpha and gamma.
@@ -493,5 +491,5 @@ def _model_structure(config):
     kl_loss = kl_loss_layer([mean_kl_div, fc_kl_div])
 
     return tf.keras.Model(
-        inputs=inputs, outputs=[ll_loss, kl_loss, alpha, gamma], name="MTS-DyNeMo"
+        inputs=inputs, outputs=[ll_loss, kl_loss, alpha, gamma], name="M-DyNeMo"
     )

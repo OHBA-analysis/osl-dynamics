@@ -7,7 +7,7 @@ print("Setting up")
 import numpy as np
 from ohba_models import data, simulation
 from ohba_models.inference import metrics, modes, tf_ops
-from ohba_models.models.mts_dynemo import Config, Model
+from ohba_models.models.mdynemo import Config, Model
 from ohba_models.inference import callbacks
 from ohba_models.utils import plotting
 

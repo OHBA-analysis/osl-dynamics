@@ -1,4 +1,4 @@
-"""Multi-Time-Scale DyNeMo observation model.
+"""Multi-Dynamic Network Modes (M-DyNeMo) observation model.
 
 """
 
@@ -21,7 +21,7 @@ from ohba_models.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig):
-    """Settings for MTS-DyNeMo observation model.
+    """Settings for M-DyNeMo observation model.
 
     Parameters
     ----------
@@ -83,11 +83,11 @@ class Config(BaseModelConfig):
 
 
 class Model(ModelBase):
-    """MTS-DyNeMo observation model class.
+    """M-DyNeMo observation model class.
 
     Parameters
     ----------
-    config : ohba_models.models.mts_dynemo_obs.Config
+    config : ohba_models.models.mdynemo_obs.Config
     """
 
     def build_model(self):
@@ -181,7 +181,7 @@ def _model_structure(config):
     ll_loss = ll_loss_layer([data, m, C])
 
     return tf.keras.Model(
-        inputs=[data, alpha, gamma], outputs=[ll_loss], name="MTS-DyNeMo-Obs"
+        inputs=[data, alpha, gamma], outputs=[ll_loss], name="M-DyNeMo-Obs"
     )
 
 
