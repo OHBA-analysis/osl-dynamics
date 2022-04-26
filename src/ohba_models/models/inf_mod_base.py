@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Tuple, Union, Literal
 
 import numpy as np
-from tensorflow.keras import optimizers
 from ohba_models.models.mod_base import ModelBase
 from ohba_models.inference import callbacks, initializers
 from ohba_models.utils.misc import replace_argument

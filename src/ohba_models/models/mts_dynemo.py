@@ -10,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from ohba_models.models import mts_dynemo_obs
-from ohba_models.models.mod_base import BaseModelConfig, ModelBase
+from ohba_models.models.mod_base import BaseModelConfig
 from ohba_models.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
 from ohba_models.inference.layers import (
     InferenceRNNLayer,
@@ -28,7 +28,6 @@ from ohba_models.inference.layers import (
     SoftmaxLayer,
     ConcatenateLayer,
     MatMulLayer,
-    DummyLayer,
 )
 
 

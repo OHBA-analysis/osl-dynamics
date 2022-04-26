@@ -193,7 +193,7 @@ def set_means(model, means, update_initializer=True):
 
     if update_initializer:
         means_layer.initial_value = means
-        means_covs_layer.vectors_initializer.initial_value = means
+        means_layer.vectors_initializer.initial_value = means
 
 
 def set_covariances(model, covariances, update_initializer=True):

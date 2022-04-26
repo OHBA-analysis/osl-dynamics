@@ -5,8 +5,6 @@
 import numpy as np
 from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from tqdm import trange
-from scipy.spatial.distance import cosine
-
 
 def alpha_correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
     """Calculates the correlation between modes of two alpha time series.
