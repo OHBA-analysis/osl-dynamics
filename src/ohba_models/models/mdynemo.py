@@ -313,10 +313,8 @@ def _model_structure(config):
     #
 
     # Layers
-    inference_input_dropout_layer = layers.Dropout(
-        config.inference_dropout, name="data_drop"
-    )
-    inference_output_layer = InferenceRNNLayer(
+    data_drop_layer = layers.Dropout(config.inference_dropout, name="data_drop")
+    inf_rnn_layer = InferenceRNNLayer(
         config.inference_rnn,
         config.inference_normalization,
         config.inference_activation,
@@ -327,8 +325,8 @@ def _model_structure(config):
     )
 
     # Data flow
-    inference_input_dropout = inference_input_dropout_layer(inputs)
-    inference_output = inference_output_layer(inference_input_dropout)
+    data_drop = data_drop_layer(inputs)
+    inf_rnn = inf_rnn_layer(data_drop)
 
     #
     # Mode time course for the mean and standard deviation
@@ -350,8 +348,8 @@ def _model_structure(config):
     )
 
     # Data flow
-    mean_inf_mu = mean_inf_mu_layer(inference_output)
-    mean_inf_sigma = mean_inf_sigma_layer(inference_output)
+    mean_inf_mu = mean_inf_mu_layer(inf_rnn)
+    mean_inf_sigma = mean_inf_sigma_layer(inf_rnn)
     mean_theta = mean_theta_layer([mean_inf_mu, mean_inf_sigma])
     mean_theta_norm = mean_theta_norm_layer(mean_theta)
     alpha = alpha_layer(mean_theta_norm)
@@ -376,8 +374,8 @@ def _model_structure(config):
     )
 
     # Data flow
-    fc_inf_mu = fc_inf_mu_layer(inference_output)
-    fc_inf_sigma = fc_inf_sigma_layer(inference_output)
+    fc_inf_mu = fc_inf_mu_layer(inf_rnn)
+    fc_inf_sigma = fc_inf_sigma_layer(inf_rnn)
     fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
     fc_theta_norm = fc_theta_norm_layer(fc_theta)
     gamma = gamma_layer(fc_theta_norm)
@@ -432,10 +430,8 @@ def _model_structure(config):
 
     # Layers
     concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
-    model_input_dropout_layer = layers.Dropout(
-        config.model_dropout, name="theta_norm_drop"
-    )
-    model_output_layer = ModelRNNLayer(
+    theta_norm_drop_layer = layers.Dropout(config.model_dropout, name="theta_norm_drop")
+    mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
         config.model_activation,
@@ -447,8 +443,8 @@ def _model_structure(config):
 
     # Data flow
     theta_norm = concatenate_layer([mean_theta_norm, fc_theta_norm])
-    model_input_dropout = model_input_dropout_layer(theta_norm)
-    model_output = model_output_layer(model_input_dropout)
+    theta_norm_drop = theta_norm_drop_layer(theta_norm)
+    mod_rnn = mod_rnn_layer(theta_norm_drop)
 
     #
     # Mode time course for the mean
@@ -462,8 +458,8 @@ def _model_structure(config):
     kl_div_layer_mean = KLDivergenceLayer(name="mean_kl_div")
 
     # Data flow
-    mean_mod_mu = mean_mod_mu_layer(model_output)
-    mean_mod_sigma = mean_mod_sigma_layer(model_output)
+    mean_mod_mu = mean_mod_mu_layer(mod_rnn)
+    mean_mod_sigma = mean_mod_sigma_layer(mod_rnn)
     mean_kl_div = kl_div_layer_mean(
         [mean_inf_mu, mean_inf_sigma, mean_mod_mu, mean_mod_sigma]
     )
@@ -480,8 +476,8 @@ def _model_structure(config):
     fc_kl_div_layer = KLDivergenceLayer(name="fc_kl_div")
 
     # Data flow
-    fc_mod_mu = fc_mod_mu_layer(model_output)
-    fc_mod_sigma = fc_mod_sigma_layer(model_output)
+    fc_mod_mu = fc_mod_mu_layer(mod_rnn)
+    fc_mod_sigma = fc_mod_sigma_layer(mod_rnn)
     fc_kl_div = fc_kl_div_layer([fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma])
 
     #

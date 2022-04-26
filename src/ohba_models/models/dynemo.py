@@ -295,10 +295,8 @@ def _model_structure(config):
     #     - inf_sigma ~ softplus(RNN(inputs_<=t))
 
     # Definition of layers
-    inference_input_dropout_layer = layers.Dropout(
-        config.inference_dropout, name="data_drop"
-    )
-    inference_output_layer = InferenceRNNLayer(
+    data_drop_layer = layers.Dropout(config.inference_dropout, name="data_drop")
+    inf_rnn_layer = InferenceRNNLayer(
         config.inference_rnn,
         config.inference_normalization,
         config.inference_activation,
@@ -320,10 +318,10 @@ def _model_structure(config):
     )
 
     # Data flow
-    inference_input_dropout = inference_input_dropout_layer(inputs)
-    inference_output = inference_output_layer(inference_input_dropout)
-    inf_mu = inf_mu_layer(inference_output)
-    inf_sigma = inf_sigma_layer(inference_output)
+    data_drop = data_drop_layer(inputs)
+    inf_rnn = inf_rnn_layer(data_drop)
+    inf_mu = inf_mu_layer(inf_rnn)
+    inf_sigma = inf_sigma_layer(inf_rnn)
     theta = theta_layer([inf_mu, inf_sigma])
     theta_norm = theta_norm_layer(theta)
     alpha = alpha_layer(theta_norm)
@@ -366,10 +364,8 @@ def _model_structure(config):
     #     - mod_sigma ~ softplus(RNN(theta_<t))
 
     # Definition of layers
-    model_input_dropout_layer = layers.Dropout(
-        config.model_dropout, name="theta_norm_drop"
-    )
-    model_output_layer = ModelRNNLayer(
+    theta_norm_drop_layer = layers.Dropout(config.model_dropout, name="theta_norm_drop")
+    mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
         config.model_activation,
@@ -386,10 +382,10 @@ def _model_structure(config):
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
-    model_input_dropout = model_input_dropout_layer(theta_norm)
-    model_output = model_output_layer(model_input_dropout)
-    mod_mu = mod_mu_layer(model_output)
-    mod_sigma = mod_sigma_layer(model_output)
+    theta_norm_drop = theta_norm_drop_layer(theta_norm)
+    mod_rnn = mod_rnn_layer(theta_norm_drop)
+    mod_mu = mod_mu_layer(mod_rnn)
+    mod_sigma = mod_sigma_layer(mod_rnn)
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
     kl_loss = kl_loss_layer(kl_div)
 
