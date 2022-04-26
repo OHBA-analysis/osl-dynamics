@@ -2,7 +2,7 @@ print("Setting up")
 import numpy as np
 from ohba_models import data, simulation
 from ohba_models.inference import metrics, modes, tf_ops
-from ohba_models.models.hsmvn import Config, Model
+from ohba_models.models.dynest import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -75,4 +75,4 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DyNeSt):", modes.fractional_occupancies(inf_stc))

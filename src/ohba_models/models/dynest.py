@@ -1,4 +1,4 @@
-"""Hidden State Multivariate Normal (HS-MVN) model.
+"""Dynamic Network States (DyNeSt) model.
 
 """
 
@@ -25,7 +25,7 @@ from ohba_models.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig, InferenceModelConfig):
-    """Settings for HS-MVN.
+    """Settings for DyNeSt.
 
     Parameters
     ----------
@@ -142,11 +142,11 @@ class Config(BaseModelConfig, InferenceModelConfig):
 
 
 class Model(InferenceModelBase):
-    """HS-MVN model class.
+    """DyNeSt model class.
 
     Parameters
     ----------
-    config : ohba_models.models.hsmvn.Config
+    config : ohba_models.models.dynest.Config
     """
 
     def build_model(self):
@@ -225,4 +225,4 @@ def _model_structure(config):
     kl_div = kl_div_layer([inf_theta, mod_theta])
     kl_loss = kl_loss_layer(kl_div)
 
-    return tf.keras.Model(inputs=data, outputs=[ll_loss, kl_loss, alpha], name="HS-MVN")
+    return tf.keras.Model(inputs=data, outputs=[ll_loss, kl_loss, alpha], name="DyNeSt")
