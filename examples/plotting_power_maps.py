@@ -3,9 +3,9 @@
 """
 
 print("Setting up")
-from ohba_models.analysis import power, spectral, modes, workbench
-from ohba_models.data import OSL_HMM, Data, io
-from ohba_models.utils import plotting
+from osl_dynamics.analysis import power, spectral, modes, workbench
+from osl_dynamics.data import OSL_HMM, Data, io
+from osl_dynamics.utils import plotting
 
 # Load an HMM fit
 hmm = OSL_HMM(

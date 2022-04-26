@@ -3,7 +3,7 @@
 """
 
 print("Setting up")
-from ohba_models.data import Data
+from osl_dynamics.data import Data
 
 # Load real MEG data
 # - String can be the path to a .npy or .mat file, or the path to a folder containing .npy files

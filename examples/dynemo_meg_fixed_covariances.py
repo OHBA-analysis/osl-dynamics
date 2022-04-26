@@ -8,9 +8,9 @@
 """
 
 print("Setting up")
-from ohba_models.data import OSL_HMM, Data, manipulation
-from ohba_models.inference import metrics, modes, tf_ops
-from ohba_models.models.dynemo import Config, Model
+from osl_dynamics.data import OSL_HMM, Data, manipulation
+from osl_dynamics.inference import metrics, modes, tf_ops
+from osl_dynamics.models.dynemo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()

@@ -7,10 +7,10 @@
 print("Setting up")
 import os
 import numpy as np
-from ohba_models import data, simulation
-from ohba_models.inference import tf_ops, modes, metrics, callbacks
-from ohba_models.models.dynemo import Config, Model
-from ohba_models.utils import plotting
+from osl_dynamics import data, simulation
+from osl_dynamics.inference import tf_ops, modes, metrics, callbacks
+from osl_dynamics.models.dynemo import Config, Model
+from osl_dynamics.utils import plotting
 
 # Make directory to hold plots
 os.makedirs("figures", exist_ok=True)

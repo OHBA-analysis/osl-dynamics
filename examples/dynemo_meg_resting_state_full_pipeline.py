@@ -16,9 +16,9 @@ run = int(argv[1])
 print("Setting up")
 import numpy as np
 import pickle
-from ohba_models import analysis, data, inference
-from ohba_models.models.dynemo import Config, Model
-from ohba_models.utils import plotting
+from osl_dynamics import analysis, data, inference
+from osl_dynamics.models.dynemo import Config, Model
+from osl_dynamics.utils import plotting
 
 # -------- #
 # Settings #

@@ -1,11 +1,11 @@
 
 # Contribution Guide
 
-This is an introductory guide to using OHBA-Models on the Biomedical Research Computing (BMRC) cluster. This guide covers:
+This is an introductory guide to using osl-dynamics on the Biomedical Research Computing (BMRC) cluster. This guide covers:
 - [The BMRC Cluster](#the-bmrc-cluster)
-- [Installing OHBA-Models on BMRC](#installing-ohba-models-on-bmrc)
-- [Using OHBA-Models on BMRC](#using-ohba-models-on-bmrc)
-- [Editing OHBA-Models Source Code](#editing-ohba-models-source-code)
+- [Installing osl-dynamics on BMRC](#installing-osl-dynamics-on-bmrc)
+- [Using osl-dynamics on BMRC](#using-osl-dynamics-on-bmrc)
+- [Editing osl-dynamics Source Code](#editing-osl-dynamics-source-code)
 
 ## The BMRC Cluster
 
@@ -57,7 +57,7 @@ To submit a non-interactive GPU job, first create a `submission.sh` file:
 # Setup your environment
 module load Anaconda3
 module load cudnn
-source activate ohba-tf23
+source activate osld-tf23
 
 # Run scripts
 python dynemo_hmm_mvn.py
@@ -71,17 +71,17 @@ Delete all jobs: `qdel -u <username>`.
 
 Further info: https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources.
 
-## Installing OHBA-Models on BMRC
-It is recommended to install OHBA-Models within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
+## Installing osl-dynamics on BMRC
+It is recommended to install osl-dynamics within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
 
 ### TensorFlow 2.5 (Recommended for compG017)
 ```
 module use /well/woolrich/projects/software/modulefiles
 module load Anaconda3
 module load cuda/11.2
-conda create --name ohba-tf25 python=3.8
-conda activate ohba-tf25
-cd OHBA-Models
+conda create --name osld-tf25 python=3.8
+conda activate osld-tf25
+cd osl-dynamics
 pip install -e .
 ```
 
@@ -96,9 +96,9 @@ Install:
 ```
 module load Anaconda3
 module load cuDNN
-conda create --name ohba-tf24 python=3.8
-conda activate ohba-tf24
-cd OHBA-Models
+conda create --name osld-tf24 python=3.8
+conda activate osld-tf24
+cd osl-dynamics
 pip install -e .
 ```
 
@@ -113,31 +113,31 @@ Install:
 ```
 module load Anaconda3
 module load cudnn
-conda create --name ohba-tf23 python=3.8
-conda activate ohba-tf23
-cd OHBA-Models
+conda create --name osld-tf23 python=3.8
+conda activate osld-tf23
+cd osl-dynamics
 pip install -e .
 ```
 
-## Using OHBA-Models on BMRC
+## Using osl-dynamics on BMRC
 
-OHBA-Models can be used in a standalone python script, e.g. the scripts in `/OHBA-Models/examples`. It is imported like any other python package:
+osl-dynamics can be used in a standalone python script, e.g. the scripts in `/osl-dynamics/examples`. It is imported like any other python package:
 ```
-from ohba_models import array_ops
-from ohba_models.models.dynemo import Model
+from osl_dynamics import array_ops
+from osl_dynamics.models.dynemo import Model
 ```
 
 The script is executed via the command line on a GPU node with `python <script>.py`.
 
-Before you can run the script you need to activate the virtual environment in which OHBA-Models was installed with `conda activate <env>`.
+Before you can run the script you need to activate the virtual environment in which osl-dynamics was installed with `conda activate <env>`.
 
-## Editing OHBA-Models Source Code
+## Editing osl-dynamics Source Code
 
 This section gives an overview of the source code and useful tips for editing.
 
-### Overview of the OHBA-Models Package
+### Overview of the osl-dynamics Package
 
-The main source code is contained in `/OHBA-Models/src/ohba_models`. This directory contains 7 subpackages:
+The main source code is contained in `/osl-dynamics/src/osl_dynamics`. This directory contains 7 subpackages:
 - `data`: Classes and functions used to load, save and manipulate data.
 - `models` and `inference`: Classes for each model type and TensorFlow functions used for inference.
 - `analysis`: Functions for analysing a fitted model.

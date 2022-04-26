@@ -4,9 +4,9 @@
 
 print("Setting up")
 import numpy as np
-from ohba_models.analysis import connectivity, spectral, modes
-from ohba_models.data import OSL_HMM, Data, io
-from ohba_models.utils import plotting
+from osl_dynamics.analysis import connectivity, spectral, modes
+from osl_dynamics.data import OSL_HMM, Data, io
+from osl_dynamics.utils import plotting
 
 # Load a HMM fit
 hmm = OSL_HMM(

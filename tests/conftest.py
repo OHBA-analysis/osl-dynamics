@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    Dummy conftest.py for ohba_models.
+    Dummy conftest.py for osl_dynamics.
 
     If you don't know what this is for, just leave it empty.
     Read more about conftest.py under:

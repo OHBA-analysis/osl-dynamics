@@ -1,8 +1,8 @@
-================================
-OHBA-Models
-================================
+============
+osl-dynamics
+============
 
-This is the documentation of OHBA-Models.
+This is the documentation of osl-dynamics.
 
 Contents
 ========

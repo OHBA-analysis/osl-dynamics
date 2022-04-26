@@ -1,34 +1,34 @@
-===========
-OHBA Models
-===========
+============
+osl-dynamics
+============
 
 Models for analysing neuroimaging data developed by the Oxford Centre for Human Brain Activity (OHBA) group at the University of Oxford.
 
 Models included:
     - Dynamic Network Modes (DyNeMo).
-    - Multi-Time-Scale Dynamic Network Modes (MTS-DyNeMo).
-    - Hidden-State Multivariate Normal (HS-MVN).
+    - Multi-Dynamic Network Modes (M-DyNeMo).
+    - Dynamic Network States (DyNeSt).
 
 Installation
 ============
 .. code-block:: shell
 
-    git clone git@github.com:evanr70/OHBA-Models.git
-    cd OHBA-Models
+    git clone git@github.com:evanr70/osl-dynamics.git
+    cd osl-dynamics
     pip install -e .
 
-See OHBA-Models/contribution.md for further details.
+See osl-dynamics/contribution.md for further details.
 
 Run tests
 =========
 .. code-block:: shell
 
-    cd OHBA-Models
+    cd osl-dynamics
     python setup.py test
 
 Build documentation
 ===================
 .. code-block:: shell
 
-    cd OHBA-Models
+    cd osl-dynamics
     python setup.py docs 

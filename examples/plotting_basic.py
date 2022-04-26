@@ -3,8 +3,8 @@
 """
 
 import numpy as np
-from ohba_models import simulation
-from ohba_models.utils import plotting
+from osl_dynamics import simulation
+from osl_dynamics.utils import plotting
 
 
 #

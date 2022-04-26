@@ -5,9 +5,9 @@
 print("Setting up")
 import os
 import numpy as np
-from ohba_models.analysis import connectivity, power, spectral
-from ohba_models.data import OSL_HMM, Data, io
-from ohba_models.utils import plotting
+from osl_dynamics.analysis import connectivity, power, spectral
+from osl_dynamics.data import OSL_HMM, Data, io
+from osl_dynamics.utils import plotting
 
 # Make directory for plots
 os.makedirs("figures", exist_ok=True)

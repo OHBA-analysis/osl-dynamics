@@ -6,9 +6,9 @@
 
 print("Setting up")
 import numpy as np
-from ohba_models import data, simulation
-from ohba_models.inference import metrics, modes, tf_ops
-from ohba_models.models.dynemo import Config, Model
+from osl_dynamics import data, simulation
+from osl_dynamics.inference import metrics, modes, tf_ops
+from osl_dynamics.models.dynemo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
