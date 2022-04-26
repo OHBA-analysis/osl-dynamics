@@ -8,9 +8,8 @@ from pathlib import Path
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from osl_dynamics import array_ops
+from osl_dynamics import array_ops, analysis
 from osl_dynamics.inference import metrics
-from osl_dynamics.analysis.gmm import fit_gaussian_mixture
 
 _logger = logging.getLogger("osl-dynamics")
 _rng = np.random.default_rng()
@@ -471,7 +470,7 @@ def gmm_per_subject(time_course, time_course_type, gmm_filename=None):
             )
         else:
             plot_filename = None
-        mixture_label = fit_gaussian_mixture(
+        mixture_label = analysis.gmm.fit_gaussian_mixture(
             a,
             print_message=False,
             plot_filename=plot_filename,
