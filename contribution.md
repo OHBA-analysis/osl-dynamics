@@ -56,8 +56,8 @@ To submit a non-interactive GPU job, first create a `submission.sh` file:
 
 # Setup your environment
 module load Anaconda3
-module load cudnn
-source activate osld-tf23
+module load cuDNN
+source activate osld-tf24
 
 # Run scripts
 python dynemo_hmm_mvn.py
@@ -74,25 +74,7 @@ Further info: https://www.medsci.ox.ac.uk/divisional-services/support-services-1
 ## Installing osl-dynamics on BMRC
 It is recommended to install osl-dynamics within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
 
-### TensorFlow 2.5 (Recommended for compG017)
-```
-module use /well/woolrich/projects/software/modulefiles
-module load Anaconda3
-module load cuda/11.2
-conda create --name osld-tf25 python=3.8
-conda activate osld-tf25
-cd osl-dynamics
-pip install -e .
-```
-
-### TensorFlow 2.4 
-Update setup.cfg with dependencies:
-```
-tensorflow==2.4.1
-tensorflow_probability==0.12.2
-```
-
-Install:
+### TensorFlow 2.4 (Recommended)
 ```
 module load Anaconda3
 module load cuDNN
@@ -115,6 +97,24 @@ module load Anaconda3
 module load cudnn
 conda create --name osld-tf23 python=3.8
 conda activate osld-tf23
+cd osl-dynamics
+pip install -e .
+```
+
+### TensorFlow 2.5 (Not recommended)
+Update setup.cfg with dependencies:
+```
+tensorflow==2.5
+tensorflow_probability==0.13
+```
+
+Install:
+```
+module use /well/woolrich/projects/software/modulefiles
+module load Anaconda3
+module load cuda/11.2
+conda create --name osld-tf25 python=3.8
+conda activate osld-tf25
 cd osl-dynamics
 pip install -e .
 ```
