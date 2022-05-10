@@ -26,7 +26,7 @@ config = Config(
     learn_covariances=True,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=100,
+    n_epochs=300,
 )
 
 # Simulate data
@@ -68,13 +68,11 @@ history = model.train(training_dataset)
 
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-print("inf_alp", inf_alp.shape)
 inf_stc = modes.time_courses(inf_alp)
 sim_stc = sim.mode_time_course
-print("sim_stc",sim_stc.shape)
 sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Sage):", modes.fractional_occupancies(inf_stc))
