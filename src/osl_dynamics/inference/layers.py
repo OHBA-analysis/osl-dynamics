@@ -537,6 +537,21 @@ class MixMatricesLayer(layers.Layer):
         return C
 
 
+class MixVectorsMatricesLayer(layers.Layer):
+    """Layer to mix vectors and matrices.
+
+    The mixture is calculated as C_u_t.
+    """
+
+    def call(self, inputs, **kwargs):
+
+        # Unpack the inputs:
+        m, C = inputs
+        m = tf.expand_dims(m,axis=-1)
+        C_m = tf.concat([C,m],axis=3) 
+
+        return C_m
+
 class LogLikelihoodLossLayer(layers.Layer):
     """Layer to calculate the negative log likelihood.
 
@@ -568,6 +583,38 @@ class LogLikelihoodLossLayer(layers.Layer):
 
         return tf.expand_dims(nll_loss, axis=-1)
 
+class sageLogLikelihoodLossLayer(layers.Layer):
+    """Layer to calculate the negative log likelihood.
+
+    The negative log-likelihood is calculated assuming a multivariate normal
+    probability density and its value is added to the loss function.
+    """
+
+    def __init__(self, n_channels: int, name= 'll_loss'):
+        super().__init__(name = name )
+        self.n_channels = n_channels
+
+    def call (self, y_true, y_pred):
+        sigma = y_pred[:,:,:,:self.n_channels]
+        mu = y_pred[:,:,:,self.n_channels]
+
+        # Multivariate normal distribution
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
+        )
+
+        # Calculate the log-likelihood
+        ll_loss = mvn.log_prob(y_true)
+
+        # Sum over time dimension and average over the batch dimension
+        ll_loss = tf.reduce_sum(ll_loss, axis=1)
+        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        # Add the negative log-likelihood to the loss
+        nll_loss = -ll_loss
+
+        return nll_loss
 
 class KLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two Normal distributions.
