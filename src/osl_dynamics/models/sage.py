@@ -109,6 +109,14 @@ class Config():
     model_activation: str = None
     model_dropout: float = 0.0
 
+    # Descriminator network parameters
+    des_rnn: Literal["gru", "lstm"] = "lstm"
+    des_n_layers: int = 1
+    des_n_units: int = None
+    des_normalization: Literal[None, "batch", "layer"] = None
+    des_activation: str = None
+    des_dropout: float = 0.0
+
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
@@ -196,13 +204,13 @@ class SAGE():
             name="data")
 
         # Inference RNN:
-        # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
-        #     - inf_mu    ~ affine(RNN(inputs_<=t))
-        #     - inf_sigma ~ softplus(RNN(inputs_<=t))
+        # - \alpha_{t} = \zeta({\theta^{m}_{t}}) where
+        #   \mu^{m,\theta}_t  = f(LSTM_{bi}(Y,\omega^m_e),\lambda_e^m)
+        #  \mu^{c,\theta}_t = f(LSTM_{bi}(Y,\omega^c_e),\lambda_e^c)
 
         # Definition of layers
 
-        data_drop_layer = layers.TimeDistributed(layers.Dropout(self.config.inference_dropout, name="data_drop"))
+        data_drop_layer = layers.TimeDistributed(layers.Dropout(self.config.inference_dropout, name="data_drop_inf"))
         inf_rnn_layer = InferenceRNNLayer(
             self.config.inference_rnn,
             self.config.inference_normalization,
@@ -213,6 +221,10 @@ class SAGE():
             name="inf_rnn",
         )
 
+        #Exponential Linear Unit
+        relu_layer = layers.ELU(name="elu_inf")
+
+
         alpha_layer =  layers.TimeDistributed(layers.Dense(self.config.n_modes, 
             activation='softmax',
             name="alpha_inf"))
@@ -220,7 +232,8 @@ class SAGE():
         # Data flow
         data_drop = data_drop_layer(inputs)
         inf_rnn = inf_rnn_layer(data_drop)
-        alpha = alpha_layer(inf_rnn)
+        inf_rnn_elu = relu_layer(inf_rnn)
+        alpha = alpha_layer(inf_rnn_elu)
 
 
         # Observation model:
@@ -263,9 +276,9 @@ class SAGE():
         print("Building Generator Model…")
 
         # Model RNN:
-        # - Learns p(theta_t |theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
-        #     - mod_mu    ~ affine(RNN(theta_<t))
-        #     - mod_sigma ~ softplus(RNN(theta_<t))
+        # - \alpha_{t} = \zeta({\theta^{m}_{t}}) where
+        #    \hat{\mu}^{m,\theta}_{t} = f (LSTM_{uni} (\theta^{m}_{<t},\omega^m_g), \lambda_g^m)
+        #     \hat{\mu}^{c,\theta}_{t}   = f (LSTM_{uni} (\theta^{c}_{<t},\omega^c_g), \lambda_g^c)
 
         # Definition of layers
         generator_input = layers.Input(shape=(self.config.sequence_length, 
@@ -273,8 +286,8 @@ class SAGE():
             name="generator_input")
 
 
-        theta_norm_drop_layer = layers.TimeDistributed(layers.Dropout(self.config.model_dropout,
-            name="theta_norm_drop_generator"))
+        drop_layer = layers.TimeDistributed(layers.Dropout(self.config.model_dropout,
+            name="data_drop_gen"))
 
 
         mod_rnn_layer = ModelRNNLayer(
@@ -290,14 +303,18 @@ class SAGE():
         alpha_layer =  layers.TimeDistributed(layers.Dense(self.config.n_modes, 
             activation='softmax',
             name="alpha_gen"))
+        
+        #Exponential Linear Unit
+        relu_layer = layers.ELU(name="elu_gen")
 
 
         # Data flow
-        theta_norm_drop = theta_norm_drop_layer(generator_input)
-        alpha_prior = mod_rnn_layer(theta_norm_drop)
-        alpha_prior_softmax = alpha_layer(alpha_prior)
+        theta_drop = drop_layer(generator_input)
+        theta_drop_prior = mod_rnn_layer(theta_drop)
+        theta_drop_prior_relu = relu_layer(theta_drop_prior)
+        alpha_prior = alpha_layer(theta_drop_prior_relu)
 
-        self.generator_model = Model(generator_input, alpha_prior_softmax)
+        self.generator_model = Model(generator_input, alpha_prior)
 
         self.generator_model.summary()
 
@@ -305,33 +322,41 @@ class SAGE():
     def _build_discriminator_model(self):
         print("Building Discriminator…")
 
+        # Descriminator RNN:
+        #     D_{\theta^m_t} = \sigma (f (LSTM_{bi}([\zeta(\hat{\mu}^{m,\theta}_{t}), \zeta(\mu^{m,\theta}_t)],\omega^m_d), \lambda_d^m))
+        #     D_{\theta^c_t} = \sigma (f (LSTM_{bi}([\zeta(\hat{\mu}^{c,\theta}_{t}), \zeta(\mu^{c,\theta}_t)],\omega^c_d), \lambda_d^c))
+
         # Definition of layers
         discriminator_input = layers.Input(shape=(self.config.sequence_length,
             self.config.n_modes),
             name="data")
 
 
-        theta_norm_drop_layer = layers.TimeDistributed(layers.Dropout(self.config.model_dropout, 
-            name="theta_norm_drop_descriminator"))
+        drop_layer = layers.TimeDistributed(layers.Dropout(self.config.model_dropout, 
+            name="data_drop_des"))
         
-        mod_rnn_layer = ModelRNNLayer(
-            self.config.model_rnn,
-            self.config.model_normalization,
-            self.config.model_activation,
-            self.config.model_n_layers,
-            self.config.model_n_units,
+        des_rnn_layer = ModelRNNLayer(
+            self.config.des_rnn,
+            self.config.des_normalization,
+            self.config.des_activation,
+            self.config.des_n_layers,
+            self.config.des_n_units,
             self.config.model_dropout,
             name="des_rnn",
         )
 
+        #Exponential Linear Unit
+        relu_layer = layers.ELU(name="elu_des")
+
         sigmoid_layer = layers.TimeDistributed(layers.Dense(1, activation="sigmoid"))
         
         # Data flow
-        theta_norm_drop = theta_norm_drop_layer(discriminator_input)
-        discriminator_sequence = mod_rnn_layer(theta_norm_drop)
-        sigmoid_layer_softmax = sigmoid_layer(discriminator_sequence)
+        theta_norm_drop = drop_layer(discriminator_input)
+        discriminator_sequence = des_rnn_layer(theta_norm_drop)
+        discriminator_sequence_relu = relu_layer(discriminator_sequence)
+        discriminator_output = sigmoid_layer(discriminator_sequence_relu)
 
-        self.discriminator_model = Model(discriminator_input, sigmoid_layer_softmax)
+        self.discriminator_model = Model(discriminator_input, discriminator_output)
         self.discriminator_model.summary()
 
     def _build_and_compile_sage(self):
@@ -358,8 +383,18 @@ class SAGE():
         self.sage = Model(real_input, [C_m, discriminator_output_prior, discriminator_output_posterior],
             name = 'sage_model')
 
+        # Reconstruction (Likelihood) loss:
+        #   -The first loss corresponds to the likelihood - this tells us how well we are explaining our data 
+        #   -according to the current estimate of the generative model, and is given by:
+        #   -L =  \sum_{t=1}^{T}\, log \,p(Y_t | \theta_t^m = \mu^{m,\theta}_t, \theta_t^c = \mu^{c,\theta}_t )
+
         log_kl_loss = sageLogLikelihoodLossLayer(self.config.n_channels, name="ll_loss")
         log_kl_loss.__name__ = 'log_lh' # need to fix this as error without it
+
+        # Regularization (Prior) Loss:
+        #   -The second loss regularises the estimate of the latent, time-varying parameters [$\theta^m$, $\theta^c$] using an adaptive prior
+        #   -this penalises when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the prior:
+        #   -R = \sum_{t=1}^{T}  [\textnormal{CrossEntropy} \,(\mu^{m,\theta}_t || \hat{\mu}^{m,\theta}_{t}) + \textnormal{CrossEntropy}\, (\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})]
 
         self.sage.compile(loss=[log_kl_loss, 'binary_crossentropy','binary_crossentropy'],
             loss_weights=[0.998, 0.001, 0.001],
@@ -379,6 +414,18 @@ class SAGE():
 
     def train(self, train_data):
         
+        """Train the Model
+
+        Parameters
+        ----------
+        inputs : tensorflow.data.Dataset
+            Prediction dataset.
+
+        Returns
+        -------
+        history: History of discriminator_loss and generator_loss
+        """
+
         real = np.ones((self.config.batch_size,self.config.sequence_length, 1))
         fake = np.zeros((self.config.batch_size,self.config.sequence_length, 1))
         
@@ -433,3 +480,24 @@ class SAGE():
 
         return outputs
 
+    def get_covariances(self):
+        """Get the covariances of each mode.
+
+        Returns
+        -------
+        np.ndarary
+            Mode covariances.
+        """
+        return dynemo_obs.get_covariances(self.inference_model)
+
+    def get_means_covariances(self):
+        """Get the means and covariances of each mode.
+
+        Returns
+        -------
+        means : np.ndarary
+            Mode means.
+        covariances : np.ndarray
+            Mode covariances.
+        """
+        return dynemo_obs.get_means_covariances(self.inference_model)
