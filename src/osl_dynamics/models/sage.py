@@ -98,7 +98,7 @@ class Config():
     inference_n_layers: int = 1
     inference_n_units: int = None
     inference_normalization: Literal[None, "batch", "layer"] = None
-    inference_activation: str = None
+    inference_activation: str = "elu"
     inference_dropout: float = 0.0
 
     # Model network parameters
@@ -106,7 +106,7 @@ class Config():
     model_n_layers: int = 1
     model_n_units: int = None
     model_normalization: Literal[None, "batch", "layer"] = None
-    model_activation: str = None
+    model_activation: str = "elu"
     model_dropout: float = 0.0
 
     # Descriminator network parameters
@@ -114,7 +114,7 @@ class Config():
     des_n_layers: int = 1
     des_n_units: int = None
     des_normalization: Literal[None, "batch", "layer"] = None
-    des_activation: str = None
+    des_activation: str = "elu"
     des_dropout: float = 0.0
 
     # Observation model parameters
@@ -221,10 +221,6 @@ class SAGE():
             name="inf_rnn",
         )
 
-        #Exponential Linear Unit
-        relu_layer = layers.ELU(name="elu_inf")
-
-
         alpha_layer =  layers.TimeDistributed(layers.Dense(self.config.n_modes, 
             activation='softmax',
             name="alpha_inf"))
@@ -232,8 +228,7 @@ class SAGE():
         # Data flow
         data_drop = data_drop_layer(inputs)
         inf_rnn = inf_rnn_layer(data_drop)
-        inf_rnn_elu = relu_layer(inf_rnn)
-        alpha = alpha_layer(inf_rnn_elu)
+        alpha = alpha_layer(inf_rnn)
 
 
         # Observation model:
@@ -303,16 +298,11 @@ class SAGE():
         alpha_layer =  layers.TimeDistributed(layers.Dense(self.config.n_modes, 
             activation='softmax',
             name="alpha_gen"))
-        
-        #Exponential Linear Unit
-        relu_layer = layers.ELU(name="elu_gen")
-
 
         # Data flow
         theta_drop = drop_layer(generator_input)
         theta_drop_prior = mod_rnn_layer(theta_drop)
-        theta_drop_prior_relu = relu_layer(theta_drop_prior)
-        alpha_prior = alpha_layer(theta_drop_prior_relu)
+        alpha_prior = alpha_layer(theta_drop_prior)
 
         self.generator_model = Model(generator_input, alpha_prior)
 
@@ -345,16 +335,12 @@ class SAGE():
             name="des_rnn",
         )
 
-        #Exponential Linear Unit
-        relu_layer = layers.ELU(name="elu_des")
-
         sigmoid_layer = layers.TimeDistributed(layers.Dense(1, activation="sigmoid"))
         
         # Data flow
         theta_norm_drop = drop_layer(discriminator_input)
         discriminator_sequence = des_rnn_layer(theta_norm_drop)
-        discriminator_sequence_relu = relu_layer(discriminator_sequence)
-        discriminator_output = sigmoid_layer(discriminator_sequence_relu)
+        discriminator_output = sigmoid_layer(discriminator_sequence)
 
         self.discriminator_model = Model(discriminator_input, discriminator_output)
         self.discriminator_model.summary()
@@ -370,6 +356,7 @@ class SAGE():
         self.discriminator_model.trainable = False
 
         print("Conecting models…")
+        
         real_input = layers.Input(shape=(self.config.sequence_length,
             self.config.n_channels),
             name="data")
