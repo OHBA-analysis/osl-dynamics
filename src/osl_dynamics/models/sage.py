@@ -21,7 +21,6 @@ from osl_dynamics.inference.layers import (
     ModelRNNLayer,
     NormalizationLayer,
     MixVectorsMatricesLayer,
-    SampleNormalDistributionLayer,
     sageLogLikelihoodLossLayer,
 )
 
@@ -222,13 +221,13 @@ class SAGE():
         )
 
         alpha_layer =  layers.TimeDistributed(layers.Dense(self.config.n_modes, 
-            activation='softmax',
-            name="alpha_inf"))
+            activation='softmax'),
+            name="alpha_inf")
 
         # Data flow
         data_drop = data_drop_layer(inputs)
-        inf_rnn = inf_rnn_layer(data_drop)
-        alpha = alpha_layer(inf_rnn)
+        theta = inf_rnn_layer(data_drop)
+        alpha = alpha_layer(theta)
 
 
         # Observation model:
@@ -296,8 +295,8 @@ class SAGE():
         )
 
         alpha_layer =  layers.TimeDistributed(layers.Dense(self.config.n_modes, 
-            activation='softmax',
-            name="alpha_gen"))
+            activation='softmax'),
+            name="alpha_gen")
 
         # Data flow
         theta_drop = drop_layer(generator_input)
@@ -356,7 +355,7 @@ class SAGE():
         self.discriminator_model.trainable = False
 
         print("Conecting models…")
-        
+
         real_input = layers.Input(shape=(self.config.sequence_length,
             self.config.n_channels),
             name="data")
@@ -365,9 +364,8 @@ class SAGE():
         C_m, alpha_posterior = self.inference_model(real_input)
         alpha_prior = self.generator_model(alpha_posterior)
         discriminator_output_prior = self.discriminator_model(alpha_prior) 
-        discriminator_output_posterior = self.discriminator_model(alpha_posterior)
 
-        self.sage = Model(real_input, [C_m, discriminator_output_prior, discriminator_output_posterior],
+        self.sage = Model(real_input, [C_m, discriminator_output_prior],
             name = 'sage_model')
 
         # Reconstruction (Likelihood) loss:
@@ -383,9 +381,9 @@ class SAGE():
         #   -this penalises when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the prior:
         #   -R = \sum_{t=1}^{T}  [\textnormal{CrossEntropy} \,(\mu^{m,\theta}_t || \hat{\mu}^{m,\theta}_{t}) + \textnormal{CrossEntropy}\, (\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})]
 
-        self.sage.compile(loss=[log_kl_loss, 'binary_crossentropy','binary_crossentropy'],
-            loss_weights=[0.998, 0.001, 0.001],
-            optimizer=self.config.optimizer)
+        self.sage.compile(loss=[log_kl_loss, 'binary_crossentropy'],
+            loss_weights=[0.995, 0.005],
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.config.learning_rate))
 
 
     def _discriminator_training(self, real, fake):
@@ -426,9 +424,9 @@ class SAGE():
                 C_m, alpha_posterior = self.inference_model.predict_on_batch(batch)
                 alpha_prior = self.generator_model.predict_on_batch(alpha_posterior)
 
-                discriminator_loss = train_discriminator(alpha_prior,alpha_posterior)
+                discriminator_loss = train_discriminator(alpha_posterior, alpha_prior)
                 #  Train Generator
-                generator_loss = self.sage.train_on_batch(batch, [batch, real,fake])
+                generator_loss = self.sage.train_on_batch(batch, [batch, real])
 
             # Plot the progress
             print ("———————————————————")
@@ -488,3 +486,45 @@ class SAGE():
             Mode covariances.
         """
         return dynemo_obs.get_means_covariances(self.inference_model)
+
+    def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
+        """Uses the model RNN to sample mode mixing factors, alpha.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to take.
+        theta_norm : np.ndarray
+            Normalized logits to initialise the sampling with. Shape must be
+            (sequence_length, n_modes).
+
+        Returns
+        -------
+        np.ndarray
+            Sampled alpha.
+        """
+
+        if theta_norm is None:
+            # Sequence of the underlying logits theta
+            theta_norm = np.zeros(
+                [self.config.sequence_length, self.config.n_modes],
+                dtype=np.float32,
+            )
+
+            theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+
+        # Sample the mode fixing factors
+        alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+
+        for i in trange(n_samples, desc="Sampling mode time course", ncols=98):
+            # If there are leading zeros we trim theta so that we don't pass the zeros
+            trimmed_theta = theta_norm[np.newaxis, :, :]
+            # Predict the point estimates for theta one time step in the future,
+            theta = self.generator_model.predict_on_batch(trimmed_theta)
+
+            # Shift theta one time step to the left
+            theta_norm = np.roll(theta_norm, -1, axis=0)
+            theta_norm[-1] = theta[0,0]
+            alpha[i] = theta[0,0]
+
+        return alpha    
