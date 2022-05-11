@@ -1,6 +1,6 @@
 """Example script for running inference on simulated HMM-MVN data.
 
-- Should achieve a dice coefficient of ~0.99.
+- Should achieve a dice coefficient of ~0.98.
 - A seed is set for the random number generators for reproducibility.
 """
 
@@ -20,13 +20,15 @@ config = Config(
     sequence_length=200,
     inference_n_units=32,
     inference_normalization="layer",
-    model_n_units=4,
+    model_n_units=32,
     model_normalization="layer",
+    des_n_units=4,
+    des_normalization="layer",
     learn_means=False,
     learn_covariances=True,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=300,
+    n_epochs=200,
 )
 
 # Simulate data
@@ -51,8 +53,6 @@ training_dataset = input_data.dataset(
     config.batch_size,
     shuffle=True,
 )
-
-print(training_dataset)
 
 prediction_dataset = input_data.dataset(
     config.sequence_length,
