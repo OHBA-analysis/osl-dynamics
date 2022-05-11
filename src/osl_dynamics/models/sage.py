@@ -506,25 +506,26 @@ class SAGE():
 
         if theta_norm is None:
             # Sequence of the underlying logits theta
+            # Sequence of the underlying logits theta
             theta_norm = np.zeros(
                 [self.config.sequence_length, self.config.n_modes],
                 dtype=np.float32,
             )
 
-            theta_norm[-1] = np.random.normal(size=self.config.n_modes)
-
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
-
         for i in trange(n_samples, desc="Sampling mode time course", ncols=98):
+
             # If there are leading zeros we trim theta so that we don't pass the zeros
             trimmed_theta = theta_norm[np.newaxis, :, :]
-            # Predict the point estimates for theta one time step in the future,
-            theta = self.generator_model.predict_on_batch(trimmed_theta)
-
+            
             # Shift theta one time step to the left
             theta_norm = np.roll(theta_norm, -1, axis=0)
-            theta_norm[-1] = theta[0,0]
-            alpha[i] = theta[0,0]
-
-        return alpha    
+            
+            # Predict the point estimates for theta one time step
+            # in the future,
+            theta = self.generator_model.predict_on_batch(trimmed_theta)[0]
+            theta_norm[-1] = theta[0]
+            alpha[i] = theta[0]
+            
+        return alpha
