@@ -21,7 +21,7 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=8,
-    n_channels=15,
+    n_channels=25,
     sequence_length=200,
     inference_n_units=32,
     inference_normalization="layer",
@@ -120,8 +120,9 @@ plotting.plot_alpha(
     filename="figures_longrange/generated_alpha.png",
 )
 
+"""
 # Sample the prior alpha
-sam_alp = model.sample_alpha(2000,inf_alp[:config.sequence_length])
+sam_alp = model.sample_alpha(25600,inf_alp[:config.sequence_length])
 sam_stc = modes.time_courses(sam_alp)
 
 plotting.plot_mode_lifetimes(
@@ -136,4 +137,4 @@ plotting.plot_alpha(
     y_labels=["Sampled_alpha"],
     filename="figures_longrange/Sampled_alpha.png",
 )
-
+"""
