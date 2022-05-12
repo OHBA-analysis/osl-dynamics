@@ -46,7 +46,7 @@ sim = simulation.HSMM_MVN(
     covariances="random",
     observation_error=0.0,
     gamma_shape=10,
-    gamma_scale=5,
+    gamma_scale=2,
     random_seed=123,
 )
 
@@ -104,13 +104,12 @@ plotting.plot_matrices(inf_cov, filename="figures_longrange/inf_cov.png")
 
 
 # Sample from model RNN
-sam_alp = model.sample_alpha(25600)
+sam_alp = model.sample_alpha(25600,inf_alp[:config.sequence_length,:])
 sam_stc = modes.time_courses(sam_alp)
 
 plotting.plot_mode_lifetimes(
     sam_stc,
     x_label="Lifetime",
-    x_range=[0, 150],
     y_label="Occurrence",
     filename="figures_longrange/sam_lt.png",
 )
