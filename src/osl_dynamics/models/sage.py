@@ -487,15 +487,43 @@ class SAGE():
         """
         return dynemo_obs.get_means_covariances(self.inference_model)
 
+    def gen_alpha(self, alpha: np.ndarray = None) -> np.ndarray:
+        """Uses the Generator RNN to predict the prior alphas.
+
+        Parameters
+        ----------
+        alpha : np.ndarray
+            Shape must be
+            (n_samples, n_modes).
+
+        Returns
+        -------
+        np.ndarray
+            Sampled alpha.
+        """
+
+        # Sample the mode fixing factors
+        n_samples = np.shape(alpha)[0]
+        alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        for i in trange(n_samples-self.config.sequence_length, desc="Predicting mode time course", ncols=98):
+            # Shift theta one time step to the left
+            alpha_input = alpha[i:i+self.config.sequence_length]
+            alpha_input = alpha_input[np.newaxis,:,:]
+            # Predict the point estimates for theta one time step
+            # in the future,
+            alpha_sampled[i] = self.generator_model.predict_on_batch(alpha_input)[0,0]
+
+        return alpha_sampled
+
     def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
-        """Uses the model RNN to sample mode mixing factors, alpha.
+        """Uses the Generator RNN to sample alpha.
 
         Parameters
         ----------
         n_samples : int
             Number of samples to take.
-        theta_norm : np.ndarray
-            Normalized logits to initialise the sampling with. Shape must be
+        inference_alpha : np.ndarray
+            Shape must be
             (sequence_length, n_modes).
 
         Returns
@@ -515,15 +543,12 @@ class SAGE():
 
             # If there are leading zeros we trim theta so that we don't pass the zeros
             trimmed_theta = theta_norm[np.newaxis, :, :]
-            
-            # Shift theta one time step to the left
-            theta_norm = np.roll(theta_norm, -1, axis=0)
-            
             # Predict the point estimates for theta one time step
             # in the future,
             theta = self.generator_model.predict_on_batch(trimmed_theta)[0]
             theta_norm[-1] = theta[0]
+            # Shift theta one time step to the left
+            theta_norm = np.roll(theta_norm, -1, axis=0)
             alpha[i] = theta[0]
             
         return alpha
-
