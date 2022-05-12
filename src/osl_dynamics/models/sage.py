@@ -506,11 +506,8 @@ class SAGE():
 
         if theta_norm is None:
             # Sequence of the underlying logits theta
-            # Sequence of the underlying logits theta
-            theta_norm = np.zeros(
-                [self.config.sequence_length, self.config.n_modes],
-                dtype=np.float32,
-            )
+            theta_norm = np.random.normal(0,1,
+                [self.config.sequence_length, self.config.n_modes])
 
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
@@ -529,3 +526,4 @@ class SAGE():
             alpha[i] = theta[0]
             
         return alpha
+
