@@ -103,19 +103,37 @@ plotting.plot_matrices(sim_cov, filename="figures_longrange/sim_cov.png")
 plotting.plot_matrices(inf_cov, filename="figures_longrange/inf_cov.png")
 
 
-# Sample from model RNN
-sam_alp = model.sample_alpha(25600,inf_alp[:config.sequence_length,:])
+# Predict the prior alpha on infer alpha input
+gen_alp = model.gen_alpha(inf_alp)
+gen_stc = modes.time_courses(gen_alp)
+
+plotting.plot_mode_lifetimes(
+    gen_stc,
+    x_label="Lifetime",
+    y_label="Occurrence",
+    filename="figures_longrange/gen_lt.png",
+)
+
+plotting.plot_alpha(
+    gen_stc,
+    y_labels=["Sampled_alpha"],
+    filename="figures_longrange/generated_alpha.png",
+)
+
+# Sample the prior alpha
+sam_alp = model.sample_alpha(2000,inf_alp[:config.sequence_length])
 sam_stc = modes.time_courses(sam_alp)
 
 plotting.plot_mode_lifetimes(
     sam_stc,
     x_label="Lifetime",
     y_label="Occurrence",
-    filename="figures_longrange/sam_lt.png",
+    filename="figures_longrange/gen_lt.png",
 )
 
 plotting.plot_alpha(
     sam_stc,
     y_labels=["Sampled_alpha"],
-    filename="figures_longrange/Sampled_alpha.png",
+    filename="figures_longrange/generated_alpha.png",
 )
+
