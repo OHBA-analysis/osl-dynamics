@@ -515,8 +515,9 @@ class SAGE():
 
         return alpha_sampled
 
+    """
     def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
-        """Uses the Generator RNN to sample alpha.
+        Uses the Generator RNN to sample alpha.
 
         Parameters
         ----------
@@ -530,7 +531,7 @@ class SAGE():
         -------
         np.ndarray
             Sampled alpha.
-        """
+        
 
         if theta_norm is None:
             # Sequence of the underlying logits theta
@@ -552,3 +553,4 @@ class SAGE():
             alpha[i] = theta[0]
             
         return alpha
+    """
