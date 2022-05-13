@@ -557,9 +557,9 @@ def multitaper_spectra(
                 # If we're missing samples we pad with zeros either side of the data
                 if time_series_segment.shape[0] != segment_length:
                     n_zeros = segment_length - time_series_segment.shape[0]
-                    n_padding = n_zeros // 2
+                    n_padding = round(n_zeros / 2)
                     time_series_segment = np.pad(time_series_segment, n_padding)[
-                        :, n_padding:-n_padding
+                        :segment_length, n_padding:-n_padding
                     ]
 
                 # Calculate the power (and cross) spectrum using the multitaper method
@@ -572,9 +572,9 @@ def multitaper_spectra(
                 )
 
         # Normalise the power spectra
-        # TODO: We should be normalising using sum alpha instead of sum alpha^2,
-        # but this makes a small difference, so left like this for consistency
-        # with HMM-MAR
+        # NOTE: We should be normalising using sum alpha instead of sum
+        # alpha^2, but this makes a small difference, so we left it like
+        # this for consistency with the HMM-MAR toolbox.
         sum_alpha = np.sum(alpha[n] ** 2, axis=0)[
             ..., np.newaxis, np.newaxis, np.newaxis
         ]
