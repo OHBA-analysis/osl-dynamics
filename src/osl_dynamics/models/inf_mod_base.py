@@ -173,11 +173,20 @@ class InferenceModelBase(ModelBase):
                 best_history = history
 
         print(f"Using initialization {best_initialization}")
-        self.reset_weights()
         self.model.set_weights(best_weights)
-        self.compile(optimizer=best_optimizer)
+        if self.config.do_kl_annealing:
+            self.reset_kl_annealing_factor()
+        self.compile()
 
         return best_history
+
+    def reset_kl_annealing_factor(self):
+        """Sets the KL annealing factor to zero.
+
+        This method assumes there is a keras layer named 'kl_loss' in the model.
+        """
+        kl_loss_layer = self.model.get_layer("kl_loss")
+        kl_loss_layer.annealing_factor.assign(0.0)
 
     def reset_weights(self, keep: list = None):
         """Reset the model as if you've built a new model.
@@ -189,8 +198,7 @@ class InferenceModelBase(ModelBase):
         """
         initializers.reinitialize_model_weights(self.model, keep)
         if self.config.do_kl_annealing:
-            kl_loss_layer = self.model.get_layer("kl_loss")
-            kl_loss_layer.annealing_factor.assign(0.0)
+            self.reset_kl_annealing_factor()
 
     def predict(self, *args, **kwargs) -> dict:
         """Wrapper for the standard keras predict method.
