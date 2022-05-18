@@ -267,6 +267,7 @@ class SAGE():
         self.inference_model.summary()
 
     def _build_generator_model(self):
+        
         print("Building Generator Model…")
 
         # Model RNN:
@@ -304,7 +305,6 @@ class SAGE():
         alpha_prior = alpha_layer(theta_drop_prior)
 
         self.generator_model = Model(generator_input, alpha_prior)
-
         self.generator_model.summary()
 
 
@@ -374,7 +374,7 @@ class SAGE():
         #   -L =  \sum_{t=1}^{T}\, log \,p(Y_t | \theta_t^m = \mu^{m,\theta}_t, \theta_t^c = \mu^{c,\theta}_t )
 
         log_kl_loss = sageLogLikelihoodLossLayer(self.config.n_channels, name="ll_loss")
-        log_kl_loss.__name__ = 'log_lh' # need to fix this as error without it
+        log_kl_loss.__name__ = 'll_loss' # need to fix this as error without it
 
         # Regularization (Prior) Loss:
         #   -The second loss regularises the estimate of the latent, time-varying parameters [$\theta^m$, $\theta^c$] using an adaptive prior
@@ -435,7 +435,7 @@ class SAGE():
             print ("Generator loss: {}".format(generator_loss[0]))
             print ("———————————————————")
 
-            history.append({"D":discriminator_loss[1],"G":generator_loss[1]})
+            history.append({"D":discriminator_loss[1],"G":generator_loss[0]})
 
         return history
 
@@ -499,14 +499,15 @@ class SAGE():
         Returns
         -------
         np.ndarray
-            Sampled alpha.
+            Predicted alpha.
         """
 
-        # Sample the mode fixing factors
+        # number of samples
         n_samples = np.shape(alpha)[0]
         alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+
         for i in trange(n_samples-self.config.sequence_length, desc="Predicting mode time course", ncols=98):
-            # Shift theta one time step to the left
+            # Extract the sequence
             alpha_input = alpha[i:i+self.config.sequence_length]
             alpha_input = alpha_input[np.newaxis,:,:]
             # Predict the point estimates for theta one time step
