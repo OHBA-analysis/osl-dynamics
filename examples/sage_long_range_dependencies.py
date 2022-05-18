@@ -1,7 +1,7 @@
-"""Example script for demonstrating DyNeMo's ability to learn long-range dependependcies.
+"""Example script for demonstrating Sage's ability to learn long-range dependependcies.
 
 - An HSMM is simulated.
-- The output of this script will vary slightly due to random sampling.
+- The prior alpha is generated based on the inferred alpha
 """
 
 print("Setting up")
@@ -27,7 +27,7 @@ config = Config(
     inference_normalization="layer",
     model_n_units=32,
     model_normalization="layer",
-    des_n_units=32,
+    des_n_units=64,
     des_normalization="layer",
     learn_means=False,
     learn_covariances=True,
@@ -46,7 +46,7 @@ sim = simulation.HSMM_MVN(
     covariances="random",
     observation_error=0.0,
     gamma_shape=10,
-    gamma_scale=2,
+    gamma_scale=5,
     random_seed=123,
 )
 
@@ -120,21 +120,3 @@ plotting.plot_alpha(
     filename="figures_longrange/generated_alpha.png",
 )
 
-"""
-# Sample the prior alpha
-sam_alp = model.sample_alpha(25600,inf_alp[:config.sequence_length])
-sam_stc = modes.time_courses(sam_alp)
-
-plotting.plot_mode_lifetimes(
-    sam_stc,
-    x_label="Lifetime",
-    y_label="Occurrence",
-    filename="figures_longrange/sam_lt.png",
-)
-
-plotting.plot_alpha(
-    sam_stc,
-    y_labels=["Sampled_alpha"],
-    filename="figures_longrange/Sampled_alpha.png",
-)
-"""
