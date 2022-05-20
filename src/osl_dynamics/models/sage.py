@@ -10,6 +10,7 @@ from tensorflow.keras import layers
 from tensorflow.python.data import Dataset
 from osl_dynamics.data import Data
 from tqdm import trange
+import time, os
 from osl_dynamics.models import dynemo_obs
 import tensorflow_datasets as tfds
 from osl_dynamics.inference.layers import (
@@ -411,12 +412,18 @@ class SAGE():
         history: History of discriminator_loss and generator_loss
         """
 
+        # Saving the Model Weights
+        timestr = time.strftime("%Y%m%d-%H%M%S") # current date-time
+        save_filepath = os.getcwd() + "/tmp/" + str(timestr) + "best_model.h5"
+
+        # Generating real/fake input for the descriminator
         real = np.ones((self.config.batch_size,self.config.sequence_length, 1))
         fake = np.zeros((self.config.batch_size,self.config.sequence_length, 1))
         
-        # Batch-wise training
+        # Batch-wise trainingq
         train_discriminator = self._discriminator_training(real, fake)
         history = []
+        best_val_loss = 9999999
 
         for epoch in range(self.config.n_epochs):
             
@@ -428,6 +435,13 @@ class SAGE():
                 #  Train Generator
                 generator_loss = self.sage.train_on_batch(batch, [batch, real])
 
+            if generator_loss[0] < best_val_loss:
+                self.sage.save_weights(save_filepath) 
+                print("Best model w/ val loss (generator) {} saved to {}".
+                    format(generator_loss[0], save_filepath))
+                best_val_loss = generator_loss[0]  
+            val_loss = self.sage.test_on_batch([batch], [batch,real])
+            
             # Plot the progress
             print ("———————————————————")
             print ("******************Epoch {}***************************".format(epoch))
@@ -515,43 +529,3 @@ class SAGE():
             alpha_sampled[i] = self.generator_model.predict_on_batch(alpha_input)[0,0]
 
         return alpha_sampled
-
-    """
-    def sample_alpha(self, n_samples: int, theta_norm: np.ndarray = None) -> np.ndarray:
-        Uses the Generator RNN to sample alpha.
-
-        Parameters
-        ----------
-        n_samples : int
-            Number of samples to take.
-        inference_alpha : np.ndarray
-            Shape must be
-            (sequence_length, n_modes).
-
-        Returns
-        -------
-        np.ndarray
-            Sampled alpha.
-        
-
-        if theta_norm is None:
-            # Sequence of the underlying logits theta
-            theta_norm = np.random.normal(0,1,
-                [self.config.sequence_length, self.config.n_modes])
-
-        # Sample the mode fixing factors
-        alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
-        for i in trange(n_samples, desc="Sampling mode time course", ncols=98):
-
-            # If there are leading zeros we trim theta so that we don't pass the zeros
-            trimmed_theta = theta_norm[np.newaxis, :, :]
-            # Predict the point estimates for theta one time step
-            # in the future,
-            theta = self.generator_model.predict_on_batch(trimmed_theta)[0]
-            theta_norm[-1] = theta[0]
-            # Shift theta one time step to the left
-            theta_norm = np.roll(theta_norm, -1, axis=0)
-            alpha[i] = theta[0]
-            
-        return alpha
-    """
