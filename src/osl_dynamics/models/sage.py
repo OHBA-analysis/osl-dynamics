@@ -414,7 +414,12 @@ class SAGE():
 
         # Saving the Model Weights
         timestr = time.strftime("%Y%m%d-%H%M%S") # current date-time
-        save_filepath = os.getcwd() + "/tmp/" + str(timestr) + "best_model.h5"
+        filepath = os.getcwd() + "/tmp/" 
+        
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)    
+
+        save_filepath = filepath + str(timestr) + "_best_model.h5"
 
         # Generating real/fake input for the descriminator
         real = np.ones((self.config.batch_size,self.config.sequence_length, 1))
