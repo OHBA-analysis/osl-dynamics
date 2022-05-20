@@ -1,4 +1,4 @@
-"""Example script for demonstrating DyNeMo's ability to infer a soft mixture of modes.
+"""Example script for demonstrating Sage's ability to infer a soft mixture of modes.
 
 """
 print("Setting up")
@@ -26,7 +26,7 @@ config = Config(
     inference_normalization="layer",
     model_n_units=32,
     model_normalization="layer",
-    des_n_units=4,
+    des_n_units=16,
     des_normalization="layer",
     learn_means=False,
     learn_covariances=True,
@@ -90,7 +90,7 @@ plotting.plot_alpha(
 plotting.plot_alpha(
     inf_stc,
     n_samples=2000,
-    title="DyNeMo",
+    title="Sage",
     y_labels=r"$\alpha_{jt}$",
     filename="figures/inf_stc.png",
 )
