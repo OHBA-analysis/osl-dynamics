@@ -17,15 +17,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers, utils
+from osl_dynamics.simulation import HMM
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
-    MixVectorsLayer,
-    MixMatricesLayer,
-    LogLikelihoodLossLayer,
+    CategoricalLogLikelihoodLossLayer,
 )
 
 from ctypes import c_void_p, c_double, c_int, CDLL
@@ -139,7 +138,7 @@ class Model(ModelBase):
         Iterates between:
         1) Baum-Welch updates of latent variable time courses and
            transition probability matrix.
-        2) Tensorflow updates of observation model parameters.
+        2) TensorFlow updates of observation model parameters.
 
         Parameters
         ----------
@@ -177,9 +176,7 @@ class Model(ModelBase):
                     self._update_transprob(gamma, xi)
 
                 # Update observation model
-                training_data = np.concatenate(
-                    [x, gamma, np.ones_like(gamma) * 1e-5], axis=2
-                )
+                training_data = np.concatenate([x, gamma], axis=2)
                 h = self.model.fit(training_data, epochs=1, verbose=0)
 
                 l = h.history["loss"][0]
@@ -192,7 +189,7 @@ class Model(ModelBase):
         return history
 
     def _get_state_probs(self, x):
-        """Get state time courses.
+        """Get state probabilities.
 
         Parameters
         ----------
@@ -291,16 +288,20 @@ class Model(ModelBase):
         """
         means, covs = self.get_means_covariances()
 
-        likelihood = []
-        for state in range(means.shape[0]):
+        n_states = means.shape[0]
+        batch_size = x.shape[0]
+        sequence_length = x.shape[1]
+
+        log_likelihood = np.empty([n_states, batch_size, sequence_length])
+        for state in range(n_states):
             mvn = tfp.distributions.MultivariateNormalTriL(
                 loc=means[state],
                 scale_tril=tf.linalg.cholesky(covs[state]),
                 allow_nan_stats=False,
             )
-            likelihood.append(mvn.prob(x))
+            log_likelihood[state] = mvn.log_prob(x)
 
-        return np.array(likelihood)
+        return np.exp(log_likelihood)
 
     def _update_transprob(self, gamma, xi):
         """Update transition probability matrix.
@@ -343,7 +344,24 @@ class Model(ModelBase):
             -self.config.stochastic_update_forget,
         )
 
-    def get_trans_prob(self):
+    def sample_stc(self, n_samples: int):
+        """Sample a state time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        np.ndarray
+            State time course with shape (n_samples, n_states).
+        """
+        sim = HMM(self.transprob)
+        stc = sim.generate_states(n_samples)
+        return stc
+
+    def get_transprob(self):
         """Get the transition probability matrix.
 
         Returns
@@ -399,24 +417,37 @@ class Model(ModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
-    def get_alpha(self, dataset):
+    def get_alpha(
+        self, dataset: Union[list, tf.data.Dataset], concatenate: bool = False
+    ) -> Union[list, np.ndarray]:
         """Get state probabilities.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset
+            Prediction dataset for each subject.
+        concatenate : bool
+            Should we concatenate alpha for each subject?
 
         Returns
         -------
-        np.ndarray
+        list or np.ndarray
+            State probabilities with shape (n_subjects, n_samples, n_states)
+            or (n_samples, n_states).
         """
+        dataset = self._make_dataset(dataset)
+
         alpha = []
-        for data in dataset:
-            x = data["data"]
-            gamma, _ = self._get_state_probs(x)
-            gamma = np.concatenate(gamma)
-            alpha.append(gamma)
-        alpha = np.concatenate(alpha)
+        for ds in dataset:
+            gamma = []
+            for data in ds:
+                g, _ = self._get_state_probs(data["data"])
+                gamma.append(np.concatenate(g))
+            alpha.append(np.concatenate(gamma))
+
+        if concatenate or len(alpha) == 1:
+            alpha = np.concatenate(alpha)
+
         return alpha
 
     def save_all(self, dirname: str):
@@ -446,12 +477,10 @@ class Model(ModelBase):
 def _model_structure(config):
     # Inputs
     inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels + 2 * config.n_states),
+        shape=(config.sequence_length, config.n_channels + config.n_states),
         name="inputs",
     )
-    data, posterior_mu, posterior_sigma = tf.split(
-        inputs, [config.n_channels, config.n_states, config.n_states], 2
-    )
+    data, gamma = tf.split(inputs, [config.n_channels, config.n_states], 2)
 
     # Definition of layers
     means_layer = MeanVectorsLayer(
@@ -468,19 +497,11 @@ def _model_structure(config):
         config.initial_covariances,
         name="covs",
     )
-    theta_layer = SampleNormalDistributionLayer(name="theta")
-    alpha_layer = layers.ReLU(name="alpha")
-    mix_means_layer = MixVectorsLayer(name="mix_means")
-    mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = CategoricalLogLikelihoodLossLayer(config.n_states, name="ll_loss")
 
     # Data flow
-    theta = theta_layer([posterior_mu, posterior_sigma])
-    alpha = alpha_layer(theta)
     mu = means_layer(data)  # data not used
     D = covs_layer(data)  # data not used
-    m = mix_means_layer([alpha, mu])
-    C = mix_covs_layer([alpha, D])
-    ll_loss = ll_loss_layer([data, m, C])
+    ll_loss = ll_loss_layer([data, mu, D, gamma])
 
     return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM-Obs")

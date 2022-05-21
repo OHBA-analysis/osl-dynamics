@@ -5,9 +5,11 @@ osl-dynamics
 Models for analysing neuroimaging data developed by the Oxford Centre for Human Brain Activity (OHBA) group at the University of Oxford.
 
 Models included:
+    - Hidden Markov Model (HMM).
     - Dynamic Network Modes (DyNeMo).
     - Multi-Dynamic Network Modes (M-DyNeMo).
     - Dynamic Network States (DyNeSt).
+    - Single-dynamic Adversarial Generator Encoder (SAGE).
 
 Installation
 ============

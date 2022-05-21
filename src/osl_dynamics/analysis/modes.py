@@ -2,6 +2,8 @@
 
 """
 
+from typing import Union
+
 import numpy as np
 from osl_dynamics import array_ops
 
@@ -157,3 +159,62 @@ def reverse_pca(covariances: np.ndarray, pca_components: np.ndarray) -> np.ndarr
         )
 
     return pca_components @ covariances @ pca_components.T
+
+
+def partial_covariances(data: Union[list, np.ndarray], alpha: Union[list, np.ndarray]):
+    """Calculate partial covariances.
+
+    Returns the multiple regression parameters estimates, pcovs, of the state
+    time courses regressed onto the data from each channel. The regression is
+    done separately for each channel. I.e. pcovs is the estimate of the
+    (n_modes, n_channels) matrix, Beta, where:
+
+    Y_i = X @ Beta_i + e
+
+    - Y_i is (n_samples, 1) is the data amplitude/envelope/power/abs time course
+    at channel i.
+    - X is (n_samples, n_modes) matrix of the variance normalised mode time courses
+      (i.e. alpha).
+    - Beta_i is (n_modes, 1) vector of multiple regression parameters for channel i
+    - e is the error.
+
+    NOTE: state time courses are variance normalised so that all amplitude info goes
+    into Beta (i.e. pcovs).
+
+    Parameters
+    ----------
+    data : np.ndarray or list of np.ndarray
+        Training data for each subject.
+    alpha : np.ndarray or list of np.ndarray
+        State/mode time courses for each subject.
+
+    Returns
+    -------
+    pcovs : np.ndarray
+        Matrix of partial covariance (multiple regression parameter estimates).
+        Shape is (n_modes, n_channels).
+    """
+    if type(data) != type(alpha):
+        raise ValueError(
+            "data and alpha must be the same type: numpy arrays or lists of numpy arrays."
+        )
+    if isinstance(data, np.ndarray):
+        data = [data]
+        alpha = [alpha]
+    for i in range(len(data)):
+        if data[i].shape[0] != alpha[i].shape[0]:
+            raise ValueError("Difference number of samples in data and alpha.")
+
+    n_subjects = len(data)
+    n_channels = data[0].shape[-1]
+    n_modes = alpha[0].shape[-1]
+
+    pcovs = np.zeros([n_subjects, n_modes, n_channels])
+    for X, a in zip(data, alpha):
+        # Variance normalise state/mode time courses
+        a /= np.std(a, axis=0, keepdims=True)
+
+        # Do multiple regression of alpha onto data
+        pcovs[i, :, :] = np.linalg.pinv(a) @ X
+
+    return np.squeeze(pcovs)

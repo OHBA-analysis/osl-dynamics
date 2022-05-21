@@ -75,7 +75,7 @@ prediction_dataset = training_data.dataset(
 
 inf_stc = model.get_alpha(prediction_dataset)
 inf_means, inf_covs = model.get_means_covariances()
-inf_tp = model.get_trans_prob()
+inf_tp = model.get_transprob()
 
 # Re-order with respect to the simulation
 sim_stc = sim.mode_time_course

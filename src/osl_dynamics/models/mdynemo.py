@@ -11,7 +11,10 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from osl_dynamics.models import mdynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
+from osl_dynamics.models.inf_mod_base import (
+    VariationalInferenceModelConfig,
+    VariationalInferenceModelBase,
+)
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
@@ -32,7 +35,7 @@ from osl_dynamics.inference.layers import (
 
 
 @dataclass
-class Config(BaseModelConfig, InferenceModelConfig):
+class Config(BaseModelConfig, VariationalInferenceModelConfig):
     """Settings for M-DyNeMo.
 
     Parameters
@@ -173,7 +176,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
 
 
-class Model(InferenceModelBase):
+class Model(VariationalInferenceModelBase):
     """M-DyNeMo model class.
 
     Parameters
