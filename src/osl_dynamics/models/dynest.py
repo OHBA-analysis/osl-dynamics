@@ -9,7 +9,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.models.inf_mod_base import InferenceModelConfig, InferenceModelBase
+from osl_dynamics.models.inf_mod_base import (
+    VariationalInferenceModelConfig,
+    VariationalInferenceModelBase,
+)
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     ModelRNNLayer,
@@ -24,7 +27,7 @@ from osl_dynamics.inference.layers import (
 
 
 @dataclass
-class Config(BaseModelConfig, InferenceModelConfig):
+class Config(BaseModelConfig, VariationalInferenceModelConfig):
     """Settings for DyNeSt.
 
     Parameters
@@ -141,7 +144,7 @@ class Config(BaseModelConfig, InferenceModelConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
 
-class Model(InferenceModelBase):
+class Model(VariationalInferenceModelBase):
     """DyNeSt model class.
 
     Parameters

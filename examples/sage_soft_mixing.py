@@ -6,7 +6,7 @@ import os
 import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
-from osl_dynamics.models.sage import Config, SAGE
+from osl_dynamics.models.sage import Config, Model
 from osl_dynamics.utils import plotting
 from tqdm import trange
 
@@ -67,7 +67,7 @@ prediction_dataset = input_data.dataset(
 )
 
 # Build model
-model = SAGE(config)
+model = Model(config)
 
 print("Training model")
 history = model.train(training_dataset)
@@ -125,4 +125,3 @@ plotting.plot_line(
     fig_kwargs={"figsize": (15, 1.5)},
     filename="figures/rd.png",
 )
-

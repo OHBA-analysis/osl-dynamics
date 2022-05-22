@@ -11,7 +11,7 @@ print("Setting up")
 from osl_dynamics.data import OSL_HMM, Data
 from osl_dynamics.data.processing import Processing
 from osl_dynamics.inference import metrics, modes, tf_ops
-from osl_dynamics.models.sage import Config, SAGE
+from osl_dynamics.models.sage import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -61,7 +61,7 @@ hmm = OSL_HMM(
 config.initial_covariances = hmm.covariances
 
 # Build model
-model = SAGE(config)
+model = Model(config)
 
 print("Training model")
 history = model.train(training_dataset)

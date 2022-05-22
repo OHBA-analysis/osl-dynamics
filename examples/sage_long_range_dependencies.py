@@ -9,7 +9,7 @@ import os
 import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import tf_ops, modes, metrics, callbacks
-from osl_dynamics.models.sage import Config, SAGE
+from osl_dynamics.models.sage import Config, Model
 from osl_dynamics.utils import plotting
 
 # Make directory to hold plots
@@ -67,7 +67,7 @@ prediction_dataset = input_data.dataset(
 )
 
 # Build model
-model = SAGE(config)
+model = Model(config)
 
 print("Training model")
 history = model.train(training_dataset)
@@ -77,7 +77,7 @@ history = model.train(training_dataset)
 inf_alp = model.get_alpha(prediction_dataset)
 inf_stc = modes.time_courses(inf_alp)
 sim_stc = sim.mode_time_course
-orders = modes.match_modes(sim_stc, inf_stc,return_order=True)
+orders = modes.match_modes(sim_stc, inf_stc, return_order=True)
 inf_stc = inf_stc[:, orders[1]]
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
@@ -89,10 +89,16 @@ plotting.plot_alpha(
 )
 
 plotting.plot_mode_lifetimes(
-    sim_stc, x_label="Lifetime", y_label="Occurrence", filename="figures_longrange/sim_lt.png"
+    sim_stc,
+    x_label="Lifetime",
+    y_label="Occurrence",
+    filename="figures_longrange/sim_lt.png",
 )
 plotting.plot_mode_lifetimes(
-    inf_stc, x_label="Lifetime", y_label="Occurrence", filename="figures_longrange/inf_lt.png"
+    inf_stc,
+    x_label="Lifetime",
+    y_label="Occurrence",
+    filename="figures_longrange/inf_lt.png",
 )
 
 # Ground truth vs inferred covariances
@@ -119,4 +125,3 @@ plotting.plot_alpha(
     y_labels=["Sampled_alpha"],
     filename="figures_longrange/generated_alpha.png",
 )
-
