@@ -31,8 +31,8 @@ config = Config(
     learn_means=False,
     learn_covariances=True,
     batch_size=16,
-    learning_rate=0.01,
-    n_epochs=300,
+    learning_rate=0.001,
+    n_epochs=400,
 )
 
 
