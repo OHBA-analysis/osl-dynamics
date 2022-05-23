@@ -417,12 +417,6 @@ class AdversarialInferenceModelBase(ModelBase):
         filepath = "tmp/"
         save_filepath = filepath + str(timestr) + "_best_model.h5"
 
-        # Generating real/fake input for the descriminator
-        real = np.ones((self.config.batch_size, self.config.sequence_length, 1))
-        fake = np.zeros((self.config.batch_size, self.config.sequence_length, 1))
-
-        # Batch-wise training
-        train_discriminator = self._discriminator_training(real, fake)
         history = []
         best_val_loss = np.Inf
         for epoch in range(epochs):
@@ -431,6 +425,15 @@ class AdversarialInferenceModelBase(ModelBase):
                 pb_i = utils.Progbar(len(train_data), stateful_metrics=["D", "G"])
 
             for idx, batch in enumerate(train_data):
+                
+                # Generating real/fake input for the descriminator
+                real = np.ones((len(batch['data']), self.config.sequence_length, 1))
+                fake = np.zeros((len(batch['data']), self.config.sequence_length, 1))
+
+                # Batch-wise training
+                train_discriminator = self._discriminator_training(real, fake)
+
+                # Train the Inference and Generator Model
                 C_m, alpha_posterior = self.inference_model.predict_on_batch(batch)
                 alpha_prior = self.generator_model.predict_on_batch(alpha_posterior)
 
