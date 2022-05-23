@@ -8,7 +8,7 @@
 """
 
 print("Setting up")
-from osl_dynamics.data import OSL_HMM, Data, manipulation
+from osl_dynamics.data import OSL_HMM, Data, processing
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
 
@@ -83,7 +83,7 @@ print(f"Free energy: {free_energy}")
 # Inferred mode mixing factors and mode time courses
 alpha = model.get_alpha(prediction_dataset)
 inf_stc = modes.time_courses(alpha)
-hmm_stc = manipulation.trim_time_series(
+hmm_stc = processing.trim_time_series(
     time_series=hmm.mode_time_course(),
     sequence_length=config.sequence_length,
 )

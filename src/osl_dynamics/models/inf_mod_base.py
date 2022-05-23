@@ -425,10 +425,10 @@ class AdversarialInferenceModelBase(ModelBase):
                 pb_i = utils.Progbar(len(train_data), stateful_metrics=["D", "G"])
 
             for idx, batch in enumerate(train_data):
-                
+
                 # Generating real/fake input for the descriminator
-                real = np.ones((len(batch['data']), self.config.sequence_length, 1))
-                fake = np.zeros((len(batch['data']), self.config.sequence_length, 1))
+                real = np.ones((len(batch["data"]), self.config.sequence_length, 1))
+                fake = np.zeros((len(batch["data"]), self.config.sequence_length, 1))
 
                 # Batch-wise training
                 train_discriminator = self._discriminator_training(real, fake)
@@ -447,7 +447,7 @@ class AdversarialInferenceModelBase(ModelBase):
                     )
 
             if generator_loss[0] < best_val_loss:
-                self.model.save_weights(save_filepath)
+                self.save_weights(save_filepath)
                 print(
                     "Best model w/ val loss (generator) {} saved to {}".format(
                         generator_loss[0], save_filepath
@@ -457,6 +457,10 @@ class AdversarialInferenceModelBase(ModelBase):
             val_loss = self.model.test_on_batch([batch], [batch, real])
 
             history.append({"D": discriminator_loss[1], "G": generator_loss[0]})
+
+        # Load the weights for the best model
+        print("Loading best model:", save_filepath)
+        self.load_weights(save_filepath)
 
         return history
 

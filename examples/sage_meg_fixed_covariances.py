@@ -8,8 +8,7 @@
 """
 
 print("Setting up")
-from osl_dynamics.data import OSL_HMM, Data
-from osl_dynamics.data.processing import Processing
+from osl_dynamics.data import OSL_HMM, Data, processing
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.sage import Config, Model
 
@@ -69,7 +68,7 @@ history = model.train(training_dataset)
 # Inferred mode mixing factors and mode time courses
 alpha = model.get_alpha(prediction_dataset)
 inf_stc = modes.time_courses(alpha)
-hmm_stc = Processing.trim_time_series(
+hmm_stc = processing.trim_time_series(
     time_series=hmm.mode_time_course(),
     sequence_length=config.sequence_length,
 )
