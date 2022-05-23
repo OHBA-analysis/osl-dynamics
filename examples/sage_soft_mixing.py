@@ -32,7 +32,7 @@ config = Config(
     learn_covariances=True,
     batch_size=16,
     learning_rate=0.001,
-    n_epochs=400,
+    n_epochs=500,
 )
 
 
