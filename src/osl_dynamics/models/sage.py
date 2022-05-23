@@ -34,7 +34,7 @@ class Config(BaseModelConfig):
     n_channels : int
         Number of channels.
     sequence_length : int
-        Length of sequence passed to the inference network and generative model.
+        Length of sequence passed to the inference, generative and descriminator network.
 
     inference_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -64,6 +64,19 @@ class Config(BaseModelConfig):
     model_dropout : float
         Dropout rate.
 
+    descriminator_rnn : str
+        RNN to use, either 'gru' or 'lstm'.
+    descriminator_n_layers : int
+        Number of layers.
+    descriminator_n_units : int
+        Number of units.
+    descriminator_normalization : str
+        Type of normalization to use. Either None, 'batch' or 'layer'.
+    descriminator_activation : str
+        Type of activation to use after normalization and before dropout.
+        E.g. 'relu', 'elu', etc.
+    descriminator_dropout : float
+        Dropout rate.
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
@@ -105,12 +118,12 @@ class Config(BaseModelConfig):
     model_dropout: float = 0.0
 
     # Descriminator network parameters
-    des_rnn: Literal["gru", "lstm"] = "lstm"
-    des_n_layers: int = 1
-    des_n_units: int = None
-    des_normalization: Literal[None, "batch", "layer"] = None
-    des_activation: str = "elu"
-    des_dropout: float = 0.0
+    descriminator_rnn: Literal["gru", "lstm"] = "lstm"
+    descriminator_n_layers: int = 1
+    descriminator_n_units: int = None
+    descriminator_normalization: Literal[None, "batch", "layer"] = None
+    descriminator_activation: str = "elu"
+    descriminator_dropout: float = 0.0
 
     # Observation model parameters
     learn_means: bool = None
@@ -294,12 +307,12 @@ def _build_discriminator_model(config):
         layers.Dropout(config.model_dropout, name="data_drop_des")
     )
     des_rnn_layer = ModelRNNLayer(
-        config.des_rnn,
-        config.des_normalization,
-        config.des_activation,
-        config.des_n_layers,
-        config.des_n_units,
-        config.model_dropout,
+        config.descriminator_rnn,
+        config.descriminator_normalization,
+        config.descriminator_activation,
+        config.descriminator_n_layers,
+        config.descriminator_n_units,
+        config.descriminator_dropout,
         name="des_rnn",
     )
     sigmoid_layer = layers.TimeDistributed(layers.Dense(1, activation="sigmoid"))
