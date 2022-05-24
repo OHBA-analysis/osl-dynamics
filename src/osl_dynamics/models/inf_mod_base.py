@@ -536,3 +536,246 @@ class AdversarialInferenceModelBase(ModelBase):
             alpha_sampled[i] = self.generator_model.predict_on_batch(alpha_input)[0, 0]
 
         return alpha_sampled
+
+class MultiAdversarialInferenceModelBase(ModelBase):
+    """Adversarial inference model base class.
+
+    This class assumes the model has a inference_model, generator_model,
+    discriminator_model and model attribute.
+    """
+
+    def compile(self):
+        """Compile the model."""
+
+        self.discriminator_model_mean.compile(
+            loss="binary_crossentropy",
+            optimizer=self.config.optimizer.lower(),
+            metrics=["accuracy"],
+        )
+        self.discriminator_model_mean.trainable = False
+
+        self.discriminator_model_cov.compile(
+            loss="binary_crossentropy",
+            optimizer=self.config.optimizer.lower(),
+            metrics=["accuracy"],
+        )
+        self.discriminator_model_cov.trainable = False
+
+        
+        # Reconstruction (Likelihood) loss:
+        # The first loss corresponds to the likelihood - this tells us how well we
+        # are explaining our data according to the current estimate of the
+        # generative model, and is given by:
+        # L = \sum_{t=1}^{T} log p(Y_t | \theta_t^m = \mu^{m,\theta}_t,
+        #                                \theta_t^c = \mu^{c,\theta}_t)
+        ll_loss = SAGELogLikelihoodLossLayer(self.config.n_channels, name="ll_loss")
+
+        # Regularization (Prior) Loss:
+        # The second loss regularises the estimate of the latent, time-varying
+        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this penalises
+        # when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the
+        # prior:
+        # R = \sum_{t=1}^{T} [
+        #     CrossEntropy(\mu^{m,\theta}_t|| \hat{\mu}^{m,\theta}_{t})
+        #     + CrossEntropy(\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})
+        # ]
+
+        # Optimizer
+        optimizer = optimizers.get(
+            {
+                "class_name": self.config.optimizer.lower(),
+                "config": {"learning_rate": self.config.learning_rate},
+            }
+        )
+
+        # Compile the full model
+        self.model.compile(
+            loss=[ll_loss, "binary_crossentropy", "binary_crossentropy"],
+            loss_weights=[0.990, 0.005, 0.005],
+            optimizer=optimizer,
+        )
+
+    def fit(self, *args, **kwargs):
+        print("Warning: model.train() should be used with adversarial training.")
+        return self.train(*args, **kwargs)
+
+    def train(self, train_data: tf.data.Dataset, epochs: int = None, verbose: int = 1):
+        """Train the model.
+
+        Parameters
+        ----------
+        train_data : tensorflow.data.Dataset
+            Training dataset.
+        epochs : int
+            Number of epochs to train. Defaults to value in config if not passed.
+        verbose : int
+            Should we print a progress bar?
+
+        Returns
+        -------
+        history
+            History of discriminator_loss and generator_loss.
+        """
+        if epochs is None:
+            epochs = self.config.n_epochs
+
+        # Path to save the best model weights
+        timestr = time.strftime("%Y%m%d-%H%M%S")  # current date-time
+        filepath = "tmp/"
+        save_filepath = filepath + str(timestr) + "_best_model.h5"
+
+        history = []
+        best_val_loss = np.Inf
+        for epoch in range(epochs):
+            if verbose:
+                print("Epoch {}/{}".format(epoch + 1, epochs))
+                pb_i = utils.Progbar(len(train_data), stateful_metrics=["D_m", "D_c", "G"])
+
+            for idx, batch in enumerate(train_data):
+
+                # Generating real/fake input for the descriminator
+                real = np.ones((len(batch["data"]), self.config.sequence_length, 1))
+                fake = np.zeros((len(batch["data"]), self.config.sequence_length, 1))
+
+                # Batch-wise training
+                train_discriminator_mean = self._discriminator_training_mean(real, fake)
+                train_discriminator_cov = self._discriminator_training_cov(real, fake)
+
+                # Train the Inference and Generator Model
+                C_m, alpha_posterior, gamma_posterior = self.inference_model.predict_on_batch(batch)
+                alpha_prior = self.generator_model_mean.predict_on_batch(alpha_posterior)
+                gamma_prior = self.generator_model_cov.predict_on_batch(gamma_posterior)
+
+                discriminator_loss_mean = train_discriminator_mean(alpha_posterior, alpha_prior)
+                discriminator_loss_cov = train_discriminator_cov(gamma_posterior, gamma_prior)
+
+                generator_loss = self.model.train_on_batch(batch, [batch, real, real])
+
+                if verbose:
+                    pb_i.add(
+                        1,
+                        values=[("D_m", discriminator_loss_mean[1]), ("D_c", discriminator_loss_cov[1]),
+                            ("G", generator_loss[0])],
+                    )
+
+            if generator_loss[0] < best_val_loss:
+                self.save_weights(save_filepath)
+                print(
+                    "Best model w/ val loss (generator) {} saved to {}".format(
+                        generator_loss[0], save_filepath
+                    )
+                )
+                best_val_loss = generator_loss[0]
+            val_loss = self.model.test_on_batch([batch], [batch, real, real])
+
+            history.append({"D_m": discriminator_loss_mean[1], "D_c": discriminator_loss_cov[1],
+                 "G": generator_loss[0]})
+
+        # Load the weights for the best model
+        print("Loading best model:", save_filepath)
+        self.load_weights(save_filepath)
+
+        return history
+
+    def _discriminator_training_mean(self, real, fake):
+        def train(real_samples, fake_samples):
+            self.discriminator_model_mean.trainable = True
+            loss_real = self.discriminator_model_mean.train_on_batch(real_samples,real)
+            loss_fake = self.discriminator_model_mean.train_on_batch(fake_samples,fake)
+            loss = np.add(loss_real, loss_fake) * 0.5
+            self.discriminator_model_mean.trainable = False
+            return loss
+        return train
+
+    def _discriminator_training_cov(self, real, fake):
+        def train(real_samples, fake_samples):
+            self.discriminator_model_cov.trainable = True
+            loss_real = self.discriminator_model_cov.train_on_batch(real_samples,real)
+            loss_fake = self.discriminator_model_cov.train_on_batch(fake_samples,fake)
+            loss = np.add(loss_real, loss_fake) * 0.5
+            self.discriminator_model_cov.trainable = False
+            return loss
+        return train
+
+    def get_mode_time_courses(
+        self, inputs, concatenate: bool = True,
+    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
+        """Get mode time courses.
+
+        This method is used to get mode time courses for the multi-time-scale model.
+
+        Parameters
+        ----------
+        inputs : tensorflow.data.Dataset
+            Prediction dataset.
+        concatenate : bool
+            Should we concatenate alpha for each subject?
+
+        Returns
+        -------
+        list or np.ndarray
+            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Gamma time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        """
+        if not self.config.multiple_dynamics:
+            raise ValueError("Please use get_alpha for a single time scale model.")
+
+        outputs_alpha = []
+        outputs_gamma = []
+
+        for dataset in inputs:
+            alpha, gamma = self.inference_model(dataset)[1:]
+
+            alpha = np.concatenate(alpha)
+            gamma = np.concatenate(gamma)
+
+            outputs_alpha.append(alpha)
+            outputs_gamma.append(gamma)
+
+        if concatenate or len(outputs_alpha) == 1:
+            outputs_alpha = np.concatenate(outputs_alpha)
+            outputs_gamma = np.concatenate(outputs_gamma)
+
+        return outputs_alpha, outputs_gamma
+
+
+    def gen_alpha(self, alpha: np.ndarray = None, gamma: np.ndarray = None) -> np.ndarray:
+        """Uses the generator to predict the prior alphas.
+
+        Parameters
+        ----------
+        alpha : np.ndarray
+            Shape must be (n_samples, n_modes).
+
+        gamma : np.ndarray
+            Shape must be (n_samples, n_modes).
+
+        Returns
+        -------
+        np.ndarray
+            Predicted alpha.
+        """
+        n_samples = np.shape(alpha)[0]
+        alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        gamma_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+
+        for i in trange(
+            n_samples - self.config.sequence_length,
+            desc="Predicting mode time course",
+            ncols=98,
+        ):
+            # Extract the sequence
+            alpha_input = alpha[i : i + self.config.sequence_length]
+            alpha_input = alpha_input[np.newaxis, :, :]
+
+            gamma_input = gamma[i : i + self.config.sequence_length]
+            gamma_input = gamma_input[np.newaxis, :, :]
+
+            # Predict the point estimates for theta one time step in the future
+            alpha_sampled[i] = self.generator_model_mean.predict_on_batch(alpha_input)[0, 0]
+            gamma_sampled[i] = self.generator_model_cov.predict_on_batch(gamma_input)[0, 0]
+
+        return alpha_sampled, gamma_sampled
