@@ -291,9 +291,10 @@ class MixedHSMM_MVN(Simulation):
     def __init__(
         self,
         n_samples: int,
-        mixed_state_vectors: np.ndarray,
         gamma_shape: float,
         gamma_scale: float,
+        mixed_state_vectors: np.ndarray = None,
+        mixed_mode_vectors: np.ndarray = None,
         off_diagonal_trans_prob: np.ndarray = None,
         full_trans_prob: np.ndarray = None,
         means: np.ndarray = None,
@@ -302,6 +303,9 @@ class MixedHSMM_MVN(Simulation):
         observation_error: float = 0.0,
         random_seed: int = None,
     ):
+        if mixed_state_vectors is None:
+            mixed_state_vectors = mixed_mode_vectors
+
         # Get the number of single activation states and mixed states
         self.n_states = mixed_state_vectors.shape[1]
         self.n_mixed_states = mixed_state_vectors.shape[0]
