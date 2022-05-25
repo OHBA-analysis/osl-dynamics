@@ -14,7 +14,6 @@ def linear(
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """Wrapper for sklearn's LinearRegression.
 
-
     Parameters
     ----------
     X : np.ndarray

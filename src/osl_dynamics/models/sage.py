@@ -37,7 +37,6 @@ class Config(BaseModelConfig):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference, generative and discriminator network.
-
     inference_rnn : str
         RNN to use, either 'gru' or 'lstm'.
     inference_n_layers : int
