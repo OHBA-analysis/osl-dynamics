@@ -9,6 +9,7 @@ Models included:
     - Multi-Dynamic Network Modes (M-DyNeMo).
     - Dynamic Network States (DyNeSt).
     - Single-dynamic Adversarial Generator Encoder (SAGE).
+    - Multi-dynamic Adversarial Generator Encoder (MAGE).
 
 Installation
 ============
