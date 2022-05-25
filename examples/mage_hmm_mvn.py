@@ -8,7 +8,6 @@ import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.mage import Config, Model
-from osl_dynamics.inference import callbacks
 from osl_dynamics.utils import plotting
 
 # GPU settings
@@ -23,9 +22,9 @@ config = Config(
     inference_normalization="layer",
     model_n_units=128,
     model_normalization="layer",
-    descriminator_n_units=32,
-    descriminator_n_layers=1,
-    descriminator_normalization="layer",
+    discriminator_n_units=32,
+    discriminator_n_layers=1,
+    discriminator_normalization="layer",
     learn_means=True,
     learn_stds=True,
     learn_fcs=True,
@@ -65,17 +64,11 @@ prediction_dataset = meg_data.dataset(
 # Build model
 model = Model(config)
 
-# Callbacks
-dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.mode_time_course, mode_names=["alpha", "gamma"]
-)
-
 print("Training model")
-history = model.train(training_dataset)
+history = model.fit(training_dataset)
 
 # Inferred parameters
-inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs() 
-
+inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
 
 # Inferred mode mixing factors
 inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
@@ -107,7 +100,6 @@ plotting.plot_matrices(inf_means - sim_means, filename="means_diff.png")
 plotting.plot_matrices(inf_stds - sim_stds, filename="stds_diff.png")
 plotting.plot_matrices(inf_fcs - sim_fcs, filename="fcs_diff.png")
 
-
 # Dice coefficients
 dice_alpha = metrics.dice_coefficient(sim_alpha, inf_alpha)
 dice_gamma = metrics.dice_coefficient(sim_gamma, inf_gamma)
@@ -123,8 +115,7 @@ fo_inf_alpha = modes.fractional_occupancies(inf_alpha)
 fo_inf_gamma = modes.fractional_occupancies(inf_gamma)
 
 print("Fractional occupancies mean (Simulation):", fo_sim_alpha)
-print("Fractional occupancies mean (Mage):    ", fo_inf_alpha)
+print("Fractional occupancies mean (MAGE):    ", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
-print("Fractional occupancies fc (Mage):    ", fo_inf_gamma)
-
+print("Fractional occupancies fc (MAGE):    ", fo_inf_gamma)

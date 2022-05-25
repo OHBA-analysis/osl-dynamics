@@ -24,8 +24,8 @@ config = Config(
     inference_normalization="layer",
     model_n_units=64,
     model_normalization="layer",
-    descriminator_n_units=16,
-    descriminator_normalization="layer",
+    discriminator_n_units=16,
+    discriminator_normalization="layer",
     learn_means=False,
     learn_covariances=False,
     batch_size=64,
@@ -63,7 +63,7 @@ config.initial_covariances = hmm.covariances
 model = Model(config)
 
 print("Training model")
-history = model.train(training_dataset)
+history = model.fit(training_dataset)
 
 # Inferred mode mixing factors and mode time courses
 alpha = model.get_alpha(prediction_dataset)

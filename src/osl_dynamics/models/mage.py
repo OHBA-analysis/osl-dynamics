@@ -2,15 +2,16 @@
 
 """
 
+import time
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Union, Tuple
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models, optimizers, utils
+from tqdm import trange
 from osl_dynamics.models import mdynemo_obs
-from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.models.inf_mod_base import MultiAdversarialInferenceModelBase
+from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     MeanVectorsLayer,
@@ -21,6 +22,7 @@ from osl_dynamics.inference.layers import (
     MatMulLayer,
     ModelRNNLayer,
     MixVectorsMatricesLayer,
+    AdversarialLogLikelihoodLossLayer,
 )
 
 
@@ -35,7 +37,7 @@ class Config(BaseModelConfig):
     n_channels : int
         Number of channels.
     sequence_length : int
-        Length of sequence passed to the inference, generative and descriminator network.
+        Length of sequence passed to the inference, generative and discriminator network.
 
     inference_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -65,18 +67,18 @@ class Config(BaseModelConfig):
     model_dropout : float
         Dropout rate.
 
-    descriminator_rnn : str
+    discriminator_rnn : str
         RNN to use, either 'gru' or 'lstm'.
-    descriminator_n_layers : int
+    discriminator_n_layers : int
         Number of layers.
-    descriminator_n_units : int
+    discriminator_n_units : int
         Number of units.
-    descriminator_normalization : str
+    discriminator_normalization : str
         Type of normalization to use. Either None, 'batch' or 'layer'.
-    descriminator_activation : str
+    discriminator_activation : str
         Type of activation to use after normalization and before dropout.
         E.g. 'relu', 'elu', etc.
-    descriminator_dropout : float
+    discriminator_dropout : float
         Dropout rate.
 
     learn_means : bool
@@ -119,12 +121,12 @@ class Config(BaseModelConfig):
     model_dropout: float = 0.0
 
     # Descriminator network parameters
-    descriminator_rnn: Literal["gru", "lstm"] = "lstm"
-    descriminator_n_layers: int = 1
-    descriminator_n_units: int = None
-    descriminator_normalization: Literal[None, "batch", "layer"] = None
-    descriminator_activation: str = "elu"
-    descriminator_dropout: float = 0.0
+    discriminator_rnn: Literal["gru", "lstm"] = "lstm"
+    discriminator_n_layers: int = 1
+    discriminator_n_units: int = None
+    discriminator_normalization: Literal[None, "batch", "layer"] = None
+    discriminator_activation: str = "elu"
+    discriminator_dropout: float = 0.0
 
     # Observation model parameters
     learn_means: bool = None
@@ -140,7 +142,7 @@ class Config(BaseModelConfig):
         self.validate_training_parameters()
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
-    
+
     def validate_rnn_parameters(self):
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
@@ -148,8 +150,8 @@ class Config(BaseModelConfig):
         if self.model_n_units is None:
             raise ValueError("Please pass model_n_units.")
 
-        if self.descriminator_n_units is None:
-            raise ValueError("Please pass descriminator_n_units.")
+        if self.discriminator_n_units is None:
+            raise ValueError("Please pass discriminator_n_units.")
 
     def validate_observation_model_parameters(self):
         if (
@@ -160,12 +162,12 @@ class Config(BaseModelConfig):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
 
 
-class Model(MultiAdversarialInferenceModelBase):
+class Model(ModelBase):
     """MAGE model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.sage.Config
+    config : osl_dynamics.models.mage.Config
     """
 
     def build_model(self):
@@ -176,80 +178,337 @@ class Model(MultiAdversarialInferenceModelBase):
         self.inference_model = _build_inference_model(self.config)
         self.inference_model.summary()
         print()
-  
-        self.generator_model_mean = _build_generator_model_mean(self.config)
+
+        self.generator_model_mean = _build_generator_model(self.config, name="alpha")
+        self.generator_model_cov = _build_generator_model(self.config, name="gamma")
+        self.generator_model_cov.summary()
         self.generator_model_mean.summary()
         print()
-        self.generator_model_cov = _build_generator_model_cov(self.config)
-        self.generator_model_cov.summary()
 
-        self.discriminator_model_mean = _build_discriminator_model_mean(self.config)
+        self.discriminator_model_mean = _build_discriminator_model(
+            self.config, name="alpha"
+        )
+        self.discriminator_model_cov = _build_discriminator_model(
+            self.config, name="gamma"
+        )
         self.discriminator_model_mean.summary()
-        print()
-        self.discriminator_model_cov = _build_discriminator_model_cov(self.config)
         self.discriminator_model_cov.summary()
+        print()
 
+        # Connect the inputs and outputs
         data = layers.Input(
             shape=(self.config.sequence_length, self.config.n_channels), name="data"
         )
-
-        # Connecting the inputs and outputs
         C_m, alpha_posterior, gamma_posterior = self.inference_model(data)
         alpha_prior = self.generator_model_mean(alpha_posterior)
         gamma_prior = self.generator_model_cov(gamma_posterior)
-
         discriminator_output_alpha = self.discriminator_model_mean(alpha_prior)
         discriminator_output_gamma = self.discriminator_model_cov(gamma_prior)
-        self.model = models.Model(data, [C_m, discriminator_output_alpha, discriminator_output_gamma],
-             name="MAGE")
+
+        self.model = models.Model(
+            data,
+            [C_m, discriminator_output_alpha, discriminator_output_gamma],
+            name="MAGE",
+        )
         self.model.summary()
         print()
 
-    def get_means_stds_fcs(self):
-            """Get the mean, standard devation and functional connectivity of each mode.
+    def compile(self):
+        """Compile the model."""
 
-            Returns
-            -------
-            means : np.ndarray
-                Mode means.
-            stds : np.ndarray
-                Mode standard deviations.
-            fcs : np.ndarray
-                Mode functional connectivities.
-            """
-            return mdynemo_obs.get_means_stds_fcs(self.inference_model)
+        self.discriminator_model_mean.compile(
+            loss="binary_crossentropy",
+            optimizer=self.config.optimizer.lower(),
+            metrics=["accuracy"],
+        )
+        self.discriminator_model_mean.trainable = False
+
+        self.discriminator_model_cov.compile(
+            loss="binary_crossentropy",
+            optimizer=self.config.optimizer.lower(),
+            metrics=["accuracy"],
+        )
+        self.discriminator_model_cov.trainable = False
+
+        # Reconstruction (Likelihood) loss:
+        # The first loss corresponds to the likelihood - this tells us how well we
+        # are explaining our data according to the current estimate of the
+        # generative model, and is given by:
+        # L = \sum_{t=1}^{T} log p(Y_t | \theta_t^m = \mu^{m,\theta}_t,
+        #                                \theta_t^c = \mu^{c,\theta}_t)
+        ll_loss = AdversarialLogLikelihoodLossLayer(
+            self.config.n_channels, name="ll_loss"
+        )
+
+        # Regularization (Prior) Loss:
+        # The second loss regularises the estimate of the latent, time-varying
+        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this penalises
+        # when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the
+        # prior:
+        # R = \sum_{t=1}^{T} [
+        #     CrossEntropy(\mu^{m,\theta}_t|| \hat{\mu}^{m,\theta}_{t})
+        #     + CrossEntropy(\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})
+        # ]
+
+        # Compile the full model
+        optimizer = optimizers.get(
+            {
+                "class_name": self.config.optimizer.lower(),
+                "config": {"learning_rate": self.config.learning_rate},
+            }
+        )
+        self.model.compile(
+            loss=[ll_loss, "binary_crossentropy", "binary_crossentropy"],
+            loss_weights=[0.990, 0.005, 0.005],
+            optimizer=optimizer,
+        )
+
+    def fit(self, train_data: tf.data.Dataset, epochs: int = None, verbose: int = 1):
+        """Train the model.
+
+        Parameters
+        ----------
+        train_data : tensorflow.data.Dataset
+            Training dataset.
+        epochs : int
+            Number of epochs to train. Defaults to value in config if not passed.
+        verbose : int
+            Should we print a progress bar?
+
+        Returns
+        -------
+        history
+            History of discriminator_loss and generator_loss.
+        """
+        if epochs is None:
+            epochs = self.config.n_epochs
+
+        # Path to save the best model weights
+        timestr = time.strftime("%Y%m%d-%H%M%S")  # current date-time
+        filepath = "tmp/"
+        save_filepath = filepath + str(timestr) + "_best_model.h5"
+
+        history = []
+        best_val_loss = np.Inf
+        for epoch in range(epochs):
+            if verbose:
+                print("Epoch {}/{}".format(epoch + 1, epochs))
+                pb_i = utils.Progbar(
+                    len(train_data), stateful_metrics=["D_m", "D_c", "G"]
+                )
+
+            for idx, batch in enumerate(train_data):
+                # Generate real/fake input for the discriminator
+                real = np.ones((len(batch["data"]), self.config.sequence_length, 1))
+                fake = np.zeros((len(batch["data"]), self.config.sequence_length, 1))
+                train_discriminator_mean = self._train_discriminator(
+                    real, fake, self.discriminator_model_mean
+                )
+                train_discriminator_cov = self._train_discriminator(
+                    real, fake, self.discriminator_model_cov
+                )
+
+                (
+                    C_m,
+                    alpha_posterior,
+                    gamma_posterior,
+                ) = self.inference_model.predict_on_batch(batch)
+                alpha_prior = self.generator_model_mean.predict_on_batch(
+                    alpha_posterior
+                )
+                gamma_prior = self.generator_model_cov.predict_on_batch(gamma_posterior)
+
+                # Train discriminator, inference and generator model
+                discriminator_loss_mean = train_discriminator_mean(
+                    alpha_posterior, alpha_prior
+                )
+                discriminator_loss_cov = train_discriminator_cov(
+                    gamma_posterior, gamma_prior
+                )
+                generator_loss = self.model.train_on_batch(batch, [batch, real, real])
+
+                if verbose:
+                    pb_i.add(
+                        1,
+                        values=[
+                            ("D_m", discriminator_loss_mean[1]),
+                            ("D_c", discriminator_loss_cov[1]),
+                            ("G", generator_loss[0]),
+                        ],
+                    )
+
+            if generator_loss[0] < best_val_loss:
+                self.save_weights(save_filepath)
+                print(
+                    "Best model w/ val loss (generator) {} saved to {}".format(
+                        generator_loss[0], save_filepath
+                    )
+                )
+                best_val_loss = generator_loss[0]
+            val_loss = self.model.test_on_batch([batch], [batch, real, real])
+
+            history.append(
+                {
+                    "D_m": discriminator_loss_mean[1],
+                    "D_c": discriminator_loss_cov[1],
+                    "G": generator_loss[0],
+                }
+            )
+
+        # Load the weights for the best model
+        print("Loading best model:", save_filepath)
+        self.load_weights(save_filepath)
+
+        return history
+
+    def _train_discriminator(self, real, fake, discriminator):
+        def train(real_samples, fake_samples):
+            discriminator.trainable = True
+            loss_real = discriminator.train_on_batch(real_samples, real)
+            loss_fake = discriminator.train_on_batch(fake_samples, fake)
+            loss = np.add(loss_real, loss_fake) * 0.5
+            discriminator.trainable = False
+            return loss
+
+        return train
+
+    def get_mode_time_courses(
+        self,
+        inputs,
+        concatenate: bool = True,
+    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
+        """Get mode time courses.
+
+        This method is used to get mode time courses for the multi-time-scale model.
+
+        Parameters
+        ----------
+        inputs : tensorflow.data.Dataset
+            Prediction dataset.
+        concatenate : bool
+            Should we concatenate alpha for each subject?
+
+        Returns
+        -------
+        list or np.ndarray
+            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Gamma time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        """
+        if not self.config.multiple_dynamics:
+            raise ValueError("Please use get_alpha for a single time scale model.")
+
+        outputs_alpha = []
+        outputs_gamma = []
+
+        for dataset in inputs:
+            alpha, gamma = self.inference_model(dataset)[1:]
+
+            alpha = np.concatenate(alpha)
+            gamma = np.concatenate(gamma)
+
+            outputs_alpha.append(alpha)
+            outputs_gamma.append(gamma)
+
+        if concatenate or len(outputs_alpha) == 1:
+            outputs_alpha = np.concatenate(outputs_alpha)
+            outputs_gamma = np.concatenate(outputs_gamma)
+
+        return outputs_alpha, outputs_gamma
+
+    def sample_mode_time_courses(
+        self, alpha: np.ndarray = None, gamma: np.ndarray = None
+    ) -> np.ndarray:
+        """Uses the generator to predict the prior alpha and gamma.
+
+        Parameters
+        ----------
+        alpha : np.ndarray
+            Shape must be (n_samples, n_modes).
+
+        gamma : np.ndarray
+            Shape must be (n_samples, n_modes).
+
+        Returns
+        -------
+        tuple of np.ndarray
+            Predicted alpha and gamma.
+        """
+        n_samples = np.shape(alpha)[0]
+        alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        gamma_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+
+        for i in trange(
+            n_samples - self.config.sequence_length,
+            desc="Predicting mode time course",
+            ncols=98,
+        ):
+            # Extract the sequence
+            alpha_input = alpha[i : i + self.config.sequence_length]
+            alpha_input = alpha_input[np.newaxis, :, :]
+
+            gamma_input = gamma[i : i + self.config.sequence_length]
+            gamma_input = gamma_input[np.newaxis, :, :]
+
+            # Predict the point estimates for theta one time step in the future
+            alpha_sampled[i] = self.generator_model_mean.predict_on_batch(alpha_input)[
+                0, 0
+            ]
+            gamma_sampled[i] = self.generator_model_cov.predict_on_batch(gamma_input)[
+                0, 0
+            ]
+
+        return alpha_sampled, gamma_sampled
+
+    def get_means_stds_fcs(self):
+        """Get the mean, standard devation and functional connectivity of each mode.
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means.
+        stds : np.ndarray
+            Mode standard deviations.
+        fcs : np.ndarray
+            Mode functional connectivities.
+        """
+        return mdynemo_obs.get_means_stds_fcs(self.inference_model)
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
-            """Set the means, standard deviations, functional connectivities of each mode.
+        """Set the means, standard deviations, functional connectivities of each mode.
 
-            Parameters
-            ----------
-            means: np.ndarray
-                Mode means with shape (n_modes, n_channels).
-            stds: np.ndarray
-                Mode standard deviations with shape (n_modes, n_channels) or
-                (n_modes, n_channels, n_channels).
-            fcs: np.ndarray
-                Mode functional connectivities with shape (n_modes, n_channels, n_channels).
-            update_initializer: bool
-                Do we want to use the passed parameters when we re_initialize
-                the model?
-            """
-            mdynemo_obs.set_means_stds_fcs(self.inference_model, means, stds, fcs, update_initializer)
+        Parameters
+        ----------
+        means: np.ndarray
+            Mode means with shape (n_modes, n_channels).
+        stds: np.ndarray
+            Mode standard deviations with shape (n_modes, n_channels) or
+            (n_modes, n_channels, n_channels).
+        fcs: np.ndarray
+            Mode functional connectivities with shape (n_modes, n_channels, n_channels).
+        update_initializer: bool
+            Do we want to use the passed parameters when we re_initialize
+            the model?
+        """
+        mdynemo_obs.set_means_stds_fcs(
+            self.inference_model, means, stds, fcs, update_initializer
+        )
 
 
 def _build_inference_model(config):
     # Inference RNN:
-    #   \alpha_{t} = \zeta({\theta^{m}_{t}}) where
-    #   \mu^{m,\theta}_t  = f(LSTM_{bi}(Y,\omega^m_e),\lambda_e^m)
-    #   \mu^{c,\theta}_t = f(LSTM_{bi}(Y,\omega^c_e),\lambda_e^c)
+    #   alpha_t = zeta(theta^m_t}) where
+    #   mu^{m,theta}_t = f(BLSTM(Y,omega^m_e),lambda_e^m)
+    #   mu^{c,theta}_t = f(BLSTM(Y,omega^c_e),lambda_e^c)
 
     # Definition of layers
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
     )
     data_drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.inference_dropout, name="data_drop_inf")
+        layers.Dropout(config.inference_dropout, name="inf_data_drop")
     )
     inf_rnn_layer = InferenceRNNLayer(
         config.inference_rnn,
@@ -262,11 +521,11 @@ def _build_inference_model(config):
     )
 
     alpha_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), name="alpha_inf"
+        layers.Dense(config.n_modes, activation="softmax"), name="inf_alpha"
     )
 
     gamma_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), name="gamma_inf"
+        layers.Dense(config.n_modes, activation="softmax"), name="inf_gamma"
     )
 
     # Data flow
@@ -311,7 +570,7 @@ def _build_inference_model(config):
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
     mix_means_covs_layer = MixVectorsMatricesLayer(name="mix_means_covs")
-    
+
     # Data flow
     mu = means_layer(inputs)  # inputs not used
     E = stds_layer(inputs)  # inputs not used
@@ -326,21 +585,21 @@ def _build_inference_model(config):
     return models.Model(inputs, [C_m, alpha, gamma], name="inference")
 
 
-def _build_generator_model_mean(config):
+def _build_generator_model(config, name):
     # Model RNN:
-    #   \alpha_{t} = \zeta({\theta^{m}_{t}}) where
-    #   \hat{\mu}^{m,\theta}_{t} = f (LSTM_{uni} (\theta^{m}_{<t},\omega^m_g), \lambda_g^m)
-    #   \hat{\mu}^{c,\theta}_{t}   = f (LSTM_{uni} (\theta^{c}_{<t},\omega^c_g), \lambda_g^c)
+    #   alpha_t = zeta(theta^m_t) where
+    #   hat{mu}^{m,theta}_t = f(LSTM(theta^m_<t,omega^m_g),lambda_g^m)
+    #   hat{mu}^{c,theta}_t = f(LSTM(theta^c_<t,omega^c_g),lambda_g^c)
 
     # Input
-    generator_input_mean = layers.Input(
+    inputs = layers.Input(
         shape=(config.sequence_length, config.n_modes),
-        name="generator_input_mean",
+        name="gen_inp_" + name,
     )
 
     # Definition of layers
     drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.model_dropout, name="data_drop_gen_mean")
+        layers.Dropout(config.model_dropout, name="gen_data_drop_" + name)
     )
     mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
@@ -349,120 +608,49 @@ def _build_generator_model_mean(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
-        name="mod_rnn_mean",
+        name="gen_rnn_" + name,
     )
-    alpha_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), name="alpha_gen_mean"
-    )
-
-    # Data flow
-    theta_drop = drop_layer(generator_input_mean)
-    theta_drop_prior = mod_rnn_layer(theta_drop)
-    alpha_prior = alpha_layer(theta_drop_prior)
-
-    return models.Model(generator_input_mean, alpha_prior, name="generator_mean")
-
-def _build_generator_model_cov(config):
-
-    # Model RNN:
-    #   \alpha_{t} = \zeta({\theta^{m}_{t}}) where
-    #   \hat{\mu}^{m,\theta}_{t} = f (LSTM_{uni} (\theta^{m}_{<t},\omega^m_g), \lambda_g^m)
-    #   \hat{\mu}^{c,\theta}_{t}   = f (LSTM_{uni} (\theta^{c}_{<t},\omega^c_g), \lambda_g^c)
-
-    # Input
-    generator_input_cov = layers.Input(
-        shape=(config.sequence_length, config.n_modes),
-        name="generator_input_cov",
-    )
-
-    # Definition of layers
-    drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.model_dropout, name="data_drop_gen_cov")
-    )
-    mod_rnn_layer = ModelRNNLayer(
-        config.model_rnn,
-        config.model_normalization,
-        config.model_activation,
-        config.model_n_layers,
-        config.model_n_units,
-        config.model_dropout,
-        name="mod_rnn_cov",
-    )
-    gamma_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), 
-        name="alpha_gen_cov"
+    prior_layer = layers.TimeDistributed(
+        layers.Dense(config.n_modes, activation="softmax"), name="gen_softmax_" + name
     )
 
     # Data flow
-    theta_drop = drop_layer(generator_input_cov)
-    theta_drop_prior = mod_rnn_layer(theta_drop)
-    gamma_prior = gamma_layer(theta_drop_prior)
+    theta_drop = drop_layer(inputs)
+    mod_rnn = mod_rnn_layer(theta_drop)
+    prior = prior_layer(mod_rnn)
 
-    return models.Model(generator_input_cov, gamma_prior, name="generator_cov")
+    return models.Model(inputs, prior, name="generator_" + name)
 
 
-def _build_discriminator_model_mean(config):
+def _build_discriminator_model(config, name):
     # Descriminator RNN:
-    #   D_{\theta^m_t} = \sigma (f (LSTM_{bi}([\zeta(\hat{\mu}^{m,\theta}_{t}), \zeta(\mu^{m,\theta}_t)],\omega^m_d), \lambda_d^m))
-    #   D_{\theta^c_t} = \sigma (f (LSTM_{bi}([\zeta(\hat{\mu}^{c,\theta}_{t}), \zeta(\mu^{c,\theta}_t)],\omega^c_d), \lambda_d^c))
+    #   D_{theta^m_t} = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t), zeta(mu^{m,theta}_t)],omega^m_d), lambda_d^m))
+    #   D_{theta^c_t} = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t), zeta(mu^{c,theta}_t)],omega^c_d), lambda_d^c))
 
     # Definition of layers
-    discriminator_input_mean = layers.Input(
-        shape=(config.sequence_length, config.n_modes), name="data_mean"
+    inputs = layers.Input(
+        shape=(config.sequence_length, config.n_modes), name="dis_inp_" + name
     )
 
     drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.model_dropout, name="data_drop_des_mean")
+        layers.Dropout(config.model_dropout, name="dis_data_drop_" + name)
     )
-    des_rnn_layer = ModelRNNLayer(
-        config.descriminator_rnn,
-        config.descriminator_normalization,
-        config.descriminator_activation,
-        config.descriminator_n_layers,
-        config.descriminator_n_units,
-        config.descriminator_dropout,
-        name="des_rnn_mean",
+    dis_rnn_layer = ModelRNNLayer(
+        config.discriminator_rnn,
+        config.discriminator_normalization,
+        config.discriminator_activation,
+        config.discriminator_n_layers,
+        config.discriminator_n_units,
+        config.discriminator_dropout,
+        name="dis_rnn_" + name,
     )
-    sigmoid_layer_mean = layers.TimeDistributed(layers.Dense(1, activation="sigmoid"), 
-        name="sigmoid_mean")
+    sigmoid_layer = layers.TimeDistributed(
+        layers.Dense(1, activation="sigmoid"), name="dis_sigmoid_" + name
+    )
 
     # Data flow
-    theta_norm_drop = drop_layer(discriminator_input_mean)
-    discriminator_sequence = des_rnn_layer(theta_norm_drop)
-    discriminator_output_mean = sigmoid_layer_mean(discriminator_sequence)
+    theta_norm_drop = drop_layer(inputs)
+    dis_rnn = dis_rnn_layer(theta_norm_drop)
+    output = sigmoid_layer(dis_rnn)
 
-    return models.Model(discriminator_input_mean,
-        discriminator_output_mean, name="discriminator_mean")
-
-def _build_discriminator_model_cov(config):
-    # Descriminator RNN:
-    #   D_{\theta^m_t} = \sigma (f (LSTM_{bi}([\zeta(\hat{\mu}^{m,\theta}_{t}), \zeta(\mu^{m,\theta}_t)],\omega^m_d), \lambda_d^m))
-    #   D_{\theta^c_t} = \sigma (f (LSTM_{bi}([\zeta(\hat{\mu}^{c,\theta}_{t}), \zeta(\mu^{c,\theta}_t)],\omega^c_d), \lambda_d^c))
-
-    # Definition of layers
-    discriminator_input_cov = layers.Input(
-        shape=(config.sequence_length, config.n_modes), name="data_cov"
-    )
-
-    drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.model_dropout, name="data_drop_des_cov")
-    )
-    des_rnn_layer = ModelRNNLayer(
-        config.descriminator_rnn,
-        config.descriminator_normalization,
-        config.descriminator_activation,
-        config.descriminator_n_layers,
-        config.descriminator_n_units,
-        config.descriminator_dropout,
-        name="des_rnn_cov",
-    )
-    sigmoid_layer_cov = layers.TimeDistributed(layers.Dense(1, activation="sigmoid"), 
-        name="sigmoid_cov")
-
-    # Data flow
-    theta_norm_drop = drop_layer(discriminator_input_cov)
-    discriminator_sequence = des_rnn_layer(theta_norm_drop)
-    discriminator_output_cov = sigmoid_layer_cov(discriminator_sequence)
-
-    return models.Model(discriminator_input_cov,
-        discriminator_output_cov, name="discriminator_cov")
+    return models.Model(inputs, output, name="discriminator_" + name)

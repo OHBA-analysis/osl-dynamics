@@ -27,8 +27,8 @@ config = Config(
     inference_normalization="layer",
     model_n_units=32,
     model_normalization="layer",
-    descriminator_n_units=16,
-    descriminator_normalization="layer",
+    discriminator_n_units=16,
+    discriminator_normalization="layer",
     learn_means=False,
     learn_covariances=True,
     batch_size=16,
@@ -70,8 +70,7 @@ prediction_dataset = input_data.dataset(
 model = Model(config)
 
 print("Training model")
-history = model.train(training_dataset)
-
+history = model.fit(training_dataset)
 
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
@@ -110,7 +109,7 @@ plotting.plot_matrices(inf_cov, filename="figures_longrange/inf_cov.png")
 
 
 # Predict the prior alpha on infer alpha input
-gen_alp = model.gen_alpha(inf_alp)
+gen_alp = model.sample_alpha(inf_alp)
 gen_stc = modes.time_courses(gen_alp)
 
 plotting.plot_mode_lifetimes(
