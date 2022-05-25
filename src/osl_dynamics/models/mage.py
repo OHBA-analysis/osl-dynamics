@@ -1,4 +1,4 @@
-"""Single-dynamic Adversarial Generator Encoder (SAGE) model.
+"""Multi-dynamic Adversarial Generator Encoder (MAGE) model.
 
 """
 
@@ -170,7 +170,7 @@ class Model(MultiAdversarialInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
-        and the full SAGE model.
+        and the full MAGE model.
         """
         print("Build models")
         self.inference_model = _build_inference_model(self.config)
@@ -311,8 +311,7 @@ def _build_inference_model(config):
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
     mix_means_covs_layer = MixVectorsMatricesLayer(name="mix_means_covs")
-
-    # Data flow
+    
     # Data flow
     mu = means_layer(inputs)  # inputs not used
     E = stds_layer(inputs)  # inputs not used
