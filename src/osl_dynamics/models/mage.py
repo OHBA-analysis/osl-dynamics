@@ -1,25 +1,26 @@
-"""Single-dynamic Adversarial Generator Encoder (SAGE) model.
+"""Multi-dynamic Adversarial Generator Encoder (MAGE) model.
 
 """
 
 import time
 from dataclasses import dataclass
-from typing import Literal, Union
+from typing import Literal, Union, Tuple
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm import trange
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import mdynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     MeanVectorsLayer,
-    CovarianceMatricesLayer,
+    DiagonalMatricesLayer,
+    CorrelationMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
+    MatMulLayer,
     ModelRNNLayer,
-    NormalizationLayer,
     MixVectorsMatricesLayer,
     AdversarialLogLikelihoodLossLayer,
 )
@@ -27,7 +28,7 @@ from osl_dynamics.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig):
-    """Settings for SAGE.
+    """Settings for MAGE.
 
     Parameters
     ----------
@@ -129,57 +130,105 @@ class Config(BaseModelConfig):
 
     # Observation model parameters
     learn_means: bool = None
-    learn_covariances: bool = None
+    learn_stds: bool = None
+    learn_fcs: bool = None
     initial_means: np.ndarray = None
-    initial_covariances: np.ndarray = None
+    initial_stds: np.ndarray = None
+    initial_fcs: np.ndarray = None
+    multiple_dynamics: bool = True
 
     def __post_init__(self):
         self.validate_dimension_parameters()
         self.validate_training_parameters()
+        self.validate_rnn_parameters()
+        self.validate_observation_model_parameters()
+
+    def validate_rnn_parameters(self):
+        if self.inference_n_units is None:
+            raise ValueError("Please pass inference_n_units.")
+
+        if self.model_n_units is None:
+            raise ValueError("Please pass model_n_units.")
+
+        if self.discriminator_n_units is None:
+            raise ValueError("Please pass discriminator_n_units.")
+
+    def validate_observation_model_parameters(self):
+        if (
+            self.learn_means is None
+            or self.learn_stds is None
+            or self.learn_fcs is None
+        ):
+            raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
 
 
 class Model(ModelBase):
-    """SAGE model class.
+    """MAGE model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.sage.Config
+    config : osl_dynamics.models.mage.Config
     """
 
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
-        and the full SAGE model.
+        and the full MAGE model.
         """
         print("Build models")
         self.inference_model = _build_inference_model(self.config)
         self.inference_model.summary()
         print()
-        self.generator_model = _build_generator_model(self.config)
-        self.generator_model.summary()
-        print()
-        self.discriminator_model = _build_discriminator_model(self.config)
-        self.discriminator_model.summary()
+
+        self.generator_model_mean = _build_generator_model(self.config, name="alpha")
+        self.generator_model_cov = _build_generator_model(self.config, name="gamma")
+        self.generator_model_cov.summary()
+        self.generator_model_mean.summary()
         print()
 
+        self.discriminator_model_mean = _build_discriminator_model(
+            self.config, name="alpha"
+        )
+        self.discriminator_model_cov = _build_discriminator_model(
+            self.config, name="gamma"
+        )
+        self.discriminator_model_mean.summary()
+        self.discriminator_model_cov.summary()
+        print()
+
+        # Connect the inputs and outputs
         data = layers.Input(
             shape=(self.config.sequence_length, self.config.n_channels), name="data"
         )
-        C_m, alpha_posterior = self.inference_model(data)
-        alpha_prior = self.generator_model(alpha_posterior)
-        discriminator_output_prior = self.discriminator_model(alpha_prior)
-        self.model = models.Model(data, [C_m, discriminator_output_prior], name="SAGE")
+        C_m, alpha_posterior, gamma_posterior = self.inference_model(data)
+        alpha_prior = self.generator_model_mean(alpha_posterior)
+        gamma_prior = self.generator_model_cov(gamma_posterior)
+        discriminator_output_alpha = self.discriminator_model_mean(alpha_prior)
+        discriminator_output_gamma = self.discriminator_model_cov(gamma_prior)
+
+        self.model = models.Model(
+            data,
+            [C_m, discriminator_output_alpha, discriminator_output_gamma],
+            name="MAGE",
+        )
         self.model.summary()
         print()
 
     def compile(self):
         """Compile the model."""
 
-        self.discriminator_model.compile(
+        self.discriminator_model_mean.compile(
             loss="binary_crossentropy",
             optimizer=self.config.optimizer.lower(),
             metrics=["accuracy"],
         )
-        self.discriminator_model.trainable = False
+        self.discriminator_model_mean.trainable = False
+
+        self.discriminator_model_cov.compile(
+            loss="binary_crossentropy",
+            optimizer=self.config.optimizer.lower(),
+            metrics=["accuracy"],
+        )
+        self.discriminator_model_cov.trainable = False
 
         # Reconstruction (Likelihood) loss:
         # The first loss corresponds to the likelihood - this tells us how well we
@@ -209,8 +258,8 @@ class Model(ModelBase):
             }
         )
         self.model.compile(
-            loss=[ll_loss, "binary_crossentropy"],
-            loss_weights=[0.995, 0.005],
+            loss=[ll_loss, "binary_crossentropy", "binary_crossentropy"],
+            loss_weights=[0.990, 0.005, 0.005],
             optimizer=optimizer,
         )
 
@@ -244,25 +293,48 @@ class Model(ModelBase):
         for epoch in range(epochs):
             if verbose:
                 print("Epoch {}/{}".format(epoch + 1, epochs))
-                pb_i = utils.Progbar(len(train_data), stateful_metrics=["D", "G"])
+                pb_i = utils.Progbar(
+                    len(train_data), stateful_metrics=["D_m", "D_c", "G"]
+                )
 
             for idx, batch in enumerate(train_data):
                 # Generate real/fake input for the discriminator
                 real = np.ones((len(batch["data"]), self.config.sequence_length, 1))
                 fake = np.zeros((len(batch["data"]), self.config.sequence_length, 1))
-                train_discriminator = self._train_discriminator(real, fake)
+                train_discriminator_mean = self._train_discriminator(
+                    real, fake, self.discriminator_model_mean
+                )
+                train_discriminator_cov = self._train_discriminator(
+                    real, fake, self.discriminator_model_cov
+                )
 
-                C_m, alpha_posterior = self.inference_model.predict_on_batch(batch)
-                alpha_prior = self.generator_model.predict_on_batch(alpha_posterior)
+                (
+                    C_m,
+                    alpha_posterior,
+                    gamma_posterior,
+                ) = self.inference_model.predict_on_batch(batch)
+                alpha_prior = self.generator_model_mean.predict_on_batch(
+                    alpha_posterior
+                )
+                gamma_prior = self.generator_model_cov.predict_on_batch(gamma_posterior)
 
                 # Train discriminator, inference and generator model
-                discriminator_loss = train_discriminator(alpha_posterior, alpha_prior)
-                generator_loss = self.model.train_on_batch(batch, [batch, real])
+                discriminator_loss_mean = train_discriminator_mean(
+                    alpha_posterior, alpha_prior
+                )
+                discriminator_loss_cov = train_discriminator_cov(
+                    gamma_posterior, gamma_prior
+                )
+                generator_loss = self.model.train_on_batch(batch, [batch, real, real])
 
                 if verbose:
                     pb_i.add(
                         1,
-                        values=[("D", discriminator_loss[1]), ("G", generator_loss[0])],
+                        values=[
+                            ("D_m", discriminator_loss_mean[1]),
+                            ("D_c", discriminator_loss_cov[1]),
+                            ("G", generator_loss[0]),
+                        ],
                     )
 
             if generator_loss[0] < best_val_loss:
@@ -273,9 +345,15 @@ class Model(ModelBase):
                     )
                 )
                 best_val_loss = generator_loss[0]
-            val_loss = self.model.test_on_batch([batch], [batch, real])
+            val_loss = self.model.test_on_batch([batch], [batch, real, real])
 
-            history.append({"D": discriminator_loss[1], "G": generator_loss[0]})
+            history.append(
+                {
+                    "D_m": discriminator_loss_mean[1],
+                    "D_c": discriminator_loss_cov[1],
+                    "G": generator_loss[0],
+                }
+            )
 
         # Load the weights for the best model
         print("Loading best model:", save_filepath)
@@ -283,107 +361,84 @@ class Model(ModelBase):
 
         return history
 
-    def _train_discriminator(self, real, fake):
+    def _train_discriminator(self, real, fake, discriminator):
         def train(real_samples, fake_samples):
-            self.discriminator_model.trainable = True
-            loss_real = self.discriminator_model.train_on_batch(real_samples, real)
-            loss_fake = self.discriminator_model.train_on_batch(fake_samples, fake)
+            discriminator.trainable = True
+            loss_real = discriminator.train_on_batch(real_samples, real)
+            loss_fake = discriminator.train_on_batch(fake_samples, fake)
             loss = np.add(loss_real, loss_fake) * 0.5
-            self.discriminator_model.trainable = False
+            discriminator.trainable = False
             return loss
 
         return train
 
-    def get_alpha(self, inputs, concatenate: bool = True) -> Union[list, np.ndarray]:
-        """Mode mixing factors, alpha.
+    def get_mode_time_courses(
+        self,
+        inputs,
+        concatenate: bool = True,
+    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
+        """Get mode time courses.
+
+        This method is used to get mode time courses for the multi-time-scale model.
 
         Parameters
         ----------
         inputs : tensorflow.data.Dataset
             Prediction dataset.
+        concatenate : bool
+            Should we concatenate alpha for each subject?
 
         Returns
         -------
         list or np.ndarray
-            Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
+            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        list or np.ndarray
+            Gamma time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
-        outputs = []
+        if not self.config.multiple_dynamics:
+            raise ValueError("Please use get_alpha for a single time scale model.")
+
+        outputs_alpha = []
+        outputs_gamma = []
+
         for dataset in inputs:
-            alpha = self.inference_model.predict(dataset)[1]
+            alpha, gamma = self.inference_model(dataset)[1:]
+
             alpha = np.concatenate(alpha)
-            outputs.append(alpha)
+            gamma = np.concatenate(gamma)
 
-        if concatenate or len(outputs) == 1:
-            outputs = np.concatenate(outputs)
+            outputs_alpha.append(alpha)
+            outputs_gamma.append(gamma)
 
-        return outputs
+        if concatenate or len(outputs_alpha) == 1:
+            outputs_alpha = np.concatenate(outputs_alpha)
+            outputs_gamma = np.concatenate(outputs_gamma)
 
-    def get_covariances(self):
-        """Get the covariances of each mode.
+        return outputs_alpha, outputs_gamma
 
-        Returns
-        -------
-        np.ndarary
-            Mode covariances.
-        """
-        return dynemo_obs.get_covariances(self.inference_model)
-
-    def get_means_covariances(self):
-        """Get the means and covariances of each mode.
-
-        Returns
-        -------
-        means : np.ndarary
-            Mode means.
-        covariances : np.ndarray
-            Mode covariances.
-        """
-        return dynemo_obs.get_means_covariances(self.inference_model)
-
-    def set_means(self, means, update_initializer=True):
-        """Set the means of each mode.
-
-        Parameters
-        ----------
-        means : np.ndarray
-            Mode covariances.
-        update_initializer : bool
-            Do we want to use the passed means when we re-initialize
-            the model?
-        """
-        dynemo_obs.set_means(self.inference_model, means, update_initializer)
-
-    def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each mode.
-
-        Parameters
-        ----------
-        covariances : np.ndarray
-            Mode covariances.
-        update_initializer : bool
-            Do we want to use the passed covariances when we re-initialize
-            the model?
-        """
-        dynemo_obs.set_covariances(
-            self.inference_model, covariances, update_initializer
-        )
-
-    def sample_alpha(self, alpha: np.ndarray = None) -> np.ndarray:
-        """Uses the generator to predict the prior alphas.
+    def sample_mode_time_courses(
+        self, alpha: np.ndarray = None, gamma: np.ndarray = None
+    ) -> np.ndarray:
+        """Uses the generator to predict the prior alpha and gamma.
 
         Parameters
         ----------
         alpha : np.ndarray
             Shape must be (n_samples, n_modes).
 
+        gamma : np.ndarray
+            Shape must be (n_samples, n_modes).
+
         Returns
         -------
-        np.ndarray
-            Predicted alpha.
+        tuple of np.ndarray
+            Predicted alpha and gamma.
         """
         n_samples = np.shape(alpha)[0]
         alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        gamma_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
 
         for i in trange(
             n_samples - self.config.sequence_length,
@@ -394,15 +449,57 @@ class Model(ModelBase):
             alpha_input = alpha[i : i + self.config.sequence_length]
             alpha_input = alpha_input[np.newaxis, :, :]
 
-            # Predict the point estimates for theta one time step in the future
-            alpha_sampled[i] = self.generator_model.predict_on_batch(alpha_input)[0, 0]
+            gamma_input = gamma[i : i + self.config.sequence_length]
+            gamma_input = gamma_input[np.newaxis, :, :]
 
-        return alpha_sampled
+            # Predict the point estimates for theta one time step in the future
+            alpha_sampled[i] = self.generator_model_mean.predict_on_batch(alpha_input)[
+                0, 0
+            ]
+            gamma_sampled[i] = self.generator_model_cov.predict_on_batch(gamma_input)[
+                0, 0
+            ]
+
+        return alpha_sampled, gamma_sampled
+
+    def get_means_stds_fcs(self):
+        """Get the mean, standard devation and functional connectivity of each mode.
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means.
+        stds : np.ndarray
+            Mode standard deviations.
+        fcs : np.ndarray
+            Mode functional connectivities.
+        """
+        return mdynemo_obs.get_means_stds_fcs(self.inference_model)
+
+    def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
+        """Set the means, standard deviations, functional connectivities of each mode.
+
+        Parameters
+        ----------
+        means: np.ndarray
+            Mode means with shape (n_modes, n_channels).
+        stds: np.ndarray
+            Mode standard deviations with shape (n_modes, n_channels) or
+            (n_modes, n_channels, n_channels).
+        fcs: np.ndarray
+            Mode functional connectivities with shape (n_modes, n_channels, n_channels).
+        update_initializer: bool
+            Do we want to use the passed parameters when we re_initialize
+            the model?
+        """
+        mdynemo_obs.set_means_stds_fcs(
+            self.inference_model, means, stds, fcs, update_initializer
+        )
 
 
 def _build_inference_model(config):
     # Inference RNN:
-    #   alpha_t = zeta(theta^m_t) where
+    #   alpha_t = zeta(theta^m_t}) where
     #   mu^{m,theta}_t = f(BLSTM(Y,omega^m_e),lambda_e^m)
     #   mu^{c,theta}_t = f(BLSTM(Y,omega^c_e),lambda_e^c)
 
@@ -427,10 +524,15 @@ def _build_inference_model(config):
         layers.Dense(config.n_modes, activation="softmax"), name="inf_alpha"
     )
 
+    gamma_layer = layers.TimeDistributed(
+        layers.Dense(config.n_modes, activation="softmax"), name="inf_gamma"
+    )
+
     # Data flow
     data_drop = data_drop_layer(inputs)
     theta = inf_rnn_layer(data_drop)
     alpha = alpha_layer(theta)
+    gamma = gamma_layer(theta)
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
@@ -446,40 +548,58 @@ def _build_inference_model(config):
         config.initial_means,
         name="means",
     )
-    covs_layer = CovarianceMatricesLayer(
+
+    stds_layer = DiagonalMatricesLayer(
         config.n_modes,
         config.n_channels,
-        config.learn_covariances,
-        config.initial_covariances,
-        name="covs",
+        config.learn_stds,
+        config.initial_stds,
+        name="stds",
     )
+
+    fcs_layer = CorrelationMatricesLayer(
+        config.n_modes,
+        config.n_channels,
+        config.learn_fcs,
+        config.initial_fcs,
+        name="fcs",
+    )
+
     mix_means_layer = MixVectorsLayer(name="mix_means")
-    mix_covs_layer = MixMatricesLayer(name="mix_covs")
+    mix_stds_layer = MixMatricesLayer(name="mix_stds")
+    mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
+    matmul_layer = MatMulLayer(name="cov")
     mix_means_covs_layer = MixVectorsMatricesLayer(name="mix_means_covs")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
-    D = covs_layer(inputs)  # inputs not used
+    E = stds_layer(inputs)  # inputs not used
+    D = fcs_layer(inputs)  # inputs not used
+
     m = mix_means_layer([alpha, mu])
-    C = mix_covs_layer([alpha, D])
+    G = mix_stds_layer([alpha, E])
+    F = mix_fcs_layer([gamma, D])
+    C = matmul_layer([G, F, G])
     C_m = mix_means_covs_layer([m, C])
 
-    return models.Model(inputs, [C_m, alpha], name="inference")
+    return models.Model(inputs, [C_m, alpha, gamma], name="inference")
 
 
-def _build_generator_model(config):
+def _build_generator_model(config, name):
     # Model RNN:
-    #   alpha_{t} = zeta(theta^m_t}) where
-    #   hat{mu}^{m,theta}_t = f(LSTM(theta^m_<t,omega^m_g), lambda_g^m)
-    #   hat{mu}^{c,theta}_t = f(LSTM(theta^c_<t,omega^c_g), lambda_g^c)
+    #   alpha_t = zeta(theta^m_t) where
+    #   hat{mu}^{m,theta}_t = f(LSTM(theta^m_<t,omega^m_g),lambda_g^m)
+    #   hat{mu}^{c,theta}_t = f(LSTM(theta^c_<t,omega^c_g),lambda_g^c)
 
-    # Definition of layers
+    # Input
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_modes),
-        name="gen_inp",
+        name="gen_inp_" + name,
     )
+
+    # Definition of layers
     drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.model_dropout, name="gen_data_drop")
+        layers.Dropout(config.model_dropout, name="gen_data_drop_" + name)
     )
     mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
@@ -488,10 +608,10 @@ def _build_generator_model(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
-        name="gen_rnn",
+        name="gen_rnn_" + name,
     )
     prior_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), name="gen_softmax_alpha"
+        layers.Dense(config.n_modes, activation="softmax"), name="gen_softmax_" + name
     )
 
     # Data flow
@@ -499,18 +619,21 @@ def _build_generator_model(config):
     mod_rnn = mod_rnn_layer(theta_drop)
     prior = prior_layer(mod_rnn)
 
-    return models.Model(inputs, prior, name="generator")
+    return models.Model(inputs, prior, name="generator_" + name)
 
 
-def _build_discriminator_model(config):
+def _build_discriminator_model(config, name):
     # Descriminator RNN:
-    #   D_theta^m_t = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t), zeta(mu^{m,theta}_t)],omega^m_d), \lambda_d^m))
-    #   D_theta^c_t = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t), zeta(mu^{c,theta}_t)],omega^c_d), \lambda_d^c))
+    #   D_{theta^m_t} = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t), zeta(mu^{m,theta}_t)],omega^m_d), lambda_d^m))
+    #   D_{theta^c_t} = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t), zeta(mu^{c,theta}_t)],omega^c_d), lambda_d^c))
 
     # Definition of layers
-    inputs = layers.Input(shape=(config.sequence_length, config.n_modes), name="data")
+    inputs = layers.Input(
+        shape=(config.sequence_length, config.n_modes), name="dis_inp_" + name
+    )
+
     drop_layer = layers.TimeDistributed(
-        layers.Dropout(config.model_dropout, name="dis_data_drop")
+        layers.Dropout(config.model_dropout, name="dis_data_drop_" + name)
     )
     dis_rnn_layer = ModelRNNLayer(
         config.discriminator_rnn,
@@ -519,10 +642,10 @@ def _build_discriminator_model(config):
         config.discriminator_n_layers,
         config.discriminator_n_units,
         config.discriminator_dropout,
-        name="dis_rnn",
+        name="dis_rnn_" + name,
     )
     sigmoid_layer = layers.TimeDistributed(
-        layers.Dense(1, activation="sigmoid"), name="dis_sigmoid"
+        layers.Dense(1, activation="sigmoid"), name="dis_sigmoid_" + name
     )
 
     # Data flow
@@ -530,4 +653,4 @@ def _build_discriminator_model(config):
     dis_rnn = dis_rnn_layer(theta_norm_drop)
     output = sigmoid_layer(dis_rnn)
 
-    return models.Model(inputs, output, name="discriminator")
+    return models.Model(inputs, output, name="discriminator_" + name)

@@ -585,7 +585,7 @@ class LogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class SAGELogLikelihoodLossLayer(layers.Layer):
+class AdversarialLogLikelihoodLossLayer(layers.Layer):
     """Layer to calculate the negative log likelihood.
 
     The negative log-likelihood is calculated assuming a multivariate normal
