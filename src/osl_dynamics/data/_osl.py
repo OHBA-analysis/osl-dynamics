@@ -3,6 +3,7 @@ from typing import Union
 import mat73
 import numpy as np
 from osl_dynamics import array_ops
+from osl_dynamics.data.rw import loadmat
 from osl_dynamics.inference import modes
 
 
@@ -17,23 +18,23 @@ class OSL_HMM:
 
     def __init__(self, filename):
         self.filename = filename
-        self.hmm = mat73.loadmat(filename, use_attrdict=True)["hmm"]
+        self.hmm = loadmat(filename)
 
-        self.state = self.hmm.state
-        self.mode = self.hmm.state
-        self.k = int(self.hmm.K)
-        self.p = self.hmm.P
-        self.dir_2d_alpha = self.hmm.Dir2d_alpha
-        self.pi = self.hmm.Pi
-        self.dir_alpha = self.hmm.Dir_alpha
-        self.prior = self.hmm.prior
-        self.train = self.hmm.train
+        self.state = self.hmm["state"]
+        self.mode = self.hmm["state"]
+        self.k = int(self.hmm["K"])
+        self.p = self.hmm["P"]
+        self.dir_2d_alpha = self.hmm["Dir2d_alpha"]
+        self.pi = self.hmm["Pi"]
+        self.dir_alpha = self.hmm["Dir_alpha"]
+        self.prior = self.hmm["prior"]
+        self.train = self.hmm["train"]
 
         # State probabilities
         if "gamma" in self.hmm:
-            self.gamma = self.hmm.gamma.astype(np.float32)
+            self.gamma = self.hmm["gamma"].astype(np.float32)
         elif "Gamma" in self.hmm:
-            self.gamma = self.hmm.Gamma.astype(np.float32)
+            self.gamma = self.hmm["Gamma"].astype(np.float32)
         else:
             self.gamma = None
 
@@ -45,13 +46,13 @@ class OSL_HMM:
             self.vpath = None
 
         # State means
-        self.means = np.array([state.W.Mu_W for state in self.state])
+        self.means = np.array([state["W"]["Mu_W"] for state in self.state])
 
         # State covariances
         self.covariances = np.array(
             [
-                state.Omega.Gam_rate
-                / (state.Omega.Gam_shape - len(state.Omega.Gam_rate) - 1)
+                state["Omega"]["Gam_rate"]
+                / (state["Omega"]["Gam_shape"] - len(state["Omega"]["Gam_rate"]) - 1)
                 for state in self.state
             ]
         )
@@ -62,7 +63,7 @@ class OSL_HMM:
         # Discontinuities in the training data which indicate the number of data
         # points for different subjects
         if "T" in self.hmm:
-            self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm.T]
+            self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm["T"]]
         elif self.gamma is not None:
             # Assume gamma has no discontinuities
             self.discontinuities = [self.gamma.shape[0]]
