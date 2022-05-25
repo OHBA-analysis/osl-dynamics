@@ -191,6 +191,31 @@ class Model(AdversarialInferenceModelBase):
         """
         return dynemo_obs.get_means_covariances(self.inference_model)
 
+    def set_means(self, means, update_initializer=True):
+        """Set the means of each mode.
+
+        Parameters
+        ----------
+        means : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed means when we re-initialize
+            the model?
+        """
+        dynemo_obs.set_means(self.inference_model, means, update_initializer)
+
+    def set_covariances(self, covariances, update_initializer=True):
+        """Set the covariances of each mode.
+
+        Parameters
+        ----------
+        covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed covariances when we re-initialize
+            the model?
+        """
+        dynemo_obs.set_covariances(self.inference_model, covariances, update_initializer)
 
 def _build_inference_model(config):
     # Inference RNN:
