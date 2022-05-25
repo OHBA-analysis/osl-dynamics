@@ -20,10 +20,8 @@ config = Config(
     n_channels=40,
     sequence_length=200,
     inference_n_units=128,
-    inference_n_layers=2,
     inference_normalization="layer",
     model_n_units=128,
-    model_n_layers=2,
     model_normalization="layer",
     descriminator_n_units=32,
     descriminator_n_layers=1,
@@ -76,10 +74,8 @@ print("Training model")
 history = model.train(training_dataset)
 
 # Inferred parameters
-inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
+inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs() 
 
-plotting.plot_matrices(sim.fcs, filename="sim_fcs.png")
-plotting.plot_matrices(inf_fcs, filename="inf_fcs.png")
 
 # Inferred mode mixing factors
 inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
@@ -91,8 +87,26 @@ inf_gamma = modes.time_courses(inf_gamma)
 sim_alpha, sim_gamma = sim.mode_time_course
 
 # Match the inferred and simulated mixing factors
-sim_alpha, inf_alpha = modes.match_modes(sim_alpha, inf_alpha)
-sim_gamma, inf_gamma = modes.match_modes(sim_gamma, inf_gamma)
+# Calculate the dice coefficient between mode time courses
+orders = modes.match_modes(sim_alpha, inf_alpha, return_order=True)
+inf_alpha = inf_alpha[:, orders[1]]
+
+orders = modes.match_modes(sim_gamma, inf_gamma, return_order=True)
+inf_gamma = inf_gamma[:, orders[1]]
+
+# Compare with simulated parameters
+sim_means = sim.means
+sim_stds = np.array([np.diag(s) for s in sim.stds])
+sim_fcs = sim.fcs
+
+inf_means = inf_means[orders[1]]
+inf_stds = inf_stds[orders[1]]
+inf_fcs = inf_fcs[orders[1]]
+
+plotting.plot_matrices(inf_means - sim_means, filename="means_diff.png")
+plotting.plot_matrices(inf_stds - sim_stds, filename="stds_diff.png")
+plotting.plot_matrices(inf_fcs - sim_fcs, filename="fcs_diff.png")
+
 
 # Dice coefficients
 dice_alpha = metrics.dice_coefficient(sim_alpha, inf_alpha)
@@ -114,5 +128,3 @@ print("Fractional occupancies mean (Mage):    ", fo_inf_alpha)
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (Mage):    ", fo_inf_gamma)
 
-# Delete the temporary folder holding the data
-meg_data.delete_dir()
