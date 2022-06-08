@@ -129,9 +129,13 @@ class RW:
             for file in list_dir(inputs):
                 if "preparation.pkl" in file:
                     preparation = pickle.load(open(inputs + "/preparation.pkl", "rb"))
+                    self.amplitude_envelope = preparation["amplitude_envelope"]
+                    self.n_window = preparation["n_window"]
                     self.n_embeddings = preparation["n_embeddings"]
+                    self.n_te_channels = preparation["n_te_channels"]
+                    self.n_pca_components = preparation["n_pca_components"]
                     self.pca_components = preparation["pca_components"]
-                    self.n_pca_components = preparation["pca_components"].shape[1]
+                    self.whiten = preparation["whiten"]
                     self.prepared = True
 
     def load_raw_data(
@@ -194,8 +198,13 @@ class RW:
         # Save preparation info if .prepared has been called
         if self.prepared:
             preparation = {
+                "amplitude_envelope": self.amplitude_envelope,
+                "n_window": self.n_window,
                 "n_embeddings": self.n_embeddings,
+                "n_te_channels": self.n_te_channels,
+                "n_pca_components": self.n_pca_components,
                 "pca_components": self.pca_components,
+                "whiten": self.whiten,
             }
             pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
 

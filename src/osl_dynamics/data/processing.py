@@ -80,6 +80,14 @@ class Processing:
         if self.prepared:
             _logger.warning("Previously prepared data will be overwritten.")
 
+        self.amplitude_envelope = amplitude_envelope
+        self.n_window = n_window
+        self.n_embeddings = n_embeddings
+        self.n_te_channels = self.n_raw_data_channels * n_embeddings
+        self.n_pca_components = n_pca_components
+        self.pca_components = pca_components
+        self.whiten = whiten
+
         if amplitude_envelope:
             # Prepare amplitude envelope data
             self.prepare_amp_env(n_window)
@@ -91,8 +99,6 @@ class Processing:
 
     def prepare_amp_env(self, n_window: int = 1):
         """Prepare amplitude envelope data."""
-
-        self.amplitude_envelope = True
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -135,12 +141,6 @@ class Processing:
         whiten: bool = False,
     ):
         """Prepares time-delay embedded data to train the model with."""
-
-        self.n_embeddings = n_embeddings
-        self.n_te_channels = self.n_raw_data_channels * n_embeddings
-        self.n_pca_components = n_pca_components
-        self.pca_components = pca_components
-        self.whiten = whiten
 
         if n_pca_components is not None and pca_components is not None:
             raise ValueError("Please only pass n_pca_components or pca_components.")
