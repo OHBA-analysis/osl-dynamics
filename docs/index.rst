@@ -1,8 +1,15 @@
-============
-osl-dynamics
+OSL Dynamics
 ============
 
-This is the documentation of osl-dynamics.
+This package contains models for analysing neuroimaging data developed by the Oxford Centre for Human Brain Activity (OHBA) group at the University of Oxford.
+
+Models included:
+    - Hidden Markov Model (HMM).
+    - Dynamic Network Modes (DyNeMo).
+    - Multi-Dynamic Network Modes (M-DyNeMo).
+    - Dynamic Network States (DyNeSt).
+    - Single-dynamic Adversarial Generator Encoder (SAGE).
+    - Multi-dynamic Adversarial Generator Encoder (MAGE).
 
 Contents
 ========
@@ -10,9 +17,10 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-   License <license>
-   Authors <authors>
-   Module Reference <api/modules>
+   Install <install>
+   Documentation <documentation>
+   API Reference <api/modules>
+   Development <development>
 
 
 Indices and tables

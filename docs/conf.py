@@ -22,41 +22,6 @@ __location__ = os.path.join(
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.join(__location__, "../src"))
 
-# -- Run sphinx-apidoc ------------------------------------------------------
-# This hack is necessary since RTD does not issue `sphinx-apidoc` before running
-# `sphinx-build -b html . _build/html`. See Issue:
-# https://github.com/rtfd/readthedocs.org/issues/1139
-# DON'T FORGET: Check the box "Install your project inside a virtualenv using
-# setup.py install" in the RTD Advanced Settings.
-# Additionally it helps us to avoid running apidoc manually
-
-try:  # for Sphinx >= 1.7
-    from sphinx.ext import apidoc
-except ImportError:
-    from sphinx import apidoc
-
-output_dir = os.path.join(__location__, "api")
-module_dir = os.path.join(__location__, "../src/osl_dynamics")
-try:
-    shutil.rmtree(output_dir)
-except FileNotFoundError:
-    pass
-
-try:
-    import sphinx
-    from pkg_resources import parse_version
-
-    cmd_line_template = "sphinx-apidoc -f -o {outputdir} {moduledir}"
-    cmd_line = cmd_line_template.format(outputdir=output_dir, moduledir=module_dir)
-
-    args = cmd_line.split(" ")
-    if parse_version(sphinx.__version__) >= parse_version("1.7"):
-        args = args[1:]
-
-    apidoc.main(args)
-except Exception as e:
-    print("Running `sphinx-apidoc` failed!\n{}".format(e))
-
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -75,6 +40,7 @@ extensions = [
     "sphinx.ext.ifconfig",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
+    "sphinx_gallery.gen_gallery",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -91,6 +57,8 @@ master_doc = "index"
 
 # General information about the project.
 project = u"osl-dynamics"
+copyright = '2020, OHBA Methods Group, University of Oxford'
+author = 'OHBA Methods Group, University of Oxford'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -113,7 +81,7 @@ release = ""  # Is set by calling `setup.py docs`
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ["_build"]
+# exclude_patterns = ["_build"]
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 # default_role = None
@@ -148,19 +116,21 @@ html_theme = "pydata_sphinx_theme"
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-html_theme_options = {"sidebar_width": "300px", "page_width": "1200px"}
+#html_theme_options = {"sidebar_width": "300px", "page_width": "1200px"}
 
 # Add any paths that contain custom themes here, relative to this directory.
 # html_theme_path = []
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-try:
-    from osl_dynamics import __version__ as version
-except ImportError:
-    pass
-else:
-    release = version
+#try:
+#    from osl_dynamics import __version__ as version
+#except ImportError:
+#    pass
+#else:
+#    release = version
+
+html_title = "OSL Dynamics"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 # html_short_title = None
@@ -207,10 +177,10 @@ html_static_path = ["_static"]
 # html_show_sourcelink = True
 
 # If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
-# html_show_sphinx = True
+# html_show_sphinx = False
 
 # If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
-# html_show_copyright = True
+# html_show_copyright = False
 
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
@@ -223,52 +193,7 @@ html_static_path = ["_static"]
 # Output file base name for HTML help builder.
 htmlhelp_basename = "osl_dynamics-doc"
 
-
-# -- Options for LaTeX output --------------------------------------------------
-
-#latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
-    # 'papersize': 'letterpaper',
-    # The font size ('10pt', '11pt' or '12pt').
-    # 'pointsize': '10pt',
-    # Additional stuff for the LaTeX preamble.
-    # 'preamble': '',
-#}
-
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title, author, documentclass [howto/manual]).
-#latex_documents = [
-#    ("index", "user_guide.tex", u"osl-dynamics Documentation", "manual"),
-#]
-
-# The name of an image file (relative to this directory) to place at the top of
-# the title page.
-# latex_logo = ""
-
-# For "manual" documents, if this is true, then toplevel headings are parts,
-# not chapters.
-# latex_use_parts = False
-
-# If true, show page references after internal links.
-# latex_show_pagerefs = False
-
-# If true, show URL addresses after external links.
-# latex_show_urls = False
-
-# Documents to append as an appendix to all manuals.
-# latex_appendices = []
-
-# If false, no module index is generated.
-# latex_domain_indices = True
-
-# -- External mapping ------------------------------------------------------------
-python_version = ".".join(map(str, sys.version_info[0:2]))
-intersphinx_mapping = {
-    "sphinx": ("http://www.sphinx-doc.org/en/stable", None),
-    "python": ("https://docs.python.org/" + python_version, None),
-    "matplotlib": ("https://matplotlib.org", None),
-    "numpy": ("https://docs.scipy.org/doc/numpy", None),
-    "sklearn": ("http://scikit-learn.org/stable", None),
-    "pandas": ("http://pandas.pydata.org/pandas-docs/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
+sphinx_gallery_conf = {
+     'examples_dirs': 'tutorials',   # path to your example (tutorial) scripts
+     'gallery_dirs': '_build',  # path to where to save gallery generated output
 }
