@@ -167,15 +167,11 @@ def partial_covariances(data: Union[list, np.ndarray], alpha: Union[list, np.nda
     Returns the multiple regression parameters estimates, pcovs, of the state
     time courses regressed onto the data from each channel. The regression is
     done separately for each channel. I.e. pcovs is the estimate of the
-    (n_modes, n_channels) matrix, Beta, where:
-
-    Y_i = X @ Beta_i + e
-
-    - Y_i is (n_samples, 1) is the data amplitude/envelope/power/abs time course
-    at channel i.
-    - X is (n_samples, n_modes) matrix of the variance normalised mode time courses
-      (i.e. alpha).
-    - Beta_i is (n_modes, 1) vector of multiple regression parameters for channel i
+    (n_modes, n_channels) matrix, Beta. We fit the regression Y_i = X @ Beta_i + e,
+    where:
+    - Y_i is (n_samples, 1) the data amplitude/envelope/power/abs time course at channel i.
+    - X is (n_samples, n_modes) matrix of the variance normalised mode time courses (i.e. alpha).
+    - Beta_i is (n_modes, 1) vector of multiple regression parameters for channel i.
     - e is the error.
 
     NOTE: state time courses are variance normalised so that all amplitude info goes

@@ -6,6 +6,7 @@ This is an introductory guide to using osl-dynamics on the Biomedical Research C
 - [Installing osl-dynamics on BMRC](#installing-osl-dynamics-on-bmrc)
 - [Using osl-dynamics on BMRC](#using-osl-dynamics-on-bmrc)
 - [Editing osl-dynamics Source Code](#editing-osl-dynamics-source-code)
+- [Documentation](#documentation)
 
 ## The BMRC Cluster
 
@@ -215,3 +216,17 @@ git checkout main
 git merge <branch-name>
 git push
 ```
+
+## Documentation
+
+To compile the documentation you need to install the following packages in your conda environment:
+```
+pip install sphinx
+pip install pydata-sphinx-theme
+```
+
+To compile the documentation use:
+```
+python setup.py docs
+```
+The local build of the documentation webpage can be found in `build/sphinx/html/index.html`.

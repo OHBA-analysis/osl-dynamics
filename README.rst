@@ -20,7 +20,7 @@ Installation
     cd osl-dynamics
     pip install -e .
 
-See osl-dynamics/contribution.md for further details.
+See CONTRIBUTION.md for further details.
 
 Build documentation
 ===================
@@ -28,3 +28,6 @@ Build documentation
 
     cd osl-dynamics
     python setup.py docs
+
+
+See CONTRIBUTION.md for further details.
