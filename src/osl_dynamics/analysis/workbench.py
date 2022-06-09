@@ -2,17 +2,15 @@
 
 """
 
-import logging
 import os
 import pathlib
 import re
 import subprocess
+import warnings
 
 import nibabel as nib
 from tqdm import trange
 from osl_dynamics import files
-
-_logger = logging.getLogger("osl-dynamics")
 
 surfs = {
     0: [files.mask.surf_left, files.mask.surf_right],
@@ -126,8 +124,9 @@ def create_scene(cifti_left, cifti_right, inflation, temp_scene):
 def visualise(cifti_left, cifti_right, inflation=0, temp_scene=None):
     surface = surfs.get(inflation, None)
     if surface is None:
-        _logger.warning(
-            f"Inflation of {inflation} is not a valid selection. Using '0' instead."
+        warnings.warn(
+            f"Inflation of {inflation} is not a valid selection. Using '0' instead.",
+            RuntimeWarning,
         )
 
     if temp_scene is None:

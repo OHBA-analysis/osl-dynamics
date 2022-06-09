@@ -1,6 +1,6 @@
-import logging
 import pathlib
 import pickle
+import warnings
 from os import listdir, path
 from shutil import rmtree
 from typing import Tuple, Union
@@ -10,8 +10,6 @@ import numpy as np
 import scipy.io
 from tqdm import tqdm
 from osl_dynamics.data import spm
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 class RW:
@@ -352,7 +350,9 @@ def load_matlab(filename: str, field: str, ignored_keys=None) -> np.ndarray:
 
     # Get data
     if "D" in mat:
-        _logger.warning("Assuming that key 'D' corresponds to an SPM MEEG object.")
+        warnings.warn(
+            "Assuming that key 'D' corresponds to an SPM MEEG object.", RuntimeWarning
+        )
         D = spm.SPM(filename)
         data = D.data
     else:

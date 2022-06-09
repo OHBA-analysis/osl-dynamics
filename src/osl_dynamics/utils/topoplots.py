@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from typing import List, Union
 
@@ -8,8 +7,6 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import griddata
 from osl_dynamics.files.scanner import layouts
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 def available_layouts():

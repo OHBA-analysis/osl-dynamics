@@ -2,17 +2,13 @@
 
 """
 
-import logging
-from pathlib import Path
-
 import nibabel as nib
 import numpy as np
+from pathlib import Path
 from nilearn import plotting
 from tqdm import trange
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 def variance_from_spectra(

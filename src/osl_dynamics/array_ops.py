@@ -1,12 +1,9 @@
 """Helper functions using NumPy.
 
 """
-import logging
-from typing import List, Union
 
 import numpy as np
-
-_logger = logging.getLogger("osl-dynamics")
+from typing import List, Union
 
 
 def get_one_hot(values: np.ndarray, n_states: int = None):
@@ -54,7 +51,6 @@ def get_one_hot(values: np.ndarray, n_states: int = None):
 
     """
     if values.ndim == 2:
-        _logger.info("argmax being taken on shorter axis.")
         values = values.argmax(axis=1)
     if n_states is None:
         n_states = values.max() + 1

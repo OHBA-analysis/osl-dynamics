@@ -2,7 +2,7 @@
 
 """
 
-import logging
+import warnings
 from dataclasses import dataclass
 from typing import Tuple, Union, Literal
 
@@ -12,8 +12,6 @@ from tqdm import trange
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import replace_argument
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -146,7 +144,7 @@ class VariationalInferenceModelBase(ModelBase):
             The training history of the best initialization.
         """
         if n_init is None or n_init == 0:
-            _logger.warning(
+            print(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
             )

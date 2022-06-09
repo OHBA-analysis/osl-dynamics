@@ -2,7 +2,6 @@
 
 """
 
-import logging
 from typing import List, Tuple, Union
 from pathlib import Path
 
@@ -11,7 +10,6 @@ from scipy.optimize import linear_sum_assignment
 from osl_dynamics import array_ops, analysis
 from osl_dynamics.inference import metrics
 
-_logger = logging.getLogger("osl-dynamics")
 _rng = np.random.default_rng()
 
 
@@ -242,7 +240,7 @@ def mode_activation(mode_time_course: np.ndarray) -> Tuple[np.ndarray, np.ndarra
             mode_on.append(on)
             mode_off.append(off)
         except IndexError:
-            _logger.info(f"No activation in mode {i}.")
+            print(f"No activation in mode {i}.")
             mode_on.append(np.array([]))
             mode_off.append(np.array([]))
 

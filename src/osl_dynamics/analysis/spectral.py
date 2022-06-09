@@ -2,7 +2,7 @@
 
 """
 
-import logging
+import warnings
 from typing import Tuple, Union
 
 import numpy as np
@@ -13,8 +13,6 @@ from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
 from osl_dynamics.analysis.time_series import get_mode_time_series
 from osl_dynamics.data import processing
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 def coherence_spectra(power_spectra: np.ndarray, print_message: bool = True):
@@ -496,7 +494,10 @@ def multitaper_spectra(
         segment_length = 2 * sampling_frequency
 
     elif segment_length != 2 * sampling_frequency:
-        _logger.warning("segment_length is recommended to be 2 * sampling_frequency.")
+        warnings.warn(
+            "segment_length is recommended to be 2 * sampling_frequency.",
+            RuntimeWarning,
+        )
 
     segment_length = int(segment_length)
 

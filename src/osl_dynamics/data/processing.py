@@ -1,5 +1,5 @@
-import logging
 import pathlib
+import warnings
 from typing import Union
 
 import numpy as np
@@ -9,8 +9,6 @@ from scipy import signal
 from osl_dynamics import array_ops
 from osl_dynamics.data.spm import SPM
 from osl_dynamics.utils.misc import MockArray
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 class Processing:
@@ -78,7 +76,9 @@ class Processing:
             Should we whiten the PCA'ed data?
         """
         if self.prepared:
-            _logger.warning("Previously prepared data will be overwritten.")
+            warnings.warn(
+                "Previously prepared data will be overwritten.", RuntimeWarning
+            )
 
         self.amplitude_envelope = amplitude_envelope
         self.n_window = n_window

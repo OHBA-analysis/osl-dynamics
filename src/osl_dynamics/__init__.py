@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import logging
 
 from pkg_resources import DistributionNotFound, get_distribution
 
@@ -11,6 +10,3 @@ except DistributionNotFound:
     __version__ = "unknown"
 finally:
     del get_distribution, DistributionNotFound
-
-logging.basicConfig(level=logging.WARNING, format=logging.BASIC_FORMAT)
-_logger = logging.getLogger("osl-dynamics")

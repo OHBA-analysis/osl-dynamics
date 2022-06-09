@@ -2,13 +2,9 @@
 
 """
 
-import logging
-
 import numpy as np
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.simulation import MVN, Simulation
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 class HSMM:
@@ -107,9 +103,7 @@ class HSMM:
         )
 
         with np.printoptions(linewidth=np.nan):
-            _logger.info(
-                f"off_diagonal_trans_prob is:\n{str(self.off_diagonal_trans_prob)}"
-            )
+            print(f"off_diagonal_trans_prob is:\n{str(self.off_diagonal_trans_prob)}")
 
     def generate_states(self, n_samples):
         cumsum_off_diagonal_trans_prob = np.cumsum(self.off_diagonal_trans_prob, axis=1)

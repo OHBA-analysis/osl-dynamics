@@ -2,7 +2,7 @@
 
 """
 
-import logging
+import warnings
 from typing import Union
 
 import numpy as np
@@ -15,9 +15,6 @@ from osl_dynamics.simulation import (
     Simulation,
 )
 from osl_dynamics.simulation._hsmm import HSMM
-
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 class HMM:
@@ -67,8 +64,9 @@ class HMM:
             if np.any(abs(row_sums - ones) > 1e-12):
                 if np.all(abs(col_sums - ones) < 1e-12):
                     trans_prob = trans_prob.T
-                    _logger.warning(
-                        "Rows of trans_prob matrix must sum to 1. Transpose taken."
+                    warnings.warn(
+                        "Rows of trans_prob matrix must sum to 1. Transpose taken.",
+                        RuntimeWarning,
                     )
                 else:
                     raise ValueError("Rows of trans_prob must sum to 1.")

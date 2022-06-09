@@ -1,13 +1,10 @@
 import inspect
-import logging
 from copy import copy
 from pathlib import Path
 from typing import Any, List, Union
 
 import numpy as np
 import yaml
-
-_logger = logging.getLogger("osl-dynamics")
 
 
 def override_dict_defaults(default_dict: dict, override_dict: dict = None) -> dict:
@@ -179,63 +176,10 @@ def time_axis_first(input_array: np.ndarray) -> np.ndarray:
 
     """
     if input_array.ndim != 2:
-        _logger.info("Non-2D array not transposed.")
         return input_array
     if input_array.shape[1] > input_array.shape[0]:
         input_array = np.transpose(input_array)
-        # NOTE: hidden the warning because it doesn't play nice with the tqdm
-        # progress bar.
-        # _logger.warning(
-        #    "More channels than time points detected. Time series has been transposed."
-        # )
     return input_array
-
-
-class LoggingContext:
-    """Context manager to temporarily change the logging level.
-
-    Parameters
-    ----------
-    logger : str or logging.Logger
-        The name of the logger (e.g. "osl-dynamics" or "tensorflow")
-    suppress_level : str or int
-        The level of logs to suppress. String or integer matching a level from the
-        logging module.
-    handler
-        A handler for the logging module.
-    close : bool
-        Should the handler be closed with the context manager?
-    """
-
-    def __init__(
-        self,
-        logger: Union[str, logging.Logger],
-        suppress_level: Union[str, int] = "warning",
-        handler=None,
-        close: bool = True,
-    ):
-
-        self.logger = logging.getLogger(logger)
-        if isinstance(suppress_level, str):
-            suppress_level = logging.getLevelName(suppress_level.upper())
-        self.level = suppress_level + 10
-        self.handler = handler
-        self.close = close
-
-    def __enter__(self):
-        if self.level is not None:
-            self.old_level = self.logger.level
-            self.logger.setLevel(self.level)
-        if self.handler:
-            self.logger.addHandler(self.handler)
-
-    def __exit__(self, et, ev, tb):
-        if self.level is not None:
-            self.logger.setLevel(self.old_level)
-        if self.handler:
-            self.logger.removeHandler(self.handler)
-        if self.handler and self.close:
-            self.handler.close()
 
 
 def array_to_memmap(filename, array):
@@ -400,8 +344,8 @@ def class_from_yaml(cls, file, kwargs):
     if actually_missing.size > 0:
         raise ValueError(f"Missing arguments: {', '.join(actually_missing[:, 0])}")
     if extra:
-        _logger.info(f"Extra arguments: {', '.join(extra)}")
+        print(f"Extra arguments: {', '.join(extra)}")
     if using_default.size > 0:
-        _logger.info(f"Using defaults for: {', '.join(using_default[:, 0])}")
+        print(f"Using defaults for: {', '.join(using_default[:, 0])}")
 
     return cls(**{key: value for key, value in args.items() if key not in extra})

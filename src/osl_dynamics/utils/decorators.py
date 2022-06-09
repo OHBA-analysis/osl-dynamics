@@ -6,8 +6,6 @@ from time import time
 import numpy as np
 import yaml
 
-_logger = logging.getLogger("osl-dynamics")
-
 
 def timing(f):
     """Decorator to print function execution time.
@@ -225,7 +223,7 @@ def deprecated(f, *, replaced_by: str = None, reason: str = None):
         if reason is not None:
             message.append(reason)
         message = " ".join(message)
-        _logger.warning(message)
+        warnings.warn(message, DeprecationWarning)
         return f(*args, **kwargs)
 
     return wrapper_function
