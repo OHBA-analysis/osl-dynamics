@@ -22,16 +22,9 @@ Installation
 
 See osl-dynamics/contribution.md for further details.
 
-Run tests
-=========
-.. code-block:: shell
-
-    cd osl-dynamics
-    python setup.py test
-
 Build documentation
 ===================
 .. code-block:: shell
 
     cd osl-dynamics
-    python setup.py docs 
+    python setup.py docs
