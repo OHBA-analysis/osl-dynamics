@@ -19,7 +19,7 @@ Contents
 
    Install <install>
    Documentation <documentation>
-   API Reference <api/modules>
+   API Reference <api>
    Development <development>
 
 

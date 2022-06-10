@@ -3,7 +3,7 @@ Documentation
 
 Welcome to the osl-dynamics documentation.
 
-The :doc:`API reference <api/modules>` provides documentation for the classes, functions and methods in osl-dynamics.
+The :doc:`API reference <api>` provides documentation for the classes, functions and methods in osl-dynamics.
 
 Tutorials
 ---------
