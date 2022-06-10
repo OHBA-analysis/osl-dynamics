@@ -227,6 +227,6 @@ pip install pydata-sphinx-theme
 
 To compile the documentation use:
 ```
-python setup.py docs
+python setup.py build_sphinx
 ```
 The local build of the documentation webpage can be found in `build/sphinx/html/index.html`.

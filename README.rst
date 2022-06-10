@@ -27,7 +27,7 @@ Build documentation
 .. code-block:: shell
 
     cd osl-dynamics
-    python setup.py docs
+    python setup.py build_sphinx
 
 
 See CONTRIBUTION.md for further details.
