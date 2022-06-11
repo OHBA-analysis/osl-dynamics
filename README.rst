@@ -28,8 +28,11 @@ To use the HMM you also need to install armadillo:
 
 See CONTRIBUTION.md for further details.
 
-Build documentation
-===================
+Documentation
+=============
+
+The documentation is hosted on Read the Docs: `https://osl-dynamics.readthedocs.io <https://osl-dynamics.readthedocs.io>`_. To compile locally use:
+
 .. code-block:: shell
 
     cd osl-dynamics

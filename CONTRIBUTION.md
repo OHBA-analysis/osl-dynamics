@@ -225,9 +225,11 @@ git push
 
 ## Documentation
 
+The Read the Docs page is: [https://osl-dynamics.readthedocs.io](https://osl-dynamics.readthedocs.io). This should be automatically updated whenevery there's a new commit on the main branch.
+
 The documentation is included as docstrings in the source code. Please write docstrings to any classes or functions you add following the [numpy style](https://numpydoc.readthedocs.io/en/latest/format.html). The documentation directory `/doc` also contains `.rst` files that provide additional info regarding installation, development, the models, etc.
 
-To compile the documentation you need to install the following packages in your conda environment:
+To compile the documentation locally you need to install the following packages in your conda environment:
 ```
 pip install sphinx
 pip install pydata-sphinx-theme
@@ -235,7 +237,7 @@ pip install sphinx_gallery
 pip install sphinx-autoapi
 ```
 
-To compile the documentation use:
+To compile the documentation locally use:
 ```
 python setup.py build_sphinx
 ```
