@@ -1,4 +1,4 @@
-"""Metrics to evaluate model performance.
+"""Metrics for evaluating model performance.
 
 """
 

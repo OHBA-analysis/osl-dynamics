@@ -34,14 +34,19 @@ The remaining models are still a work in progress, we summarise their status bel
     - This model is currently being tested.
     - A full pipeline example scripts using the model to study fMRI data will be added.
 
-Contribution Guide
-------------------
-Developers may find the `contribution guide <https://github.com/OHBA-analysis/osl-dynamics/blob/main/CONTRIBUTION.md>`_ helpful.
-
 Development Team
 ----------------
 The core development team is:
 
-.. include:: ../AUTHORS.rst 
+* Chetan Gohil <chetan.gohil@psych.ox.ac.uk>
+* Evan Roberts <evan.roberts@kellogg.ox.ac.uk>
+* Rukuang Huang <rukuang.huang@jesus.ox.ac.uk>
+* Usama Pervaiz <usama.pervaiz@ndcn.ox.ac.uk>
+* Mark Woolrich <mark.woolrich@ohba.ox.ac.uk>
+
+With contributions from former group members:
+
+* Ryan Timms
+* Alex Skates
 
 Please email chetan.gohil@psych.ox.ac.uk if you'd like to get in touch with us.

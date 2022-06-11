@@ -46,4 +46,10 @@ To use the HMM you will also need to install armadillo:
 
     conda install -c conda-forge armadillo
 
-See the `contribution guide <https://github.com/OHBA-analysis/osl-dynamics/blob/main/CONTRIBUTION.md>`_ for further details.
+Additional packages needed for development can be installed with:
+
+::
+
+    pip install black
+    pip install -r doc/requirements.txt
+    pip install build twine
