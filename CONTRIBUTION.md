@@ -7,6 +7,7 @@ This is an introductory guide to using osl-dynamics on the Biomedical Research C
 - [Using osl-dynamics on BMRC](#using-osl-dynamics-on-bmrc)
 - [Editing osl-dynamics Source Code](#editing-osl-dynamics-source-code)
 - [Documentation](#documentation)
+- [Releases](#releases)
 
 ## The BMRC Cluster
 
@@ -242,3 +243,25 @@ python setup.py build_sphinx
 The local build of the documentation webpage can be found in `build/sphinx/html/index.html`.
 
 The documentation is hosted on read the docs [here](osl-dynamics.readthedocs.io). Tagging a version on the GitHub repo will automatically update the read the docs page.
+
+## Releases
+
+The process of packaging a python project is described here: [https://packaging.python.org/en/latest/tutorials/packaging-projects/](https://packaging.python.org/en/latest/tutorials/packaging-projects/).
+
+A couple packages are needed to build and upload a project to PyPI, these can be installed in your conda environment with:
+```
+pip install build twine
+```
+
+The following steps can be used to release a new version:
+
+1. Update the version number on line 5 of `setup.cfg`.
+2. Commit the updated setup.cfg to the `main` branch of the GitHub repo.
+3. Tag the commit with the version number using the 'Create a new release' link on the right of the GitHub repo webpage.
+4. Build a distribution in the `osl-dynamics` root directory with `python -m build`. This will create a new directory called `dist`.
+5. Upload the distribution to PyPI with `twine upload dist/*`. You will need to enter the username and password that you used to register with [https://pypi.org/](https://pypi.org/).
+
+The uploaded distribution will then be available to be installed with:
+```
+pip install osl-dynamics
+```
