@@ -36,10 +36,10 @@ sim = simulation.MS_HMM_MVN(
     covariances="random",
     random_seed=123,
 )
-meg_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 # Prepare dataset
-training_dataset = meg_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     alpha=[sim.mode_time_course[0]],

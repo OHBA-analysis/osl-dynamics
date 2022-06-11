@@ -1,7 +1,7 @@
 OSL Dynamics
 ============
 
-This package contains models for analysing neuroimaging data developed by the Oxford Centre for Human Brain Activity (OHBA) group at the University of Oxford.
+This package contains models for analysing neuroimaging data developed by the Oxford Centre for Human Brain Activity (OHBA) group at the University of Oxford. Our group website is `here <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_.
 
 Models included:
     - Hidden Markov Model (HMM).

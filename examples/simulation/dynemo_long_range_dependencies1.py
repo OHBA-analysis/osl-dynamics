@@ -54,7 +54,7 @@ sim = simulation.HSMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 # Plot the transition probability matrix for mode switching in the HSMM
 plotting.plot_matrices(
@@ -62,10 +62,10 @@ plotting.plot_matrices(
 )
 
 # Create tensorflow datasets for training and model evaluation
-training_dataset = meg_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length, config.batch_size, shuffle=True
 )
-prediction_dataset = meg_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length, config.batch_size, shuffle=False
 )
 
@@ -137,4 +137,4 @@ plotting.plot_mode_lifetimes(
 )
 
 # Delete temporary directory
-meg_data.delete_dir()
+training_data.delete_dir()

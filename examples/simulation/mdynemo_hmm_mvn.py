@@ -53,15 +53,15 @@ sim = simulation.MS_HMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 # Prepare datasets
-training_dataset = meg_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     shuffle=True,
 )
-prediction_dataset = meg_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     shuffle=False,
@@ -129,4 +129,4 @@ print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (DyNeMo):    ", fo_inf_gamma)
 
 # Delete the temporary folder holding the data
-meg_data.delete_dir()
+training_data.delete_dir()

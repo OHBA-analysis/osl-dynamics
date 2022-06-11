@@ -64,7 +64,7 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "osl-dynamics"
+project = "OSL Dynamics"
 copyright = "2020, OHBA Methods Group, University of Oxford"
 author = "OHBA Methods Group, University of Oxford"
 

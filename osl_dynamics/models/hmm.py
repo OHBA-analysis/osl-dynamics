@@ -1,6 +1,7 @@
 """Hidden Markov Model (HMM).
 
 NOTE:
+
 - This model is still under development.
 - This model requires a C library which has been compiled for BMRC, but will need to be recompiled if running on a different computer. The C library can be found on BMRC here: /well/woolrich/projects/software/hmm_inference_libc
 

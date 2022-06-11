@@ -1,30 +1,43 @@
 Install
 =======
 
-Currently osl-dynamics can only be installed from source. Installation instructions are given below.
+The recommended installation is described below. We recommend using Python 3.8 and TensorFlow 2.4.
 
 Conda Environments
 ------------------
 We recommend installing osl-dynamics within a conda environment, see https://docs.conda.io/en/latest for further details.
+A conda environment can be created and activated with:
+
+::
+
+    conda create --name osld python=3.8
+    conda activate osld
+
+
+NOTE: this conda environment must be activated everytime you would like to use osl-dynamics.
 
 Pip Installation
 ----------------
-osl-dynamics can be installed from source with the following:
+
+osl-dynamics can be installed in your conda environment with:
 
 ::
-    
-    git clone https://github.com/OHBA-analysis/osl-dynamics.git
-    conda create --name osld python=3.8
-    conda activate osld
-    cd osl-dynamics
-    pip install .
+
+    pip install osl-dynamics
 
 This will install TensorFlow 2.4 by default.
 
-Developers will want to install in editable mode:
+For Developers
+--------------
+
+Developers will want to install from source in editable mode:
 
 ::
 
+    conda create --name osld-tf24 python=3.8
+    conda activate osld-tf24
+    git clone git@github.com:OHBA-analysis/osl-dynamics.git
+    cd osl-dynamics
     pip install -e .
 
 See the `contribution guide <https://github.com/OHBA-analysis/osl-dynamics/blob/main/CONTRIBUTION.md>`_ for further details.

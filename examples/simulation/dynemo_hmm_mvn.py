@@ -48,15 +48,15 @@ sim = simulation.HMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 # Prepare dataset
-training_dataset = meg_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     shuffle=True,
 )
-prediction_dataset = meg_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     shuffle=False,

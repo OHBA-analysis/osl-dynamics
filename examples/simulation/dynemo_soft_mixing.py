@@ -53,7 +53,7 @@ sim = simulation.MixedSine_MVN(
     random_seed=123,
 )
 sim_stc = sim.mode_time_course
-meg_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 # Plot ground truth logits
 plotting.plot_separate_time_series(
@@ -61,10 +61,10 @@ plotting.plot_separate_time_series(
 )
 
 # Prepare tensorflow datasets for training and model evaluation
-training_dataset = meg_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length, config.batch_size, shuffle=True
 )
-prediction_dataset = meg_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length, config.batch_size, shuffle=False
 )
 
@@ -139,4 +139,4 @@ plotting.plot_line(
 )
 
 # Delete temporary directory
-meg_data.delete_dir()
+training_data.delete_dir()
