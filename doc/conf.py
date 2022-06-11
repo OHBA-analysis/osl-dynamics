@@ -48,7 +48,7 @@ autoapi_dirs = ["../osl_dynamics"]
 
 sphinx_gallery_conf = {
     "examples_dirs": "tutorials",  # path to your example (tutorial) scripts
-    "gallery_dirs": "_build",  # path to where to save gallery generated output
+    "gallery_dirs": "tutorials_build",  # path to where to save gallery generated output
 }
 
 # Add any paths that contain templates here, relative to this directory.
