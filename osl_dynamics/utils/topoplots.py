@@ -278,7 +278,7 @@ class Topology:
             cax.set_title("fT")
 
         if title:
-            axis.set_title(title, fontSize=20)
+            axis.set_title(title, fontsize=20)
 
         # Plot sensor positions.
         axis.scatter(

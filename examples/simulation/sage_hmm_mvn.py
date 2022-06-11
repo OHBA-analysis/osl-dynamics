@@ -44,17 +44,17 @@ sim = simulation.HMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-input_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 
 # Prepare dataset
-training_dataset = input_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     shuffle=True,
 )
 
-prediction_dataset = input_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size,
     shuffle=False,
@@ -76,3 +76,6 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (Sage):", modes.fractional_occupancies(inf_stc))
+
+# Delete temporary directory
+training_data.delete_dir()

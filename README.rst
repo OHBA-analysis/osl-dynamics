@@ -20,6 +20,12 @@ Installation
     cd osl-dynamics
     pip install -e .
 
+To use the HMM you also need to install armadillo:
+
+.. code-block:: shell
+
+    conda install -c conda-forge armadillo
+
 See CONTRIBUTION.md for further details.
 
 Build documentation

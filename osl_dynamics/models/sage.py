@@ -4,11 +4,13 @@
 
 import time
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm import trange
+
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
@@ -102,34 +104,34 @@ class Config(BaseModelConfig):
     """
 
     # Inference network parameters
-    inference_rnn = "lstm"
-    inference_n_layers = 1
-    inference_n_units = None
-    inference_normalization = None
-    inference_activation = "elu"
-    inference_dropout = 0.0
+    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_n_layers: int = 1
+    inference_n_units: int = None
+    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_activation: str = "elu"
+    inference_dropout: float = 0.0
 
     # Model network parameters
-    model_rnn = "lstm"
-    model_n_layers = 1
-    model_n_units = None
-    model_normalization = None
-    model_activation = "elu"
-    model_dropout = 0.0
+    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_n_layers: int = 1
+    model_n_units: int = None
+    model_normalization: Literal[None, "batch", "layer"] = None
+    model_activation: str = "elu"
+    model_dropout: float = 0.0
 
     # Descriminator network parameters
-    discriminator_rnn = "lstm"
-    discriminator_n_layers = 1
-    discriminator_n_units = None
-    discriminator_normalization = None
-    discriminator_activation = "elu"
-    discriminator_dropout = 0.0
+    discriminator_rnn: Literal["gru", "lstm"] = "lstm"
+    discriminator_n_layers: int = 1
+    discriminator_n_units: int = None
+    discriminator_normalization: Literal[None, "batch", "layer"] = None
+    discriminator_activation: str = "elu"
+    discriminator_dropout: float = 0.0
 
     # Observation model parameters
-    learn_means = None
-    learn_covariances = None
-    initial_means = None
-    initial_covariances = None
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
 
     def __post_init__(self):
         self.validate_dimension_parameters()

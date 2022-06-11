@@ -103,9 +103,6 @@ class HSMM:
             / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
         )
 
-        with np.printoptions(linewidth=np.nan):
-            print(f"off_diagonal_trans_prob is:\n{str(self.off_diagonal_trans_prob)}")
-
     def generate_states(self, n_samples):
         cumsum_off_diagonal_trans_prob = np.cumsum(self.off_diagonal_trans_prob, axis=1)
         alpha = np.zeros([n_samples, self.state_vectors.shape[1]])

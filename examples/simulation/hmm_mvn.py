@@ -42,6 +42,9 @@ sim = simulation.HMM_MVN(
 )
 sim.standardize()
 
+# Use ground truth covariances as initialization
+config.initial_covariances = sim.covariances
+
 # Create training dataset
 training_data = data.Data(sim.time_series)
 training_dataset = training_data.dataset(

@@ -81,17 +81,17 @@ class Config(BaseModelConfig):
     """
 
     # Observation model parameters
-    learn_means = None
-    learn_covariances = None
-    initial_means = None
-    initial_covariances = None
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
 
-    initial_transprob = None
-    learn_transprob = True
-    state_probs_t0 = None
+    initial_transprob: np.ndarray = None
+    learn_transprob: bool = True
+    state_probs_t0: np.ndarray = None
 
-    stochastic_update_delay = 0  # alpha
-    stochastic_update_forget = 0.5  # beta
+    stochastic_update_delay: float = 0  # alpha
+    stochastic_update_forget: float = 0.5  # beta
 
     def __post_init__(self):
         self.validate_observation_model_parameters()

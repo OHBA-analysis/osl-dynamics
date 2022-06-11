@@ -78,7 +78,7 @@ print("Free energy:", free_energy)
 #%%
 # We are often interested in interpreting latent variables. In DyNeMo, these are the mode mixing coefficients, alpha, and mode means and covariances.
 #
-# The DyNeMo model has methods to get the inferred parameters:
+# The DyNeMo model has methods to get the inferred parameters:
 
 alpha = model.get_alpha(prediction_dataset)
 means, covs = model.get_means_covariances()

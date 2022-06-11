@@ -4,7 +4,7 @@
 
 print("Setting up")
 from osl_dynamics.analysis import power, spectral, modes, workbench
-from osl_dynamics.data import OSL_HMM, Data, io
+from osl_dynamics.data import OSL_HMM, Data, rw
 from osl_dynamics.utils import plotting
 
 # Load an HMM fit
@@ -15,7 +15,7 @@ cov = hmm.covariances
 alp = hmm.alpha(concatenate=True)
 
 n_embeddings = 15
-pca_components = io.loadmat(
+pca_components = rw.loadmat(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18"
     "/prepared_data/pca_components.mat"
 )

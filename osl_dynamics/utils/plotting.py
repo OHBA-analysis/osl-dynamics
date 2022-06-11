@@ -1594,7 +1594,7 @@ def plot_mode_lifetimes(
     x_label=None,
     y_label=None,
     plot_kwargs=None,
-    fig_kwarg=None,
+    fig_kwargs=None,
     filename=None,
 ):
     """Create a histogram of mode lifetimes.

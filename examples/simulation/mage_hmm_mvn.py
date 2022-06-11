@@ -119,3 +119,6 @@ print("Fractional occupancies mean (MAGE):    ", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (MAGE):    ", fo_inf_gamma)
+
+# Delete temporary directory
+training_data.delete_dir()

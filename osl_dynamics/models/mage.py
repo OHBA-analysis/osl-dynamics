@@ -4,6 +4,7 @@
 
 import time
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -105,37 +106,37 @@ class Config(BaseModelConfig):
     """
 
     # Inference network parameters
-    inference_rnn = "lstm"
-    inference_n_layers = 1
-    inference_n_units = None
-    inference_normalization = None
-    inference_activation = "elu"
-    inference_dropout = 0.0
+    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_n_layers: int = 1
+    inference_n_units: int = None
+    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_activation: str = "elu"
+    inference_dropout: float = 0.0
 
     # Model network parameters
-    model_rnn = "lstm"
-    model_n_layers = 1
-    model_n_units = None
-    model_normalization = None
-    model_activation = "elu"
-    model_dropout = 0.0
+    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_n_layers: int = 1
+    model_n_units: int = None
+    model_normalization: Literal[None, "batch", "layer"] = None
+    model_activation: str = "elu"
+    model_dropout: float = 0.0
 
     # Descriminator network parameters
-    discriminator_rnn = "lstm"
-    discriminator_n_layers = 1
-    discriminator_n_units = None
-    discriminator_normalization = None
-    discriminator_activation = "elu"
-    discriminator_dropout = 0.0
+    discriminator_rnn: Literal["gru", "lstm"] = "lstm"
+    discriminator_n_layers: int = 1
+    discriminator_n_units: int = None
+    discriminator_normalization: Literal[None, "batch", "layer"] = None
+    discriminator_activation: str = "elu"
+    discriminator_dropout: float = 0.0
 
     # Observation model parameters
-    learn_means = None
-    learn_stds = None
-    learn_fcs = None
-    initial_means = None
-    initial_stds = None
-    initial_fcs = None
-    multiple_dynamics = True
+    learn_means: bool = None
+    learn_stds: bool = None
+    learn_fcs: bool = None
+    initial_means: np.ndarray = None
+    initial_stds: np.ndarray = None
+    initial_fcs: np.ndarray = None
+    multiple_dynamics: bool = True
 
     def __post_init__(self):
         self.validate_dimension_parameters()
@@ -375,8 +376,8 @@ class Model(ModelBase):
     def get_mode_time_courses(
         self,
         inputs,
-        concatenate: bool = True,
-    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
+        concatenate=True,
+    ):
         """Get mode time courses.
 
         This method is used to get mode time courses for the multi-time-scale model.
@@ -418,9 +419,7 @@ class Model(ModelBase):
 
         return outputs_alpha, outputs_gamma
 
-    def sample_mode_time_courses(
-        self, alpha: np.ndarray = None, gamma: np.ndarray = None
-    ) -> np.ndarray:
+    def sample_mode_time_courses(self, alpha=None, gamma=None):
         """Uses the generator to predict the prior alpha and gamma.
 
         Parameters

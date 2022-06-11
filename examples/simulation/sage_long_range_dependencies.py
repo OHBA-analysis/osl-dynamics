@@ -13,7 +13,7 @@ from osl_dynamics.models.sage import Config, Model
 from osl_dynamics.utils import plotting
 
 # Make directory to hold plots
-os.makedirs("figures_longrange", exist_ok=True)
+os.makedirs("figures", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -51,18 +51,18 @@ sim = simulation.HSMM_MVN(
 )
 
 sim.standardize()
-input_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series)
 
 # Plot the transition probability matrix for mode switching in the HSMM
 plotting.plot_matrices(
-    sim.off_diagonal_trans_prob, filename="figures_longrange/sim_trans_prob.png"
+    sim.off_diagonal_trans_prob, filename="figures/sim_trans_prob.png"
 )
 
 # Create tensorflow datasets for training and model evaluation
-training_dataset = input_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length, config.batch_size, shuffle=True
 )
-prediction_dataset = input_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length, config.batch_size, shuffle=False
 )
 
@@ -84,28 +84,28 @@ plotting.plot_alpha(
     sim_stc,
     inf_stc,
     y_labels=["Ground Truth", "Sage"],
-    filename="figures_longrange/compare.png",
+    filename="figures/compare.png",
 )
 
 plotting.plot_mode_lifetimes(
     sim_stc,
     x_label="Lifetime",
     y_label="Occurrence",
-    filename="figures_longrange/sim_lt.png",
+    filename="figures/sim_lt.png",
 )
 plotting.plot_mode_lifetimes(
     inf_stc,
     x_label="Lifetime",
     y_label="Occurrence",
-    filename="figures_longrange/inf_lt.png",
+    filename="figures/inf_lt.png",
 )
 
 # Ground truth vs inferred covariances
 sim_cov = sim.covariances
 inf_cov = model.get_covariances()[orders[1]]
 
-plotting.plot_matrices(sim_cov, filename="figures_longrange/sim_cov.png")
-plotting.plot_matrices(inf_cov, filename="figures_longrange/inf_cov.png")
+plotting.plot_matrices(sim_cov, filename="figures/sim_cov.png")
+plotting.plot_matrices(inf_cov, filename="figures/inf_cov.png")
 
 
 # Predict the prior alpha on infer alpha input
@@ -116,11 +116,14 @@ plotting.plot_mode_lifetimes(
     gen_stc,
     x_label="Lifetime",
     y_label="Occurrence",
-    filename="figures_longrange/gen_lt.png",
+    filename="figures/gen_lt.png",
 )
 
 plotting.plot_alpha(
     gen_stc,
     y_labels=["Sampled_alpha"],
-    filename="figures_longrange/generated_alpha.png",
+    filename="figures/generated_alpha.png",
 )
+
+# Delete temporary directory
+training_data.delete_dir()

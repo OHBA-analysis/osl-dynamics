@@ -27,22 +27,22 @@ class BaseModelConfig:
     """Base class for settings for all models."""
 
     # Model choices
-    multiple_dynamics = False
+    multiple_dynamics: bool = False
 
     # Training parameters
-    batch_size = None
-    learning_rate = None
-    gradient_clip = None
-    n_epochs = None
-    optimizer = "adam"
-    multi_gpu = False
-    strategy = None
+    batch_size: int = None
+    learning_rate: float = None
+    gradient_clip: float = None
+    n_epochs: int = None
+    optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
+    multi_gpu: bool = False
+    strategy: str = None
 
     # Dimension parameters
-    n_modes = None
-    n_states = None
-    n_channels = None
-    sequence_length = None
+    n_modes: int = None
+    n_states: int = None
+    n_channels: int = None
+    sequence_length: int = None
 
     def validate_training_parameters(self):
         if self.batch_size is None:

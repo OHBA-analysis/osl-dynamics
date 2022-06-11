@@ -3,6 +3,7 @@
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -126,31 +127,30 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Strategy for distributed learning.
     """
 
-    multiple_dynamics = True
-
     # Inference network parameters
-    inference_rnn = "lstm"
-    inference_n_layers = 1
-    inference_n_units = None
-    inference_normalization = None
-    inference_activation = None
-    inference_dropout = 0.0
+    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_n_layers: int = 1
+    inference_n_units: int = None
+    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_activation: str = None
+    inference_dropout: float = 0.0
 
     # Model network parameters
-    model_rnn = "lstm"
-    model_n_layers = 1
-    model_n_units = None
-    model_normalization = None
-    model_activation = None
-    model_dropout = 0.0
+    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_n_layers: int = 1
+    model_n_units: int = None
+    model_normalization: Literal[None, "batch", "layer"] = None
+    model_activation: str = None
+    model_dropout: float = 0.0
 
     # Observation model parameters
-    learn_means = None
-    learn_stds = None
-    learn_fcs = None
-    initial_means = None
-    initial_stds = None
-    initial_fcs = None
+    learn_means: bool = None
+    learn_stds: bool = None
+    learn_fcs: bool = None
+    initial_means: np.ndarray = None
+    initial_stds: np.ndarray = None
+    initial_fcs: np.ndarray = None
+    multiple_dynamics: bool = True
 
     def __post_init__(self):
         self.validate_rnn_parameters()

@@ -58,10 +58,10 @@ class Config(BaseModelConfig):
     """
 
     # Observation model parameters
-    learn_means = None
-    learn_covariances = None
-    initial_means = None
-    initial_covariances = None
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
 
     def __post_init__(self):
         self.validate_observation_model_parameters()

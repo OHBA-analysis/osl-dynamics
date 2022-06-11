@@ -4,6 +4,7 @@
 
 import warnings
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -19,15 +20,15 @@ class VariationalInferenceModelConfig:
     """Settings needed for the inference model."""
 
     # Alpha parameters
-    theta_normalization = None
-    learn_alpha_temperature = None
-    initial_alpha_temperature = None
+    theta_normalization: Literal[None, "batch", "layer"] = None
+    learn_alpha_temperature: bool = None
+    initial_alpha_temperature: float = None
 
     # KL annealing parameters
-    do_kl_annealing = False
-    kl_annealing_curve = None
-    kl_annealing_sharpness = None
-    n_kl_annealing_epochs = None
+    do_kl_annealing: bool = False
+    kl_annealing_curve: Literal["linear", "tanh"] = None
+    kl_annealing_sharpness: float = None
+    n_kl_annealing_epochs: int = None
 
     def validate_alpha_parameters(self):
         if self.initial_alpha_temperature is None:

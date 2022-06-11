@@ -17,7 +17,7 @@ from osl_dynamics.models.dynemo import Config, Model
 # ^^^^^^^^^^^^^^^^^
 #
 # Model hyperparameters are all contained in the Config object. The API reference for each model lists the attributes for each model's Config object.
-# 
+#
 # In this example we will use the following configuration.
 
 config = Config(

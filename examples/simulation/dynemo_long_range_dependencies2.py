@@ -210,3 +210,6 @@ plotting.plot_scatter(
     sam_ff.T,
     filename="figures/sam_ff.png",
 )
+
+# Delete temporary directory
+training_data.delete_dir()

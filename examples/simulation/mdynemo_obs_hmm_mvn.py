@@ -65,3 +65,6 @@ sim_fcs = sim.fcs
 plotting.plot_matrices(inf_means - sim_means, filename="means_diff.png")
 plotting.plot_matrices(inf_stds - sim_stds, filename="stds_diff.png")
 plotting.plot_matrices(inf_fcs - sim_fcs, filename="fcs_diff.png")
+
+# Delete temporary directory
+training_data.delete_dir()

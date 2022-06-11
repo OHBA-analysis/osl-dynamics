@@ -58,8 +58,6 @@ class Config(BaseModelConfig):
         Strategy for distributed learning.
     """
 
-    multiple_dynamics: bool = True
-
     # Observation model parameters
     learn_means: bool = None
     learn_stds: bool = None
@@ -67,6 +65,7 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    multiple_dynamics: bool = True
 
     def __post_init__(self):
         self.validate_observation_model_parameters()

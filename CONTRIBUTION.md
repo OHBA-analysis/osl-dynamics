@@ -120,6 +120,12 @@ cd osl-dynamics
 pip install -e .
 ```
 
+### HMM
+To use the HMM implementation in this package you also need to install armadillo:
+```
+conda install -c conda-forge armadillo
+```
+
 ## Using osl-dynamics on BMRC
 
 osl-dynamics can be used in a standalone python script, e.g. the scripts in `/osl-dynamics/examples`. It is imported like any other python package:
@@ -225,6 +231,8 @@ To compile the documentation you need to install the following packages in your 
 ```
 pip install sphinx
 pip install pydata-sphinx-theme
+pip install sphinx_gallery
+pip install sphinx-autoapi
 ```
 
 To compile the documentation use:

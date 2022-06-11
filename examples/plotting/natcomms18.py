@@ -6,7 +6,7 @@ print("Setting up")
 import os
 import numpy as np
 from osl_dynamics.analysis import connectivity, power, spectral
-from osl_dynamics.data import OSL_HMM, Data, io
+from osl_dynamics.data import OSL_HMM, Data, rw
 from osl_dynamics.utils import plotting
 
 # Make directory for plots
@@ -19,7 +19,7 @@ hmm = OSL_HMM(
 alp = hmm.alpha()
 
 n_embeddings = 15
-pca_components = io.loadmat(
+pca_components = rw.loadmat(
     "/well/woolrich/projects/uk_meg_notts/eo"
     + "/natcomms18/prepared_data/pca_components.mat"
 )
