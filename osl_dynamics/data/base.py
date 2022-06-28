@@ -33,6 +33,8 @@ class Data(RW, Processing, TensorFlowDataset):
         Number of embeddings. Can be passed if data has already been prepared.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)?
+    load_memmaps: bool
+        Should we load the data into the memmaps?      
     keep_memmaps_on_close : bool
         Should we keep the memmaps?
     """
@@ -45,6 +47,7 @@ class Data(RW, Processing, TensorFlowDataset):
         store_dir="tmp",
         n_embeddings=None,
         time_axis_first=True,
+        load_memmaps: bool=True,
         keep_memmaps_on_close=False,
     ):
         # Unique identifier for the Data object
@@ -58,6 +61,7 @@ class Data(RW, Processing, TensorFlowDataset):
             sampling_frequency,
             store_dir,
             time_axis_first,
+            load_memmaps=load_memmaps,
             keep_memmaps_on_close=keep_memmaps_on_close,
         )
 
