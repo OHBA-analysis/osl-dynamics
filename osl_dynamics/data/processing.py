@@ -41,6 +41,7 @@ class Processing:
                 n_embeddings=prep_settings.get("n_embeddings"),
                 n_pca_components=prep_settings.get("n_pca_components", None),
                 whiten=prep_settings.get("whiten", False),
+                load_memmaps=prep_settings.get("load_memmaps", True),
             )
 
     def prepare(
@@ -50,6 +51,7 @@ class Processing:
         n_embeddings=1,
         n_pca_components=None,
         pca_components=None,
+        load_memmaps: bool = True,
         whiten=False,
     ):
         """Prepares data to train the model with.
@@ -75,6 +77,8 @@ class Processing:
             Number of PCA components to keep. Default is no PCA.
         pca_components : np.ndarray
             PCA components to apply if they have already been calculated.
+        load_memmaps: bool
+            Should we load the data into the memmaps? 
         whiten : bool
             Should we whiten the PCA'ed data?
         """
@@ -93,14 +97,14 @@ class Processing:
 
         if amplitude_envelope:
             # Prepare amplitude envelope data
-            self.prepare_amp_env(n_window)
+            self.prepare_amp_env(n_window, load_memmaps)
         else:
             # Prepare time-delay embedded data
-            self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
+            self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten, load_memmaps)
 
         self.prepared = True
 
-    def prepare_amp_env(self, n_window=1):
+    def prepare_amp_env(self, n_window: int = 1, load_memmaps: bool = True):
         """Prepare amplitude envelope data."""
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
@@ -125,9 +129,10 @@ class Processing:
             ).T
 
             # Create a memory map for the prepared data
-            prepared_data_memmap = MockArray.get_memmap(
-                prepared_data_file, prepared_data.shape, dtype=np.float32
-            )
+            if load_memmaps:
+                prepared_data_memmap = MockArray.get_memmap(
+                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                )
 
             # Standardise to get the final data
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
@@ -142,6 +147,7 @@ class Processing:
         n_pca_components=None,
         pca_components=None,
         whiten=False,
+        load_memmaps: bool = True,
     ):
         """Prepares time-delay embedded data to train the model with."""
 
@@ -202,9 +208,10 @@ class Processing:
                 prepared_data = te_std_data
 
             # Create a memory map for the prepared data
-            prepared_data_memmap = MockArray.get_memmap(
-                prepared_data_file, prepared_data.shape, dtype=np.float32
-            )
+            if load_memmaps:
+                prepared_data_memmap = MockArray.get_memmap(
+                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                )
 
             # Standardise to get the final data
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
