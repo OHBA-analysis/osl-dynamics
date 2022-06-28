@@ -31,6 +31,8 @@ class RW:
         Directory to save results and intermediate steps to. Default is /tmp.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)?
+    load_memmaps: bool
+        Should we load the data into the memmaps?  
     keep_memmaps_on_close : bool
         Should we keep the memmaps?
     """
@@ -42,14 +44,16 @@ class RW:
         sampling_frequency,
         store_dir,
         time_axis_first,
+        load_memmaps: bool = True,
         keep_memmaps_on_close=False,
     ):
         self.keep_memmaps_on_close = keep_memmaps_on_close
+        self.load_memmaps = load_memmaps
 
         # Validate inputs
         if isinstance(inputs, str):
             if path.isdir(inputs):
-                self.inputs = list_dir(inputs, keep_ext=[".npy", ".mat"])
+                self.inputs = list_dir(inputs, keep_ext=[".npy", ".mat", ".txt"])
             else:
                 self.inputs = [inputs]
 
@@ -68,7 +72,7 @@ class RW:
                 self.inputs = []
                 for inp in inputs:
                     if path.isdir(inp):
-                        self.inputs += list_dir(inp, keep_ext=[".npy", ".mat"])
+                        self.inputs += list_dir(inp, keep_ext=[".npy", ".mat", ".txt"])
                     else:
                         self.inputs.append(inp)
             else:
@@ -173,6 +177,8 @@ class RW:
         for raw_data, mmap_location in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
         ):
+            if not self.load_memmaps: # do not load into the memory maps
+                mmap_location = None
             raw_data_mmap = load_data(
                 raw_data, data_field, mmap_location, mmap_mode="r"
             )
@@ -274,7 +280,7 @@ def load_data(
     Parameters
     ----------
     data : numpy.ndarray or str or list
-        An array or filename of a .npy or .mat file containing the data.
+        An array or filename of a .npy, .txt, or .mat file containing the data.
     data_field : str
         If a MATLAB filename is passed, this is the field that corresponds to
         the data.
@@ -304,8 +310,8 @@ def load_data(
 
         # Check extension
         ext = file_ext(data)
-        if ext not in [".npy", ".mat"]:
-            raise ValueError("Data file must be .npy or .mat.")
+        if ext not in [".npy", ".mat", ".txt"]:
+            raise ValueError("Data file must be .npy, .txt or .mat.")
 
         # Load a MATLAB file
         if ext == ".mat":
@@ -326,6 +332,16 @@ def load_data(
                 return data
             else:
                 mmap_location = data
+
+        # Load a text file
+        elif ext == ".txt":
+            data = np.loadtxt(data)
+            data = data.astype(np.float32)
+            if mmap_location is None:
+                return data
+            else:
+                np.save(mmap_location, data)
+                data = mmap_location        
 
     # Load data as memmap
     data = np.load(mmap_location, mmap_mode=mmap_mode)
