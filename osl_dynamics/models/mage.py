@@ -405,7 +405,7 @@ class Model(ModelBase):
         outputs_gamma = []
 
         for dataset in inputs:
-            alpha, gamma = self.inference_model(dataset)[1:]
+            alpha, gamma = self.inference_model.predict(dataset)[1:]
 
             alpha = np.concatenate(alpha)
             gamma = np.concatenate(gamma)
