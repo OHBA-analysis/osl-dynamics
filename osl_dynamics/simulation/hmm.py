@@ -4,10 +4,11 @@
 
 import warnings
 import numpy as np
+from typing import Union
 
 from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
-from osl_dynamics.simulation.mvn import MVN, MS_MVN
+from osl_dynamics.simulation.mvn import MVN, MS_MVN, MultiSubject_MVN
 from osl_dynamics.simulation.sin import SingleSine
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
@@ -33,11 +34,7 @@ class HMM:
     """
 
     def __init__(
-        self,
-        trans_prob,
-        stay_prob=None,
-        n_states=None,
-        random_seed=None,
+        self, trans_prob, stay_prob=None, n_states=None, random_seed=None,
     ):
 
         if isinstance(trans_prob, list):
@@ -161,20 +158,10 @@ class HMM_MAR(Simulation):
     """
 
     def __init__(
-        self,
-        n_samples,
-        trans_prob,
-        coeffs,
-        covs,
-        stay_prob=None,
-        random_seed=None,
+        self, n_samples, trans_prob, coeffs, covs, stay_prob=None, random_seed=None,
     ):
         # Observation model
-        self.obs_mod = MAR(
-            coeffs=coeffs,
-            covs=covs,
-            random_seed=random_seed,
-        )
+        self.obs_mod = MAR(coeffs=coeffs, covs=covs, random_seed=random_seed,)
 
         self.n_states = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
@@ -409,6 +396,134 @@ class MS_HMM_MVN(Simulation):
             return getattr(self.obs_mod, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
+
+
+class MultiSubject_HMM_MVN(Simulation):
+    """Simulate an HMM with multivariate normal observation model for each subject.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples per subject to draw from the model.
+    n_subjects : int
+        Number of subjects.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    means : np.ndarray or str
+        Group mean vector for each state, shape should be (n_states, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    covariances : np.ndarray or str
+        Group covariance matrix for each state, shape should be (n_states,
+        n_channels, n_channels). Either a numpy array or 'random'.
+    subject_maps_std : float
+        Standard deviation when generating subject specific means and covariances
+        from the group means and covariances. Default = 0.01.
+    subject_tc_std : float
+        Standard deviation when generating subject specific stay probability. Default = 0.0.
+    n_states : int
+        Number of states. Can pass this argument with keyword n_modes instead.
+    n_channels : int
+        Number of channels.
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for random number generator.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        n_subjects: int,
+        trans_prob: Union[np.ndarray, str, None, list],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        subject_maps_std: float = 0.01,
+        subject_tc_std: float = 0.0,
+        n_states: int = None,
+        n_modes: int = None,
+        n_channels: int = None,
+        stay_prob: float = None,
+        observation_error: float = 0.0,
+        random_seed: int = None,
+    ):
+        if n_states is None:
+            n_states = n_modes
+
+        # Construct trans_prob for each subject
+        if isinstance(trans_prob, str) or trans_prob is None:
+            trans_prob = [trans_prob] * n_subjects
+
+        # Observation model
+        self.obs_mod = MultiSubject_MVN(
+            means=means,
+            covariances=covariances,
+            subject_maps_std=subject_maps_std,
+            n_modes=n_modes,
+            n_channels=n_channels,
+            n_subjects=n_subjects,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        self.n_states = self.obs_mod.n_modes
+        self.n_channels = self.obs_mod.n_channels
+        self.n_subjects = self.obs_mod.n_subjects
+
+        # vary the stay probability for each subject
+        if stay_prob is not None:
+            subject_stay_prob = self.obs_mod._rng.normal(
+                loc=stay_prob, scale=subject_tc_std, size=self.n_subjects,
+            )
+            # truncate stay_prob at 0 and 1
+            subject_stay_prob = np.minimum(subject_stay_prob, 1)
+            subject_stay_prob = np.maximum(subject_stay_prob, 0)
+        else:
+            subject_stay_prob = [stay_prob] * n_subjects
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate state time courses all subjects
+        self.state_time_course = []
+        self.hmm = []
+        for subject in range(self.n_subjects):
+            # Build HMM object with the subject's stay probalibity with different seeds
+            hmm = HMM(
+                trans_prob=trans_prob[subject],
+                stay_prob=subject_stay_prob[subject],
+                n_states=self.n_states,
+                random_seed=random_seed
+                if random_seed is None
+                else random_seed + 1 + subject,
+            )
+            self.hmm.append(hmm)
+            self.state_time_course.append(hmm.generate_states(self.n_samples))
+        self.state_time_course = np.array(self.state_time_course)
+
+        # Simulate data
+        self.time_series = self.obs_mod.simulate_multi_subject_data(
+            self.state_time_course
+        )
+
+    @property
+    def n_modes(self):
+        return self.n_states
+
+    @property
+    def mode_time_course(self):
+        return self.state_time_course
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+    def standardize(self):
+        super().standardize(axis=1)
 
 
 class HierarchicalHMM_MVN(Simulation):
