@@ -61,7 +61,7 @@ config = Config(
 
 print("Reading resting-fMRI data")
 # For Training: Dataset containing a subset of resting-state fMRI data (location of training data in BMRC)
-dataset_dir = '/gpfs3/well/win-biobank/projects/imaging/data/data3/subjectsAll/2121*/fMRI/rfMRI_25.dr/dr_stage1.txt'
+dataset_dir = '/gpfs3/well/win-biobank/projects/imaging/data/data3/subjectsAll/2*/fMRI/rfMRI_25.dr/dr_stage1.txt'
 
 files = random.sample(glob(dataset_dir),
             len(glob(dataset_dir)))[:2000] # subset of 3k subjects for training
