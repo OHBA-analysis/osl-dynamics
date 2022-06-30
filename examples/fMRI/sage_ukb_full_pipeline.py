@@ -1,3 +1,12 @@
+""" A script to run SAGE on the UKB data. This example is composed of three main steps:
+
+1) Running SAGE on the subset of UKB group-level data.
+2) Running SAGE on the subject-level data using dual-estimation technique.
+3) Predicting a non-imaging variable (age) using subject-level FCs.
+
+This should give a prediction correlation around 0.4.
+
+"""
 
 from osl_dynamics import analysis, data, inference
 from osl_dynamics.models.sage import Config, Model
@@ -22,12 +31,12 @@ tf_ops.gpu_growth()
 print("Setting up")
 
 # Output id and folders
-output_dir = f"final_sage_4"
+output_dir = f"temp"
 os.makedirs(output_dir, exist_ok=True)
 
 # Settings
 config = Config(
-    n_modes=6,
+    n_modes=12,
     n_channels=25,
     sequence_length=100,
     inference_n_units=64,
@@ -41,7 +50,7 @@ config = Config(
     learn_covariances=True,
     batch_size=32,
     learning_rate=0.0003,
-    n_epochs=40,
+    n_epochs=50,
 )
 
 # ------------------------------- #
@@ -51,7 +60,7 @@ config = Config(
 ## Training (Subset) data
 
 print("Reading resting-fMRI data")
-# For Training: Dataset containing a subset of resting-state fMRI data
+# For Training: Dataset containing a subset of resting-state fMRI data (location of training data in BMRC)
 dataset_dir = '/gpfs3/well/win-biobank/projects/imaging/data/data3/subjectsAll/2*/fMRI/rfMRI_25.dr/dr_stage1.txt'
 files = random.sample(glob(dataset_dir),
             len(glob(dataset_dir)))[:2000] # subset of 3k subjects for training
@@ -203,18 +212,6 @@ plotting.plot_violin(
 plotting.plot_matrices(covariances, filename=f"{output_dir}/cov.png")
 plotting.plot_matrices(means, filename=f"{output_dir}/mean.png")
 
-# mask and parcellation files
-mask_file = "/gpfs3/well/win-fmrib-analysis/users/nhx531/MNI152_T1_2mm_brain.nii.gz"
-parcellation_file =  "/gpfs3/well/win-fmrib-analysis/users/nhx531/melodic_IC.nii.gz"
-
-# Plot connectivity maps
-#analysis.connectivity.save(
-#    connectivity_map=covariances,
-#    threshold=0.90,
-#   filename=f"figures_ukb/conn_.png",
-#    parcellation_file=parcellation_file,
-#)
-
 # ------------------------------- #
 
 
@@ -225,7 +222,7 @@ parcellation_file =  "/gpfs3/well/win-fmrib-analysis/users/nhx531/melodic_IC.nii
 means, covariances = model.get_means_covariances()
 
 config = DynemoConfig(
-    n_modes=6,
+    n_modes=12,
     n_channels=25,
     sequence_length=100,
     learn_means=False,
@@ -282,8 +279,12 @@ np.save(f"{output_dir}/ids.npy", subject_ids, allow_pickle=True)
 #           Subject-level Behavioural Variability        #
 # ------------- ------------- ------------- -------------#
 
+# Loading the non-imaging variable age (i.e., age is just used an example here, any non-imaging variable can be loaded)
 age = io.loadmat('/gpfs3/well/win-fmrib-analysis/users/nhx531/ukb_46k/age.mat')['age']
+# Loading the original IDs of the subject that are in accordance with the order in which non-imaging variable (i.e., age) is loaded
 ids_orig = io.loadmat('/gpfs3/well/win-fmrib-analysis/users/nhx531/ukb_46k/ids.mat')['ids']
+
+#Loading the subject-level state fcs and subject IDs in accordance with which the fcs are loaded
 covariances_subject = np.load(f"/well/win/users/nhx531/osl-dynamics/examples/fMRI/{output_dir}/covariances.npy")
 subject_ids = np.load(f"/well/win/users/nhx531/osl-dynamics/examples/fMRI/{output_dir}/ids.npy")
 
@@ -292,13 +293,13 @@ y, X = age[ind_b], covariances_subject[ind_a]
 X = X.reshape(*X.shape[:-3], -1)
 
 # define model evaluation method
-cv = RepeatedKFold(n_splits=5, n_repeats=2, random_state=1)
+cv = RepeatedKFold(n_splits=10, n_repeats=5, random_state=1)
 # define model
 ratios = np.arange(0, 1, 0.1)
 alphas = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0]
 model = ElasticNetCV(l1_ratio=ratios, alphas=alphas, cv=cv, n_jobs=-1, precompute = False)
 # Split into training and testing set
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 # Train the model using the training sets
 model.fit(X_train, y_train)
 # summarize chosen configuration
@@ -306,5 +307,5 @@ print('alpha: %f' % model.alpha_)
 print('l1_ratio_: %f' % model.l1_ratio_)
 # Make predictions using the testing set
 predict_y = model.predict(X_test)
-print(pearsonr(np.squeeze(y_test),np.squeeze(predict_y)))
+print(pearsonr(np.squeeze(y_test),np.squeeze(predict_y))) # prediction correlation on the testing set. 
 # ------------------------------- #
