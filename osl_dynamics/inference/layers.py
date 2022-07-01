@@ -59,7 +59,7 @@ class DummyLayer(layers.Layer):
         Strength of regularisation. Optional.
     """
 
-    def __init__(self, regularisation: str = None, reg_strength: float = 0, **kwargs):
+    def __init__(self, regularisation=None, reg_strength=0, **kwargs):
         super().__init__(**kwargs)
         self.regularisation = regularisation
         self.reg_strength = reg_strength
@@ -83,7 +83,7 @@ class ConcatenateLayer(layers.Layer):
         Axis to concatenate along.
     """
 
-    def __init__(self, axis: int, **kwargs):
+    def __init__(self, axis, **kwargs):
         super().__init__(**kwargs)
         self.axis = axis
 
@@ -132,7 +132,7 @@ class ZeroLayer(layers.Layer):
         Shape of the zero tensor.
     """
 
-    def __init__(self, shape: tuple, **kwargs):
+    def __init__(self, shape, **kwargs):
         super().__init__(**kwargs)
         self.shape = shape
 
@@ -219,7 +219,7 @@ class ScalarLayer(layers.Layer):
     """
 
     def __init__(
-        self, learn: bool, initial_value: float, **kwargs,
+        self, learn, initial_value, **kwargs,
     ):
         super().__init__(**kwargs)
         self.learn = learn
@@ -926,7 +926,7 @@ class SubjectDevEmbeddingLayer(layers.Layer):
     """
 
     def __init__(
-        self, n_modes: int, n_channels: int, n_subjects: int, **kwargs,
+        self, n_modes, n_channels, n_subjects, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes
@@ -965,7 +965,7 @@ class SubjectMapLayer(layers.Layer):
         Which spatial map are we using? Must be one of 'means' and 'covariances'.
     """
 
-    def __init__(self, which_map: str, **kwargs):
+    def __init__(self, which_map, **kwargs):
         super().__init__(**kwargs)
         self.which_map = which_map
         if which_map == "covariances":

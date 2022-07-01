@@ -101,7 +101,7 @@ def align_arrays(*sequences, alignment="left"):
         raise ValueError("Alignment must be left, right or center.")
 
 
-def cov2corr(cov: np.ndarray) -> np.ndarray:
+def cov2corr(cov):
     """Converts batches covariance matrix into batches correlation matrix.
 
     Parameters
@@ -126,7 +126,7 @@ def cov2corr(cov: np.ndarray) -> np.ndarray:
     return cov / normalisation
 
 
-def cov2std(cov: np.ndarray) -> np.ndarray:
+def cov2std(cov):
     """Gets the standard deviation from batches of covariance matrices.
 
     Parameters

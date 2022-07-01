@@ -3,7 +3,6 @@
 """
 
 import numpy as np
-from typing import Union
 from osl_dynamics import array_ops
 
 
@@ -30,12 +29,12 @@ class MVN:
 
     def __init__(
         self,
-        means: Union[np.ndarray, str],
-        covariances: Union[np.ndarray, str],
-        n_modes: int = None,
-        n_channels: int = None,
-        observation_error: float = 0.0,
-        random_seed: int = None,
+        means,
+        covariances,
+        n_modes=None,
+        n_channels=None,
+        observation_error=0.0,
+        random_seed=None,
     ):
         self._rng = np.random.default_rng(random_seed)
         self.observation_error = observation_error
@@ -177,12 +176,12 @@ class MS_MVN(MVN):
 
     def __init__(
         self,
-        means: Union[np.ndarray, str],
-        covariances: Union[np.ndarray, str],
-        n_modes: int = None,
-        n_channels: int = None,
-        observation_error: float = 0.0,
-        random_seed: int = None,
+        means,
+        covariances,
+        n_modes=None,
+        n_channels=None,
+        observation_error=0.0,
+        random_seed=None,
     ):
         super().__init__(
             means=means,
@@ -197,7 +196,7 @@ class MS_MVN(MVN):
         self.stds = array_ops.cov2std(self.covariances)
         self.fcs = array_ops.cov2corr(self.covariances)
 
-    def simulate_data(self, state_time_courses: np.ndarray) -> np.ndarray:
+    def simulate_data(self, state_time_courses):
         """Simulates data.
 
         Parameters
@@ -289,14 +288,14 @@ class MultiSubject_MVN(MVN):
 
     def __init__(
         self,
-        means: Union[np.ndarray, str],
-        covariances: Union[np.ndarray, str],
-        subject_maps_std: float = 0.01,
-        n_modes: int = None,
-        n_channels: int = None,
-        n_subjects: int = 1,
-        observation_error: float = 0.0,
-        random_seed: int = None,
+        means,
+        covariances,
+        subject_maps_std=0.01,
+        n_modes=None,
+        n_channels=None,
+        n_subjects=1,
+        observation_error=0.0,
+        random_seed=None,
     ):
         super().__init__(
             means=means,
@@ -375,7 +374,7 @@ class MultiSubject_MVN(MVN):
 
         return data.astype(np.float32)
 
-    def simulate_multi_subject_data(self, mode_time_courses: np.ndarray) -> np.ndarray:
+    def simulate_multi_subject_data(self, mode_time_courses):
         """Simulates data.
 
         Parameters

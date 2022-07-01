@@ -4,7 +4,6 @@
 
 import warnings
 import numpy as np
-from typing import Union
 
 from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
@@ -328,7 +327,7 @@ class MS_HMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples: int,
+        n_samples,
         trans_prob,
         means,
         covariances,
@@ -435,19 +434,19 @@ class MultiSubject_HMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples: int,
-        n_subjects: int,
-        trans_prob: Union[np.ndarray, str, None, list],
-        means: Union[np.ndarray, str],
-        covariances: Union[np.ndarray, str],
-        subject_maps_std: float = 0.01,
-        subject_tc_std: float = 0.0,
-        n_states: int = None,
-        n_modes: int = None,
-        n_channels: int = None,
-        stay_prob: float = None,
-        observation_error: float = 0.0,
-        random_seed: int = None,
+        n_samples,
+        n_subjects,
+        trans_prob,
+        means,
+        covariances,
+        subject_maps_std=0.01,
+        subject_tc_std=0.0,
+        n_states=None,
+        n_modes=None,
+        n_channels=None,
+        stay_prob=None,
+        observation_error=0.0,
+        random_seed=None,
     ):
         if n_states is None:
             n_states = n_modes
@@ -728,7 +727,7 @@ class HMM_Sine(Simulation):
 
     def __init__(
         self,
-        n_samples: int,
+        n_samples,
         trans_prob,
         amplitudes,
         frequencies,

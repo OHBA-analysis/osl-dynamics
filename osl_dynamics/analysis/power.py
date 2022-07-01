@@ -7,7 +7,6 @@ import numpy as np
 from pathlib import Path
 from nilearn import plotting
 from tqdm import trange
-from typing import Union
 from os import makedirs
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
@@ -286,14 +285,14 @@ def save(
 
 
 def multi_subject_power_map_grid(
-    mask_file: str,
-    parcellation_file: str,
-    group_power_map: np.ndarray,
-    subject_power_map: np.ndarray,
-    component: int = 0,
-    subtract_mean: bool = False,
-    mean_weights: np.ndarray = None,
-) -> np.ndarray:
+    mask_file,
+    parcellation_file,
+    group_power_map,
+    subject_power_map,
+    component=0,
+    subtract_mean=False,
+    mean_weights=None,
+):
     """Takes a power map and returns the power at locations on a spatial grid."""
 
     # Validation
@@ -378,15 +377,15 @@ def multi_subject_power_map_grid(
 
 
 def multi_subject_save(
-    group_power_map: np.ndarray,
-    subject_power_map: np.ndarray,
-    filename: str,
-    mask_file: str,
-    parcellation_file: str,
-    subject_list: Union[list, str] = "all",
-    component: int = 0,
-    subtract_mean: bool = False,
-    mean_weights: np.ndarray = None,
+    group_power_map,
+    subject_power_map,
+    filename,
+    mask_file,
+    parcellation_file,
+    subject_list="all",
+    component=0,
+    subtract_mean=False,
+    mean_weights=None,
     **plot_kwargs,
 ):
     """Saves power maps.
