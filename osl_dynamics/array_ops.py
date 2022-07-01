@@ -121,7 +121,7 @@ def cov2corr(cov: np.ndarray) -> np.ndarray:
         raise ValueError("input covariances must have more than 1 dimension.")
 
     # Extract batches of standard deviations
-    std = np.math.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
+    std = np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
     normalisation = np.expand_dims(std, -1) @ np.expand_dims(std, -2)
     return cov / normalisation
 
@@ -145,7 +145,7 @@ def cov2std(cov: np.ndarray) -> np.ndarray:
     if cov.ndim < 2:
         raise ValueError("input covariances must have more than 1 dimension.")
 
-    return np.math.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
+    return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
 def mean_diagonal(array):
