@@ -1027,6 +1027,7 @@ def plot_epoched_time_series(
     sampling_frequency=None,
     pre=125,
     post=1000,
+    baseline_correct=False,
     legend=True,
     legend_loc=1,
     title=None,
@@ -1049,6 +1050,8 @@ def plot_epoched_time_series(
         The integer number of samples to include before the trigger.
     post : int
         The integer number of samples to include after the trigger.
+    baseline_correct : bool
+        Should we subtract the mean value pre-trigger.
     legend : bool
         Should a legend be created.
     legend_loc : int
@@ -1094,6 +1097,10 @@ def plot_epoched_time_series(
     # Create figure
     if ax is None:
         fig, ax = create_figure(**fig_kwargs)
+
+    # Baseline correct
+    if baseline_correct:
+        epoched_1 -= np.mean(epoched_1[:pre], axis=0, keepdims=True)
 
     # Plot data
     for i, s in enumerate(epoched_1.T):
