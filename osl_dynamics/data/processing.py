@@ -41,6 +41,7 @@ class Processing:
                 n_embeddings=prep_settings.get("n_embeddings"),
                 n_pca_components=prep_settings.get("n_pca_components", None),
                 whiten=prep_settings.get("whiten", False),
+                load_memmaps=prep_settings.get("load_memmaps", True),
             )
 
     def prepare(
@@ -50,6 +51,7 @@ class Processing:
         n_embeddings=1,
         n_pca_components=None,
         pca_components=None,
+        load_memmaps=True,
         whiten=False,
     ):
         """Prepares data to train the model with.
@@ -75,6 +77,8 @@ class Processing:
             Number of PCA components to keep. Default is no PCA.
         pca_components : np.ndarray
             PCA components to apply if they have already been calculated.
+        load_memmaps: bool
+            Should we load the data into the memmaps? 
         whiten : bool
             Should we whiten the PCA'ed data?
         """
@@ -90,6 +94,7 @@ class Processing:
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
         self.whiten = whiten
+        self.load_memmaps = load_memmaps
 
         if amplitude_envelope:
             # Prepare amplitude envelope data
@@ -125,9 +130,10 @@ class Processing:
             ).T
 
             # Create a memory map for the prepared data
-            prepared_data_memmap = MockArray.get_memmap(
-                prepared_data_file, prepared_data.shape, dtype=np.float32
-            )
+            if self.load_memmaps:
+                prepared_data_memmap = MockArray.get_memmap(
+                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                )
 
             # Standardise to get the final data
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
@@ -202,9 +208,10 @@ class Processing:
                 prepared_data = te_std_data
 
             # Create a memory map for the prepared data
-            prepared_data_memmap = MockArray.get_memmap(
-                prepared_data_file, prepared_data.shape, dtype=np.float32
-            )
+            if self.load_memmaps:
+                prepared_data_memmap = MockArray.get_memmap(
+                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                )
 
             # Standardise to get the final data
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
