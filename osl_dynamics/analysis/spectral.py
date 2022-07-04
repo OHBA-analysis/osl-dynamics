@@ -21,7 +21,7 @@ def coherence_spectra(power_spectra, print_message=True):
     power_spectra : np.ndarray
         Power spectra. Shape is (n_modes, n_channels, n_channels, n_f).
     print_message : bool
-        Should we print a message to screen? Optional.
+        Should we print a message to screen?
 
     Returns
     -------
@@ -132,9 +132,9 @@ def fourier_transform(
     nfft : int
         Number of points in the FFT.
     args_range : list
-        Minimum and maximum indices of the FFT to keep. Optional.
+        Minimum and maximum indices of the FFT to keep.
     one_side : bool
-        Should we return a one-sided FFT? Optional.
+        Should we return a one-sided FFT?
 
     Returns
     -------
@@ -192,7 +192,6 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_f=512):
         Sampling frequency in Hertz.
     n_f : int
         Number of frequency bins in the cross power spectral density to calculate.
-        Optional.
 
     Returns
     -------
@@ -438,10 +437,9 @@ def multitaper_spectra(
         Minimum and maximum frequency to keep.
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
-        Useful for calculating the group average PSD. Optional.
+        Useful for calculating the group average PSD.
     standardize : bool
         Should we standardize the data before calculating the multitaper?
-        Optional.
 
     Returns
     -------
@@ -636,27 +634,26 @@ def regression_spectra(
     window_length : int
         Number samples to use in the window to calculate a PSD.
     sampling_frequency : float
-        Sampling_frequency in Hz. Optional.
+        Sampling_frequency in Hz.
     frequency_range : list
         Minimum and maximum frequency to keep.
     n_embeddings : int
-        Number of time embeddings applied when inferring alpha. Optional.
+        Number of time embeddings applied when inferring alpha.
     psd_only : bool
-        Should we only calculate the PSD? Optional.
+        Should we only calculate the PSD?
     step_size : int
-        Step size for shifting the window. Optional.
+        Step size for shifting the window.
     n_sub_windows : int
         Should we split the window into a set of sub-windows and average the
-        spectra for each sub-window. Optional.
+        spectra for each sub-window.
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
-        Useful for calculating the group average PSD. Optional.
+        Useful for calculating the group average PSD.
     return_coef_int : bool
         Should we return the regression coefficients and intercept
-        separately for the PSDs? Optional.
+        separately for the PSDs?
     standardize : bool
         Should we standardize the data before calculating the spectrogram?
-        Optional.
 
     Returns
     -------
@@ -807,17 +804,17 @@ def spectrogram(
     window_length : int
         Number of data points to use when calculating the periodogram.
     sampling_frequency : float
-        Sampling frequency in Hz. Optional.
+        Sampling frequency in Hz.
     calc_cpsd : bool
-        Should we calculate cross spectra? Optional.
+        Should we calculate cross spectra?
     step_size : int
-        Step size for shifting the window. Optional.
+        Step size for shifting the window.
     alpha : np.ndarray
-        Alpha fitted to the data. Optional. Useful to pass if you want to regress
+        Alpha fitted to the data. Useful to pass if you want to regress
         the spectrogram with alpha.
     n_sub_windows : int
         Should we split the window into a set of sub-windows and average the
-        spectra for each sub-window. Optional.
+        spectra for each sub-window.
 
     Returns
     -------
