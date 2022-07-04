@@ -8,9 +8,26 @@ from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
 from osl_dynamics import array_ops
-from osl_dynamics.analysis import regression
-from osl_dynamics.analysis.time_series import get_mode_time_series
+from osl_dynamics.analysis import regression, time_series
 from osl_dynamics.data import processing
+
+
+def nextpow2(x):
+    """Next power of 2.
+
+    Parameters
+    ----------
+    x : int
+        Any integer.
+
+    Returns
+    -------
+    res : int
+        The smallest power of two that is greater than or equal to the absolute
+        value of x.
+    """
+    res = np.ceil(np.log2(x))
+    return res.astype("int")
 
 
 def coherence_spectra(power_spectra, print_message=True):
@@ -523,7 +540,7 @@ def multitaper_spectra(
             print(f"Subject {n}:")
 
         # Use the mode mixing factors to get a time series for each mode
-        mode_time_series = get_mode_time_series(data[n], alpha[n])
+        mode_time_series = time_series.get_mode_time_series(data[n], alpha[n])
 
         # Number of subjects, modes, samples and channels
         n_modes, n_samples, n_channels = mode_time_series.shape
@@ -589,24 +606,6 @@ def multitaper_spectra(
         return frequencies, np.squeeze(power_spectra), np.squeeze(coherences), weights
     else:
         return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
-
-
-def nextpow2(x):
-    """Next power of 2.
-
-    Parameters
-    ----------
-    x : int
-        Any integer.
-
-    Returns
-    -------
-    res : int
-        The smallest power of two that is greater than or equal to the absolute
-        value of x.
-    """
-    res = np.ceil(np.log2(x))
-    return res.astype("int")
 
 
 def regression_spectra(
@@ -710,14 +709,19 @@ def regression_spectra(
     for i in range(n_subjects):
         if n_subjects > 1:
             print(f"Subject {i}:")
-        t, f, p, a = spectrogram(
+        t, f, p = spectrogram(
             data[i],
             window_length,
             sampling_frequency,
             frequency_range,
             calc_cpsd=calc_cpsd,
             step_size=step_size,
-            alpha=alpha[i],
+            n_sub_windows=n_sub_windows,
+        )
+        a = time_series.window_mean(
+            alpha[i],
+            window_length,
+            step_size=step_size,
             n_sub_windows=n_sub_windows,
         )
         Pt.append(p)
@@ -789,7 +793,6 @@ def spectrogram(
     frequency_range=None,
     calc_cpsd=True,
     step_size=1,
-    alpha=None,
     n_sub_windows=1,
 ):
     """Calculates a spectogram.
@@ -809,9 +812,6 @@ def spectrogram(
         Should we calculate cross spectra?
     step_size : int
         Step size for shifting the window.
-    alpha : np.ndarray
-        Alpha fitted to the data. Useful to pass if you want to regress
-        the spectrogram with alpha.
     n_sub_windows : int
         Should we split the window into a set of sub-windows and average the
         spectra for each sub-window.
@@ -824,26 +824,17 @@ def spectrogram(
         Frequency axis.
     P : np.ndarray
         Spectrogram.
-    a : np.ndarray
-        Alpha values corresponding to each periodogram.
-        Returned if alpha is passed.
     """
 
     # Number of samples, channels and modes
     n_samples = data.shape[0]
     n_channels = data.shape[1]
-    if alpha is not None:
-        n_modes = alpha.shape[1]
 
     # First pad the data so we have enough data points to estimate the periodogram
     # for time points at the start/end of the data
     data = np.pad(data, window_length // 2)[
         :, window_length // 2 : window_length // 2 + n_channels
     ]
-    if alpha is not None:
-        alpha = np.pad(alpha, window_length // 2)[
-            :, window_length // 2 : window_length // 2 + n_modes
-        ]
 
     # Window to apply to the data before calculating the Fourier transform
     window = hann(window_length // n_sub_windows)
@@ -869,10 +860,6 @@ def spectrogram(
     time_indices = range(0, n_samples, step_size)
     n_psds = n_samples // step_size
 
-    if alpha is not None:
-        # Array to hold mean of alpha multiplied by the windowing function
-        a = np.empty([n_psds, n_modes])
-
     if calc_cpsd:
         # Calculate cross periodograms for each segment of the data
         P = np.empty(
@@ -881,18 +868,13 @@ def spectrogram(
         XY_sub_window = np.empty(
             [n_sub_windows, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
         )
-        if alpha is not None:
-            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
         for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
+
+            # Data in the window
             j = time_indices[i]
-
-            # Data and alpha in the window
             x_window = data[j : j + window_length].T
-            a_window = alpha[j : j + window_length]
 
-            # Loop through sub-windows
             for k in range(n_sub_windows):
-
                 # Data in the sub-window with the windowing function applied
                 x_sub_window = (
                     x_window[
@@ -911,42 +893,20 @@ def spectrogram(
                 XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
                 XY_sub_window[k] = XY[m, n]
 
-                if alpha is not None:
-                    # Calculate alpha for the sub-window by taking the mean
-                    # over time after applying the windowing function
-                    a_sub_window[k] = np.mean(
-                        a_window[
-                            k
-                            * window_length
-                            // n_sub_windows : (k + 1)
-                            * window_length
-                            // n_sub_windows
-                        ]
-                        * window[..., np.newaxis],
-                        axis=0,
-                    )
-
-            # Average the cross spectra and alpha for each sub-window
+            # Average the cross spectra for each sub-window
             P[i] = np.mean(XY_sub_window, axis=0)
-            a[i] = np.mean(a_sub_window, axis=0)
 
     else:
         # Calculate the periodogram for each segment of the data
         P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
         XX_sub_window = np.empty([n_sub_windows, n_channels, n_f], dtype=np.float32)
-        if alpha is not None:
-            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
         for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
+
+            # Data in the window
             j = time_indices[i]
-
-            # Data and alpha in the window
             x_window = data[j : j + window_length].T
-            if alpha is not None:
-                a_window = alpha[j : j + window_length]
 
-            # Loop through sub-windows
             for k in range(n_sub_windows):
-
                 # Data in the sub-window with the windowing function applied
                 x_sub_window = (
                     x_window[
@@ -964,30 +924,10 @@ def spectrogram(
                 X = fourier_transform(x_sub_window, nfft, args_range)
                 XX_sub_window[k] = np.real(X * np.conj(X))
 
-                if alpha is not None:
-                    # Calculate alpha for the sub-window by taking the mean
-                    # over time after applying the windowing function
-                    a_sub_window[k] = np.mean(
-                        a_window[
-                            k
-                            * window_length
-                            // n_sub_windows : (k + 1)
-                            * window_length
-                            // n_sub_windows
-                        ]
-                        * window[..., np.newaxis],
-                        axis=0,
-                    )
-
-            # Average the cross spectra and alpha for each sub-window
+            # Average the cross spectra for each sub-window
             P[i] = np.mean(XX_sub_window, axis=0)
-            if alpha is not None:
-                a[i] = np.mean(a_sub_window, axis=0)
 
     # Scaling for the periodograms
     P /= sampling_frequency * np.sum(window**2)
 
-    if alpha is not None:
-        return t, f, P, a
-    else:
-        return t, f, P
+    return t, f, P
