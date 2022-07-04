@@ -189,10 +189,6 @@ def plot_line(
         Label for x-axis.
     y_label : str
         Label for y-axis.
-    log_xscale : bool
-        Should we log the x-axis?
-    log_yscale : bool
-        Should we log the y-axis?
     title : str
         Figure title.
     plot_kwargs : dict
@@ -203,6 +199,13 @@ def plot_line(
         Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
 
     # Validation
@@ -278,12 +281,6 @@ def plot_line(
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
 
-    # Log scale axes
-    if log_xscale:
-        ax.set_xscale("log")
-    if log_yscale:
-        ax.set_yscale("log")
-
     # Add a legend
     if add_legend:
         ax.legend(loc=legend_loc)
@@ -291,6 +288,8 @@ def plot_line(
     # Save figure
     if filename is not None:
         save(fig, filename)
+
+    return fig, ax
 
 
 def plot_scatter(
@@ -347,6 +346,13 @@ def plot_scatter(
         Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
 
     # Validation
@@ -442,6 +448,8 @@ def plot_scatter(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_hist(
     data,
@@ -488,6 +496,13 @@ def plot_hist(
         Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
 
     # Validation
@@ -554,6 +569,8 @@ def plot_hist(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_bar_chart(
     counts,
@@ -594,6 +611,13 @@ def plot_bar_chart(
         Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
 
     # Validation
@@ -648,6 +672,8 @@ def plot_bar_chart(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_gmm(
     data,
@@ -695,6 +721,13 @@ def plot_gmm(
         Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
 
     # Validation
@@ -749,6 +782,8 @@ def plot_gmm(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_violin(
     data,
@@ -798,6 +833,13 @@ def plot_violin(
         Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
 
     # Validation
@@ -867,6 +909,8 @@ def plot_violin(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_time_series(
     time_series,
@@ -895,6 +939,13 @@ def plot_time_series(
         The axis on which to plot the data. If not given, a new axis is created.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     time_series = np.asarray(time_series)
     n_samples = min(n_samples or np.inf, time_series.shape[0])
@@ -951,6 +1002,8 @@ def plot_time_series(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_separate_time_series(
     *time_series,
@@ -977,6 +1030,13 @@ def plot_separate_time_series(
         Keyword arguments to be passed on to matplotlib.pyplot.plot.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     time_series = np.asarray(time_series)
     n_samples = n_samples or min([ts.shape[0] for ts in time_series])
@@ -1019,6 +1079,8 @@ def plot_separate_time_series(
     # Save figure
     if filename is not None:
         save(fig, filename)
+
+    return fig, axes
 
 
 def plot_epoched_time_series(
@@ -1066,6 +1128,13 @@ def plot_epoched_time_series(
         The axis on which to plot the data. If not given, a new axis is created.
     filename : str
         Output_filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     epoched_1 = epoch_mean(data, time_index, pre, post)
 
@@ -1121,6 +1190,8 @@ def plot_epoched_time_series(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def plot_matrices(
     matrix,
@@ -1156,6 +1227,13 @@ def plot_matrices(
         Should we show the elements on a log scale?
     filename: str
         A file to which to save the figure.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     matrix = np.array(matrix)
     if matrix.ndim == 2:
@@ -1210,6 +1288,8 @@ def plot_matrices(
     if filename is not None:
         save(fig, filename, tight_layout=False)
 
+    return fig, axes
+
 
 def plot_connections(
     weights,
@@ -1242,6 +1322,13 @@ def plot_connections(
         A string corresponding to a matplotlib color.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     weights = np.abs(weights)
     x, y = np.diag_indices_from(weights)
@@ -1372,6 +1459,8 @@ def plot_connections(
     if filename is not None:
         save(fig, filename)
 
+    return fig, ax
+
 
 def topoplot(
     layout,
@@ -1421,6 +1510,11 @@ def topoplot(
         number of field isolines to show on the plot.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
     """
     topology = Topology(layout)
 
@@ -1441,6 +1535,8 @@ def topoplot(
 
     if filename is not None:
         save(fig, filename)
+
+    return fig
 
 
 def plot_brain_surface(
@@ -1519,6 +1615,13 @@ def plot_alpha(
         Arguments to pass to matplotlib.pyplot.subplots.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     n_alphas = len(alpha)
     n_modes = max(a.shape[1] for a in alpha)
@@ -1590,6 +1693,8 @@ def plot_alpha(
     if filename is not None:
         save(fig, filename, tight_layout=False)
 
+    return fig, axes
+
 
 def plot_mode_lifetimes(
     mode_time_course,
@@ -1634,6 +1739,13 @@ def plot_mode_lifetimes(
         Keyword arguments to pass to matplotlib.pyplot.subplots.
     filename : str
         A file to which to save the figure.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     n_plots = mode_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
@@ -1713,3 +1825,5 @@ def plot_mode_lifetimes(
     # Save file is a filename has been passed
     if filename is not None:
         save(fig, filename)
+
+    return fig, axes
