@@ -47,7 +47,7 @@ class Data(RW, Processing, TensorFlowDataset):
         store_dir="tmp",
         n_embeddings=None,
         time_axis_first=True,
-        load_memmaps: bool=True,
+        load_memmaps=True,
         keep_memmaps_on_close=False,
     ):
         # Unique identifier for the Data object
