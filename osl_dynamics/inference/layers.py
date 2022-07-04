@@ -54,9 +54,9 @@ class DummyLayer(layers.Layer):
     Parameters
     ----------
     regularisation : str
-        Type of regularisation. Optional.
+        Type of regularisation.
     reg_strength : float
-        Strength of regularisation. Optional.
+        Strength of regularisation.
     """
 
     def __init__(self, regularisation=None, reg_strength=0, **kwargs):

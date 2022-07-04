@@ -417,7 +417,6 @@ def multi_subject_save(
         Should we subtract the mean group power across modes?
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
-        Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
     """

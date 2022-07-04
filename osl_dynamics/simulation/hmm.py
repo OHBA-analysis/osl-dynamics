@@ -417,9 +417,9 @@ class MultiSubject_HMM_MVN(Simulation):
         n_channels, n_channels). Either a numpy array or 'random'.
     subject_maps_std : float
         Standard deviation when generating subject specific means and covariances
-        from the group means and covariances. Default = 0.01.
+        from the group means and covariances.
     subject_tc_std : float
-        Standard deviation when generating subject specific stay probability. Default = 0.0.
+        Standard deviation when generating subject specific stay probability.
     n_states : int
         Number of states. Can pass this argument with keyword n_modes instead.
     n_channels : int

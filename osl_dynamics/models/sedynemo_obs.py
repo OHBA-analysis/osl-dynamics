@@ -55,15 +55,15 @@ class Config(BaseModelConfig):
     mode_embedding_activation : str
         Activation of the mode encoders.
     dev_reg : str
-        Type of regularisation applied to the deviations. Default is None.
+        Type of regularisation applied to the deviations.
     dev_reg_strength : float
-        Strength of regularisation to deviations. Default is 0.
+        Strength of regularisation to deviations.
     dev_bayesian : bool
-        Do we want to be fully Bayesian on deviations? Default is False.
+        Do we want to be fully Bayesian on deviations?.
     learn_dev_mod_sigma : bool
-        Do we want to learn the prior std of the deviation. Default is True.
+        Do we want to learn the prior std of the deviation.
     initial_dev_mod_sigma : float
-        Initial value for prior std of the deviation. Default = 1.
+        Initial value for prior std of the deviation.
 
     batch_size : int
         Mini-batch size.

@@ -270,7 +270,7 @@ class MultiSubject_MVN(MVN):
     n_modes : int
         Number of modes.
     n_subjects : int
-        Number of subjects. Default = 1.
+        Number of subjects.
     means : np.ndarray or str
         Group mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or 'zero' or 'random'.
@@ -279,9 +279,9 @@ class MultiSubject_MVN(MVN):
         n_channels, n_channels). Either a numpy array or 'random'.
     subject_maps_std : float
         Standard deviation when generating subject specific means and covariances
-        from the group means and covariances. Default = 0.01.
+        from the group means and covariances.
     observation_error : float
-        Standard deviation of the error added to the generated data. Default = 0.0.
+        Standard deviation of the error added to the generated data.
     random_seed : int
         Seed for the random number generator.
     """

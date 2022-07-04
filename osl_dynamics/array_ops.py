@@ -102,17 +102,17 @@ def align_arrays(*sequences, alignment="left"):
 
 
 def cov2corr(cov):
-    """Converts batches covariance matrix into batches correlation matrix.
+    """Converts batches of covariance matrix into batches correlation matrix.
 
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrices. Shape is (..., N, N)
+        Covariance matrices. Shape is (..., N, N).
 
     Returns
     -------
     corr : np.ndarray
-        Correlation matrices. Shape is (..., N, N)
+        Correlation matrices. Shape is (..., N, N).
     """
     cov = np.array(cov)
 
