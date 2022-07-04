@@ -105,7 +105,7 @@ class Processing:
 
         self.prepared = True
 
-    def prepare_amp_env(self, n_window: int = 1):
+    def prepare_amp_env(self, n_window=1):
         """Prepare amplitude envelope data."""
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
