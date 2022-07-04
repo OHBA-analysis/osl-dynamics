@@ -44,7 +44,7 @@ class RW:
         sampling_frequency,
         store_dir,
         time_axis_first,
-        load_memmaps: bool = True,
+        load_memmaps=True,
         keep_memmaps_on_close=False,
     ):
         self.keep_memmaps_on_close = keep_memmaps_on_close
