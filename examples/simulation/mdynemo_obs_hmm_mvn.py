@@ -26,7 +26,7 @@ config = Config(
 )
 
 print("Simulating data")
-sim = simulation.MS_HMM_MVN(
+sim = simulation.MDyn_HMM_MVN(
     n_samples=25600,
     n_modes=config.n_modes,
     n_channels=config.n_channels,

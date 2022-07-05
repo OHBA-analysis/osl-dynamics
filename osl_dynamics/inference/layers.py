@@ -48,10 +48,27 @@ def RNNLayer(rnn_type, *args, **kwargs):
 class DummyLayer(layers.Layer):
     """Dummy layer.
 
-    Returns the inputs without modification.
+    Returns the inputs without modification and optionally adds loss
+    according to the input.
+
+    Parameters
+    ----------
+    regularisation : str
+        Type of regularisation.
+    reg_strength : float
+        Strength of regularisation.
     """
 
+    def __init__(self, regularisation=None, reg_strength=0, **kwargs):
+        super().__init__(**kwargs)
+        self.regularisation = regularisation
+        self.reg_strength = reg_strength
+
     def call(self, inputs, **kwargs):
+        if self.regularisation == "l2":
+            l2_norm = tf.reduce_sum(tf.square(inputs))
+            self.add_loss(self.reg_strength * l2_norm)
+
         return inputs
 
 
@@ -66,7 +83,7 @@ class ConcatenateLayer(layers.Layer):
         Axis to concatenate along.
     """
 
-    def __init__(self, axis: int, **kwargs):
+    def __init__(self, axis, **kwargs):
         super().__init__(**kwargs)
         self.axis = axis
 
@@ -103,6 +120,33 @@ class TFRangeLayer(layers.Layer):
 
     def call(self, inputs):
         return tf.range(self.limit)
+
+
+class ZeroLayer(layers.Layer):
+    """Layer that outputs tensor of zeros.
+    Wrapper for tf.zeros.
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of the zero tensor.
+    """
+
+    def __init__(self, shape, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+
+    def call(self, inputs):
+        # Input not used here
+        return tf.zeros(self.shape)
+
+
+class InverseCholeskyLayer(layers.Layer):
+    """Layer for getting Cholesky vectors from postive definite symmetric matrices."""
+
+    def call(self, inputs):
+        bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+        return bijector.inverse(inputs)
 
 
 class SampleNormalDistributionLayer(layers.Layer):
@@ -163,6 +207,44 @@ class SoftmaxLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         return activations.softmax(inputs / self.temperature, axis=2)
+
+
+class ScalarLayer(layers.Layer):
+    """Layer to learn a single scalar.
+
+    Parameters
+    ----------
+    learn : bool
+        Should we learn the scalar?
+    initial_value : float
+        Initial value for the scalar.
+    """
+
+    def __init__(
+        self,
+        learn,
+        initial_value,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.learn = learn
+        if initial_value is None:
+            self.initial_value = 1
+        else:
+            self.initial_value = initial_value
+        self.scalar_initializer = WeightInitializer(self.initial_value)
+
+    def build(self, input_shape):
+        self.scalar = self.add_weight(
+            "scalar",
+            dtype=tf.float32,
+            initializer=self.scalar_initializer,
+            trainable=self.learn,
+        )
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        return self.scalar
 
 
 class MeanVectorsLayer(layers.Layer):
@@ -867,3 +949,139 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
+
+
+class SubjectDevEmbeddingLayer(layers.Layer):
+    """Layer for getting the concatenated embeddings.
+
+    The concatenated embeddings are obtained by concatenating subject embeddings
+    and mode spatial map embeddings. The concatenated embeddings are used to
+    generate subject specific deviations from the group spatial map.
+
+    Parameters
+    ----------
+    n_modes : int
+        Number of modes.
+    n_channels: int
+        Number of channels.
+    n_subjects : int
+        Number of subjects.
+    """
+
+    def __init__(
+        self,
+        n_modes,
+        n_channels,
+        n_subjects,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.n_subjects = n_subjects
+
+    def call(self, inputs):
+        subject_embeddings, mode_embeddings = inputs
+        subject_embedding_dim = subject_embeddings.shape[-1]
+        mode_embedding_dim = mode_embeddings.shape[-1]
+
+        # Match dimensions for concatenation
+        subject_embeddings = tf.broadcast_to(
+            tf.expand_dims(subject_embeddings, axis=1),
+            [self.n_subjects, self.n_modes, subject_embedding_dim],
+        )
+        mode_embeddings = tf.broadcast_to(
+            tf.expand_dims(mode_embeddings, axis=0),
+            [self.n_subjects, self.n_modes, mode_embedding_dim],
+        )
+
+        # Concatenate the embeddings
+        concat_embeddings = tf.concat([subject_embeddings, mode_embeddings], -1)
+
+        return concat_embeddings
+
+
+class SubjectMapLayer(layers.Layer):
+    """Layer for getting the subject specific maps.
+
+    This layer adds subject specific deviations to the group spatial maps.
+
+    Parameters
+    ----------
+    which_map : str
+        Which spatial map are we using? Must be one of 'means' and 'covariances'.
+    """
+
+    def __init__(self, which_map, **kwargs):
+        super().__init__(**kwargs)
+        self.which_map = which_map
+        if which_map == "covariances":
+            self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+        elif which_map != "means":
+            raise ValueError("which_map must be one of 'means' and 'covariances'.")
+
+    def call(self, inputs):
+        group_map, dev = inputs
+
+        if self.which_map == "covariances":
+            group_map = self.bijector.inverse(group_map)
+
+        # Match dimensions for addition
+        group_map = tf.expand_dims(group_map, axis=0)
+        subject_map = tf.add(group_map, dev)
+
+        if self.which_map == "covariances":
+            subject_map = self.bijector(subject_map)
+
+        return subject_map
+
+
+class MixSubjectEmbeddingParametersLayer(layers.Layer):
+    """Class for mixing means and covariances for the
+    subject embedding model.
+
+    The mixture is calculated as
+    - m_t = Sum_j alpha_jt mu_j^(s_t)
+    - C_t = Sum_j alpha_jt D_j^(s_t)
+    where s_t is the subject at time t.
+    """
+
+    def call(self, inputs):
+        # alpha.shape = (None, sequence_length, n_modes)
+        # mu.shape = (n_subjects, n_modes, n_channels)
+        # D.shape = (n_subjects, n_modes, n_channels, n_channels)
+        # subj_id.shape = (None, sequence_length)
+        alpha, mu, D, subj_id = inputs
+        subj_id = tf.cast(subj_id, tf.int32)
+
+        # The parameters for each time point
+        dynamic_mu = tf.gather(mu, subj_id)
+        dynamic_D = tf.gather(D, subj_id)
+
+        # Next mix with the time course
+        alpha = tf.expand_dims(alpha, axis=-1)
+        m = tf.reduce_sum(tf.multiply(alpha, dynamic_mu), axis=2)
+
+        alpha = tf.expand_dims(alpha, axis=-1)
+        C = tf.reduce_sum(tf.multiply(alpha, dynamic_D), axis=2)
+
+        return m, C
+
+
+class SubjectMapKLDivergenceLayer(layers.Layer):
+    """Layer to calculate KL divergence between posterior and prior of
+    subject specific deviation.
+    """
+
+    def call(self, inputs, **kwargs):
+        inference_mu, inference_sigma, model_sigma = inputs
+
+        prior = tfp.distributions.Normal(loc=0.0, scale=model_sigma)
+        posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
+        kl_loss = tfp.distributions.kl_divergence(
+            posterior, prior, allow_nan_stats=False
+        )
+
+        kl_loss = tf.reduce_sum(kl_loss)
+
+        return kl_loss

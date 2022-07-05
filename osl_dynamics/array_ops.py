@@ -102,56 +102,50 @@ def align_arrays(*sequences, alignment="left"):
 
 
 def cov2corr(cov):
-    """Converts a covariance matrix into a correlation matrix.
+    """Converts batches of covariance matrix into batches correlation matrix.
 
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrix. Can be 2D or 3D.
+        Covariance matrices. Shape is (..., N, N).
 
     Returns
     -------
     corr : np.ndarray
-        Correlation matrix.
+        Correlation matrices. Shape is (..., N, N).
     """
     cov = np.array(cov)
-    if cov.ndim == 3:
-        for i in range(cov.shape[0]):
-            std_dev = np.sqrt(np.diag(cov[i]))
-            cov[i] /= np.outer(std_dev, std_dev)
-    elif cov.ndim == 2:
-        std_dev = np.sqrt(np.diag(cov))
-        cov /= np.outer(std_dev, std_dev)
-    else:
-        raise ValueError("cov must be a 2D or 3D numpy array.")
-    return cov
+
+    # Validation
+    if cov.ndim < 2:
+        raise ValueError("input covariances must have more than 1 dimension.")
+
+    # Extract batches of standard deviations
+    std = np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
+    normalisation = np.expand_dims(std, -1) @ np.expand_dims(std, -2)
+    return cov / normalisation
 
 
 def cov2std(cov):
-    """Gets the standard deviation from a covariance matrix.
+    """Gets the standard deviation from batches of covariance matrices.
 
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrix. Can be 2D or 3D.
+        Covariance matrix. Shape is (..., N, N).
 
     Returns
     -------
     std : np.ndarray
-        Standard deviations for each channel.
+        Standard deviations. Shape is (..., N).
     """
     cov = np.array(cov)
-    if cov.ndim == 3:
-        std_dev = np.empty(cov.shape[:2], dtype=cov.dtype)
-        for i in range(cov.shape[0]):
-            std_dev[i] = np.sqrt(np.diag(cov[i]))
-    elif cov.ndim == 2:
-        std_dev = np.sqrt(np.diag(cov))
-    else:
-        raise ValueError("cov must be a 2D or 3D numpy array.")
-    if np.isnan(std_dev).any():
-        raise ValueError("cov contains invalid entries on the diagonal.")
-    return std_dev
+
+    # Validation
+    if cov.ndim < 2:
+        raise ValueError("input covariances must have more than 1 dimension.")
+
+    return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
 def mean_diagonal(array):
