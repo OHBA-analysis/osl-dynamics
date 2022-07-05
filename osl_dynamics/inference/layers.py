@@ -48,7 +48,7 @@ def RNNLayer(rnn_type, *args, **kwargs):
 class DummyLayer(layers.Layer):
     """Dummy layer.
 
-    Returns the inputs without modification and optionally adds loss 
+    Returns the inputs without modification and optionally adds loss
     according to the input.
 
     Parameters
@@ -142,8 +142,7 @@ class ZeroLayer(layers.Layer):
 
 
 class InverseCholeskyLayer(layers.Layer):
-    """Layer for getting Cholesky vectors from postive definite symmetric matrices.
-    """
+    """Layer for getting Cholesky vectors from postive definite symmetric matrices."""
 
     def call(self, inputs):
         bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
@@ -186,7 +185,10 @@ class SoftmaxLayer(layers.Layer):
     """
 
     def __init__(
-        self, initial_temperature, learn_temperature, **kwargs,
+        self,
+        initial_temperature,
+        learn_temperature,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
@@ -219,7 +221,10 @@ class ScalarLayer(layers.Layer):
     """
 
     def __init__(
-        self, learn, initial_value, **kwargs,
+        self,
+        learn,
+        initial_value,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.learn = learn
@@ -260,7 +265,12 @@ class MeanVectorsLayer(layers.Layer):
     """
 
     def __init__(
-        self, n, m, learn, initial_value, **kwargs,
+        self,
+        n,
+        m,
+        learn,
+        initial_value,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -320,7 +330,12 @@ class CovarianceMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self, n, m, learn, initial_value, **kwargs,
+        self,
+        n,
+        m,
+        learn,
+        initial_value,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -391,7 +406,12 @@ class CorrelationMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self, n, m, learn, initial_value, **kwargs,
+        self,
+        n,
+        m,
+        learn,
+        initial_value,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -463,7 +483,12 @@ class DiagonalMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self, n, m, learn, initial_value, **kwargs,
+        self,
+        n,
+        m,
+        learn,
+        initial_value,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -626,7 +651,9 @@ class LogLikelihoodLossLayer(layers.Layer):
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
         )
 
         # Calculate the log-likelihood
@@ -667,7 +694,9 @@ class AdversarialLogLikelihoodLossLayer(layers.Layer):
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
         )
 
         # Calculate the log-likelihood
@@ -774,7 +803,14 @@ class InferenceRNNLayer(layers.Layer):
     """
 
     def __init__(
-        self, rnn_type, norm_type, act_type, n_layers, n_units, drop_rate, **kwargs,
+        self,
+        rnn_type,
+        norm_type,
+        act_type,
+        n_layers,
+        n_units,
+        drop_rate,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.layers = []
@@ -816,7 +852,14 @@ class ModelRNNLayer(layers.Layer):
     """
 
     def __init__(
-        self, rnn_type, norm_type, act_type, n_layers, n_units, drop_rate, **kwargs,
+        self,
+        rnn_type,
+        norm_type,
+        act_type,
+        n_layers,
+        n_units,
+        drop_rate,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.layers = []
@@ -914,7 +957,7 @@ class SubjectDevEmbeddingLayer(layers.Layer):
     The concatenated embeddings are obtained by concatenating subject embeddings
     and mode spatial map embeddings. The concatenated embeddings are used to
     generate subject specific deviations from the group spatial map.
-    
+
     Parameters
     ----------
     n_modes : int
@@ -926,7 +969,11 @@ class SubjectDevEmbeddingLayer(layers.Layer):
     """
 
     def __init__(
-        self, n_modes, n_channels, n_subjects, **kwargs,
+        self,
+        n_modes,
+        n_channels,
+        n_subjects,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes

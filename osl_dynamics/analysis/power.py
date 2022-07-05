@@ -2,18 +2,22 @@
 
 """
 
+from os import makedirs
+
 import nibabel as nib
 import numpy as np
 from pathlib import Path
 from nilearn import plotting
 from tqdm import trange
-from os import makedirs
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 
 
 def variance_from_spectra(
-    frequencies, power_spectra, components=None, frequency_range=None,
+    frequencies,
+    power_spectra,
+    components=None,
+    frequency_range=None,
 ):
     """Calculates variance from power spectra.
 
@@ -132,7 +136,10 @@ def variance_from_spectra(
 
 
 def power_map_grid(
-    mask_file, parcellation_file, power_map, component=0,
+    mask_file,
+    parcellation_file,
+    power_map,
+    component=0,
 ):
     """Takes a power map and returns the power at locations on a spatial grid."""
 
@@ -292,7 +299,7 @@ def multi_save(
     mean_weights=None,
     **plot_kwargs,
 ):
-    """Saves group level and subject level power maps. 
+    """Saves group level and subject level power maps.
     This is a multi-subject wrapper of save.
     Parameters
     ----------
