@@ -132,12 +132,7 @@ def variance_from_spectra(
 
 
 def power_map_grid(
-    mask_file,
-    parcellation_file,
-    power_map,
-    component=0,
-    subtract_mean=False,
-    mean_weights=None,
+    mask_file, parcellation_file, power_map, component=0,
 ):
     """Takes a power map and returns the power at locations on a spatial grid."""
 
@@ -177,14 +172,6 @@ def power_map_grid(
     spatial_map_values = np.empty([n_voxels, n_modes])
     for i in range(n_modes):
         spatial_map_values[:, i] = voxel_weights @ power_map[component, i]
-
-    # Subtract weighted mean
-    if n_modes == 1:
-        subtract_mean = False
-    if subtract_mean:
-        spatial_map_values -= np.average(
-            spatial_map_values, axis=1, weights=mean_weights,
-        )[..., np.newaxis]
 
     # Final spatial map as a 3D grid for each mode
     spatial_map = np.zeros([mask_grid.shape[0], n_modes])
@@ -246,6 +233,17 @@ def save(
             # A n_channels by n_channels array has been passed,
             # extract the diagonal
             power_map = np.diagonal(power_map, axis1=-2, axis2=-1)
+    else:
+        power_map = power_map[np.newaxis, ...]
+
+    # Subtract weighted mean
+    n_modes = power_map.shape[0]
+    if n_modes == 1:
+        subtract_mean = False
+    if subtract_mean:
+        power_map -= np.average(power_map, axis=0, weights=mean_weights)[
+            np.newaxis, ...
+        ]
 
     # Calculate power maps
     power_map = power_map_grid(
@@ -253,8 +251,6 @@ def save(
         parcellation_file=parcellation_file,
         power_map=power_map,
         component=component,
-        subtract_mean=subtract_mean,
-        mean_weights=mean_weights,
     )
 
     # Load the mask
@@ -284,124 +280,31 @@ def save(
             )
 
 
-def multi_subject_power_map_grid(
-    mask_file,
-    parcellation_file,
-    group_power_map,
-    subject_power_map,
-    component=0,
-    subtract_mean=False,
-    mean_weights=None,
-):
-    """Takes a power map and returns the power at locations on a spatial grid."""
-
-    # Validation
-    group_error_message = f"Dimensionality of group_power_map must be less than 4 got ndim={group_power_map.ndim}."
-    subject_error_message = f"Dimensionality of subject_power_maps must be less than 5, got ndim={subject_power_map.ndim}."
-    group_power_map = array_ops.validate(
-        group_power_map,
-        correct_dimensionality=3,
-        allow_dimensions=[1, 2],
-        error_message=group_error_message,
-    )
-    subject_power_map = array_ops.validate(
-        subject_power_map,
-        correct_dimensionality=4,
-        allow_dimensions=[1, 2, 3],
-        error_message=subject_error_message,
-    )
-    # Now group_power_map.shape = (n_components, n_modes, n_channels)
-    # Now subject_power_map.shape = (n_components, n_subject, n_modes, n_channels).
-
-    # Load the mask
-    mask = nib.load(mask_file)
-    mask_grid = mask.get_data()
-    mask_grid = mask_grid.ravel(order="F")
-
-    # Get indices of non-zero elements, i.e. those which contain the brain
-    non_zero_voxels = mask_grid != 0
-
-    # Load the parcellation
-    parcellation = nib.load(parcellation_file)
-    parcellation_grid = parcellation.get_data()
-
-    # Make a 2D array of voxel weights for each parcel
-    n_parcels = parcellation.shape[-1]
-    voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
-
-    # Normalise the voxels weights
-    voxel_weights /= voxel_weights.max(axis=0)[np.newaxis, ...]
-
-    # Generate a spatial map vector for each mode
-    n_voxels = voxel_weights.shape[0]
-    n_modes = group_power_map.shape[1]
-    n_subjects = subject_power_map.shape[1]
-
-    group_spatial_map_values = np.empty([n_voxels, n_modes])
-    subject_spatial_map_values = np.empty([n_voxels, n_modes, n_subjects])
-
-    for i in range(n_modes):
-        group_spatial_map_values[:, i] = voxel_weights @ group_power_map[component, i]
-        for j in range(n_subjects):
-            subject_spatial_map_values[:, i, j] = (
-                voxel_weights @ subject_power_map[component, j, i]
-            )
-
-    # Subtract weighted mean
-    if n_modes == 1:
-        subtract_mean = False
-    if subtract_mean:
-        # Calculate the mean across modes using the group spatial map
-        mean_group_spatial_map_values = np.average(
-            group_spatial_map_values, axis=1, weights=mean_weights,
-        )
-        group_spatial_map_values -= mean_group_spatial_map_values[..., np.newaxis]
-        subject_spatial_map_values -= mean_group_spatial_map_values[
-            ..., np.newaxis, np.newaxis
-        ]
-
-    # Final spatial map as a 3D grid for each mode
-    group_spatial_map = np.zeros([mask_grid.shape[0], n_modes])
-    group_spatial_map[non_zero_voxels] = group_spatial_map_values
-    group_spatial_map = group_spatial_map.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], n_modes, order="F"
-    )
-
-    subject_spatial_map = np.zeros([mask_grid.shape[0], n_modes, n_subjects])
-    subject_spatial_map[non_zero_voxels] = subject_spatial_map_values
-    subject_spatial_map = subject_spatial_map.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], n_modes, n_subjects, order="F"
-    )
-
-    return group_spatial_map, subject_spatial_map
-
-
-def multi_subject_save(
+def multi_save(
     group_power_map,
     subject_power_map,
     filename,
     mask_file,
     parcellation_file,
-    subject_list="all",
+    subject_list=None,
     component=0,
     subtract_mean=False,
     mean_weights=None,
     **plot_kwargs,
 ):
-    """Saves power maps.
-
+    """Saves group level and subject level power maps. 
+    This is a multi-subject wrapper of save.
     Parameters
     ----------
     group_power_map : np.ndarray
-        Group power map to save. Can be of shape: (n_components, n_modes, n_channels),
+        Group level power map to save. Can be of shape: (n_components, n_modes, n_channels),
         (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
         array can also be passed. Warning: this function cannot be used if n_modes
         is equal to n_channels.
     subject_power_map : np.ndarray
-        Subject specific power map to save. Can be of shape: (n_components, n_subjects, n_modes, n_channels),
+        Subject level power maps to save. Can be of shape: (n_components, n_subjects, n_modes, n_channels),
         (n_subjects, n_modes, n_channels), (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
-        array can also be passed. Warning: this function cannot be used if n_modes = n_channels. also, do not pass
-        power map of shape (n_subjects, n_channels).
+        array can also be passed. Warning: this function cannot be used if n_modes = n_channels.
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png, it is saved as images.
@@ -410,108 +313,102 @@ def multi_subject_save(
     parcellation_file : str
         Parcellation file used to parcelate the training data.
     subject_list : list
-        List of subjects for which the power plots to be plotted. Default is all subjects.
+        List of subjects for which the power plots to be plotted.
     component : int
         Spectral component to save.
     subtract_mean : bool
-        Should we subtract the mean group power across modes?
+        Should we subtract the mean power of the group level power across modes?
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
+        Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
     """
     # Validation
-    if ".nii.gz" not in filename and ".png" not in filename:
-        raise ValueError("filename must have extension .nii.gz or .png.")
-    mask_file = files.check_exists(mask_file, files.mask.directory)
-    parcellation_file = files.check_exists(
-        parcellation_file, files.parcellation.directory
-    )
-
-    group_power_map = np.squeeze(group_power_map)
-    subject_power_map = np.squeeze(subject_power_map)
     if group_power_map.ndim > 1:
         if group_power_map.shape[-1] == group_power_map.shape[-2]:
-            # A n_channels by n_channels array has been passed,
-            # extract the diagonal
             group_power_map = np.diagonal(group_power_map, axis1=-2, axis2=-1)
+    else:
+        group_power_map = group_power_map[np.newaxis, ...]
+
+    if subject_power_map.ndim > 1:
         if subject_power_map.shape[-1] == subject_power_map.shape[-2]:
             subject_power_map = np.diagonal(subject_power_map, axis1=-2, axis2=-1)
+    else:
+        subject_power_map = subject_power_map[np.newaxis, ...]
 
-    # Calculate power maps
-    group_power_map, subject_power_map = power_map_grid(
+    group_error_message = (
+        "Dimensionality of group_power_map must be less than 4, "
+        + f"got ndim={group_power_map.ndim}."
+    )
+    subject_error_message = (
+        "Dimensionality of subject_power_map must be less than 5, "
+        + f"got ndim={subject_power_map.ndim}."
+    )
+
+    group_power_map = array_ops.validate(
+        group_power_map,
+        correct_dimensionality=3,
+        allow_dimensions=[2],
+        error_message=group_error_message,
+    )
+    subject_power_map = array_ops.validate(
+        subject_power_map,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message=subject_error_message,
+    )
+    group_power_map = group_power_map[component]
+    subject_power_map = subject_power_map[component]
+
+    if group_power_map.shape[0] != subject_power_map.shape[1]:
+        raise ValueError(
+            "group and subject level power maps must have the same n_modes."
+        )
+
+    # Subtract mean
+    n_modes = group_power_map.shape[0]
+    if n_modes == 1:
+        subtract_mean = False
+    if subtract_mean:
+        mean_group_power = np.average(group_power_map, axis=0, weights=mean_weights)
+        group_power_map -= mean_group_power[np.newaxis, ...]
+        subject_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
+
+    # Save the group power map
+    filename_object = Path(filename)
+    group_dir = f"{filename_object.parent}/group"
+    makedirs(group_dir, exist_ok=True)
+    group_filename = f"{group_dir}/{filename_object.stem}{filename_object.suffix}"
+
+    print("Saving group level power map.")
+    save(
+        power_map=group_power_map,
+        filename=group_filename,
         mask_file=mask_file,
         parcellation_file=parcellation_file,
-        group_power_map=group_power_map,
-        subject_power_map=subject_power_map,
-        component=component,
-        subtract_mean=subtract_mean,
-        mean_weights=mean_weights,
+        **plot_kwargs,
     )
-    n_subjects = subject_power_map.shape[-1]
-    # Only take the power maps of subjects in the subject list.
-    if subject_list is "all":
+
+    # Save the subject lebel power maps
+    n_subjects = subject_power_map.shape[0]
+    if subject_list is None:
         subject_list = np.arange(n_subjects)
 
-    subject_power_map = subject_power_map[..., subject_list]
+    for sub in subject_list:
+        subject_dir = "{fn.parent}/sub_{sub:0{v}d}".format(
+            fn=filename_object, sub=sub, v=len(str(n_subjects))
+        )
+        makedirs(subject_dir, exist_ok=True)
+        subject_filename = (
+            f"{subject_dir}/{filename_object.stem}{filename_object.suffix}"
+        )
 
-    # Load the mask
-    mask = nib.load(mask_file)
-
-    # Save as nii file
-    if ".nii.gz" in filename:
-        print(f"Saving {filename}")
-        group_nii = nib.Nifti1Image(group_power_map, mask.affine, mask.header)
-        subject_nii = nib.Nifti1Image(subject_power_map, mask.affine, mask.header)
-        nib.save(group_nii, f"group_{filename}")
-        nib.save(subject_nii, f"subject_{filename}")
-
-    # Save each map as an image
-    elif ".png" in filename:
-        n_modes = group_power_map.shape[-1]
-
-        # Save the group power map
-        makedirs(f"{Path(filename).parent}/group", exist_ok=True)
-        for i in trange(n_modes, desc="Saving group power maps", ncols=98):
-            nii = nib.Nifti1Image(group_power_map[:, :, :, i], mask.affine, mask.header)
-            output_file = "{fn.parent}/group/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-                fn=Path(filename), i=i, w=len(str(n_modes))
-            )
-            plotting.plot_img_on_surf(
-                nii,
-                views=["lateral", "medial"],
-                hemispheres=["left", "right"],
-                colorbar=True,
-                output_file=output_file,
-                **plot_kwargs,
-            )
-
-        # Save the subject power map
-        for j, subject in enumerate(subject_list):
-            makedirs(
-                "{fn.parent}/sub_{subject:0{v}d}".format(
-                    fn=Path(filename), subject=subject, v=len(str(n_subjects))
-                ),
-                exist_ok=True,
-            )
-            for i in trange(
-                n_modes, desc=f"Saving subject {subject} power maps", ncols=98
-            ):
-                nii = nib.Nifti1Image(
-                    subject_power_map[:, :, :, i, j], mask.affine, mask.header
-                )
-                output_file = "{fn.parent}/sub_{subject:0{v}d}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-                    fn=Path(filename),
-                    subject=subject,
-                    v=len(str(n_subjects)),
-                    i=i,
-                    w=len(str(n_modes)),
-                )
-                plotting.plot_img_on_surf(
-                    nii,
-                    views=["lateral", "medial"],
-                    hemispheres=["left", "right"],
-                    colorbar=True,
-                    output_file=output_file,
-                    **plot_kwargs,
-                )
+        print(f"Saving subject {sub} power map.")
+        save(
+            power_map=subject_power_map[sub],
+            filename=subject_filename,
+            mask_file=mask_file,
+            parcellation_file=parcellation_file,
+            **plot_kwargs,
+        )
