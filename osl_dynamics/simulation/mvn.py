@@ -151,7 +151,7 @@ class MVN:
         return data.astype(np.float32)
 
 
-class MS_MVN(MVN):
+class MDyn_MVN(MVN):
     """Class that generates data from a multivariate normal distribution.
 
     Multi-time-scale version of MVN.
@@ -260,7 +260,7 @@ class MS_MVN(MVN):
         return data.astype(np.float32)
 
 
-class MultiSubject_MVN(MVN):
+class MSubj_MVN(MVN):
     """Class that generates data from a multivariate normal distribution for multiple subjects.
 
     Parameters

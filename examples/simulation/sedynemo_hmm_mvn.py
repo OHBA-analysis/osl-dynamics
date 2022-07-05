@@ -1,5 +1,6 @@
 """Example script for running inference on simulated multi-subject HMM-MVN data.
-    Should achieve a dice score of 0.99.
+
+-Should achieve a dice score of 0.99.
 """
 
 print("Setting up")
@@ -45,7 +46,7 @@ config = Config(
 print("Simulating data")
 print("Number of GPUs in use:", config.strategy.num_replicas_in_sync)
 
-sim = simulation.MultiSubject_HMM_MVN(
+sim = simulation.MSubj_HMM_MVN(
     n_samples=12800,
     n_subjects=config.n_subjects,
     n_modes=config.n_modes,
