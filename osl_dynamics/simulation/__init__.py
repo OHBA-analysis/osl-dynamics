@@ -10,7 +10,7 @@ from osl_dynamics.simulation.hmm import (
     HMM,
     HMM_MAR,
     HMM_MVN,
-    MS_HMM_MVN,
+    MDyn_MVN,
     HierarchicalHMM_MVN,
     HMM_Sine,
     MSubj_HMM_MVN,

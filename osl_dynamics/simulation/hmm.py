@@ -7,7 +7,7 @@ import numpy as np
 
 from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
-from osl_dynamics.simulation.mvn import MVN, MS_MVN, MultiSubject_MVN
+from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSubj_MVN
 from osl_dynamics.simulation.sin import SingleSine
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
@@ -356,7 +356,7 @@ class MDyn_HMM_MVN(Simulation):
             n_states = n_modes
 
         # Observation model
-        self.obs_mod = MS_MVN(
+        self.obs_mod = MDyn_MVN(
             means=means,
             covariances=covariances,
             n_modes=n_states,
@@ -470,7 +470,7 @@ class MSubj_HMM_MVN(Simulation):
             trans_prob = [trans_prob] * n_subjects
 
         # Observation model
-        self.obs_mod = MultiSubject_MVN(
+        self.obs_mod = MSubj_MVN(
             means=means,
             covariances=covariances,
             subject_maps_std=subject_maps_std,
