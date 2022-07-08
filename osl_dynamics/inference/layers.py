@@ -560,9 +560,7 @@ class MatrixLayer(layers.Layer):
 
         self.initial_value = initial_value
         if initial_value is not None:
-            if initial_value.ndim != 2:
-                raise ValueError("A 2D numpy array must be passed for initial_value.")
-            if initial_value.shape[0] != m:
+            if initial_value.shape[-1] != m:
                 raise ValueError(
                     "Number of rows/columns in initial_value does not match m."
                 )

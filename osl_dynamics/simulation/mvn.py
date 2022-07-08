@@ -108,7 +108,7 @@ class MVN:
                 active_channels = np.unique(
                     self._rng.integers(0, self.n_channels, size=n_active_channels)
                 )
-                W[i, active_channels] += 0.15
+                W[i, active_channels] += 1 / self.n_channels
 
             # A small value to add to the diagonal to ensure the covariances are
             # invertible
