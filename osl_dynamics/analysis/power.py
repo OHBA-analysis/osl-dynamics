@@ -135,24 +135,8 @@ def variance_from_spectra(
     return np.squeeze(var)
 
 
-def power_map_grid(
-    mask_file,
-    parcellation_file,
-    power_map,
-    component=0,
-):
+def power_map_grid(mask_file, parcellation_file, power_map):
     """Takes a power map and returns the power at locations on a spatial grid."""
-
-    # Validation
-    error_message = (
-        f"Dimensionality of power_map must be less than 4 got ndim={power_map.ndim}."
-    )
-    power_map = array_ops.validate(
-        power_map,
-        correct_dimensionality=3,
-        allow_dimensions=[1, 2],
-        error_message=error_message,
-    )
 
     # Load the mask
     mask = nib.load(mask_file)
@@ -175,10 +159,10 @@ def power_map_grid(
 
     # Generate a spatial map vector for each mode
     n_voxels = voxel_weights.shape[0]
-    n_modes = power_map.shape[1]
+    n_modes = power_map.shape[0]
     spatial_map_values = np.empty([n_voxels, n_modes])
     for i in range(n_modes):
-        spatial_map_values[:, i] = voxel_weights @ power_map[component, i]
+        spatial_map_values[:, i] = voxel_weights @ power_map[i]
 
     # Final spatial map as a 3D grid for each mode
     spatial_map = np.zeros([mask_grid.shape[0], n_modes])
@@ -226,6 +210,9 @@ def save(
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
     """
+    # Create a copy of the power map so we don't modify it
+    power_map = np.copy(power_map)
+
     # Validation
     if ".nii.gz" not in filename and ".png" not in filename:
         raise ValueError("filename must have extension .nii.gz or .png.")
@@ -238,27 +225,33 @@ def save(
     if power_map.ndim > 1:
         if power_map.shape[-1] == power_map.shape[-2]:
             # A n_channels by n_channels array has been passed,
-            # extract the diagonal
-            power_map = np.diagonal(power_map, axis1=-2, axis2=-1)
+            # extract the diagonal (the np.copy is needed because np.diagonal
+            # returns a read-only array (this started in NumPy 1.9))
+            power_map = np.copy(np.diagonal(power_map, axis1=-2, axis2=-1))
     else:
         power_map = power_map[np.newaxis, ...]
+
+    power_map = array_ops.validate(
+        power_map,
+        correct_dimensionality=3,
+        allow_dimensions=[2],
+        error_message="power_map.shape is incorrect",
+    )
 
     # Subtract weighted mean
     n_modes = power_map.shape[0]
     if n_modes == 1:
         subtract_mean = False
     if subtract_mean:
-        power_map -= np.average(power_map, axis=0, weights=mean_weights)[
-            np.newaxis, ...
+        power_map -= np.average(power_map, axis=1, weights=mean_weights)[
+            :, np.newaxis, ...
         ]
 
-    # Calculate power maps
-    power_map = power_map_grid(
-        mask_file=mask_file,
-        parcellation_file=parcellation_file,
-        power_map=power_map,
-        component=component,
-    )
+    # Select the component to plot
+    power_map = power_map[component]
+
+    # Calculate power map grid
+    power_map = power_map_grid(mask_file, parcellation_file, power_map)
 
     # Load the mask
     mask = nib.load(mask_file)
@@ -293,25 +286,30 @@ def multi_save(
     filename,
     mask_file,
     parcellation_file,
-    subject_list=None,
+    subjects=None,
     component=0,
     subtract_mean=False,
     mean_weights=None,
     **plot_kwargs,
 ):
     """Saves group level and subject level power maps.
+
     This is a multi-subject wrapper of save.
+
     Parameters
     ----------
     group_power_map : np.ndarray
-        Group level power map to save. Can be of shape: (n_components, n_modes, n_channels),
+        Group level power map to save.
+        Can be of shape: (n_components, n_modes, n_channels),
         (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
         array can also be passed. Warning: this function cannot be used if n_modes
         is equal to n_channels.
     subject_power_map : np.ndarray
-        Subject level power maps to save. Can be of shape: (n_components, n_subjects, n_modes, n_channels),
-        (n_subjects, n_modes, n_channels), (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
-        array can also be passed. Warning: this function cannot be used if n_modes = n_channels.
+        Subject level power maps to save.
+        Can be of shape: (n_components, n_subjects, n_modes, n_channels),
+        (n_subjects, n_modes, n_channels), (n_modes, n_channels) or (n_channels,).
+        A (..., n_channels, n_channels) array can also be passed.
+        Warning: this function cannot be used if n_modes = n_channels.
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png, it is saved as images.
@@ -319,8 +317,8 @@ def multi_save(
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcelate the training data.
-    subject_list : list
-        List of subjects for which the power plots to be plotted.
+    subjects : list
+        List of subject indices to be plot power maps for.
     component : int
         Spectral component to save.
     subtract_mean : bool
@@ -331,40 +329,41 @@ def multi_save(
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
     """
+    # Create a copy of the power maps so we don't modify them
+    group_power_map = np.copy(group_power_map)
+    subject_power_map = np.copy(subject_power_map)
+
     # Validation
     if group_power_map.ndim > 1:
         if group_power_map.shape[-1] == group_power_map.shape[-2]:
-            group_power_map = np.diagonal(group_power_map, axis1=-2, axis2=-1)
+            # np.copy is needed because np.diagonal returns a read only array
+            group_power_map = np.copy(np.diagonal(group_power_map, axis1=-2, axis2=-1))
     else:
         group_power_map = group_power_map[np.newaxis, ...]
 
     if subject_power_map.ndim > 1:
         if subject_power_map.shape[-1] == subject_power_map.shape[-2]:
-            subject_power_map = np.diagonal(subject_power_map, axis1=-2, axis2=-1)
+            # np.copy is needed because np.diagonal returns a read only array
+            subject_power_map = np.copy(
+                np.diagonal(subject_power_map, axis1=-2, axis2=-1)
+            )
     else:
         subject_power_map = subject_power_map[np.newaxis, ...]
-
-    group_error_message = (
-        "Dimensionality of group_power_map must be less than 4, "
-        + f"got ndim={group_power_map.ndim}."
-    )
-    subject_error_message = (
-        "Dimensionality of subject_power_map must be less than 5, "
-        + f"got ndim={subject_power_map.ndim}."
-    )
 
     group_power_map = array_ops.validate(
         group_power_map,
         correct_dimensionality=3,
         allow_dimensions=[2],
-        error_message=group_error_message,
+        error_message="group_power_map.shape is incorrect.",
     )
     subject_power_map = array_ops.validate(
         subject_power_map,
         correct_dimensionality=4,
         allow_dimensions=[2, 3],
-        error_message=subject_error_message,
+        error_message="subject_power_map.shape is incorrect",
     )
+
+    # Select component to plot
     group_power_map = group_power_map[component]
     subject_power_map = subject_power_map[component]
 
@@ -383,12 +382,12 @@ def multi_save(
         subject_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
 
     # Save the group power map
-    filename_object = Path(filename)
-    group_dir = f"{filename_object.parent}/group"
+    filename = Path(filename)
+    group_dir = f"{filename.parent}/group"
     makedirs(group_dir, exist_ok=True)
-    group_filename = f"{group_dir}/{filename_object.stem}{filename_object.suffix}"
+    group_filename = f"{group_dir}/{filename.stem}{filename.suffix}"
 
-    print("Saving group level power map.")
+    print("Saving group level power map:")
     save(
         power_map=group_power_map,
         filename=group_filename,
@@ -399,19 +398,17 @@ def multi_save(
 
     # Save the subject lebel power maps
     n_subjects = subject_power_map.shape[0]
-    if subject_list is None:
-        subject_list = np.arange(n_subjects)
+    if subjects is None:
+        subjects = np.arange(n_subjects)
 
-    for sub in subject_list:
+    for sub in subjects:
         subject_dir = "{fn.parent}/sub_{sub:0{v}d}".format(
-            fn=filename_object, sub=sub, v=len(str(n_subjects))
+            fn=filename, sub=sub, v=len(str(n_subjects))
         )
         makedirs(subject_dir, exist_ok=True)
-        subject_filename = (
-            f"{subject_dir}/{filename_object.stem}{filename_object.suffix}"
-        )
+        subject_filename = f"{subject_dir}/{filename.stem}{filename.suffix}"
 
-        print(f"Saving subject {sub} power map.")
+        print(f"Saving subject {sub} power map:")
         save(
             power_map=subject_power_map[sub],
             filename=subject_filename,
