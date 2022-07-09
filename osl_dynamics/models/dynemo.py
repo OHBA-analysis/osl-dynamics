@@ -16,6 +16,7 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
     VariationalInferenceModelBase,
 )
+from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
@@ -218,6 +219,72 @@ class Model(VariationalInferenceModelBase):
             the model?
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
+
+    def set_means_regularizer(self, training_data=None, sigma=None):
+        """Set the means vector regularizer.
+
+        The regularization is equivalent to applying a multivariate normal prior.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Estimate sigma using the training data instead of specifying it
+            explicitly. If training_data is passed, sigma=(max - min / 2)**2.
+        sigma : np.ndarray
+            Variance of each channel. Shape must be (n_channels,).
+        """
+        if training_data is None and sigma is None:
+            raise ValueError("Either sigma or training_data must be passed.")
+
+        if training_data is not None:
+            ts = training_data.time_series(concatenate=True)
+            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
+            sigma = (range_ / 2) ** 2
+
+        means_layer = self.model.get_layer("means")
+        means_layer.regularizer = regularizers.MultivariateNormal(sigma)
+
+    def set_covariances_regularizer(self, training_data=None, nu=None, psi=None):
+        """Set the covariance matrices regularizer.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Estimate nu and psi using the training data instead of specifying it
+            explicitly. If training_data is passed, nu=n_channels - 1 + 0.1
+            and psi=1 / (max - min)
+        nu : int
+            Degrees of freedom.
+        psi : np.ndarray
+            Scale matrix. Shape must be (n_channels, n_channels).
+        """
+        if training_data is None:
+            if nu is None or psi is None:
+                raise ValueError("Both nu and psi must be passed.")
+
+        if training_data is not None:
+            nu = self.config.n_channels - 1 + 0.1
+            ts = training_data.time_series(concatenate=True)
+            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
+            psi = 1 / range_
+
+        covs_layer = self.model.get_layer("covs")
+        covs_layer.regularizer = regularizers.InverseWishart(nu, psi)
+
+    def set_means_covariances_regularizer(self, training_data):
+        """Set the means and covariances regularizer based on the training data.
+
+        A multivariate normal prior is applied to the mean vectors with
+        sigma=(range / 2)**2 and an inverse Wishart prior is applied to the
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=1 / range.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        """
+        self.set_means_regularizer(training_data)
+        self.set_covariances_regularizer(training_data)
 
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.
