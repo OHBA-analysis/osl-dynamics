@@ -316,7 +316,7 @@ class MeanVectorsLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         if self.regularizer is not None:
-            self.add_loss(self.regularizer(inputs))
+            self.add_loss(self.regularizer(self.vectors))
         return self.vectors
 
 

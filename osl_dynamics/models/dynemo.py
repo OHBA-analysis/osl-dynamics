@@ -220,7 +220,7 @@ class Model(VariationalInferenceModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
-    def set_means_regularizer(self, training_data=None, sigma=None):
+    def set_means_regularizer(self, training_data=None, mu=None, sigma=None):
         """Set the means vector regularizer.
 
         The regularization is equivalent to applying a multivariate normal prior.
@@ -228,21 +228,26 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
-            Estimate sigma using the training data instead of specifying it
-            explicitly. If training_data is passed, sigma=(max - min / 2)**2.
+            Estimate mu and sigma using the training data instead of specifying it
+            explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
+        mu : np.ndarray
+            Mean vector of the prior. Shape must be (n_channels,).
         sigma : np.ndarray
-            Variance of each channel. Shape must be (n_channels,).
+            Covariance matrix of the prior. Shape must be (n_channels,n_channels).
         """
-        if training_data is None and sigma is None:
-            raise ValueError("Either sigma or training_data must be passed.")
-
-        if training_data is not None:
+        if training_data is None:
+            if mu is None or sigma is None:
+                raise ValueError(
+                    "Either prior parameters (mu, sigma) or training_data must be passed."
+                )
+        else:
             ts = training_data.time_series(concatenate=True)
             range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-            sigma = (range_ / 2) ** 2
+            sigma = np.diag((range_ / 2) ** 2)
+            mu = np.zeros(self.config.n_channels, dtype=np.float32)
 
         means_layer = self.model.get_layer("means")
-        means_layer.regularizer = regularizers.MultivariateNormal(sigma)
+        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma)
 
     def set_covariances_regularizer(self, training_data=None, nu=None, psi=None):
         """Set the covariance matrices regularizer.
@@ -254,19 +259,19 @@ class Model(VariationalInferenceModelBase):
             explicitly. If training_data is passed, nu=n_channels - 1 + 0.1
             and psi=1 / (max - min)
         nu : int
-            Degrees of freedom.
+            Degrees of freedom of the prior.
         psi : np.ndarray
-            Scale matrix. Shape must be (n_channels, n_channels).
+            Scale matrix of the prior. Shape must be (n_channels, n_channels).
         """
         if training_data is None:
             if nu is None or psi is None:
                 raise ValueError("Both nu and psi must be passed.")
 
-        if training_data is not None:
+        else:
             nu = self.config.n_channels - 1 + 0.1
             ts = training_data.time_series(concatenate=True)
             range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-            psi = 1 / range_
+            psi = np.diag(1 / range_)
 
         covs_layer = self.model.get_layer("covs")
         covs_layer.regularizer = regularizers.InverseWishart(nu, psi)
@@ -274,9 +279,9 @@ class Model(VariationalInferenceModelBase):
     def set_means_covariances_regularizer(self, training_data):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with
-        sigma=(range / 2)**2 and an inverse Wishart prior is applied to the
-        covariances matrices with nu=n_channels - 1 + 0.1 and psi=1 / range.
+        A multivariate normal prior is applied to the mean vectors with mu = 0,
+        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
 
         Parameters
         ----------
