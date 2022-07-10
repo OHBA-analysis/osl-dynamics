@@ -262,6 +262,8 @@ class MeanVectorsLayer(layers.Layer):
         Should we learn the vectors?
     initial_value : np.ndarray
         Initial value for the vectors.
+    regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for vectors.
     """
 
     def __init__(
@@ -270,12 +272,15 @@ class MeanVectorsLayer(layers.Layer):
         m,
         learn,
         initial_value,
+        regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
         self.m = m
         self.learn = learn
+
+        # Initialisation for vectors
         if initial_value is None:
             self.initial_value = np.zeros([n, m], dtype=np.float32)
         else:
@@ -296,6 +301,9 @@ class MeanVectorsLayer(layers.Layer):
             self.initial_value = initial_value.astype("float32")
         self.vectors_initializer = WeightInitializer(self.initial_value)
 
+        # Regulariser
+        self.regularizer = regularizer
+
     def build(self, input_shape):
         self.vectors = self.add_weight(
             "vectors",
@@ -307,6 +315,8 @@ class MeanVectorsLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
+        if self.regularizer is not None:
+            self.add_loss(self.regularizer(self.vectors))
         return self.vectors
 
 
@@ -327,6 +337,8 @@ class CovarianceMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
+    regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for matrices.
     """
 
     def __init__(
@@ -335,6 +347,7 @@ class CovarianceMatricesLayer(layers.Layer):
         m,
         learn,
         initial_value,
+        regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -373,6 +386,9 @@ class CovarianceMatricesLayer(layers.Layer):
             self.initial_flattened_cholesky_factors
         )
 
+        # Regulariser
+        self.regularizer = regularizer
+
     def build(self, input_shape):
         self.flattened_cholesky_factors = self.add_weight(
             "flattened_cholesky_factors",
@@ -384,7 +400,10 @@ class CovarianceMatricesLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        return self.bijector(self.flattened_cholesky_factors)
+        covariances = self.bijector(self.flattened_cholesky_factors)
+        if self.regularizer is not None:
+            self.add_loss(self.regularizer(covariances))
+        return covariances
 
 
 class CorrelationMatricesLayer(layers.Layer):

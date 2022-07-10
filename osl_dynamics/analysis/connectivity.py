@@ -293,15 +293,19 @@ def save(
         "node_size": 10,
         "node_color": "black",
         "edge_cmap": cm["red_transparent_full_alpha_range"],
-        "colorbar": True,
     }
 
-    # Overwrite keyword arguments if passed
-    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
-
-    # Plot maps
+    # Loop through each connectivity map
     n_modes = conn_map.shape[0]
     for i in trange(n_modes, desc="Saving images", ncols=98):
+
+        # Overwrite keyword arguments if passed
+        kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+        # If all connections are zero don't add a colourbar
+        kwargs["colorbar"] = np.any(conn_map[i] != 0)
+
+        # Plot maps
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
             fn=Path(filename), i=i, w=len(str(n_modes))
         )
@@ -310,5 +314,5 @@ def save(
             parcellation.roi_centers(),
             edge_threshold=f"{threshold * 100}%",
             output_file=output_file,
-            **plot_kwargs,
+            **kwargs,
         )
