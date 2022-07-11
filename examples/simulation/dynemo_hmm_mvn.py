@@ -66,6 +66,8 @@ prediction_dataset = training_data.dataset(
 model = Model(config)
 model.summary()
 
+model.set_covariances_regularizer(training_data)
+
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
 
