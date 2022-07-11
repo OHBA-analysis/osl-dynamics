@@ -66,6 +66,7 @@ prediction_dataset = training_data.dataset(
 model = Model(config)
 model.summary()
 
+# Add regularisation for mode covariances
 model.set_covariances_regularizer(training_data)
 
 print("Training model")

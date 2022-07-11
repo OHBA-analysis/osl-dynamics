@@ -362,7 +362,10 @@ class CovarianceMatricesLayer(layers.Layer):
 
         # Initialisation of matrices
         if initial_value is None:
-            self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
+            self.initial_value = np.array(
+                [np.diag(np.random.normal(1, 0.05, size=m)) for i in range(n)],
+                dtype=np.float32,
+            )
         else:
             if initial_value.ndim != 3:
                 raise ValueError(
