@@ -90,6 +90,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for covariance matrices.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -139,6 +143,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -414,6 +420,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     covs_layer = CovarianceMatricesLayer(
@@ -421,6 +428,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")

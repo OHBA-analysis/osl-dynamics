@@ -316,7 +316,9 @@ class MeanVectorsLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         if self.regularizer is not None:
-            self.add_loss(self.regularizer(self.vectors))
+            reg = self.regularizer(self.vectors)
+            self.add_loss(reg)
+            self.add_metric(reg, name=self.name)
         return self.vectors
 
 
@@ -402,7 +404,9 @@ class CovarianceMatricesLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         covariances = self.bijector(self.flattened_cholesky_factors)
         if self.regularizer is not None:
-            self.add_loss(self.regularizer(covariances))
+            reg = self.regularizer(covariances)
+            self.add_loss(reg)
+            self.add_metric(reg, name=self.name)
         return covariances
 
 
