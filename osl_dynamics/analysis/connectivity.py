@@ -303,7 +303,9 @@ def save(
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
         # If all connections are zero don't add a colourbar
-        kwargs["colorbar"] = np.any(conn_map[i] != 0)
+        kwargs["colorbar"] = np.any(
+            conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
+        )
 
         # Plot maps
         output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(

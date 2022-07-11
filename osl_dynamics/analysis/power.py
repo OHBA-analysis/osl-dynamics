@@ -239,7 +239,7 @@ def save(
     )
 
     # Subtract weighted mean
-    n_modes = power_map.shape[0]
+    n_modes = power_map.shape[1]
     if n_modes == 1:
         subtract_mean = False
     if subtract_mean:

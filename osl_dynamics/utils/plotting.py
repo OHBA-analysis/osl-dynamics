@@ -96,6 +96,19 @@ def save(fig, filename, tight_layout=True):
     fig.savefig(filename)
 
 
+def close(fig=None):
+    """Close a figure.
+
+    Parameters
+    ----------
+    fig : matplotlib.pyplot.Figure
+        Figure to close. Defaults to all figures.
+    """
+    if fig is None:
+        fig = "all"
+    plt.close(fig)
+
+
 def rough_square_axes(n_plots):
     """Get the most square axis layout for n_plots.
 
