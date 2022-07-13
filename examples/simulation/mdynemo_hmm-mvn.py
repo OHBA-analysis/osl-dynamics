@@ -1,15 +1,12 @@
-"""Example script for running inference on simulated MS-HMM-MVN data.
+"""Example script for running inference on simulated MDyn_HMM_MVN data.
 
-- Multiple scale version for simulation_hmm_mvn.py
-- Should achieve a dice of close to one for alpha and gamma.
+- Multiple dynamic version for simulation_hmm_mvn.py
+- Should achieve a dice of ~0.99 for alpha and ~0.99 for gamma.
 """
 print("Setting up")
-import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.mdynemo import Config, Model
-from osl_dynamics.inference import callbacks
-from osl_dynamics.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -17,13 +14,11 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=5,
-    n_channels=40,
+    n_channels=20,
     sequence_length=200,
-    inference_n_units=128,
-    inference_n_layers=2,
+    inference_n_units=64,
     inference_normalization="layer",
-    model_n_units=128,
-    model_n_layers=2,
+    model_n_units=64,
     model_normalization="layer",
     theta_normalization="layer",
     learn_alpha_temperature=True,
@@ -34,10 +29,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=300,
+    n_kl_annealing_epochs=100,
     batch_size=16,
     learning_rate=0.005,
-    n_epochs=400,
+    n_epochs=200,
 )
 
 # Simulate data
@@ -71,10 +66,8 @@ prediction_dataset = training_data.dataset(
 model = Model(config)
 model.summary()
 
-# Callbacks
-dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.mode_time_course, mode_names=["alpha", "gamma"]
-)
+# Set regularisers
+# model.set_regularizers(training_data)
 
 print("Training model")
 history = model.fit(
@@ -82,7 +75,6 @@ history = model.fit(
     epochs=config.n_epochs,
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
-    callbacks=[dice_callback],
 )
 
 # Free energy = Log Likelihood - KL Divergence
@@ -91,9 +83,6 @@ print(f"Free energy: {free_energy}")
 
 # Inferred parameters
 inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
-
-plotting.plot_matrices(sim.fcs, filename="sim_fcs.png")
-plotting.plot_matrices(inf_fcs, filename="inf_fcs.png")
 
 # Inferred mode mixing factors
 inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
