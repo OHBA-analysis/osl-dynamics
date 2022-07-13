@@ -90,7 +90,7 @@ class MVN:
         if option == "zero":
             means = np.zeros([self.n_modes, self.n_channels])
         elif option == "random":
-            means = self._rng.normal(size=[self.n_modes, self.n_channels])
+            means = self._rng.normal(0, 0.2, size=[self.n_modes, self.n_channels])
         else:
             raise ValueError("means must be a np.array or 'zero' or 'random'.")
         return means
