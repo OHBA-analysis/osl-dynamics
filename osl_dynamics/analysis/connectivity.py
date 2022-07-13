@@ -171,6 +171,9 @@ def mean_coherence_from_spectra(
         # Concatenate over modes
         coh = coherence[i].reshape(-1, n_f)
 
+        # Same frequencies give nan coherences, replace with zero
+        coh = np.nan_to_num(coh)
+
         if components is not None:
             # Coherence for each spectral component
             coh = components @ coh.T
@@ -189,7 +192,7 @@ def mean_coherence_from_spectra(
         c.append(coh)
 
     if fit_gmm:
-        # Mean coherence over modes
+        # Mean coherence over spectral components
         mean_coh = np.mean(coh, axis=1)
 
         # Indices for off diagonal elements
@@ -201,9 +204,6 @@ def mean_coherence_from_spectra(
 
                 # Off diagonal coherence values to fit a GMM to
                 c = coh[i, j, m, n] - mean_coh[i, m, n]
-
-                # Replace nans with mean value so that they don't affect the GMM fit
-                c[np.isnan(c)] = np.mean(c[~np.isnan(c)])
 
                 # Fit a GMM
                 if gmm_filename is not None:
@@ -230,7 +230,6 @@ def mean_coherence_from_spectra(
                 # Only keep the second mixture component and remove nan connections
                 c = coh[i, j, m, n]
                 c[mixture_label == 0] = 0
-                c[np.isnan(c)] = 0
                 coh[i, j, m, n] = c
                 coh[i, j, n, m] = c
 
