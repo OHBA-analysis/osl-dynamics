@@ -294,8 +294,11 @@ class Model(VariationalInferenceModelBase):
         training_data : osl_dynamics.data.Data
             Training dataset.
         """
-        self.set_means_regularizer(training_data)
-        self.set_covariances_regularizer(training_data)
+        if self.config.learn_means:
+            self.set_means_regularizer(training_data)
+
+        if self.config.learn_covariances:
+            self.set_covariances_regularizer(training_data)
 
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.
