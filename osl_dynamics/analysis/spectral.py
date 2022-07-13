@@ -730,55 +730,58 @@ def regression_spectra(
     # Regress the time-varying PSD with alpha to get the mode PSDs
     Pj = []
     for i in trange(n_subjects, desc="Fitting linear regression", ncols=98):
-        Pt[i] = abs(Pt[i])  # sklearn LinearRegression doesn't accept complex numbers
         coefs, intercept = regression.linear(
             at[i], Pt[i], fit_intercept=True, normalize=True
         )
-        if return_coef_int:
-            Pj.append([coefs, intercept])
-        else:
-            Pj.append([coefs + intercept[np.newaxis, ...]])
-    Pj = np.array(Pj, dtype=object)
+        Pj.append([coefs, [intercept] * coefs.shape[0]])
+    Pj = np.array(Pj)
 
     # Weights for calculating the group average PSD
     n_samples = [d.shape[0] for d in data]
     weights = np.array(n_samples) / np.sum(n_samples)
 
     if psd_only:
+        if not return_coef_int:
+            # Sum coefficients and intercept
+            Pj = np.sum(Pj, axis=1)
+
         if return_weights:
             return f, np.squeeze(Pj), weights
         else:
             return f, np.squeeze(Pj)
 
-    # Number of parcels and freqency bins
-    n_parcels = data[0].shape[1]
+    # Number of channels and freqency bins
+    n_channels = data[0].shape[1]
     n_modes = alpha[0].shape[1]
-    n_f = Pj[0][0].shape[-1]
+    n_f = Pj.shape[-1]
 
-    # Indices of the upper triangle of an n_parcels by n_parcels array
-    m, n = np.triu_indices(n_parcels)
+    # Indices of the upper triangle of an n_channels by n_channels array
+    m, n = np.triu_indices(n_channels)
 
-    # Create a n_parcels by n_parcels array
-    P = []
+    # Create a n_channels by n_channels array
+    P = np.empty(
+        [n_subjects, 2, n_modes, n_channels, n_channels, n_f], dtype=np.complex64
+    )
     for i in range(n_subjects):
-        P.append([])
-        for j in range(len(Pj[i])):
-            p = np.empty([n_modes, n_parcels, n_parcels, n_f])
-            p[:, m, n] = Pj[i][j]
-            p[:, n, m] = Pj[i][j]
-            P[i].append(p)
-    P = np.array(P)
+        for j in range(2):  # j=0 is the coefficients and j=1 is the intercepts
+            P[i, j][:, m, n] = Pj[i, j]
+            P[i, j][:, n, m] = np.conj(Pj[i, j])
 
     # PSDs and coherences for each mode
-    psd = []
-    coh = []
+    psd = np.empty([n_subjects, 2, n_modes, n_channels, n_f], dtype=np.float32)
+    coh = np.empty([n_subjects, n_modes, n_channels, n_channels, n_f], dtype=np.float32)
     for i in range(n_subjects):
-        p = P[i, :, :, range(n_parcels), range(n_parcels)]
-        p = np.rollaxis(p, 0, 3)
-        c = np.sum(P[i], axis=0)  # sum coefs and intercept
-        c = coherence_spectra(c, print_message=False)
-        psd.append(p)
-        coh.append(c)
+        # PSDs
+        p = P[i, :, :, range(n_channels), range(n_channels)].real
+        psd[i] = np.rollaxis(p, axis=0, start=3)
+
+        # Coherences
+        p = np.sum(P[i], axis=0)  # sum coefs and intercept
+        coh[i] = coherence_spectra(p, print_message=False)
+
+    if not return_coef_int:
+        # Sum coefficients and intercept
+        psd = np.sum(psd, axis=1)
 
     if return_weights:
         return f, np.squeeze(psd), np.squeeze(coh), weights
