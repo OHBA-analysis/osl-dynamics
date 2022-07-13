@@ -282,7 +282,9 @@ class MeanVectorsLayer(layers.Layer):
 
         # Initialisation for vectors
         if initial_value is None:
-            self.initial_value = np.zeros([n, m], dtype=np.float32)
+            self.initial_value = np.random.normal(0, 0.5, size=[n, m]).astype(
+                np.float32
+            )
         else:
             if initial_value.ndim != 2:
                 raise ValueError(
@@ -429,6 +431,8 @@ class CorrelationMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
+    regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for matrices.
     """
 
     def __init__(
@@ -437,6 +441,7 @@ class CorrelationMatricesLayer(layers.Layer):
         m,
         learn,
         initial_value,
+        regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -452,6 +457,13 @@ class CorrelationMatricesLayer(layers.Layer):
         # Initialisation of matrices
         if initial_value is None:
             self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
+            self.initial_flattened_cholesky_factors = self.bijector.inverse(
+                self.initial_value
+            )
+            err = np.random.normal(
+                0, 0.05, size=self.initial_flattened_cholesky_factors.shape
+            )
+            self.initial_flattened_cholesky_factors += err
         else:
             if initial_value.ndim != 3:
                 raise ValueError(
@@ -470,12 +482,15 @@ class CorrelationMatricesLayer(layers.Layer):
                     + f"initial_fcs ({initial_value.shape[0]})."
                 )
             self.initial_value = initial_value.astype("float32")
-        self.initial_flattened_cholesky_factors = self.bijector.inverse(
-            self.initial_value
-        )
+            self.initial_flattened_cholesky_factors = self.bijector.inverse(
+                self.initial_value
+            )
         self.flattened_cholesky_factors_initializer = WeightInitializer(
             self.initial_flattened_cholesky_factors
         )
+
+        # Regulariser
+        self.regularizer = regularizer
 
     def build(self, input_shape):
         self.flattened_cholesky_factors = self.add_weight(
@@ -488,7 +503,12 @@ class CorrelationMatricesLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        return self.bijector(self.flattened_cholesky_factors)
+        correlations = self.bijector(self.flattened_cholesky_factors)
+        if self.regularizer is not None:
+            reg = self.regularizer(correlations)
+            self.add_loss(reg)
+            self.add_metric(reg, name=self.name)
+        return correlations
 
 
 class DiagonalMatricesLayer(layers.Layer):
@@ -506,6 +526,8 @@ class DiagonalMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
+    regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the diagonal entries.
     """
 
     def __init__(
@@ -514,6 +536,7 @@ class DiagonalMatricesLayer(layers.Layer):
         m,
         learn,
         initial_value,
+        regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -526,7 +549,9 @@ class DiagonalMatricesLayer(layers.Layer):
 
         # Initialisation for the diagonals
         if initial_value is None:
-            self.initial_value = np.ones([n, m], dtype=np.float32)
+            self.initial_value = np.random.normal(1, 0.1, size=[n, m]).astype(
+                np.float32
+            )
         else:
             if initial_value.ndim != 2:
                 raise ValueError(
@@ -546,6 +571,9 @@ class DiagonalMatricesLayer(layers.Layer):
         self.initial_diagonals = self.bijector.inverse(self.initial_value)
         self.diagonals_initializer = WeightInitializer(self.initial_diagonals)
 
+        # Regulariser
+        self.regularizer = regularizer
+
     def build(self, input_shape):
         self.diagonals = self.add_weight(
             "diagonals",
@@ -558,6 +586,10 @@ class DiagonalMatricesLayer(layers.Layer):
 
     def call(self, alpha, **kwargs):
         D = self.bijector(self.diagonals)
+        if self.regularizer is not None:
+            reg = self.regularizer(D)
+            self.add_loss(reg)
+            self.add_metric(reg, name=self.name)
         D = tf.linalg.diag(D)
         return D
 

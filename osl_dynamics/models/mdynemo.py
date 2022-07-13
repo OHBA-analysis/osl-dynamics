@@ -16,6 +16,7 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
     VariationalInferenceModelBase,
 )
+from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
@@ -89,16 +90,22 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
     learn_means : bool
         Should we make the mean for each mode trainable?
-    learn_stds: bool
+    learn_stds : bool
         Should we make the standard deviation for each mode trainable?
-    learn_fcs: bool
+    learn_fcs : bool
         Should we make the functional connectivity for each mode trainable?
     initial_means : np.ndarray
         Initialisation for the mode means.
-    initial_stds: np.ndarray
+    initial_stds : np.ndarray
         Initialisation for mode standard deviations.
-    initial_fcs: np.ndarray
+    initial_fcs : np.ndarray
         Initialisation for mode functional connectivity matrices.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the mean vectors.
+    stds_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the standard deviation vectors.
+    fcs_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the correlation matrices.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -150,6 +157,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    stds_regularizer: tf.keras.regularizers.Regularizer = None
+    fcs_regularizer: tf.keras.regularizers.Regularizer = None
     multiple_dynamics: bool = True
 
     def __post_init__(self):
@@ -219,6 +229,113 @@ class Model(VariationalInferenceModelBase):
             the model?
         """
         mdynemo_obs.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+
+    def set_means_regularizer(self, training_data=None, mu=None, sigma=None):
+        """Set the means vector regularizer.
+
+        The regularization is equivalent to applying a multivariate normal prior.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Estimate mu and sigma using the training data instead of specifying it
+            explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
+        mu : np.ndarray
+            Mean vector of the prior. Shape must be (n_channels,).
+        sigma : np.ndarray
+            Covariance matrix of the prior. Shape must be (n_channels,n_channels).
+        """
+        if training_data is None:
+            if mu is None or sigma is None:
+                raise ValueError(
+                    "Either prior parameters (mu, sigma) or training_data must be passed."
+                )
+        else:
+            ts = training_data.time_series(concatenate=True)
+            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
+            sigma = np.diag((range_ / 2) ** 2)
+            mu = np.zeros(self.config.n_channels, dtype=np.float32)
+
+        means_layer = self.model.get_layer("means")
+        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma)
+
+    def set_stds_regularizer(self, training_data=None, mu=None, sigma=None):
+        """Set the stds vector regularizer.
+
+        The regularization is equivalent to applying independent log normal priors
+        to each channel.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Estimate mu and sigma using the training data instead of specifying it
+            explicitly. If training_data is passed, mu=0 and
+            sigma=sqrt(log(2 * (max - min))).
+        mu : np.ndarray
+            Mu parameter of the log normal priors. Shape must be (n_channels,).
+        sigma : np.ndarray
+            Sigma parameter of the log normal priors. Shape must be (n_channels,).
+        """
+        if training_data is None:
+            if mu is None or sigma is None:
+                raise ValueError("Both mu and sigma must be passed.")
+
+        else:
+            mu = np.zeros([self.config.n_channels], dtype=np.float32)
+            ts = training_data.time_series(concatenate=True)
+            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
+            sigma = np.sqrt(np.log(2 * range_))
+
+        stds_layer = self.model.get_layer("stds")
+        stds_layer.regularizer = regularizers.LogNormal(mu, sigma)
+
+    def set_fcs_regularizer(self, training_data=None, nu=None):
+        """Set the fcs matrix regularizer.
+
+        The regularization is equivalent to applying an inverse Wishart prior
+        but with variances marginalized.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Estimate nu using the training data. If training_data is passed,
+            nu = n_channels - 1 + 0.1.
+        nu : int
+            Degrees of freedom of the prior.
+        """
+        if training_data is None:
+            if nu is None:
+                raise ValueError("nu must be passed.")
+
+        else:
+            nu = self.config.n_channels - 1 + 0.1
+
+        fcs_layer = self.model.get_layer("fcs")
+        fcs_layer.regularizer = regularizers.MarginalInverseWishart(
+            nu, self.config.n_channels
+        )
+
+    def set_regularizers(self, training_data):
+        """Set the regularizers of means, stds and fcs based on the training data.
+
+        A multivariate normal prior is applied to the mean vectors with mu=0,
+        sigma=diag((range / 2)**2), a log normal prior is applied to the standard
+        deviations with mu=0, sigma=sqrt(log(2 * (range))) and a marginal inverse
+        Wishart prior is applied to the fcs matrices with nu = n_channels - 1 + 0.1.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        """
+        if self.config.learn_means:
+            self.set_means_regularizer(training_data)
+
+        if self.config.learn_stds:
+            self.set_stds_regularizer(training_data)
+
+        if self.config.learn_fcs:
+            self.set_fcs_regularizer(training_data)
 
     def sample_time_courses(self, n_samples: int):
         """Uses the model RNN to sample mode mixing factors, alpha and gamma.

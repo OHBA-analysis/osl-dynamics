@@ -101,3 +101,79 @@ class MultivariateNormal(regularizers.Regularizer):
             )
         )
         return reg
+
+
+class MarginalInverseWishart(regularizers.Regularizer):
+    """Inverse Wishart regularizer on correlaton matrices.
+
+    It is assumed that the scale matrix of the inverse Wishart distribution
+    is diagonal. Hence the marginal distribution on the correlation matrix is
+    independent of the scale matrix.
+
+    Parameters
+    ----------
+    nu : int
+        Degrees of freedom. Must be greater than (n_channels - 1).
+    n_channels : int
+        Number of channels of the correlation matrices.
+    """
+
+    def __init__(self, nu, n_channels, **kwargs):
+        super().__init__(**kwargs)
+        self.nu = nu
+        self.n_channels = n_channels
+
+        # Validation
+        if not self.nu > self.n_channels - 1:
+            raise ValueError("nu must be greater than (n_channels - 1).")
+
+    def __call__(self, corr):
+        log_det_corr = tf.linalg.logdet(corr)
+        inv_corr = tf.linalg.inv(corr)
+        reg = tf.reduce_sum(
+            ((self.nu + self.n_channels + 1) / 2) * log_det_corr
+        ) + tf.reduce_sum((self.nu / 2) * tf.math.log(tf.linalg.diag_part(inv_corr)))
+        return reg
+
+
+class LogNormal(regularizers.Regularizer):
+    """Log normal regularizer on the standard deviations.
+
+    Parameters
+    ----------
+    mu : np.ndarray
+        Mu parameters of the log normal distribution.
+        Shape is (n_channels,).
+    sigma : np.ndarray
+        Sigma parameters of the log normal distribution.
+        Shape is (n_channels,). All entries must be positive.
+    """
+
+    def __init__(self, mu, sigma, **kwargs):
+        super().__init__(**kwargs)
+        self.mu = mu
+        self.sigma = sigma
+
+        # Validation
+        if self.mu.ndim != 1:
+            raise ValueError("mu must be a 1D array.")
+
+        if self.sigma.ndim != 1:
+            raise ValueError("sigma must be a 1D array.")
+
+        if self.mu.shape[0] != self.sigma.shape[0]:
+            raise ValueError("mu and sigma must have the same length.")
+
+        if np.any(self.sigma < 0):
+            raise ValueError("Entries of sigma must be positive.")
+
+    def __call__(self, std):
+        log_std = tf.math.log(std)
+        reg = tf.reduce_sum(
+            log_std
+            + tf.multiply(
+                tf.math.square(log_std - tf.expand_dims(self.mu, 0)),
+                1 / (2 * tf.math.square(tf.expand_dims(self.sigma, 0))),
+            )
+        )
+        return reg
