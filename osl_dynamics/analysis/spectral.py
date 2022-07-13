@@ -256,7 +256,7 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_f=512):
     f = np.arange(0, sampling_frequency / 2, sampling_frequency / (2 * n_f))
 
     # z-transform of the coefficients
-    A = np.zeros([n_f, n_modes, n_channels, n_channels], dtype=np.complex_)
+    A = np.zeros([n_f, n_modes, n_channels, n_channels], dtype=np.complex64)
     for i in range(n_f):
         for l in range(n_lags):
             z = np.exp(-1j * (l + 1) * 2 * np.pi * f[i] / sampling_frequency)
@@ -407,7 +407,7 @@ def multitaper(
     n_f = X.shape[-1]
 
     # Calculate the periodogram with each taper
-    P = np.zeros([n_channels, n_channels, n_f], dtype=np.complex_)
+    P = np.zeros([n_channels, n_channels, n_f], dtype=np.complex64)
     for i in range(n_tapers):
         for j in range(n_channels):
             for k in range(j, n_channels):
@@ -556,7 +556,7 @@ def multitaper_spectra(
         n_segments = round(n_samples / segment_length)
 
         # Power spectra for each mode
-        p = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex_)
+        p = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex64)
         for i in range(n_modes):
             for j in trange(n_segments, desc=f"Mode {i}", ncols=98):
 
@@ -863,10 +863,10 @@ def spectrogram(
     if calc_cpsd:
         # Calculate cross periodograms for each segment of the data
         P = np.empty(
-            [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
+            [n_psds, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex64
         )
         XY_sub_window = np.empty(
-            [n_sub_windows, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex_
+            [n_sub_windows, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex64
         )
         for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
 
