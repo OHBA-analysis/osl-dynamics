@@ -1,4 +1,4 @@
-"""Example script for running inference on simulated HMM-MVN data.
+"""Example script for running Dynemo inference on simulated HMM-MVN data.
 
 - Should achieve a dice coefficient of ~0.99.
 - A seed is set for the random number generators for reproducibility.
@@ -9,6 +9,7 @@ import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
+from osl_dynamics.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -81,12 +82,38 @@ inf_alp = model.get_alpha(prediction_dataset)
 inf_stc = modes.time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 
+mode_order = modes.match_modes(sim_stc, inf_stc, return_order=True)
 sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo): ", modes.fractional_occupancies(inf_stc))
+
+# Fractional occupancies
+print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
+
+# Compare the inferred mode time course to the ground truth
+
+plotting.plot_alpha(
+    sim_stc,
+    n_samples=2000,
+    title="Truth",
+    y_labels=r"$\alpha_{jt}$",
+    filename=None,
+)
+plotting.plot_alpha(
+    inf_stc,
+    n_samples=2000,
+    title="Inferred",
+    y_labels=r"$\alpha_{jt}$",
+    filename=None,
+)
+
+# Inferred covariances
+covariances = model.get_covariances()
+plotting.plot_matrices(sim.covariances, main_title="Truth", filename=None)
+plotting.plot_matrices(covariances[mode_order[1], :, :], main_title="Inferred", filename=None)
 
 # Delete temporary directory
 training_data.delete_dir()
