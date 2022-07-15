@@ -18,9 +18,9 @@ config = Config(
     n_modes=5,
     n_channels=11,
     sequence_length=200,
-    inference_n_units=64,
+    inference_n_units=128,
     inference_normalization="layer",
-    model_n_units=64,
+    model_n_units=128,
     model_normalization="layer",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
@@ -29,10 +29,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=50,
+    n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.01,
-    n_epochs=100,
+    learning_rate=0.005,
+    n_epochs=200,
 )
 
 # Simulate data
@@ -67,7 +67,8 @@ model = Model(config)
 model.summary()
 
 # Add regularisation for mode covariances
-model.set_covariances_regularizer(training_data)
+n_batches = training_dataset.cardinality().numpy()
+model.set_regularizers(n_batches, training_data)
 
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
