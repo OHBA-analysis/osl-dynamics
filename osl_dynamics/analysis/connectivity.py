@@ -8,8 +8,9 @@ import numpy as np
 from nilearn import plotting
 from nilearn.plotting.cm import _cmap_d as cm
 from tqdm import trange
+
 from osl_dynamics import array_ops
-from osl_dynamics.analysis.gmm import fit_gaussian_mixture
+from osl_dynamics.analysis import gmm
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils.parcellation import Parcellation
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -105,8 +106,6 @@ def mean_coherence_from_spectra(
     coherence,
     components=None,
     frequency_range=None,
-    fit_gmm=False,
-    gmm_filename=None,
 ):
     """Calculates mean coherence from spectra.
 
@@ -121,17 +120,13 @@ def mean_coherence_from_spectra(
         Spectral components. Shape is (n_components, n_f).
     frequency_range : list
         Frequency range to integrate the PSD over (Hz).
-    fit_gmm : bool
-        Should we fit a two component Gaussian mixture model and only keep
-        one of the components.
-    gmm_filename : str
-        Filename to save GMM plot. Only used if fit_gmm=True.
 
     Returns
     -------
     coh : np.ndarray
         Mean coherence over a frequency band for each component of each mode.
-        Shape is (n_components, n_modes, n_channels, n_channels).
+        Shape is (n_components, n_modes, n_channels, n_channels). Axis of
+        length 1 are squeezed.
     """
 
     # Validation
@@ -191,57 +186,191 @@ def mean_coherence_from_spectra(
         coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)
 
-    if fit_gmm:
-        # Mean coherence over spectral components
-        mean_coh = np.mean(coh, axis=1)
+    return np.squeeze(c)
 
-        # Indices for off diagonal elements
-        m, n = np.triu_indices(n_channels, k=1)
 
-        # Loop over components and modes
-        for i in range(n_components):
-            for j in range(n_modes):
+def fit_gmm(
+    conn_map,
+    min_percentile=0,
+    max_percentile=100,
+    subtract_mean=False,
+    standardize=False,
+    sklearn_kwargs=None,
+    filename=None,
+    plot_kwargs=None,
+):
+    """Fit a two component Gaussian mixture model to connections to identify a
+    threshold.
 
-                # Off diagonal coherence values to fit a GMM to
-                c = coh[i, j, m, n] - mean_coh[i, m, n]
+    Parameters
+    ----------
+    conn_map : np.ndarray
+        Connectivity map.
+    min_percentile : float
+        Minimum percentile for the threshold. Should be between 0 and 100.
+        E.g. for the 90th percentile, max_percentile=90.
+    max_percentile : float
+        Maximum percentile for the threshold. Should be a between 0 and 100.
+        E.g. for the 95th percentile, max_percentile=95.
+    subtract_mean : bool
+        Should we subtract the mean over modes before fitting a GMM?
+    standardize : bool
+        Should we standardize the input to the GMM?
+    sklearn_kwargs : dict
+        Dictionary of keyword arguments to pass to
+        sklearn.mixture.BayesianGaussianMixture().
+    filename : str
+        Filename to save fit to.
+    plot_kwargs : dict
+        Dictionary of keyword arguments to pass to
+        osl_dynamics.utils.plotting.plot_gmm().
 
-                # Fit a GMM
-                if gmm_filename is not None:
-                    plot_filename = (
-                        "{fn.parent}/{fn.stem}{i:0{w1}d}_{j:0{w2}d}{fn.suffix}".format(
-                            fn=Path(gmm_filename),
-                            i=i,
-                            j=j,
-                            w1=len(str(n_components)),
-                            w2=len(str(n_modes)),
-                        )
+    Returns
+    -------
+    percentile : np.ndarray
+        Percentile threshold. Shape is (n_components, n_modes) or (n_modes,).
+    """
+    # Validation
+    conn_map = array_ops.validate(
+        conn_map,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message="conn_map must be (n_modes, n_channels, n_channels) "
+        + "or (n_channels, n_channels).",
+    )
+
+    if sklearn_kwargs is None:
+        sklearn_kwargs = {"max_iter": 5000, "n_init": 10}
+
+    # Number of components, modes and channels
+    n_components = conn_map.shape[0]
+    n_modes = conn_map.shape[1]
+    n_channels = conn_map.shape[2]
+
+    # Mean over modes
+    mean_conn_map = np.mean(conn_map, axis=1)
+
+    # Indices for off diagonal elements
+    m, n = np.triu_indices(n_channels, k=1)
+
+    # Calculate thresholds by fitting a GMM
+    percentiles = np.empty([n_components, n_modes])
+    for i in range(n_components):
+        for j in range(n_modes):
+
+            # Off diagonal connectivity values to fit a GMM to
+            if subtract_mean:
+                c = conn_map[i, j, m, n] - mean_conn_map[i, m, n]
+            else:
+                c = conn_map[i, j, m, n]
+
+            # Output filename
+            if filename is not None:
+                plot_filename = (
+                    "{fn.parent}/{fn.stem}{i:0{w1}d}_{j:0{w2}d}{fn.suffix}".format(
+                        fn=Path(filename),
+                        i=i,
+                        j=j,
+                        w1=len(str(n_components)),
+                        w2=len(str(n_modes)),
                     )
-                else:
-                    plot_filename = None
-                mixture_label = fit_gaussian_mixture(
-                    c,
-                    print_message=False,
-                    plot_filename=plot_filename,
-                    bayesian=True,
-                    max_iter=5000,
-                    n_init=10,
                 )
+            else:
+                plot_filename = None
 
-                # Only keep the second mixture component and remove nan connections
-                c = coh[i, j, m, n]
-                c[mixture_label == 0] = 0
-                coh[i, j, m, n] = c
-                coh[i, j, n, m] = c
+            # Fit a GMM to get class labels
+            percentiles[i, j] = gmm.fit_gaussian_mixture(
+                c,
+                bayesian=True,
+                standardize=standardize,
+                sklearn_kwargs=sklearn_kwargs,
+                min_percentile=min_percentile,
+                max_percentile=max_percentile,
+                plot_filename=plot_filename,
+                plot_kwargs=plot_kwargs,
+                print_message=False,
+            )
 
-    return np.squeeze(coh)
+    return np.squeeze(percentiles)
+
+
+def threshold(conn_map, percentile, subtract_mean=False, return_edges=False):
+    """Return edges that exceed a threshold.
+
+    Parameters
+    ---------
+    conn_map : np.narray
+        Connectivity matrix to threshold.
+        Can be (n_components, n_modes, n_channels, n_channels),
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+    percentile : float or np.ndarray
+        Percentile to threshold with. Should be between 0 and 100.
+        Can be a numpy array of shape (n_modes,) or (n_components, n_modes).
+    subtract_mean : bool
+        Should we subtract the mean over modes before thresholding?
+        The thresholding is only done to identify edges, the values returned in
+        conn_map are not mean subtracted.
+    return_edges : bool
+        Should we return a boolean array for whether edges are above the
+        threshold?
+
+    Returns
+    -------
+    conn_map : np.ndarray
+        Connectivity matrix with connections below the threshold set to zero.
+        Or a boolean array if return_edges=True.
+    """
+    # Validation
+    conn_map = array_ops.validate(
+        conn_map,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message="conn_map must be of shape "
+        + "(n_components, n_modes, n_channels, n_channels), "
+        + "(n_modes, n_channels, n_channels) or (n_channels, n_channels)",
+    )
+
+    # Number of components and modes
+    n_components = conn_map.shape[0]
+    n_modes = conn_map.shape[1]
+    n_channels = conn_map.shape[2]
+
+    if isinstance(percentile, float) or isinstance(percentile, int):
+        percentile = percentile * np.ones([n_components, n_modes])
+
+    if percentile.ndim == 1:
+        # A (n_modes,) array has been passed, add the n_components dimension
+        percentile = percentile[np.newaxis, ...]
+
+    # Subtract the mean
+    if n_modes == 1:
+        subtract_mean = False
+    if subtract_mean:
+        c = conn_map - np.mean(conn_map, axis=1, keepdims=True)
+    else:
+        c = conn_map
+
+    # Which edges are greater than the threshold?
+    edges = np.empty([n_components, n_modes, n_channels, n_channels], dtype=bool)
+    for i in range(n_components):
+        for j in range(n_modes):
+            edges[i, j] = c[i, j] > np.percentile(c[i, j], percentile[i, j])
+
+    if return_edges:
+        return np.squeeze(edges)
+
+    # Zero the connections that are below the threshold
+    conn_map[~edges] = 0
+
+    return np.squeeze(conn_map)
 
 
 def save(
     connectivity_map,
-    threshold,
     filename,
     parcellation_file,
     component=None,
+    threshold=0,
     **plot_kwargs,
 ):
     """Save connectivity maps.
@@ -250,10 +379,7 @@ def save(
     ----------
     connectivity_map : np.ndarray
         Matrices containing connectivity strengths to plot.
-        Shape must be (n_modes, n_channels, n_channels).
-    threshold : float
-        Threshold to determine which connectivity to show.
-        Should be between 0 and 1.
+        Shape must be (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     filename : str
         Output filename.
     parcellation_file : str
@@ -262,6 +388,10 @@ def save(
         Spectral component to save.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_connectome.
+    threshold : float or np.ndarray
+        Threshold to determine which connectivity to show. Should be between 0 and 1.
+        If a float is passed the same threshold is used for all modes. Otherwise,
+        threshold should be a numpy array of shape (n_modes,).
     """
     # Validation
     error_message = (
@@ -275,7 +405,10 @@ def save(
         error_message=error_message,
     )
 
-    if threshold > 1 or threshold < 0:
+    if isinstance(threshold, float) or isinstance(threshold, int):
+        threshold = np.array([threshold] * connectivity_map.shape[1])
+
+    if np.any(threshold > 1) or np.any(threshold < 0):
         raise ValueError("threshold must be between 0 and 1.")
 
     if component is None:
@@ -313,7 +446,7 @@ def save(
         plotting.plot_connectome(
             conn_map[i],
             parcellation.roi_centers(),
-            edge_threshold=f"{threshold * 100}%",
+            edge_threshold=f"{threshold[i] * 100}%",
             output_file=output_file,
             **kwargs,
         )
