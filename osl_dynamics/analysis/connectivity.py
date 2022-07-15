@@ -189,6 +189,63 @@ def mean_coherence_from_spectra(
     return np.squeeze(c)
 
 
+def gmm_threshold(
+    conn_map,
+    min_percentile=0,
+    max_percentile=100,
+    subtract_mean=False,
+    standardize=False,
+    sklearn_kwargs=None,
+    filename=None,
+    plot_kwargs=None,
+):
+    """Threshold a connectivity matrix using the GMM method.
+
+    Wrapper for connectivity.fit_gmm() and connectivity.threshold().
+
+    Parameters
+    ----------
+    conn_map : np.ndarray
+        Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channesl).
+    min_percentile : float
+        Minimum percentile for the threshold. Should be between 0 and 100.
+        E.g. for the 90th percentile, max_percentile=90.
+    max_percentile : float
+        Maximum percentile for the threshold. Should be a between 0 and 100.
+        E.g. for the 95th percentile, max_percentile=95.
+    subtract_mean : bool
+        Should we subtract the mean over modes before fitting a GMM?
+    standardize : bool
+        Should we standardize the input to the GMM?
+    sklearn_kwargs : dict
+        Dictionary of keyword arguments to pass to
+        sklearn.mixture.BayesianGaussianMixture().
+    filename : str
+        Filename to save fit to.
+    plot_kwargs : dict
+        Dictionary of keyword arguments to pass to
+        osl_dynamics.utils.plotting.plot_gmm().
+
+    Returns
+    -------
+    conn_map : np.ndarray
+        Thresholded connectivity matrix.
+    """
+    percentile = fit_gmm(
+        conn_map,
+        min_percentile,
+        max_percentile,
+        subtract_mean,
+        standardize,
+        sklearn_kwargs,
+        filename,
+        plot_kwargs,
+    )
+    conn_map = threshold(conn_map, percentile, subtract_mean, return_edges=False)
+    return conn_map
+
+
 def fit_gmm(
     conn_map,
     min_percentile=0,

@@ -153,6 +153,9 @@ def get_percentile_threshold(X, y, min_percentile=0, max_percentile=100):
     if max_percentile > 100 or max_percentile < 0:
         raise ValueError("max_percentile must be between 0 and 100.")
 
+    if min_percentile >= max_percentile:
+        raise ValueError("min_percentile must be less than max_percentile.")
+
     # Get the threshold for determining the class
     threshold = np.max([np.min(X[y == 1]), np.max(X[y == 0])])
 

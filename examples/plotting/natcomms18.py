@@ -64,7 +64,7 @@ power_map = power.variance_from_spectra(f, gpsd, wideband_components)
 conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, wideband_components)
 
 # Use a GMM to threshold the connectivity maps
-percentile = connectivity.fit_gmm(
+conn_map = connectivity.gmm_threshold(
     conn_map,
     min_percentile=90,
     max_percentile=98,
@@ -76,7 +76,6 @@ percentile = connectivity.fit_gmm(
         "y_label": "Probability",
     },
 )
-conn_map = connectivity.threshold(conn_map, percentile, subtract_mean=True)
 
 # Just plot the first component (second is noise)
 power.save(

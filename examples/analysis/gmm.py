@@ -20,4 +20,4 @@ X[component == 1] = np.random.normal(0, 0.5, size=n1)
 X[component == 0] = np.random.normal(2, 1, size=n2)
 
 # Fit a Gaussian mixture model
-y = fit_gaussian_mixture(X, plot_filename="gmm.png")
+percentile = fit_gaussian_mixture(X, plot_filename="gmm.png")
