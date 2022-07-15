@@ -17,12 +17,15 @@ class InverseWishart(regularizers.Regularizer):
     psi : np.ndarray
         Scale matrix. Must be a symmetric positive definite matrix.
         Shape must be (n_channels, n_channels).
+    n_batches : int
+        Number of batches in the data.
     """
 
-    def __init__(self, nu, psi, **kwargs):
+    def __init__(self, nu, psi, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.psi = psi
+        self.n_batches = n_batches
         self.n_channels = psi.shape[-1]
 
         # Validation
@@ -63,12 +66,15 @@ class MultivariateNormal(regularizers.Regularizer):
     sigma : np.ndarray
         2D numpy array of covariance matrix of the prior.
         Shape must be (n_channels, n_channels).
+    n_batches : int
+        Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, **kwargs):
+    def __init__(self, mu, sigma, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
+        self.n_batches = n_batches
 
         # Validation
         if self.mu.ndim != 1:
@@ -116,13 +122,15 @@ class MarginalInverseWishart(regularizers.Regularizer):
         Degrees of freedom. Must be greater than (n_channels - 1).
     n_channels : int
         Number of channels of the correlation matrices.
+    n_batches : int
+        Number of batches in the data.
     """
 
-    def __init__(self, nu, n_channels, **kwargs):
+    def __init__(self, nu, n_channels, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.n_channels = n_channels
-
+        self.n_batches = n_batches
         # Validation
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
@@ -147,12 +155,15 @@ class LogNormal(regularizers.Regularizer):
     sigma : np.ndarray
         Sigma parameters of the log normal distribution.
         Shape is (n_channels,). All entries must be positive.
+    n_batches : int
+        Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, **kwargs):
+    def __init__(self, mu, sigma, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
+        self.n_batches = n_batches
 
         # Validation
         if self.mu.ndim != 1:

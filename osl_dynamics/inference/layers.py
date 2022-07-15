@@ -319,6 +319,13 @@ class MeanVectorsLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         if self.regularizer is not None:
             reg = self.regularizer(self.vectors)
+
+            # Calculate the the scaling on regularisation
+            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+            n_batches = self.regularizer.n_batches
+            scaling_factor = batch_size * n_batches
+            reg = reg / scaling_factor
+
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
         return self.vectors
@@ -410,6 +417,13 @@ class CovarianceMatricesLayer(layers.Layer):
         covariances = self.bijector(self.flattened_cholesky_factors)
         if self.regularizer is not None:
             reg = self.regularizer(covariances)
+
+            # Calculate the the scaling on regularisation
+            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+            n_batches = self.regularizer.n_batches
+            scaling_factor = batch_size * n_batches
+            reg = reg / scaling_factor
+
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
         return covariances
@@ -506,6 +520,13 @@ class CorrelationMatricesLayer(layers.Layer):
         correlations = self.bijector(self.flattened_cholesky_factors)
         if self.regularizer is not None:
             reg = self.regularizer(correlations)
+
+            # Calculate the the scaling on regularisation
+            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+            n_batches = self.regularizer.n_batches
+            scaling_factor = batch_size * n_batches
+            reg = reg / scaling_factor
+
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
         return correlations
@@ -584,10 +605,17 @@ class DiagonalMatricesLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, alpha, **kwargs):
+    def call(self, inputs, **kwargs):
         D = self.bijector(self.diagonals)
         if self.regularizer is not None:
             reg = self.regularizer(D)
+
+            # Calculate the the scaling on regularisation
+            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+            n_batches = self.regularizer.n_batches
+            scaling_factor = batch_size * n_batches
+            reg = reg / scaling_factor
+
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
         D = tf.linalg.diag(D)

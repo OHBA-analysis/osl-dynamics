@@ -230,13 +230,15 @@ class Model(VariationalInferenceModelBase):
         """
         mdynemo_obs.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
 
-    def set_means_regularizer(self, training_data=None, mu=None, sigma=None):
+    def set_means_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
         """Set the means vector regularizer.
 
         The regularization is equivalent to applying a multivariate normal prior.
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Estimate mu and sigma using the training data instead of specifying it
             explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
@@ -257,9 +259,9 @@ class Model(VariationalInferenceModelBase):
             mu = np.zeros(self.config.n_channels, dtype=np.float32)
 
         means_layer = self.model.get_layer("means")
-        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma)
+        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
 
-    def set_stds_regularizer(self, training_data=None, mu=None, sigma=None):
+    def set_stds_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
         """Set the stds vector regularizer.
 
         The regularization is equivalent to applying independent log normal priors
@@ -267,6 +269,8 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Estimate mu and sigma using the training data instead of specifying it
             explicitly. If training_data is passed, mu=0 and
@@ -287,9 +291,9 @@ class Model(VariationalInferenceModelBase):
             sigma = np.sqrt(np.log(2 * range_))
 
         stds_layer = self.model.get_layer("stds")
-        stds_layer.regularizer = regularizers.LogNormal(mu, sigma)
+        stds_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
 
-    def set_fcs_regularizer(self, training_data=None, nu=None):
+    def set_fcs_regularizer(self, n_batches, training_data=None, nu=None):
         """Set the fcs matrix regularizer.
 
         The regularization is equivalent to applying an inverse Wishart prior
@@ -297,6 +301,8 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Estimate nu using the training data. If training_data is passed,
             nu = n_channels - 1 + 0.1.
@@ -312,10 +318,12 @@ class Model(VariationalInferenceModelBase):
 
         fcs_layer = self.model.get_layer("fcs")
         fcs_layer.regularizer = regularizers.MarginalInverseWishart(
-            nu, self.config.n_channels
+            nu,
+            self.config.n_channels,
+            n_batches,
         )
 
-    def set_regularizers(self, training_data):
+    def set_regularizers(self, n_batches, training_data):
         """Set the regularizers of means, stds and fcs based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu=0,
@@ -325,17 +333,19 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Training dataset.
         """
         if self.config.learn_means:
-            self.set_means_regularizer(training_data)
+            self.set_means_regularizer(n_batches, training_data)
 
         if self.config.learn_stds:
-            self.set_stds_regularizer(training_data)
+            self.set_stds_regularizer(n_batches, training_data)
 
         if self.config.learn_fcs:
-            self.set_fcs_regularizer(training_data)
+            self.set_fcs_regularizer(n_batches, training_data)
 
     def sample_time_courses(self, n_samples: int):
         """Uses the model RNN to sample mode mixing factors, alpha and gamma.

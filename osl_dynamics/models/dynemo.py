@@ -226,13 +226,15 @@ class Model(VariationalInferenceModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
-    def set_means_regularizer(self, training_data=None, mu=None, sigma=None):
+    def set_means_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
         """Set the means vector regularizer.
 
         The regularization is equivalent to applying a multivariate normal prior.
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Estimate mu and sigma using the training data instead of specifying it
             explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
@@ -253,18 +255,22 @@ class Model(VariationalInferenceModelBase):
             mu = np.zeros(self.config.n_channels, dtype=np.float32)
 
         means_layer = self.model.get_layer("means")
-        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma)
+        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
 
-    def set_covariances_regularizer(self, training_data=None, nu=None, psi=None):
+    def set_covariances_regularizer(
+        self, n_batches, training_data=None, nu=None, psi=None
+    ):
         """Set the covariance matrices regularizer.
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Estimate nu and psi using the training data instead of specifying it
             explicitly. If training_data is passed, nu=n_channels - 1 + 0.1
-            and psi=1 / (max - min)
-        nu : int
+            and psi=diag(1 / (max - min)).
+        nu : float
             Degrees of freedom of the prior.
         psi : np.ndarray
             Scale matrix of the prior. Shape must be (n_channels, n_channels).
@@ -280,9 +286,9 @@ class Model(VariationalInferenceModelBase):
             psi = np.diag(1 / range_)
 
         covs_layer = self.model.get_layer("covs")
-        covs_layer.regularizer = regularizers.InverseWishart(nu, psi)
+        covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)
 
-    def set_means_covariances_regularizer(self, training_data):
+    def set_regularizers(self, n_batches, training_data):
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
@@ -291,14 +297,16 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
+        n_batches : int
+            Number of batches.
         training_data : osl_dynamics.data.Data
             Training dataset.
         """
         if self.config.learn_means:
-            self.set_means_regularizer(training_data)
+            self.set_means_regularizer(n_batches, training_data)
 
         if self.config.learn_covariances:
-            self.set_covariances_regularizer(training_data)
+            self.set_covariances_regularizer(n_batches, training_data)
 
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.
