@@ -177,13 +177,17 @@ def _model_structure(config):
 
 def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    return covs_layer(1).numpy()
+    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
+    return covs
 
 
 def get_means_covariances(model):
     means_layer = model.get_layer("means")
     covs_layer = model.get_layer("covs")
-    return means_layer(1).numpy(), covs_layer(1).numpy()
+
+    means = means_layer.vectors.numpy()
+    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
+    return means, covs
 
 
 def set_means(model, means, update_initializer=True):

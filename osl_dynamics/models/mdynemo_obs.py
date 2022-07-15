@@ -188,7 +188,11 @@ def get_means_stds_fcs(model):
     means_layer = model.get_layer("means")
     stds_layer = model.get_layer("stds")
     fcs_layer = model.get_layer("fcs")
-    return means_layer(1).numpy(), stds_layer(1).numpy(), fcs_layer(1).numpy()
+
+    means = means_layer.vectors.numpy()
+    stds = tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)).numpy()
+    fcs = fcs_layer.bijector(fcs_layer.flattened_cholesky_factors).numpy()
+    return means, stds, fcs
 
 
 def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
