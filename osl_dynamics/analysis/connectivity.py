@@ -351,7 +351,9 @@ def fit_gmm(
     return np.squeeze(percentiles)
 
 
-def threshold(conn_map, percentile, subtract_mean=False, return_edges=False):
+def threshold(
+    conn_map, percentile, subtract_mean=False, absolute_value=False, return_edges=False
+):
     """Return edges that exceed a threshold.
 
     Parameters
@@ -367,6 +369,11 @@ def threshold(conn_map, percentile, subtract_mean=False, return_edges=False):
         Should we subtract the mean over modes before thresholding?
         The thresholding is only done to identify edges, the values returned in
         conn_map are not mean subtracted.
+    absolute_value : bool
+        Should we take the absolute value before thresholding?
+        The thresholding is only done to identify edges, the values returned in
+        conn_map are not absolute values. If subtract_mean=True, the mean is
+        subtracted before the absolute value.
     return_edges : bool
         Should we return a boolean array for whether edges are above the
         threshold?
@@ -399,13 +406,18 @@ def threshold(conn_map, percentile, subtract_mean=False, return_edges=False):
         # A (n_modes,) array has been passed, add the n_components dimension
         percentile = percentile[np.newaxis, ...]
 
+    # Copy the original connectivity map
+    c = conn_map.copy()
+
     # Subtract the mean
     if n_modes == 1:
         subtract_mean = False
     if subtract_mean:
-        c = conn_map - np.mean(conn_map, axis=1, keepdims=True)
-    else:
-        c = conn_map
+        c -= np.mean(c, axis=1, keepdims=True)
+
+    # Take absolute value
+    if absolute_value:
+        c = abs(c)
 
     # Which edges are greater than the threshold?
     edges = np.empty([n_components, n_modes, n_channels, n_channels], dtype=bool)
@@ -420,6 +432,28 @@ def threshold(conn_map, percentile, subtract_mean=False, return_edges=False):
     conn_map[~edges] = 0
 
     return np.squeeze(conn_map)
+
+
+def separate_edges(conn_map):
+    """Separate positive and negative edges in a connectivity map.
+
+    Parameters
+    ----------
+    conn_map : np.ndarray
+        Connectivity map.
+
+    Returns
+    -------
+    pos_conn_map : np.ndarray
+        Connectivity map with positive edges.
+    neg_conn_map : np.ndarray
+        Connectivity map with negative edges.
+    """
+    pos_conn_map = conn_map.copy()
+    neg_conn_map = conn_map.copy()
+    pos_conn_map[pos_conn_map < 0] = 0
+    neg_conn_map[neg_conn_map > 0] = 0
+    return pos_conn_map, neg_conn_map
 
 
 def save(
@@ -478,11 +512,7 @@ def save(
     conn_map = connectivity_map[component]
 
     # Default plotting settings
-    default_plot_kwargs = {
-        "node_size": 10,
-        "node_color": "black",
-        "edge_cmap": cm["red_transparent_full_alpha_range"],
-    }
+    default_plot_kwargs = {"node_size": 10, "node_color": "black"}
 
     # Loop through each connectivity map
     n_modes = conn_map.shape[0]
