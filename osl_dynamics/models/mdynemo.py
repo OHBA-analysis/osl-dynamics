@@ -247,19 +247,9 @@ class Model(VariationalInferenceModelBase):
         sigma : np.ndarray
             Covariance matrix of the prior. Shape must be (n_channels,n_channels).
         """
-        if training_data is None:
-            if mu is None or sigma is None:
-                raise ValueError(
-                    "Either prior parameters (mu, sigma) or training_data must be passed."
-                )
-        else:
-            ts = training_data.time_series(concatenate=True)
-            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-            sigma = np.diag((range_ / 2) ** 2)
-            mu = np.zeros(self.config.n_channels, dtype=np.float32)
-
-        means_layer = self.model.get_layer("means")
-        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
+        mdynemo_obs.set_means_regularizer(
+            self.model, n_batches, training_data, mu, sigma
+        )
 
     def set_stds_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
         """Set the stds vector regularizer.
@@ -280,18 +270,9 @@ class Model(VariationalInferenceModelBase):
         sigma : np.ndarray
             Sigma parameter of the log normal priors. Shape must be (n_channels,).
         """
-        if training_data is None:
-            if mu is None or sigma is None:
-                raise ValueError("Both mu and sigma must be passed.")
-
-        else:
-            mu = np.zeros([self.config.n_channels], dtype=np.float32)
-            ts = training_data.time_series(concatenate=True)
-            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-            sigma = np.sqrt(np.log(2 * range_))
-
-        stds_layer = self.model.get_layer("stds")
-        stds_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
+        mdynemo_obs.set_stds_regularizer(
+            self.model, n_batches, training_data, mu, sigma
+        )
 
     def set_fcs_regularizer(self, n_batches, training_data=None, nu=None):
         """Set the fcs matrix regularizer.
@@ -309,19 +290,7 @@ class Model(VariationalInferenceModelBase):
         nu : int
             Degrees of freedom of the prior.
         """
-        if training_data is None:
-            if nu is None:
-                raise ValueError("nu must be passed.")
-
-        else:
-            nu = self.config.n_channels - 1 + 0.1
-
-        fcs_layer = self.model.get_layer("fcs")
-        fcs_layer.regularizer = regularizers.MarginalInverseWishart(
-            nu,
-            self.config.n_channels,
-            n_batches,
-        )
+        mdynemo_obs.set_fcs_regularizer(self.model, n_batches, training_data, nu)
 
     def set_regularizers(self, n_batches, training_data):
         """Set the regularizers of means, stds and fcs based on the training data.
@@ -520,6 +489,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     stds_layer = DiagonalMatricesLayer(
@@ -527,6 +497,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
+        config.stds_regularizer,
         name="stds",
     )
     fcs_layer = CorrelationMatricesLayer(
@@ -534,6 +505,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
+        config.fcs_regularizer,
         name="fcs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
