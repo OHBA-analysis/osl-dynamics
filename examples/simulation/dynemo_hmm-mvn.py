@@ -5,7 +5,6 @@
 """
 
 print("Setting up")
-import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
@@ -16,7 +15,7 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=5,
-    n_channels=11,
+    n_channels=20,
     sequence_length=200,
     inference_n_units=128,
     inference_normalization="layer",

@@ -243,19 +243,9 @@ class Model(VariationalInferenceModelBase):
         sigma : np.ndarray
             Covariance matrix of the prior. Shape must be (n_channels,n_channels).
         """
-        if training_data is None:
-            if mu is None or sigma is None:
-                raise ValueError(
-                    "Either prior parameters (mu, sigma) or training_data must be passed."
-                )
-        else:
-            ts = training_data.time_series(concatenate=True)
-            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-            sigma = np.diag((range_ / 2) ** 2)
-            mu = np.zeros(self.config.n_channels, dtype=np.float32)
-
-        means_layer = self.model.get_layer("means")
-        means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
+        dynemo_obs.set_means_regularizer(
+            self.model, n_batches, training_data, mu, sigma
+        )
 
     def set_covariances_regularizer(
         self, n_batches, training_data=None, nu=None, psi=None
@@ -275,18 +265,9 @@ class Model(VariationalInferenceModelBase):
         psi : np.ndarray
             Scale matrix of the prior. Shape must be (n_channels, n_channels).
         """
-        if training_data is None:
-            if nu is None or psi is None:
-                raise ValueError("Both nu and psi must be passed.")
-
-        else:
-            nu = self.config.n_channels - 1 + 0.1
-            ts = training_data.time_series(concatenate=True)
-            range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-            psi = np.diag(1 / range_)
-
-        covs_layer = self.model.get_layer("covs")
-        covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)
+        dynemo_obs.set_covariances_regularizer(
+            self.model, n_batches, training_data, nu, psi
+        )
 
     def set_regularizers(self, n_batches, training_data):
         """Set the means and covariances regularizer based on the training data.
