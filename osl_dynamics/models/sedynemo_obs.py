@@ -480,7 +480,12 @@ def _model_structure(config):
 def get_group_means_covariances(model):
     group_means_layer = model.get_layer("group_means")
     group_covs_layer = model.get_layer("group_covs")
-    return group_means_layer(1).numpy(), group_covs_layer(1).numpy()
+
+    group_means = group_means_layer.vectors.numpy()
+    group_covs = group_covs_layer.bijector(
+        group_covs_layer.flattened_cholesky_factors
+    ).numpy()
+    return group_means, group_covs
 
 
 def get_subject_embeddings(model):
