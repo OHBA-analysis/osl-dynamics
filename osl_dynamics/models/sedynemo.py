@@ -7,12 +7,14 @@ from typing import Literal
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+
+import osl_dynamics.data.tf as dtf
+from osl_dynamics.models import dynemo_obs, sedynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
     VariationalInferenceModelBase,
 )
-from osl_dynamics.models import sedynemo_obs
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
@@ -290,50 +292,7 @@ class Model(VariationalInferenceModelBase):
             self.model, self.config.dev_bayesian
         )
 
-    def set_means_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
-        """Set the group means vector regularizer.
-
-        The regularization is equivalent to applying a multivariate normal prior.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate mu and sigma using the training data instead of specifying it
-            explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
-        mu : np.ndarray
-            Mean vector of the prior. Shape must be (n_channels,).
-        sigma : np.ndarray
-            Covariance matrix of the prior. Shape must be (n_channels,n_channels).
-        """
-        sedynemo_obs.set_means_regularizer(
-            self.model, n_batches, training_data, mu, sigma
-        )
-
-    def set_covariances_regularizer(
-        self, n_batches, training_data=None, nu=None, psi=None
-    ):
-        """Set the group covariance matrices regularizer.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate nu and psi using the training data instead of specifying it
-            explicitly. If training_data is passed, nu=n_channels - 1 + 0.1
-            and psi=diag(1 / (max - min)).
-        nu : float
-            Degrees of freedom of the prior.
-        psi : np.ndarray
-            Scale matrix of the prior. Shape must be (n_channels, n_channels).
-        """
-        sedynemo_obs.set_covariances_regularizer(
-            self.model, n_batches, training_data, nu, psi
-        )
-
-    def set_regularizers(self, n_batches, training_data):
+    def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
@@ -342,20 +301,27 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
+        training_data : tensorflow.data.Dataset
             Training dataset.
         """
         if self.config.learn_means:
-            self.set_means_regularizer(n_batches, training_data)
+            dynemo_obs.set_means_regularizer(
+                self.model, training_dataset, layer_name="group_means"
+            )
 
         if self.config.learn_covariances:
-            self.set_covariances_regularizer(n_batches, training_data)
+            dynemo_obs.set_covariances_regularizer(
+                self.model, training_dataset, layer_name="group_covs"
+            )
 
-    def set_bayesian_kl_scaling(self, n_batches):
+    def set_bayesian_kl_scaling(self, training_dataset):
         """Set the correct scaling for KL loss between deviation posterior and prior."""
-        sedynemo_obs.set_bayesian_kl_scaling(self.model, self.config, n_batches)
+        n_batches = dtf.get_n_batches(training_dataset)
+        learn_means = self.config.learn_means
+        learn_covariances = self.config.learn_covariances
+        sedynemo_obs.set_bayesian_kl_scaling(
+            self.model, n_batches, learn_means, learn_covariances
+        )
 
 
 def _model_structure(config):

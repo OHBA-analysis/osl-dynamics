@@ -82,11 +82,10 @@ model = Model(config)
 model.summary()
 
 # Set scaling factor for devation kl loss
-n_batches = training_dataset.cardinality().numpy()
-model.set_bayesian_kl_scaling(n_batches)
+model.set_bayesian_kl_scaling(training_dataset)
 
 # Set regularizers
-model.set_regularizers(n_batches, training_data)
+model.set_regularizers(training_dataset)
 
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)

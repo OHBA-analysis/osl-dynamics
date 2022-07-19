@@ -74,6 +74,7 @@ class TensorFlowDataset:
             Dataset for training or evaluating the model along with the validation
             set if validation_split was passed.
         """
+        self.n_batches = self.count_batches(sequence_length)
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
@@ -327,3 +328,65 @@ def create_dataset(
         dataset = dataset.map(tuple_to_dict)
 
     return dataset
+
+
+def get_range(dataset):
+    """The range (max-min) of values contained in a batched Tensorflow dataset.
+
+    Parameters
+    ----------
+    dataset : tensorflow.data.Dataset
+        TensorFlow dataset.
+
+    Returns
+    -------
+    range : np.ndarray
+        Range of each channel.
+    """
+    amax = []
+    amin = []
+    for batch in dataset:
+        if isinstance(batch, dict):
+            batch = batch["data"]
+        batch = batch.numpy()
+        n_channels = batch.shape[-1]
+        batch = batch.reshape(-1, n_channels)
+        amin.append(np.amin(batch, axis=0))
+        amax.append(np.amax(batch, axis=0))
+    return np.amax(amax, axis=0) - np.amin(amin, axis=0)
+
+
+def get_n_channels(dataset):
+    """Get the number of channels in a batched TensorFlow dataset.
+
+    Parameters
+    ----------
+    dataset : tensorflow.data.Dataset
+        TensorFlow dataset.
+
+    Returns
+    -------
+    n_channels : int
+        Number of channels.
+    """
+    for batch in dataset:
+        if isinstance(batch, dict):
+            batch = batch["data"]
+        batch = batch.numpy()
+        return batch.shape[-1]
+
+
+def get_n_batches(dataset):
+    """Get number of batches in a TensorFlow dataset.
+
+    Parameters
+    ----------
+    dataset : tensorflow.data.Dataset
+        TensorFlow dataset.
+
+    Returns
+    -------
+    n_batches : int
+        Number of batches.
+    """
+    return dataset.cardinality().numpy()

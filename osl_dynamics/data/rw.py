@@ -32,7 +32,7 @@ class RW:
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)?
     load_memmaps: bool
-        Should we load the data into the memmaps?  
+        Should we load the data into the memmaps?
     keep_memmaps_on_close : bool
         Should we keep the memmaps?
     """
@@ -177,7 +177,7 @@ class RW:
         for raw_data, mmap_location in zip(
             tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
         ):
-            if not self.load_memmaps: # do not load into the memory maps
+            if not self.load_memmaps:  # do not load into the memory maps
                 mmap_location = None
             raw_data_mmap = load_data(
                 raw_data, data_field, mmap_location, mmap_mode="r"
@@ -341,7 +341,7 @@ def load_data(
                 return data
             else:
                 np.save(mmap_location, data)
-                data = mmap_location        
+                data = mmap_location
 
     # Load data as memmap
     data = np.load(mmap_location, mmap_mode=mmap_mode)

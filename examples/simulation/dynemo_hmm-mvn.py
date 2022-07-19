@@ -65,9 +65,8 @@ prediction_dataset = training_data.dataset(
 model = Model(config)
 model.summary()
 
-# Add regularisation for mode covariances
-n_batches = training_dataset.cardinality().numpy()
-model.set_regularizers(n_batches, training_data)
+# Add regularisation
+model.set_regularizers(training_dataset)
 
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)

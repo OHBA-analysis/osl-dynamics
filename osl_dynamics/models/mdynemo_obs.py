@@ -7,7 +7,10 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+from osl_dynamics.models import dynemo_obs
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
@@ -135,65 +138,7 @@ class Model(ModelBase):
         """
         set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
 
-    def set_means_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
-        """Set the means vector regularizer.
-
-        The regularization is equivalent to applying a multivariate normal prior.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate mu and sigma using the training data instead of specifying it
-            explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
-        mu : np.ndarray
-            Mean vector of the prior. Shape must be (n_channels,).
-        sigma : np.ndarray
-            Covariance matrix of the prior. Shape must be (n_channels,n_channels).
-        """
-        set_means_regularizer(self.model, n_batches, training_data, mu, sigma)
-
-    def set_stds_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
-        """Set the stds vector regularizer.
-
-        The regularization is equivalent to applying independent log normal priors
-        to each channel.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate mu and sigma using the training data instead of specifying it
-            explicitly. If training_data is passed, mu=0 and
-            sigma=sqrt(log(2 * (max - min))).
-        mu : np.ndarray
-            Mu parameter of the log normal priors. Shape must be (n_channels,).
-        sigma : np.ndarray
-            Sigma parameter of the log normal priors. Shape must be (n_channels,).
-        """
-        set_stds_regularizer(self.model, n_batches, training_data, mu, sigma)
-
-    def set_fcs_regularizer(self, n_batches, training_data=None, nu=None):
-        """Set the fcs matrix regularizer.
-
-        The regularization is equivalent to applying an inverse Wishart prior
-        but with variances marginalized.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate nu using the training data. If training_data is passed,
-            nu = n_channels - 1 + 0.1.
-        nu : int
-            Degrees of freedom of the prior.
-        """
-        set_fcs_regularizer(self.model, n_batches, training_data, nu)
-
-    def set_regularizers(self, n_batches, training_data):
+    def set_regularizers(self, training_dataset):
         """Set the regularizers of means, stds and fcs based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu=0,
@@ -203,19 +148,17 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
+        training_dataset : tensorflow.data.Dataset
             Training dataset.
         """
         if self.config.learn_means:
-            self.set_means_regularizer(n_batches, training_data)
+            dynemo_obs.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_stds:
-            self.set_stds_regularizer(n_batches, training_data)
+            set_stds_regularizer(self.model, training_dataset)
 
         if self.config.learn_fcs:
-            self.set_fcs_regularizer(n_batches, training_data)
+            set_fcs_regularizer(self.model, training_dataset)
 
 
 def _model_structure(config):
@@ -326,48 +269,23 @@ def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
         )
 
 
-def set_means_regularizer(model, n_batches, training_data=None, mu=None, sigma=None):
-    if training_data is None:
-        if mu is None or sigma is None:
-            raise ValueError(
-                "Either prior parameters (mu, sigma) or training_data must be passed."
-            )
-    else:
-        ts = training_data.time_series(concatenate=True)
-        n_channels = ts.shape[1]
-        range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-        sigma = np.diag((range_ / 2) ** 2)
-        mu = np.zeros(n_channels, dtype=np.float32)
+def set_stds_regularizer(model, training_dataset):
+    n_batches = dtf.get_n_batches(training_dataset)
+    n_channels = dtf.get_n_channels(training_dataset)
+    range_ = dtf.get_range(training_dataset)
 
-    means_layer = model.get_layer("means")
-    means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
-
-
-def set_stds_regularizer(model, n_batches, training_data=None, mu=None, sigma=None):
-    if training_data is None:
-        if mu is None or sigma is None:
-            raise ValueError("Both mu and sigma must be passed.")
-
-    else:
-        ts = training_data.time_series(concatenate=True)
-        n_channels = ts.shape[1]
-        mu = np.zeros([n_channels], dtype=np.float32)
-        range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-        sigma = np.sqrt(np.log(2 * range_))
+    mu = np.zeros([n_channels], dtype=np.float32)
+    sigma = np.sqrt(np.log(2 * range_))
 
     stds_layer = model.get_layer("stds")
     stds_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
 
 
-def set_fcs_regularizer(model, n_batches, training_data, nu):
-    if training_data is None:
-        if nu is None:
-            raise ValueError("nu must be passed.")
+def set_fcs_regularizer(model, training_dataset):
+    n_batches = dtf.get_n_batches(training_dataset)
+    n_channels = dtf.get_n_channels(training_dataset)
 
-    else:
-        ts = training_data.time_series(concatenate=True)
-        n_channels = ts.shape[1]
-        nu = n_channels - 1 + 0.1
+    nu = n_channels - 1 + 0.1
 
     fcs_layer = model.get_layer("fcs")
     fcs_layer.regularizer = regularizers.MarginalInverseWishart(

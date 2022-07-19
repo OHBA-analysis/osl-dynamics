@@ -1,12 +1,17 @@
 """Subject Embedding Dynamic Network Modes (Se-DyNeMo) observation model.
+
 """
+
 from dataclasses import dataclass
+
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability import bijectors as tfb
 from tensorflow.keras import layers
-from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 
+import osl_dynamics.data.tf as dtf
+from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     DummyLayer,
@@ -215,46 +220,7 @@ class Model(ModelBase):
         """
         return get_subject_means_covariances(self.model, self.config.dev_bayesian)
 
-    def set_means_regularizer(self, n_batches, training_data=None, mu=None, sigma=None):
-        """Set the group means vector regularizer.
-
-        The regularization is equivalent to applying a multivariate normal prior.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate mu and sigma using the training data instead of specifying it
-            explicitly. If training_data is passed, diag(sigma)=((max - min) / 2)**2.
-        mu : np.ndarray
-            Mean vector of the prior. Shape must be (n_channels,).
-        sigma : np.ndarray
-            Covariance matrix of the prior. Shape must be (n_channels,n_channels).
-        """
-        set_means_regularizer(self.model, n_batches, training_data, mu, sigma)
-
-    def set_covariances_regularizer(
-        self, n_batches, training_data=None, nu=None, psi=None
-    ):
-        """Set the group covariance matrices regularizer.
-
-        Parameters
-        ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
-            Estimate nu and psi using the training data instead of specifying it
-            explicitly. If training_data is passed, nu=n_channels - 1 + 0.1
-            and psi=diag(1 / (max - min)).
-        nu : float
-            Degrees of freedom of the prior.
-        psi : np.ndarray
-            Scale matrix of the prior. Shape must be (n_channels, n_channels).
-        """
-        set_covariances_regularizer(self.model, n_batches, training_data, nu, psi)
-
-    def set_regularizers(self, n_batches, training_data):
+    def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
@@ -263,20 +229,25 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        n_batches : int
-            Number of batches.
-        training_data : osl_dynamics.data.Data
+        training_data : tensorflow.data.Dataset
             Training dataset.
         """
         if self.config.learn_means:
-            self.set_means_regularizer(n_batches, training_data)
+            dynemo_obs.set_means_regularizer(
+                self.model, training_dataset, layer_name="group_means"
+            )
 
         if self.config.learn_covariances:
-            self.set_covariances_regularizer(n_batches, training_data)
+            dynemo_obs.set_covariances_regularizer(
+                self.model, training_dataset, layer_name="group_covs"
+            )
 
-    def set_bayesian_deviation_parameters(self, n_batches):
+    def set_bayesian_deviation_parameters(self, training_dataset):
         """Set the correct scaling for KL loss between deviation posterior and prior."""
-        set_bayesian_kl_scaling(self.model, self.config, n_batches)
+        n_batches = dtf.get_n_batches(training_dataset)
+        learn_means = self.config.learn_means
+        learn_covariances = self.config.learn_covariances
+        set_bayesian_kl_scaling(self.model, n_batches, learn_means, learn_covariances)
 
 
 def _model_structure(config):
@@ -580,46 +551,11 @@ def get_subject_means_covariances(model, dev_bayesian):
     return mu.numpy(), D.numpy()
 
 
-def set_means_regularizer(model, n_batches, training_data=None, mu=None, sigma=None):
-    if training_data is None:
-        if mu is None or sigma is None:
-            raise ValueError(
-                "Either prior parameters (mu, sigma) or training_data must be passed."
-            )
-    else:
-        ts = training_data.time_series(concatenate=True)
-        n_channels = ts.shape[1]
-        range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-        sigma = np.diag((range_ / 2) ** 2)
-        mu = np.zeros(n_channels, dtype=np.float32)
-
-    means_layer = model.get_layer("group_means")
-    means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
-
-
-def set_covariances_regularizer(
-    model, n_batches, training_data=None, nu=None, psi=None
-):
-    if training_data is None:
-        if nu is None or psi is None:
-            raise ValueError("Both nu and psi must be passed.")
-
-    else:
-        ts = training_data.time_series(concatenate=True)
-        n_channels = ts.shape[1]
-        nu = n_channels - 1 + 0.1
-        range_ = np.amax(ts, axis=0) - np.amin(ts, axis=0)
-        psi = np.diag(1 / range_)
-
-    covs_layer = model.get_layer("group_covs")
-    covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)
-
-
-def set_bayesian_kl_scaling(model, config, n_batches):
-    if config.learn_means:
+def set_bayesian_kl_scaling(model, n_batches, learn_means, learn_covariances):
+    if learn_means:
         means_dev_kl_loss_layer = model.get_layer("means_dev_kl_loss")
         means_dev_kl_loss_layer.n_batches = n_batches
 
-    if config.learn_covariances:
+    if learn_covariances:
         covs_dev_kl_loss_layer = model.get_layer("covs_dev_kl_loss")
         covs_dev_kl_loss_layer.n_batches = n_batches

@@ -67,8 +67,7 @@ model = Model(config)
 model.summary()
 
 # Set regularisers
-n_batches = training_dataset.cardinality().numpy()
-model.set_regularizers(n_batches, training_data)
+model.set_regularizers(training_dataset)
 
 print("Training model")
 history = model.fit(

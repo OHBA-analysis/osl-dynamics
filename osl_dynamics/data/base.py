@@ -34,7 +34,7 @@ class Data(RW, Processing, TensorFlowDataset):
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)?
     load_memmaps: bool
-        Should we load the data into the memmaps?      
+        Should we load the data into the memmaps?
     keep_memmaps_on_close : bool
         Should we keep the memmaps?
     """
