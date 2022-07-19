@@ -7,12 +7,14 @@ from typing import Literal
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+
+import osl_dynamics.data.tf as dtf
+from osl_dynamics.models import dynemo_obs, sedynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
     VariationalInferenceModelBase,
 )
-from osl_dynamics.models import sedynemo_obs
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
@@ -90,6 +92,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for group mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for group covariance matrices.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -159,6 +165,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     # Parameters specific to subject embedding model
     n_subjects: int = None
@@ -284,6 +292,37 @@ class Model(VariationalInferenceModelBase):
             self.model, self.config.dev_bayesian
         )
 
+    def set_regularizers(self, training_dataset):
+        """Set the means and covariances regularizer based on the training data.
+
+        A multivariate normal prior is applied to the mean vectors with mu = 0,
+        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+
+        Parameters
+        ----------
+        training_data : tensorflow.data.Dataset
+            Training dataset.
+        """
+        if self.config.learn_means:
+            dynemo_obs.set_means_regularizer(
+                self.model, training_dataset, layer_name="group_means"
+            )
+
+        if self.config.learn_covariances:
+            dynemo_obs.set_covariances_regularizer(
+                self.model, training_dataset, layer_name="group_covs"
+            )
+
+    def set_bayesian_kl_scaling(self, training_dataset):
+        """Set the correct scaling for KL loss between deviation posterior and prior."""
+        n_batches = dtf.get_n_batches(training_dataset)
+        learn_means = self.config.learn_means
+        learn_covariances = self.config.learn_covariances
+        sedynemo_obs.set_bayesian_kl_scaling(
+            self.model, n_batches, learn_means, learn_covariances
+        )
+
 
 def _model_structure(config):
     # layers for inputs
@@ -353,6 +392,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="group_means",
     )
     group_covs_layer = CovarianceMatricesLayer(
@@ -360,6 +400,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_regularizer,
         name="group_covs",
     )
     means_mode_embedding_layer = layers.Dense(
@@ -541,12 +582,9 @@ def _model_structure(config):
     mod_mu = mod_mu_layer(model_output_concat)
     mod_sigma = mod_sigma_layer(model_output_concat)
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
-    kl_loss = kl_loss_layer(kl_div)
 
     if not config.dev_bayesian:
-        return tf.keras.Model(
-            inputs=[data, subj_id], outputs=[ll_loss, kl_loss, alpha], name="Se-DyNeMo"
-        )
+        kl_loss = kl_loss_layer(kl_div)
     else:
         # Layers for dev prior
         dev_mod_sigma_layer = ScalarLayer(
@@ -554,22 +592,32 @@ def _model_structure(config):
             config.initial_dev_mod_sigma,
             name="dev_mod_sigma",
         )
-        means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(name="means_dev_kl_loss")
-        covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(name="covs_dev_kl_loss")
-        dev_kl_loss_layer = KLLossLayer(do_annealing=False, name="dev_kl_loss")
+        if config.learn_means:
+            means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
+                name="means_dev_kl_loss"
+            )
+        else:
+            means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
+
+        if config.learn_covariances:
+            covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
+                name="covs_dev_kl_loss"
+            )
+        else:
+            covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")
 
         # Data flow
         dev_mod_sigma = dev_mod_sigma_layer(data)  # Data not used
         means_dev_kl_loss = means_dev_kl_loss_layer(
-            [means_dev_inf_mu, means_dev_inf_sigma, dev_mod_sigma]
+            [data, means_dev_inf_mu, means_dev_inf_sigma, dev_mod_sigma]
         )
         covs_dev_kl_loss = covs_dev_kl_loss_layer(
-            [covs_dev_inf_mu, covs_dev_inf_sigma, dev_mod_sigma]
+            [data, covs_dev_inf_mu, covs_dev_inf_sigma, dev_mod_sigma]
         )
-        dev_kl_loss = dev_kl_loss_layer([means_dev_kl_loss, covs_dev_kl_loss])
+        kl_loss = kl_loss_layer([kl_div, means_dev_kl_loss, covs_dev_kl_loss])
 
-        return tf.keras.Model(
-            inputs=[data, subj_id],
-            outputs=[ll_loss, kl_loss, alpha, dev_kl_loss],
-            name="Se-DyNeMo",
-        )
+    return tf.keras.Model(
+        inputs=[data, subj_id],
+        outputs=[ll_loss, kl_loss, alpha],
+        name="Se-DyNeMo",
+    )

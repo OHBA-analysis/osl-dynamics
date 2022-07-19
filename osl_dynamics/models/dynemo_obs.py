@@ -8,7 +8,9 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -39,6 +41,10 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for covariance matrices.
 
     batch_size : int
         Mini-batch size.
@@ -62,6 +68,8 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
@@ -133,6 +141,24 @@ class Model(ModelBase):
         """
         set_covariances(self.model, covariances, update_initializer)
 
+    def set_regularizers(self, training_dataset):
+        """Set the means and covariances regularizer based on the training data.
+
+        A multivariate normal prior is applied to the mean vectors with mu = 0,
+        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+
+        Parameters
+        ----------
+        training_dataset : tensorflow.data.Dataset
+            Training dataset.
+        """
+        if self.config.learn_means:
+            set_means_regularizer(self.model, training_dataset)
+
+        if self.config.learn_covariances:
+            set_covariances_regularizer(self.model, training_dataset)
+
 
 def _model_structure(config):
 
@@ -152,6 +178,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     covs_layer = CovarianceMatricesLayer(
@@ -159,6 +186,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
@@ -177,13 +205,17 @@ def _model_structure(config):
 
 def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    return covs_layer(1).numpy()
+    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
+    return covs
 
 
 def get_means_covariances(model):
     means_layer = model.get_layer("means")
     covs_layer = model.get_layer("covs")
-    return means_layer(1).numpy(), covs_layer(1).numpy()
+
+    means = means_layer.vectors.numpy()
+    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
+    return means, covs
 
 
 def set_means(model, means, update_initializer=True):
@@ -210,3 +242,27 @@ def set_covariances(model, covariances, update_initializer=True):
         covs_layer.flattened_cholesky_factors_initializer.initial_value = (
             flattened_cholesky_factors
         )
+
+
+def set_means_regularizer(model, training_dataset, layer_name="means"):
+    n_batches = dtf.get_n_batches(training_dataset)
+    n_channels = dtf.get_n_channels(training_dataset)
+    range_ = dtf.get_range(training_dataset)
+
+    mu = np.zeros(n_channels, dtype=np.float32)
+    sigma = np.diag((range_ / 2) ** 2)
+
+    means_layer = model.get_layer(layer_name)
+    means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
+
+
+def set_covariances_regularizer(model, training_dataset, layer_name="covs"):
+    n_batches = dtf.get_n_batches(training_dataset)
+    n_channels = dtf.get_n_channels(training_dataset)
+    range_ = dtf.get_range(training_dataset)
+
+    nu = n_channels - 1 + 0.1
+    psi = np.diag(1 / range_)
+
+    covs_layer = model.get_layer(layer_name)
+    covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)

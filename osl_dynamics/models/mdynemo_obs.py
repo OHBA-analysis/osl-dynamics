@@ -7,7 +7,11 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+from osl_dynamics.models import dynemo_obs
+from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -40,6 +44,12 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the mean vectors.
+    stds_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the standard deviation vectors.
+    fcs_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the correlation matrices.
 
     batch_size : int
         Mini-batch size.
@@ -65,6 +75,9 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    stds_regularizer: tf.keras.regularizers.Regularizer = None
+    fcs_regularizer: tf.keras.regularizers.Regularizer = None
     multiple_dynamics: bool = True
 
     def __post_init__(self):
@@ -124,6 +137,28 @@ class Model(ModelBase):
             the model?
         """
         set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+
+    def set_regularizers(self, training_dataset):
+        """Set the regularizers of means, stds and fcs based on the training data.
+
+        A multivariate normal prior is applied to the mean vectors with mu=0,
+        sigma=diag((range / 2)**2), a log normal prior is applied to the standard
+        deviations with mu=0, sigma=sqrt(log(2 * (range))) and a marginal inverse
+        Wishart prior is applied to the fcs matrices with nu = n_channels - 1 + 0.1.
+
+        Parameters
+        ----------
+        training_dataset : tensorflow.data.Dataset
+            Training dataset.
+        """
+        if self.config.learn_means:
+            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+
+        if self.config.learn_stds:
+            set_stds_regularizer(self.model, training_dataset)
+
+        if self.config.learn_fcs:
+            set_fcs_regularizer(self.model, training_dataset)
 
 
 def _model_structure(config):
@@ -188,7 +223,11 @@ def get_means_stds_fcs(model):
     means_layer = model.get_layer("means")
     stds_layer = model.get_layer("stds")
     fcs_layer = model.get_layer("fcs")
-    return means_layer(1).numpy(), stds_layer(1).numpy(), fcs_layer(1).numpy()
+
+    means = means_layer.vectors.numpy()
+    stds = tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)).numpy()
+    fcs = fcs_layer.bijector(fcs_layer.flattened_cholesky_factors).numpy()
+    return means, stds, fcs
 
 
 def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
@@ -228,3 +267,29 @@ def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
         fcs_layer.flattened_cholesky_factors_initializer.initial_value = (
             flattened_cholesky_factors
         )
+
+
+def set_stds_regularizer(model, training_dataset):
+    n_batches = dtf.get_n_batches(training_dataset)
+    n_channels = dtf.get_n_channels(training_dataset)
+    range_ = dtf.get_range(training_dataset)
+
+    mu = np.zeros([n_channels], dtype=np.float32)
+    sigma = np.sqrt(np.log(2 * range_))
+
+    stds_layer = model.get_layer("stds")
+    stds_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
+
+
+def set_fcs_regularizer(model, training_dataset):
+    n_batches = dtf.get_n_batches(training_dataset)
+    n_channels = dtf.get_n_channels(training_dataset)
+
+    nu = n_channels - 1 + 0.1
+
+    fcs_layer = model.get_layer("fcs")
+    fcs_layer.regularizer = regularizers.MarginalInverseWishart(
+        nu,
+        n_channels,
+        n_batches,
+    )

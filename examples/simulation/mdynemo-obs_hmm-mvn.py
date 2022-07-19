@@ -15,7 +15,7 @@ tf_ops.gpu_growth()
 # Hyperparameters
 config = Config(
     n_modes=5,
-    n_channels=40,
+    n_channels=20,
     sequence_length=200,
     learn_means=True,
     learn_stds=True,
@@ -50,6 +50,9 @@ training_dataset = training_data.dataset(
 # Build model
 model = Model(config)
 model.summary()
+
+# Set regularisers
+model.set_regularizers(training_dataset)
 
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)

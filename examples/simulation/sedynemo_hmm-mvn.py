@@ -17,16 +17,14 @@ tf_ops.gpu_growth()
 # Settings
 config = Config(
     n_modes=5,
-    n_channels=11,
+    n_channels=20,
     n_subjects=20,
     subject_embedding_dim=5,
     mode_embedding_dim=2,
-    spatial_map_reg="l2",
-    spatial_map_reg_strength=1e-3,
     sequence_length=200,
-    inference_n_units=64,
+    inference_n_units=128,
     inference_normalization="layer",
-    model_n_units=64,
+    model_n_units=128,
     model_normalization="layer",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
@@ -35,10 +33,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=50,
-    batch_size=16,
-    learning_rate=0.01,
-    n_epochs=100,
+    n_kl_annealing_epochs=100,
+    batch_size=64,
+    learning_rate=0.005,
+    n_epochs=200,
     multi_gpu=False,
 )
 
@@ -58,25 +56,36 @@ sim = simulation.MSubj_HMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-meg_data = data.Data([mtc for mtc in sim.time_series])
+training_data = data.Data([mtc for mtc in sim.time_series])
 
 # Prepare dataset
-training_dataset = meg_data.dataset(
+training_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size * config.strategy.num_replicas_in_sync,
     shuffle=True,
     subj_id=True,
 )
-prediction_dataset = meg_data.dataset(
+prediction_dataset = training_data.dataset(
     config.sequence_length,
     config.batch_size * config.strategy.num_replicas_in_sync,
     shuffle=False,
     subj_id=True,
 )
 
+# Bayesian about subject deviations?
+config.dev_bayesian = True
+config.learn_dev_mod_sigma = True
+config.initial_dev_mod_sigma = np.sqrt(0.5 / 1e-3)
+
 # Build model
 model = Model(config)
 model.summary()
+
+# Set scaling factor for devation kl loss
+model.set_bayesian_kl_scaling(training_dataset)
+
+# Set regularizers
+model.set_regularizers(training_dataset)
 
 print("Training model")
 history = model.fit(training_dataset, epochs=config.n_epochs)
@@ -113,4 +122,4 @@ plotting.plot_scatter(
     filename="subject_embeddings.png",
 )
 
-meg_data.delete_dir()
+training_data.delete_dir()

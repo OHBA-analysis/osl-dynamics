@@ -78,7 +78,7 @@ class Processing:
         pca_components : np.ndarray
             PCA components to apply if they have already been calculated.
         load_memmaps: bool
-            Should we load the data into the memmaps? 
+            Should we load the data into the memmaps?
         whiten : bool
             Should we whiten the PCA'ed data?
         """

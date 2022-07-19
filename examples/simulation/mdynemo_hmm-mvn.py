@@ -16,9 +16,9 @@ config = Config(
     n_modes=5,
     n_channels=20,
     sequence_length=200,
-    inference_n_units=64,
+    inference_n_units=256,
     inference_normalization="layer",
-    model_n_units=64,
+    model_n_units=256,
     model_normalization="layer",
     theta_normalization="layer",
     learn_alpha_temperature=True,
@@ -29,10 +29,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=200,
     batch_size=16,
-    learning_rate=0.005,
-    n_epochs=200,
+    learning_rate=0.001,
+    n_epochs=400,
 )
 
 # Simulate data
@@ -67,7 +67,7 @@ model = Model(config)
 model.summary()
 
 # Set regularisers
-# model.set_regularizers(training_data)
+model.set_regularizers(training_dataset)
 
 print("Training model")
 history = model.fit(
@@ -80,9 +80,6 @@ history = model.fit(
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
-
-# Inferred parameters
-inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
 
 # Inferred mode mixing factors
 inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
