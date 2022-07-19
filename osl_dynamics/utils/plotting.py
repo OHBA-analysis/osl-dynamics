@@ -781,6 +781,7 @@ def plot_gmm(
     y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * variances[1] ** 2))
     ax.plot(x, y1)
     ax.plot(x, y2)
+    ax.plot(x, y1 + y2)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])

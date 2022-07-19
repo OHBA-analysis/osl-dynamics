@@ -368,10 +368,25 @@ analysis.power.save(
 )
 
 # Calculate connectivity maps using mode coherences
-conn_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh, fit_gmm=True)
+conn_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh)
+
+# Use a GMM to threshold the connectivity maps
+percentile = analysis.connectivity.fit_gmm(
+    conn_map,
+    min_percentile=92,
+    max_percentile=98,
+    subtract_mean=True,
+    standardize=True,
+    filename=f"{maps_dir}/gmm_conn_.png",
+    plot_kwargs={
+        "x_label": "Standardised Relative Coherence",
+        "y_label": "Probability",
+    },
+)
+conn_map = connectivity.threshold(conn_map, percentile, subtract_mean=True)
+
 analysis.connectivity.save(
     connectivity_map=conn_map,
-    threshold=0.95,
     filename=f"{maps_dir}/conn_.png",
     parcellation_file=parcellation_file,
 )

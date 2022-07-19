@@ -61,11 +61,20 @@ plotting.plot_line([f, f], wideband_components, filename="figures/wideband.png")
 
 # Calculate power and connectivity maps using PSDs and coherences
 power_map = power.variance_from_spectra(f, gpsd, wideband_components)
-conn_map = connectivity.mean_coherence_from_spectra(
-    f,
-    gcoh,
-    wideband_components,
-    fit_gmm=True,
+conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, wideband_components)
+
+# Use a GMM to threshold the connectivity maps
+conn_map = connectivity.gmm_threshold(
+    conn_map,
+    min_percentile=90,
+    max_percentile=98,
+    subtract_mean=True,
+    standardize=True,
+    filename="figures/mt_wideband_gmm_conn_.png",
+    plot_kwargs={
+        "x_label": "Standardised Relative Coherence",
+        "y_label": "Probability",
+    },
 )
 
 # Just plot the first component (second is noise)
@@ -79,7 +88,6 @@ power.save(
 )
 connectivity.save(
     connectivity_map=conn_map,
-    threshold=0.925,
     filename="figures/mt_wideband0_conn_.png",
     parcellation_file=parcellation_file,
     component=0,
@@ -93,9 +101,22 @@ plotting.plot_line(
 
 # Calculate power and connectivity maps using PSDs and coherences
 power_map = power.variance_from_spectra(f, gpsd, narrowband_components)
-conn_map = connectivity.mean_coherence_from_spectra(
-    f, gcoh, narrowband_components, fit_gmm=True
+conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, narrowband_components)
+
+# Use a GMM to threshold the connectivity maps
+percentile = connectivity.fit_gmm(
+    conn_map,
+    min_percentile=90,
+    max_percentile=98,
+    subtract_mean=True,
+    standardize=True,
+    filename="figures/mt_narrowband_gmm_conn_.png",
+    plot_kwargs={
+        "x_label": "Standardised Relative Coherence",
+        "y_label": "Probability",
+    },
 )
+conn_map = connectivity.threshold(conn_map, percentile, subtract_mean=True)
 
 # Plot the first 3 components
 for component in range(3):
@@ -109,7 +130,6 @@ for component in range(3):
     )
     connectivity.save(
         connectivity_map=conn_map,
-        threshold=0.925,
         filename=f"figures/mt_narrowband{component}_conn_.png",
         parcellation_file=parcellation_file,
         component=component,
