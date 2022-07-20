@@ -15,11 +15,11 @@ def fit_gaussian_mixture(
     bayesian=True,
     standardize=True,
     label_order="mean",
-    sklearn_kwargs=None,
-    min_percentile=0,
-    max_percentile=100,
+    sklearn_kwargs={},
+    one_component_percentile=None,
+    n_sigma=1,
     plot_filename=None,
-    plot_kwargs=None,
+    plot_kwargs={},
     print_message=True,
 ):
     """Fits a two component Bayesian Gaussian mixture model.
@@ -36,12 +36,14 @@ def fit_gaussian_mixture(
         How do we order the inferred classes?
     sklearn_kwargs : dict
         Keyword arguments to pass to the sklearn class.
-    min_percentile : float
-        Minimum percentile for the threshold. Should be between 0 and 100.
-        E.g. for the 90th percentile, max_percentile=90.
-    max_percentile : float
-        Maximum percentile for the threshold. Should be a between 0 and 100.
-        E.g. for the 95th percentile, max_percentile=95.
+    one_component_percentile : float
+        Percentile threshold if only one component is found.
+        Should be a between 0 and 100. E.g. for the 95th percentile,
+        one_component_percentile=95.
+    n_sigma : float
+        Number of standard deviations of the 'off' component the mean
+        of the 'on' component must be for the fit to be considered to
+        have two components.
     plot_filename : str
         Filename to save a plot of the Gaussian mixture model.
     plot_kwargs : dict
@@ -101,7 +103,12 @@ def fit_gaussian_mixture(
             y = (1 - y).astype(int)
 
     # Percentile threshold
-    percentile = get_percentile_threshold(X[:, 0], y, min_percentile, max_percentile)
+    if (means[1] - means[0]) < n_sigma * np.sqrt(
+        variances[0]
+    ) and one_component_percentile is not None:
+        percentile = one_component_percentile
+    else:
+        percentile = get_percentile_threshold(X[:, 0], y)
 
     # Plots
     if plot_filename is not None:
@@ -120,7 +127,7 @@ def fit_gaussian_mixture(
     return percentile
 
 
-def get_percentile_threshold(X, y, min_percentile=0, max_percentile=100):
+def get_percentile_threshold(X, y):
     """Calculate the percentile threshold for determining class labels
     from a two component GMM.
 
@@ -131,12 +138,6 @@ def get_percentile_threshold(X, y, min_percentile=0, max_percentile=100):
     y : np.ndarray
         Class labels. This must be an array of 0s and 1s, where 0 indicates an
         'off' component and 1 indicates an 'on' component.
-    min_percentile : float
-        Minimum percentile for the threshold. Should be between 0 and 100.
-        E.g. for the 90th percentile, max_percentile=90.
-    max_percentile : float
-        Maximum percentile for the threshold. Should be a between 0 and 100.
-        E.g. for the 95th percentile, max_percentile=95.
 
     Returns
     -------
@@ -145,21 +146,10 @@ def get_percentile_threshold(X, y, min_percentile=0, max_percentile=100):
         belongs to the 'on' class and largest value in the X array that belongs to
         the 'off' class. Value is returned as a percentile of X.
     """
-
-    # Validation
-    if min_percentile > 100 or min_percentile < 0:
-        raise ValueError("min_percentile must be between 0 and 100.")
-
-    if max_percentile > 100 or max_percentile < 0:
-        raise ValueError("max_percentile must be between 0 and 100.")
-
-    if min_percentile >= max_percentile:
-        raise ValueError("min_percentile must be less than max_percentile.")
-
     # Get the threshold for determining the class
     threshold = np.max([np.min(X[y == 1]), np.max(X[y == 0])])
 
     # What percentile of the full distribution is the threshold?
     percentile = stats.percentileofscore(X, threshold)
 
-    return max(min(percentile, max_percentile), min_percentile)
+    return percentile

@@ -66,10 +66,9 @@ conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, wideband_components
 # Use a GMM to threshold the connectivity maps
 conn_map = connectivity.gmm_threshold(
     conn_map,
-    min_percentile=90,
-    max_percentile=98,
     subtract_mean=True,
     standardize=True,
+    one_component_percentile=95,
     filename="figures/mt_wideband_gmm_conn_.png",
     plot_kwargs={
         "x_label": "Standardised Relative Coherence",
@@ -106,10 +105,9 @@ conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, narrowband_componen
 # Use a GMM to threshold the connectivity maps
 percentile = connectivity.fit_gmm(
     conn_map,
-    min_percentile=90,
-    max_percentile=98,
     subtract_mean=True,
     standardize=True,
+    one_component_percentile=95,
     filename="figures/mt_narrowband_gmm_conn_.png",
     plot_kwargs={
         "x_label": "Standardised Relative Coherence",

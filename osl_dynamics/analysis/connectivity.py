@@ -190,10 +190,9 @@ def mean_coherence_from_spectra(
 
 def gmm_threshold(
     conn_map,
-    min_percentile=0,
-    max_percentile=100,
     subtract_mean=False,
     standardize=False,
+    one_component_percentile=0,
     sklearn_kwargs=None,
     filename=None,
     plot_kwargs=None,
@@ -207,16 +206,14 @@ def gmm_threshold(
     conn_map : np.ndarray
         Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
         n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channesl).
-    min_percentile : float
-        Minimum percentile for the threshold. Should be between 0 and 100.
-        E.g. for the 90th percentile, max_percentile=90.
-    max_percentile : float
-        Maximum percentile for the threshold. Should be a between 0 and 100.
-        E.g. for the 95th percentile, max_percentile=95.
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     standardize : bool
         Should we standardize the input to the GMM?
+    one_component_percentile : float
+        Percentile threshold if only one component is found.
+        Should be a between 0 and 100. E.g. for the 95th percentile,
+        one_component_percentile=95.
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
         sklearn.mixture.BayesianGaussianMixture().
@@ -233,10 +230,9 @@ def gmm_threshold(
     """
     percentile = fit_gmm(
         conn_map,
-        min_percentile,
-        max_percentile,
         subtract_mean,
         standardize,
+        one_component_percentile,
         sklearn_kwargs,
         filename,
         plot_kwargs,
@@ -247,10 +243,9 @@ def gmm_threshold(
 
 def fit_gmm(
     conn_map,
-    min_percentile=0,
-    max_percentile=100,
     subtract_mean=False,
     standardize=False,
+    one_component_percentile=0,
     sklearn_kwargs=None,
     filename=None,
     plot_kwargs=None,
@@ -262,16 +257,14 @@ def fit_gmm(
     ----------
     conn_map : np.ndarray
         Connectivity map.
-    min_percentile : float
-        Minimum percentile for the threshold. Should be between 0 and 100.
-        E.g. for the 90th percentile, max_percentile=90.
-    max_percentile : float
-        Maximum percentile for the threshold. Should be a between 0 and 100.
-        E.g. for the 95th percentile, max_percentile=95.
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     standardize : bool
         Should we standardize the input to the GMM?
+    one_component_percentile : float
+        Percentile threshold if only one component is found.
+        Should be a between 0 and 100. E.g. for the 95th percentile,
+        one_component_percentile=95.
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
         sklearn.mixture.BayesianGaussianMixture().
@@ -340,8 +333,7 @@ def fit_gmm(
                 bayesian=True,
                 standardize=standardize,
                 sklearn_kwargs=sklearn_kwargs,
-                min_percentile=min_percentile,
-                max_percentile=max_percentile,
+                one_component_percentile=one_component_percentile,
                 plot_filename=plot_filename,
                 plot_kwargs=plot_kwargs,
                 print_message=False,
