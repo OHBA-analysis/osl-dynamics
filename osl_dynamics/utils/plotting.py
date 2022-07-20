@@ -694,6 +694,7 @@ def plot_gmm(
     means,
     variances,
     bins=50,
+    legend_loc=1,
     x_range=None,
     y_range=None,
     x_label=None,
@@ -716,6 +717,8 @@ def plot_gmm(
         Variance of each Gaussian component.
     bins : list of int
         Number of bins for the historgram.
+    legend_loc : int
+        Position for the legend.
     x_range : list
         Minimum and maximum for x-axis.
     y_range : list
@@ -779,8 +782,8 @@ def plot_gmm(
     x = np.arange(min(data), max(data), (max(data) - min(data)) / bins)
     y1 = amplitudes[0] * np.exp(-((x - means[0]) ** 2) / (2 * variances[0] ** 2))
     y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * variances[1] ** 2))
-    ax.plot(x, y1)
-    ax.plot(x, y2)
+    ax.plot(x, y1, label="Off")
+    ax.plot(x, y2, label="On")
     ax.plot(x, y1 + y2)
 
     # Set axis range
@@ -791,6 +794,9 @@ def plot_gmm(
     ax.set_title(title)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+
+    # Add legend
+    ax.legend(loc=legend_loc)
 
     # Save the figure if a filename has been pass
     if filename is not None:
