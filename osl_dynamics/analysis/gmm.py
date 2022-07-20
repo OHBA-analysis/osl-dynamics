@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-from scipy import stats
+from scipy import stats, special
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 
 from osl_dynamics.data import processing
@@ -13,6 +13,7 @@ from osl_dynamics.utils import plotting
 def fit_gaussian_mixture(
     X,
     bayesian=True,
+    logit_transform=False,
     standardize=True,
     label_order="mean",
     sklearn_kwargs={},
@@ -21,6 +22,7 @@ def fit_gaussian_mixture(
     plot_filename=None,
     plot_kwargs={},
     print_message=True,
+    return_labels=False,
 ):
     """Fits a two component Bayesian Gaussian mixture model.
 
@@ -30,6 +32,8 @@ def fit_gaussian_mixture(
         Data to fit Gaussian mixture model to.
     bayesian : bool
         Should we fit a Bayesian GMM?
+    logit_transform : bool
+        Should we logit transform the X?
     standardize : bool
         Should we standardize X?
     label_order: str
@@ -51,24 +55,34 @@ def fit_gaussian_mixture(
         Only used if plot_filename is not None.
     print_message : bool
         Should we print a message?
+    return_labels : bool
+        Should we return the labels?
 
     Returns
     -------
-    y : np.ndarray
-        Class of each data point.
+    y : float or np.ndarray
+        Percentile for thresholding or class of each data point if
+        return_labels=True.
     """
     if print_message:
         print("Fitting GMM")
 
+    # Copy the data so we don't modify it
+    X = np.copy(X)
+
     # Validation
-    if X.ndim == 1:
+    if X.ndim != 1:
+        raise ValueError("X must be a 1D numpy array.")
+    else:
         X = X[:, np.newaxis]
-    elif X.ndim != 2:
-        raise ValueError("X must be a 1D or 2D numpy array.")
+
+    # Logit transform
+    if logit_transform:
+        X = special.logit(X)
 
     # Standardise the data
     if standardize:
-        X = processing.standardize(X)
+        X = processing.standardize(X, create_copy=False)
 
     # Fit a Gaussian mixture model
     if bayesian:
@@ -103,9 +117,10 @@ def fit_gaussian_mixture(
             y = (1 - y).astype(int)
 
     # Percentile threshold
-    if (means[1] - means[0]) < n_sigma * np.sqrt(
-        variances[0]
-    ) and one_component_percentile is not None:
+    if (
+        abs(means[1] - means[0]) < n_sigma * np.sqrt(variances[0])
+        and one_component_percentile is not None
+    ):
         percentile = one_component_percentile
     else:
         percentile = get_percentile_threshold(X[:, 0], y)
@@ -124,7 +139,10 @@ def fit_gaussian_mixture(
         ax.axvline(threshold, color="black", linestyle="--")
         plotting.save(fig, plot_filename)
 
-    return percentile
+    if return_labels:
+        return y
+    else:
+        return percentile
 
 
 def get_percentile_threshold(X, y):
