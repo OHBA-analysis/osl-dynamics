@@ -193,6 +193,7 @@ def gmm_threshold(
     subtract_mean=False,
     standardize=False,
     one_component_percentile=0,
+    n_sigma=0,
     sklearn_kwargs=None,
     filename=None,
     plot_kwargs=None,
@@ -214,6 +215,10 @@ def gmm_threshold(
         Percentile threshold if only one component is found.
         Should be a between 0 and 100. E.g. for the 95th percentile,
         one_component_percentile=95.
+    n_sigma : float
+        Number of standard deviations of the 'off' component the mean
+        of the 'on' component must be for the fit to be considered to
+        have two components.
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
         sklearn.mixture.BayesianGaussianMixture().
@@ -233,6 +238,7 @@ def gmm_threshold(
         subtract_mean,
         standardize,
         one_component_percentile,
+        n_sigma,
         sklearn_kwargs,
         filename,
         plot_kwargs,
@@ -246,6 +252,7 @@ def fit_gmm(
     subtract_mean=False,
     standardize=False,
     one_component_percentile=0,
+    n_sigma=0,
     sklearn_kwargs=None,
     filename=None,
     plot_kwargs=None,
@@ -265,6 +272,10 @@ def fit_gmm(
         Percentile threshold if only one component is found.
         Should be a between 0 and 100. E.g. for the 95th percentile,
         one_component_percentile=95.
+    n_sigma : float
+        Number of standard deviations of the 'off' component the mean
+        of the 'on' component must be for the fit to be considered to
+        have two components.
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
         sklearn.mixture.BayesianGaussianMixture().
@@ -334,6 +345,7 @@ def fit_gmm(
                 standardize=standardize,
                 sklearn_kwargs=sklearn_kwargs,
                 one_component_percentile=one_component_percentile,
+                n_sigma=n_sigma,
                 plot_filename=plot_filename,
                 plot_kwargs=plot_kwargs,
                 print_message=False,

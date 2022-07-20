@@ -18,7 +18,7 @@ def fit_gaussian_mixture(
     label_order="mean",
     sklearn_kwargs={},
     one_component_percentile=None,
-    n_sigma=1,
+    n_sigma=0,
     plot_filename=None,
     plot_kwargs={},
     print_message=True,
@@ -115,6 +115,9 @@ def fit_gaussian_mixture(
     if label_order == "variance":
         if variances[0] > variances[1]:
             y = (1 - y).astype(int)
+    amplitudes = amplitudes[order]
+    means = means[order]
+    variances = variances[order]
 
     # Percentile threshold
     if (
@@ -123,15 +126,15 @@ def fit_gaussian_mixture(
     ):
         percentile = one_component_percentile
     else:
-        percentile = get_percentile_threshold(X[:, 0], y)
+        percentile = get_percentile_threshold(X[:, 0], y, means)
 
     # Plots
     if plot_filename is not None:
         fig, ax = plotting.plot_gmm(
             X[:, 0],
-            amplitudes[order],
-            means[order],
-            variances[order],
+            amplitudes,
+            means,
+            variances,
             title=f"Percentile = {round(percentile)}",
             **plot_kwargs,
         )
@@ -145,7 +148,7 @@ def fit_gaussian_mixture(
         return percentile
 
 
-def get_percentile_threshold(X, y):
+def get_percentile_threshold(X, y, mu):
     """Calculate the percentile threshold for determining class labels
     from a two component GMM.
 
@@ -156,6 +159,8 @@ def get_percentile_threshold(X, y):
     y : np.ndarray
         Class labels. This must be an array of 0s and 1s, where 0 indicates an
         'off' component and 1 indicates an 'on' component.
+    mu : np.ndarray
+        Mean of each class.
 
     Returns
     -------
@@ -164,8 +169,16 @@ def get_percentile_threshold(X, y):
         belongs to the 'on' class and largest value in the X array that belongs to
         the 'off' class. Value is returned as a percentile of X.
     """
+
     # Get the threshold for determining the class
-    threshold = np.max([np.min(X[y == 1]), np.max(X[y == 0])])
+    min_threshold = np.min([np.min(X[y == 1]), np.max(X[y == 0])])
+    max_threshold = np.max([np.min(X[y == 1]), np.max(X[y == 0])])
+
+    # Pick the threshold that is between the means
+    if mu[0] < min_threshold < mu[1]:
+        threshold = min_threshold
+    else:
+        threshold = max_threshold
 
     # What percentile of the full distribution is the threshold?
     percentile = stats.percentileofscore(X, threshold)
