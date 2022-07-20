@@ -3,7 +3,6 @@
 """
 
 import numpy as np
-import tensorflow
 from tensorflow.python.data import Dataset
 
 

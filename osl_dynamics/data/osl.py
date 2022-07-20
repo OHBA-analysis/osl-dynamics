@@ -2,7 +2,6 @@
 
 """
 
-import mat73
 import numpy as np
 from osl_dynamics import array_ops
 from osl_dynamics.data.rw import loadmat

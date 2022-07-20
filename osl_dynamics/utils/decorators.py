@@ -3,7 +3,7 @@
 """
 
 import inspect
-import logging
+import warnings
 from functools import wraps
 from time import time
 

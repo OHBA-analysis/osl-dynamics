@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 from nilearn import plotting
-from nilearn.plotting.cm import _cmap_d as cm
 from tqdm import trange
 
 from osl_dynamics import array_ops

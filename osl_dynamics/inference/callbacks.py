@@ -3,7 +3,6 @@
 """
 
 import numpy as np
-import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.python.keras import callbacks
 from osl_dynamics import inference
@@ -14,7 +13,7 @@ class DiceCoefficientCallback(callbacks.Callback):
 
     Parameters
     ----------
-    prediction_dataset : tf.data.Dataset
+    prediction_dataset : tensorflow.data.Dataset
         Dataset to use to calculate outputs of the model.
     ground_truth_mode_time_course : np.ndarray
         2D or 3D numpy array containing the ground truth mode time

@@ -2,13 +2,10 @@
 
 """
 
-import warnings
 from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-import tensorflow as tf
-from tqdm import trange
 
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.inference import callbacks, initializers
@@ -167,7 +164,6 @@ class VariationalInferenceModelBase(ModelBase):
                 best_initialization = n
                 best_free_energy = free_energy
                 best_weights = self.model.get_weights()
-                best_optimizer = self.model.optimizer
                 best_history = history
 
         print(f"Using initialization {best_initialization}")

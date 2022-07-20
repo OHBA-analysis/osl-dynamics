@@ -297,7 +297,7 @@ class MeanVectorsLayer(layers.Layer):
                 )
             if initial_value.shape[0] != n:
                 raise ValueError(
-                    f"mismatch bettwen the number of modes and vectors in "
+                    "mismatch bettwen the number of modes and vectors in "
                     + f"initial_means ({initial_value.shape[0]})."
                 )
             self.initial_value = initial_value.astype("float32")
@@ -389,7 +389,7 @@ class CovarianceMatricesLayer(layers.Layer):
                 )
             if initial_value.shape[0] != n:
                 raise ValueError(
-                    f"mismatch bettwen the number of modes and matrices in "
+                    "mismatch bettwen the number of modes and matrices in "
                     + f"initial_covariances ({initial_value.shape[0]})."
                 )
             self.initial_value = initial_value.astype("float32")
@@ -492,7 +492,7 @@ class CorrelationMatricesLayer(layers.Layer):
                 )
             if initial_value.shape[0] != n:
                 raise ValueError(
-                    f"mismatch bettwen the number of modes and matrices in "
+                    "mismatch bettwen the number of modes and matrices in "
                     + f"initial_fcs ({initial_value.shape[0]})."
                 )
             self.initial_value = initial_value.astype("float32")
@@ -585,7 +585,7 @@ class DiagonalMatricesLayer(layers.Layer):
                 )
             if initial_value.shape[0] != n:
                 raise ValueError(
-                    f"mismatch bettwen the number of modes and vectors in "
+                    "mismatch bettwen the number of modes and vectors in "
                     + f"initial_value ({initial_value.shape[0]})."
                 )
             self.initial_value = initial_value.astype("float32")

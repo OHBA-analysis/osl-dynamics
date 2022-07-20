@@ -8,7 +8,6 @@ NOTE:
 """
 
 import os
-from pathlib import Path
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,7 +19,6 @@ from osl_dynamics.simulation import HMM
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
-    SampleNormalDistributionLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
     CategoricalLogLikelihoodLossLayer,

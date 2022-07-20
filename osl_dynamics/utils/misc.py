@@ -5,7 +5,6 @@
 import inspect
 from copy import copy
 from pathlib import Path
-from typing import Any, List, Union
 
 import numpy as np
 import yaml
@@ -41,7 +40,7 @@ def listify(obj):
 
     Parameters
     ----------
-    obj : Any
+    obj : typing.Any
         Object to be transformed to a list.
 
     Returns

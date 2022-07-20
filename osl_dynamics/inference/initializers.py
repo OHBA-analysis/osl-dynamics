@@ -2,8 +2,6 @@
 
 """
 
-import numpy as np
-import tensorflow as tf
 from tensorflow.keras import Model, layers
 from tensorflow.keras.initializers import Initializer
 from osl_dynamics import inference
@@ -14,7 +12,7 @@ class WeightInitializer(Initializer):
 
     Parameters
     ----------
-    initial_value : np.ndarray
+    initial_value : numpy.ndarray
         Value to initialise weights to.
         Note, the shape is not checked.
     """
@@ -31,7 +29,7 @@ class CopyTensorInitializer(Initializer):
 
     Parameters
     ----------
-    tensor : tf.Tensor
+    tensor : tensorflow.Tensor
         Tensor to copy.
     """
 
