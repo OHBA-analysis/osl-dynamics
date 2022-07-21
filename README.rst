@@ -11,8 +11,8 @@ To install osl-dynamics in editable mode:
 
 .. code-block:: shell
 
-    conda create --name osld-tf24 python=3.8
-    conda activate osld-tf24
+    conda create --name osld python=3
+    conda activate osld
     git clone git@github.com:OHBA-analysis/osl-dynamics.git
     cd osl-dynamics
     pip install -e .
@@ -60,9 +60,10 @@ The following steps can be used to release a new version:
 
 #. Update the version number on line 5 of ``setup.cfg``.
 #. Commit the updated setup.cfg to the ``main`` branch of the GitHub repo.
-#. Tag the commit with the version number using the 'Create a new release' link on the right of the GitHub repo webpage.
 #. Build a distribution in the osl-dynamics root directory with ``python -m build``. This will create a new directory called ``dist``.
+#. Test the build by installing in a test conda environment with ``cd dist; pip install <build>.whl``.
 #. Upload the distribution to PyPI with ``twine upload dist/*``. You will need to enter the username and password that you used to register with `https://pypi.org <https://pypi.org>`_.
+#. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage.
 
 The uploaded distribution will then be available to be installed with:
 

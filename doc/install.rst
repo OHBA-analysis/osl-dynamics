@@ -1,7 +1,7 @@
 Install
 =======
 
-The recommended installation is described below. We recommend using Python 3.8 and TensorFlow 2.4.
+The recommended installation is described below.
 
 Conda Environments
 ------------------
@@ -10,7 +10,7 @@ A conda environment can be created and activated with:
 
 ::
 
-    conda create --name osld python=3.8
+    conda create --name osld python=3
     conda activate osld
 
 
@@ -25,7 +25,7 @@ osl-dynamics can be installed in your conda environment with:
 
     pip install osl-dynamics
 
-This will install TensorFlow 2.4 by default.
+This will install the latest version of TensorFlow compatible with your Python version.
 
 For Developers
 --------------
@@ -34,8 +34,8 @@ Developers will want to install from source in editable mode:
 
 ::
 
-    conda create --name osld-tf24 python=3.8
-    conda activate osld-tf24
+    conda create --name osld python=3
+    conda activate osld
     git clone git@github.com:OHBA-analysis/osl-dynamics.git
     cd osl-dynamics
     pip install -e .
