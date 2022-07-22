@@ -703,9 +703,8 @@ def regression_spectra(
     # Remove the data points lost due to separating into sequences
     data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-    # Calculate a time-varying PSD
-    Pt = []
-    at = []
+    # Calculate a time-varying PSD and regress to get the mode PSDs
+    Pj = []
     for i in range(n_subjects):
         if n_subjects > 1:
             print(f"Subject {i}:")
@@ -724,15 +723,7 @@ def regression_spectra(
             step_size=step_size,
             n_sub_windows=n_sub_windows,
         )
-        Pt.append(p)
-        at.append(a)
-
-    # Regress the time-varying PSD with alpha to get the mode PSDs
-    Pj = []
-    for i in trange(n_subjects, desc="Fitting linear regression", ncols=98):
-        coefs, intercept = regression.linear(
-            at[i], Pt[i], fit_intercept=True, normalize=True
-        )
+        coefs, intercept = regression.linear(a, p, fit_intercept=True, normalize=True)
         Pj.append([coefs, [intercept] * coefs.shape[0]])
     Pj = np.array(Pj)
 
