@@ -643,8 +643,9 @@ def regression_spectra(
     step_size : int
         Step size for shifting the window.
     n_sub_windows : int
-        Should we split the window into a set of sub-windows and average the
-        spectra for each sub-window.
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        n_sub_windows.
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
@@ -685,6 +686,9 @@ def regression_spectra(
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
+
+    if window_length % n_sub_windows != 0:
+        raise ValueError("window_length must be divisible by n_sub_windows.")
 
     # Do we calculate cross spectral densities?
     calc_cpsd = not psd_only
