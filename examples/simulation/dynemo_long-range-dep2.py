@@ -125,7 +125,7 @@ print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-inf_stc = modes.time_courses(inf_alp)
+inf_stc = modes.argmax_time_courses(inf_alp)
 sim_bot_stc = sim.mode_time_course
 sim_top_stc = sim.top_level_stc
 
@@ -141,7 +141,7 @@ plotting.plot_alpha(inf_stc, n_samples=4000, filename="figures/inf_stc.png")
 
 # Sample from the trained model
 sam_alp = model.sample_alpha(10000)
-sam_stc = modes.time_courses(sam_alp)
+sam_stc = modes.argmax_time_courses(sam_alp)
 sam_stc = sam_stc[:, orders[1]]
 
 plotting.plot_alpha(sam_stc, n_samples=4000, filename="figures/sam_stc.png")

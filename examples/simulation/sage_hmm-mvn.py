@@ -68,7 +68,7 @@ history = model.fit(training_dataset)
 
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-inf_stc = modes.time_courses(inf_alp)
+inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))

@@ -73,8 +73,8 @@ inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
 # Inferred mode mixing factors
 inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
 
-inf_alpha = modes.time_courses(inf_alpha)
-inf_gamma = modes.time_courses(inf_gamma)
+inf_alpha = modes.argmax_time_courses(inf_alpha)
+inf_gamma = modes.argmax_time_courses(inf_gamma)
 
 # Simulated mode mixing factors
 sim_alpha, sim_gamma = sim.mode_time_course

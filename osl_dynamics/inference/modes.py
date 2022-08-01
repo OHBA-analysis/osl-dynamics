@@ -9,7 +9,7 @@ from osl_dynamics import array_ops, analysis
 from osl_dynamics.inference import metrics
 
 
-def time_courses(
+def argmax_time_courses(
     alpha,
     concatenate=False,
     n_modes=None,

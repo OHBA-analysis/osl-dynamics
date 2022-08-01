@@ -73,7 +73,7 @@ class DiceCoefficientCallback(callbacks.Callback):
         # For each time course calculate the dice with respect to the ground truth
         dices = []
         for i in range(self.n_time_courses):
-            pmtc = inference.modes.time_courses(
+            pmtc = inference.modes.argmax_time_courses(
                 tc[i], concatenate=True, n_modes=self.n_modes
             )
             pmtc, gtmtc = inference.modes.match_modes(pmtc, self.gtmtc[i])

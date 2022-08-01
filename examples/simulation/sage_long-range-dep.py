@@ -74,7 +74,7 @@ history = model.fit(training_dataset)
 
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
-inf_stc = modes.time_courses(inf_alp)
+inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 orders = modes.match_modes(sim_stc, inf_stc, return_order=True)
 inf_stc = inf_stc[:, orders[1]]
@@ -110,7 +110,7 @@ plotting.plot_matrices(inf_cov, filename="figures/inf_cov.png")
 
 # Predict the prior alpha on infer alpha input
 gen_alp = model.sample_alpha(inf_alp)
-gen_stc = modes.time_courses(gen_alp)
+gen_stc = modes.argmax_time_courses(gen_alp)
 
 plotting.plot_mode_lifetimes(
     gen_stc,

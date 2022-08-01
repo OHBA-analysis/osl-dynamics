@@ -242,7 +242,7 @@ mean_a_NW = np.mean(np.concatenate(a_NW), axis=0)
 print("mean_a_NW:", mean_a_NW)
 
 # Create a state time course from the normalised weighted alpha
-argmax_a_NW = inference.modes.time_courses(a_NW)
+argmax_a_NW = inference.modes.argmax_time_courses(a_NW)
 
 plotting.plot_alpha(
     argmax_a_NW[0],
