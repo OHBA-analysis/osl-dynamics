@@ -125,6 +125,3 @@ plotting.plot_line(
     fig_kwargs={"figsize": (15, 1.5)},
     filename="figures/rd.png",
 )
-
-# Delete temporary directory
-training_data.delete_dir()

@@ -124,6 +124,3 @@ plotting.plot_alpha(
     y_labels=["Sampled_alpha"],
     filename="figures/generated_alpha.png",
 )
-
-# Delete temporary directory
-training_data.delete_dir()

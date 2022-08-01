@@ -113,6 +113,3 @@ print("Fractional occupancies mean (DyNeMo):    ", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (DyNeMo):    ", fo_inf_gamma)
-
-# Delete the temporary folder holding the data
-training_data.delete_dir()

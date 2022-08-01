@@ -75,6 +75,3 @@ hmm_stc = processing.trim_time_series(
 
 # Dice coefficient
 print("Dice coefficient:", metrics.dice_coefficient(hmm_stc, inf_stc))
-
-# Delete temporary directory
-prepared_data.delete_dir()

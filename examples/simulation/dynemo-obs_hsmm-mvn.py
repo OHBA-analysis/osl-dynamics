@@ -61,6 +61,3 @@ history = model.fit(training_dataset, epochs=config.n_epochs)
 # Inferred covariances
 covariances = model.get_covariances()
 plotting.plot_matrices(covariances - sim.covariances, filename="cov_diff.png")
-
-# Delete temporary directory
-training_data.delete_dir()

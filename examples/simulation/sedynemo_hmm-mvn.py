@@ -121,5 +121,3 @@ plotting.plot_scatter(
     annotate=[[str(i) for i in range(config.n_subjects)]],
     filename="subject_embeddings.png",
 )
-
-training_data.delete_dir()

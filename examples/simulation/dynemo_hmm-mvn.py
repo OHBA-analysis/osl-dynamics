@@ -86,6 +86,3 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo): ", modes.fractional_occupancies(inf_stc))
-
-# Delete temporary directory
-training_data.delete_dir()

@@ -138,6 +138,3 @@ analysis.power.save(
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     filename="figures/pcov_.png",
 )
-
-# Delete temporary directory
-training_data.delete_dir()
