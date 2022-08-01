@@ -4,6 +4,7 @@
 
 import numpy as np
 from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
+from scipy.linalg import eigvalsh
 from tqdm import trange
 
 
@@ -179,7 +180,7 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=True):
     return correlations
 
 
-def riemannian_distance(M1, M2):
+def riemannian_distance(M1, M2, threshold=1e-3):
     """Calculate the Riemannian distance between two matrices.
 
     The Riemannian distance is defined as: d = (sum log(eig(M_1 * M_2))) ^ 0.5
@@ -188,77 +189,47 @@ def riemannian_distance(M1, M2):
     ----------
     M1 : np.ndarray
     M2 : np.ndarray
+    threshold : float
+        Threshold to apply when there are negative eigenvalues. Must be positive.
 
     Returns
     -------
     d : np.ndarray
     """
-    d = np.sqrt(
-        np.sum(
-            (
-                np.log(np.maximum(np.linalg.eigvals(M1 @ np.linalg.inv(M2)).real, 1e-3))
-                ** 2
-            )
-        )
-    )
+    eigvals = eigvalsh(M1, M2, driver="gv")
+    if np.any(eigvals < 0):
+        eigvals = np.maximum(eigvals, threshold)
+        print(f"Warning, negative eigenvalue, truncated with {threshold}")
+
+    d = np.sqrt((np.log(eigvals) ** 2).sum())
     return d
 
 
 def pairwise_riemannian_distances(
     matrices,
-    parallel=False,
-    inv_matrices=None,
 ):
     """Calculate the Riemannian distance between matrices.
 
     Parameters
     ----------
     matrices : np.ndarray
-        Shape must be (n_matrices, n_channels, n_channels) if parallel=False.
-        Shape can be (..., n_channels, n_channels) if parallel=True.
-    parallel : bool
-        Should we calculate the Riemannian distances in parallel?
-        Much faster if first dimension is large, but uses more RAM.
-    inv_matrices : np.ndarray
-        Inverse of matrices
+        Shape must be (n_matrices, n_channels, n_channels).
 
     Returns
     -------
     riemannian_distances : np.ndarray
         Matrix containing the pairwise Riemannian distances between matrices.
-        Shape is (..., n_matrices, n_matrices).
+        Shape is (n_matrices, n_matrices).
     """
-    if parallel:
-        if inv_matrices is not None:
-            inverse_matrices = inv_matrices
-        else:
-            inverse_matrices = np.linalg.inv(matrices)
-        pairwise_products = np.matmul(
-            np.expand_dims(matrices, -4), np.expand_dims(inverse_matrices, -3)
-        )
+    n_matrices = matrices.shape[0]
+    riemannian_distances = np.zeros([n_matrices, n_matrices])
+    for i in trange(n_matrices, desc="Computing Riemannian distances", ncols=98):
+        for j in range(i + 1, n_matrices):
+            riemannian_distances[i][j] = riemannian_distance(matrices[i], matrices[j])
 
-        # The eigenvalues of the product should be real due to Sylvester's law
-        # of inertia
-        eigenvalues = np.linalg.eigvals(pairwise_products).real
-
-        # Threshold the negative eigenvalues due to computational instability
-        eigenvalues = np.maximum(eigenvalues, 1e-3)
-
-        log_eigenvalues = np.log(eigenvalues)
-        riemannian_distances = np.sqrt(np.sum(log_eigenvalues**2, axis=-1))
-
-    else:
-        n_matrices = matrices.shape[0]
-        riemannian_distances = np.zeros([n_matrices, n_matrices])
-        for i in trange(n_matrices, desc="Computing Riemannian distances", ncols=98):
-            for j in range(i + 1, n_matrices):
-                riemannian_distances[i][j] = riemannian_distance(
-                    matrices[i], matrices[j]
-                )
-
-        # Only the upper triangular entries are filled,
-        # the diagonal entries are zeros
-        riemannian_distances = riemannian_distances + riemannian_distances.T
+    # Only the upper triangular entries are filled,
+    # the diagonal entries are zeros
+    riemannian_distances = riemannian_distances + riemannian_distances.T
 
     return riemannian_distances
 
