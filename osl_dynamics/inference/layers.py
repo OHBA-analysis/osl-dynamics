@@ -282,9 +282,11 @@ class MeanVectorsLayer(layers.Layer):
 
         # Initialisation for vectors
         if initial_value is None:
-            self.initial_value = np.random.normal(0, 0.5, size=[n, m]).astype(
-                np.float32
-            )
+            if learn:
+                self.initial_value = np.random.normal(0, 0.5, size=[n, m])
+            else:
+                self.initial_value = np.zeros([n, m])
+            self.initial_value = self.initial_value.astype(np.float32)
         else:
             if initial_value.ndim != 2:
                 raise ValueError(
@@ -371,10 +373,13 @@ class CovarianceMatricesLayer(layers.Layer):
 
         # Initialisation of matrices
         if initial_value is None:
-            self.initial_value = np.array(
-                [np.diag(np.random.normal(1, 0.05, size=m)) for i in range(n)],
-                dtype=np.float32,
-            )
+            if learn:
+                self.initial_value = np.array(
+                    [np.diag(np.random.normal(1, 0.05, size=m)) for i in range(n)]
+                )
+            else:
+                self.initial_value = np.array([np.eye(m)] * n)
+            self.initial_value = self.initial_value.astype(np.float32)
         else:
             if initial_value.ndim != 3:
                 raise ValueError(
@@ -474,10 +479,11 @@ class CorrelationMatricesLayer(layers.Layer):
             self.initial_flattened_cholesky_factors = self.bijector.inverse(
                 self.initial_value
             )
-            err = np.random.normal(
-                0, 0.05, size=self.initial_flattened_cholesky_factors.shape
-            )
-            self.initial_flattened_cholesky_factors += err
+            if learn:
+                err = np.random.normal(
+                    0, 0.05, size=self.initial_flattened_cholesky_factors.shape
+                )
+                self.initial_flattened_cholesky_factors += err
         else:
             if initial_value.ndim != 3:
                 raise ValueError(
@@ -570,9 +576,11 @@ class DiagonalMatricesLayer(layers.Layer):
 
         # Initialisation for the diagonals
         if initial_value is None:
-            self.initial_value = np.random.normal(1, 0.1, size=[n, m]).astype(
-                np.float32
-            )
+            if learn:
+                self.initial_value = np.random.normal(1, 0.1, size=[n, m])
+            else:
+                self.initial_value = np.zeros([n, m])
+            self.initial_value = self.initial_value.astype(np.float32)
         else:
             if initial_value.ndim != 2:
                 raise ValueError(
