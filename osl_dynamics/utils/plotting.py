@@ -1094,7 +1094,7 @@ def plot_separate_time_series(
     if sampling_frequency is not None:
         axes[-1].set_xlabel("Time (s)")
     else:
-        axes[-1].set_xlabel("Samples")
+        axes[-1].set_xlabel("Sample")
 
     # Save figure
     if filename is not None:
@@ -1158,7 +1158,7 @@ def plot_epoched_time_series(
     """
     epoched_1 = epoch_mean(data, time_index, pre, post)
 
-    x_label = "Samples"
+    x_label = "Sample"
     time_index = np.arange(-pre, post)
     if sampling_frequency:
         time_index = time_index / sampling_frequency
