@@ -218,8 +218,13 @@ class ModelBase:
             self.model.load_weights(filepath)
 
     def reset_weights(self):
-        """Reset the model as if you've built a new model."""
+        """Resets trainable variables in the model to their initial value."""
         initializers.reinitialize_model_weights(self.model)
+
+    def reset(self):
+        """Reset the model as if you've built a new model."""
+        self.reset_weights()
+        self.compile()
 
     def _make_dataset(self, inputs):
         """Make a dataset.

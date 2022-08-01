@@ -152,8 +152,7 @@ class VariationalInferenceModelBase(ModelBase):
         best_free_energy = np.Inf
         for n in range(n_init):
             print(f"Initialization {n}")
-            self.reset_weights()
-            self.compile()
+            self.reset()
             history = self.fit(
                 training_dataset,
                 epochs=epochs,
