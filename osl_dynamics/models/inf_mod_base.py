@@ -226,6 +226,8 @@ class VariationalInferenceModelBase(ModelBase):
             Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
+        print("Getting alpha:")
+
         if self.config.multiple_dynamics:
             return self.get_mode_time_courses(
                 inputs, *args, concatenate=concatenate, **kwargs
@@ -267,6 +269,8 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
+        print("Getting mode time courses:")
+
         inputs = self._make_dataset(inputs)
 
         outputs_alpha = []
@@ -304,6 +308,8 @@ class VariationalInferenceModelBase(ModelBase):
         kl_loss : float
             KL divergence loss.
         """
+        print("Getting losses:")
+
         if isinstance(dataset, list):
             predictions = [self.predict(subject) for subject in dataset]
             ll_loss = np.mean([np.mean(p["ll_loss"]) for p in predictions])
