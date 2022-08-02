@@ -182,7 +182,7 @@ def save(
     component=0,
     subtract_mean=False,
     mean_weights=None,
-    **plot_kwargs,
+    plot_kwargs=None,
 ):
     """Saves power maps.
 
@@ -220,6 +220,9 @@ def save(
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
+
+    if plot_kwargs is None:
+        plot_kwargs = {}
 
     power_map = np.squeeze(power_map)
     if power_map.ndim > 1:
@@ -290,7 +293,7 @@ def multi_save(
     component=0,
     subtract_mean=False,
     mean_weights=None,
-    **plot_kwargs,
+    plot_kwargs=None,
 ):
     """Saves group level and subject level power maps.
 
@@ -393,7 +396,7 @@ def multi_save(
         filename=group_filename,
         mask_file=mask_file,
         parcellation_file=parcellation_file,
-        **plot_kwargs,
+        plot_kwargs=plot_kwargs,
     )
 
     # Save the subject lebel power maps
@@ -414,5 +417,5 @@ def multi_save(
             filename=subject_filename,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
-            **plot_kwargs,
+            plot_kwargs=plot_kwargs,
         )

@@ -465,7 +465,7 @@ def save(
     parcellation_file,
     component=None,
     threshold=0,
-    **plot_kwargs,
+    plot_kwargs=None,
 ):
     """Save connectivity maps.
 
@@ -480,12 +480,12 @@ def save(
         Name of parcellation file used.
     component : int
         Spectral component to save.
-    plot_kwargs : dict
-        Keyword arguments to pass to nilearn.plotting.plot_connectome.
     threshold : float or np.ndarray
         Threshold to determine which connectivity to show. Should be between 0 and 1.
         If a float is passed the same threshold is used for all modes. Otherwise,
         threshold should be a numpy array of shape (n_modes,).
+    plot_kwargs : dict
+        Keyword arguments to pass to nilearn.plotting.plot_connectome.
     """
     # Validation
     error_message = (
