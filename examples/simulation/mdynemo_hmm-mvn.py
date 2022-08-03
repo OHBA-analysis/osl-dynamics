@@ -109,7 +109,7 @@ fo_inf_alpha = modes.fractional_occupancies(inf_alpha)
 fo_inf_gamma = modes.fractional_occupancies(inf_gamma)
 
 print("Fractional occupancies mean (Simulation):", fo_sim_alpha)
-print("Fractional occupancies mean (DyNeMo):    ", fo_inf_alpha)
+print("Fractional occupancies mean (DyNeMo):", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
-print("Fractional occupancies fc (DyNeMo):    ", fo_inf_gamma)
+print("Fractional occupancies fc (DyNeMo):", fo_inf_gamma)

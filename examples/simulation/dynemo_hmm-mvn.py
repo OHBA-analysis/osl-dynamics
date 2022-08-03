@@ -1,4 +1,4 @@
-"""Example script for running inference on simulated HMM-MVN data.
+"""Example script for running DyNeMo on simulated HMM-MVN data.
 
 - Should achieve a dice coefficient of ~0.99.
 - A seed is set for the random number generators for reproducibility.
@@ -8,6 +8,7 @@ print("Setting up")
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
+from osl_dynamics.utils import plotting
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -75,14 +76,40 @@ history = model.fit(training_dataset, epochs=config.n_epochs)
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# Inferred mode mixing factors and mode time course
+# Inferred mode mixing factors and state time course
 inf_alp = model.get_alpha(prediction_dataset)
 inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 
-sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
-print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
+# Inferred covariances
+inf_cov = model.get_covariances()
+sim_cov = sim.covariances
 
-# Fractional occupancies
+# Reorder inferred modes to match the simulation
+_, order = modes.match_modes(sim_stc, inf_stc, return_order=True)
+inf_stc = inf_stc[:, order]
+inf_cov = inf_cov[order]
+
+# Metrics
+print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (DyNeMo): ", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
+
+# Plots
+plotting.plot_alpha(
+    sim_stc,
+    n_samples=2000,
+    title="Ground Truth",
+    y_labels=r"$\alpha_{jt}$",
+    filename="sim_stc.png",
+)
+plotting.plot_alpha(
+    inf_stc,
+    n_samples=2000,
+    title="Inferred",
+    y_labels=r"$\alpha_{jt}$",
+    filename="inf_stc.png",
+)
+
+plotting.plot_matrices(sim_cov, main_title="Ground Truth", filename="sim_cov.png")
+plotting.plot_matrices(inf_cov, main_title="Inferred", filename="inf_cov.png")

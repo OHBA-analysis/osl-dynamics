@@ -104,7 +104,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (DyNeMo):      ", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
 
 # Get the subject embeddings
 subject_embeddings = model.get_subject_embeddings()
