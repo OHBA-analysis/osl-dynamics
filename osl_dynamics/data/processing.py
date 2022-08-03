@@ -246,15 +246,16 @@ class Processing:
             self.prepared_data_memmaps = None
             self.prepared_data_filenames = None
 
-    def trim_raw_time_series(
+    def trim_time_series(
         self,
         sequence_length=None,
-        n_embeddings=None,
+        n_embeddings=1,
+        prepared=True,
         concatenate=False,
     ):
-        """Trims the raw preprocessed data time series.
+        """Trims the data time series.
 
-        Removes the data points that are removed when the data is prepared,
+        Removes the data points that are lost when the data is prepared,
         i.e. due to time embedding and separating into sequences, but does not
         perform time embedding or batching into sequences on the time series.
 
@@ -264,6 +265,8 @@ class Processing:
             Length of the segement of data to feed into the model.
         n_embeddings : int
             Number of data points to embed the data.
+        prepared : bool
+            Should we return the prepared data? If not we return the raw data.
         concatenate : bool
             Should we concatenate the data for each subject?
 
@@ -272,19 +275,23 @@ class Processing:
         list of np.ndarray
             Trimed time series for each subject.
         """
-        n_embeddings = n_embeddings or self.n_embeddings
+        if self.n_embeddings is None:
+            # Data has not been prepared so we can't trim the prepared data
+            prepared = False
 
-        if n_embeddings is None:
-            raise ValueError(
-                "n_embeddings has not been set. "
-                + "Either pass it as an argument or call prepare."
-            )
+        if not prepared:
+            # We're trimming the raw data, how many time embedding data
+            # points do we need to remove?
+            n_embeddings = self.n_embeddings or n_embeddings
 
-        if hasattr(self, "sequence_length"):
-            sequence_length = self.sequence_length
+        # What data should we trim?
+        if prepared:
+            memmaps = self.subjects
+        else:
+            memmaps = self.raw_data_memmaps
 
-        trimmed_raw_time_series = []
-        for memmap in self.raw_data_memmaps:
+        trimmed_time_series = []
+        for memmap in memmaps:
 
             # Remove data points lost to time embedding
             if n_embeddings != 1:
@@ -295,40 +302,6 @@ class Processing:
                 n_sequences = memmap.shape[0] // sequence_length
                 memmap = memmap[: n_sequences * sequence_length]
 
-            trimmed_raw_time_series.append(memmap)
-
-        if concatenate or len(trimmed_raw_time_series) == 1:
-            trimmed_raw_time_series = np.concatenate(trimmed_raw_time_series)
-
-        return trimmed_raw_time_series
-
-    def trim_time_series(self, sequence_length=None, concatenate=False):
-        """Trims the current data time series.
-
-        Removes the data points that are lost when the time series is split
-        into sequences.
-
-        Parameters
-        ----------
-        sequence_length : int
-            Length of the segement of data to feed into the model.
-        concatenate : bool
-            Should we concatenate the data for each subject?
-
-        Returns
-        -------
-        list of np.ndarray
-            Trimed time series for each subject.
-        """
-        if hasattr(self, "sequence_length"):
-            sequence_length = self.sequence_length
-
-        trimmed_time_series = []
-        for memmap in self.subjects:
-            # Remove data points lost to separating into sequences
-            if sequence_length is not None:
-                n_sequences = memmap.shape[0] // sequence_length
-                memmap = memmap[: n_sequences * sequence_length]
             trimmed_time_series.append(memmap)
 
         if concatenate or len(trimmed_time_series) == 1:

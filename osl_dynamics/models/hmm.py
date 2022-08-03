@@ -138,7 +138,7 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         epochs : int
             Number of epochs.
@@ -150,6 +150,8 @@ class Model(ModelBase):
         """
         if epochs is None:
             epochs = self.config.n_epochs
+
+        dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
         history = {"loss": [], "rho": []}
         for n in range(epochs):
@@ -427,7 +429,7 @@ class Model(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
+        dataset = self.make_dataset(dataset, concatenate=False)
 
         alpha = []
         for ds in dataset:

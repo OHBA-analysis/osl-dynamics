@@ -71,7 +71,7 @@ preprocessed_data = Data(
         for i in range(1, 11)
     ]
 )
-ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings, concatenate=True)
+ts = preprocessed_data.trim_time_series(n_embeddings=n_embeddings, concatenate=True)
 
 f, psd, coh = spectral.multitaper_spectra(
     data=ts,
@@ -118,3 +118,6 @@ for component in range(4):
         subtract_mean=True,
         component=component,
     )
+
+# Delete temporary directory
+preprocessed_data.delete_dir()

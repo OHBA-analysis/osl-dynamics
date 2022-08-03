@@ -38,7 +38,7 @@ preprocessed_data = Data(
         for i in range(1, 56)
     ]
 )
-ts = preprocessed_data.trim_raw_time_series(n_embeddings=n_embeddings)
+ts = preprocessed_data.trim_time_series(n_embeddings=n_embeddings)
 
 # Calculate subject-specific PSDs and coherences using multitaper method
 f, psd, coh, w = spectral.multitaper_spectra(

@@ -148,8 +148,7 @@ model.set_weights(best_weights)
 init_cov = model.get_covariances()
 
 # Reset model for full training
-model.reset_weights()
-model.compile()
+model.reset()
 
 # Set initial covariances
 model.set_covariances(init_cov, update_initializer=True)
@@ -292,9 +291,10 @@ plotting.plot_violin(
 # Spectral analysis #
 # ----------------- #
 # Source reconstructed data
-src_rec_data = training_data.trim_raw_time_series(
+src_rec_data = training_data.trim_time_series(
     sequence_length=config.sequence_length,
     n_embeddings=training_data.n_embeddings,
+    prepared=False,
 )
 
 # Caclculate subject-specific mode PSDs and coherences

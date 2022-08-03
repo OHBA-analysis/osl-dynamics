@@ -47,18 +47,13 @@ config.initial_covariances = sim.covariances
 
 # Create training dataset
 training_data = data.Data(sim.time_series)
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
 
 # Build model
 model = Model(config)
 model.summary()
 
 # Train model
-history = model.fit(training_dataset)
+history = model.fit(training_data)
 
 # Loss
 plotting.plot_line(
@@ -70,22 +65,16 @@ plotting.plot_line(
 )
 
 # Get inferred parameters
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-
-inf_stc = model.get_alpha(prediction_dataset)
+inf_stc = model.get_alpha(training_data)
 inf_means, inf_covs = model.get_means_covariances()
 inf_tp = model.get_transprob()
 
 # Re-order with respect to the simulation
 sim_stc = sim.mode_time_course
-orders = modes.match_modes(sim_stc, inf_stc, return_order=True)
-inf_stc = inf_stc[:, orders[1]]
-inf_covs = inf_covs[orders[1]]
-inf_tp = inf_tp[np.ix_(orders[1], orders[1])]
+_, order = modes.match_modes(sim_stc, inf_stc, return_order=True)
+inf_stc = inf_stc[:, order]
+inf_covs = inf_covs[order]
+inf_tp = inf_tp[np.ix_(order, order)]
 
 plotting.plot_alpha(
     sim_stc,

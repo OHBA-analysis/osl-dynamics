@@ -282,13 +282,15 @@ class ModelBase:
 
         return outputs
 
-    def get_training_time_series(self, training_data, concatenate=False):
+    def get_training_time_series(self, training_data, prepared=True, concatenate=False):
         """Get the time series used for training from a Data object.
 
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
             Data object.
+        prepared : bool
+            Should we return the prepared data? If not, we return the raw data.
         concatenate : bool
             Should we concatenate the data for each subject?
 
@@ -298,7 +300,7 @@ class ModelBase:
             Training data time series.
         """
         return training_data.trim_time_series(
-            self.config.sequence_length, concatenate=concatenate
+            self.config.sequence_length, prepared=prepared, concatenate=concatenate
         )
 
     def summary_string(self):
