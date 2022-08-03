@@ -9,16 +9,16 @@ from dataclasses import dataclass
 
 import numpy as np
 import tensorflow
+from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
-from tensorflow.python.data import Dataset
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
-from osl_dynamics.data import Data
+from osl_dynamics import data
 from osl_dynamics.inference import callbacks, initializers
-from osl_dynamics.utils.misc import check_iterable_type, replace_argument
+from osl_dynamics.utils.misc import get_argument, replace_argument
 from osl_dynamics.utils.model import HTMLTable, LatexTable
 
 
@@ -171,7 +171,13 @@ class ModelBase:
         history : history
             The training history.
         """
-        # Use the number of epochs in config if it has not been passed
+        # If a osl_dynamics.data.Data object has been passed for the x arguments,
+        # replace it with a tensorflow dataset
+        x = get_argument(self.model.fit, "x", args, kwargs)
+        x = self.make_dataset(x, shuffle=True, concatenate=True)
+        args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
+
+        # Use the number of epochs in the config if it has not been passed
         args, kwargs = replace_argument(
             self.model.fit, "epochs", self.config.n_epochs, args, kwargs
         )
@@ -236,43 +242,64 @@ class ModelBase:
         self.reset_weights()
         self.compile()
 
-    def _make_dataset(self, inputs):
-        """Make a dataset.
+    def make_dataset(self, inputs, shuffle=False, concatenate=False):
+        """Converts a Data object into a TensorFlow Dataset.
 
         Parameters
         ----------
         inputs : osl_dynamics.data.Data
-            Data object.
+            Data object. If a str or numpy array is passed this function will
+            convert it into a Data object.
+        shuffle : bool
+            Should we shuffle the data?
+        concatenate : bool
+            Should we return a single TensorFlow Dataset or a list of Datasets.
 
         Returns
         -------
-        dataset : tensorflow.data.Dataset
-            Tensorflow dataset that can be used for training.
+        dataset : tensorflow.data.Dataset or list
+            TensorFlow Dataset (or list of Datasets) that can be used for
+            training/evaluating.
         """
-        if isinstance(inputs, Data):
-            return inputs.dataset(self.config.sequence_length, shuffle=False)
-        if isinstance(inputs, Dataset):
-            return [inputs]
-        if isinstance(inputs, str):
-            return [Data(inputs).dataset(self.config.sequence_length, shuffle=False)]
-        if isinstance(inputs, np.ndarray):
-            if inputs.ndim == 2:
-                return [
-                    Data(inputs).dataset(self.config.sequence_length, shuffle=False)
-                ]
-            if inputs.ndim == 3:
-                return [
-                    Data(subject).dataset(self.config.sequence_length, shuffle=False)
-                    for subject in inputs
-                ]
-        if check_iterable_type(inputs, Dataset):
-            return inputs
-        if check_iterable_type(inputs, str):
-            datasets = [
-                Data(subject).dataset(self.config.sequence_length, shuffle=False)
-                for subject in inputs
-            ]
-            return datasets
+        if isinstance(inputs, str) or isinstance(inputs, np.ndarray):
+            # str or numpy array -> Data object
+            inputs = data.Data(inputs)
+
+        if isinstance(inputs, data.Data):
+            # Data object -> list of Dataset if concatenate=False or
+            # Data object -> Dataset if concatenate=True
+            outputs = inputs.dataset(
+                self.config.sequence_length,
+                self.config.batch_size,
+                shuffle=shuffle,
+                concatenate=concatenate,
+            )
+        elif isinstance(inputs, Dataset) and not concatenate:
+            # Dataset -> list of Dataset if concatenate=False
+            outputs = [inputs]
+        else:
+            outputs = inputs
+
+        return outputs
+
+    def get_training_time_series(self, training_data, concatenate=False):
+        """Get the time series used for training from a Data object.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Data object.
+        concatenate : bool
+            Should we concatenate the data for each subject?
+
+        Returns
+        -------
+        training_data : np.ndarray or list
+            Training data time series.
+        """
+        return training_data.trim_time_series(
+            self.config.sequence_length, concatenate=concatenate
+        )
 
     def summary_string(self):
         stringio = StringIO()

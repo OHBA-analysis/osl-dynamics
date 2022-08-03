@@ -99,6 +99,36 @@ def replace_argument(func, name, item, args, kwargs, append=False):
     return args, kwargs
 
 
+def get_argument(func, name, args, kwargs):
+    """Get an argument passed to a function call whether it is a normal
+    argument or keyword argument.
+
+    Parameters
+    ----------
+    func : callable
+        The function being called.
+    name : str
+        Name of the variable to be modified.
+    args : dict
+        Arguments.
+    kwargs : dict
+        Keyword arguments.
+
+    Returns
+    -------
+    args : argument
+    """
+    args = copy(listify(args))
+    kwargs = copy(kwargs)
+    param_order = list(inspect.signature(func).parameters)
+    param_position = param_order.index(name)
+    if len(args) > param_position:
+        arg = args[param_position]
+    else:
+        arg = kwargs[name]
+    return arg
+
+
 def check_arguments(args, kwargs, index, name, value, comparison_op):
     """Checks the arguments passed to a function.
 

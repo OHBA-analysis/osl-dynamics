@@ -297,13 +297,44 @@ class Processing:
 
             trimmed_raw_time_series.append(memmap)
 
-        if len(trimmed_raw_time_series) == 1:
-            trimmed_raw_time_series = trimmed_raw_time_series[0]
-
-        elif concatenate:
+        if concatenate or len(trimmed_raw_time_series) == 1:
             trimmed_raw_time_series = np.concatenate(trimmed_raw_time_series)
 
         return trimmed_raw_time_series
+
+    def trim_time_series(self, sequence_length=None, concatenate=False):
+        """Trims the current data time series.
+
+        Removes the data points that are lost when the time series is split
+        into sequences.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        concatenate : bool
+            Should we concatenate the data for each subject?
+
+        Returns
+        -------
+        list of np.ndarray
+            Trimed time series for each subject.
+        """
+        if hasattr(self, "sequence_length"):
+            sequence_length = self.sequence_length
+
+        trimmed_time_series = []
+        for memmap in self.subjects:
+            # Remove data points lost to separating into sequences
+            if sequence_length is not None:
+                n_sequences = memmap.shape[0] // sequence_length
+                memmap = memmap[: n_sequences * sequence_length]
+            trimmed_time_series.append(memmap)
+
+        if concatenate or len(trimmed_time_series) == 1:
+            trimmed_time_series = np.concatenate(trimmed_time_series)
+
+        return trimmed_time_series
 
 
 def standardize(

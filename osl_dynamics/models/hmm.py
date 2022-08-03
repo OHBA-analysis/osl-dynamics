@@ -427,7 +427,7 @@ class Model(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self._make_dataset(dataset)
+        dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
         alpha = []
         for ds in dataset:

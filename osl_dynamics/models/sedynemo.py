@@ -301,9 +301,11 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset
+        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
+        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+
         if self.config.learn_means:
             dynemo_obs.set_means_regularizer(
                 self.model, training_dataset, layer_name="group_means"

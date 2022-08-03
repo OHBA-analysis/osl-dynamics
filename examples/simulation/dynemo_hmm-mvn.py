@@ -50,34 +50,22 @@ sim = simulation.HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-# Prepare dataset
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-
 # Build model
 model = Model(config)
 model.summary()
 
 # Add regularisation
-model.set_regularizers(training_dataset)
+model.set_regularizers(training_data)
 
 print("Training model")
-history = model.fit(training_dataset, epochs=config.n_epochs)
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(prediction_dataset)
+free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors and state time course
-inf_alp = model.get_alpha(prediction_dataset)
+inf_alp = model.get_alpha(training_data)
 inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 
@@ -94,6 +82,10 @@ inf_cov = inf_cov[order]
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
+
+ts = model.get_training_time_series(training_data)
+print(ts.shape)
+exit()
 
 # Plots
 plotting.plot_alpha(
