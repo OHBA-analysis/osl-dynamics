@@ -148,55 +148,6 @@ def cov2std(cov):
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
-def mean_diagonal(array):
-    """Set the diagonal of a matrix to the mean of all non-diagonal elements.
-
-    This is primarily useful for plotting without being concerned about the magnitude
-    of diagonal values compressing the color scale.
-
-    Parameters
-    ----------
-    array : np.ndarray
-
-    Returns
-    -------
-    mean_diagonal_array : np.ndarray
-        Array with diagonal set to mean of non-diagonal elements.
-
-    """
-    off_diagonals = ~np.eye(array.shape[0], dtype=bool)
-    new_array = array.copy()
-    np.fill_diagonal(new_array, array[off_diagonals].mean())
-    return new_array
-
-
-def trace_weights(covariance_matrices):
-    """Calculate a weight for each mode in a list of covariances, from their variance.
-
-    Parameters
-    ----------
-    covariance_matrices : np.ndarray or list of np.ndarray
-        A 3D matrix of dimensions [modes x chans x chans] ([modes x covariance]).
-
-    Returns
-    -------
-    weights : np.ndarray
-        The relative weights of each mode, from its variance.
-    """
-    covariance_matrices = np.array(covariance_matrices)
-    if covariance_matrices.ndim == 2:
-        covariance_matrices = covariance_matrices[None, ...]
-    if np.not_equal(*covariance_matrices.shape[-2:]):
-        raise ValueError(
-            "Last two dimensions of matrix must be equal. Found {} and {}".format(
-                *covariance_matrices.shape[-2:]
-            )
-        )
-    weights = np.trace(covariance_matrices, axis1=1, axis2=2)
-    normalized_weights = weights / weights.max()
-    return normalized_weights
-
-
 def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=False):
     """Create a sliding window over an array in arbitrary dimensions.
 

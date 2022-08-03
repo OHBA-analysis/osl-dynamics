@@ -164,15 +164,3 @@ class OSL_HMM:
             Mode time course.
         """
         return self.state_time_course(*args, **kwargs)
-
-    def covariance_weights(self):
-        """Calculate covariance weightings based on variance (trace).
-
-        Method to wrap `array_ops.trace_weights`.
-
-        Returns
-        -------
-        weights: np.ndarray
-            Statewise weights.
-        """
-        return array_ops.trace_weights(self.covariances)
