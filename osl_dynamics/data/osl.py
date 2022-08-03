@@ -4,6 +4,7 @@
 
 import numpy as np
 from osl_dynamics import array_ops
+from osl_dynamics.data.processing import trim_time_series
 from osl_dynamics.data.rw import loadmat
 from osl_dynamics.inference import modes
 
@@ -80,7 +81,7 @@ class OSL_HMM:
         Parameters
         ----------
         concatenate : bool
-            Should we concatenate the gammas for each subejcts?
+            Should we concatenate the gammas for each subjects?
         pad : int
             Pad the gamma for each subject with zeros to replace the data points lost
             by performing n_embeddings. Default is no padding.
@@ -107,6 +108,28 @@ class OSL_HMM:
                 return np.concatenate(padded_gamma)
             else:
                 return padded_gamma
+
+    def trimmed_gamma(self, sequence_length, concatenate=False):
+        """Trimmed state probabilities for each subject.
+
+        Data points that would be lost due to separating the time series into
+        sequences are removed from each subject.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Sequence length.
+        concatenate : bool
+            Should we concatenate the gammas for each subject?
+
+        Returns
+        -------
+        gamma : np.ndarray or list
+            State probabilities.
+        """
+        return trim_time_series(
+            self.gamma(), sequence_length=sequence_length, concatenate=concatenate
+        )
 
     def fractional_occupancies(self):
         """Fractional Occupancy of each state.

@@ -25,14 +25,17 @@ config = Config(
     sequence_length=100,
     learn_means=False,
     learn_covariances=True,
-    learn_transprob=True,
+    learn_trans_prob=True,
     batch_size=64,
-    learning_rate=0.001,
+    learning_rate=1e-3,
     n_epochs=10,
 )
 
-# Use the final HMM covariances for initialisation
-config.initial_covariances = hmmmar.covariances
+# Use the initial HMM covariances for initial covariances
+hmmmar_init = data.OSL_HMM(
+    "/well/woolrich/projects/mrc_meguk/notts22/results/K-6/hmm_init.mat"
+)
+config.initial_covariances = hmmmar_init.covariances
 
 # Load dataset
 training_data = data.Data(
@@ -43,36 +46,19 @@ training_data = data.Data(
 )
 training_data.prepare()
 
-# Create tensorflow datasets for training and model evaluation
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
-
 # Build model
 model = Model(config)
 model.summary()
 
 # Train the model
-history = model.fit(training_dataset)
+history = model.fit(training_data)
 
 # Get inferred state probabilities
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-inf_alp = model.get_alpha(prediction_dataset)
+inf_alp = model.get_alpha(training_data, concatenate=True)
 
 # Get the inferred state probability from HMM-MAR
 # and trim data points lost due to separating the data into sequences
-hmm_gam = data.processing.trim_time_series(
-    hmmmar.gamma,
-    discontinuities=hmmmar.discontinuities,
-    sequence_length=config.sequence_length,
-    concatenate=True,
-)
+hmm_gam = hmmmar.trimmed_gamma(config.sequence_length, concatenate=True)
 
 _, order = modes.match_modes(inf_alp, hmm_gam, return_order=True)
 hmm_gam = hmm_gam[:, order]
@@ -94,7 +80,7 @@ print("Fractional occupancies (Inferred):", inf_fo)
 print("Fractional occupancies (HMM-MAR):", hmm_fo)
 
 # Transition probability matrices
-inf_tp = model.get_transprob()
+inf_tp = model.get_trans_prob()
 inf_tp = inf_tp[np.ix_(order, order)]
 np.fill_diagonal(inf_tp, 0)
 
@@ -102,7 +88,7 @@ hmm_tp = hmmmar.trans_prob
 hmm_tp = hmm_tp[np.ix_(order, order)]
 np.fill_diagonal(hmm_tp, 0)
 
-plotting.plot_matrices([inf_tp, hmm_tp], filename="figures/transprob.png")
+plotting.plot_matrices([inf_tp, hmm_tp], filename="figures/trans_prob.png")
 
 # Inferred covariances
 inf_cov = model.get_covariances()
@@ -114,21 +100,12 @@ hmm_cov = hmm_cov[order]
 plotting.plot_matrices(inf_cov, group_color_scale=False, filename="figures/inf_cov.png")
 plotting.plot_matrices(hmm_cov, group_color_scale=False, filename="figures/hmm_cov.png")
 
+# Get subject-specific training data and state probabilities
+ts = model.get_training_time_series(training_data, prepared=False)
+alp = model.get_alpha(training_data)
+
 # Compute partial covariances of state time courses regressing onto data,
 # where data is the non-whitened hilbert envelope data
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-    concatenate=False,  # gives a list of indivudual subject data
-)
-ts = training_data.time_series()
-ts = data.processing.trim_time_series(
-    ts,
-    discontinuities=hmmmar.discontinuities,
-    sequence_length=config.sequence_length,
-)
-alp = model.get_alpha(prediction_dataset)  # subject-specific alpha
 pcov = analysis.modes.partial_covariances(ts, alp)
 pcov = np.mean(pcov, axis=0)  # average over subjects
 
@@ -137,4 +114,5 @@ analysis.power.save(
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     filename="figures/pcov_.png",
+    subtract_mean=True,
 )

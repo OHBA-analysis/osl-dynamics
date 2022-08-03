@@ -25,7 +25,7 @@ config = Config(
     batch_size=16,
     learning_rate=0.01,
     n_epochs=30,
-    learn_transprob=True,
+    learn_trans_prob=True,
 )
 
 # Simulate data
@@ -41,9 +41,6 @@ sim = simulation.HMM_MVN(
     random_seed=123,
 )
 sim.standardize()
-
-# Use ground truth covariances as initialization
-config.initial_covariances = sim.covariances
 
 # Create training dataset
 training_data = data.Data(sim.time_series)
@@ -67,7 +64,7 @@ plotting.plot_line(
 # Get inferred parameters
 inf_stc = model.get_alpha(training_data)
 inf_means, inf_covs = model.get_means_covariances()
-inf_tp = model.get_transprob()
+inf_tp = model.get_trans_prob()
 
 # Re-order with respect to the simulation
 sim_stc = sim.mode_time_course
@@ -89,7 +86,7 @@ plotting.plot_matrices(
 )
 plotting.plot_matrices(inf_covs, main_title="Inferred", filename="figures/inf_covs.png")
 
-plotting.plot_matrices(inf_tp[np.newaxis, ...], filename="figures/transprob.png")
+plotting.plot_matrices(inf_tp[np.newaxis, ...], filename="figures/trans_prob.png")
 
 # Compare the inferred mode time course to the ground truth
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))

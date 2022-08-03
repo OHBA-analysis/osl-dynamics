@@ -55,9 +55,9 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
-    initial_transprob : np.ndarray
+    initial_trans_prob : np.ndarray
         Initialisation for trans prob matrix
-    learn_transprob : bool
+    learn_trans_prob : bool
         Should we make the trans prob matrix trainable?
     state_probs_t0: np.ndarray
         State probabilities at time=0. Not trainable.
@@ -65,9 +65,6 @@ class Config(BaseModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
-    gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tensorflow.keras.optimizers.Optimizer
@@ -84,12 +81,12 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
 
-    initial_transprob: np.ndarray = None
-    learn_transprob: bool = True
+    initial_trans_prob: np.ndarray = None
+    learn_trans_prob: bool = True
     state_probs_t0: np.ndarray = None
 
-    stochastic_update_delay: float = 0  # alpha
-    stochastic_update_forget: float = 0.5  # beta
+    stochastic_update_delay: float = 5  # alpha
+    stochastic_update_forget: float = 0.7  # beta
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
@@ -114,15 +111,15 @@ class Model(ModelBase):
         self.model = _model_structure(self.config)
 
         self.rho = 1
-        initial_transprob = self.config.initial_transprob
-        if initial_transprob is None:
-            initial_transprob = (
+        initial_trans_prob = self.config.initial_trans_prob
+        if initial_trans_prob is None:
+            initial_trans_prob = (
                 np.ones((self.config.n_states, self.config.n_states))
                 * 0.1
                 / self.config.n_states
             )
-            np.fill_diagonal(initial_transprob, 0.9)
-        self.transprob = initial_transprob
+            np.fill_diagonal(initial_trans_prob, 0.9)
+        self.trans_prob = initial_trans_prob
 
         if self.config.state_probs_t0 is None:
             self.state_probs_t0 = (
@@ -170,8 +167,8 @@ class Model(ModelBase):
                 gamma, xi = self._get_state_probs(x)
 
                 # Update transition probability matrix
-                if self.config.learn_transprob:
-                    self._update_transprob(gamma, xi)
+                if self.config.learn_trans_prob:
+                    self._update_trans_prob(gamma, xi)
 
                 # Update observation model
                 training_data = np.concatenate([x, gamma], axis=2)
@@ -229,7 +226,7 @@ class Model(ModelBase):
         # locations in memory) to pass into the C++ update function
         B_cont = np.ascontiguousarray(likelihood, np.double)
         Pi_0_cont = np.ascontiguousarray(self.state_probs_t0.T, np.double)
-        transprob_cont = np.ascontiguousarray(self.transprob.T, np.double)
+        trans_prob_cont = np.ascontiguousarray(self.trans_prob.T, np.double)
 
         # Define C++ class initialiser outputs types
         hidden_state_inference.new_inferer.restype = c_void_p
@@ -243,7 +240,7 @@ class Model(ModelBase):
             c_void_p,
             ndpointer(dtype=c_double, shape=B_cont.shape),
             ndpointer(dtype=c_double, shape=Pi_0_cont.shape),
-            ndpointer(dtype=c_double, shape=transprob_cont.shape),
+            ndpointer(dtype=c_double, shape=trans_prob_cont.shape),
             c_int,
             ndpointer(dtype=c_double, shape=gamma_cont.shape),
             ndpointer(dtype=c_double, shape=xi_cont.shape),
@@ -255,7 +252,7 @@ class Model(ModelBase):
             inferer_obj,
             B_cont,
             Pi_0_cont,
-            transprob_cont,
+            trans_prob_cont,
             n_samples,
             gamma_cont,
             xi_cont,
@@ -299,7 +296,7 @@ class Model(ModelBase):
 
         return np.exp(log_likelihood)
 
-    def _update_transprob(self, gamma, xi):
+    def _update_trans_prob(self, gamma, xi):
         """Update transition probability matrix.
 
         Parameters
@@ -320,9 +317,9 @@ class Model(ModelBase):
             np.sum(xi, 1), [self.config.n_states, self.config.n_states]
         ).T / np.reshape(np.sum(gamma[:, :-1], 1), [self.config.n_states, 1])
 
-        # We use stochastic updates on transprob as per Eqs. (1) and (2) in the paper:
+        # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
-        self.transprob = (1 - self.rho) * self.transprob + self.rho * phi_interim
+        self.trans_prob = (1 - self.rho) * self.trans_prob + self.rho * phi_interim
 
     def _update_rho(self, ind):
         """Update rho.
@@ -340,7 +337,7 @@ class Model(ModelBase):
             -self.config.stochastic_update_forget,
         )
 
-    def sample_stc(self, n_samples):
+    def sample_state_time_course(self, n_samples):
         """Sample a state time course.
 
         Parameters
@@ -353,18 +350,18 @@ class Model(ModelBase):
         np.ndarray
             State time course with shape (n_samples, n_states).
         """
-        sim = HMM(self.transprob)
+        sim = HMM(self.trans_prob)
         stc = sim.generate_states(n_samples)
         return stc
 
-    def get_transprob(self):
+    def get_trans_prob(self):
         """Get the transition probability matrix.
 
         Returns
         -------
         np.ndarray
         """
-        return self.transprob
+        return self.trans_prob
 
     def get_covariances(self):
         """Get the covariances of each mode.
@@ -413,6 +410,26 @@ class Model(ModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
+    def set_regularizers(self, training_dataset):
+        """Set the means and covariances regularizer based on the training data.
+
+        A multivariate normal prior is applied to the mean vectors with mu = 0,
+        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+
+        Parameters
+        ----------
+        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Training dataset.
+        """
+        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+
+        if self.config.learn_means:
+            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+
+        if self.config.learn_covariances:
+            dynemo_obs.set_covariances_regularizer(self.model, training_dataset)
+
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
 
@@ -444,6 +461,27 @@ class Model(ModelBase):
 
         return alpha
 
+    def get_training_time_series(self, training_data, prepared=True, concatenate=False):
+        """Get the time series used for training from a Data object.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Data object.
+        prepared : bool
+            Should we return the prepared data? If not, we return the raw data.
+        concatenate : bool
+            Should we concatenate the data for each subject?
+
+        Returns
+        -------
+        training_data : np.ndarray or list
+            Training data time series.
+        """
+        return training_data.trim_time_series(
+            self.config.sequence_length, prepared=prepared, concatenate=concatenate
+        )
+
     def save_all(self, dirname):
         """Save all model weights.
 
@@ -454,7 +492,7 @@ class Model(ModelBase):
         """
         os.system("mkdir {}".format(dirname))
         self.save_weights(os.path.join(dirname, "model_weights"))
-        np.save(os.path.join(dirname, "model_transprob.npy"), self.transprob)
+        np.save(os.path.join(dirname, "model_trans_prob.npy"), self.trans_prob)
 
     def load_all(self, dirname):
         """Load all model parameters.
@@ -465,7 +503,7 @@ class Model(ModelBase):
             Location to load model parameters from.
         """
         self.load_weights(os.path.join(dirname, "model_weights"))
-        self.transprob = np.load(os.path.join(dirname, "model_transprob.npy"))
+        self.trans_prob = np.load(os.path.join(dirname, "model_trans_prob.npy"))
 
 
 def _model_structure(config):
