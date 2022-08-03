@@ -33,15 +33,15 @@ class OSL_HMM:
 
         # State probabilities
         if "gamma" in self.hmm:
-            self.gamma = self.hmm["gamma"].astype(np.float32)
+            self.Gamma = self.hmm["gamma"].astype(np.float32)
         elif "Gamma" in self.hmm:
-            self.gamma = self.hmm["Gamma"].astype(np.float32)
+            self.Gamma = self.hmm["Gamma"].astype(np.float32)
         else:
-            self.gamma = None
+            self.Gamma = None
 
         # State time course
-        if self.gamma is not None:
-            vpath = self.gamma.argmax(axis=1)
+        if self.Gamma is not None:
+            vpath = self.Gamma.argmax(axis=1)
             self.vpath = array_ops.get_one_hot(vpath).astype(np.float32)
         else:
             self.vpath = None
@@ -65,50 +65,48 @@ class OSL_HMM:
         # points for different subjects
         if "T" in self.hmm:
             self.discontinuities = [np.squeeze(T).astype(int) for T in self.hmm["T"]]
-        elif self.gamma is not None:
+        elif self.Gamma is not None:
             # Assume gamma has no discontinuities
-            self.discontinuities = [self.gamma.shape[0]]
+            self.discontinuities = [self.Gamma.shape[0]]
         else:
             self.discontinuities = None
 
     def __str__(self):
         return f"OSL HMM object from file {self.filename}"
 
-    def alpha(self, concatenate=False, pad=None):
-        """Alpha for each subject.
-
-        Alpha is equivalent to gamma in OSL HMM.
+    def gamma(self, concatenate=False, pad=None):
+        """State probabilities for each subject.
 
         Parameters
         ----------
         concatenate : bool
-            Should we concatenate the alphas for each subejcts?
+            Should we concatenate the gammas for each subejcts?
         pad : int
-            Pad the alpha for each subject with zeros to replace the data points lost
+            Pad the gamma for each subject with zeros to replace the data points lost
             by performing n_embeddings. Default is no padding.
 
         Returns
         -------
-        alpha : np.ndarray or list
+        gamma : np.ndarray or list
             State probabilities.
         """
-        if self.gamma is None:
+        if self.Gamma is None:
             return None
 
         if pad is None:
             if concatenate or len(self.discontinuities) == 1:
-                return self.gamma
+                return self.Gamma
             else:
-                return np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
+                return np.split(self.Gamma, np.cumsum(self.discontinuities[:-1]))
         else:
-            padded_alpha = [
-                np.pad(alpha, [[pad, pad], [0, 0]])
-                for alpha in np.split(self.gamma, np.cumsum(self.discontinuities[:-1]))
+            padded_gamma = [
+                np.pad(gamma, [[pad, pad], [0, 0]])
+                for gamma in np.split(self.Gamma, np.cumsum(self.discontinuities[:-1]))
             ]
             if concatenate:
-                return np.concatenate(padded_alpha)
+                return np.concatenate(padded_gamma)
             else:
-                return padded_alpha
+                return padded_gamma
 
     def fractional_occupancies(self):
         """Fractional Occupancy of each state.

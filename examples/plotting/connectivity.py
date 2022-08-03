@@ -13,7 +13,7 @@ hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
 cov = hmm.covariances
-alp = hmm.alpha()
+alp = hmm.gamma()
 
 n_embeddings = 15
 pca_components = rw.loadmat(

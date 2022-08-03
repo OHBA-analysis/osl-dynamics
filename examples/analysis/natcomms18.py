@@ -16,7 +16,7 @@ os.makedirs("figures", exist_ok=True)
 hmm = OSL_HMM(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
 )
-alp = hmm.alpha()
+alp = hmm.gamma()
 
 n_embeddings = 15
 pca_components = rw.loadmat(
