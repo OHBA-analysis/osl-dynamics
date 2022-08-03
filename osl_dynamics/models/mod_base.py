@@ -149,6 +149,8 @@ class ModelBase:
 
         Parameters
         ----------
+        args : arguments
+            Arguments for keras.Model.fit().
         use_tqdm : bool
             Should we use a tqdm progress bar instead of the usual output from
             tensorflow.
@@ -161,12 +163,20 @@ class ModelBase:
             Path to save the best model to.
         additional_callbacks : list
             List of keras callback objects.
+        kwargs : keyword arguments
+            Keyword arguments for keras.Model.fit()
 
         Returns
         -------
         history : history
             The training history.
         """
+        # Use the number of epochs in config if it has not been passed
+        args, kwargs = replace_argument(
+            self.model.fit, "epochs", self.config.n_epochs, args, kwargs
+        )
+
+        # Callbacks to add to the ones the user passed
         additional_callbacks = []
 
         # Callback to display a progress bar with tqdm
