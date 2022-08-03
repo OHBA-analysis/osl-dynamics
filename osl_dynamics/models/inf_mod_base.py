@@ -316,6 +316,12 @@ class VariationalInferenceModelBase(ModelBase):
     def free_energy(self, dataset):
         """Calculates the variational free energy of a dataset.
 
+        Note, this method returns a free energy which may have a significantly
+        smaller KL loss. This is because during training we sample from the
+        posterior, however, when we're evaluating the model, we take the maximum
+        a posteriori estimate (posterior mean). This has the effect of giving a
+        lower KL loss for a given dataset.
+
         Parameters
         ----------
         dataset : tensorflow.data.Dataset or osl_dynamics.data.Data.
