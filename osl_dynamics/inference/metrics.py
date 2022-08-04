@@ -205,15 +205,15 @@ def riemannian_distance(M1, M2, threshold=1e-3):
     return d
 
 
-def pairwise_riemannian_distances(
-    matrices,
-):
+def pairwise_riemannian_distances(matrices, threshold=1e-3):
     """Calculate the Riemannian distance between matrices.
 
     Parameters
     ----------
     matrices : np.ndarray
         Shape must be (n_matrices, n_channels, n_channels).
+    threshold : float
+        Threshold to apply when there are negative eigenvalues. Must be positive.
 
     Returns
     -------
@@ -225,7 +225,9 @@ def pairwise_riemannian_distances(
     riemannian_distances = np.zeros([n_matrices, n_matrices])
     for i in trange(n_matrices, desc="Computing Riemannian distances", ncols=98):
         for j in range(i + 1, n_matrices):
-            riemannian_distances[i][j] = riemannian_distance(matrices[i], matrices[j])
+            riemannian_distances[i][j] = riemannian_distance(
+                matrices[i], matrices[j], threshold=threshold
+            )
 
     # Only the upper triangular entries are filled,
     # the diagonal entries are zeros
