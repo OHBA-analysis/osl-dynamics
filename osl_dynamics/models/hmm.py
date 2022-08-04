@@ -68,7 +68,7 @@ class Config(BaseModelConfig):
     n_epochs : int
         Number of training epochs.
     optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+        Optimizer to use.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str

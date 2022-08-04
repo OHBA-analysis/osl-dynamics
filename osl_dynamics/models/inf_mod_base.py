@@ -191,7 +191,7 @@ class VariationalInferenceModelBase(ModelBase):
         if self.config.do_kl_annealing:
             self.reset_kl_annealing_factor()
 
-    def predict(self, *args, **kwargs) -> dict:
+    def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.
 
         Returns
