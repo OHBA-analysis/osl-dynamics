@@ -247,7 +247,7 @@ class Model(VariationalInferenceModelBase):
             dynemo_obs.set_covariances_regularizer(self.model, training_dataset)
 
     def random_subject_initialization(
-        self, training_data, n_epochs, n_subjects, **kwargs
+        self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
     ):
         """Initialization for the mode means/covariances.
 
@@ -262,15 +262,34 @@ class Model(VariationalInferenceModelBase):
             Number of epochs to train.
         n_subjects : int
             How many subjects should we train on?
+        n_kl_annealing_epochs : int
+            Number of KL annealing epochs to use during initialization. If None
+            then the KL annealing epochs in the config is used.
         kwargs : keyword arguments
             Keyword arguments for the fit method.
         """
-        training_datasets = self.make_dataset(
+        print("Random subject initialization for mode means and covariances:")
+
+        # Original number of KL annealing epochs
+        original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
+
+        # Use n_kl_annealing_epochs if passed
+        self.config.n_kl_annealing_epochs = (
+            n_kl_annealing_epochs or original_n_kl_annealing_epochs
+        )
+
+        # Make a list of tensorflow Datasets if the data
+        training_data = self.make_dataset(
             training_data, shuffle=True, concatenate=False
         )
 
+        if not isinstance(training_data, list):
+            raise ValueError(
+                "training_data must be a list of Datasets or a Data object."
+            )
+
         # Pick n_subjects at random
-        n_all_subjects = len(training_datasets)
+        n_all_subjects = len(training_data)
         subjects_to_use = np.random.choice(
             range(n_all_subjects), n_subjects, replace=False
         )
@@ -279,14 +298,14 @@ class Model(VariationalInferenceModelBase):
         best_loss = np.Inf
         losses = []
         for subject in subjects_to_use:
-            print("Using subject", subject, "to train initial covariances")
+            print("Using subject", subject)
 
             # Get the dataset for this subject
-            subject_dataset = training_dataset[subject]
+            subject_dataset = training_data[subject]
 
             # Reset the model weights and train
             self.reset()
-            history = self.fit(subject_dataset, epochs=n_epochs)
+            history = self.fit(subject_dataset, epochs=n_epochs, **kwargs)
             loss = history.history["loss"][-1]
             losses.append(loss)
             print(f"Subject {subject} loss: {loss}")
@@ -297,7 +316,7 @@ class Model(VariationalInferenceModelBase):
                 subject_chosen = subject
                 best_weights = self.get_weights()
 
-        print(f"Using covariances from subject {subject_chosen}")
+        print(f"Using means and covariances from subject {subject_chosen}")
 
         # Restore the best model and get the inferred means/covariances
         # for initialisation
@@ -310,6 +329,9 @@ class Model(VariationalInferenceModelBase):
         # Set initial means/covariances
         self.set_means(init_means, update_initializer=True)
         self.set_covariances(init_covs, update_initializer=True)
+
+        # Reset the number of KL annealing epochs
+        self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
 
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.

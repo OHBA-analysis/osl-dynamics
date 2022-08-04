@@ -178,9 +178,10 @@ class ModelBase:
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
 
         # Use the number of epochs in the config if it has not been passed
-        args, kwargs = replace_argument(
-            self.model.fit, "epochs", self.config.n_epochs, args, kwargs
-        )
+        if get_argument(self.model.fit, "epochs", args, kwargs) is None:
+            args, kwargs = replace_argument(
+                self.model.fit, "epochs", self.config.n_epochs, args, kwargs
+            )
 
         # Callbacks to add to the ones the user passed
         additional_callbacks = []

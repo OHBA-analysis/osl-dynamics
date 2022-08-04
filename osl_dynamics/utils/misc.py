@@ -125,6 +125,8 @@ def get_argument(func, name, args, kwargs):
     if len(args) > param_position:
         arg = args[param_position]
     else:
+        if name not in kwargs:
+            return None
         arg = kwargs[name]
     return arg
 

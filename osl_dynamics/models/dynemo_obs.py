@@ -221,7 +221,7 @@ def get_means_covariances(model):
 def set_means(model, means, update_initializer=True):
     means = means.astype(np.float32)
     means_layer = model.get_layer("means")
-    layer_weights = means_layer.means
+    layer_weights = means_layer.vectors
     layer_weights.assign(means)
 
     if update_initializer:
