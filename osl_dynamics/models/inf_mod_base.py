@@ -115,23 +115,23 @@ class VariationalInferenceModelBase(ModelBase):
 
         return super().fit(*args, **kwargs)
 
-    def initialize(
+    def multistart_initialization(
         self,
         training_data,
-        epochs,
+        n_epochs,
         n_init,
         **kwargs,
     ):
-        """Multi-start training.
+        """Multi-start initialization.
 
         The model is trained for a few epochs with different random initializations
         for weights and the model with the best free energy is kept.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
-        epochs : int
+        n_epochs : int
             Number of epochs to train the model.
         n_init : int
             Number of initializations.
@@ -155,7 +155,7 @@ class VariationalInferenceModelBase(ModelBase):
             self.reset()
             history = self.fit(
                 training_data,
-                epochs=epochs,
+                epochs=n_epochs,
                 **kwargs,
             )
             free_energy = history.history["loss"][-1]
@@ -166,10 +166,8 @@ class VariationalInferenceModelBase(ModelBase):
                 best_history = history
 
         print(f"Using initialization {best_initialization}")
-        self.model.set_weights(best_weights)
-        if self.config.do_kl_annealing:
-            self.reset_kl_annealing_factor()
-        self.compile()
+        self.reset()
+        self.set_weights(best_weights)
 
         return best_history
 

@@ -246,6 +246,71 @@ class Model(VariationalInferenceModelBase):
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(self.model, training_dataset)
 
+    def random_subject_initialization(
+        self, training_data, n_epochs, n_subjects, **kwargs
+    ):
+        """Initialization for the mode means/covariances.
+
+        Pick a subject at random, train a model, repeat a few times. Use
+        the means/covariances from the best model (judged using the final loss).
+
+        Parameters
+        ----------
+        training_data : list of tensorflow.data.Dataset or osl_dynamics.data.Data
+            Datasets for each subject.
+        n_epochs : int
+            Number of epochs to train.
+        n_subjects : int
+            How many subjects should we train on?
+        kwargs : keyword arguments
+            Keyword arguments for the fit method.
+        """
+        training_datasets = self.make_dataset(
+            training_data, shuffle=True, concatenate=False
+        )
+
+        # Pick n_subjects at random
+        n_all_subjects = len(training_datasets)
+        subjects_to_use = np.random.choice(
+            range(n_all_subjects), n_subjects, replace=False
+        )
+
+        # Train the model a few times and keep the best one
+        best_loss = np.Inf
+        losses = []
+        for subject in subjects_to_use:
+            print("Using subject", subject, "to train initial covariances")
+
+            # Get the dataset for this subject
+            subject_dataset = training_dataset[subject]
+
+            # Reset the model weights and train
+            self.reset()
+            history = self.fit(subject_dataset, epochs=n_epochs)
+            loss = history.history["loss"][-1]
+            losses.append(loss)
+            print(f"Subject {subject} loss: {loss}")
+
+            # Record the loss of this subject's data
+            if loss < best_loss:
+                best_loss = loss
+                subject_chosen = subject
+                best_weights = self.get_weights()
+
+        print(f"Using covariances from subject {subject_chosen}")
+
+        # Restore the best model and get the inferred means/covariances
+        # for initialisation
+        self.set_weights(best_weights)
+        init_means, init_covs = self.get_means_covariances()
+
+        # Reset model for full training
+        self.reset()
+
+        # Set initial means/covariances
+        self.set_means(init_means, update_initializer=True)
+        self.set_covariances(init_covs, update_initializer=True)
+
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.
 
