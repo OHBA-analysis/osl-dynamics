@@ -42,13 +42,11 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    # n_kl_annealing_epochs=200,
-    n_kl_annealing_epochs=10,
+    n_kl_annealing_epochs=200,
     batch_size=32,
     learning_rate=0.0025,
     gradient_clip=0.5,
-    # n_epochs=400,
-    n_epochs=20,
+    n_epochs=400,
     multi_gpu=False,
 )
 

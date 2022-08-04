@@ -83,10 +83,6 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
 
-ts = model.get_training_time_series(training_data)
-print(ts.shape)
-exit()
-
 # Plots
 plotting.plot_alpha(
     sim_stc,
