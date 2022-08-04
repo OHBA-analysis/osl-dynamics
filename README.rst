@@ -60,6 +60,7 @@ The following steps can be used to release a new version:
 
 #. Update the version number on line 5 of ``setup.cfg``.
 #. Commit the updated setup.cfg to the ``main`` branch of the GitHub repo.
+#. Delete any old distributions that have been built (if there are any): ``rm -r dist``.
 #. Build a distribution in the osl-dynamics root directory with ``python -m build``. This will create a new directory called ``dist``.
 #. Test the build by installing in a test conda environment with ``cd dist; pip install <build>.whl``.
 #. Upload the distribution to PyPI with ``twine upload dist/*``. You will need to enter the username and password that you used to register with `https://pypi.org <https://pypi.org>`_.
