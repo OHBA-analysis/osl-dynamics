@@ -1,4 +1,4 @@
-"""Dynamic Network States (DyNeSt).
+"""State-Dynamic Network Modelling (State-DyNeMo).
 
 """
 
@@ -28,7 +28,7 @@ from osl_dynamics.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for DyNeSt.
+    """Settings for State-DyNeMo.
 
     Parameters
     ----------
@@ -145,11 +145,11 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
 
 class Model(VariationalInferenceModelBase):
-    """DyNeSt model class.
+    """State-DyNeMo model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.dynest.Config
+    config : osl_dynamics.models.state_dynemo.Config
     """
 
     def build_model(self):
@@ -228,4 +228,6 @@ def _model_structure(config):
     kl_div = kl_div_layer([inf_theta, mod_theta])
     kl_loss = kl_loss_layer(kl_div)
 
-    return tf.keras.Model(inputs=data, outputs=[ll_loss, kl_loss, alpha], name="DyNeSt")
+    return tf.keras.Model(
+        inputs=data, outputs=[ll_loss, kl_loss, alpha], name="State-DyNeMo"
+    )

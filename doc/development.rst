@@ -18,7 +18,7 @@ The remaining models are still a work in progress, we summarise their status bel
     - The core model has been written.
     - Improvements in parameter intialisation and removal of the C library is planned.
 
-- Dynamic Network States (DyNeSt).
+- State Dynamic Network Modelling (State-DyNeMo).
 
     - Core model has been written.
     - Has not been validated or tested.

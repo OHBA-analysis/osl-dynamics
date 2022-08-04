@@ -7,7 +7,7 @@ Models included:
     - Hidden Markov Model (HMM).
     - Dynamic Network Modes (DyNeMo).
     - Multi-Dynamic Network Modes (M-DyNeMo).
-    - Dynamic Network States (DyNeSt).
+    - State Dynamic Network Modelling (State-DyNeMo).
     - Single-dynamic Adversarial Generator Encoder (SAGE).
     - Multi-dynamic Adversarial Generator Encoder (MAGE).
 
