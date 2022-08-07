@@ -2,7 +2,6 @@
 
 """
 
-import pathlib
 import warnings
 
 import numpy as np
@@ -233,18 +232,6 @@ class Processing:
         ]
 
         self.prepared_data_memmaps = []
-
-    def delete_processing_memmaps(self):
-        """Deletes memmaps and removes store_dir if empty."""
-        if hasattr(self, "prepared_data_filenames"):
-            if self.prepared_data_filenames is not None:
-                for filename in self.prepared_data_filenames:
-                    pathlib.Path(filename).unlink(missing_ok=True)
-            if self.store_dir.exists():
-                if not any(self.store_dir.iterdir()):
-                    self.store_dir.rmdir()
-            self.prepared_data_memmaps = None
-            self.prepared_data_filenames = None
 
     def trim_time_series(
         self,
