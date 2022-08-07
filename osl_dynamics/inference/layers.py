@@ -715,19 +715,13 @@ class MixMatricesLayer(layers.Layer):
         return C
 
 
-class MixVectorsMatricesLayer(layers.Layer):
-    """Layer to mix vectors and matrices.
-
-    The mixture is calculated as C_u_t.
-    """
+class ConcatVectorsMatricesLayer(layers.Layer):
+    """Layer to concatenate vectors and matrices."""
 
     def call(self, inputs, **kwargs):
-
-        # Unpack the inputs:
         m, C = inputs
         m = tf.expand_dims(m, axis=-1)
         C_m = tf.concat([C, m], axis=3)
-
         return C_m
 
 

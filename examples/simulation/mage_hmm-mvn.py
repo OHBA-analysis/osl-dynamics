@@ -1,6 +1,6 @@
-"""Example script for running inference on simulated MS-HMM-MVN data.
+"""Example script for running inference on simulated MDyn-HMM-MVN data.
 
-- Multiple scale version for sage_hmm_mvn.py
+- Multiple dynamic version for sage_hmm_mvn.py
 - Should achieve a dice of close to one for alpha and gamma.
 """
 print("Setting up")
@@ -36,7 +36,7 @@ config = Config(
 
 # Simulate data
 print("Simulating data")
-sim = simulation.MS_HMM_MVN(
+sim = simulation.MDyn_HMM_MVN(
     n_samples=25600,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
@@ -49,29 +49,17 @@ sim = simulation.MS_HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-# Prepare datasets
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-
 # Build model
 model = Model(config)
 
 print("Training model")
-history = model.fit(training_dataset)
+history = model.fit(training_data)
 
 # Inferred parameters
 inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
 
 # Inferred mode mixing factors
-inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
+inf_alpha, inf_gamma = model.get_mode_time_courses(training_data)
 
 inf_alpha = modes.argmax_time_courses(inf_alpha)
 inf_gamma = modes.argmax_time_courses(inf_gamma)

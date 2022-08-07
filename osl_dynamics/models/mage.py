@@ -22,7 +22,7 @@ from osl_dynamics.inference.layers import (
     MixMatricesLayer,
     MatMulLayer,
     ModelRNNLayer,
-    MixVectorsMatricesLayer,
+    ConcatVectorsMatricesLayer,
     AdversarialLogLikelihoodLossLayer,
 )
 
@@ -264,13 +264,13 @@ class Model(ModelBase):
             optimizer=optimizer,
         )
 
-    def fit(self, train_data: tf.data.Dataset, epochs: int = None, verbose: int = 1):
+    def fit(self, training_data, epochs=None, verbose=1):
         """Train the model.
 
         Parameters
         ----------
-        train_data : tensorflow.data.Dataset
-            Training dataset.
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Training data.
         epochs : int
             Number of epochs to train. Defaults to value in config if not passed.
         verbose : int
@@ -284,6 +284,9 @@ class Model(ModelBase):
         if epochs is None:
             epochs = self.config.n_epochs
 
+        # Make sure training data is a TensorFlow Dataset
+        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+
         # Path to save the best model weights
         timestr = time.strftime("%Y%m%d-%H%M%S")  # current date-time
         filepath = "tmp/"
@@ -295,10 +298,10 @@ class Model(ModelBase):
             if verbose:
                 print("Epoch {}/{}".format(epoch + 1, epochs))
                 pb_i = utils.Progbar(
-                    len(train_data), stateful_metrics=["D_m", "D_c", "G"]
+                    len(training_data), stateful_metrics=["D_m", "D_c", "G"]
                 )
 
-            for idx, batch in enumerate(train_data):
+            for idx, batch in enumerate(training_data):
                 # Generate real/fake input for the discriminator
                 real = np.ones((len(batch["data"]), self.config.sequence_length, 1))
                 fake = np.zeros((len(batch["data"]), self.config.sequence_length, 1))
@@ -376,7 +379,7 @@ class Model(ModelBase):
     def get_mode_time_courses(
         self,
         inputs,
-        concatenate=True,
+        concatenate=False,
     ):
         """Get mode time courses.
 
@@ -384,8 +387,8 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        inputs : tensorflow.data.Dataset
-            Prediction dataset.
+        inputs : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction data.
         concatenate : bool
             Should we concatenate alpha for each subject?
 
@@ -401,9 +404,11 @@ class Model(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
+        inputs = self.make_dataset(inputs, concatenate=concatenate)
+
+        print("Getting mode time courses:")
         outputs_alpha = []
         outputs_gamma = []
-
         for dataset in inputs:
             alpha, gamma = self.inference_model.predict(dataset)[1:]
 
@@ -570,7 +575,7 @@ def _build_inference_model(config):
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
-    mix_means_covs_layer = MixVectorsMatricesLayer(name="mix_means_covs")
+    concat_means_covs_layer = ConcatVectorsMatricesLayer(name="concat_means_covs")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
@@ -581,7 +586,7 @@ def _build_inference_model(config):
     G = mix_stds_layer([alpha, E])
     F = mix_fcs_layer([gamma, D])
     C = matmul_layer([G, F, G])
-    C_m = mix_means_covs_layer([m, C])
+    C_m = concat_means_covs_layer([m, C])
 
     return models.Model(inputs, [C_m, alpha, gamma], name="inference")
 

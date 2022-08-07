@@ -46,28 +46,14 @@ sim = simulation.HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-
-# Prepare dataset
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
-
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-
 # Build model
 model = Model(config)
 
 print("Training model")
-history = model.fit(training_dataset)
+history = model.fit(training_data)
 
 # Inferred mode mixing factors and mode time course
-inf_alp = model.get_alpha(prediction_dataset)
+inf_alp = model.get_alpha(training_data)
 inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)

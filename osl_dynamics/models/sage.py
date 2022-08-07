@@ -19,7 +19,7 @@ from osl_dynamics.inference.layers import (
     MixVectorsLayer,
     MixMatricesLayer,
     ModelRNNLayer,
-    MixVectorsMatricesLayer,
+    ConcatVectorsMatricesLayer,
     AdversarialLogLikelihoodLossLayer,
 )
 
@@ -212,12 +212,12 @@ class Model(ModelBase):
             optimizer=optimizer,
         )
 
-    def fit(self, train_data, epochs=None, verbose=1):
+    def fit(self, training_data, epochs=None, verbose=1):
         """Train the model.
 
         Parameters
         ----------
-        train_data : tensorflow.data.Dataset
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         epochs : int
             Number of epochs to train. Defaults to value in config if not passed.
@@ -232,6 +232,9 @@ class Model(ModelBase):
         if epochs is None:
             epochs = self.config.n_epochs
 
+        # Make sure training data is a TensorFlow Dataset
+        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+
         # Path to save the best model weights
         timestr = time.strftime("%Y%m%d-%H%M%S")  # current date-time
         filepath = "tmp/"
@@ -242,9 +245,9 @@ class Model(ModelBase):
         for epoch in range(epochs):
             if verbose:
                 print("Epoch {}/{}".format(epoch + 1, epochs))
-                pb_i = utils.Progbar(len(train_data), stateful_metrics=["D", "G"])
+                pb_i = utils.Progbar(len(training_data), stateful_metrics=["D", "G"])
 
-            for idx, batch in enumerate(train_data):
+            for idx, batch in enumerate(training_data):
                 # Generate real/fake input for the discriminator
                 real = np.ones((len(batch["data"]), self.config.sequence_length, 1))
                 fake = np.zeros((len(batch["data"]), self.config.sequence_length, 1))
@@ -292,13 +295,13 @@ class Model(ModelBase):
 
         return train
 
-    def get_alpha(self, inputs, concatenate=True):
+    def get_alpha(self, inputs, concatenate=False):
         """Mode mixing factors, alpha.
 
         Parameters
         ----------
-        inputs : tensorflow.data.Dataset
-            Prediction dataset.
+        inputs : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction data.
 
         Returns
         -------
@@ -306,6 +309,9 @@ class Model(ModelBase):
             Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
+        inputs = self.make_dataset(inputs, concatenate=concatenate)
+
+        print("Getting alpha:")
         outputs = []
         for dataset in inputs:
             alpha = self.inference_model.predict(dataset)[1]
@@ -453,14 +459,14 @@ def _build_inference_model(config):
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    mix_means_covs_layer = MixVectorsMatricesLayer(name="mix_means_covs")
+    concat_means_covs_layer = ConcatVectorsMatricesLayer(name="concat_means_covs")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
     D = covs_layer(inputs)  # inputs not used
     m = mix_means_layer([alpha, mu])
     C = mix_covs_layer([alpha, D])
-    C_m = mix_means_covs_layer([m, C])
+    C_m = concat_means_covs_layer([m, C])
 
     return models.Model(inputs, [C_m, alpha], name="inference")
 
