@@ -5,10 +5,14 @@
 """
 
 print("Setting up")
+import os
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
+
+# Create directory to hold plots
+os.makedirs("figures", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -89,15 +93,17 @@ plotting.plot_alpha(
     n_samples=2000,
     title="Ground Truth",
     y_labels=r"$\alpha_{jt}$",
-    filename="sim_stc.png",
+    filename="figures/sim_stc.png",
 )
 plotting.plot_alpha(
     inf_stc,
     n_samples=2000,
     title="Inferred",
     y_labels=r"$\alpha_{jt}$",
-    filename="inf_stc.png",
+    filename="figures/inf_stc.png",
 )
 
-plotting.plot_matrices(sim_cov, main_title="Ground Truth", filename="sim_cov.png")
-plotting.plot_matrices(inf_cov, main_title="Inferred", filename="inf_cov.png")
+plotting.plot_matrices(
+    sim_cov, main_title="Ground Truth", filename="figures/sim_cov.png"
+)
+plotting.plot_matrices(inf_cov, main_title="Inferred", filename="figures/inf_cov.png")

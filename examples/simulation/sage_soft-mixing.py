@@ -1,6 +1,7 @@
-"""Example script for demonstrating Sage's ability to infer a soft mixture of modes.
+"""Example script for demonstrating SAGE's ability to infer a soft mixture of modes.
 
 """
+
 print("Setting up")
 import os
 import numpy as np
@@ -34,7 +35,6 @@ config = Config(
     learning_rate=0.001,
     n_epochs=500,
 )
-
 
 print("Simulating data")
 sim = simulation.MixedSine_MVN(

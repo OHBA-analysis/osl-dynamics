@@ -60,38 +60,26 @@ plotting.plot_separate_time_series(
     sim.logits, n_samples=2000, filename="figures/sim_logits.png"
 )
 
-# Prepare tensorflow datasets for training and model evaluation
-training_dataset = training_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=True
-)
-prediction_dataset = training_data.dataset(
-    config.sequence_length, config.batch_size, shuffle=False
-)
-
 # Build model
 model = Model(config)
 model.summary()
 
 print("Training model")
 history = model.fit(
-    training_dataset,
-    epochs=config.n_epochs,
+    training_data,
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
 )
 
 # Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(prediction_dataset)
+free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
 
 # Inferred alpha and mode time course
-inf_alp = model.get_alpha(prediction_dataset)
+inf_alp = model.get_alpha(training_data)
 sim_stc, inf_stc = modes.match_modes(sim_stc, inf_alp)
 
 # Compare the inferred mode time course to the ground truth
-plotting.plot_separate_time_series(
-    sim_stc, inf_stc, n_samples=2000, filename="figures/stc.png"
-)
 plotting.plot_alpha(
     sim_stc,
     n_samples=2000,

@@ -283,7 +283,7 @@ class MeanVectorsLayer(layers.Layer):
         # Initialisation for vectors
         if initial_value is None:
             if learn:
-                self.initial_value = np.random.normal(0, 0.5, size=[n, m])
+                self.initial_value = np.random.normal(0, 0.02, size=[n, m])
             else:
                 self.initial_value = np.zeros([n, m])
             self.initial_value = self.initial_value.astype(np.float32)

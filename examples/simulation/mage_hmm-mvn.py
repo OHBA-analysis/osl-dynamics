@@ -1,14 +1,19 @@
 """Example script for running inference on simulated MDyn-HMM-MVN data.
 
-- Multiple dynamic version for sage_hmm_mvn.py
+- Multi-dynamic version for sage_hmm-mvn.py
 - Should achieve a dice of close to one for alpha and gamma.
 """
+
 print("Setting up")
+import os
 import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.mage import Config, Model
 from osl_dynamics.utils import plotting
+
+# Create directory to hold plots
+os.makedirs("figures", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -23,7 +28,6 @@ config = Config(
     model_n_units=128,
     model_normalization="layer",
     discriminator_n_units=32,
-    discriminator_n_layers=1,
     discriminator_normalization="layer",
     learn_means=True,
     learn_stds=True,
@@ -31,7 +35,6 @@ config = Config(
     batch_size=16,
     learning_rate=0.005,
     n_epochs=400,
-    multiple_dynamics=True,
 )
 
 # Simulate data
@@ -68,25 +71,24 @@ inf_gamma = modes.argmax_time_courses(inf_gamma)
 sim_alpha, sim_gamma = sim.mode_time_course
 
 # Match the inferred and simulated mixing factors
-# Calculate the dice coefficient between mode time courses
-orders = modes.match_modes(sim_alpha, inf_alpha, return_order=True)
-inf_alpha = inf_alpha[:, orders[1]]
+_, order = modes.match_modes(sim_alpha, inf_alpha, return_order=True)
+inf_alpha = inf_alpha[:, order]
 
-orders = modes.match_modes(sim_gamma, inf_gamma, return_order=True)
-inf_gamma = inf_gamma[:, orders[1]]
+_, order = modes.match_modes(sim_gamma, inf_gamma, return_order=True)
+inf_gamma = inf_gamma[:, order]
 
 # Compare with simulated parameters
 sim_means = sim.means
 sim_stds = np.array([np.diag(s) for s in sim.stds])
 sim_fcs = sim.fcs
 
-inf_means = inf_means[orders[1]]
-inf_stds = inf_stds[orders[1]]
-inf_fcs = inf_fcs[orders[1]]
+inf_means = inf_means[order]
+inf_stds = inf_stds[order]
+inf_fcs = inf_fcs[order]
 
-plotting.plot_matrices(inf_means - sim_means, filename="means_diff.png")
-plotting.plot_matrices(inf_stds - sim_stds, filename="stds_diff.png")
-plotting.plot_matrices(inf_fcs - sim_fcs, filename="fcs_diff.png")
+plotting.plot_matrices(inf_means - sim_means, filename="figures/means_diff.png")
+plotting.plot_matrices(inf_stds - sim_stds, filename="figures/stds_diff.png")
+plotting.plot_matrices(inf_fcs - sim_fcs, filename="figures/fcs_diff.png")
 
 # Dice coefficients
 dice_alpha = metrics.dice_coefficient(sim_alpha, inf_alpha)
@@ -103,7 +105,10 @@ fo_inf_alpha = modes.fractional_occupancies(inf_alpha)
 fo_inf_gamma = modes.fractional_occupancies(inf_gamma)
 
 print("Fractional occupancies mean (Simulation):", fo_sim_alpha)
-print("Fractional occupancies mean (MAGE):    ", fo_inf_alpha)
+print("Fractional occupancies mean (MAGE):", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
-print("Fractional occupancies fc (MAGE):    ", fo_inf_gamma)
+print("Fractional occupancies fc (MAGE):", fo_inf_gamma)
+
+# Delete temporary directory
+training_data.delete_dir()

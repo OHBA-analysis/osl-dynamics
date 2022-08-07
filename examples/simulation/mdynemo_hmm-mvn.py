@@ -1,8 +1,9 @@
 """Example script for running inference on simulated MDyn_HMM_MVN data.
 
-- Multiple dynamic version for simulation_hmm_mvn.py
+- Multi-dynamic version for dynemo_hmm-mvn.py
 - Should achieve a dice of ~0.99 for alpha and ~0.99 for gamma.
 """
+
 print("Setting up")
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
@@ -50,39 +51,26 @@ sim = simulation.MDyn_HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-# Prepare datasets
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-
 # Build model
 model = Model(config)
 model.summary()
 
 # Set regularisers
-model.set_regularizers(training_dataset)
+model.set_regularizers(training_data)
 
 print("Training model")
 history = model.fit(
-    training_dataset,
-    epochs=config.n_epochs,
+    training_data,
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath="tmp/weights",
 )
 
 # Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(prediction_dataset)
+free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors
-inf_alpha, inf_gamma = model.get_mode_time_courses(prediction_dataset)
+inf_alpha, inf_gamma = model.get_mode_time_courses(training_data)
 
 inf_alpha = modes.argmax_time_courses(inf_alpha)
 inf_gamma = modes.argmax_time_courses(inf_gamma)
@@ -113,3 +101,6 @@ print("Fractional occupancies mean (DyNeMo):", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (DyNeMo):", fo_inf_gamma)
+
+# Delete temporary directory
+training_data.delete_dir()
