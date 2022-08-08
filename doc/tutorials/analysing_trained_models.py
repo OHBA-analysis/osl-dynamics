@@ -16,7 +16,7 @@ from osl_dynamics.utils import plotting
 # Loading a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^
 #
-# To load a model we must rebuild it using the same Config as before. In this tutorial we will rebuild the model trained in the 'Train a Model' tutorial.
+# To load a model we must rebuild it using the same Config as before. In this tutorial we will rebuild the model trained in the 'Training Models' tutorial.
 
 config = Config(
     n_modes=5,
@@ -50,14 +50,14 @@ model.load_weights("trained_model/weights")
 # ^^^^^^^^^^^^^^^^^^
 #
 # The first thing we can do to evaluate a model is to evaluate the loss (variational free energy for DyNeMo) with the training dataset.
-# For this we need the training data. Let's load the same training data as the 'Train a Model' tutorial:
+# For this we need the training data. Let's load the same training data as the 'Training Models' tutorial:
 
 training_data = data.Data("X.npy")
 training_data.prepare()
 
 #%%
 # To evaluate our model let's create a TensorFlow dataset without shuffling the sequences and batches to maintain the order of the time series.
-# The loss is evaluated by averaging the batches across the full dataset should be the same if you use a shuffled or non-shuffled dataset.
+# The loss is evaluated by averaging the batches across a dataset. Therefore, it should be the same if you use a shuffled or non-shuffled dataset.
 
 prediction_dataset = training_data.dataset(
     config.sequence_length,

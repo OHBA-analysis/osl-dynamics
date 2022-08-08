@@ -56,7 +56,7 @@ print(training_data)
 X = training_data.time_series()
 
 #%%
-# If multiple a list of file paths was passed to Data, then the `time_series` method will return a list of numpy arrays.
+# If a list of file paths was passed to Data, then the `time_series` method will return a list of numpy arrays.
 # The concatenated time series will be returned if `concatenate=True` is passed.
 
 #%%
@@ -95,7 +95,7 @@ training_data = Data("prepared_data")
 # Creating TensorFlow Datasets
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# The Data object has a `dataset` method to created a batched TensorFlow dataset that can be used to train a model.
+# The Data object has a `dataset` method to create a batched TensorFlow dataset that can be used to train a model.
 #
 
 # Specify hyperparameters

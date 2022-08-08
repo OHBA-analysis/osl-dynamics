@@ -86,4 +86,4 @@ model.fit(training_dataset, epochs=config.n_epochs)
 model.save_weights("trained_model/weights")
 
 #%%
-# See the 'Analyse Trained Models' tutorial for how to load a trained model.
+# See the 'Analysing Trained Models' tutorial for how to load a trained model.
