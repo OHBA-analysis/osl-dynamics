@@ -183,6 +183,13 @@ class ModelBase:
                 self.model.fit, "epochs", self.config.n_epochs, args, kwargs
             )
 
+        # If we're saving the model after a particular epoch make sure it's
+        # less than the total number of epochs
+        if save_best_after is not None:
+            epochs = get_argument(self.model.fit, "epochs", args, kwargs)
+            if epochs < save_best_after:
+                raise ValueError("save_best_after must be less than epochs.")
+
         # Callbacks to add to the ones the user passed
         additional_callbacks = []
 
