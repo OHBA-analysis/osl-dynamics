@@ -125,7 +125,8 @@ class Processing:
                         prepared_data[:, i], np.ones(n_window) / n_window, mode="same"
                     )
                     for i in range(prepared_data.shape[1])
-                ]
+                ],
+                dtype=np.float32,
             ).T
 
             # Create a memory map for the prepared data
