@@ -712,7 +712,11 @@ class MixMatricesLayer(layers.Layer):
         D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
-        return C
+        # Small error to add to the diagonal
+        eps = 1e-5 * tf.eye(tf.shape(D)[-1])
+        eps = tf.expand_dims(tf.expand_dims(eps, axis=0), axis=0)
+
+        return C + eps
 
 
 class ConcatVectorsMatricesLayer(layers.Layer):
