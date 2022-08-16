@@ -12,6 +12,7 @@ import osl_dynamics.data.tf as dtf
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.inference import regularizers
+from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -255,16 +256,9 @@ def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
 
     # Update initialisers
     if update_initializer:
-        means_layer.initial_value = means
-        stds_layer.initial_value = stds
-        fcs_layer.initial_value = fcs
-
-        stds_layer.initial_diagonals = diagonals
-        fcs_layer.initial_flattened_cholesky_factors = flattened_cholesky_factors
-
-        means_layer.vectors_initializer.initial_value = means
-        stds_layer.diagonals_initializer.initial_value = diagonals
-        fcs_layer.flattened_cholesky_factors_initializer.initial_value = (
+        means_layer.vectors_initializer = WeightInitializer(means)
+        stds_layer.diagonals_initializer = WeightInitializer(diagonals)
+        fcs_layer.flattened_cholesky_factors_initializer = WeightInitializer(
             flattened_cholesky_factors
         )
 
