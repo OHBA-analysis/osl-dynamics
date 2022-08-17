@@ -42,7 +42,6 @@ config = Config(
 
 # Simulate data
 print("Simulating data")
-print("Number of GPUs in use:", config.strategy.num_replicas_in_sync)
 
 sim = simulation.MSubj_HMM_MVN(
     n_samples=12800,
@@ -58,20 +57,6 @@ sim = simulation.MSubj_HMM_MVN(
 sim.standardize()
 training_data = data.Data([mtc for mtc in sim.time_series])
 
-# Prepare dataset
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size * config.strategy.num_replicas_in_sync,
-    shuffle=True,
-    subj_id=True,
-)
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size * config.strategy.num_replicas_in_sync,
-    shuffle=False,
-    subj_id=True,
-)
-
 # Bayesian about subject deviations?
 config.dev_bayesian = True
 config.learn_dev_mod_sigma = True
@@ -82,20 +67,20 @@ model = Model(config)
 model.summary()
 
 # Set scaling factor for devation kl loss
-model.set_bayesian_kl_scaling(training_dataset)
+model.set_bayesian_kl_scaling(training_data)
 
 # Set regularizers
-model.set_regularizers(training_dataset)
+model.set_regularizers(training_data)
 
 print("Training model")
-history = model.fit(training_dataset, epochs=config.n_epochs)
+history = model.fit(training_data, epochs=config.n_epochs)
 
 # Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(prediction_dataset)
+free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors and mode time course
-inf_alp = model.get_alpha(prediction_dataset)
+inf_alp = model.get_alpha(training_data, concatenate=True)
 inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = np.concatenate(sim.mode_time_course)
 

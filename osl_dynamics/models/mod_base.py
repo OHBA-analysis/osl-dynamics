@@ -250,7 +250,7 @@ class ModelBase:
         self.reset_weights()
         self.compile()
 
-    def make_dataset(self, inputs, shuffle=False, concatenate=False):
+    def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=False):
         """Converts a Data object into a TensorFlow Dataset.
 
         Parameters
@@ -262,6 +262,8 @@ class ModelBase:
             Should we shuffle the data?
         concatenate : bool
             Should we return a single TensorFlow Dataset or a list of Datasets.
+        subj_id : bool
+            Should we include the subject id in the dataset?
 
         Returns
         -------
@@ -281,6 +283,7 @@ class ModelBase:
                 self.config.batch_size,
                 shuffle=shuffle,
                 concatenate=concatenate,
+                subj_id=subj_id,
             )
         elif isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False

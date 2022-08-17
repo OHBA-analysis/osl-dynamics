@@ -221,6 +221,10 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=True):
+        """SE-DyNeMo requires subject id to be included in the dataset."""
+        return super().make_dataset(inputs, shuffle, concatenate, subj_id)
+
     def get_group_means_covariances(self):
         """Get the group means and covariances of each mode
         Returns
@@ -317,7 +321,14 @@ class Model(VariationalInferenceModelBase):
             )
 
     def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior and prior."""
+        """Set the correct scaling for KL loss between deviation posterior and prior.
+
+        Parameters
+        ----------
+        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Training dataset.
+        """
+        training_dataset = self.make_dataset(training_dataset, concatenate=True)
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
