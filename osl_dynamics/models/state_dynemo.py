@@ -8,11 +8,10 @@ from typing import Literal
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.models.inf_mod_base import (
-    VariationalInferenceModelConfig,
-    VariationalInferenceModelBase,
-)
+from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
+from osl_dynamics.models.dynemo import Model as DyNeMo
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     ModelRNNLayer,
@@ -144,7 +143,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
 
-class Model(VariationalInferenceModelBase):
+class Model(DyNeMo):
     """State-DyNeMo model class.
 
     Parameters
@@ -155,6 +154,10 @@ class Model(VariationalInferenceModelBase):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def sample_alpha(self, n_samples):
+        """Uses the model RNN to sample a state time course, alpha."""
+        raise NotImplementedError("This method hasn't been coded yet.")
 
 
 def _model_structure(config):
