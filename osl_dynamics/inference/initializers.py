@@ -30,10 +30,7 @@ class WeightInitializer(Initializer):
 
 
 class IdentityCholeskyInitializer(Initializer):
-    """Initialize weights to a flattened cholesky factor of identity
-    matrices with a normal error added to the diagonal.
-
-    """
+    """Initialize weights to a flattened cholesky factor of identity matrices."""
 
     def __init__(*args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -79,7 +76,7 @@ class NormalIdentityCholeskyInitializer(Initializer):
 
 class NormalCorrelationCholeskyInitializer(Initializer):
     """Initialize weights to a flattened cholesky factor of correlation
-    matrices with an error added.
+    matrices with a normal error added to the flattened cholesky factor.
 
     Parameters
     ----------
@@ -112,7 +109,7 @@ class NormalCorrelationCholeskyInitializer(Initializer):
 
 
 class NormalDiagonalInitializer(Initializer):
-    """Initializer for diagonal matrices with an error added.
+    """Initializer for diagonal matrices with a normal error added.
 
     Parameters
     ----------
