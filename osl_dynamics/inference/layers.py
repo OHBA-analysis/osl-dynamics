@@ -408,6 +408,9 @@ class CovarianceMatricesLayer(layers.Layer):
         # Regulariser
         self.regularizer = regularizer
 
+        # Small error to add to the diagonal to help with numerical stability
+        self.eps = tf.expand_dims(1e-5 * tf.eye(m), axis=0)
+
     def build(self, input_shape):
         self.flattened_cholesky_factors = self.add_weight(
             "flattened_cholesky_factors",
@@ -431,7 +434,7 @@ class CovarianceMatricesLayer(layers.Layer):
 
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
-        return covariances
+        return covariances + self.eps
 
 
 class CorrelationMatricesLayer(layers.Layer):
