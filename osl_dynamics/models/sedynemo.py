@@ -336,6 +336,14 @@ class Model(VariationalInferenceModelBase):
             self.model, n_batches, learn_means, learn_covariances
         )
 
+    def random_subject_initialization(
+        self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
+    ):
+        """random subject initialisation not compatible with SE-DyNeMo."""
+        raise AttributeError(
+            " 'Model' object has no attribute 'random_subject_initialization'."
+        )
+
 
 def _model_structure(config):
     # layers for inputs

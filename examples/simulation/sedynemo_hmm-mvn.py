@@ -18,13 +18,13 @@ tf_ops.gpu_growth()
 config = Config(
     n_modes=5,
     n_channels=20,
-    n_subjects=20,
+    n_subjects=10,
     subject_embedding_dim=5,
     mode_embedding_dim=2,
-    sequence_length=200,
-    inference_n_units=128,
+    sequence_length=100,
+    inference_n_units=64,
     inference_normalization="layer",
-    model_n_units=128,
+    model_n_units=64,
     model_normalization="layer",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
@@ -33,10 +33,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
-    batch_size=64,
-    learning_rate=0.005,
-    n_epochs=200,
+    n_kl_annealing_epochs=50,
+    batch_size=128,
+    learning_rate=0.01,
+    n_epochs=100,
     multi_gpu=False,
 )
 
@@ -44,7 +44,7 @@ config = Config(
 print("Simulating data")
 
 sim = simulation.MSubj_HMM_MVN(
-    n_samples=12800,
+    n_samples=25600,
     n_subjects=config.n_subjects,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
