@@ -236,6 +236,10 @@ class Model(VariationalInferenceModelBase):
         """
         return sedynemo_obs.get_group_means_covariances(self.model)
 
+    def get_observation_model_parameters(self):
+        """Wrapper for get_group_means_covariances."""
+        return self.get_group_means_covariances()
+
     def get_subject_embeddings(self):
         """Get the subject embedding vectors
         Returns
@@ -319,6 +323,48 @@ class Model(VariationalInferenceModelBase):
             dynemo_obs.set_covariances_regularizer(
                 self.model, training_dataset, layer_name="group_covs"
             )
+
+    def set_group_means(self, group_means, update_initializer=True):
+        """Set the group means of each mode.
+
+        Parameters
+        ----------
+        group_means : np.ndarray
+            Mode means.
+        update_initializer : bool
+            Do we want to use the passed group means when we re-initialize the model?
+        """
+        dynemo_obs.set_means(
+            self.model, group_means, update_initializer, layer_name="group_means"
+        )
+
+    def set_group_covariances(self, group_covariances, update_initializer=True):
+        """Set the group covariances of each mode.
+
+        Parameters
+        ----------
+        group_covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed group covariances when we re-initialize
+            the model?
+        """
+        dynemo_obs.set_covariances(
+            self.model, group_covariances, update_initializer, layer_name="group_covs"
+        )
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_group_means and set_group_covariances."""
+        self.set_group_means(
+            observation_model_parameters[0],
+            update_initializer=update_initializer,
+        )
+        self.set_group_covariances(
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
+        )
 
     def set_bayesian_kl_scaling(self, training_dataset):
         """Set the correct scaling for KL loss between deviation posterior and prior.
