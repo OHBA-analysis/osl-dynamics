@@ -214,7 +214,7 @@ class Model(VariationalInferenceModelBase):
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_stds_fcs."""
-        return get_means_stds_fcs()
+        return self.get_means_stds_fcs()
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
