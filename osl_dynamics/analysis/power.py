@@ -195,7 +195,7 @@ def save(
         is equal to n_channels.
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png, it is saved as images.
+        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
@@ -214,8 +214,12 @@ def save(
     power_map = np.copy(power_map)
 
     # Validation
-    if ".nii.gz" not in filename and ".png" not in filename:
-        raise ValueError("filename must have extension .nii.gz or .png.")
+    allowed_extensions = [".nii.gz", ".png", ".svg", ".pdf"]
+    if not any([ext in filename for ext in allowed_extensions]):
+        raise ValueError(
+            "filename must have one of following extensions: "
+            + f"{' '.join(allowed_extensions)}."
+        )
     mask_file = files.check_exists(mask_file, files.mask.directory)
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
@@ -266,7 +270,7 @@ def save(
         nib.save(nii, filename)
 
     # Save each map as an image
-    elif ".png" in filename:
+    else:
         n_modes = power_map.shape[-1]
         for i in trange(n_modes, desc="Saving images", ncols=98):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)

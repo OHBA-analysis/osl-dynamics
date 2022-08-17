@@ -1578,7 +1578,7 @@ def plot_brain_surface(
         Warning: this function cannot be used if n_maps is equal to n_channels.
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png, it is saved as images.
+        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
