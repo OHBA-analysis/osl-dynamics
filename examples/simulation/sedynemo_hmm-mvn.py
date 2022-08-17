@@ -12,19 +12,20 @@ from osl_dynamics.utils import plotting
 from osl_dynamics.models.sedynemo import Config, Model
 
 # GPU settings
+tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
 config = Config(
     n_modes=5,
     n_channels=20,
-    n_subjects=10,
+    n_subjects=20,
     subject_embedding_dim=5,
     mode_embedding_dim=2,
     sequence_length=100,
-    inference_n_units=64,
+    inference_n_units=128,
     inference_normalization="layer",
-    model_n_units=64,
+    model_n_units=128,
     model_normalization="layer",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
@@ -33,10 +34,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=50,
-    batch_size=128,
+    n_kl_annealing_epochs=100,
+    batch_size=256,
     learning_rate=0.01,
-    n_epochs=100,
+    n_epochs=200,
     multi_gpu=False,
 )
 
@@ -45,13 +46,14 @@ print("Simulating data")
 
 sim = simulation.MSubj_HMM_MVN(
     n_samples=25600,
-    n_subjects=config.n_subjects,
-    n_modes=config.n_modes,
-    n_channels=config.n_channels,
     trans_prob="sequence",
+    subject_means="zero",
+    subject_covariances="random",
+    n_states=config.n_modes,
+    n_channels=config.n_channels,
+    n_subjects=config.n_subjects,
+    n_groups=2,
     stay_prob=0.9,
-    means="zero",
-    covariances="random",
     random_seed=123,
 )
 sim.standardize()
@@ -72,6 +74,8 @@ model.set_bayesian_kl_scaling(training_data)
 # Set regularizers
 model.set_regularizers(training_data)
 
+# Initialise observation model parameters
+# model.random_subset_initialization(training_data, n_epochs=20, n_init=5, take=0.25)
 print("Training model")
 history = model.fit(training_data, epochs=config.n_epochs)
 
@@ -106,3 +110,8 @@ plotting.plot_scatter(
     annotate=[[str(i) for i in range(config.n_subjects)]],
     filename="subject_embeddings.png",
 )
+
+# Look at the ground truth group assignment
+covariances_assigned_groups = sim.obs_mod.covariances_assigned_groups
+print("group 0: ", np.where(covariances_assigned_groups == 0)[0])
+print("group 1: ", np.where(covariances_assigned_groups == 1)[0])
