@@ -16,10 +16,10 @@ tf_ops.gpu_growth()
 config = Config(
     n_modes=5,
     n_channels=20,
-    sequence_length=200,
-    inference_n_units=256,
+    sequence_length=100,
+    inference_n_units=128,
     inference_normalization="layer",
-    model_n_units=256,
+    model_n_units=128,
     model_normalization="layer",
     theta_normalization="layer",
     learn_alpha_temperature=True,
@@ -30,10 +30,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=200,
+    n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.001,
-    n_epochs=400,
+    learning_rate=0.01,
+    n_epochs=200,
 )
 
 # Simulate data
@@ -59,11 +59,7 @@ model.summary()
 model.set_regularizers(training_data)
 
 print("Training model")
-history = model.fit(
-    training_data,
-    save_best_after=config.n_kl_annealing_epochs,
-    save_filepath="tmp/weights",
-)
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
@@ -101,6 +97,3 @@ print("Fractional occupancies mean (DyNeMo):", fo_inf_alpha)
 
 print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
 print("Fractional occupancies fc (DyNeMo):", fo_inf_gamma)
-
-# Delete temporary directory
-training_data.delete_dir()

@@ -221,6 +221,10 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=True):
+        """SE-DyNeMo requires subject id to be included in the dataset."""
+        return super().make_dataset(inputs, shuffle, concatenate, subj_id)
+
     def get_group_means_covariances(self):
         """Get the group means and covariances of each mode
         Returns
@@ -231,6 +235,10 @@ class Model(VariationalInferenceModelBase):
             Mode covariances for the group. Shape is (n_modes, n_channels, n_channels).
         """
         return sedynemo_obs.get_group_means_covariances(self.model)
+
+    def get_observation_model_parameters(self):
+        """Wrapper for get_group_means_covariances."""
+        return self.get_group_means_covariances()
 
     def get_subject_embeddings(self):
         """Get the subject embedding vectors
@@ -316,13 +324,70 @@ class Model(VariationalInferenceModelBase):
                 self.model, training_dataset, layer_name="group_covs"
             )
 
+    def set_group_means(self, group_means, update_initializer=True):
+        """Set the group means of each mode.
+
+        Parameters
+        ----------
+        group_means : np.ndarray
+            Mode means.
+        update_initializer : bool
+            Do we want to use the passed group means when we re-initialize the model?
+        """
+        dynemo_obs.set_means(
+            self.model, group_means, update_initializer, layer_name="group_means"
+        )
+
+    def set_group_covariances(self, group_covariances, update_initializer=True):
+        """Set the group covariances of each mode.
+
+        Parameters
+        ----------
+        group_covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed group covariances when we re-initialize
+            the model?
+        """
+        dynemo_obs.set_covariances(
+            self.model, group_covariances, update_initializer, layer_name="group_covs"
+        )
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_group_means and set_group_covariances."""
+        self.set_group_means(
+            observation_model_parameters[0],
+            update_initializer=update_initializer,
+        )
+        self.set_group_covariances(
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
+        )
+
     def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior and prior."""
+        """Set the correct scaling for KL loss between deviation posterior and prior.
+
+        Parameters
+        ----------
+        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Training dataset.
+        """
+        training_dataset = self.make_dataset(training_dataset, concatenate=True)
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
         sedynemo_obs.set_bayesian_kl_scaling(
             self.model, n_batches, learn_means, learn_covariances
+        )
+
+    def random_subject_initialization(
+        self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
+    ):
+        """random subject initialisation not compatible with SE-DyNeMo."""
+        raise AttributeError(
+            " 'Model' object has no attribute 'random_subject_initialization'."
         )
 
 

@@ -5,8 +5,9 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, layers
-from osl_dynamics.inference.initializers import WeightInitializer
+from tensorflow.keras import activations, layers, initializers
+
+import osl_dynamics.inference.initializers as osld_initializers
 
 tfb = tfp.bijectors
 
@@ -193,7 +194,9 @@ class SoftmaxLayer(layers.Layer):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
         self.learn_temperature = learn_temperature
-        self.temperature_initializer = WeightInitializer(self.initial_temperature)
+        self.temperature_initializer = osld_initializers.WeightInitializer(
+            self.initial_temperature
+        )
 
     def build(self, input_shape):
         self.temperature = self.add_weight(
@@ -232,7 +235,9 @@ class ScalarLayer(layers.Layer):
             self.initial_value = 1
         else:
             self.initial_value = initial_value
-        self.scalar_initializer = WeightInitializer(self.initial_value)
+        self.scalar_initializer = osld_initializers.WeightInitializer(
+            self.initial_value
+        )
 
     def build(self, input_shape):
         self.scalar = self.add_weight(
@@ -280,14 +285,8 @@ class MeanVectorsLayer(layers.Layer):
         self.m = m
         self.learn = learn
 
-        # Initialisation for vectors
-        if initial_value is None:
-            if learn:
-                self.initial_value = np.random.normal(0, 0.02, size=[n, m])
-            else:
-                self.initial_value = np.zeros([n, m])
-            self.initial_value = self.initial_value.astype(np.float32)
-        else:
+        if initial_value is not None:
+            # Use value passed to initialise
             if initial_value.ndim != 2:
                 raise ValueError(
                     "a (n_modes, n_channels) array must be passed for initial_means."
@@ -302,8 +301,17 @@ class MeanVectorsLayer(layers.Layer):
                     "mismatch bettwen the number of modes and vectors in "
                     + f"initial_means ({initial_value.shape[0]})."
                 )
-            self.initial_value = initial_value.astype("float32")
-        self.vectors_initializer = WeightInitializer(self.initial_value)
+            initial_value = initial_value.astype("float32")
+            self.vectors_initializer = osld_initializers.WeightInitializer(
+                initial_value
+            )
+
+        elif learn:
+            # Use a random vector to initialise
+            self.vectors_initializer = initializers.TruncatedNormal(0, 0.02)
+        else:
+            # We're not learning the mean vectors, use zeros
+            self.vectors_initializer = initializers.Zeros()
 
         # Regulariser
         self.regularizer = regularizer
@@ -371,16 +379,8 @@ class CovarianceMatricesLayer(layers.Layer):
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
-        # Initialisation of matrices
-        if initial_value is None:
-            if learn:
-                self.initial_value = np.array(
-                    [np.diag(np.random.normal(1, 0.05, size=m)) for i in range(n)]
-                )
-            else:
-                self.initial_value = np.array([np.eye(m)] * n)
-            self.initial_value = self.initial_value.astype(np.float32)
-        else:
+        if initial_value is not None:
+            # Used passed value to initialise
             if initial_value.ndim != 3:
                 raise ValueError(
                     "a (n_modes, n_channels, n_channels) array must be passed for "
@@ -397,13 +397,23 @@ class CovarianceMatricesLayer(layers.Layer):
                     "mismatch bettwen the number of modes and matrices in "
                     + f"initial_covariances ({initial_value.shape[0]})."
                 )
-            self.initial_value = initial_value.astype("float32")
-        self.initial_flattened_cholesky_factors = self.bijector.inverse(
-            self.initial_value
-        )
-        self.flattened_cholesky_factors_initializer = WeightInitializer(
-            self.initial_flattened_cholesky_factors
-        )
+            initial_value = initial_value.astype("float32")
+            initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
+            self.flattened_cholesky_factors_initializer = (
+                osld_initializers.WeightInitializer(initial_flattened_cholesky_factors)
+            )
+
+        elif learn:
+            # Use the identity matrix with a random error
+            self.flattened_cholesky_factors_initializer = (
+                osld_initializers.NormalIdentityCholeskyInitializer(mean=0, std=0.1)
+            )
+
+        else:
+            # Use the identity matrix
+            self.flattened_cholesky_factors_initializer = (
+                osld_initializers.IdentityCholeskyInitializer()
+            )
 
         # Regulariser
         self.regularizer = regularizer
@@ -476,18 +486,8 @@ class CorrelationMatricesLayer(layers.Layer):
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
 
-        # Initialisation of matrices
-        if initial_value is None:
-            self.initial_value = np.stack([np.eye(m, dtype=np.float32)] * n)
-            self.initial_flattened_cholesky_factors = self.bijector.inverse(
-                self.initial_value
-            )
-            if learn:
-                err = np.random.normal(
-                    0, 0.05, size=self.initial_flattened_cholesky_factors.shape
-                )
-                self.initial_flattened_cholesky_factors += err
-        else:
+        if initial_value is not None:
+            # Use passed value for initialisation
             if initial_value.ndim != 3:
                 raise ValueError(
                     "a (n_modes, n_channels, n_channels) array must be passed for "
@@ -504,13 +504,23 @@ class CorrelationMatricesLayer(layers.Layer):
                     "mismatch bettwen the number of modes and matrices in "
                     + f"initial_fcs ({initial_value.shape[0]})."
                 )
-            self.initial_value = initial_value.astype("float32")
-            self.initial_flattened_cholesky_factors = self.bijector.inverse(
-                self.initial_value
+            initial_value = initial_value.astype("float32")
+            initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
+            self.flattened_cholesky_factors_initializer = (
+                osld_initializers.WeightInitializer(initial_flattened_cholesky_factors)
             )
-        self.flattened_cholesky_factors_initializer = WeightInitializer(
-            self.initial_flattened_cholesky_factors
-        )
+
+        elif learn:
+            # Use a correlation matrix with an error added
+            self.flattened_cholesky_factors_initializer = (
+                osld_initializers.NormalCorrelationCholeskyInitializer(mean=0, std=0.1)
+            )
+
+        else:
+            # Use an identity matrix
+            self.flattened_cholesky_factors_initializer = (
+                osld_initializers.IdentityCholeskyInitializer()
+            )
 
         # Regulariser
         self.regularizer = regularizer
@@ -577,14 +587,8 @@ class DiagonalMatricesLayer(layers.Layer):
         # Softplus transformation to ensure diagonal is positive
         self.bijector = tfb.Softplus()
 
-        # Initialisation for the diagonals
-        if initial_value is None:
-            if learn:
-                self.initial_value = np.random.normal(1, 0.1, size=[n, m])
-            else:
-                self.initial_value = np.zeros([n, m])
-            self.initial_value = self.initial_value.astype(np.float32)
-        else:
+        if initial_value is not None:
+            # Used passed value for initialisation
             if initial_value.ndim != 2:
                 raise ValueError(
                     "a (n_modes, n_channels) array must be passed for initial_value."
@@ -599,9 +603,25 @@ class DiagonalMatricesLayer(layers.Layer):
                     "mismatch bettwen the number of modes and vectors in "
                     + f"initial_value ({initial_value.shape[0]})."
                 )
-            self.initial_value = initial_value.astype("float32")
-        self.initial_diagonals = self.bijector.inverse(self.initial_value)
-        self.diagonals_initializer = WeightInitializer(self.initial_diagonals)
+            initial_value = initial_value.astype("float32")
+            initial_diagonals = self.bijector.inverse(initial_value)
+            self.diagonals_initializer = osld_initializers.WeightInitializer(
+                initial_diagonals
+            )
+
+        elif learn:
+            # Use random numbers
+            self.diagonals_initializer = osld_initializers.NormalDiagonalInitializer(
+                mean=0, std=0.05
+            )
+
+        else:
+            # Use ones
+            initial_value = np.ones(size=[n, m]).astype(np.float32)
+            initial_diagonals = self.bijector.inverse(initial_value)
+            self.diagonals_initializer = osld_initializers.WeightInitializer(
+                initial_diagonals
+            )
 
         # Regulariser
         self.regularizer = regularizer
@@ -655,7 +675,6 @@ class MatrixLayer(layers.Layer):
         self.constraint = constraint
         self.learn = learn
 
-        self.initial_value = initial_value
         if initial_value is not None:
             if initial_value.shape[-1] != m:
                 raise ValueError(

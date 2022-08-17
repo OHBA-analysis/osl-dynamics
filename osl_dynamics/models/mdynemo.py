@@ -212,6 +212,10 @@ class Model(VariationalInferenceModelBase):
         """
         return mdynemo_obs.get_means_stds_fcs(self.model)
 
+    def get_observation_model_parameters(self):
+        """Wrapper for get_means_stds_fcs."""
+        return self.get_means_stds_fcs()
+
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
 
@@ -229,6 +233,17 @@ class Model(VariationalInferenceModelBase):
             the model?
         """
         mdynemo_obs.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_means_stds_fcs."""
+        self.set_means_stds_fcs(
+            observation_model_parameters[0],
+            observation_model_parameters[1],
+            observation_model_parameters[2],
+            update_initializer=update_initializer,
+        )
 
     def set_regularizers(self, training_dataset):
         """Set the regularizers of means, stds and fcs based on the training data.

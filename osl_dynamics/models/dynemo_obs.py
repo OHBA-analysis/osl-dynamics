@@ -11,6 +11,7 @@ from tensorflow.keras import layers
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference import regularizers
+from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -121,7 +122,7 @@ class Model(ModelBase):
         Parameters
         ----------
         means : np.ndarray
-            Mode covariances.
+            Mode means.
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model?
@@ -218,28 +219,25 @@ def get_means_covariances(model):
     return means, covs
 
 
-def set_means(model, means, update_initializer=True):
+def set_means(model, means, update_initializer=True, layer_name="means"):
     means = means.astype(np.float32)
-    means_layer = model.get_layer("means")
+    means_layer = model.get_layer(layer_name)
     layer_weights = means_layer.vectors
     layer_weights.assign(means)
 
     if update_initializer:
-        means_layer.initial_value = means
-        means_layer.vectors_initializer.initial_value = means
+        means_layer.vectors_initializer = WeightInitializer(means)
 
 
-def set_covariances(model, covariances, update_initializer=True):
+def set_covariances(model, covariances, update_initializer=True, layer_name="covs"):
     covariances = covariances.astype(np.float32)
-    covs_layer = model.get_layer("covs")
+    covs_layer = model.get_layer(layer_name)
     layer_weights = covs_layer.flattened_cholesky_factors
     flattened_cholesky_factors = covs_layer.bijector.inverse(covariances)
     layer_weights.assign(flattened_cholesky_factors)
 
     if update_initializer:
-        covs_layer.initial_value = covariances
-        covs_layer.initial_flattened_cholesky_factors = flattened_cholesky_factors
-        covs_layer.flattened_cholesky_factors_initializer.initial_value = (
+        covs_layer.flattened_cholesky_factors_initializer = WeightInitializer(
             flattened_cholesky_factors
         )
 

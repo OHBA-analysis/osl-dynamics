@@ -200,6 +200,10 @@ class Model(VariationalInferenceModelBase):
         """
         return dynemo_obs.get_means_covariances(self.model)
 
+    def get_observation_model_parameters(self):
+        """Wrapper for get_means_covariances."""
+        return self.get_means_covariances()
+
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
 
@@ -226,6 +230,19 @@ class Model(VariationalInferenceModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_means and set_covariances."""
+        self.set_means(
+            observation_model_parameters[0],
+            update_initializer=update_initializer,
+        )
+        self.set_covariances(
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
+        )
+
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
@@ -245,93 +262,6 @@ class Model(VariationalInferenceModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(self.model, training_dataset)
-
-    def random_subject_initialization(
-        self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
-    ):
-        """Initialization for the mode means/covariances.
-
-        Pick a subject at random, train a model, repeat a few times. Use
-        the means/covariances from the best model (judged using the final loss).
-
-        Parameters
-        ----------
-        training_data : list of tensorflow.data.Dataset or osl_dynamics.data.Data
-            Datasets for each subject.
-        n_epochs : int
-            Number of epochs to train.
-        n_subjects : int
-            How many subjects should we train on?
-        n_kl_annealing_epochs : int
-            Number of KL annealing epochs to use during initialization. If None
-            then the KL annealing epochs in the config is used.
-        kwargs : keyword arguments
-            Keyword arguments for the fit method.
-        """
-        print("Random subject initialization for mode means and covariances:")
-
-        # Original number of KL annealing epochs
-        original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
-
-        # Use n_kl_annealing_epochs if passed
-        self.config.n_kl_annealing_epochs = (
-            n_kl_annealing_epochs or original_n_kl_annealing_epochs
-        )
-
-        # Make a list of tensorflow Datasets if the data
-        training_data = self.make_dataset(
-            training_data, shuffle=True, concatenate=False
-        )
-
-        if not isinstance(training_data, list):
-            raise ValueError(
-                "training_data must be a list of Datasets or a Data object."
-            )
-
-        # Pick n_subjects at random
-        n_all_subjects = len(training_data)
-        subjects_to_use = np.random.choice(
-            range(n_all_subjects), n_subjects, replace=False
-        )
-
-        # Train the model a few times and keep the best one
-        best_loss = np.Inf
-        losses = []
-        for subject in subjects_to_use:
-            print("Using subject", subject)
-
-            # Get the dataset for this subject
-            subject_dataset = training_data[subject]
-
-            # Reset the model weights and train
-            self.reset()
-            history = self.fit(subject_dataset, epochs=n_epochs, **kwargs)
-            loss = history.history["loss"][-1]
-            losses.append(loss)
-            print(f"Subject {subject} loss: {loss}")
-
-            # Record the loss of this subject's data
-            if loss < best_loss:
-                best_loss = loss
-                subject_chosen = subject
-                best_weights = self.get_weights()
-
-        print(f"Using means and covariances from subject {subject_chosen}")
-
-        # Restore the best model and get the inferred means/covariances
-        # for initialisation
-        self.set_weights(best_weights)
-        init_means, init_covs = self.get_means_covariances()
-
-        # Reset model for full training
-        self.reset()
-
-        # Set initial means/covariances
-        self.set_means(init_means, update_initializer=True)
-        self.set_covariances(init_covs, update_initializer=True)
-
-        # Reset the number of KL annealing epochs
-        self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
 
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.

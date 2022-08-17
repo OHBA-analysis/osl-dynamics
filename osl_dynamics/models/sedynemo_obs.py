@@ -12,7 +12,6 @@ from tensorflow.keras import layers
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
-from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     DummyLayer,
     LogLikelihoodLossLayer,
@@ -248,6 +247,35 @@ class Model(ModelBase):
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
         set_bayesian_kl_scaling(self.model, n_batches, learn_means, learn_covariances)
+
+    def set_group_means(self, group_means, update_initializer=True):
+        """Set the group means of each mode.
+
+        Parameters
+        ----------
+        group_means : np.ndarray
+            Mode means.
+        update_initializer : bool
+            Do we want to use the passed group means when we re-initialize the model?
+        """
+        dynemo_obs.set_means(
+            self.model, group_means, update_initializer, layer_name="group_means"
+        )
+
+    def set_group_covariances(self, group_covariances, update_initializer=True):
+        """Set the group covariances of each mode.
+
+        Parameters
+        ----------
+        group_covariances : np.ndarray
+            Mode covariances.
+        update_initializer : bool
+            Do we want to use the passed group covariances when we re-initialize
+            the model?
+        """
+        dynemo_obs.set_covariances(
+            self.model, group_covariances, update_initializer, layer_name="group_covs"
+        )
 
 
 def _model_structure(config):

@@ -7,6 +7,7 @@ from typing import Literal
 
 import numpy as np
 
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import replace_argument
@@ -114,6 +115,183 @@ class VariationalInferenceModelBase(ModelBase):
             )
 
         return super().fit(*args, **kwargs)
+
+    def random_subset_initialization(
+        self,
+        training_data,
+        n_epochs,
+        n_init,
+        take,
+        n_kl_annealing_epochs=None,
+        **kwargs,
+    ):
+        """Random subset initialization.
+
+        The model is trained for a few epochs with different random subsets
+        of the training dataset. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float
+            Fraction of total batches to take.
+        n_kl_annealing_epochs : int
+            Number of KL annealing epochs.
+        kwargs : keyword arguments
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            print(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        print("Random subset initialization for mode means and covariances:")
+
+        # Original number of KL annealing epochs
+        original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
+
+        # Use n_kl_annealing_epochs if passed
+        self.config.n_kl_annealing_epochs = (
+            n_kl_annealing_epochs or original_n_kl_annealing_epochs
+        )
+
+        # Make a TensorFlow Dataset
+        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_data)
+        n_batches = max(round(n_total_batches * take), 1)
+        print(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            print(f"Initialization {n}")
+            self.reset()
+            training_data.shuffle(100000)
+            training_data_subset = training_data.take(n_batches)
+            history = self.fit(
+                training_data_subset,
+                epochs=n_epochs,
+                **kwargs,
+            )
+            loss = history.history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                init_obs_mod_params = self.get_observation_model_parameters()
+
+        print(f"Using initialization {best_initialization}")
+        self.reset()
+        self.set_observation_model_parameters(
+            init_obs_mod_params, update_initializer=True
+        )
+
+        # Reset the number of KL annealing epochs
+        self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
+
+        return best_history
+
+    def random_subject_initialization(
+        self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
+    ):
+        """Initialization for the mode means/covariances.
+
+        Pick a subject at random, train a model, repeat a few times. Use
+        the means/covariances from the best model (judged using the final loss).
+
+        Parameters
+        ----------
+        training_data : list of tensorflow.data.Dataset or osl_dynamics.data.Data
+            Datasets for each subject.
+        n_epochs : int
+            Number of epochs to train.
+        n_subjects : int
+            How many subjects should we train on?
+        n_kl_annealing_epochs : int
+            Number of KL annealing epochs to use during initialization. If None
+            then the KL annealing epochs in the config is used.
+        kwargs : keyword arguments
+            Keyword arguments for the fit method.
+        """
+        if n_init is None or n_init == 0:
+            print(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        print("Random subject initialization for mode means and covariances:")
+
+        # Original number of KL annealing epochs
+        original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
+
+        # Use n_kl_annealing_epochs if passed
+        self.config.n_kl_annealing_epochs = (
+            n_kl_annealing_epochs or original_n_kl_annealing_epochs
+        )
+
+        # Make a list of tensorflow Datasets if the data
+        training_data = self.make_dataset(
+            training_data, shuffle=True, concatenate=False
+        )
+
+        if not isinstance(training_data, list):
+            raise ValueError(
+                "training_data must be a list of Datasets or a Data object."
+            )
+
+        # Pick n_subjects at random
+        n_all_subjects = len(training_data)
+        subjects_to_use = np.random.choice(
+            range(n_all_subjects), n_subjects, replace=False
+        )
+
+        # Train the model a few times and keep the best one
+        best_loss = np.Inf
+        losses = []
+        for subject in subjects_to_use:
+            print("Using subject", subject)
+
+            # Get the dataset for this subject
+            subject_dataset = training_data[subject]
+
+            # Reset the model weights and train
+            self.reset()
+            history = self.fit(subject_dataset, epochs=n_epochs, **kwargs)
+            loss = history.history["loss"][-1]
+            losses.append(loss)
+            print(f"Subject {subject} loss: {loss}")
+
+            # Record the loss of this subject's data
+            if loss < best_loss:
+                best_loss = loss
+                subject_chosen = subject
+                init_obs_mod_params = self.get_observation_model_parameters()
+
+        print(f"Using means and covariances from subject {subject_chosen}")
+
+        # Reset model for full training
+        self.reset()
+        self.set_observation_model_parameters(
+            init_obs_mod_params, update_initializer=True
+        )
+
+        # Reset the number of KL annealing epochs
+        self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
 
     def multistart_initialization(
         self,
