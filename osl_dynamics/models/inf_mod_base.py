@@ -192,13 +192,12 @@ class VariationalInferenceModelBase(ModelBase):
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                init_obs_mod_params = self.get_observation_model_parameters()
+                best_weights = self.get_weights()
 
         print(f"Using initialization {best_initialization}")
         self.reset()
-        self.set_observation_model_parameters(
-            init_obs_mod_params, update_initializer=True
-        )
+        self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         # Reset the number of KL annealing epochs
         self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
@@ -280,15 +279,14 @@ class VariationalInferenceModelBase(ModelBase):
             if loss < best_loss:
                 best_loss = loss
                 subject_chosen = subject
-                init_obs_mod_params = self.get_observation_model_parameters()
+                best_weights = self.get_weights()
 
         print(f"Using means and covariances from subject {subject_chosen}")
 
-        # Reset model for full training
+        # Use the weights from the best initialisation for the full training
         self.reset()
-        self.set_observation_model_parameters(
-            init_obs_mod_params, update_initializer=True
-        )
+        self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         # Reset the number of KL annealing epochs
         self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
@@ -298,64 +296,34 @@ class VariationalInferenceModelBase(ModelBase):
         training_data,
         n_epochs,
         n_init,
-        **kwargs,
+        n_kl_annealing_epochs=None,
     ):
         """Multi-start initialization.
 
-        The model is trained for a few epochs with different random initializations
-        for weights and the model with the best free energy is kept.
-
-        Parameters
-        ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Dataset to use for training.
-        n_epochs : int
-            Number of epochs to train the model.
-        n_init : int
-            Number of initializations.
+        Wrapper for random_subset_initialization with take=1.
 
         Returns
         -------
         history : history
             The training history of the best initialization.
         """
-        if n_init is None or n_init == 0:
-            print(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
-            )
-            return
 
-        # Pick the initialization with the lowest free energy
-        best_free_energy = np.Inf
-        for n in range(n_init):
-            print(f"Initialization {n}")
-            self.reset()
-            history = self.fit(
-                training_data,
-                epochs=n_epochs,
-                **kwargs,
-            )
-            free_energy = history.history["loss"][-1]
-            if free_energy < best_free_energy:
-                best_initialization = n
-                best_free_energy = free_energy
-                best_weights = self.model.get_weights()
-                best_history = history
-
-        print(f"Using initialization {best_initialization}")
-        self.reset()
-        self.set_weights(best_weights)
-
-        return best_history
+        return self.random_subset_initialization(
+            training_data,
+            n_epochs,
+            n_init,
+            take=1,
+            n_kl_annealing_epochs=n_kl_annealing_epochs,
+        )
 
     def reset_kl_annealing_factor(self):
         """Sets the KL annealing factor to zero.
 
         This method assumes there is a keras layer named 'kl_loss' in the model.
         """
-        kl_loss_layer = self.model.get_layer("kl_loss")
-        kl_loss_layer.annealing_factor.assign(0.0)
+        if self.config.do_kl_annealing:
+            kl_loss_layer = self.model.get_layer("kl_loss")
+            kl_loss_layer.annealing_factor.assign(0.0)
 
     def reset_weights(self, keep=None):
         """Reset the model as if you've built a new model.
@@ -366,8 +334,7 @@ class VariationalInferenceModelBase(ModelBase):
             Layer names to NOT reset.
         """
         initializers.reinitialize_model_weights(self.model, keep)
-        if self.config.do_kl_annealing:
-            self.reset_kl_annealing_factor()
+        self.reset_kl_annealing_factor()
 
     def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.
