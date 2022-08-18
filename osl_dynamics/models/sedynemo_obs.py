@@ -224,7 +224,7 @@ class Model(ModelBase):
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
         sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
-        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(range).
 
         Parameters
         ----------

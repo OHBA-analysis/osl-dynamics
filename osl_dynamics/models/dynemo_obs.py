@@ -147,7 +147,7 @@ class Model(ModelBase):
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
         sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
-        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(range).
 
         Parameters
         ----------
@@ -260,7 +260,7 @@ def set_covariances_regularizer(model, training_dataset, layer_name="covs"):
     range_ = dtf.get_range(training_dataset)
 
     nu = n_channels - 1 + 0.1
-    psi = np.diag(1 / range_)
+    psi = np.diag(range_)
 
     covs_layer = model.get_layer(layer_name)
     covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)
