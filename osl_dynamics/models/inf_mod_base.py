@@ -297,6 +297,7 @@ class VariationalInferenceModelBase(ModelBase):
         n_epochs,
         n_init,
         n_kl_annealing_epochs=None,
+        **kwargs,
     ):
         """Multi-start initialization.
 
@@ -369,9 +370,7 @@ class VariationalInferenceModelBase(ModelBase):
             (n_samples, n_modes).
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_time_courses(
-                inputs, *args, concatenate=concatenate, **kwargs
-            )
+            return self.get_mode_time_courses(inputs, concatenate=concatenate)
 
         inputs = self.make_dataset(inputs, concatenate=concatenate)
 
