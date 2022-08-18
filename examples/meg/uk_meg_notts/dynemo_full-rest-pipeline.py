@@ -87,11 +87,11 @@ model.summary()
 # ------------------------------------------------------ #
 # Random subject initialisation for the mode covariances #
 # ------------------------------------------------------ #
-model.random_subject_initialization(
+model.single_subject_initialization(
     training_data,
     n_kl_annealing_epochs=100,
     n_epochs=200,
-    n_subjects=10,
+    n_init=10,
 )
 
 # -------------------------- #

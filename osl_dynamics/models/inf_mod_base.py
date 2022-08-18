@@ -157,7 +157,7 @@ class VariationalInferenceModelBase(ModelBase):
             )
             return
 
-        print("Random subset initialization for mode means and covariances:")
+        print("Random subset initialization:")
 
         # Original number of KL annealing epochs
         original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
@@ -204,8 +204,8 @@ class VariationalInferenceModelBase(ModelBase):
 
         return best_history
 
-    def random_subject_initialization(
-        self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
+    def single_subject_initialization(
+        self, training_data, n_epochs, n_init, n_kl_annealing_epochs=None, **kwargs
     ):
         """Initialization for the mode means/covariances.
 
@@ -218,7 +218,7 @@ class VariationalInferenceModelBase(ModelBase):
             Datasets for each subject.
         n_epochs : int
             Number of epochs to train.
-        n_subjects : int
+        n_init : int
             How many subjects should we train on?
         n_kl_annealing_epochs : int
             Number of KL annealing epochs to use during initialization. If None
@@ -233,7 +233,7 @@ class VariationalInferenceModelBase(ModelBase):
             )
             return
 
-        print("Random subject initialization for mode means and covariances:")
+        print("Single subject initialization:")
 
         # Original number of KL annealing epochs
         original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
@@ -253,11 +253,9 @@ class VariationalInferenceModelBase(ModelBase):
                 "training_data must be a list of Datasets or a Data object."
             )
 
-        # Pick n_subjects at random
+        # Pick n_init subjects at random
         n_all_subjects = len(training_data)
-        subjects_to_use = np.random.choice(
-            range(n_all_subjects), n_subjects, replace=False
-        )
+        subjects_to_use = np.random.choice(range(n_all_subjects), n_init, replace=False)
 
         # Train the model a few times and keep the best one
         best_loss = np.Inf
@@ -315,6 +313,7 @@ class VariationalInferenceModelBase(ModelBase):
             n_init,
             take=1,
             n_kl_annealing_epochs=n_kl_annealing_epochs,
+            **kwargs,
         )
 
     def reset_kl_annealing_factor(self):
