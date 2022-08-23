@@ -405,7 +405,7 @@ class MSubj_MVN(MVN):
 
     def create_group_means(self, option):
         group_means = []
-        means_mu = np.arange(self.n_groups, dtype=np.float32)
+        means_mu = np.arange(self.n_groups, dtype=np.float32) * 0.1
         means_mu = means_mu - np.mean(means_mu)
         for group in range(self.n_groups):
             group_means.append(super().create_means(option, means_mu[group]))
@@ -414,7 +414,9 @@ class MSubj_MVN(MVN):
     def create_group_covariances(self, option):
         group_covariances = []
         group_W = []
-        covariances_active_strengths = np.arange(1, self.n_groups + 1)
+        covariances_active_strengths = np.linspace(
+            1, 1 + 0.1 * (self.n_groups - 1), self.n_groups
+        )
         for group in range(self.n_groups):
             place_holder = super().create_covariances(
                 option, covariances_active_strengths[group]
@@ -437,7 +439,7 @@ class MSubj_MVN(MVN):
                 group_mask = assigned_groups == group
                 subject_means[group_mask] = self._rng.normal(
                     loc=self.group_means[group],
-                    scale=0.02,
+                    scale=0.05,
                     size=(np.sum(group_mask), self.n_modes, self.n_channels),
                 )
         return subject_means, assigned_groups
@@ -452,7 +454,7 @@ class MSubj_MVN(MVN):
             group_mask = assigned_groups == group
             subject_W[group_mask] = self._rng.normal(
                 loc=self.group_W[group],
-                scale=0.01,
+                scale=0.05,
                 size=(
                     np.sum(group_mask),
                     self.n_modes,
