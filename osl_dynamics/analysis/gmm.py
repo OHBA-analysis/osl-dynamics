@@ -79,6 +79,7 @@ def fit_gaussian_mixture(
     # Logit transform
     if logit_transform:
         X = special.logit(X)
+        X[np.isinf(X[:, 0]), :] = np.mean(X[~np.isinf(X[:, 0]), 0])
 
     # Standardise the data
     if standardize:

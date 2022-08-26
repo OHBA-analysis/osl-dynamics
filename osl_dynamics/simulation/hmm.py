@@ -418,28 +418,29 @@ class MSubj_HMM_MVN(Simulation):
     ----------
     n_samples : int
         Number of samples per subject to draw from the model.
-    n_subjects : int
-        Number of subjects.
     trans_prob : np.ndarray or str
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
-    means : np.ndarray or str
-        Group mean vector for each state, shape should be (n_states, n_channels).
+    subject_means : np.ndarray or str
+        Subject mean vector for each state, shape should be (n_subjects, n_states, n_channels).
         Either a numpy array or 'zero' or 'random'.
-    covariances : np.ndarray or str
-        Group covariance matrix for each state, shape should be (n_states,
-        n_channels, n_channels). Either a numpy array or 'random'.
-    subject_maps_std : float
-        Standard deviation when generating subject specific means and covariances
-        from the group means and covariances.
-    subject_tc_std : float
-        Standard deviation when generating subject specific stay probability.
+    subject_covariances : np.ndarray or str
+        Subject covariance matrix for each state, shape should be
+        (n_subjects, n_states, n_channels, n_channels). Either a numpy array or 'random'.
     n_states : int
         Number of states. Can pass this argument with keyword n_modes instead.
+    n_modes : int
+        Number of modes.
     n_channels : int
         Number of channels.
+    n_subjects : int
+        Number of subjects.
+    n_groups : int
+        Number of groups of subjects when subject means or covariances are 'random'.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
+    subject_tc_std : float
+        Standard deviation when generating subject specific stay probability.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
@@ -449,15 +450,15 @@ class MSubj_HMM_MVN(Simulation):
     def __init__(
         self,
         n_samples,
-        n_subjects,
         trans_prob,
-        means,
-        covariances,
-        subject_maps_std=0.01,
-        subject_tc_std=0.0,
+        subject_means,
+        subject_covariances,
         n_states=None,
         n_modes=None,
         n_channels=None,
+        n_subjects=None,
+        n_groups=1,
+        subject_tc_std=0.0,
         stay_prob=None,
         observation_error=0.0,
         random_seed=None,
@@ -471,12 +472,12 @@ class MSubj_HMM_MVN(Simulation):
 
         # Observation model
         self.obs_mod = MSubj_MVN(
-            means=means,
-            covariances=covariances,
-            subject_maps_std=subject_maps_std,
-            n_modes=n_modes,
+            subject_means=subject_means,
+            subject_covariances=subject_covariances,
+            n_modes=n_states,
             n_channels=n_channels,
             n_subjects=n_subjects,
+            n_groups=n_groups,
             observation_error=observation_error,
             random_seed=random_seed,
         )
