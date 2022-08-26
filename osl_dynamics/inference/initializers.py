@@ -32,7 +32,7 @@ class WeightInitializer(Initializer):
 class IdentityCholeskyInitializer(Initializer):
     """Initialize weights to a flattened cholesky factor of identity matrices."""
 
-    def __init__(*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Bijector used to transform learnable vectors to covariance matrices
