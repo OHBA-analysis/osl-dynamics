@@ -12,7 +12,6 @@ from osl_dynamics.utils import plotting
 from osl_dynamics.models.sedynemo import Config, Model
 
 # GPU settings
-tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
@@ -74,8 +73,6 @@ model.set_bayesian_kl_scaling(training_data)
 # Set regularizers
 model.set_regularizers(training_data)
 
-# Initialise observation model parameters
-# model.random_subset_initialization(training_data, n_epochs=20, n_init=5, take=0.25)
 print("Training model")
 history = model.fit(training_data, epochs=config.n_epochs)
 

@@ -95,7 +95,7 @@ class MVN:
             raise ValueError("means must be a np.array or 'zero' or 'random'.")
         return means
 
-    def create_covariances(self, option, covariances_active_strength=1, eps=1e-6):
+    def create_covariances(self, option, activation_strength=1, eps=1e-6):
         if option == "random":
             # Randomly sample the elements of W from a normal distribution
             W = self._rng.normal(
@@ -108,7 +108,7 @@ class MVN:
                 active_channels = np.unique(
                     self._rng.integers(0, self.n_channels, size=n_active_channels)
                 )
-                W[i, active_channels] += covariances_active_strength / self.n_channels
+                W[i, active_channels] += activation_strength / self.n_channels
 
             # A small value to add to the diagonal to ensure the covariances are
             # invertible
@@ -311,7 +311,8 @@ class MSubj_MVN(MVN):
                 )
             if subject_covariances.ndim != 4:
                 raise ValueError(
-                    "subject_covariances must have shape (n_subjects, n_modes, n_channels, n_channels)."
+                    "subject_covariances must have shape "
+                    + "(n_subjects, n_modes, n_channels, n_channels)."
                 )
             if subject_means.shape[0] != subject_covariances.shape[0]:
                 raise ValueError(
@@ -383,7 +384,8 @@ class MSubj_MVN(MVN):
         ):
             if n_subjects is None or n_modes is None or n_channels is None:
                 raise ValueError(
-                    "If we are generating subject means and covariances, n_subjects, n_modes, n_channels must be passed."
+                    "If we are generating subject means and covariances, "
+                    + "n_subjects, n_modes, n_channels must be passed."
                 )
             self.n_subjects = n_subjects
             self.n_modes = n_modes
@@ -414,12 +416,12 @@ class MSubj_MVN(MVN):
     def create_group_covariances(self, option):
         group_covariances = []
         group_W = []
-        covariances_active_strengths = np.linspace(
+        activation_strengths = np.linspace(
             1, 1 + 0.1 * (self.n_groups - 1), self.n_groups
         )
         for group in range(self.n_groups):
             place_holder = super().create_covariances(
-                option, covariances_active_strengths[group]
+                option, activation_strengths[group]
             )
             group_covariances.append(place_holder[0])
             group_W.append(place_holder[1])
@@ -473,7 +475,20 @@ class MSubj_MVN(MVN):
         return subject_covariances, assigned_groups
 
     def simulate_subject_data(self, subject, mode_time_course):
-        """Simulate single subject data."""
+        """Simulate single subject data.
+
+        Parameters
+        ----------
+        subject : int
+            Subject number.
+        mode_time_course : np.ndarray
+            Mode time course. Shape is (n_samples, n_modes).
+
+        Returns
+        -------
+        data : np.ndarray
+            Simulated data. Shape is (n_samples, n_channels).
+        """
         n_samples = mode_time_course.shape[0]
 
         # Initialise array to hold data
@@ -515,9 +530,7 @@ class MSubj_MVN(MVN):
         np.ndarray
             Simulated data for subjects. Shape is (n_subjects, n_samples, n_channels).
         """
-        # Initialise list to hold data
         data = []
         for subject in range(self.n_subjects):
             data.append(self.simulate_subject_data(subject, mode_time_courses[subject]))
-        data = np.array(data)
-        return data
+        return np.array(data)
