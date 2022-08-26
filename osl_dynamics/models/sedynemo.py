@@ -160,7 +160,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_dropout: float = 0.0
 
     # Observation model parameters
-    multiple_scales: bool = False
     learn_means: bool = None
     learn_covariances: bool = None
     initial_means: np.ndarray = None
