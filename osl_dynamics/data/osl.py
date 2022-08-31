@@ -20,7 +20,8 @@ class OSL_HMM:
 
     def __init__(self, filename):
         self.filename = filename
-        self.hmm = loadmat(filename)
+        hmm = loadmat(filename)
+        self.hmm = hmm["hmm"] if "hmm" in hmm else hmm
 
         self.state = self.hmm["state"]
         self.mode = self.hmm["state"]
@@ -33,12 +34,12 @@ class OSL_HMM:
         self.train = self.hmm["train"]
 
         # State probabilities
-        if "gamma" in self.hmm:
-            self.Gamma = self.hmm["gamma"].astype(np.float32)
-        elif "Gamma" in self.hmm:
-            self.Gamma = self.hmm["Gamma"].astype(np.float32)
-        else:
-            self.Gamma = None
+        self.Gamma = None
+        for gamma in ["gamma", "Gamma"]:
+            if gamma in self.hmm:
+                self.Gamma = self.hmm[gamma].astype(np.float32)
+            elif gamma in hmm:
+                self.Gamma = hmm[gamma].astype(np.float32)
 
         # State time course
         if self.Gamma is not None:
