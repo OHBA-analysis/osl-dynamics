@@ -376,3 +376,60 @@ class ModelBase:
 
         with open(f"{filepath}/config.yml", "w") as f:
             yaml.dump(config_dict, f)
+
+def load_model(filepath):
+    """
+    Load model from filepath.
+
+    Parameters
+    ----------
+    filepath : str
+        Path where config.yml and weights are stored.
+
+    Returns
+    -------
+    config
+        Config object.
+    model
+        model object.
+    """
+    # Get the config
+    with open(f"{filepath}/config.yml", "r") as f:
+        config_dict = yaml.safe_load(f)
+    
+    import osl_dynamics.models as oslm
+    model_name = config_dict["model_name"]
+    match model_name:
+        case "DyNeMo":
+            config = oslm.dynemo.Config(**config_dict)
+            model = oslm.dynemo.Model(config)
+        case "DyNeMo-Obs":
+            config = oslm.dynemo_obs.Config(**config_dict)
+            model = oslm.dynemo_obs.Model(config)
+        case "MAGE":
+            config = oslm.mage.Config(**config_dict)
+            model = oslm.mage.Model(config)
+        case "SAGE":
+            config = oslm.sage.Config(**config_dict)
+            model = oslm.sage.Model(config)
+        case "M-DyNeMo":
+            config = oslm.mdynemo.Config(**config_dict)
+            model = oslm.mdynemo.Model(config)
+        case "M-DyNeMo-Obs":
+            config = oslm.mdynemo_obs.Config(**config_dict)
+            model = oslm.mdynemo_obs.Model(config)
+        case "SE-DyNeMo":
+            config = oslm.sedynemo.Config(**config_dict)
+            model = oslm.sedynemo.Model(config)
+        case "SE-DyNeMo-Obs":
+            config = oslm.sedynemo_obs.Config(**config_dict)
+            model = oslm.sedynemo_obs.Model(config)
+        case "State-DyNeMo":
+            config = oslm.state_dynemo.Config(**config_dict)
+            model = oslm.state_dynemo.Model(config)
+        case other:
+            raise NotImplementedError(model_name)
+        
+        # Restore weights
+    model.load_weights(f"{filepath}/weights")
+    return config, model
