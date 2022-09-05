@@ -29,6 +29,7 @@ class BaseModelConfig:
 
     # Model choices
     multiple_dynamics: bool = False
+    model_name: str = None
 
     # Training parameters
     batch_size: int = None

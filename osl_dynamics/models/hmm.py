@@ -41,6 +41,8 @@ class Config(BaseModelConfig):
 
     Parameters
     ----------
+    model_name : str
+        Model name.
     n_states : int
         Number of states.
     n_channels : int
@@ -74,6 +76,8 @@ class Config(BaseModelConfig):
     strategy : str
         Strategy for distributed learning.
     """
+
+    model_name: str = "HMM"
 
     # Observation model parameters
     learn_means: bool = None
