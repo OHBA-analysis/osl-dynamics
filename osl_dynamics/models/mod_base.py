@@ -8,6 +8,7 @@ from io import StringIO
 from dataclasses import dataclass
 
 import numpy as np
+import yaml
 import tensorflow
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
@@ -361,3 +362,16 @@ class ModelBase:
 
     def _repr_html_(self):
         return self.html_summary()
+
+    def save_config(self, filepath):
+        config_dict = self.config.__dict__.copy()
+        # for serialisability of the dict
+        non_serializable_keys = [
+            key for key in list(config_dict.keys()) if "regularizer" in key
+        ]
+        non_serializable_keys.append("strategy")
+        for key in non_serializable_keys:
+            config_dict[key] = None
+
+        with open(f"{filepath}/config.yml", "w") as f:
+            yaml.dump(config_dict, f)
