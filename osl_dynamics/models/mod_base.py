@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import yaml
 import tensorflow
+from os import makedirs
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -365,6 +366,14 @@ class ModelBase:
         return self.html_summary()
 
     def save_config(self, filepath):
+        """Saves config object as a .yml file.
+        
+        Parameters
+        ----------
+        filepath : str
+            Filepath to save config.yml.
+        """
+        makedirs(filepath, exist_ok=True)
         config_dict = self.config.__dict__.copy()
         # for serialisability of the dict
         non_serializable_keys = [
@@ -376,6 +385,30 @@ class ModelBase:
 
         with open(f"{filepath}/config.yml", "w") as f:
             yaml.dump(config_dict, f)
+    
+    def save_weights(self, filepath):
+        """Saves weights of the model.
+        This is a wrapper for self.model.save_weights.
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath to save the weights of the model.
+        """
+        makedirs(filepath, exist_ok=True)
+        self.model.save_weights(f"{filepath}/weights")
+    
+    def save_all(self, filepath):
+        """Saves config object and weights of the model.
+        This is a wrapper for self.save_config and self.save_weights.
+
+        Parameters
+        ----------
+        filepath : str
+            Filepath to save the config object and weights of the model.
+        """
+        self.save_config(filepath)
+        self.save_weights(filepath)
 
 def load_model(filepath):
     """
