@@ -1,7 +1,7 @@
 """Implemented models.
 
 """
-from osl_dynamics.models.mod_base import load_model
+from osl_dynamics.models.mod_base import load
 from osl_dynamics.models import (
     dynemo,
     dynemo_obs,

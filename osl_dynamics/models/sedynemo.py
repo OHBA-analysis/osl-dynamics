@@ -41,7 +41,7 @@ from osl_dynamics.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for SERIGO.
+    """Settings for SE-DyNeMo.
 
     Parameters
     ----------

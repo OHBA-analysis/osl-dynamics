@@ -395,10 +395,9 @@ class ModelBase:
         filepath : str
             Filepath to save the weights of the model.
         """
-        makedirs(filepath, exist_ok=True)
         self.model.save_weights(f"{filepath}/weights")
     
-    def save_all(self, filepath):
+    def save(self, filepath):
         """Saves config object and weights of the model.
         This is a wrapper for self.save_config and self.save_weights.
 
@@ -410,7 +409,7 @@ class ModelBase:
         self.save_config(filepath)
         self.save_weights(filepath)
 
-def load_model(filepath):
+def load(filepath):
     """
     Load model from filepath.
 
