@@ -36,6 +36,8 @@ class Config(BaseModelConfig):
 
     Parameters
     ----------
+    model_name : str
+        Model name.
     n_modes : int
         Number of modes.
     n_channels : int
@@ -92,6 +94,8 @@ class Config(BaseModelConfig):
     strategy : str
         Strategy for distributed learning.
     """
+
+    model_name: str = "SE-DyNeMo-Obs"
 
     # Observation model parameters
     learn_means: bool = None

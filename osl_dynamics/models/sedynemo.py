@@ -41,9 +41,12 @@ from osl_dynamics.inference.layers import (
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for SERIGO.
+    """Settings for SE-DyNeMo.
+
     Parameters
     ----------
+    model_name : str
+        Model name.
     n_modes : int
         Number of modes.
     n_channels : int
@@ -142,6 +145,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_dev_mod_sigma : float
         Initial value for prior std of the deviation.
     """
+
+    model_name: str = "SE-DyNeMo"
 
     # Inference network parameters
     inference_rnn: Literal["gru", "lstm"] = "lstm"

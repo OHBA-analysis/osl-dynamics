@@ -31,6 +31,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
     Parameters
     ----------
+    model_name : str
+        Model name.
     n_states : int
         Number of states.
     n_channels : int
@@ -101,6 +103,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     strategy : str
         Strategy for distributed learning.
     """
+
+    model_name: str = "State-DyNeMo"
 
     # Inference network parameters
     inference_rnn: Literal["gru", "lstm"] = "lstm"
