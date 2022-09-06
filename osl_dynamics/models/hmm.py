@@ -7,7 +7,7 @@ NOTE:
 
 """
 
-import os
+import os.path as op
 from dataclasses import dataclass
 
 import numpy as np
@@ -486,7 +486,7 @@ class Model(ModelBase):
             self.config.sequence_length, prepared=prepared, concatenate=concatenate
         )
 
-    def save_all(self, dirname):
+    def save_weights(self, dirname):
         """Save all model weights.
 
         Parameters
@@ -494,11 +494,10 @@ class Model(ModelBase):
         dirname : str
             Location to save model parameters to.
         """
-        os.system("mkdir {}".format(dirname))
-        self.save_weights(os.path.join(dirname, "model_weights"))
-        np.save(os.path.join(dirname, "model_trans_prob.npy"), self.trans_prob)
+        self.model.save_weights(op.join(dirname, "weights"))
+        np.save(op.join(dirname, "trans_prob.npy"), self.trans_prob)
 
-    def load_all(self, dirname):
+    def load_weights(self, dirname):
         """Load all model parameters.
 
         Parameters
@@ -506,8 +505,8 @@ class Model(ModelBase):
         dirname : str
             Location to load model parameters from.
         """
-        self.load_weights(os.path.join(dirname, "model_weights"))
-        self.trans_prob = np.load(os.path.join(dirname, "model_trans_prob.npy"))
+        self.model.load_weights(op.join(dirname, "weights"))
+        self.trans_prob = np.load(op.join(dirname, "trans_prob.npy"))
 
 
 def _model_structure(config):

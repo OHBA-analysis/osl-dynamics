@@ -2,7 +2,9 @@
 
 """
 
+import os
 import re
+import pprint as pp
 from abc import abstractmethod
 from io import StringIO
 from dataclasses import dataclass
@@ -10,7 +12,6 @@ from dataclasses import dataclass
 import numpy as np
 import yaml
 import tensorflow
-from os import makedirs
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -18,7 +19,7 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
-from osl_dynamics import data
+from osl_dynamics import data, models
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import get_argument, replace_argument
 from osl_dynamics.utils.model import HTMLTable, LatexTable
@@ -367,13 +368,14 @@ class ModelBase:
 
     def save_config(self, filepath):
         """Saves config object as a .yml file.
-        
+
         Parameters
         ----------
         filepath : str
             Filepath to save config.yml.
         """
-        makedirs(filepath, exist_ok=True)
+        os.makedirs(filepath, exist_ok=True)
+
         config_dict = self.config.__dict__.copy()
         # for serialisability of the dict
         non_serializable_keys = [
@@ -383,22 +385,12 @@ class ModelBase:
         for key in non_serializable_keys:
             config_dict[key] = None
 
-        with open(f"{filepath}/config.yml", "w") as f:
-            yaml.dump(config_dict, f)
-    
-    def save_weights(self, filepath):
-        """Saves weights of the model.
-        This is a wrapper for self.model.save_weights.
+        with open(f"{filepath}/config.yml", "w") as file:
+            yaml.dump(config_dict, file)
 
-        Parameters
-        ----------
-        filepath : str
-            Filepath to save the weights of the model.
-        """
-        self.model.save_weights(f"{filepath}/weights")
-    
     def save(self, filepath):
         """Saves config object and weights of the model.
+
         This is a wrapper for self.save_config and self.save_weights.
 
         Parameters
@@ -407,7 +399,10 @@ class ModelBase:
             Filepath to save the config object and weights of the model.
         """
         self.save_config(filepath)
-        self.save_weights(filepath)
+        self.save_weights(
+            str(filepath) + "/weights"
+        )  # will use the keras method: self.model.save_weights()
+
 
 def load(filepath):
     """
@@ -423,45 +418,52 @@ def load(filepath):
     config
         Config object.
     model
-        model object.
+        Model object.
     """
+
     # Get the config
     with open(f"{filepath}/config.yml", "r") as f:
         config_dict = yaml.safe_load(f)
-    
-    import osl_dynamics.models as oslm
-    model_name = config_dict["model_name"]
-    match model_name:
+
+    print("Loading model with config:")
+    pp.pprint(config_dict)
+
+    # Create model
+    match config_dict["model_name"]:
         case "DyNeMo":
-            config = oslm.dynemo.Config(**config_dict)
-            model = oslm.dynemo.Model(config)
+            config = models.dynemo.Config(**config_dict)
+            model = models.dynemo.Model(config)
         case "DyNeMo-Obs":
-            config = oslm.dynemo_obs.Config(**config_dict)
-            model = oslm.dynemo_obs.Model(config)
+            config = models.dynemo_obs.Config(**config_dict)
+            model = models.dynemo_obs.Model(config)
         case "MAGE":
-            config = oslm.mage.Config(**config_dict)
-            model = oslm.mage.Model(config)
+            config = models.mage.Config(**config_dict)
+            model = models.mage.Model(config)
         case "SAGE":
-            config = oslm.sage.Config(**config_dict)
-            model = oslm.sage.Model(config)
+            config = models.sage.Config(**config_dict)
+            model = models.sage.Model(config)
         case "M-DyNeMo":
-            config = oslm.mdynemo.Config(**config_dict)
-            model = oslm.mdynemo.Model(config)
+            config = models.mdynemo.Config(**config_dict)
+            model = models.mdynemo.Model(config)
         case "M-DyNeMo-Obs":
-            config = oslm.mdynemo_obs.Config(**config_dict)
-            model = oslm.mdynemo_obs.Model(config)
+            config = models.mdynemo_obs.Config(**config_dict)
+            model = models.mdynemo_obs.Model(config)
         case "SE-DyNeMo":
-            config = oslm.sedynemo.Config(**config_dict)
-            model = oslm.sedynemo.Model(config)
+            config = models.sedynemo.Config(**config_dict)
+            model = models.sedynemo.Model(config)
         case "SE-DyNeMo-Obs":
-            config = oslm.sedynemo_obs.Config(**config_dict)
-            model = oslm.sedynemo_obs.Model(config)
+            config = models.sedynemo_obs.Config(**config_dict)
+            model = models.sedynemo_obs.Model(config)
         case "State-DyNeMo":
-            config = oslm.state_dynemo.Config(**config_dict)
-            model = oslm.state_dynemo.Model(config)
+            config = models.state_dynemo.Config(**config_dict)
+            model = models.state_dynemo.Model(config)
+        case "HMM":
+            config = models.hmm.Config(**config_dict)
+            model = models.hmm.Model(config)
         case other:
             raise NotImplementedError(model_name)
-        
-        # Restore weights
-    model.load_weights(f"{filepath}/weights")
+
+    # Restore weights
+    model.load_weights(str(filepath) + "/weights")
+
     return config, model
