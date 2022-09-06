@@ -461,7 +461,7 @@ def load(filepath):
             config = models.hmm.Config(**config_dict)
             model = models.hmm.Model(config)
         case other:
-            raise NotImplementedError(model_name)
+            raise NotImplementedError(config_dict["model_name"])
 
     # Restore weights
     model.load_weights(str(filepath) + "/weights")
