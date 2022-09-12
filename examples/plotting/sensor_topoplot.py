@@ -1,3 +1,7 @@
+"""Example code for creating a sensor space topoplot.
+
+"""
+
 import numpy as np
 from osl_dynamics import files
 from osl_dynamics.utils import plotting

@@ -200,16 +200,12 @@ def partial_covariances(data, alpha):
         if data[i].shape[0] != alpha[i].shape[0]:
             raise ValueError("Difference number of samples in data and alpha.")
 
-    n_subjects = len(data)
-    n_channels = data[0].shape[-1]
-    n_modes = alpha[0].shape[-1]
-
-    pcovs = np.zeros([n_subjects, n_modes, n_channels])
+    pcovs = []
     for X, a in zip(data, alpha):
         # Variance normalise state/mode time courses
         a /= np.std(a, axis=0, keepdims=True)
 
         # Do multiple regression of alpha onto data
-        pcovs[i, :, :] = np.linalg.pinv(a) @ X
+        pcovs.append(np.linalg.pinv(a) @ X)
 
     return np.squeeze(pcovs)

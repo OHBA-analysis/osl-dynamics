@@ -59,8 +59,11 @@ def render(
     """
     nii = pathlib.Path(nii)
 
-    if not nii.exists() or ".nii" not in nii.suffixes:
+    if ".nii" not in nii.suffixes:
         raise ValueError(f"nii should be a nii or nii.gz file, got {nii}.")
+
+    if not nii.exists():
+        raise FileNotFoundError(nii)
 
     if save_dir is None:
         save_dir = pathlib.Path.cwd()
