@@ -31,7 +31,7 @@ from numpy.ctypeslib import ndpointer
 # This library has has already been compiled for BMRC.
 # Please re-compile if running on a different computer with:
 # `python setup.py build`, and update the path.
-libfile = "/well/woolrich/projects/software/hmm_inference_libc/build/lib.linux-x86_64-3.8/hidden_state_inference.so"
+libfile = "/well/woolrich/projects/software/hmm_inference_libc/build/lib.linux-x86_64-cpython-310/hidden_state_inference.so"
 hidden_state_inference = CDLL(libfile)
 
 
