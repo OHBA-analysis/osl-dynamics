@@ -64,6 +64,8 @@ class Data(RW, Processing, TensorFlowDataset):
             load_memmaps=load_memmaps,
             keep_memmaps_on_close=keep_memmaps_on_close,
         )
+        if hasattr(self, "n_embeddings"):
+            n_embeddings = self.n_embeddings
 
         # Initialise a Processing object so we have method we can use to prepare
         # the data
@@ -73,11 +75,6 @@ class Data(RW, Processing, TensorFlowDataset):
 
         # Initialise a TensorFlowDataset object so we have methods to create datasets
         TensorFlowDataset.__init__(self)
-
-    def __del__(self):
-        if not self.keep_memmaps_on_close:
-            self.delete_processing_memmaps()
-            self.delete_io_memmaps()
 
     def __iter__(self):
         return iter(self.subjects)

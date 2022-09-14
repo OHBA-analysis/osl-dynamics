@@ -110,28 +110,6 @@ class RW:
         if self.store_dir.exists():
             rmtree(self.store_dir)
 
-    def delete_io_memmaps(self):
-        """Deletes memmaps and removes store_dir if empty."""
-        if self.raw_data_filenames is not None:
-            for filename in self.raw_data_filenames:
-                pathlib.Path(filename).unlink(missing_ok=True)
-        if self.store_dir.exists():
-            if not any(self.store_dir.iterdir()):
-                self.store_dir.rmdir()
-        self.raw_data_memmaps = None
-        self.raw_data_filenames = None
-
-    def delete_processing_memmaps(self):
-        """Deletes memmaps and removes store_dir if empty."""
-        if self.prepared_data_filenames is not None:
-            for filename in self.prepared_data_filenames:
-                pathlib.Path(filename).unlink(missing_ok=True)
-        if self.store_dir.exists():
-            if not any(self.store_dir.iterdir()):
-                self.store_dir.rmdir()
-        self.prepared_data_memmaps = None
-        self.prepared_data_filenames = None
-
     def load_preparation(self, inputs):
         """Loads a pickle file containing preparation settings.
 
@@ -154,9 +132,7 @@ class RW:
                     self.prepared = True
 
     def load_raw_data(
-        self,
-        data_field,
-        time_axis_first,
+        self, data_field, time_axis_first,
     ):
         """Import data into a list of memory maps.
 
@@ -278,10 +254,7 @@ def list_dir(path, keep_ext=None):
 
 
 def load_data(
-    data,
-    data_field="X",
-    mmap_location=None,
-    mmap_mode="r+",
+    data, data_field="X", mmap_location=None, mmap_mode="r+",
 ):
     """Loads time series data.
 

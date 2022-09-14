@@ -271,9 +271,7 @@ def concatenate_datasets(datasets, shuffle=True):
 
 
 def create_dataset(
-    data,
-    sequence_length,
-    step_size,
+    data, sequence_length, step_size,
 ):
     """Creates a TensorFlow dataset of batched time series data.
 
