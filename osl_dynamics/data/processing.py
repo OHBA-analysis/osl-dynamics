@@ -122,7 +122,7 @@ class Processing:
             prepared_data = np.array(
                 [
                     np.convolve(
-                        prepared_data[:, i], np.ones(n_window) / n_window, mode="same"
+                        prepared_data[:, i], np.ones(n_window) / n_window, mode="valid"
                     )
                     for i in range(prepared_data.shape[1])
                 ],
