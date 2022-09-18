@@ -572,6 +572,14 @@ def multitaper_spectra(
                     time_series_segment = np.pad(time_series_segment, n_padding)[
                         :segment_length, n_padding:-n_padding
                     ]
+                    if time_series_segment.shape[0] == segment_length - 1:
+                        time_series_segment = np.append(
+                            time_series_segment,
+                            np.zeros(
+                                [1, time_series_segment.shape[1]], dtype=np.float32
+                            ),
+                            axis=0,
+                        )
 
                 # Calculate the power (and cross) spectrum using the multitaper method
                 p[i] += multitaper(
