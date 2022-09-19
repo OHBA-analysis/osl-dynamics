@@ -72,10 +72,7 @@ class VariationalInferenceModelBase(ModelBase):
     """Base class for a variational inference model."""
 
     def fit(
-        self,
-        *args,
-        kl_annealing_callback=None,
-        **kwargs,
+        self, *args, kl_annealing_callback=None, **kwargs,
     ):
         """Wrapper for the standard keras fit method.
 
@@ -182,11 +179,7 @@ class VariationalInferenceModelBase(ModelBase):
             self.reset()
             training_data.shuffle(100000)
             training_data_subset = training_data.take(n_batches)
-            history = self.fit(
-                training_data_subset,
-                epochs=n_epochs,
-                **kwargs,
-            )
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs,)
             loss = history.history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
@@ -290,12 +283,7 @@ class VariationalInferenceModelBase(ModelBase):
         self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
 
     def multistart_initialization(
-        self,
-        training_data,
-        n_epochs,
-        n_init,
-        n_kl_annealing_epochs=None,
-        **kwargs,
+        self, training_data, n_epochs, n_init, n_kl_annealing_epochs=None, **kwargs,
     ):
         """Multi-start initialization.
 

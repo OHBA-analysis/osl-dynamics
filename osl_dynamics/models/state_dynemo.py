@@ -53,6 +53,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     inference_dropout : float
         Dropout rate.
+    inference_regularizer : str
+        Regularizer.
 
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -67,6 +69,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     model_dropout : float
         Dropout rate.
+    model_regularizer : str
+        Regularizer.
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
@@ -113,6 +117,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = None
     inference_dropout: float = 0.0
+    inference_regularizer: str = None
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = "lstm"
@@ -121,6 +126,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = None
     model_dropout: float = 0.0
+    model_regularizer: str = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -178,6 +184,7 @@ def _model_structure(config):
         config.inference_n_layers,
         config.inference_n_units,
         config.inference_dropout,
+        config.inference_regularizer,
         name="inf_rnn",
     )
     inf_theta_layer = layers.Dense(config.n_states, name="inf_theta")
@@ -224,6 +231,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
+        config.model_regularizer,
         name="mod_rnn",
     )
     mod_theta_layer = layers.Dense(config.n_states, name="mod_theta")

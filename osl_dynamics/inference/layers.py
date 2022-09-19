@@ -186,10 +186,7 @@ class SoftmaxLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        initial_temperature,
-        learn_temperature,
-        **kwargs,
+        self, initial_temperature, learn_temperature, **kwargs,
     ):
         super().__init__(**kwargs)
         self.initial_temperature = initial_temperature
@@ -224,10 +221,7 @@ class ScalarLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        learn,
-        initial_value,
-        **kwargs,
+        self, learn, initial_value, **kwargs,
     ):
         super().__init__(**kwargs)
         self.learn = learn
@@ -272,13 +266,7 @@ class MeanVectorsLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n,
-        m,
-        learn,
-        initial_value,
-        regularizer=None,
-        **kwargs,
+        self, n, m, learn, initial_value, regularizer=None, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -363,13 +351,7 @@ class CovarianceMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n,
-        m,
-        learn,
-        initial_value,
-        regularizer=None,
-        **kwargs,
+        self, n, m, learn, initial_value, regularizer=None, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -399,14 +381,14 @@ class CovarianceMatricesLayer(layers.Layer):
                 )
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.WeightInitializer(initial_flattened_cholesky_factors)
+            self.flattened_cholesky_factors_initializer = osld_initializers.WeightInitializer(
+                initial_flattened_cholesky_factors
             )
 
         elif learn:
             # Use the identity matrix with a random error
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalIdentityCholeskyInitializer(mean=0, std=0.1)
+            self.flattened_cholesky_factors_initializer = osld_initializers.NormalIdentityCholeskyInitializer(
+                mean=0, std=0.1
             )
 
         else:
@@ -468,13 +450,7 @@ class CorrelationMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n,
-        m,
-        learn,
-        initial_value,
-        regularizer=None,
-        **kwargs,
+        self, n, m, learn, initial_value, regularizer=None, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -506,14 +482,14 @@ class CorrelationMatricesLayer(layers.Layer):
                 )
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.WeightInitializer(initial_flattened_cholesky_factors)
+            self.flattened_cholesky_factors_initializer = osld_initializers.WeightInitializer(
+                initial_flattened_cholesky_factors
             )
 
         elif learn:
             # Use a correlation matrix with an error added
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalCorrelationCholeskyInitializer(mean=0, std=0.1)
+            self.flattened_cholesky_factors_initializer = osld_initializers.NormalCorrelationCholeskyInitializer(
+                mean=0, std=0.1
             )
 
         else:
@@ -571,13 +547,7 @@ class DiagonalMatricesLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n,
-        m,
-        learn,
-        initial_value,
-        regularizer=None,
-        **kwargs,
+        self, n, m, learn, initial_value, regularizer=None, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n = n
@@ -763,9 +733,7 @@ class LogLikelihoodLossLayer(layers.Layer):
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
+            loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
         )
 
         # Calculate the log-likelihood
@@ -806,9 +774,7 @@ class AdversarialLogLikelihoodLossLayer(layers.Layer):
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
+            loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False,
         )
 
         # Calculate the log-likelihood
@@ -912,6 +878,8 @@ class InferenceRNNLayer(layers.Layer):
         Number of units/neurons per layer.
     drop_rate : float
         Dropout rate for the output of each layer.
+    reg : str
+        Regularization for each layer.
     """
 
     def __init__(
@@ -922,6 +890,7 @@ class InferenceRNNLayer(layers.Layer):
         n_layers,
         n_units,
         drop_rate,
+        reg,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -930,7 +899,14 @@ class InferenceRNNLayer(layers.Layer):
             self.layers.append(
                 layers.Bidirectional(
                     layer=RNNLayer(
-                        rnn_type, n_units, return_sequences=True, stateful=False
+                        rnn_type,
+                        n_units,
+                        kernel_regularizer=reg,
+                        recurrent_regularizer=reg,
+                        bias_regularizer=reg,
+                        activity_regularizer=reg,
+                        return_sequences=True,
+                        stateful=False,
                     )
                 )
             )
@@ -961,6 +937,8 @@ class ModelRNNLayer(layers.Layer):
         Number of units/neurons per layer.
     drop_rate : float
         Dropout rate for the output of each layer.
+    reg : str
+        Regularization for each layer.
     """
 
     def __init__(
@@ -971,13 +949,23 @@ class ModelRNNLayer(layers.Layer):
         n_layers,
         n_units,
         drop_rate,
+        reg,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.layers = []
         for n in range(n_layers):
             self.layers.append(
-                RNNLayer(rnn_type, n_units, return_sequences=True, stateful=False)
+                RNNLayer(
+                    rnn_type,
+                    n_units,
+                    kernel_regularizer=reg,
+                    recurrent_regularizer=reg,
+                    bias_regularizer=reg,
+                    activity_regularizer=reg,
+                    return_sequences=True,
+                    stateful=False,
+                )
             )
             self.layers.append(NormalizationLayer(norm_type))
             self.layers.append(layers.Activation(act_type))
@@ -1081,11 +1069,7 @@ class SubjectDevEmbeddingLayer(layers.Layer):
     """
 
     def __init__(
-        self,
-        n_modes,
-        n_channels,
-        n_subjects,
-        **kwargs,
+        self, n_modes, n_channels, n_subjects, **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_modes = n_modes

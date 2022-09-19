@@ -61,6 +61,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     inference_dropout : float
         Dropout rate.
+    inference_regularizer : str
+        Regularizer.
 
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -75,6 +77,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     model_dropout : float
         Dropout rate.
+    model_regularizer : str
+        Regularizer.
 
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
@@ -133,6 +137,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = None
     inference_dropout: float = 0.0
+    inference_regularizer: str = None
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = "lstm"
@@ -141,6 +146,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = None
     model_dropout: float = 0.0
+    model_regularizer: str = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -239,12 +245,10 @@ class Model(VariationalInferenceModelBase):
     ):
         """Wrapper for set_means and set_covariances."""
         self.set_means(
-            observation_model_parameters[0],
-            update_initializer=update_initializer,
+            observation_model_parameters[0], update_initializer=update_initializer,
         )
         self.set_covariances(
-            observation_model_parameters[1],
-            update_initializer=update_initializer,
+            observation_model_parameters[1], update_initializer=update_initializer,
         )
 
     def set_regularizers(self, training_dataset):
@@ -298,8 +302,7 @@ class Model(VariationalInferenceModelBase):
         if theta_norm is None:
             # Sequence of the underlying logits theta
             theta_norm = np.zeros(
-                [self.config.sequence_length, self.config.n_modes],
-                dtype=np.float32,
+                [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
             )
 
             # Randomly sample the first time step
@@ -355,6 +358,7 @@ def _model_structure(config):
         config.inference_n_layers,
         config.inference_n_units,
         config.inference_dropout,
+        config.inference_regularizer,
         name="inf_rnn",
     )
     inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
@@ -364,9 +368,7 @@ def _model_structure(config):
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow
@@ -426,6 +428,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
+        config.model_regularizer,
         name="mod_rnn",
     )
     mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")

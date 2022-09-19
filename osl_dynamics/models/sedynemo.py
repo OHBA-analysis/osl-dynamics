@@ -47,12 +47,14 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     ----------
     model_name : str
         Model name.
+
     n_modes : int
         Number of modes.
     n_channels : int
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
+
     inference_rnn : str
         RNN to use, either 'gru' or 'lstm'.
     inference_n_layers : int
@@ -66,6 +68,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     inference_dropout : float
         Dropout rate.
+    inference_regularizer : str
+        Regularizer.
+
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
     model_n_layers : int
@@ -79,6 +84,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     model_dropout : float
         Dropout rate.
+    model_regularizer : str
+        Regularizer.
+
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
         Either 'layer', 'batch' or None.
@@ -155,6 +163,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = None
     inference_dropout: float = 0.0
+    inference_regularizer: str = None
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = "lstm"
@@ -163,6 +172,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = None
     model_dropout: float = 0.0
+    model_regularizer: str = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -362,12 +372,10 @@ class Model(VariationalInferenceModelBase):
     ):
         """Wrapper for set_group_means and set_group_covariances."""
         self.set_group_means(
-            observation_model_parameters[0],
-            update_initializer=update_initializer,
+            observation_model_parameters[0], update_initializer=update_initializer,
         )
         self.set_group_covariances(
-            observation_model_parameters[1],
-            update_initializer=update_initializer,
+            observation_model_parameters[1], update_initializer=update_initializer,
         )
 
     def set_bayesian_kl_scaling(self, training_dataset):
@@ -416,6 +424,7 @@ def _model_structure(config):
         config.inference_n_layers,
         config.inference_n_units,
         config.inference_dropout,
+        config.inference_regularizer,
         name="inf_rnn",
     )
     inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
@@ -428,9 +437,7 @@ def _model_structure(config):
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow
@@ -510,8 +517,7 @@ def _model_structure(config):
 
         if config.learn_covariances:
             covs_dev_layer = layers.Dense(
-                config.n_channels * (config.n_channels + 1) // 2,
-                name="covs_dev",
+                config.n_channels * (config.n_channels + 1) // 2, name="covs_dev",
             )
         else:
             covs_dev_layer = ZeroLayer(
@@ -524,14 +530,10 @@ def _model_structure(config):
             )
 
         means_dev_reg_layer = DummyLayer(
-            config.dev_reg,
-            config.dev_reg_strength,
-            name="means_dev_reg",
+            config.dev_reg, config.dev_reg_strength, name="means_dev_reg",
         )
         covs_dev_reg_layer = DummyLayer(
-            config.dev_reg,
-            config.dev_reg_strength,
-            name="covs_dev_reg",
+            config.dev_reg, config.dev_reg_strength, name="covs_dev_reg",
         )
     # ------------------------------------- #
     # Layers specific to the Bayesian model #
@@ -635,6 +637,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
+        config.model_regularizer,
         name="mod_rnn",
     )
     concatenate_layer = ConcatenateLayer(axis=2, name="model_concat")
@@ -688,7 +691,5 @@ def _model_structure(config):
         kl_loss = kl_loss_layer([kl_div, means_dev_kl_loss, covs_dev_kl_loss])
 
     return tf.keras.Model(
-        inputs=[data, subj_id],
-        outputs=[ll_loss, kl_loss, alpha],
-        name="Se-DyNeMo",
+        inputs=[data, subj_id], outputs=[ll_loss, kl_loss, alpha], name="Se-DyNeMo",
     )

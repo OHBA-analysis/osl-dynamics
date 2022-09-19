@@ -30,8 +30,8 @@ class BaseModelConfig:
     """Base class for settings for all models."""
 
     # Model choices
-    multiple_dynamics: bool = False
     model_name: str = None
+    multiple_dynamics: bool = False
 
     # Training parameters
     batch_size: int = None

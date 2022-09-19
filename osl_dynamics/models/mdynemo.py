@@ -64,6 +64,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     inference_dropout : float
         Dropout rate.
+    inference_regularizer : str
+        Regularizer.
 
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -78,6 +80,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         E.g. 'relu', 'elu', etc.
     model_dropout : float
         Dropout rate.
+    model_regularizer : str
+        Regularizer.
 
     theta_normalization : str
         Type of normalization to apply to the posterior samples, theta.
@@ -145,6 +149,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = None
     inference_dropout: float = 0.0
+    inference_regularizer: str = None
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = "lstm"
@@ -153,6 +158,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = None
     model_dropout: float = 0.0
+    model_regularizer: str = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -310,13 +316,11 @@ class Model(VariationalInferenceModelBase):
 
         # Initialise sequence of underlying logits theta
         mean_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes],
-            dtype=np.float32,
+            [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
         )
         mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
         fc_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes],
-            dtype=np.float32,
+            [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
         )
         fc_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
 
@@ -377,6 +381,7 @@ def _model_structure(config):
         config.inference_n_layers,
         config.inference_n_units,
         config.inference_dropout,
+        config.inference_regularizer,
         name="inf_rnn",
     )
 
@@ -398,9 +403,7 @@ def _model_structure(config):
         config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow
@@ -424,9 +427,7 @@ def _model_structure(config):
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="gamma",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="gamma",
     )
 
     # Data flow
@@ -497,6 +498,7 @@ def _model_structure(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
+        config.model_regularizer,
         name="mod_rnn",
     )
 

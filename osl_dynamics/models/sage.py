@@ -51,6 +51,8 @@ class Config(BaseModelConfig):
         E.g. 'relu', 'elu', etc.
     inference_dropout : float
         Dropout rate.
+    inference_regularizer : str
+        Regularizer.
 
     model_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -65,6 +67,8 @@ class Config(BaseModelConfig):
         E.g. 'relu', 'elu', etc.
     model_dropout : float
         Dropout rate.
+    model_regularizer : str
+        Regularizer.
 
     discriminator_rnn : str
         RNN to use, either 'gru' or 'lstm'.
@@ -79,6 +83,8 @@ class Config(BaseModelConfig):
         E.g. 'relu', 'elu', etc.
     discriminator_dropout : float
         Dropout rate.
+    discriminator_regularizer : str
+        Regularizer.
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
@@ -112,6 +118,7 @@ class Config(BaseModelConfig):
     inference_normalization: Literal[None, "batch", "layer"] = None
     inference_activation: str = "elu"
     inference_dropout: float = 0.0
+    inference_regularizer: str = None
 
     # Model network parameters
     model_rnn: Literal["gru", "lstm"] = "lstm"
@@ -120,6 +127,7 @@ class Config(BaseModelConfig):
     model_normalization: Literal[None, "batch", "layer"] = None
     model_activation: str = "elu"
     model_dropout: float = 0.0
+    model_regularizer: str = None
 
     # Descriminator network parameters
     discriminator_rnn: Literal["gru", "lstm"] = "lstm"
@@ -128,6 +136,7 @@ class Config(BaseModelConfig):
     discriminator_normalization: Literal[None, "batch", "layer"] = None
     discriminator_activation: str = "elu"
     discriminator_dropout: float = 0.0
+    discriminator_regularizer: str = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -428,6 +437,7 @@ def _build_inference_model(config):
         config.inference_n_layers,
         config.inference_n_units,
         config.inference_dropout,
+        config.inference_regularizer,
         name="inf_rnn",
     )
 
@@ -483,8 +493,7 @@ def _build_generator_model(config):
 
     # Definition of layers
     inputs = layers.Input(
-        shape=(config.sequence_length, config.n_modes),
-        name="gen_inp",
+        shape=(config.sequence_length, config.n_modes), name="gen_inp",
     )
     drop_layer = layers.TimeDistributed(
         layers.Dropout(config.model_dropout, name="gen_data_drop")
@@ -496,6 +505,7 @@ def _build_generator_model(config):
         config.model_n_layers,
         config.model_n_units,
         config.model_dropout,
+        config.model_regularizer,
         name="gen_rnn",
     )
     prior_layer = layers.TimeDistributed(
@@ -527,6 +537,7 @@ def _build_discriminator_model(config):
         config.discriminator_n_layers,
         config.discriminator_n_units,
         config.discriminator_dropout,
+        config.discriminator_regularizer,
         name="dis_rnn",
     )
     sigmoid_layer = layers.TimeDistributed(

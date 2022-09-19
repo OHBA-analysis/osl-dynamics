@@ -356,8 +356,7 @@ def _model_structure(config):
 
         if config.learn_covariances:
             covs_dev_layer = layers.Dense(
-                config.n_channels * (config.n_channels + 1) // 2,
-                name="covs_dev",
+                config.n_channels * (config.n_channels + 1) // 2, name="covs_dev",
             )
         else:
             covs_dev_layer = ZeroLayer(
@@ -370,14 +369,10 @@ def _model_structure(config):
             )
 
         means_dev_reg_layer = DummyLayer(
-            config.dev_reg,
-            config.dev_reg_strength,
-            name="means_dev_reg",
+            config.dev_reg, config.dev_reg_strength, name="means_dev_reg",
         )
         covs_dev_reg_layer = DummyLayer(
-            config.dev_reg,
-            config.dev_reg_strength,
-            name="covs_dev_reg",
+            config.dev_reg, config.dev_reg_strength, name="covs_dev_reg",
         )
     # ------------------------------------- #
     # Layers specific to the Bayesian model #
