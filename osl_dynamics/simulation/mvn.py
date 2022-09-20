@@ -493,6 +493,7 @@ class MSubj_MVN(MVN):
 
         # Initialise array to hold data
         data = np.zeros((n_samples, self.n_channels))
+        instantaneous_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
 
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
@@ -503,6 +504,8 @@ class MSubj_MVN(MVN):
                 self.subject_covariances[subject] * alpha[:, None, None], axis=0
             )
 
+            instantaneous_covs[np.all(mode_time_course == alpha, axis=1)] = sigma
+
             # Generate data for the time points that this combination of modes is active
             data[
                 np.all(mode_time_course == alpha, axis=1)
@@ -512,6 +515,7 @@ class MSubj_MVN(MVN):
                 size=np.count_nonzero(np.all(mode_time_course == alpha, axis=1)),
             )
 
+        self.instantaneous_covs.append(instantaneous_covs)
         # Add an error to the data at all time points
         data += self._rng.normal(scale=self.observation_error, size=data.shape)
 
@@ -531,6 +535,7 @@ class MSubj_MVN(MVN):
             Simulated data for subjects. Shape is (n_subjects, n_samples, n_channels).
         """
         data = []
+        self.instantaneous_covs = []
         for subject in range(self.n_subjects):
             data.append(self.simulate_subject_data(subject, mode_time_courses[subject]))
         return np.array(data)
