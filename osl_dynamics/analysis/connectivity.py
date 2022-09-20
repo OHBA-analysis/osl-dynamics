@@ -429,11 +429,14 @@ def threshold(
     if absolute_value:
         c = abs(c)
 
+    # Set diagonal to nan
+    c[:, :, range(n_channels), range(n_channels)] = np.nan
+
     # Which edges are greater than the threshold?
     edges = np.empty([n_components, n_modes, n_channels, n_channels], dtype=bool)
     for i in range(n_components):
         for j in range(n_modes):
-            edges[i, j] = c[i, j] > np.percentile(c[i, j], percentile[i, j])
+            edges[i, j] = c[i, j] > np.nanpercentile(c[i, j], percentile[i, j])
 
     if return_edges:
         return np.squeeze(edges)
