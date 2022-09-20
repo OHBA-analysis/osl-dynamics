@@ -355,13 +355,18 @@ def fit_gmm(
 
 
 def threshold(
-    conn_map, percentile, subtract_mean=False, absolute_value=False, return_edges=False
+    conn_map,
+    percentile,
+    subtract_mean=False,
+    mean_weights=None,
+    absolute_value=False,
+    return_edges=False,
 ):
     """Return edges that exceed a threshold.
 
     Parameters
     ---------
-    conn_map : np.narray
+    conn_map : np.ndarray
         Connectivity matrix to threshold.
         Can be (n_components, n_modes, n_channels, n_channels),
         (n_modes, n_channels, n_channels) or (n_channels, n_channels).
@@ -372,6 +377,8 @@ def threshold(
         Should we subtract the mean over modes before thresholding?
         The thresholding is only done to identify edges, the values returned in
         conn_map are not mean subtracted.
+    mean_weights : np.ndarray
+        Weights when calculating the mean over modes.
     absolute_value : bool
         Should we take the absolute value before thresholding?
         The thresholding is only done to identify edges, the values returned in
@@ -416,7 +423,7 @@ def threshold(
     if n_modes == 1:
         subtract_mean = False
     if subtract_mean:
-        c -= np.mean(c, axis=1, keepdims=True)
+        c -= np.average(c, axis=1, weights=mean_weights, keepdims=True)
 
     # Take absolute value
     if absolute_value:
