@@ -16,7 +16,6 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
     VariationalInferenceModelBase,
 )
-from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
@@ -45,7 +44,11 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_name : str
         Model name.
     n_modes : int
-        Number of modes.
+        Number of modes for both power and FC.
+    mean_n_modes : int
+        Number of modes for power.
+    fc_n_modes : int
+        Number of modes for FC.
     n_channels : int
         Number of channels.
     sequence_length : int
@@ -161,6 +164,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer: str = None
 
     # Observation model parameters
+    mean_n_modes: int = None
+    fc_n_modes: int = None
     learn_means: bool = None
     learn_stds: bool = None
     learn_fcs: bool = None
@@ -194,6 +199,26 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             or self.learn_fcs is None
         ):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
+
+    def validate_dimension_parameters(self):
+        if self.n_modes is None:
+            if self.mean_n_modes is None or self.fc_n_modes is None:
+                raise ValueError(
+                    "Either n_modes or (mean_n_modes and fc_n_modes)  must be passed."
+                )
+            else:
+                self.n_modes = 1
+
+        else:
+            if self.mean_n_modes is not None:
+                print("n_modes passed, mean_n_modes will be overwrote with n_modes.")
+            if self.fc_n_modes is not None:
+                print("n_modes passed, fc_n_modes will be overwrote with n_modes.")
+
+            self.mean_n_modes = self.n_modes
+            self.fc_n_modes = self.n_modes
+
+        super().validate_dimension_parameters()
 
 
 class Model(VariationalInferenceModelBase):
@@ -232,12 +257,12 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         means: np.ndarray
-            Mode means with shape (n_modes, n_channels).
+            Mode means with shape (mean_n_modes, n_channels).
         stds: np.ndarray
-            Mode standard deviations with shape (n_modes, n_channels) or
-            (n_modes, n_channels, n_channels).
+            Mode standard deviations with shape (mean_n_modes, n_channels) or
+            (mean_n_modes, n_channels, n_channels).
         fcs: np.ndarray
-            Mode functional connectivities with shape (n_modes, n_channels, n_channels).
+            Mode functional connectivities with shape (fc_n_modes, n_channels, n_channels).
         update_initializer: bool
             Do we want to use the passed parameters when we re_initialize
             the model?
@@ -308,25 +333,27 @@ class Model(VariationalInferenceModelBase):
 
         # Normally distributed random numbers used to sample the logits theta
         mean_epsilon = np.random.normal(
-            0, 1, [n_samples + 1, self.config.n_modes]
+            0, 1, [n_samples + 1, self.config.mean_n_modes]
         ).astype(np.float32)
         fc_epsilon = np.random.normal(
-            0, 1, [n_samples + 1, self.config.n_modes]
+            0, 1, [n_samples + 1, self.config.fc_n_modes]
         ).astype(np.float32)
 
         # Initialise sequence of underlying logits theta
         mean_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
+            [self.config.sequence_length, self.config.mean_n_modes],
+            dtype=np.float32,
         )
-        mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+        mean_theta_norm[-1] = np.random.normal(size=self.config.mean_n_modes)
         fc_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
+            [self.config.sequence_length, self.config.fc_n_modes],
+            dtype=np.float32,
         )
-        fc_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+        fc_theta_norm[-1] = np.random.normal(size=self.config.fc_n_modes)
 
         # Sample the mode time courses
-        alpha = np.empty([n_samples, self.config.n_modes])
-        gamma = np.empty([n_samples, self.config.n_modes])
+        alpha = np.empty([n_samples, self.config.mean_n_modes])
+        gamma = np.empty([n_samples, self.config.fc_n_modes])
         for i in trange(n_samples, desc="Sampling mode time courses", ncols=98):
             # If there are leading zeros we trim theta so that we don't pass the zeros
             trimmed_mean_theta = mean_theta_norm[~np.all(mean_theta_norm == 0, axis=1)][
@@ -394,16 +421,18 @@ def _model_structure(config):
     #
 
     # Layers
-    mean_inf_mu_layer = layers.Dense(config.n_modes, name="mean_inf_mu")
+    mean_inf_mu_layer = layers.Dense(config.mean_n_modes, name="mean_inf_mu")
     mean_inf_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="mean_inf_sigma"
+        config.mean_n_modes, activation="softplus", name="mean_inf_sigma"
     )
     mean_theta_layer = SampleNormalDistributionLayer(name="mean_theta")
     mean_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="alpha",
     )
 
     # Data flow
@@ -418,16 +447,18 @@ def _model_structure(config):
     #
 
     # Layers
-    fc_inf_mu_layer = layers.Dense(config.n_modes, name="fc_inf_mu")
+    fc_inf_mu_layer = layers.Dense(config.fc_n_modes, name="fc_inf_mu")
     fc_inf_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="fc_inf_sigma"
+        config.fc_n_modes, activation="softplus", name="fc_inf_sigma"
     )
     fc_theta_layer = SampleNormalDistributionLayer(name="fc_theta")
     fc_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="gamma",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="gamma",
     )
 
     # Data flow
@@ -443,7 +474,7 @@ def _model_structure(config):
 
     # Layers
     means_layer = MeanVectorsLayer(
-        config.n_modes,
+        config.mean_n_modes,
         config.n_channels,
         config.learn_means,
         config.initial_means,
@@ -451,7 +482,7 @@ def _model_structure(config):
         name="means",
     )
     stds_layer = DiagonalMatricesLayer(
-        config.n_modes,
+        config.mean_n_modes,
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
@@ -459,7 +490,7 @@ def _model_structure(config):
         name="stds",
     )
     fcs_layer = CorrelationMatricesLayer(
-        config.n_modes,
+        config.fc_n_modes,
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
@@ -512,9 +543,9 @@ def _model_structure(config):
     #
 
     # Layers
-    mean_mod_mu_layer = layers.Dense(config.n_modes, name="mean_mod_mu")
+    mean_mod_mu_layer = layers.Dense(config.mean_n_modes, name="mean_mod_mu")
     mean_mod_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="mean_mod_sigma"
+        config.mean_n_modes, activation="softplus", name="mean_mod_sigma"
     )
     kl_div_layer_mean = KLDivergenceLayer(name="mean_kl_div")
 
@@ -530,9 +561,9 @@ def _model_structure(config):
     #
 
     # Layers
-    fc_mod_mu_layer = layers.Dense(config.n_modes, name="fc_mod_mu")
+    fc_mod_mu_layer = layers.Dense(config.fc_n_modes, name="fc_mod_mu")
     fc_mod_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="fc_mod_sigma"
+        config.fc_n_modes, activation="softplus", name="fc_mod_sigma"
     )
     fc_kl_div_layer = KLDivergenceLayer(name="fc_kl_div")
 
