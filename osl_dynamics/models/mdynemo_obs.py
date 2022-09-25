@@ -33,11 +33,9 @@ class Config(BaseModelConfig):
     model_name : str
         Model name.
     n_modes : int
-        Number of modes for both power and FC.
-    mean_n_modes : int
-        Number of modes for power.
+        Number of modes for both power.
     fc_n_modes : int
-        Number of modes for FC.
+        Number of modes for FC. If none, set to n_modes.
     n_channels : int
         Number of channels.
     sequence_length : int
@@ -78,7 +76,6 @@ class Config(BaseModelConfig):
     model_name: str = "M-DyNeMo-Obs"
 
     # Observation model parameters
-    mean_n_modes: int = None
     fc_n_modes: int = None
     learn_means: bool = None
     learn_stds: bool = None
@@ -105,24 +102,10 @@ class Config(BaseModelConfig):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
 
     def validate_dimension_parameters(self):
-        if self.n_modes is None:
-            if self.mean_n_modes is None or self.fc_n_modes is None:
-                raise ValueError(
-                    "Either n_modes or (mean_n_modes and fc_n_modes)  must be passed."
-                )
-            else:
-                self.n_modes = 1
-
-        else:
-            if self.mean_n_modes is not None:
-                print("n_modes passed, mean_n_modes will be overwrote with n_modes.")
-            if self.fc_n_modes is not None:
-                print("n_modes passed, fc_n_modes will be overwrote with n_modes.")
-
-            self.mean_n_modes = self.n_modes
-            self.fc_n_modes = self.n_modes
-
         super().validate_dimension_parameters()
+        if self.fc_n_modes is None:
+            self.fc_n_modes = self.n_modes
+            print("Warning: fc_n_modes is None, set to n_modes.")
 
 
 class Model(ModelBase):
@@ -157,10 +140,10 @@ class Model(ModelBase):
         Parameters
         ----------
         means: np.ndarray
-            Mode means with shape (mean_n_modes, n_channels).
+            Mode means with shape (n_modes, n_channels).
         stds: np.ndarray
-            Mode standard deviations with shape (mean_n_modes, n_channels) or
-            (mean_n_modes, n_channels, n_channels).
+            Mode standard deviations with shape (n_modes, n_channels) or
+            (n_modes, n_channels, n_channels).
         fcs: np.ndarray
             Mode functional connectivities with shape (fc_n_modes, n_channels, n_channels).
         update_initializer: bool
@@ -196,9 +179,7 @@ def _model_structure(config):
 
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
-    alpha = layers.Input(
-        shape=(config.sequence_length, config.mean_n_modes), name="alpha"
-    )
+    alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
     gamma = layers.Input(
         shape=(config.sequence_length, config.fc_n_modes), name="gamma"
     )
@@ -211,14 +192,14 @@ def _model_structure(config):
 
     # Layers
     means_layer = MeanVectorsLayer(
-        config.mean_n_modes,
+        config.n_modes,
         config.n_channels,
         config.learn_means,
         config.initial_means,
         name="means",
     )
     stds_layer = DiagonalMatricesLayer(
-        config.mean_n_modes,
+        config.n_modes,
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
