@@ -33,7 +33,9 @@ class Config(BaseModelConfig):
     model_name : str
         Model name.
     n_modes : int
-        Number of modes.
+        Number of modes for both power.
+    n_fc_modes : int
+        Number of modes for FC. If none, set to n_modes.
     n_channels : int
         Number of channels.
     sequence_length : int
@@ -74,6 +76,7 @@ class Config(BaseModelConfig):
     model_name: str = "M-DyNeMo-Obs"
 
     # Observation model parameters
+    n_fc_modes: int = None
     learn_means: bool = None
     learn_stds: bool = None
     learn_fcs: bool = None
@@ -97,6 +100,12 @@ class Config(BaseModelConfig):
             or self.learn_fcs is None
         ):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
+
+    def validate_dimension_parameters(self):
+        super().validate_dimension_parameters()
+        if self.n_fc_modes is None:
+            self.n_fc_modes = self.n_modes
+            print("Warning: n_fc_modes is None, set to n_modes.")
 
 
 class Model(ModelBase):
@@ -136,7 +145,7 @@ class Model(ModelBase):
             Mode standard deviations with shape (n_modes, n_channels) or
             (n_modes, n_channels, n_channels).
         fcs: np.ndarray
-            Mode functional connectivities with shape (n_modes, n_channels, n_channels).
+            Mode functional connectivities with shape (n_fc_modes, n_channels, n_channels).
         update_initializer: bool
             Do we want to use the passed parameters when we re_initialize
             the model?
@@ -171,7 +180,9 @@ def _model_structure(config):
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
     alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")
-    gamma = layers.Input(shape=(config.sequence_length, config.n_modes), name="gamma")
+    gamma = layers.Input(
+        shape=(config.sequence_length, config.n_fc_modes), name="gamma"
+    )
 
     # Observation model:
     # - We use a multivariate normal with a mean vector and covariance matrix for
@@ -195,7 +206,7 @@ def _model_structure(config):
         name="stds",
     )
     fcs_layer = CorrelationMatricesLayer(
-        config.n_modes,
+        config.n_fc_modes,
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
@@ -287,5 +298,7 @@ def set_fcs_regularizer(model, training_dataset):
 
     fcs_layer = model.get_layer("fcs")
     fcs_layer.regularizer = regularizers.MarginalInverseWishart(
-        nu, n_channels, n_batches,
+        nu,
+        n_channels,
+        n_batches,
     )
