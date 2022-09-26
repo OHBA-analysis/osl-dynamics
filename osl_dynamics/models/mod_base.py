@@ -423,7 +423,7 @@ class ModelBase:
 
         # Get the config
         with open(f"{filepath}/config.yml", "r") as f:
-            config_dict = yaml.safe_load(f)
+            config_dict = yaml.full_load(f)
 
         print("Loading model with config:")
         pp.pprint(config_dict)
