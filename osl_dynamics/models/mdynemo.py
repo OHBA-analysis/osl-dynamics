@@ -45,7 +45,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Model name.
     n_modes : int
         Number of modes for both power.
-    fc_n_modes : int
+    n_fc_modes : int
         Number of modes for FC. If None, then set to n_modes.
     n_channels : int
         Number of channels.
@@ -162,7 +162,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer: str = None
 
     # Observation model parameters
-    fc_n_modes: int = None
+    n_fc_modes: int = None
     learn_means: bool = None
     learn_stds: bool = None
     learn_fcs: bool = None
@@ -199,9 +199,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
-        if self.fc_n_modes is None:
-            self.fc_n_modes = self.n_modes
-            print("Warning: fc_n_modes is None, set to n_modes.")
+        if self.n_fc_modes is None:
+            self.n_fc_modes = self.n_modes
+            print("Warning: n_fc_modes is None, set to n_modes.")
 
 
 class Model(VariationalInferenceModelBase):
@@ -245,7 +245,7 @@ class Model(VariationalInferenceModelBase):
             Mode standard deviations with shape (n_modes, n_channels) or
             (n_modes, n_channels, n_channels).
         fcs: np.ndarray
-            Mode functional connectivities with shape (fc_n_modes, n_channels, n_channels).
+            Mode functional connectivities with shape (n_fc_modes, n_channels, n_channels).
         update_initializer: bool
             Do we want to use the passed parameters when we re_initialize
             the model?
@@ -319,7 +319,7 @@ class Model(VariationalInferenceModelBase):
             0, 1, [n_samples + 1, self.config.n_modes]
         ).astype(np.float32)
         fc_epsilon = np.random.normal(
-            0, 1, [n_samples + 1, self.config.fc_n_modes]
+            0, 1, [n_samples + 1, self.config.n_fc_modes]
         ).astype(np.float32)
 
         # Initialise sequence of underlying logits theta
@@ -329,14 +329,14 @@ class Model(VariationalInferenceModelBase):
         )
         mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
         fc_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.fc_n_modes],
+            [self.config.sequence_length, self.config.n_fc_modes],
             dtype=np.float32,
         )
-        fc_theta_norm[-1] = np.random.normal(size=self.config.fc_n_modes)
+        fc_theta_norm[-1] = np.random.normal(size=self.config.n_fc_modes)
 
         # Sample the mode time courses
         alpha = np.empty([n_samples, self.config.n_modes])
-        gamma = np.empty([n_samples, self.config.fc_n_modes])
+        gamma = np.empty([n_samples, self.config.n_fc_modes])
         for i in trange(n_samples, desc="Sampling mode time courses", ncols=98):
             # If there are leading zeros we trim theta so that we don't pass the zeros
             trimmed_mean_theta = mean_theta_norm[~np.all(mean_theta_norm == 0, axis=1)][
@@ -430,9 +430,9 @@ def _model_structure(config):
     #
 
     # Layers
-    fc_inf_mu_layer = layers.Dense(config.fc_n_modes, name="fc_inf_mu")
+    fc_inf_mu_layer = layers.Dense(config.n_fc_modes, name="fc_inf_mu")
     fc_inf_sigma_layer = layers.Dense(
-        config.fc_n_modes, activation="softplus", name="fc_inf_sigma"
+        config.n_fc_modes, activation="softplus", name="fc_inf_sigma"
     )
     fc_theta_layer = SampleNormalDistributionLayer(name="fc_theta")
     fc_theta_norm_layer = NormalizationLayer(
@@ -473,7 +473,7 @@ def _model_structure(config):
         name="stds",
     )
     fcs_layer = CorrelationMatricesLayer(
-        config.fc_n_modes,
+        config.n_fc_modes,
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
@@ -544,9 +544,9 @@ def _model_structure(config):
     #
 
     # Layers
-    fc_mod_mu_layer = layers.Dense(config.fc_n_modes, name="fc_mod_mu")
+    fc_mod_mu_layer = layers.Dense(config.n_fc_modes, name="fc_mod_mu")
     fc_mod_sigma_layer = layers.Dense(
-        config.fc_n_modes, activation="softplus", name="fc_mod_sigma"
+        config.n_fc_modes, activation="softplus", name="fc_mod_sigma"
     )
     fc_kl_div_layer = KLDivergenceLayer(name="fc_kl_div")
 
