@@ -3,11 +3,13 @@
 """
 
 import inspect
+import sys
 from copy import copy
 from pathlib import Path
 
 import numpy as np
 import yaml
+from yaml.constructor import ConstructorError
 
 
 def override_dict_defaults(default_dict, override_dict=None):
@@ -272,7 +274,7 @@ class MockArray:
             buffer_size = 0
         else:
             # Set buffer size to 16 MiB to hide the Python loop overhead.
-            buffer_size = max(16 * 1024**2 // self.dtype.itemsize, 1)
+            buffer_size = max(16 * 1024 ** 2 // self.dtype.itemsize, 1)
 
         n_chunks, remainder = np.divmod(
             np.product(self.shape) * self.dtype.itemsize, buffer_size
@@ -381,3 +383,45 @@ def class_from_yaml(cls, file, kwargs):
         print(f"Using defaults for: {', '.join(using_default[:, 0])}")
 
     return cls(**{key: value for key, value in args.items() if key not in extra})
+
+
+class NumpyLoader(yaml.UnsafeLoader):
+    def find_python_name(self, name, mark, unsafe=False):
+        if not name:
+            raise ConstructorError(
+                "while constructing a Python object",
+                mark,
+                "expected non-empty name appended to the tag",
+                mark,
+            )
+        if "." in name:
+            module_name, object_name = name.rsplit(".", 1)
+        else:
+            module_name = "builtins"
+            object_name = name
+        if "numpy" in module_name:
+            try:
+                __import__(module_name)
+            except ImportError as exc:
+                raise ConstructorError(
+                    "while constructing a Python object",
+                    mark,
+                    "cannot find module %r (%s)" % (module_name, exc),
+                    mark,
+                )
+        if module_name not in sys.modules:
+            raise ConstructorError(
+                "while constructing a Python object",
+                mark,
+                "module %r is not imported" % module_name,
+                mark,
+            )
+        module = sys.modules[module_name]
+        if not hasattr(module, object_name):
+            raise ConstructorError(
+                "while constructing a Python object",
+                mark,
+                "cannot find %r in the module %r" % (object_name, module.__name__),
+                mark,
+            )
+        return getattr(module, object_name)
