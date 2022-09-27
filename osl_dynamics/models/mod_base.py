@@ -21,7 +21,7 @@ from tqdm.keras import TqdmCallback
 
 from osl_dynamics import data, models
 from osl_dynamics.inference import callbacks, initializers
-from osl_dynamics.utils.misc import get_argument, replace_argument
+from osl_dynamics.utils.misc import get_argument, replace_argument, NumpyLoader
 from osl_dynamics.utils.model import HTMLTable, LatexTable
 
 
@@ -423,7 +423,7 @@ class ModelBase:
 
         # Get the config
         with open(f"{filepath}/config.yml", "r") as f:
-            config_dict = yaml.full_load(f)
+            config_dict = yaml.load(f, NumpyLoader)
 
         config = cls.config_type(**config_dict)
         model = cls(config)

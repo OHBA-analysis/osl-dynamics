@@ -14,6 +14,7 @@ from osl_dynamics.models import (
     sedynemo_obs,
     state_dynemo,
 )
+from osl_dynamics.utils.misc import NumpyLoader
 
 models = {
     "DyNeMo": dynemo.Model,
@@ -30,7 +31,7 @@ models = {
 
 def load_model(filepath):
     with open(f"{filepath}/config.yml", "r") as f:
-        config_dict = yaml.full_load(f)
+        config_dict = yaml.load(f, NumpyLoader)
 
     if "model_name" not in config_dict:
         raise ValueError(
