@@ -184,6 +184,8 @@ class Model(ModelBase):
     config : osl_dynamics.models.mage.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
         and the full MAGE model.
@@ -390,7 +392,9 @@ class Model(ModelBase):
         return train
 
     def get_mode_time_courses(
-        self, inputs, concatenate=False,
+        self,
+        inputs,
+        concatenate=False,
     ):
         """Get mode time courses.
 
@@ -611,7 +615,8 @@ def _build_generator_model(config, name):
 
     # Input
     inputs = layers.Input(
-        shape=(config.sequence_length, config.n_modes), name="gen_inp_" + name,
+        shape=(config.sequence_length, config.n_modes),
+        name="gen_inp_" + name,
     )
 
     # Definition of layers

@@ -99,6 +99,8 @@ class ModelBase:
     Acts as a wrapper for a standard Keras model.
     """
 
+    config_type = None
+
     def __init__(self, config):
         self._identifier = np.random.randint(100000)
         self.config = config
@@ -415,8 +417,6 @@ class ModelBase:
 
         Returns
         -------
-        config
-            Config object.
         model
             Model object.
         """
@@ -425,42 +425,8 @@ class ModelBase:
         with open(f"{filepath}/config.yml", "r") as f:
             config_dict = yaml.full_load(f)
 
-        print("Loading model with config:")
-        pp.pprint(config_dict)
-
-        # Create model
-        if config_dict["model_name"] == "DyNeMo":
-            config = models.dynemo.Config(**config_dict)
-            model = models.dynemo.Model(config)
-        elif config_dict["model_name"] == "DyNeMo-Obs":
-            config = models.dynemo_obs.Config(**config_dict)
-            model = models.dynemo_obs.Model(config)
-        elif config_dict["model_name"] == "MAGE":
-            config = models.mage.Config(**config_dict)
-            model = models.mage.Model(config)
-        elif config_dict["model_name"] == "SAGE":
-            config = models.sage.Config(**config_dict)
-            model = models.sage.Model(config)
-        elif config_dict["model_name"] == "M-DyNeMo":
-            config = models.mdynemo.Config(**config_dict)
-            model = models.mdynemo.Model(config)
-        elif config_dict["model_name"] == "M-DyNeMo-Obs":
-            config = models.mdynemo_obs.Config(**config_dict)
-            model = models.mdynemo_obs.Model(config)
-        elif config_dict["model_name"] == "SE-DyNeMo":
-            config = models.sedynemo.Config(**config_dict)
-            model = models.sedynemo.Model(config)
-        elif config_dict["model_name"] == "SE-DyNeMo-Obs":
-            config = models.sedynemo_obs.Config(**config_dict)
-            model = models.sedynemo_obs.Model(config)
-        elif config_dict["model_name"] == "State-DyNeMo":
-            config = models.state_dynemo.Config(**config_dict)
-            model = models.state_dynemo.Model(config)
-        elif config_dict["model_name"] == "HMM":
-            config = models.hmm.Config(**config_dict)
-            model = models.hmm.Model(config)
-        else:
-            raise NotImplementedError(config_dict["model_name"])
+        config = cls.config_type(**config_dict)
+        model = cls(config)
 
         # Restore weights
         model.load_weights(str(filepath) + "/weights")

@@ -110,6 +110,8 @@ class Model(ModelBase):
     config : osl_dynamics.models.hmm.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)

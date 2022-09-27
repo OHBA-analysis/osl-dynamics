@@ -157,6 +157,8 @@ class Model(ModelBase):
     config : osl_dynamics.models.sage.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
         and the full SAGE model.
@@ -493,7 +495,8 @@ def _build_generator_model(config):
 
     # Definition of layers
     inputs = layers.Input(
-        shape=(config.sequence_length, config.n_modes), name="gen_inp",
+        shape=(config.sequence_length, config.n_modes),
+        name="gen_inp",
     )
     drop_layer = layers.TimeDistributed(
         layers.Dropout(config.model_dropout, name="gen_data_drop")
