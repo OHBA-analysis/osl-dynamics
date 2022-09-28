@@ -7,6 +7,7 @@ from pathlib import Path
 from scipy.optimize import linear_sum_assignment
 from osl_dynamics import array_ops, analysis
 from osl_dynamics.inference import metrics
+from osl_dynamics.utils.misc import override_dict_defaults
 
 
 def argmax_time_courses(
@@ -418,7 +419,13 @@ def fano_factor(
     return np.squeeze(F)
 
 
-def fit_gmm(time_course, logit_transform=True, standardize=True, gmm_filename=None):
+def fit_gmm(
+    time_course,
+    logit_transform=True,
+    standardize=True,
+    gmm_filename=None,
+    sklearn_kwargs=None,
+):
     """Fit a two component GMM on the mode time courses.
 
     Parameters
@@ -431,6 +438,8 @@ def fit_gmm(time_course, logit_transform=True, standardize=True, gmm_filename=No
         Should we standardize the mode time course?
     gmm_filename : str
         Path to directory to plot the GMM fit plots.
+    sklearn_kwargs : dict
+        keyword arguments for sklearn's GaussianMixture.
 
     Returns
     -------
@@ -447,11 +456,14 @@ def fit_gmm(time_course, logit_transform=True, standardize=True, gmm_filename=No
 
     n_modes = time_course.shape[1]
 
+    # Initialise an array to hold the gmm thresholded time course
     gmm_time_course = np.empty(time_course.shape)
+
     # Loop over modes
     for mode in range(n_modes):
         a = time_course[:, mode]
 
+        # GMM plot filename
         if gmm_filename is not None:
             plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
                 fn=Path(gmm_filename),
@@ -461,7 +473,9 @@ def fit_gmm(time_course, logit_transform=True, standardize=True, gmm_filename=No
         else:
             plot_filename = None
 
-        sklearn_kwargs = {"max_iter": 5000, "n_init": 5}
+        # Fit the GMM
+        default_sklearn_kwargs = {"max_iter": 5000, "n_init": 5}
+        sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
         mixture_label = analysis.gmm.fit_gaussian_mixture(
             a,
             bayesian=False,
