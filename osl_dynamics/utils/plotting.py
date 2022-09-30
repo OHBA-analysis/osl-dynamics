@@ -12,11 +12,9 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from itertools import zip_longest
 
 from osl_dynamics.array_ops import get_one_hot
-from osl_dynamics.analysis import power
 from osl_dynamics.data.task import epoch_mean
 from osl_dynamics.inference import modes
 from osl_dynamics.utils.misc import override_dict_defaults
-from osl_dynamics.utils.topoplots import Topology
 
 
 QUAL_CMAPS = [
@@ -129,8 +127,8 @@ def rough_square_axes(n_plots):
     empty: int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots**0.5).astype(int)
-    short = np.ceil(n_plots**0.5).astype(int)
+    long = np.floor(n_plots ** 0.5).astype(int)
+    short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -276,6 +274,8 @@ def plot_line(
     # Create figure
     if ax is None:
         fig, ax = create_figure(**fig_kwargs)
+    else:
+        fig = None
 
     # Plot lines
     for (x_data, y_data, label, e_min, e_max) in zip(
@@ -427,6 +427,8 @@ def plot_scatter(
     # Create figure
     if ax is None:
         fig, ax = create_figure(**fig_kwargs)
+    else:
+        fig = None
 
     # Plot data
     for i in range(len(x)):
@@ -1536,6 +1538,7 @@ def topoplot(
     fig : matplotlib.pyplot.figure
         Matplotlib figure object.
     """
+    from osl_dynamics.utils.topoplots import Topology
     topology = Topology(layout)
 
     if channel_names is not None:
@@ -1591,6 +1594,8 @@ def plot_brain_surface(
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
     """
+    from osl_dynamics.analysis import power
+
     power.save(
         power_map=values,
         filename=filename,
