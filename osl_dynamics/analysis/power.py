@@ -152,6 +152,11 @@ def power_map_grid(mask_file, parcellation_file, power_map):
 
     # Make a 2D array of voxel weights for each parcel
     n_parcels = parcellation.shape[-1]
+
+    # check parcellation is compatible:
+    if power_map.shape[1] is not n_parcels:
+        print("Error: parcellation_file has a different number of parcels to the power_maps")
+
     voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
 
     # Normalise the voxels weights
@@ -161,6 +166,7 @@ def power_map_grid(mask_file, parcellation_file, power_map):
     n_voxels = voxel_weights.shape[0]
     n_modes = power_map.shape[0]
     spatial_map_values = np.empty([n_voxels, n_modes])
+
     for i in range(n_modes):
         spatial_map_values[:, i] = voxel_weights @ power_map[i]
 
