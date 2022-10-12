@@ -40,6 +40,8 @@ def lazy_import(importer_name, to_import):
     return module, __getattr__
 
 
+# TODO: Problem!
+#  ModuleNotFoundError: No module named 'osl_dynamics.data.base.Data'; 'osl_dynamics.data.base' is not a package
 mod, __getattr__ = lazy_import(
     __name__, {"osl_dynamics.data.base.Data", "osl_dynamics.data.osl.OSL_HMM"}
 )
