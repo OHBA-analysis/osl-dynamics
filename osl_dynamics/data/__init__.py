@@ -40,14 +40,26 @@ def lazy_import(importer_name, to_import):
     return module, __getattr__
 
 
-# TODO: Problem!
 #  ModuleNotFoundError: No module named 'osl_dynamics.data.base.Data'; 'osl_dynamics.data.base' is not a package
 mod, __getattr__ = lazy_import(
-    __name__, {"osl_dynamics.data.base.Data", "osl_dynamics.data.osl.OSL_HMM"}
+    __name__,
+    {
+        "osl_dynamics.data.base",
+        "osl_dynamics.data.osl",
+        "osl_dynamics.data.processing",
+        "osl_dynamics.data.rw",
+        "osl_dynamics.data.spm",
+        "osl_dynamics.data.task",
+        "osl_dynamics.data.tf",
+    },
 )
 
+# # Without these lines, Data and OSL_HMM need to be directly imported from .base and .osl.
+# # With these lines, .base and .osl get non-lazy loaded completely undoing any gain.
+# Data = mod.base.Data
+# OSL_HMM = mod.osl.OSL_HMM
 
 # from osl_dynamics.data.base import Data
 # from osl_dynamics.data.osl import OSL_HMM
 
-__all__ = ["Data", "OSL_HMM"]
+# __all__ = ["Data", "OSL_HMM"]
