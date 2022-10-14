@@ -495,8 +495,7 @@ def _build_generator_model(config):
 
     # Definition of layers
     inputs = layers.Input(
-        shape=(config.sequence_length, config.n_modes),
-        name="gen_inp",
+        shape=(config.sequence_length, config.n_modes), name="gen_inp",
     )
     drop_layer = layers.TimeDistributed(
         layers.Dropout(config.model_dropout, name="gen_data_drop")

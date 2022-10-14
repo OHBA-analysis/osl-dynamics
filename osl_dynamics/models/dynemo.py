@@ -247,12 +247,10 @@ class Model(VariationalInferenceModelBase):
     ):
         """Wrapper for set_means and set_covariances."""
         self.set_means(
-            observation_model_parameters[0],
-            update_initializer=update_initializer,
+            observation_model_parameters[0], update_initializer=update_initializer,
         )
         self.set_covariances(
-            observation_model_parameters[1],
-            update_initializer=update_initializer,
+            observation_model_parameters[1], update_initializer=update_initializer,
         )
 
     def set_regularizers(self, training_dataset):
@@ -306,8 +304,7 @@ class Model(VariationalInferenceModelBase):
         if theta_norm is None:
             # Sequence of the underlying logits theta
             theta_norm = np.zeros(
-                [self.config.sequence_length, self.config.n_modes],
-                dtype=np.float32,
+                [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
             )
 
             # Randomly sample the first time step
@@ -373,9 +370,7 @@ def _model_structure(config):
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow
