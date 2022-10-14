@@ -1,48 +1,62 @@
-"""Example script for fitting an HMM to data from the Nottingham site of the
-MEG UK Partnership dataset.
+"""Full pipeline for a resting-state MEG study with DyNeMo.
+
 """
 
 import os.path as op
 from os import makedirs
 
-import pickle
-
 import numpy as np
-from osl_dynamics import analysis, data
-from osl_dynamics.models.hmm import Config, Model
+import pickle
+from osl_dynamics import analysis, data, inference
+from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 import matplotlib.pyplot as plt
 
+# -------- #
+# Settings #
+# -------- #
+# GPU settings
+#inference.tf_ops.gpu_growth()
+
+# Hyperparameters
+config = Config(
+    n_modes=6,
+    n_channels=80,
+    sequence_length=200,
+    inference_n_units=64,
+    inference_normalization="layer",
+    model_n_units=64,
+    model_normalization="layer",
+    learn_alpha_temperature=True,
+    initial_alpha_temperature=1.0,
+    learn_means=False,
+    learn_covariances=True,
+    do_kl_annealing=True,
+    kl_annealing_curve="tanh",
+    kl_annealing_sharpness=10,
+    n_kl_annealing_epochs=200,
+    batch_size=32,
+    learning_rate=0.0025,
+    gradient_clip=0.5,
+    n_epochs=400,
+    multi_gpu=False,
+)
+
 subjects_dir = '/Users/woolrich/homedir/vols_data/notts_movie_opm'
-subjects_dir = '/well/woolrich/projects/notts_movie_opm'
+#subjects_dir = '/well/woolrich/projects/notts_movie_opm'
+
+n_subject_init_runs = 5
 
 run = 1
 
-use_pre_trained_model = False
-n_subject_init_runs = 3
+use_pre_trained_model = True
 
 subjects_to_do = np.arange(0, 10)
 sessions_to_do = np.arange(0, 2)
 subj_sess_2exclude = np.zeros([10, 2]).astype(bool)
 
-#subj_sess_2exclude = np.ones([10, 2]).astype(bool)
-#subj_sess_2exclude[0:2,:] = False
-
-# GPU settings
-#tf_ops.gpu_growth()
-
-# Settings
-config = Config(
-    n_states=8,
-    n_channels=38,
-    sequence_length=100,
-    learn_means=False,
-    learn_covariances=True,
-    learn_trans_prob=True,
-    batch_size=64,
-    learning_rate=1e-3,
-    n_epochs=12,
-)
+subj_sess_2exclude = np.ones([10, 2]).astype(bool)
+subj_sess_2exclude[0:2,:] = False
 
 # -------------------------------------------------------------
 # %% Setup file names
@@ -64,7 +78,7 @@ for sub in subjects_to_do:
             subjects.append(subject)
             sf_files.append(sf_file)
 
-output_id = f"hmm_run{run}"
+output_id = f"dynemo_run{run}"
 
 model_dir = f"{recon_dir}/{output_id}/model"
 analysis_dir = f"{recon_dir}/{output_id}/analysis"
@@ -75,88 +89,69 @@ makedirs(model_dir, exist_ok=True)
 makedirs(analysis_dir, exist_ok=True)
 makedirs(maps_dir, exist_ok=True)
 
-# -------------------------------------------------------------
-# %% Prepare the data for training
+# ---------------- #
+# Training dataset #
+# ---------------- #
 
 training_data = data.Data(sf_files)
+# Prepare the data for training
 training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
 
-# Build model
+# --------------------------- #
+# Build the main DyNeMo model #
+# --------------------------- #
+print("Building model")
 model = Model(config)
 model.summary()
 
-# ----------------- #
-# Train or load fit #
-# ----------------- #
 
 if not use_pre_trained_model:
 
-    # --------------------------------------------------------- #
-    # Initialisation for the mode parameters (means, covs)      #
-    # --------------------------------------------------------- #
+    # ------------------------------------------------------ #
+    # Random subject initialisation for the mode covariances #
+    # ------------------------------------------------------ #
+    model.single_subject_initialization(
+        training_data,
+        n_kl_annealing_epochs=100,
+        n_epochs=200,
+        n_init=n_subject_init_runs,
+    )
 
-    # Choose subjects at random
-    subjects_used = np.random.choice(range(len(subjects)), n_subject_init_runs, replace=False)
+    # -------------------------- #
+    # Multi-start initialization #
+    # -------------------------- #
+    init_history = model.multistart_initialization(training_data, n_epochs=20, n_init=10)
 
-    if True and len(subjects_used) > 0:
-        # Train the model a few times and keep the best one
+    with open(f"{model_dir}/init_history.pkl", "wb") as file:
+        pickle.dump(init_history.history, file)
 
-        best_loss = np.Inf
-        losses = []
-        for subject in subjects_used:
-            print("Using subject", subject, "to train initial mode parameters")
+    # --------------------------------- #
+    # Main training on the full dataset #
+    # --------------------------------- #
+    print("Training final model")
+    history = model.fit(
+        training_data,
+        save_best_after=config.n_kl_annealing_epochs,
+        save_filepath=f"{model_dir}/weights",
+    )
 
-            # Get the dataset for this subject
-            subject_dataset = training_data.subjects[subject]
-
-            # Reset the model weights and train
-            model.reset_weights()
-            model.compile()
-            history = model.fit(subject_dataset)
-            loss = history['loss'][-1]
-            losses.append(loss)
-            print(f"Subject {subject} loss: {loss}")
-
-            # Record the loss of this subject's data
-            if loss < best_loss:
-                best_loss = loss
-                subject_chosen = subject
-                best_weights = model.get_weights()
-
-        print(f"Using mode parameters from subject {subject_chosen}")
-
-        # Restore the best model and get the inferred parameters for initialisation
-        model.set_weights(best_weights)
-        init_means, init_covs = model.get_means_covariances()
-
-        # Reset the model for full training
-        model.reset_weights()
-        model.compile()
-
-        # Set the initial mode parameters
-        if config.learn_means:
-            model.set_means(init_means, update_initializer=True)
-        model.set_covariances(init_covs, update_initializer=True)
-
-    # ------------------------- #
-    # Train on the full dataset #
-    # ------------------------- #
-
-    print("Infer Dynemo")
-
-    # Train the model
-    history = model.fit(training_data)
-    model.save_weights(f"{model_dir}/weights")
-
-    # Save history
     with open(f"{model_dir}/history.pkl", "wb") as file:
-        pickle.dump(history, file)
+        pickle.dump(history.history, file)
+
 else:
     # Load a pre-trained model
     model.load_weights(f"{model_dir}/weights")
 
     with open(f"{model_dir}/history.pkl", "rb") as file:
         history = pickle.load(file)
+
+# Training loss
+ll_loss, kl_loss = model.losses(training_data)
+loss = ll_loss + kl_loss
+print(f"training loss: {loss}")
+
+with open(f"{model_dir}/loss.dat", "w") as file:
+    file.write(f"training loss = {loss}\n")
 
 # ------------- #
 # Training loss #
@@ -183,14 +178,28 @@ print("mean_a:", mean_a)
 plotting.plot_alpha(a[0], filename=f"{analysis_dir}/a.png")
 
 # Correlation between raw alphas
-a_corr = np.corrcoef(np.concatenate(a), rowvar=False) - np.eye(config.n_states)
+a_corr = np.corrcoef(np.concatenate(a), rowvar=False) - np.eye(config.n_modes)
 
 plotting.plot_matrices(a_corr, filename=f"{analysis_dir}/a_corr1.png")
 plotting.plot_matrices(a_corr[1:, 1:], filename=f"{analysis_dir}/a_corr2.png")
-
+``````
 # Mode covariances
 D = model.get_covariances()
 D = D[order]
+
+# Trace of mode covariances
+tr_D = np.trace(D, axis1=1, axis2=2)
+
+# Normalised weighted alpha
+a_NW = [tr_D[np.newaxis, ...] * alp for alp in a]
+a_NW = [alp_NW / np.sum(alp_NW, axis=1)[..., np.newaxis] for alp_NW in a_NW]
+
+plotting.plot_alpha(a_NW[0], filename=f"{analysis_dir}/a_NW.png")
+
+# Mean normalised weighted alpha
+mean_a_NW = np.mean(np.concatenate(a_NW), axis=0)
+
+print("mean_a_NW:", mean_a_NW)
 
 # ----------------- #
 # Spectral analysis #
@@ -295,4 +304,7 @@ analysis.connectivity.save(
     parcellation_file=parcellation_file,
 )
 
-
+# -------- #
+# Clean up #
+# -------- #
+training_data.delete_dir()
