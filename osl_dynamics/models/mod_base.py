@@ -21,7 +21,7 @@ from tqdm.keras import TqdmCallback
 
 from osl_dynamics import data, models
 from osl_dynamics.inference import callbacks, initializers
-from osl_dynamics.utils.misc import get_argument, replace_argument
+from osl_dynamics.utils.misc import get_argument, replace_argument, NumpyLoader
 from osl_dynamics.utils.model import HTMLTable, LatexTable
 
 
@@ -98,6 +98,8 @@ class ModelBase:
 
     Acts as a wrapper for a standard Keras model.
     """
+
+    config_type = None
 
     def __init__(self, config):
         self._identifier = np.random.randint(100000)
@@ -215,8 +217,7 @@ class ModelBase:
             if save_filepath is None:
                 save_filepath = f"/tmp/model_weights/best_{self._identifier}"
             save_best_callback = callbacks.SaveBestCallback(
-                save_best_after=save_best_after,
-                filepath=save_filepath,
+                save_best_after=save_best_after, filepath=save_filepath,
             )
             additional_callbacks.append(save_best_callback)
 
@@ -403,67 +404,30 @@ class ModelBase:
             str(filepath) + "/weights"
         )  # will use the keras method: self.model.save_weights()
 
+    @classmethod
+    def load(cls, filepath):
+        """
+        Load model from filepath.
 
-def load(filepath):
-    """
-    Load model from filepath.
+        Parameters
+        ----------
+        filepath : str
+            Path where config.yml and weights are stored.
 
-    Parameters
-    ----------
-    filepath : str
-        Path where config.yml and weights are stored.
+        Returns
+        -------
+        model
+            Model object.
+        """
 
-    Returns
-    -------
-    config
-        Config object.
-    model
-        Model object.
-    """
+        # Get the config
+        with open(f"{filepath}/config.yml", "r") as f:
+            config_dict = yaml.load(f, NumpyLoader)
 
-    # Get the config
-    with open(f"{filepath}/config.yml", "r") as f:
-        config_dict = yaml.safe_load(f)
+        config = cls.config_type(**config_dict)
+        model = cls(config)
 
-    print("Loading model with config:")
-    pp.pprint(config_dict)
+        # Restore weights
+        model.load_weights(str(filepath) + "/weights")
 
-    # Create model
-    match config_dict["model_name"]:
-        case "DyNeMo":
-            config = models.dynemo.Config(**config_dict)
-            model = models.dynemo.Model(config)
-        case "DyNeMo-Obs":
-            config = models.dynemo_obs.Config(**config_dict)
-            model = models.dynemo_obs.Model(config)
-        case "MAGE":
-            config = models.mage.Config(**config_dict)
-            model = models.mage.Model(config)
-        case "SAGE":
-            config = models.sage.Config(**config_dict)
-            model = models.sage.Model(config)
-        case "M-DyNeMo":
-            config = models.mdynemo.Config(**config_dict)
-            model = models.mdynemo.Model(config)
-        case "M-DyNeMo-Obs":
-            config = models.mdynemo_obs.Config(**config_dict)
-            model = models.mdynemo_obs.Model(config)
-        case "SE-DyNeMo":
-            config = models.sedynemo.Config(**config_dict)
-            model = models.sedynemo.Model(config)
-        case "SE-DyNeMo-Obs":
-            config = models.sedynemo_obs.Config(**config_dict)
-            model = models.sedynemo_obs.Model(config)
-        case "State-DyNeMo":
-            config = models.state_dynemo.Config(**config_dict)
-            model = models.state_dynemo.Model(config)
-        case "HMM":
-            config = models.hmm.Config(**config_dict)
-            model = models.hmm.Model(config)
-        case other:
-            raise NotImplementedError(config_dict["model_name"])
-
-    # Restore weights
-    model.load_weights(str(filepath) + "/weights")
-
-    return config, model
+        return model

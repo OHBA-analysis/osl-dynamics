@@ -184,6 +184,8 @@ class Model(ModelBase):
     config : osl_dynamics.models.mage.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
         and the full MAGE model.

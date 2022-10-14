@@ -212,6 +212,8 @@ class Model(VariationalInferenceModelBase):
     config : osl_dynamics.models.mdynemo.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
@@ -324,13 +326,11 @@ class Model(VariationalInferenceModelBase):
 
         # Initialise sequence of underlying logits theta
         mean_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes],
-            dtype=np.float32,
+            [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
         )
         mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
         fc_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_fc_modes],
-            dtype=np.float32,
+            [self.config.sequence_length, self.config.n_fc_modes], dtype=np.float32,
         )
         fc_theta_norm[-1] = np.random.normal(size=self.config.n_fc_modes)
 
@@ -413,9 +413,7 @@ def _model_structure(config):
         config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
     )
 
     # Data flow
@@ -439,9 +437,7 @@ def _model_structure(config):
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="gamma",
+        config.initial_alpha_temperature, config.learn_alpha_temperature, name="gamma",
     )
 
     # Data flow

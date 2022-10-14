@@ -116,6 +116,8 @@ class Model(ModelBase):
     config : osl_dynamics.models.mdynemo_obs.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
@@ -298,7 +300,5 @@ def set_fcs_regularizer(model, training_dataset):
 
     fcs_layer = model.get_layer("fcs")
     fcs_layer.regularizer = regularizers.MarginalInverseWishart(
-        nu,
-        n_channels,
-        n_batches,
+        nu, n_channels, n_batches,
     )

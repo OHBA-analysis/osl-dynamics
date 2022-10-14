@@ -94,6 +94,8 @@ class Model(ModelBase):
     config : osl_dynamics.models.dynemo_obs.Config
     """
 
+    config_type = Config
+
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
