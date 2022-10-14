@@ -83,7 +83,7 @@ def fit_gaussian_mixture(
     # Standardise the data
     if standardize:
         X -= np.mean(X, axis=0)
-        X /= np.mean(X, axis=0)
+        X /= np.std(X, axis=0)
 
     # Fit a Gaussian mixture model
     if bayesian:
