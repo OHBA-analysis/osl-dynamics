@@ -281,10 +281,7 @@ class Topology:
 
         # Plot sensor positions.
         axis.scatter(
-            self.sensor_positions[:, 0],
-            self.sensor_positions[:, 1],
-            c="k",
-            s=5,
+            self.sensor_positions[:, 0], self.sensor_positions[:, 1], c="k", s=5,
         )
 
         if show_deleted_sensors:

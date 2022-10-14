@@ -6,7 +6,6 @@ import numpy as np
 from scipy import stats, special
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 
-from osl_dynamics.data import processing
 from osl_dynamics.utils import plotting
 
 
@@ -83,7 +82,8 @@ def fit_gaussian_mixture(
 
     # Standardise the data
     if standardize:
-        X = processing.standardize(X, create_copy=False)
+        X -= np.mean(X, axis=0)
+        X /= np.mean(X, axis=0)
 
     # Fit a Gaussian mixture model
     if bayesian:

@@ -35,12 +35,7 @@ def setup(path):
 
 
 def render(
-    nii,
-    save_dir=None,
-    interptype="trilinear",
-    gui=True,
-    inflation=0,
-    image_name=None,
+    nii, save_dir=None, interptype="trilinear", gui=True, inflation=0, image_name=None,
 ):
     """Render map in workbench.
 

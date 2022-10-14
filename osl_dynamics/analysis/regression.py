@@ -4,7 +4,6 @@
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from osl_dynamics.data import processing
 
 
 def linear(X, y, fit_intercept, normalize=False, print_message=True):
@@ -42,7 +41,8 @@ def linear(X, y, fit_intercept, normalize=False, print_message=True):
 
     # Normalise the regressors
     if normalize:
-        X = processing.standardize(X)
+        X -= np.mean(X, axis=0)
+        X /= np.std(X, axis=0)
 
     if y.dtype == np.complex64 or y.dtype == np.complex_:
         # Fit two linear regressions:
