@@ -3,7 +3,6 @@
 """
 
 import os
-import tensorflow as tf
 
 
 def gpu_growth():
@@ -11,6 +10,8 @@ def gpu_growth():
 
     If resources are shared between multiple users, it's polite not to hog the GPUs!
     """
+    import tensorflow as tf  # moved here to avoid slow imports
+
     gpus = tf.config.experimental.list_physical_devices("GPU")
     if gpus:
         try:

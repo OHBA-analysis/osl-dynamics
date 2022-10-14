@@ -9,15 +9,13 @@ import numpy as np
 from pathlib import Path
 from nilearn import plotting
 from tqdm import trange
+
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 
 
 def variance_from_spectra(
-    frequencies,
-    power_spectra,
-    components=None,
-    frequency_range=None,
+    frequencies, power_spectra, components=None, frequency_range=None,
 ):
     """Calculates variance from power spectra.
 
@@ -155,7 +153,9 @@ def power_map_grid(mask_file, parcellation_file, power_map):
 
     # check parcellation is compatible:
     if power_map.shape[1] is not n_parcels:
-        print("Error: parcellation_file has a different number of parcels to the power_maps")
+        print(
+            "Error: parcellation_file has a different number of parcels to the power_maps"
+        )
 
     voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
 

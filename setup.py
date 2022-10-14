@@ -1,4 +1,4 @@
-# This is the build script for setuptools.
+# This is the build script for setuptools.
 # See: https://packaging.python.org/en/latest/tutorials/packaging-projects/
 
 from setuptools import setup

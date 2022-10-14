@@ -12,9 +12,6 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from itertools import zip_longest
 
 from osl_dynamics.array_ops import get_one_hot
-from osl_dynamics.analysis import power
-from osl_dynamics.data.task import epoch_mean
-from osl_dynamics.inference import modes
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
 
@@ -129,8 +126,8 @@ def rough_square_axes(n_plots):
     empty: int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots**0.5).astype(int)
-    short = np.ceil(n_plots**0.5).astype(int)
+    long = np.floor(n_plots ** 0.5).astype(int)
+    short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -1156,6 +1153,8 @@ def plot_epoched_time_series(
     ax : matplotlib.pyplot.axis.
         Matplotlib axis object(s).
     """
+    from osl_dynamics.data.task import epoch_mean
+
     epoched_1 = epoch_mean(data, time_index, pre, post)
 
     x_label = "Sample"
@@ -1312,12 +1311,7 @@ def plot_matrices(
 
 
 def plot_connections(
-    weights,
-    labels=None,
-    ax=None,
-    cmap="hot",
-    text_color=None,
-    filename=None,
+    weights, labels=None, ax=None, cmap="hot", text_color=None, filename=None,
 ):
     """Create a chord diagram representing the values of a matrix.
 
@@ -1591,6 +1585,8 @@ def plot_brain_surface(
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
     """
+    from osl_dynamics.analysis import power
+
     power.save(
         power_map=values,
         filename=filename,
@@ -1767,6 +1763,8 @@ def plot_mode_lifetimes(
     ax : matplotlib.pyplot.axis.
         Matplotlib axis object(s).
     """
+    from osl_dynamics.inference import modes
+
     n_plots = mode_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
     colors = get_colors(n_plots)

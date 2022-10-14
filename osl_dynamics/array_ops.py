@@ -194,10 +194,7 @@ def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=Fa
 
 
 def validate(
-    array,
-    correct_dimensionality,
-    allow_dimensions,
-    error_message,
+    array, correct_dimensionality, allow_dimensions, error_message,
 ):
     """Checks if an array has been passed correctly.
 

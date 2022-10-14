@@ -33,11 +33,7 @@ class HMM:
     """
 
     def __init__(
-        self,
-        trans_prob,
-        stay_prob=None,
-        n_states=None,
-        random_seed=None,
+        self, trans_prob, stay_prob=None, n_states=None, random_seed=None,
     ):
 
         if isinstance(trans_prob, list):
@@ -161,20 +157,10 @@ class HMM_MAR(Simulation):
     """
 
     def __init__(
-        self,
-        n_samples,
-        trans_prob,
-        coeffs,
-        covs,
-        stay_prob=None,
-        random_seed=None,
+        self, n_samples, trans_prob, coeffs, covs, stay_prob=None, random_seed=None,
     ):
         # Observation model
-        self.obs_mod = MAR(
-            coeffs=coeffs,
-            covs=covs,
-            random_seed=random_seed,
-        )
+        self.obs_mod = MAR(coeffs=coeffs, covs=covs, random_seed=random_seed,)
 
         self.n_states = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
@@ -489,9 +475,7 @@ class MSubj_HMM_MVN(Simulation):
         # vary the stay probability for each subject
         if stay_prob is not None:
             subject_stay_prob = self.obs_mod._rng.normal(
-                loc=stay_prob,
-                scale=subject_tc_std,
-                size=self.n_subjects,
+                loc=stay_prob, scale=subject_tc_std, size=self.n_subjects,
             )
             # truncate stay_prob at 0 and 1
             subject_stay_prob = np.minimum(subject_stay_prob, 1)
