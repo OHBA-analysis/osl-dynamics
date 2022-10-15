@@ -3,7 +3,6 @@
 """
 
 import numpy as np
-from tensorflow.python.data import Dataset
 
 
 class TensorFlowDataset:
@@ -290,6 +289,7 @@ def create_dataset(
     dataset : tensorflow.data.Dataset
         TensorFlow dataset.
     """
+    from tensorflow.data import Dataset  # moved here to avoid slow imports
 
     # Generate a non-overlapping sequence dataset
     if step_size == sequence_length:
