@@ -79,6 +79,30 @@ Delete all jobs: ``qdel -u <username>``.
 
 Further info: `https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources <https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources>`_.
 
+Modules
+-------
+
+The BMRC server uses software modules for popular packages. We install osl-dynamics within an Anaconda environment. We can load Anaconda with:
+
+.. code-block:: shell
+
+    module load Anaconda3/2022.05
+
+We also need CUDA to use the GPUs on BMRC. We load CUDA with:
+
+.. code-block:: shell
+
+    module load cuDNN
+
+Similarly we can load other useful software packages, e.g.
+
+.. code-block:: shell
+
+    module load git
+    module load matlab/2019a
+
+All of the above lines can be added to ``/users/woolrich/<username>/.bashrc`` which will load the modules automatically when you log in.
+
 Using OSL Dynamics on BMRC
 --------------------------
 
