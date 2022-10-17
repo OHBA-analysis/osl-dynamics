@@ -38,97 +38,6 @@ Copy files from the cluster to your local machine:
 
     rsync -Phr <username>@cluster1.bmrc.ox.ac.uk:/path/to/file /path/on/local/machine
 
-Installing OSL Dynamics on BMRC
--------------------------------
-
-It is recommended to install osl-dynamics within a virtual environment. Depending on the GPU node a different version of CUDA maybe available. This means different versions of TensorFlow maybe required on different GPU nodes (older nodes may not be able to run the latest version of TensorFlow). Below are installation instructions for different TensorFlow versions.
-
-Recommended Installation
-************************
-
-To install with the latest TensorFlow version use:
-
-.. code-block:: shell
-
-    module load Anaconda3
-    module load cuDNN
-    conda create --name osld python=3
-    conda activate osld
-    cd osl-dynamics
-    pip install -e .
-
-TensorFlow 2.3
-**************
-
-Update setup.cfg with dependencies:
-
-.. code-block:: shell
-
-    tensorflow==2.3.0
-    tensorflow_probability==0.11.1
-
-Install:
-
-.. code-block:: shell
-
-    module load Anaconda3
-    module load cudnn
-    conda create --name osld-tf23 python=3.8
-    conda activate osld-tf23
-    cd osl-dynamics
-    pip install -e .
-
-TensorFlow 2.4
-**************
-
-Update setup.cfg with dependencies:
-
-.. code-block:: shell
-
-    tensorflow==2.4.1
-    tensorflow_probability==0.12.2
-
-Install:
-
-.. code-block:: shell
-
-    module load Anaconda3
-    module load cuDNN
-    conda create --name osld-tf24 python=3.8
-    conda activate osld-tf24
-    cd osl-dynamics
-    pip install -e .
-
-TensorFlow 2.5 (Not recommended)
-********************************
-
-This version is not recommended because of issues encountered when training with multiple GPUs on BMRC. Update setup.cfg with dependencies:
-
-.. code-block:: shell
-
-    tensorflow==2.5
-    tensorflow_probability==0.13
-
-Install:
-
-.. code-block:: shell
-
-    module use /well/woolrich/projects/software/modulefiles
-    module load Anaconda3
-    module load cuda/11.2
-    conda create --name osld-tf25 python=3.8
-    conda activate osld-tf25
-    cd osl-dynamics
-    pip install -e .
-
-HMM
-***
-To use the HMM implementation in this package you also need to install armadillo:
-
-.. code-block:: shell
-
-    conda install -c conda-forge armadillo
-
 Submitting Jobs
 ---------------
 
@@ -169,6 +78,30 @@ Monitor jobs: ``watch qstat``.
 Delete all jobs: ``qdel -u <username>``.
 
 Further info: `https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources <https://www.medsci.ox.ac.uk/divisional-services/support-services-1/bmrc/gpu-resources>`_.
+
+Modules
+-------
+
+The BMRC server uses software modules for popular packages. We install osl-dynamics within an Anaconda environment. We can load Anaconda with:
+
+.. code-block:: shell
+
+    module load Anaconda3/2022.05
+
+We also need CUDA to use the GPUs on BMRC. We load CUDA with:
+
+.. code-block:: shell
+
+    module load cuDNN
+
+Similarly we can load other useful software packages, e.g.
+
+.. code-block:: shell
+
+    module load git
+    module load matlab/2019a
+
+All of the above lines can be added to ``/users/woolrich/<username>/.bashrc`` which will load the modules automatically when you log in.
 
 Using OSL Dynamics on BMRC
 --------------------------

@@ -1,0 +1,18 @@
+name: osld
+dependencies:
+  - python=3
+  - pip
+  - pip:
+    - mat73
+    - matplotlib
+    - nibabel
+    - nilearn
+    - numpy
+    - pandas
+    - pre-commit
+    - pyyaml
+    - scipy
+    - scikit-learn
+    - tensorflow
+    - tensorflow_probability
+    - tqdm

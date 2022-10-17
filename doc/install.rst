@@ -34,10 +34,10 @@ Developers will want to install from source in editable mode:
 
 ::
 
-    conda create --name osld python=3
-    conda activate osld
     git clone git@github.com:OHBA-analysis/osl-dynamics.git
     cd osl-dynamics
+    conda env create -f envs/linux.yml
+    conda activate osld
     pip install -e .
 
 To use the HMM you will also need to install armadillo:
@@ -53,3 +53,5 @@ Additional packages needed for development can be installed with:
     pip install black
     pip install -r doc/requirements.txt
     pip install build twine
+
+Depending on the machine you are installing on you may want to use the system specific conda environments: bmrc.yml, hbaws.yml, m1_mac.yml.

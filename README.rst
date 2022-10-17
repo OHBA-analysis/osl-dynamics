@@ -7,14 +7,14 @@ See the read the docs page for a description of this project: `https://osl-dynam
 Installation
 ============
 
-To install osl-dynamics in editable mode:
+osl-dynamics can be installed using the conda environment files in ``/envs``. For a generic linux machine, osl-dynamics can be installed in editable mode with:
 
 .. code-block:: shell
 
-    conda create --name osld python=3
-    conda activate osld
     git clone git@github.com:OHBA-analysis/osl-dynamics.git
     cd osl-dynamics
+    conda env create -f envs/linux.yml
+    conda activate osld
     pip install -e .
 
 To use the HMM you also need to install armadillo:
@@ -22,6 +22,8 @@ To use the HMM you also need to install armadillo:
 .. code-block:: shell
 
     conda install -c conda-forge armadillo
+
+If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``.
 
 Documentation
 =============
