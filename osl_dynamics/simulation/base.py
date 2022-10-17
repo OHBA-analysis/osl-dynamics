@@ -1,6 +1,7 @@
 """Base simulation class.
 
 """
+import numpy as np
 
 
 class Simulation:
