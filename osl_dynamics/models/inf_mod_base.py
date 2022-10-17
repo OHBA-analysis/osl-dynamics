@@ -179,7 +179,7 @@ class VariationalInferenceModelBase(ModelBase):
             self.reset()
             training_data.shuffle(100000)
             training_data_subset = training_data.take(n_batches)
-            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs,)
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             loss = history.history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n

@@ -15,6 +15,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers, utils
 
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
@@ -188,6 +189,70 @@ class Model(ModelBase):
             history["rho"].append(self.rho)
 
         return history
+
+    def random_subset_initialization(
+        self, training_data, n_epochs, n_init, take, **kwargs
+    ):
+        """Random subset initialization.
+
+        The model is trained for a few epochs with different random subsets
+        of the training dataset. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float
+            Fraction of total batches to take.
+        kwargs : keyword arguments
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            print(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        print("Random subset initialization:")
+
+        # Make a TensorFlow Dataset
+        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_data)
+        n_batches = max(round(n_total_batches * take), 1)
+        print(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            print(f"Initialization {n}")
+            self.reset()
+            training_data.shuffle(100000)
+            training_data_subset = training_data.take(n_batches)
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        print(f"Using initialization {best_initialization}")
+        self.reset()
+        self.set_weights(best_weights)
+
+        return best_history
 
     def _get_state_probs(self, x):
         """Get state probabilities.
