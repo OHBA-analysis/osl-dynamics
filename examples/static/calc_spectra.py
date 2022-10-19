@@ -3,9 +3,13 @@
 """
 
 print("Setting up")
+import os
 import numpy as np
 from osl_dynamics.analysis import static
 from osl_dynamics.data import Data
+
+# Make a directory to hold output files
+os.makedirs("spectra", exist_ok=True)
 
 # Load data
 data = Data(
@@ -16,8 +20,8 @@ data = Data(
 )
 ts = data.time_series()
 
-# Calculate static power spectra
-f, p, c = static.power_spectra(
+# Calculate static power/coherence spectra
+f, psd, coh = static.power_spectra(
     data=ts,
     window_length=500,
     sampling_frequency=250,
@@ -26,6 +30,6 @@ f, p, c = static.power_spectra(
 )
 
 # Save to plot power/coherence maps: see static/plot_maps.py
-np.save("f.npy", f)
-np.save("p.npy", p)
-np.save("c.npy", c)
+np.save("spectra/f.npy", f)
+np.save("spectra/psd.npy", psd)
+np.save("spectra/coh.npy", coh)
