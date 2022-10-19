@@ -29,7 +29,7 @@ f, psd, coh = static.power_spectra(
     calc_coh=True,
 )
 
-# Save to plot power/coherence maps: see static/plot_maps.py
+# Save to plot power/coherence maps: see static/plot_*_maps.py
 np.save("spectra/f.npy", f)
 np.save("spectra/psd.npy", psd)
 np.save("spectra/coh.npy", coh)

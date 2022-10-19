@@ -3,6 +3,7 @@
 """
 
 import numpy as np
+
 from osl_dynamics import array_ops
 
 

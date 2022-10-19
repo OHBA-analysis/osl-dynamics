@@ -3,7 +3,29 @@
 """
 
 import numpy as np
+
 from osl_dynamics.analysis.spectral import spectrogram, coherence_spectra
+
+
+def functional_connectivity(data):
+    """Calculate functional connectivity (Pearson correlation).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
+
+    Returns
+    -------
+    fc : np.ndarray
+        Functional connectivity. Shape is (n_subjects, n_channels, n_channels)
+        or (n_channels, n_channels).
+    """
+    if isinstance(data, np.ndarray):
+        data = [data]
+    fc = [np.corrcoef(d, rowvar=False) for d in data]
+    return np.squeeze(fc)
 
 
 def power_spectra(
@@ -32,7 +54,7 @@ def power_spectra(
     standardize : bool
         Should we standardise the data?
     calc_coh : bool
-        Should we already return the coherence spectra?
+        Should we also return the coherence spectra?
 
     Returns
     -------
