@@ -374,10 +374,12 @@ class Model(VariationalInferenceModelBase):
     ):
         """Wrapper for set_group_means and set_group_covariances."""
         self.set_group_means(
-            observation_model_parameters[0], update_initializer=update_initializer,
+            observation_model_parameters[0],
+            update_initializer=update_initializer,
         )
         self.set_group_covariances(
-            observation_model_parameters[1], update_initializer=update_initializer,
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def set_bayesian_kl_scaling(self, training_dataset):
@@ -436,10 +438,12 @@ def _model_structure(config):
 
     # Layers to sample theta from q(theta) and to convert to mode mixing
     # factors alpha
-    theta_layer = SampleNormalDistributionLayer(name="theta")
+    theta_layer = SampleNormalDistributionLayer(config.jitter, name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="alpha",
     )
 
     # Data flow
@@ -480,6 +484,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.jitter,
         config.covariances_regularizer,
         name="group_covs",
     )
@@ -519,7 +524,8 @@ def _model_structure(config):
 
         if config.learn_covariances:
             covs_dev_layer = layers.Dense(
-                config.n_channels * (config.n_channels + 1) // 2, name="covs_dev",
+                config.n_channels * (config.n_channels + 1) // 2,
+                name="covs_dev",
             )
         else:
             covs_dev_layer = ZeroLayer(
@@ -532,10 +538,14 @@ def _model_structure(config):
             )
 
         means_dev_reg_layer = DummyLayer(
-            config.dev_reg, config.dev_reg_strength, name="means_dev_reg",
+            config.dev_reg,
+            config.dev_reg_strength,
+            name="means_dev_reg",
         )
         covs_dev_reg_layer = DummyLayer(
-            config.dev_reg, config.dev_reg_strength, name="covs_dev_reg",
+            config.dev_reg,
+            config.dev_reg_strength,
+            name="covs_dev_reg",
         )
     # ------------------------------------- #
     # Layers specific to the Bayesian model #
@@ -548,7 +558,9 @@ def _model_structure(config):
             config.n_channels, activation="softplus", name="means_dev_inf_sigma"
         )
         if config.learn_means:
-            means_dev_layer = SampleNormalDistributionLayer(name="means_dev")
+            means_dev_layer = SampleNormalDistributionLayer(
+                config.jitter, name="means_dev"
+            )
         else:
             means_dev_layer = ZeroLayer(
                 shape=(config.n_subjects, config.n_modes, config.n_channels),
@@ -564,7 +576,9 @@ def _model_structure(config):
             name="covs_dev_inf_sigma",
         )
         if config.learn_covariances:
-            covs_dev_layer = SampleNormalDistributionLayer(name="covs_dev")
+            covs_dev_layer = SampleNormalDistributionLayer(
+                config.jitter, name="covs_dev"
+            )
         else:
             covs_dev_layer = ZeroLayer(
                 shape=(
@@ -575,12 +589,14 @@ def _model_structure(config):
                 name="covs_dev",
             )
 
-    subject_means_layer = SubjectMapLayer("means", name="subject_means")
-    subject_covs_layer = SubjectMapLayer("covariances", name="subject_covs")
+    subject_means_layer = SubjectMapLayer("means", config.jitter, name="subject_means")
+    subject_covs_layer = SubjectMapLayer(
+        "covariances", config.jitter, name="subject_covs"
+    )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
         name="mix_subject_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
 
     # Data flow
     subjects = subjects_layer(data)  # data not used here
@@ -591,7 +607,9 @@ def _model_structure(config):
 
     # spatial map embeddings
     means_mode_embedding = means_mode_embedding_layer(group_mu)
-    covs_mode_embedding = covs_mode_embedding_layer(InverseCholeskyLayer()(group_D))
+    covs_mode_embedding = covs_mode_embedding_layer(
+        InverseCholeskyLayer(config.jitter)(group_D)
+    )
 
     # Now get the subject specific spatial maps
     means_concat_embedding = means_concat_embedding_layer(
@@ -647,7 +665,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_div_layer = KLDivergenceLayer(name="kl_div")
+    kl_div_layer = KLDivergenceLayer(config.jitter, name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
@@ -670,14 +688,14 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                name="means_dev_kl_loss"
+                config.jitter, name="means_dev_kl_loss"
             )
         else:
             means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
         if config.learn_covariances:
             covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                name="covs_dev_kl_loss"
+                config.jitter, name="covs_dev_kl_loss"
             )
         else:
             covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")
@@ -693,5 +711,7 @@ def _model_structure(config):
         kl_loss = kl_loss_layer([kl_div, means_dev_kl_loss, covs_dev_kl_loss])
 
     return tf.keras.Model(
-        inputs=[data, subj_id], outputs=[ll_loss, kl_loss, alpha], name="Se-DyNeMo",
+        inputs=[data, subj_id],
+        outputs=[ll_loss, kl_loss, alpha],
+        name="Se-DyNeMo",
     )

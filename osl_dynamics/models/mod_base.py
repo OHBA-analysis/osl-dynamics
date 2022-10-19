@@ -41,6 +41,7 @@ class BaseModelConfig:
     optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
     multi_gpu: bool = False
     strategy: str = None
+    jitter: float = 1e-6
 
     # Dimension parameters
     n_modes: int = None
@@ -217,7 +218,8 @@ class ModelBase:
             if save_filepath is None:
                 save_filepath = f"/tmp/model_weights/best_{self._identifier}"
             save_best_callback = callbacks.SaveBestCallback(
-                save_best_after=save_best_after, filepath=save_filepath,
+                save_best_after=save_best_after,
+                filepath=save_filepath,
             )
             additional_callbacks.append(save_best_callback)
 

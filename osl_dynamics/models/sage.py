@@ -471,6 +471,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.jitter,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
@@ -495,7 +496,8 @@ def _build_generator_model(config):
 
     # Definition of layers
     inputs = layers.Input(
-        shape=(config.sequence_length, config.n_modes), name="gen_inp",
+        shape=(config.sequence_length, config.n_modes),
+        name="gen_inp",
     )
     drop_layer = layers.TimeDistributed(
         layers.Dropout(config.model_dropout, name="gen_data_drop")

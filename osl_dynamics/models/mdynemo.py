@@ -326,11 +326,13 @@ class Model(VariationalInferenceModelBase):
 
         # Initialise sequence of underlying logits theta
         mean_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
+            [self.config.sequence_length, self.config.n_modes],
+            dtype=np.float32,
         )
         mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
         fc_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_fc_modes], dtype=np.float32,
+            [self.config.sequence_length, self.config.n_fc_modes],
+            dtype=np.float32,
         )
         fc_theta_norm[-1] = np.random.normal(size=self.config.n_fc_modes)
 
@@ -408,12 +410,14 @@ def _model_structure(config):
     mean_inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mean_inf_sigma"
     )
-    mean_theta_layer = SampleNormalDistributionLayer(name="mean_theta")
+    mean_theta_layer = SampleNormalDistributionLayer(config.jitter, name="mean_theta")
     mean_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="alpha",
     )
 
     # Data flow
@@ -432,12 +436,14 @@ def _model_structure(config):
     fc_inf_sigma_layer = layers.Dense(
         config.n_fc_modes, activation="softplus", name="fc_inf_sigma"
     )
-    fc_theta_layer = SampleNormalDistributionLayer(name="fc_theta")
+    fc_theta_layer = SampleNormalDistributionLayer(config.jitter, name="fc_theta")
     fc_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="gamma",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="gamma",
     )
 
     # Data flow
@@ -465,6 +471,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
+        config.jitter,
         config.stds_regularizer,
         name="stds",
     )
@@ -473,6 +480,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
+        config.jitter,
         config.fcs_regularizer,
         name="fcs",
     )
@@ -480,7 +488,7 @@ def _model_structure(config):
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
@@ -526,7 +534,7 @@ def _model_structure(config):
     mean_mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mean_mod_sigma"
     )
-    kl_div_layer_mean = KLDivergenceLayer(name="mean_kl_div")
+    kl_div_layer_mean = KLDivergenceLayer(config.jitter, name="mean_kl_div")
 
     # Data flow
     mean_mod_mu = mean_mod_mu_layer(mod_rnn)
@@ -544,7 +552,7 @@ def _model_structure(config):
     fc_mod_sigma_layer = layers.Dense(
         config.n_fc_modes, activation="softplus", name="fc_mod_sigma"
     )
-    fc_kl_div_layer = KLDivergenceLayer(name="fc_kl_div")
+    fc_kl_div_layer = KLDivergenceLayer(config.jitter, name="fc_kl_div")
 
     # Data flow
     fc_mod_mu = fc_mod_mu_layer(mod_rnn)

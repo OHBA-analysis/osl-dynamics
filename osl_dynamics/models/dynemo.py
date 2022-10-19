@@ -247,10 +247,12 @@ class Model(VariationalInferenceModelBase):
     ):
         """Wrapper for set_means and set_covariances."""
         self.set_means(
-            observation_model_parameters[0], update_initializer=update_initializer,
+            observation_model_parameters[0],
+            update_initializer=update_initializer,
         )
         self.set_covariances(
-            observation_model_parameters[1], update_initializer=update_initializer,
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def set_regularizers(self, training_dataset):
@@ -304,7 +306,8 @@ class Model(VariationalInferenceModelBase):
         if theta_norm is None:
             # Sequence of the underlying logits theta
             theta_norm = np.zeros(
-                [self.config.sequence_length, self.config.n_modes], dtype=np.float32,
+                [self.config.sequence_length, self.config.n_modes],
+                dtype=np.float32,
             )
 
             # Randomly sample the first time step
@@ -367,10 +370,12 @@ def _model_structure(config):
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-    theta_layer = SampleNormalDistributionLayer(name="theta")
+    theta_layer = SampleNormalDistributionLayer(config.jitter, name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="alpha",
     )
 
     # Data flow
@@ -402,12 +407,13 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.jitter,
         config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
@@ -437,7 +443,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_div_layer = KLDivergenceLayer(name="kl_div")
+    kl_div_layer = KLDivergenceLayer(config.jitter, name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow

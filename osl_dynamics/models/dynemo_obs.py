@@ -13,6 +13,7 @@ from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
+    add_jitter,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
@@ -193,12 +194,13 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.jitter,
         config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
 
     # Data flow
     mu = means_layer(data)  # data not used
@@ -212,17 +214,21 @@ def _model_structure(config):
 
 def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
-    return covs
+    covs = add_jitter(
+        covs_layer.bijector(covs_layer.flattened_cholesky_factors), covs_layer.jitter
+    )
+    return covs.numpy()
 
 
 def get_means_covariances(model):
     means_layer = model.get_layer("means")
     covs_layer = model.get_layer("covs")
 
-    means = means_layer.vectors.numpy()
-    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
-    return means, covs
+    means = means_layer.vectors
+    covs = add_jitter(
+        covs_layer.bijector(covs_layer.flattened_cholesky_factors), covs_layer.jitter
+    )
+    return means.numpy(), covs.numpy()
 
 
 def set_means(model, means, update_initializer=True, layer_name="means"):

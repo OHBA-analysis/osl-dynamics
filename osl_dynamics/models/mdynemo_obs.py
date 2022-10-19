@@ -14,6 +14,7 @@ from osl_dynamics.models import dynemo_obs
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
+    add_jitter,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     DiagonalMatricesLayer,
@@ -198,6 +199,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     stds_layer = DiagonalMatricesLayer(
@@ -205,6 +207,8 @@ def _model_structure(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
+        config.jitter,
+        config.stds_regularizer,
         name="stds",
     )
     fcs_layer = CorrelationMatricesLayer(
@@ -212,13 +216,15 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
+        config.jitter,
+        config.fcs_regularizer,
         name="fcs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
 
     # Data flow
     mu = means_layer(data)  # data not used
@@ -242,10 +248,14 @@ def get_means_stds_fcs(model):
     stds_layer = model.get_layer("stds")
     fcs_layer = model.get_layer("fcs")
 
-    means = means_layer.vectors.numpy()
-    stds = tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)).numpy()
-    fcs = fcs_layer.bijector(fcs_layer.flattened_cholesky_factors).numpy()
-    return means, stds, fcs
+    means = means_layer.vectors
+    stds = add_jitter(
+        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)), stds_layer.jitter
+    )
+    fcs = add_jitter(
+        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors), fcs_layer.jitter
+    )
+    return means.numpy(), stds.numpy(), fcs.numpy()
 
 
 def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
@@ -300,5 +310,7 @@ def set_fcs_regularizer(model, training_dataset):
 
     fcs_layer = model.get_layer("fcs")
     fcs_layer.regularizer = regularizers.MarginalInverseWishart(
-        nu, n_channels, n_batches,
+        nu,
+        n_channels,
+        n_batches,
     )
