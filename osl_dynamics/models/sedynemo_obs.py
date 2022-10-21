@@ -53,8 +53,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
-    epsilon : float
-        Error added to standard deviations for numerical stability.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for group mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -105,7 +105,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
-    epsilon: float = 1e-6
+    covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
@@ -130,6 +130,12 @@ class Config(BaseModelConfig):
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
     def validate_subject_embedding_parameters(self):
         if (
@@ -323,7 +329,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.epsilon,
+        config.covariances_epsilon,
         config.covariances_regularizer,
         name="group_covs",
     )
@@ -398,7 +404,7 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_layer = SampleNormalDistributionLayer(
-                config.epsilon, name="means_dev"
+                config.theta_std_epsilon, name="means_dev"
             )
         else:
             means_dev_layer = ZeroLayer(
@@ -416,7 +422,7 @@ def _model_structure(config):
         )
         if config.learn_covariances:
             covs_dev_layer = SampleNormalDistributionLayer(
-                config.epsilon, name="covs_dev"
+                config.theta_std_epsilon, name="covs_dev"
             )
         else:
             covs_dev_layer = ZeroLayer(
@@ -428,14 +434,16 @@ def _model_structure(config):
                 name="covs_dev",
             )
 
-    subject_means_layer = SubjectMapLayer("means", config.epsilon, name="subject_means")
+    subject_means_layer = SubjectMapLayer(
+        "means", config.covariances_epsilon, name="subject_means"
+    )
     subject_covs_layer = SubjectMapLayer(
-        "covariances", config.epsilon, name="subject_covs"
+        "covariances", config.covariances_epsilon, name="subject_covs"
     )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
         name="mix_subject_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(config.epsilon, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
 
     # Data flow
     subjects = subjects_layer(data)  # data not used here
@@ -447,7 +455,7 @@ def _model_structure(config):
     # spatial map embeddings
     means_mode_embedding = means_mode_embedding_layer(group_mu)
     covs_mode_embedding = covs_mode_embedding_layer(
-        InverseCholeskyLayer(config.epsilon)(group_D)
+        InverseCholeskyLayer(config.covariances_epsilon)(group_D)
     )
 
     # Now get the subject specific spatial maps
@@ -493,14 +501,14 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                config.epsilon, name="means_dev_kl_loss"
+                config.theta_std_epsilon, name="means_dev_kl_loss"
             )
         else:
             means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
         if config.learn_covariances:
             covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                config.epsilon, name="covs_dev_kl_loss"
+                config.theta_std_epsilon, name="covs_dev_kl_loss"
             )
         else:
             covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")

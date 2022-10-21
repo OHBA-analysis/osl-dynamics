@@ -107,8 +107,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mode standard deviations.
     initial_fcs : np.ndarray
         Initialisation for mode functional connectivity matrices.
-    epsilon : float
-        Error added to standard deviations for numerical stability.
+    stds_epsilon : float
+        Error added to mode stds for numerical stability.
+    fcs_epsilon : float
+        Error added to mode fcs for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the mean vectors.
     stds_regularizer : tf.keras.regularizers.Regularizer
@@ -171,7 +173,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
-    epsilon: float = 1e-6
+    stds_epsilon: float = None
+    fcs_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     stds_regularizer: tf.keras.regularizers.Regularizer = None
     fcs_regularizer: tf.keras.regularizers.Regularizer = None
@@ -199,6 +202,18 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             or self.learn_fcs is None
         ):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
+
+        if self.stds_epsilon is None:
+            if self.learn_stds:
+                self.stds_epsilon = 1e-6
+            else:
+                self.stds_epsilon = 0.0
+
+        if self.fcs_epsilon is None:
+            if self.learn_fcs:
+                self.fcs_epsilon = 1e-6
+            else:
+                self.fcs_epsilon = 0.0
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
@@ -413,7 +428,9 @@ def _model_structure(config):
     mean_inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mean_inf_sigma"
     )
-    mean_theta_layer = SampleNormalDistributionLayer(config.epsilon, name="mean_theta")
+    mean_theta_layer = SampleNormalDistributionLayer(
+        config.theta_std_epsilon, name="mean_theta"
+    )
     mean_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="mean_theta_norm"
     )
@@ -439,7 +456,9 @@ def _model_structure(config):
     fc_inf_sigma_layer = layers.Dense(
         config.n_fc_modes, activation="softplus", name="fc_inf_sigma"
     )
-    fc_theta_layer = SampleNormalDistributionLayer(config.epsilon, name="fc_theta")
+    fc_theta_layer = SampleNormalDistributionLayer(
+        config.theta_std_epsilon, name="fc_theta"
+    )
     fc_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="fc_theta_norm"
     )
@@ -474,7 +493,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
-        config.epsilon,
+        config.stds_epsilon,
         config.stds_regularizer,
         name="stds",
     )
@@ -483,7 +502,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
-        config.epsilon,
+        config.fcs_epsilon,
         config.fcs_regularizer,
         name="fcs",
     )
@@ -491,7 +510,9 @@ def _model_structure(config):
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(config.epsilon, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(
+        np.maximum(config.stds_epsilon, config.fcs_epsilon), name="ll_loss"
+    )
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
@@ -537,7 +558,7 @@ def _model_structure(config):
     mean_mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mean_mod_sigma"
     )
-    kl_div_layer_mean = KLDivergenceLayer(config.epsilon, name="mean_kl_div")
+    kl_div_layer_mean = KLDivergenceLayer(config.theta_std_epsilon, name="mean_kl_div")
 
     # Data flow
     mean_mod_mu = mean_mod_mu_layer(mod_rnn)
@@ -555,7 +576,7 @@ def _model_structure(config):
     fc_mod_sigma_layer = layers.Dense(
         config.n_fc_modes, activation="softplus", name="fc_mod_sigma"
     )
-    fc_kl_div_layer = KLDivergenceLayer(config.epsilon, name="fc_kl_div")
+    fc_kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="fc_kl_div")
 
     # Data flow
     fc_mod_mu = fc_mod_mu_layer(mod_rnn)

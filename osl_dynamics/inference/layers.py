@@ -26,6 +26,8 @@ def add_epsilon(A, epsilon, diag=True):
     diag : bool
         Do we want to add epsilon to the diagonal?
     """
+    # Make sure epsilon is float32
+    epsilon = tf.cast(epsilon, dtype=tf.float32)
     A_shape = tf.shape(A)
     if diag:
         e = tf.eye(A_shape[-1])
