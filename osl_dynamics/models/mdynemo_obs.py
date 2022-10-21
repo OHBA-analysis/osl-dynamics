@@ -43,13 +43,19 @@ class Config(BaseModelConfig):
         Length of sequence passed to the generative model.
 
     learn_means : bool
-        Should we make the mean vectors for each mode trainable?
-    learn_covariances : bool
-        Should we make the covariance matrix for each mode trainable?
+        Should we make the mean for each mode trainable?
+    learn_stds : bool
+        Should we make the standard deviation for each mode trainable?
+    learn_fcs : bool
+        Should we make the functional connectivity for each mode trainable?
     initial_means : np.ndarray
-        Initialisation for mean vectors.
-    initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialisation for the mode means.
+    initial_stds : np.ndarray
+        Initialisation for mode standard deviations.
+    initial_fcs : np.ndarray
+        Initialisation for mode functional connectivity matrices.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the mean vectors.
     stds_regularizer : tf.keras.regularizers.Regularizer
@@ -84,6 +90,7 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    epsilon: float = 1e-6
     means_regularizer: tf.keras.regularizers.Regularizer = None
     stds_regularizer: tf.keras.regularizers.Regularizer = None
     fcs_regularizer: tf.keras.regularizers.Regularizer = None

@@ -80,6 +80,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -133,6 +135,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    epsilon: float = 1e-6
 
     def __post_init__(self):
         self.validate_rnn_parameters()

@@ -53,6 +53,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for group mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -103,6 +105,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    epsilon: float = 1e-6
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 

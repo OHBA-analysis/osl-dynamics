@@ -98,6 +98,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
 
     batch_size : int
         Mini-batch size.
@@ -149,6 +151,7 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    epsilon: float = 1e-6
     multiple_dynamics: bool = True
 
     def __post_init__(self):

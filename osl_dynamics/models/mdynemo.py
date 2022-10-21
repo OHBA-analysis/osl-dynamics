@@ -107,6 +107,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mode standard deviations.
     initial_fcs : np.ndarray
         Initialisation for mode functional connectivity matrices.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the mean vectors.
     stds_regularizer : tf.keras.regularizers.Regularizer
@@ -169,6 +171,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    epsilon: float = 1e-6
     means_regularizer: tf.keras.regularizers.Regularizer = None
     stds_regularizer: tf.keras.regularizers.Regularizer = None
     fcs_regularizer: tf.keras.regularizers.Regularizer = None

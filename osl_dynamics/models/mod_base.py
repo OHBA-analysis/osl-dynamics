@@ -41,7 +41,6 @@ class BaseModelConfig:
     optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
     multi_gpu: bool = False
     strategy: str = None
-    epsilon: float = 1e-6
 
     # Dimension parameters
     n_modes: int = None

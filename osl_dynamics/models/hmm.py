@@ -58,6 +58,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
     initial_trans_prob : np.ndarray
         Initialisation for trans prob matrix
     learn_trans_prob : bool
@@ -85,6 +87,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    epsilon: float = 1e-6
 
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
