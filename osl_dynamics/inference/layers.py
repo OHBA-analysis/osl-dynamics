@@ -173,11 +173,11 @@ class InverseCholeskyLayer(layers.Layer):
     def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
     def call(self, inputs):
         inputs = add_epsilon(inputs, self.epsilon)
-        bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
-        return bijector.inverse(inputs)
+        return self.bijector.inverse(inputs)
 
 
 class SampleNormalDistributionLayer(layers.Layer):
