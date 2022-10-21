@@ -576,7 +576,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
-        config.jitter,
+        config.epsilon,
         name="stds",
     )
 
@@ -585,7 +585,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
-        config.jitter,
+        config.epsilon,
         name="fcs",
     )
 

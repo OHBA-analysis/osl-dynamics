@@ -471,7 +471,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.jitter,
+        config.epsilon,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")

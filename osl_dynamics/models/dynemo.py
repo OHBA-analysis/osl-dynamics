@@ -370,7 +370,7 @@ def _model_structure(config):
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-    theta_layer = SampleNormalDistributionLayer(config.jitter, name="theta")
+    theta_layer = SampleNormalDistributionLayer(config.epsilon, name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
@@ -407,13 +407,13 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.jitter,
+        config.epsilon,
         config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.epsilon, name="ll_loss")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
@@ -443,7 +443,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_div_layer = KLDivergenceLayer(config.jitter, name="kl_div")
+    kl_div_layer = KLDivergenceLayer(config.epsilon, name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow

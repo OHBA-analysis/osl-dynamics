@@ -13,7 +13,7 @@ import osl_dynamics.data.tf as dtf
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
-    add_jitter,
+    add_epsilon,
     DummyLayer,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -320,7 +320,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.jitter,
+        config.epsilon,
         config.covariances_regularizer,
         name="group_covs",
     )
@@ -395,7 +395,7 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_layer = SampleNormalDistributionLayer(
-                config.jitter, name="means_dev"
+                config.epsilon, name="means_dev"
             )
         else:
             means_dev_layer = ZeroLayer(
@@ -413,7 +413,7 @@ def _model_structure(config):
         )
         if config.learn_covariances:
             covs_dev_layer = SampleNormalDistributionLayer(
-                config.jitter, name="covs_dev"
+                config.epsilon, name="covs_dev"
             )
         else:
             covs_dev_layer = ZeroLayer(
@@ -425,14 +425,14 @@ def _model_structure(config):
                 name="covs_dev",
             )
 
-    subject_means_layer = SubjectMapLayer("means", config.jitter, name="subject_means")
+    subject_means_layer = SubjectMapLayer("means", config.epsilon, name="subject_means")
     subject_covs_layer = SubjectMapLayer(
-        "covariances", config.jitter, name="subject_covs"
+        "covariances", config.epsilon, name="subject_covs"
     )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
         name="mix_subject_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.epsilon, name="ll_loss")
 
     # Data flow
     subjects = subjects_layer(data)  # data not used here
@@ -444,7 +444,7 @@ def _model_structure(config):
     # spatial map embeddings
     means_mode_embedding = means_mode_embedding_layer(group_mu)
     covs_mode_embedding = covs_mode_embedding_layer(
-        InverseCholeskyLayer(config.jitter)(group_D)
+        InverseCholeskyLayer(config.epsilon)(group_D)
     )
 
     # Now get the subject specific spatial maps
@@ -490,14 +490,14 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                config.jitter, name="means_dev_kl_loss"
+                config.epsilon, name="means_dev_kl_loss"
             )
         else:
             means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
         if config.learn_covariances:
             covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                config.jitter, name="covs_dev_kl_loss"
+                config.epsilon, name="covs_dev_kl_loss"
             )
         else:
             covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")
@@ -526,9 +526,9 @@ def get_group_means_covariances(model):
     group_covs_layer = model.get_layer("group_covs")
 
     group_means = group_means_layer.vectors
-    group_covs = add_jitter(
+    group_covs = add_epsilon(
         group_covs_layer.bijector(group_covs_layer.flattened_cholesky_factors),
-        group_covs_layer.jitter,
+        group_covs_layer.epsilon,
     )
     return group_means.numpy(), group_covs.numpy()
 

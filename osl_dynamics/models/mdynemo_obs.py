@@ -14,7 +14,7 @@ from osl_dynamics.models import dynemo_obs
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
-    add_jitter,
+    add_epsilon,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     DiagonalMatricesLayer,
@@ -207,7 +207,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
-        config.jitter,
+        config.epsilon,
         config.stds_regularizer,
         name="stds",
     )
@@ -216,7 +216,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
-        config.jitter,
+        config.epsilon,
         config.fcs_regularizer,
         name="fcs",
     )
@@ -224,7 +224,7 @@ def _model_structure(config):
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(config.jitter, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.epsilon, name="ll_loss")
 
     # Data flow
     mu = means_layer(data)  # data not used
@@ -249,11 +249,11 @@ def get_means_stds_fcs(model):
     fcs_layer = model.get_layer("fcs")
 
     means = means_layer.vectors
-    stds = add_jitter(
-        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)), stds_layer.jitter
+    stds = add_epsilon(
+        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)), stds_layer.epsilon
     )
-    fcs = add_jitter(
-        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors), fcs_layer.jitter
+    fcs = add_epsilon(
+        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors), fcs_layer.epsilon
     )
     return means.numpy(), stds.numpy(), fcs.numpy()
 

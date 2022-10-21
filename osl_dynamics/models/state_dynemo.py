@@ -215,11 +215,11 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
-        config.jitter,
+        config.epsilon,
         name="covs",
     )
     ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-        config.n_states, config.jitter, name="ll_loss"
+        config.n_states, config.epsilon, name="ll_loss"
     )
 
     mu = means_layer(data)  # data not used

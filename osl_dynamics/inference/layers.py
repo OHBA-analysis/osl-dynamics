@@ -13,28 +13,28 @@ tfb = tfp.bijectors
 
 
 @tf.function
-def add_jitter(A, jitter, diag=True):
-    """Adds jitter the the diagonal of batches of square matrices
+def add_epsilon(A, epsilon, diag=True):
+    """Adds epsilon the the diagonal of batches of square matrices
     or all elements of matrices.
 
     Parameters
     ----------
     A : tf.Tensor
         Batches of square matrices or vectors. Shape is (..., N, N) or (..., N)
-    jitter : float
+    epsilon : float
         Small error added to the diagonal of the matrices or every element of the vectors.
     diag : bool
-        Do we want to add jitter to the diagonal?
+        Do we want to add epsilon to the diagonal?
     """
     A_shape = tf.shape(A)
     if diag:
         e = tf.eye(A_shape[-1])
 
     else:
-        # Add jitter to all elements
+        # Add epsilon to all elements
         e = 1.0
 
-    return A + jitter * e
+    return A + epsilon * e
 
 
 def NormalizationLayer(norm_type, *args, **kwargs):
@@ -170,12 +170,12 @@ class ZeroLayer(layers.Layer):
 class InverseCholeskyLayer(layers.Layer):
     """Layer for getting Cholesky vectors from postive definite symmetric matrices."""
 
-    def __init__(self, jitter, **kwargs):
+    def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
-        self.jitter = jitter
+        self.epsilon = epsilon
 
     def call(self, inputs):
-        inputs = add_jitter(inputs, self.jitter)
+        inputs = add_epsilon(inputs, self.epsilon)
         bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
         return bijector.inverse(inputs)
 
@@ -188,17 +188,17 @@ class SampleNormalDistributionLayer(layers.Layer):
 
     Parameters
     ----------
-    jitter : float
+    epsilon : float
         Error to add to the standard deviations for numerical stability.
     """
 
-    def __init__(self, jitter, **kwargs):
+    def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
-        self.jitter = jitter
+        self.epsilon = epsilon
 
     def call(self, inputs, training=None, **kwargs):
         mu, sigma = inputs
-        sigma = add_jitter(sigma, self.jitter, diag=False)
+        sigma = add_epsilon(sigma, self.epsilon, diag=False)
         if training:
             N = tfp.distributions.Normal(loc=mu, scale=sigma)
             return N.sample()
@@ -398,7 +398,7 @@ class CovarianceMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
-    jitter : float
+    epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for matrices.
@@ -410,7 +410,7 @@ class CovarianceMatricesLayer(layers.Layer):
         m,
         learn,
         initial_value,
-        jitter,
+        epsilon,
         regularizer=None,
         **kwargs,
     ):
@@ -418,7 +418,7 @@ class CovarianceMatricesLayer(layers.Layer):
         self.n = n
         self.m = m
         self.learn = learn
-        self.jitter = jitter
+        self.epsilon = epsilon
 
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
@@ -474,7 +474,7 @@ class CovarianceMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         covariances = self.bijector(self.flattened_cholesky_factors)
-        covariances = add_jitter(covariances, self.jitter)
+        covariances = add_epsilon(covariances, self.epsilon)
         if self.regularizer is not None:
             reg = self.regularizer(covariances)
 
@@ -506,7 +506,7 @@ class CorrelationMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
-    jitter : float
+    epsilon : float
         Error added to the diagonal of correlation matrices for numerical stability.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for matrices.
@@ -518,7 +518,7 @@ class CorrelationMatricesLayer(layers.Layer):
         m,
         learn,
         initial_value,
-        jitter,
+        epsilon,
         regularizer=None,
         **kwargs,
     ):
@@ -526,7 +526,7 @@ class CorrelationMatricesLayer(layers.Layer):
         self.n = n
         self.m = m
         self.learn = learn
-        self.jitter = jitter
+        self.epsilon = epsilon
 
         # Bijector used to transform learnable vectors to correlation matrices
         self.bijector = tfb.Chain(
@@ -584,7 +584,7 @@ class CorrelationMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         correlations = self.bijector(self.flattened_cholesky_factors)
-        correlations = add_jitter(correlations, self.jitter)
+        correlations = add_epsilon(correlations, self.epsilon)
         if self.regularizer is not None:
             reg = self.regularizer(correlations)
 
@@ -614,7 +614,7 @@ class DiagonalMatricesLayer(layers.Layer):
         Should the matrices be learnable?
     initial_value : np.ndarray
         Initial values for the matrices.
-    jitter : float
+    epsilon : float
         Error added to the diagonal matrices for numerical stability.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the diagonal entries.
@@ -626,7 +626,7 @@ class DiagonalMatricesLayer(layers.Layer):
         m,
         learn,
         initial_value,
-        jitter,
+        epsilon,
         regularizer=None,
         **kwargs,
     ):
@@ -634,7 +634,7 @@ class DiagonalMatricesLayer(layers.Layer):
         self.n = n
         self.m = m
         self.learn = learn
-        self.jitter = jitter
+        self.epsilon = epsilon
 
         # Softplus transformation to ensure diagonal is positive
         self.bijector = tfb.Softplus()
@@ -690,7 +690,7 @@ class DiagonalMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         D = self.bijector(self.diagonals)
-        D = add_jitter(D, self.jitter, diag=False)
+        D = add_epsilon(D, self.epsilon, diag=False)
         if self.regularizer is not None:
             reg = self.regularizer(D)
 
@@ -808,18 +808,18 @@ class LogLikelihoodLossLayer(layers.Layer):
 
     Parameters
     ----------
-    jitter : float
+    epsilon : float
         Error added to the covariance matrices for numerical stability.
     """
 
-    def __init__(self, jitter, **kwargs):
+    def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
-        self.jitter = jitter
+        self.epsilon = epsilon
 
     def call(self, inputs):
         x, mu, sigma = inputs
 
-        sigma = add_jitter(sigma, self.jitter)
+        sigma = add_epsilon(sigma, self.epsilon)
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
@@ -886,22 +886,22 @@ class KLDivergenceLayer(layers.Layer):
 
     Parameters
     ----------
-    jitter : float
+    epsilon : float
         Error added to the standard deviations for numerical stability.
     clip_start : int
         Index to clip the sequences inputted to this layer.
     """
 
-    def __init__(self, jitter, clip_start=0, **kwargs):
+    def __init__(self, epsilon, clip_start=0, **kwargs):
         super().__init__(**kwargs)
         self.clip_start = clip_start
-        self.jitter = jitter
+        self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
 
-        inference_sigma = add_jitter(inference_sigma, self.jitter, diag=False)
-        model_sigma = add_jitter(model_sigma, self.jitter, diag=False)
+        inference_sigma = add_epsilon(inference_sigma, self.epsilon, diag=False)
+        model_sigma = add_epsilon(model_sigma, self.epsilon, diag=False)
 
         # The model network predicts one time step into the future compared to
         # the inference network. We clip the sequences to ensure we are comparing
@@ -1120,18 +1120,18 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
-    jitter : float
+    epsilon : float
         Error added to the covariances for numerical stability.
     """
 
-    def __init__(self, n_states, jitter, **kwargs):
+    def __init__(self, n_states, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
-        self.jitter = jitter
+        self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs = inputs
-        sigma = add_jitter(sigma, self.jitter)
+        sigma = add_epsilon(sigma, self.epsilon)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1214,14 +1214,14 @@ class SubjectMapLayer(layers.Layer):
     ----------
     which_map : str
         Which spatial map are we using? Must be one of 'means' and 'covariances'.
-    jitter : float
+    epsilon : float
         Error added to the diagonal of covariances for numerical stability.
     """
 
-    def __init__(self, which_map, jitter, **kwargs):
+    def __init__(self, which_map, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.which_map = which_map
-        self.jitter = jitter
+        self.epsilon = epsilon
         if which_map == "covariances":
             self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
         elif which_map != "means":
@@ -1239,7 +1239,7 @@ class SubjectMapLayer(layers.Layer):
 
         if self.which_map == "covariances":
             subject_map = self.bijector(subject_map)
-            subject_map = add_jitter(subject_map, self.jitter)
+            subject_map = add_epsilon(subject_map, self.epsilon)
 
         return subject_map
 
@@ -1282,19 +1282,19 @@ class SubjectMapKLDivergenceLayer(layers.Layer):
 
     Parameters
     ----------
-    jitter : float
+    epsilon : float
         Error added to the standard deviations for numerical stability.
     """
 
-    def __init__(self, jitter, n_batches=1, **kwargs):
+    def __init__(self, epsilon, n_batches=1, **kwargs):
         super().__init__(**kwargs)
-        self.jitter = jitter
+        self.epsilon = epsilon
         self.n_batches = n_batches
 
     def call(self, inputs, **kwargs):
         data, inference_mu, inference_sigma, model_sigma = inputs
-        inference_sigma = add_jitter(inference_sigma, self.jitter, diag=False)
-        model_sigma = add_jitter(model_sigma, self.jitter, diag=False)
+        inference_sigma = add_epsilon(inference_sigma, self.epsilon, diag=False)
+        model_sigma = add_epsilon(model_sigma, self.epsilon, diag=False)
 
         prior = tfp.distributions.Normal(loc=0.0, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
