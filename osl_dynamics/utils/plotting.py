@@ -126,8 +126,8 @@ def rough_square_axes(n_plots):
     empty: int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots ** 0.5).astype(int)
-    short = np.ceil(n_plots ** 0.5).astype(int)
+    long = np.floor(n_plots**0.5).astype(int)
+    short = np.ceil(n_plots**0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -1311,7 +1311,12 @@ def plot_matrices(
 
 
 def plot_connections(
-    weights, labels=None, ax=None, cmap="hot", text_color=None, filename=None,
+    weights,
+    labels=None,
+    ax=None,
+    cmap="hot",
+    text_color=None,
+    filename=None,
 ):
     """Create a chord diagram representing the values of a matrix.
 

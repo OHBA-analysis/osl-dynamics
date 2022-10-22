@@ -30,7 +30,10 @@ class MAR:
     """
 
     def __init__(
-        self, coeffs, covs, random_seed=None,
+        self,
+        coeffs,
+        covs,
+        random_seed=None,
     ):
         # Validation
         if coeffs.ndim != 4:
@@ -70,7 +73,9 @@ class MAR:
             time_points_active = mode_time_course[:, i] == 1
             n_time_points_active = np.count_nonzero(time_points_active)
             data[time_points_active] = self._rng.multivariate_normal(
-                np.zeros(self.n_channels), self.covs[i], size=n_time_points_active,
+                np.zeros(self.n_channels),
+                self.covs[i],
+                size=n_time_points_active,
             )
 
         # Generate the MAR process

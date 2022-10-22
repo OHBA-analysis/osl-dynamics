@@ -132,7 +132,9 @@ class RW:
                     self.prepared = True
 
     def load_raw_data(
-        self, data_field, time_axis_first,
+        self,
+        data_field,
+        time_axis_first,
     ):
         """Import data into a list of memory maps.
 
@@ -254,7 +256,10 @@ def list_dir(path, keep_ext=None):
 
 
 def load_data(
-    data, data_field="X", mmap_location=None, mmap_mode="r+",
+    data,
+    data_field="X",
+    mmap_location=None,
+    mmap_mode="r+",
 ):
     """Loads time series data.
 

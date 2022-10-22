@@ -40,5 +40,7 @@ conn_map = connectivity.threshold(conn_map, percentile=95, subtract_mean=True)
 
 # Plot connectivity maps
 connectivity.save(
-    connectivity_map=conn_map, filename="coh_.png", parcellation_file=parcellation_file,
+    connectivity_map=conn_map,
+    filename="coh_.png",
+    parcellation_file=parcellation_file,
 )

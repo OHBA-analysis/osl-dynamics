@@ -374,10 +374,12 @@ class Model(VariationalInferenceModelBase):
     ):
         """Wrapper for set_group_means and set_group_covariances."""
         self.set_group_means(
-            observation_model_parameters[0], update_initializer=update_initializer,
+            observation_model_parameters[0],
+            update_initializer=update_initializer,
         )
         self.set_group_covariances(
-            observation_model_parameters[1], update_initializer=update_initializer,
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def set_bayesian_kl_scaling(self, training_dataset):
@@ -439,7 +441,9 @@ def _model_structure(config):
     theta_layer = SampleNormalDistributionLayer(name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature, config.learn_alpha_temperature, name="alpha",
+        config.initial_alpha_temperature,
+        config.learn_alpha_temperature,
+        name="alpha",
     )
 
     # Data flow
@@ -519,7 +523,8 @@ def _model_structure(config):
 
         if config.learn_covariances:
             covs_dev_layer = layers.Dense(
-                config.n_channels * (config.n_channels + 1) // 2, name="covs_dev",
+                config.n_channels * (config.n_channels + 1) // 2,
+                name="covs_dev",
             )
         else:
             covs_dev_layer = ZeroLayer(
@@ -532,10 +537,14 @@ def _model_structure(config):
             )
 
         means_dev_reg_layer = DummyLayer(
-            config.dev_reg, config.dev_reg_strength, name="means_dev_reg",
+            config.dev_reg,
+            config.dev_reg_strength,
+            name="means_dev_reg",
         )
         covs_dev_reg_layer = DummyLayer(
-            config.dev_reg, config.dev_reg_strength, name="covs_dev_reg",
+            config.dev_reg,
+            config.dev_reg_strength,
+            name="covs_dev_reg",
         )
     # ------------------------------------- #
     # Layers specific to the Bayesian model #
@@ -693,5 +702,7 @@ def _model_structure(config):
         kl_loss = kl_loss_layer([kl_div, means_dev_kl_loss, covs_dev_kl_loss])
 
     return tf.keras.Model(
-        inputs=[data, subj_id], outputs=[ll_loss, kl_loss, alpha], name="Se-DyNeMo",
+        inputs=[data, subj_id],
+        outputs=[ll_loss, kl_loss, alpha],
+        name="Se-DyNeMo",
     )

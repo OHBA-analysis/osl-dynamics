@@ -11,7 +11,9 @@ from osl_dynamics.utils.misc import override_dict_defaults
 
 
 def argmax_time_courses(
-    alpha, concatenate=False, n_modes=None,
+    alpha,
+    concatenate=False,
+    n_modes=None,
 ):
     """Calculates mode time courses.
 
@@ -362,7 +364,9 @@ def fractional_occupancies(mode_time_course):
 
 
 def fano_factor(
-    time_courses, window_lengths, sampling_frequency=1.0,
+    time_courses,
+    window_lengths,
+    sampling_frequency=1.0,
 ):
     """Calculates the FANO factor.
 
@@ -462,7 +466,9 @@ def fit_gmm(
         # GMM plot filename
         if gmm_filename is not None:
             plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
-                fn=Path(gmm_filename), mode=mode, w=len(str(n_modes)),
+                fn=Path(gmm_filename),
+                mode=mode,
+                w=len(str(n_modes)),
             )
         else:
             plot_filename = None

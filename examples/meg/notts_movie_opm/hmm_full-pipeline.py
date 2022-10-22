@@ -13,8 +13,8 @@ from osl_dynamics.models.hmm import Config, Model
 from osl_dynamics.utils import plotting
 import matplotlib.pyplot as plt
 
-subjects_dir = '/Users/woolrich/homedir/vols_data/notts_movie_opm'
-subjects_dir = '/well/woolrich/projects/notts_movie_opm'
+subjects_dir = "/Users/woolrich/homedir/vols_data/notts_movie_opm"
+subjects_dir = "/well/woolrich/projects/notts_movie_opm"
 
 run = 1
 
@@ -25,11 +25,11 @@ subjects_to_do = np.arange(0, 10)
 sessions_to_do = np.arange(0, 2)
 subj_sess_2exclude = np.zeros([10, 2]).astype(bool)
 
-#subj_sess_2exclude = np.ones([10, 2]).astype(bool)
-#subj_sess_2exclude[0:2,:] = False
+# subj_sess_2exclude = np.ones([10, 2]).astype(bool)
+# subj_sess_2exclude[0:2,:] = False
 
 # GPU settings
-#tf_ops.gpu_growth()
+# tf_ops.gpu_growth()
 
 # Settings
 config = Config(
@@ -50,16 +50,16 @@ config = Config(
 subjects = []
 sf_files = []
 
-recon_dir = op.join(subjects_dir, 'recon')
+recon_dir = op.join(subjects_dir, "recon")
 
 for sub in subjects_to_do:
     for ses in sessions_to_do:
         if not subj_sess_2exclude[sub, ses]:
 
-            sub_dir = 'sub-' + ('{}'.format(subjects_to_do[sub]+1)).zfill(3)
-            ses_dir = 'ses-' + ('{}'.format(sessions_to_do[ses]+1)).zfill(3)
-            subject = sub_dir + '_' + ses_dir
-            sf_file = op.join(recon_dir, subject + '/sflip_parc.npy')
+            sub_dir = "sub-" + ("{}".format(subjects_to_do[sub] + 1)).zfill(3)
+            ses_dir = "ses-" + ("{}".format(sessions_to_do[ses] + 1)).zfill(3)
+            subject = sub_dir + "_" + ses_dir
+            sf_file = op.join(recon_dir, subject + "/sflip_parc.npy")
 
             subjects.append(subject)
             sf_files.append(sf_file)
@@ -96,7 +96,9 @@ if not use_pre_trained_model:
     # --------------------------------------------------------- #
 
     # Choose subjects at random
-    subjects_used = np.random.choice(range(len(subjects)), n_subject_init_runs, replace=False)
+    subjects_used = np.random.choice(
+        range(len(subjects)), n_subject_init_runs, replace=False
+    )
 
     if True and len(subjects_used) > 0:
         # Train the model a few times and keep the best one
@@ -113,7 +115,7 @@ if not use_pre_trained_model:
             model.reset_weights()
             model.compile()
             history = model.fit(subject_dataset)
-            loss = history['loss'][-1]
+            loss = history["loss"][-1]
             losses.append(loss)
             print(f"Subject {subject} loss: {loss}")
 
@@ -163,7 +165,7 @@ else:
 # ------------- #
 
 plt.figure()
-plt.plot(history['loss'])
+plt.plot(history["loss"])
 
 # ------------- #
 # Mode Analysis #
@@ -258,8 +260,10 @@ gcoh = np.average(coh, axis=0, weights=w)
 # --------------------------- #
 # Source reconstruction files
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
-parcellation_file = op.join('/Users/woolrich/Dropbox/vols_scripts/hmm_misc_funcs/parcellations',
-                             'fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz')
+parcellation_file = op.join(
+    "/Users/woolrich/Dropbox/vols_scripts/hmm_misc_funcs/parcellations",
+    "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+)
 
 # Calculate relative (regression coefficients only) power maps using the
 # mode PSDs
@@ -294,5 +298,3 @@ analysis.connectivity.save(
     filename=f"{maps_dir}/conn_.png",
     parcellation_file=parcellation_file,
 )
-
-
