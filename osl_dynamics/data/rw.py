@@ -328,6 +328,7 @@ def load_data(
 
     # Load data as memmap
     data = np.load(mmap_location, mmap_mode=mmap_mode)
+    data = data.astype(np.float32)
 
     return data
 
