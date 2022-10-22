@@ -33,7 +33,9 @@ parcellation_file = (
 
 # Convert from the time-delay embedded/PCA space to the original source space
 power_map = modes.raw_covariances(
-    covs, n_embeddings=n_embeddings, pca_components=pca_components,
+    covs,
+    n_embeddings=n_embeddings,
+    pca_components=pca_components,
 )
 
 # Save the power maps

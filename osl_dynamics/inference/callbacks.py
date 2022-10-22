@@ -23,7 +23,10 @@ class DiceCoefficientCallback(callbacks.Callback):
     """
 
     def __init__(
-        self, prediction_dataset, ground_truth_mode_time_course, mode_names=None,
+        self,
+        prediction_dataset,
+        ground_truth_mode_time_course,
+        mode_names=None,
     ):
         super().__init__()
         self.prediction_dataset = prediction_dataset
@@ -112,7 +115,11 @@ class KLAnnealingCallback(callbacks.Callback):
     """
 
     def __init__(
-        self, curve, annealing_sharpness, n_annealing_epochs, n_cycles=1,
+        self,
+        curve,
+        annealing_sharpness,
+        n_annealing_epochs,
+        n_cycles=1,
     ):
         if curve not in ["linear", "tanh"]:
             raise NotImplementedError(curve)
@@ -176,7 +183,10 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
 
         kwargs.update(
             dict(
-                save_weights_only=True, monitor="loss", mode="min", save_best_only=True,
+                save_weights_only=True,
+                monitor="loss",
+                mode="min",
+                save_best_only=True,
             )
         )
 

@@ -15,7 +15,10 @@ from osl_dynamics.analysis.spectral import get_frequency_args_range
 
 
 def variance_from_spectra(
-    frequencies, power_spectra, components=None, frequency_range=None,
+    frequencies,
+    power_spectra,
+    components=None,
+    frequency_range=None,
 ):
     """Calculates variance from power spectra.
 

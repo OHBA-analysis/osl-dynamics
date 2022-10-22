@@ -143,7 +143,11 @@ class Processing:
         self.subjects = self.prepared_data_memmaps
 
     def prepare_tde(
-        self, n_embeddings=1, n_pca_components=None, pca_components=None, whiten=False,
+        self,
+        n_embeddings=1,
+        n_pca_components=None,
+        pca_components=None,
+        whiten=False,
     ):
         """Prepares time-delay embedded data to train the model with."""
 
@@ -231,7 +235,11 @@ class Processing:
         self.prepared_data_memmaps = []
 
     def trim_time_series(
-        self, sequence_length=None, n_embeddings=1, prepared=True, concatenate=False,
+        self,
+        sequence_length=None,
+        n_embeddings=1,
+        prepared=True,
+        concatenate=False,
     ):
         """Trims the data time series.
 
@@ -291,7 +299,9 @@ class Processing:
 
 
 def standardize(
-    time_series, axis=0, create_copy=True,
+    time_series,
+    axis=0,
+    create_copy=True,
 ):
     """Standardizes a time series.
 
@@ -352,7 +362,10 @@ def time_embed(time_series, n_embeddings):
 
 
 def trim_time_series(
-    time_series, sequence_length, discontinuities=None, concatenate=False,
+    time_series,
+    sequence_length,
+    discontinuities=None,
+    concatenate=False,
 ):
     """Trims a time seris.
 

@@ -274,7 +274,7 @@ class MockArray:
             buffer_size = 0
         else:
             # Set buffer size to 16 MiB to hide the Python loop overhead.
-            buffer_size = max(16 * 1024 ** 2 // self.dtype.itemsize, 1)
+            buffer_size = max(16 * 1024**2 // self.dtype.itemsize, 1)
 
         n_chunks, remainder = np.divmod(
             np.product(self.shape) * self.dtype.itemsize, buffer_size

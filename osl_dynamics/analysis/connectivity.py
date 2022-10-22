@@ -16,7 +16,10 @@ from osl_dynamics.utils.misc import override_dict_defaults
 
 
 def covariance_from_spectra(
-    frequencies, power_spectra, components=None, frequency_range=None,
+    frequencies,
+    power_spectra,
+    components=None,
+    frequency_range=None,
 ):
     """Calculates variance from power spectra.
 
@@ -98,7 +101,10 @@ def covariance_from_spectra(
 
 
 def mean_coherence_from_spectra(
-    frequencies, coherence, components=None, frequency_range=None,
+    frequencies,
+    coherence,
+    components=None,
+    frequency_range=None,
 ):
     """Calculates mean coherence from spectra.
 
@@ -320,12 +326,14 @@ def fit_gmm(
 
             # Output filename
             if filename is not None:
-                plot_filename = "{fn.parent}/{fn.stem}{i:0{w1}d}_{j:0{w2}d}{fn.suffix}".format(
-                    fn=Path(filename),
-                    i=i,
-                    j=j,
-                    w1=len(str(n_components)),
-                    w2=len(str(n_modes)),
+                plot_filename = (
+                    "{fn.parent}/{fn.stem}{i:0{w1}d}_{j:0{w2}d}{fn.suffix}".format(
+                        fn=Path(filename),
+                        i=i,
+                        j=j,
+                        w1=len(str(n_components)),
+                        w2=len(str(n_modes)),
+                    )
                 )
             else:
                 plot_filename = None

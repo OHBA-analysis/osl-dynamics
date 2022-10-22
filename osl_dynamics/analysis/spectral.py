@@ -62,7 +62,11 @@ def coherence_spectra(power_spectra, print_message=True):
 
 
 def decompose_spectra(
-    coherences, n_components, max_iter=50000, random_state=None, verbose=0,
+    coherences,
+    n_components,
+    max_iter=50000,
+    random_state=None,
+    verbose=0,
 ):
     """Performs spectral decomposition using coherences.
 
@@ -130,7 +134,10 @@ def decompose_spectra(
 
 
 def fourier_transform(
-    data, nfft, args_range=None, one_side=False,
+    data,
+    nfft,
+    args_range=None,
+    one_side=False,
 ):
     """Calculates a Fast Fourier Transform (FFT).
 
@@ -265,7 +272,10 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_f=512):
 
 
 def mode_covariance_spectra(
-    autocorrelation_function, sampling_frequency, nfft=64, frequency_range=None,
+    autocorrelation_function,
+    sampling_frequency,
+    nfft=64,
+    frequency_range=None,
 ):
     """Calculates spectra from the autocorrelation function.
 
@@ -318,7 +328,7 @@ def mode_covariance_spectra(
     power_spectra = abs(fourier_transform(autocorrelation_function, nfft, args_range))
 
     # Normalise the power spectra
-    power_spectra /= nfft ** 2
+    power_spectra /= nfft**2
 
     # Coherences for each mode
     coherences = coherence_spectra(power_spectra)
@@ -719,7 +729,10 @@ def regression_spectra(
             n_sub_windows=n_sub_windows,
         )
         a = time_series.window_mean(
-            alpha[i], window_length, step_size=step_size, n_sub_windows=n_sub_windows,
+            alpha[i],
+            window_length,
+            step_size=step_size,
+            n_sub_windows=n_sub_windows,
         )
         coefs, intercept = regression.linear(a, p, fit_intercept=True, normalize=True)
         Pj.append([coefs, [intercept] * coefs.shape[0]])
@@ -920,6 +933,6 @@ def spectrogram(
             P[i] = np.mean(XX_sub_window, axis=0)
 
     # Scaling for the periodograms
-    P /= sampling_frequency * np.sum(window ** 2)
+    P /= sampling_frequency * np.sum(window**2)
 
     return t, f, P
