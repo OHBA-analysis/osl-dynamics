@@ -32,7 +32,7 @@ alp = hmm.state_time_course()
 
 # Sanity check: make sure the length of alphas match the data
 # for i in range(len(ts)):
-#     print(ts[i].shape, alp.shape[i])
+#     print(ts[i].shape, alp[i].shape)
 
 # Calculate mode spectra
 f, psd, coh, w = spectral.regression_spectra(
