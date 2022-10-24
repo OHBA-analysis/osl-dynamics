@@ -1,12 +1,8 @@
 """Hidden Markov Model (HMM).
 
-NOTE:
-
-- This model is still under development.
-- This model requires a C library which has been compiled for BMRC, but will need to be recompiled if running on a different computer. The C library can be found on BMRC here: /well/woolrich/projects/software/hmm_inference_libc
-
 """
 
+import sys
 import os.path as op
 from dataclasses import dataclass
 
@@ -25,15 +21,7 @@ from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
 )
 
-from ctypes import c_void_p, c_double, c_int, CDLL
-from numpy.ctypeslib import ndpointer
-
-# Load a C library for hidden state inference.
-# This library has has already been compiled for BMRC.
-# Please re-compile if running on a different computer with:
-# `python setup.py build`, and update the path.
-libfile = "/well/woolrich/projects/software/hmm_inference_libc/build/lib.linux-x86_64-cpython-310/hidden_state_inference.so"
-hidden_state_inference = CDLL(libfile)
+EPS = sys.float_info.epsilon
 
 
 @dataclass
@@ -177,6 +165,10 @@ class Model(ModelBase):
                 if self.config.learn_trans_prob:
                     self._update_trans_prob(gamma, xi)
 
+                # Reshape gamma: (batch_size*sequence_length, n_states)
+                # -> (batch_size, sequence_length, n_states)
+                gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
+
                 # Update observation model
                 training_data = np.concatenate([x, gamma], axis=2)
                 h = self.model.fit(training_data, epochs=1, verbose=0)
@@ -271,71 +263,80 @@ class Model(ModelBase):
             Probability of hidden state given child and parent states, given data.
             Shape is (batch_size*sequence_length - 1, n_states*n_states).
         """
-        # Would be order>0 if observation model is MAR for example,
-        # for MVN observation model order=0
-        order = 0
 
+        # Get the likelihood
         likelihood = self._get_likelihood(x)
-        n_samples = likelihood.shape[1] * likelihood.shape[2]
-        likelihood = np.reshape(likelihood, [-1, n_samples])  # (n_states, n_samples)
+        n_states, batch_size, sequence_length = likelihood.shape
+        n_samples = batch_size * sequence_length
 
-        # Outputs
-        gamma = np.zeros(((n_samples - order), self.config.n_states))
-        xi = np.zeros(
-            ((n_samples - 1 - order), self.config.n_states * self.config.n_states)
-        )
-        scale = np.zeros((n_samples, 1))
+        # Use Baum-Welch algorithm to calculate gamma, xi
+        B = likelihood.reshape(n_states, n_samples)
+        Pi_0 = self.state_probs_t0
+        P = self.trans_prob
 
-        # We need to have numpy contiguous arrays (items in array are in contiguous
-        # locations in memory) to pass into the C++ update function
-        gamma_cont = np.ascontiguousarray(gamma.T, np.double)
-        xi_cont = np.ascontiguousarray(xi.T, np.double)
-        scale_cont = np.ascontiguousarray(scale.T, np.double)
+        gamma, xi = self._baum_welch(B, Pi_0, P)
 
-        # Inputs
-        # We need to have numpy contiguous arrays (items in array are in contiguous
-        # locations in memory) to pass into the C++ update function
-        B_cont = np.ascontiguousarray(likelihood, np.double)
-        Pi_0_cont = np.ascontiguousarray(self.state_probs_t0.T, np.double)
-        trans_prob_cont = np.ascontiguousarray(self.trans_prob.T, np.double)
+        return gamma, xi
 
-        # Define C++ class initialiser outputs types
-        hidden_state_inference.new_inferer.restype = c_void_p
+    def _baum_welch(self, B, Pi_0, P):
+        """Hidden state inference using the Baum-Welch algorithm.
 
-        # Define input types
-        hidden_state_inference.new_inferer.argtypes = [c_int, c_int]
+        This is a python implementation of the C++ library: https://github.com/OHBA-analysis/HMM-MAR/tree/master/utils/hidden_state_inference.
 
-        inferer_obj = hidden_state_inference.new_inferer(self.config.n_states, order)
+        Parameters
+        ----------
+        B : np.ndarray
+            Probability of individual data points, under observation model for
+            each state. Shape is (n_states, n_samples).
+        Pi_0 : np.ndarray
+            Initial state probabilities. Shape is (n_states,).
+        P : np.ndarray
+            State transition probabilities. Shape is (n_states, n_states).
 
-        hidden_state_inference.state_inference.argtypes = [
-            c_void_p,
-            ndpointer(dtype=c_double, shape=B_cont.shape),
-            ndpointer(dtype=c_double, shape=Pi_0_cont.shape),
-            ndpointer(dtype=c_double, shape=trans_prob_cont.shape),
-            c_int,
-            ndpointer(dtype=c_double, shape=gamma_cont.shape),
-            ndpointer(dtype=c_double, shape=xi_cont.shape),
-            ndpointer(dtype=c_double, shape=scale_cont.shape),
-        ]
+        Returns
+        -------
+        gamma : np.ndarray
+            Probability of hidden state given data. Shape is (n_samples, n_states).
+        xi : np.ndarray
+            Probability of hidden state given child and parent states, given data.
+            Shape is (n_samples - 1, n_states*n_states).
+        """
+        n_samples = B.shape[1]
+        n_states = B.shape[0]
 
-        # Uses Baum-Welch algorithm to update gamma_cont, xi_cont, scale_cont
-        hidden_state_inference.state_inference(
-            inferer_obj,
-            B_cont,
-            Pi_0_cont,
-            trans_prob_cont,
-            n_samples,
-            gamma_cont,
-            xi_cont,
-            scale_cont,
-        )
+        # Memory allocation
+        alpha = np.empty((n_samples, n_states))
+        beta = np.empty((n_samples, n_states))
+        scale = np.empty(n_samples)
 
-        # Reshape gamma: (n_states, batch_size*sequence_length)
-        # -> (batch_size, sequence_length, n_states)
-        gamma = np.reshape(gamma_cont, [-1, x.shape[0], x.shape[1]])
-        gamma = np.transpose(gamma, [1, 2, 0])
+        # Forward pass
+        alpha[0] = Pi_0 * B[:, 0]
+        scale[0] = np.sum(alpha[0])
+        alpha[0] /= scale[0] + EPS
+        for i in range(1, n_samples):
+            alpha[i] = (alpha[i - 1] @ P) * B[:, i]
+            scale[i] = np.sum(alpha[i])
+            alpha[i] /= scale[i] + EPS
 
-        return gamma, xi_cont
+        # Backward pass
+        beta[-1] = 1.0 / (scale[-1] + EPS)
+        for i in range(2, n_samples + 1):
+            beta[-i] = (beta[-i + 1] * B[:, -i + 1]) @ P.T
+            beta[-i] /= scale[-i] + EPS
+
+        # Marginal probabilities
+        gamma = alpha * beta
+        gamma /= np.sum(gamma, axis=1, keepdims=True)
+
+        b = beta[1:] * B[:, 1:].T
+        xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
+        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
+
+        # Reshape xi:
+        # (n_samples-1, n_states, n_states) -> (n_samples-1, n_states*n_states)
+        xi = xi.reshape(n_samples - 1, n_states * n_states)
+
+        return gamma, xi
 
     def _get_likelihood(self, x):
         """Get likelihood time series.
@@ -377,16 +378,15 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states, n_states).
+            Shape is (batch_size*sequence_length - 1, n_states*n_states).
         """
-        # Reshape gamma: (batch_size, sequence_length, n_states)
-        # -> (n_states, batch_size*sequence_length)
-        gamma = gamma.reshape(-1, gamma.shape[-1]).T
+        gamma = gamma.T
+        xi = xi.T
 
         # Use Baum-Welch algorithm
         phi_interim = np.reshape(
-            np.sum(xi, 1), [self.config.n_states, self.config.n_states]
-        ).T / np.reshape(np.sum(gamma[:, :-1], 1), [self.config.n_states, 1])
+            np.sum(xi, axis=1), [self.config.n_states, self.config.n_states]
+        ).T / np.reshape(np.sum(gamma[:, :-1], axis=1), [self.config.n_states, 1])
 
         # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
@@ -523,7 +523,11 @@ class Model(ModelBase):
         for ds in dataset:
             gamma = []
             for data in ds:
-                g, _ = self._get_state_probs(data["data"])
+                x = data["data"]
+                g, _ = self._get_state_probs(x)
+                # Reshape g: (batch_size*sequence_length, n_states)
+                # -> (batch_size, sequence_length, n_states)
+                g = g.reshape(x.shape[0], x.shape[1], -1)
                 gamma.append(np.concatenate(g))
             alpha.append(np.concatenate(gamma))
 
