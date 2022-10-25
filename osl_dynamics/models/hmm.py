@@ -13,6 +13,7 @@ from tensorflow.keras import layers, utils
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
+from osl_dynamics.inference import initializers
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
@@ -106,15 +107,7 @@ class Model(ModelBase):
         self.model = _model_structure(self.config)
 
         self.rho = 1
-        initial_trans_prob = self.config.initial_trans_prob
-        if initial_trans_prob is None:
-            initial_trans_prob = (
-                np.ones((self.config.n_states, self.config.n_states))
-                * 0.1
-                / (self.config.n_states  - 1)
-            )
-            np.fill_diagonal(initial_trans_prob, 0.9)
-        self.trans_prob = initial_trans_prob
+        self.set_trans_prob(self.config.initial_trans_prob)
 
         if self.config.state_probs_t0 is None:
             self.state_probs_t0 = (
@@ -232,6 +225,73 @@ class Model(ModelBase):
             self.reset()
             training_data.shuffle(100000)
             training_data_subset = training_data.take(n_batches)
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        print(f"Using initialization {best_initialization}")
+        self.reset()
+        self.set_weights(best_weights)
+
+        return best_history
+
+    def random_state_time_course_initialization(
+        self, training_data, n_epochs, n_init, take=1, **kwargs
+    ):
+        """Random subset initialization.
+
+        The model is trained for a few epochs with a sampled state time course
+        initialization. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float
+            Fraction of total batches to take.
+        kwargs : keyword arguments
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            print(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        print("Random subset initialization:")
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_dataset)
+        n_batches = max(round(n_total_batches * take), 1)
+        print(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            print(f"Initialization {n}")
+            self.reset()
+            self.set_random_state_time_course_initialization(training_data)
+            training_dataset.shuffle(100000)
+            training_data_subset = training_dataset.take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             loss = history["loss"][-1]
             if loss < best_loss:
@@ -481,6 +541,23 @@ class Model(ModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
+    def set_trans_prob(self, trans_prob):
+        """Sets the transition probability matrix.
+
+        Parameters
+        ----------
+        trans_prob : np.ndarray
+            State transition probabilities. Shape must be (n_states, n_states).
+        """
+        if trans_prob is None:
+            trans_prob = (
+                np.ones((self.config.n_states, self.config.n_states))
+                * 0.1
+                / (self.config.n_states - 1)
+            )
+            np.fill_diagonal(trans_prob, 0.9)
+        self.trans_prob = trans_prob
+
     def set_random_state_time_course_initialization(self, training_data):
         """Sets the initial means/covariances based on a random state
         time course.
@@ -622,6 +699,11 @@ class Model(ModelBase):
         """
         self.model.load_weights(op.join(dirname, "weights"))
         self.trans_prob = np.load(op.join(dirname, "trans_prob.npy"))
+
+    def reset_weights(self):
+        """Resets trainable variables in the model to their initial value."""
+        initializers.reinitialize_model_weights(self.model)
+        self.set_trans_prob(self.config.initial_trans_prob)
 
 
 def _model_structure(config):
