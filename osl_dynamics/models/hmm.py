@@ -22,7 +22,7 @@ from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
 )
 
-EPS = sys.float_info.min
+MIN = sys.float_info.min
 
 
 @dataclass
@@ -167,6 +167,9 @@ class Model(ModelBase):
                 h = self.model.fit(training_data, epochs=1, verbose=0)
 
                 l = h.history["loss"][0]
+                if np.isnan(l):
+                    print("\nTraining failed!")
+                    return
                 loss.append(l)
                 pb_i.add(1, values=[("loss", l)])
 
@@ -226,12 +229,18 @@ class Model(ModelBase):
             training_data.shuffle(100000)
             training_data_subset = training_data.take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            if history is None:
+                continue
             loss = history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
                 best_loss = loss
                 best_history = history
                 best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            print("Initialization failed")
+            return
 
         print(f"Using initialization {best_initialization}")
         self.reset()
@@ -242,7 +251,7 @@ class Model(ModelBase):
     def random_state_time_course_initialization(
         self, training_data, n_epochs, n_init, take=1, **kwargs
     ):
-        """Random subset initialization.
+        """Random state time course initialization.
 
         The model is trained for a few epochs with a sampled state time course
         initialization. The model with the best free energy is kept.
@@ -272,7 +281,7 @@ class Model(ModelBase):
             )
             return
 
-        print("Random subset initialization:")
+        print("Random state time course initialization:")
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
@@ -293,12 +302,18 @@ class Model(ModelBase):
             training_dataset.shuffle(100000)
             training_data_subset = training_dataset.take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            if history is None:
+                continue
             loss = history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
                 best_loss = loss
                 best_history = history
                 best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            print("Initialization failed")
+            return
 
         print(f"Using initialization {best_initialization}")
         self.reset()
@@ -372,17 +387,17 @@ class Model(ModelBase):
         # Forward pass
         alpha[0] = Pi_0 * B[:, 0]
         scale[0] = np.sum(alpha[0])
-        alpha[0] /= scale[0] + EPS
+        alpha[0] /= scale[0] + MIN
         for i in range(1, n_samples):
             alpha[i] = (alpha[i - 1] @ P) * B[:, i]
             scale[i] = np.sum(alpha[i])
-            alpha[i] /= scale[i] + EPS
+            alpha[i] /= scale[i] + MIN
 
         # Backward pass
-        beta[-1] = 1.0 / (scale[-1] + EPS)
+        beta[-1] = 1.0 / (scale[-1] + MIN)
         for i in range(2, n_samples + 1):
             beta[-i] = (beta[-i + 1] * B[:, -i + 1]) @ P.T
-            beta[-i] /= scale[-i] + EPS
+            beta[-i] /= scale[-i] + MIN
 
         # Marginal probabilities
         gamma = alpha * beta
@@ -390,7 +405,7 @@ class Model(ModelBase):
 
         b = beta[1:] * B[:, 1:].T
         xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
-        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
+        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + MIN
 
         # Reshape xi:
         # (n_samples-1, n_states, n_states) -> (n_samples-1, n_states*n_states)
