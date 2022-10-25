@@ -22,7 +22,7 @@ from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
 )
 
-MIN = sys.float_info.min
+EPS = sys.float_info.epsilon
 
 
 @dataclass
@@ -338,11 +338,9 @@ class Model(ModelBase):
 
         # Get the likelihood
         likelihood = self._get_likelihood(x)
-        n_states, batch_size, sequence_length = likelihood.shape
-        n_samples = batch_size * sequence_length
 
         # Use Baum-Welch algorithm to calculate gamma, xi
-        B = likelihood.reshape(n_states, n_samples)
+        B = likelihood
         Pi_0 = self.state_probs_t0
         P = self.trans_prob
 
@@ -384,17 +382,17 @@ class Model(ModelBase):
         # Forward pass
         alpha[0] = Pi_0 * B[:, 0]
         scale[0] = np.sum(alpha[0])
-        alpha[0] /= scale[0] + MIN
+        alpha[0] /= scale[0] + EPS
         for i in range(1, n_samples):
             alpha[i] = (alpha[i - 1] @ P) * B[:, i]
             scale[i] = np.sum(alpha[i])
-            alpha[i] /= scale[i] + MIN
+            alpha[i] /= scale[i] + EPS
 
         # Backward pass
-        beta[-1] = 1.0 / (scale[-1] + MIN)
+        beta[-1] = 1.0 / (scale[-1] + EPS)
         for i in range(2, n_samples + 1):
             beta[-i] = (beta[-i + 1] * B[:, -i + 1]) @ P.T
-            beta[-i] /= scale[-i] + MIN
+            beta[-i] /= scale[-i] + EPS
 
         # Marginal probabilities
         gamma = alpha * beta
@@ -402,7 +400,7 @@ class Model(ModelBase):
 
         b = beta[1:] * B[:, 1:].T
         xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
-        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + MIN
+        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
 
         # Reshape xi:
         # (n_samples-1, n_states, n_states) -> (n_samples-1, n_states*n_states)
@@ -421,23 +419,37 @@ class Model(ModelBase):
         Returns
         -------
         likelihood : np.ndarray
-            Likelihood time series. Shape is (n_states, batch_size, sequence_length).
+            Likelihood time series. Shape is (n_states, batch_size*sequence_length).
         """
+
+        # Get the current observation model parameters
         means, covs = self.get_means_covariances()
 
         n_states = means.shape[0]
         batch_size = x.shape[0]
         sequence_length = x.shape[1]
+        n_samples = batch_size * sequence_length
 
-        log_likelihood = np.empty([n_states, batch_size, sequence_length])
+        # Calculate the log-likelihood for each state to have generated the
+        # observed data
+        log_likelihood = np.empty([n_states, n_samples])
         for state in range(n_states):
             mvn = tfp.distributions.MultivariateNormalTriL(
                 loc=means[state],
                 scale_tril=tf.linalg.cholesky(covs[state]),
                 allow_nan_stats=False,
             )
-            log_likelihood[state] = mvn.log_prob(x)
+            log_likelihood[state] = np.reshape(mvn.log_prob(x), n_samples)
 
+        # We add a constant to the log-likelihood for time points where all states
+        # have a negative log-likelihood. This is critical for numerical stability.
+        time_points_with_all_states_negative = np.all(log_likelihood < 0, axis=0)
+        if np.any(time_points_with_all_states_negative):
+            log_likelihood[:, time_points_with_all_states_negative] -= np.max(
+                log_likelihood[:, time_points_with_all_states_negative], axis=0
+            )
+
+        # Return the likelihood
         return np.exp(log_likelihood)
 
     def _update_trans_prob(self, gamma, xi):
@@ -458,7 +470,7 @@ class Model(ModelBase):
         # Use Baum-Welch algorithm
         phi_interim = np.reshape(
             np.sum(xi, axis=1), [self.config.n_states, self.config.n_states]
-        ) / np.reshape(np.sum(gamma[:, :-1], axis=1), [self.config.n_states, 1])
+        ).T / np.reshape(np.sum(gamma[:, :-1], axis=1), [self.config.n_states, 1])
 
         # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
