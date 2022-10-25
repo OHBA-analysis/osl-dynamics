@@ -661,10 +661,7 @@ class Model(ModelBase):
             for data in ds:
                 x = data["data"]
                 g, _ = self._get_state_probs(x)
-                # Reshape g: (batch_size*sequence_length, n_states)
-                # -> (batch_size, sequence_length, n_states)
-                g = g.reshape(x.shape[0], x.shape[1], -1)
-                gamma.append(np.concatenate(g))
+                gamma.append(g)
             alpha.append(np.concatenate(gamma))
 
         if concatenate or len(alpha) == 1:
