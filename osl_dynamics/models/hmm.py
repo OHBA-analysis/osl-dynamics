@@ -108,11 +108,7 @@ class Model(ModelBase):
 
         self.rho = 1
         self.set_trans_prob(self.config.initial_trans_prob)
-
-        if self.config.state_probs_t0 is None:
-            self.state_probs_t0 = (
-                np.ones((self.config.n_states,)) / self.config.n_states
-            )  # state probs at time 0
+        self.set_state_probs_t0(self.config.state_probs_t0)
 
     def fit(self, dataset, epochs=None):
         """Fit model to a dataset.
@@ -136,6 +132,7 @@ class Model(ModelBase):
         if epochs is None:
             epochs = self.config.n_epochs
 
+        # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
         history = {"loss": [], "rho": []}
@@ -574,6 +571,19 @@ class Model(ModelBase):
             )
             np.fill_diagonal(trans_prob, 0.9)
         self.trans_prob = trans_prob
+
+    def set_state_probs_t0(self, state_probs_t0):
+        """Set the initial state probabilities.
+
+        Parameters
+        ----------
+        state_probs_t0 : np.ndarray
+            Initial state probabilities. Shape is (n_states,).
+        """
+
+        if state_probs_t0 is None:
+            state_probs_t0 = np.ones((self.config.n_states,)) / self.config.n_states
+        self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
         """Sets the initial means/covariances based on a random state
