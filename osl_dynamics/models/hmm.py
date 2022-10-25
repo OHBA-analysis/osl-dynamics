@@ -423,7 +423,7 @@ class Model(ModelBase):
 
         Returns
         -------
-        np.ndarray
+        likelihood : np.ndarray
             Likelihood time series. Shape is (n_states, batch_size, sequence_length).
         """
         means, covs = self.get_means_covariances()
@@ -493,7 +493,7 @@ class Model(ModelBase):
 
         Returns
         -------
-        np.ndarray
+        stc : np.ndarray
             State time course with shape (n_samples, n_states).
         """
         sim = HMM(self.trans_prob)
@@ -505,7 +505,8 @@ class Model(ModelBase):
 
         Returns
         -------
-        np.ndarray
+        trans_prob : np.ndarray
+            Transition probability matrix. Shape is (n_states, n_states).
         """
         return self.trans_prob
 
@@ -514,7 +515,8 @@ class Model(ModelBase):
 
         Returns
         -------
-        np.ndarary
+        covariances : np.ndarray
+            State covariances. Shape is (n_states, n_channels, n_channels).
         """
         return dynemo_obs.get_covariances(self.model)
 
@@ -649,7 +651,7 @@ class Model(ModelBase):
 
         Returns
         -------
-        list or np.ndarray
+        alpha : list or np.ndarray
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
