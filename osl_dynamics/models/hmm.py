@@ -21,7 +21,7 @@ from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
 )
 
-EPS = sys.float_info.epsilon
+EPS = sys.float_info.min
 
 
 @dataclass
@@ -111,7 +111,7 @@ class Model(ModelBase):
             initial_trans_prob = (
                 np.ones((self.config.n_states, self.config.n_states))
                 * 0.1
-                / self.config.n_states
+                / (self.config.n_states  - 1)
             )
             np.fill_diagonal(initial_trans_prob, 0.9)
         self.trans_prob = initial_trans_prob
@@ -386,7 +386,7 @@ class Model(ModelBase):
         # Use Baum-Welch algorithm
         phi_interim = np.reshape(
             np.sum(xi, axis=1), [self.config.n_states, self.config.n_states]
-        ).T / np.reshape(np.sum(gamma[:, :-1], axis=1), [self.config.n_states, 1])
+        ) / np.reshape(np.sum(gamma[:, :-1], axis=1), [self.config.n_states, 1])
 
         # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
@@ -586,7 +586,7 @@ def _model_structure(config):
         shape=(config.sequence_length, config.n_channels + config.n_states),
         name="inputs",
     )
-    data, gamma = tf.split(inputs, [config.n_channels, config.n_states], 2)
+    data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
     # Definition of layers
     means_layer = MeanVectorsLayer(
