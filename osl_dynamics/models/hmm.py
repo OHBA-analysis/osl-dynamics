@@ -481,6 +481,50 @@ class Model(ModelBase):
         """
         dynemo_obs.set_covariances(self.model, covariances, update_initializer)
 
+    def set_random_state_time_course_initialization(self, training_data):
+        """Sets the initial means/covariances based on a random state
+        time course.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training data object.
+        """
+
+        # Loop over subjects
+        subject_means = []
+        subject_covariances = []
+        for data in training_data.subjects:
+
+            # Sample a state time course using the initial transition
+            # probability matrix
+            stc = self.sample_state_time_course(data.shape[0])
+
+            # Calculate the mean/covariance for each state for this subject
+            m = []
+            C = []
+            for j in range(self.config.n_states):
+                x = data[stc[:, j] == 1]
+                mu_j = np.mean(x, axis=0)
+                sigma_j = np.cov(x, rowvar=False)
+                m.append(mu_j)
+                C.append(sigma_j)
+
+            subject_means.append(m)
+            subject_covariances.append(C)
+
+        # Average over subjects
+        initial_means = np.mean(subject_means, axis=0)
+        initial_covariances = np.mean(subject_covariances, axis=0)
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(initial_means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(initial_covariances, update_initializer=True)
+
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
