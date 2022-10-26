@@ -52,14 +52,16 @@ class Processing:
         pca_components=None,
         load_memmaps=True,
         whiten=False,
+        temporal_filter=None
     ):
         """Prepares data to train the model with.
 
-        If amplitude_envelope=True, performs a Hilbert transform, takes the absolute
-        value and standardizes the data.
+        If amplitude_envelope=True, performs temporal filtering,
+        a Hilbert transform, takes the absolute
+        value and standardizes the data (in that order).
 
-        Otherwise, performs standardization, time embedding and principle component
-        analysis.
+        Otherwise, performs standardization, time embedding
+        and principal component analysis (in that order).
 
         If no arguments are passed, the data is just standardized.
 
@@ -80,6 +82,12 @@ class Processing:
             Should we load the data into the memmaps?
         whiten : bool
             Should we whiten the PCA'ed data?
+        temporal_filter :
+            List of 3 values containing [low_freq, high_freq, sampling_rate] all in Hz
+            If high_freq=-1 then does highpass filter
+            If low_freq=-1 then does lowpass filter
+            Otherwise does bandpass filter between low_freq and high_freq
+            Default is None, which does no filtering
         """
         if self.prepared:
             warnings.warn(
@@ -97,14 +105,14 @@ class Processing:
 
         if amplitude_envelope:
             # Prepare amplitude envelope data
-            self.prepare_amp_env(n_window)
+            self.prepare_amp_env(n_window, temporal_filter)
         else:
             # Prepare time-delay embedded data
             self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
 
         self.prepared = True
 
-    def prepare_amp_env(self, n_window=1):
+    def prepare_amp_env(self, n_window=1, temporal_filter=None):
         """Prepare amplitude envelope data."""
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
@@ -115,8 +123,32 @@ class Processing:
             tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
             self.prepared_data_filenames,
         ):
+            if temporal_filter is not None:
+
+                order = 5
+                if len(temporal_filter) != 3:
+                    raise ValueError("filter must be a list of scalars with the format [low_freq, high_freq, sampling_rate] all in Hz")
+
+                low_freq, high_freq, sampling_rate = temporal_filter
+
+                if low_freq < 0:
+                    btype = 'lowpass'
+                    Wn = high_freq
+                elif high_freq < 0:
+                    btype = 'highpass'
+                    Wn = low_freq
+                else:
+                    btype = 'bandpass'
+                    Wn = temporal_filter[0:2]
+
+                b, a = signal.butter(order, Wn=Wn, btype=btype, fs=sampling_rate)
+                prepared_data = signal.filtfilt(b, a, raw_data_memmap)
+
+            else:
+                prepared_data = raw_data_memmap
+
             # Hilbert transform
-            prepared_data = np.abs(signal.hilbert(raw_data_memmap))
+            prepared_data = np.abs(signal.hilbert(prepared_data))
 
             # Moving average filter
             prepared_data = np.array(
@@ -137,7 +169,7 @@ class Processing:
 
             # Standardise to get the final data
             prepared_data_memmap = standardize(prepared_data, create_copy=False)
-            self.prepared_data_memmaps.append(prepared_data_memmap)
+            self.prepared_data_memmaps.append(prepared_data_memmap.astype(np.float32))
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
