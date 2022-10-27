@@ -17,12 +17,6 @@ osl-dynamics can be installed using the conda environment files in ``/envs``. Fo
     conda activate osld
     pip install -e .
 
-To use the HMM you also need to install armadillo:
-
-.. code-block:: shell
-
-    conda install -c conda-forge armadillo
-
 If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``.
 
 Documentation

@@ -40,12 +40,6 @@ Developers will want to install from source in editable mode:
     conda activate osld
     pip install -e .
 
-To use the HMM you will also need to install armadillo:
-
-::
-
-    conda install -c conda-forge armadillo
-
 Additional packages needed for development can be installed with:
 
 ::
