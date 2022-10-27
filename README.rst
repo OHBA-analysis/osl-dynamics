@@ -11,19 +11,25 @@ osl-dynamics can be installed using the conda environment files in ``/envs``. Fo
 
 .. code-block:: shell
 
-    git clone git@github.com:OHBA-analysis/osl-dynamics.git
+    git clone https://github.com/OHBA-analysis/osl-dynamics.git
     cd osl-dynamics
     conda env create -f envs/linux.yml
     conda activate osld
     pip install -e .
+
+If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``.
+
+Developers might want to clone the repo using SSH:
+
+.. code-block:: shell
+
+    git clone git@github.com:OHBA-analysis/osl-dynamics.git
 
 To use the HMM you also need to install armadillo:
 
 .. code-block:: shell
 
     conda install -c conda-forge armadillo
-
-If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``.
 
 Documentation
 =============
