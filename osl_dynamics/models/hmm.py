@@ -3,13 +3,16 @@
 """
 
 import sys
+import warnings
 import os.path as op
 from dataclasses import dataclass
 
+import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers, utils
+from numba.core.errors import NumbaWarning
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
@@ -21,6 +24,8 @@ from osl_dynamics.inference.layers import (
     CovarianceMatricesLayer,
     CategoricalLogLikelihoodLossLayer,
 )
+
+warnings.filterwarnings("ignore", category=NumbaWarning)
 
 EPS = sys.float_info.epsilon
 
@@ -348,6 +353,7 @@ class Model(ModelBase):
 
         return gamma, xi
 
+    @numba.jit
     def _baum_welch(self, B, Pi_0, P):
         """Hidden state inference using the Baum-Welch algorithm.
 
