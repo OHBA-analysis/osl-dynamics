@@ -21,6 +21,7 @@ class VariationalInferenceModelConfig:
     theta_normalization: Literal[None, "batch", "layer"] = None
     learn_alpha_temperature: bool = None
     initial_alpha_temperature: float = None
+    theta_std_epsilon: float = 1e-6
 
     # KL annealing parameters
     do_kl_annealing: bool = False

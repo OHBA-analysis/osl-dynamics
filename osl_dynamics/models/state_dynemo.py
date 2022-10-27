@@ -80,6 +80,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    epsilon : float
+        Error added to standard deviations for numerical stability.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -133,6 +135,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    epsilon: float = 1e-6
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -215,9 +218,12 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.epsilon,
         name="covs",
     )
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(config.n_states, name="ll_loss")
+    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+        config.n_states, config.epsilon, name="ll_loss"
+    )
 
     mu = means_layer(data)  # data not used
     D = covs_layer(data)  # data not used

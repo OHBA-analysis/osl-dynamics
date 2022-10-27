@@ -14,6 +14,7 @@ from osl_dynamics.models import dynemo_obs
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
+    add_epsilon,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     DiagonalMatricesLayer,
@@ -42,13 +43,21 @@ class Config(BaseModelConfig):
         Length of sequence passed to the generative model.
 
     learn_means : bool
-        Should we make the mean vectors for each mode trainable?
-    learn_covariances : bool
-        Should we make the covariance matrix for each mode trainable?
+        Should we make the mean for each mode trainable?
+    learn_stds : bool
+        Should we make the standard deviation for each mode trainable?
+    learn_fcs : bool
+        Should we make the functional connectivity for each mode trainable?
     initial_means : np.ndarray
-        Initialisation for mean vectors.
-    initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialisation for the mode means.
+    initial_stds : np.ndarray
+        Initialisation for mode standard deviations.
+    initial_fcs : np.ndarray
+        Initialisation for mode functional connectivity matrices.
+    stds_epsilon : float
+        Error added to mode stds for numerical stability.
+    fcs_epsilon : float
+        Error added to mode fcs for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the mean vectors.
     stds_regularizer : tf.keras.regularizers.Regularizer
@@ -83,6 +92,8 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
     initial_fcs: np.ndarray = None
+    stds_epsilon: float = None
+    fcs_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     stds_regularizer: tf.keras.regularizers.Regularizer = None
     fcs_regularizer: tf.keras.regularizers.Regularizer = None
@@ -100,6 +111,18 @@ class Config(BaseModelConfig):
             or self.learn_fcs is None
         ):
             raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
+
+        if self.stds_epsilon is None:
+            if self.learn_stds:
+                self.stds_epsilon = 1e-6
+            else:
+                self.stds_epsilon = 0.0
+
+        if self.fcs_epsilon is None:
+            if self.learn_fcs:
+                self.fcs_epsilon = 1e-6
+            else:
+                self.fcs_epsilon = 0.0
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
@@ -198,6 +221,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     stds_layer = DiagonalMatricesLayer(
@@ -205,6 +229,8 @@ def _model_structure(config):
         config.n_channels,
         config.learn_stds,
         config.initial_stds,
+        config.stds_epsilon,
+        config.stds_regularizer,
         name="stds",
     )
     fcs_layer = CorrelationMatricesLayer(
@@ -212,13 +238,17 @@ def _model_structure(config):
         config.n_channels,
         config.learn_fcs,
         config.initial_fcs,
+        config.fcs_epsilon,
+        config.fcs_regularizer,
         name="fcs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(
+        np.maximum(config.stds_epsilon, config.fcs_epsilon), name="ll_loss"
+    )
 
     # Data flow
     mu = means_layer(data)  # data not used
@@ -242,10 +272,14 @@ def get_means_stds_fcs(model):
     stds_layer = model.get_layer("stds")
     fcs_layer = model.get_layer("fcs")
 
-    means = means_layer.vectors.numpy()
-    stds = tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)).numpy()
-    fcs = fcs_layer.bijector(fcs_layer.flattened_cholesky_factors).numpy()
-    return means, stds, fcs
+    means = means_layer.vectors
+    stds = add_epsilon(
+        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)), stds_layer.epsilon
+    )
+    fcs = add_epsilon(
+        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors), fcs_layer.epsilon
+    )
+    return means.numpy(), stds.numpy(), fcs.numpy()
 
 
 def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):

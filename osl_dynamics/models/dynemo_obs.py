@@ -13,6 +13,7 @@ from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
+    add_epsilon,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
     CovarianceMatricesLayer,
@@ -44,6 +45,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -73,6 +76,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
@@ -84,6 +88,12 @@ class Config(BaseModelConfig):
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
 
 class Model(ModelBase):
@@ -193,12 +203,13 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_epsilon,
         config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
 
     # Data flow
     mu = means_layer(data)  # data not used
@@ -212,17 +223,21 @@ def _model_structure(config):
 
 def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
-    return covs
+    covs = add_epsilon(
+        covs_layer.bijector(covs_layer.flattened_cholesky_factors), covs_layer.epsilon
+    )
+    return covs.numpy()
 
 
 def get_means_covariances(model):
     means_layer = model.get_layer("means")
     covs_layer = model.get_layer("covs")
 
-    means = means_layer.vectors.numpy()
-    covs = covs_layer.bijector(covs_layer.flattened_cholesky_factors).numpy()
-    return means, covs
+    means = means_layer.vectors
+    covs = add_epsilon(
+        covs_layer.bijector(covs_layer.flattened_cholesky_factors), covs_layer.epsilon
+    )
+    return means.numpy(), covs.numpy()
 
 
 def set_means(model, means, update_initializer=True, layer_name="means"):
