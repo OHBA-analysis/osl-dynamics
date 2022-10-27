@@ -7,7 +7,7 @@ import numpy as np
 from osl_dynamics.analysis.spectral import spectrogram, coherence_spectra
 
 
-def functional_connectivity(data):
+def functional_connectivity(data, conn_type="corr"):
     """Calculate functional connectivity (Pearson correlation).
 
     Parameters
@@ -15,6 +15,8 @@ def functional_connectivity(data):
     data : np.ndarray
         Time series data. Shape must be (n_subjects, n_samples, n_channels)
         or (n_samples, n_channels).
+    conn_type : str
+        What metric should we use?"corr" or "cov".
 
     Returns
     -------
@@ -22,9 +24,17 @@ def functional_connectivity(data):
         Functional connectivity. Shape is (n_subjects, n_channels, n_channels)
         or (n_channels, n_channels).
     """
+    if conn_type not in ["corr", "cov"]:
+        raise ValueError(f"conn_type must be 'corr' or 'cov', got: {conn_type}")
+
+    if conn_type == "cov":
+        metric = np.cov
+    else:
+        metric = np.corrcoef
+
     if isinstance(data, np.ndarray):
         data = [data]
-    fc = [np.corrcoef(d, rowvar=False) for d in data]
+    fc = [metric(d, rowvar=False) for d in data]
     return np.squeeze(fc)
 
 
