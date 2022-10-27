@@ -52,6 +52,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
     initial_trans_prob : np.ndarray
         Initialisation for trans prob matrix
     learn_trans_prob : bool
@@ -79,6 +81,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
 
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
@@ -95,6 +98,12 @@ class Config(BaseModelConfig):
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
 
 class Model(ModelBase):
@@ -769,9 +778,12 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_epsilon,
         name="covs",
     )
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(config.n_states, name="ll_loss")
+    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+        config.n_states, config.covariances_epsilon, name="ll_loss"
+    )
 
     # Data flow
     mu = means_layer(data)  # data not used

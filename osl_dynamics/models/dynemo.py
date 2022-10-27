@@ -96,6 +96,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -153,6 +155,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
@@ -174,6 +177,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
 
 class Model(VariationalInferenceModelBase):
@@ -370,7 +379,7 @@ def _model_structure(config):
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-    theta_layer = SampleNormalDistributionLayer(name="theta")
+    theta_layer = SampleNormalDistributionLayer(config.theta_std_epsilon, name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
@@ -407,12 +416,13 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_epsilon,
         config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
 
     # Data flow
     mu = means_layer(inputs)  # inputs not used
@@ -442,7 +452,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_div_layer = KLDivergenceLayer(name="kl_div")
+    kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow

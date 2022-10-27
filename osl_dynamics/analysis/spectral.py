@@ -3,10 +3,12 @@
 """
 
 import warnings
+
 import numpy as np
 from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
+
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression, time_series
 

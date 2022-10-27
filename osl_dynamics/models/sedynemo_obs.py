@@ -13,6 +13,7 @@ import osl_dynamics.data.tf as dtf
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
+    add_epsilon,
     DummyLayer,
     LogLikelihoodLossLayer,
     MeanVectorsLayer,
@@ -52,6 +53,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for group mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -102,6 +105,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
@@ -126,6 +130,12 @@ class Config(BaseModelConfig):
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
     def validate_subject_embedding_parameters(self):
         if (
@@ -319,6 +329,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_epsilon,
         config.covariances_regularizer,
         name="group_covs",
     )
@@ -392,7 +403,9 @@ def _model_structure(config):
             config.n_channels, activation="softplus", name="means_dev_inf_sigma"
         )
         if config.learn_means:
-            means_dev_layer = SampleNormalDistributionLayer(name="means_dev")
+            means_dev_layer = SampleNormalDistributionLayer(
+                config.theta_std_epsilon, name="means_dev"
+            )
         else:
             means_dev_layer = ZeroLayer(
                 shape=(config.n_subjects, config.n_modes, config.n_channels),
@@ -408,7 +421,9 @@ def _model_structure(config):
             name="covs_dev_inf_sigma",
         )
         if config.learn_covariances:
-            covs_dev_layer = SampleNormalDistributionLayer(name="covs_dev")
+            covs_dev_layer = SampleNormalDistributionLayer(
+                config.theta_std_epsilon, name="covs_dev"
+            )
         else:
             covs_dev_layer = ZeroLayer(
                 shape=(
@@ -419,12 +434,16 @@ def _model_structure(config):
                 name="covs_dev",
             )
 
-    subject_means_layer = SubjectMapLayer("means", name="subject_means")
-    subject_covs_layer = SubjectMapLayer("covariances", name="subject_covs")
+    subject_means_layer = SubjectMapLayer(
+        "means", config.covariances_epsilon, name="subject_means"
+    )
+    subject_covs_layer = SubjectMapLayer(
+        "covariances", config.covariances_epsilon, name="subject_covs"
+    )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
         name="mix_subject_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
 
     # Data flow
     subjects = subjects_layer(data)  # data not used here
@@ -435,7 +454,9 @@ def _model_structure(config):
 
     # spatial map embeddings
     means_mode_embedding = means_mode_embedding_layer(group_mu)
-    covs_mode_embedding = covs_mode_embedding_layer(InverseCholeskyLayer()(group_D))
+    covs_mode_embedding = covs_mode_embedding_layer(
+        InverseCholeskyLayer(config.covariances_epsilon)(group_D)
+    )
 
     # Now get the subject specific spatial maps
     means_concat_embedding = means_concat_embedding_layer(
@@ -480,14 +501,14 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                name="means_dev_kl_loss"
+                config.theta_std_epsilon, name="means_dev_kl_loss"
             )
         else:
             means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
         if config.learn_covariances:
             covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                name="covs_dev_kl_loss"
+                config.theta_std_epsilon, name="covs_dev_kl_loss"
             )
         else:
             covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")
@@ -515,11 +536,12 @@ def get_group_means_covariances(model):
     group_means_layer = model.get_layer("group_means")
     group_covs_layer = model.get_layer("group_covs")
 
-    group_means = group_means_layer.vectors.numpy()
-    group_covs = group_covs_layer.bijector(
-        group_covs_layer.flattened_cholesky_factors
-    ).numpy()
-    return group_means, group_covs
+    group_means = group_means_layer.vectors
+    group_covs = add_epsilon(
+        group_covs_layer.bijector(group_covs_layer.flattened_cholesky_factors),
+        group_covs_layer.epsilon,
+    )
+    return group_means.numpy(), group_covs.numpy()
 
 
 def get_subject_embeddings(model):

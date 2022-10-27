@@ -103,6 +103,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for group mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -179,6 +181,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
@@ -212,6 +215,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
     def validate_subject_embedding_parameters(self):
         if (
@@ -438,7 +447,7 @@ def _model_structure(config):
 
     # Layers to sample theta from q(theta) and to convert to mode mixing
     # factors alpha
-    theta_layer = SampleNormalDistributionLayer(name="theta")
+    theta_layer = SampleNormalDistributionLayer(config.theta_std_epsilon, name="theta")
     theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
@@ -484,6 +493,7 @@ def _model_structure(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_epsilon,
         config.covariances_regularizer,
         name="group_covs",
     )
@@ -557,7 +567,9 @@ def _model_structure(config):
             config.n_channels, activation="softplus", name="means_dev_inf_sigma"
         )
         if config.learn_means:
-            means_dev_layer = SampleNormalDistributionLayer(name="means_dev")
+            means_dev_layer = SampleNormalDistributionLayer(
+                config.theta_std_epsilon, name="means_dev"
+            )
         else:
             means_dev_layer = ZeroLayer(
                 shape=(config.n_subjects, config.n_modes, config.n_channels),
@@ -573,7 +585,9 @@ def _model_structure(config):
             name="covs_dev_inf_sigma",
         )
         if config.learn_covariances:
-            covs_dev_layer = SampleNormalDistributionLayer(name="covs_dev")
+            covs_dev_layer = SampleNormalDistributionLayer(
+                config.theta_std_epsilon, name="covs_dev"
+            )
         else:
             covs_dev_layer = ZeroLayer(
                 shape=(
@@ -584,12 +598,16 @@ def _model_structure(config):
                 name="covs_dev",
             )
 
-    subject_means_layer = SubjectMapLayer("means", name="subject_means")
-    subject_covs_layer = SubjectMapLayer("covariances", name="subject_covs")
+    subject_means_layer = SubjectMapLayer(
+        "means", config.theta_std_epsilon, name="subject_means"
+    )
+    subject_covs_layer = SubjectMapLayer(
+        "covariances", config.theta_std_epsilon, name="subject_covs"
+    )
     mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
         name="mix_subject_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(config.theta_std_epsilon, name="ll_loss")
 
     # Data flow
     subjects = subjects_layer(data)  # data not used here
@@ -600,7 +618,9 @@ def _model_structure(config):
 
     # spatial map embeddings
     means_mode_embedding = means_mode_embedding_layer(group_mu)
-    covs_mode_embedding = covs_mode_embedding_layer(InverseCholeskyLayer()(group_D))
+    covs_mode_embedding = covs_mode_embedding_layer(
+        InverseCholeskyLayer(config.covariances_epsilon)(group_D)
+    )
 
     # Now get the subject specific spatial maps
     means_concat_embedding = means_concat_embedding_layer(
@@ -656,7 +676,7 @@ def _model_structure(config):
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
     )
-    kl_div_layer = KLDivergenceLayer(name="kl_div")
+    kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="kl_div")
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
@@ -679,14 +699,14 @@ def _model_structure(config):
         )
         if config.learn_means:
             means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                name="means_dev_kl_loss"
+                config.theta_std_epsilon, name="means_dev_kl_loss"
             )
         else:
             means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
         if config.learn_covariances:
             covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                name="covs_dev_kl_loss"
+                config.theta_std_epsilon, name="covs_dev_kl_loss"
             )
         else:
             covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")

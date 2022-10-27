@@ -94,6 +94,8 @@ class Config(BaseModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    covariances_epsilon : float
+        Error added to mode covariances for numerical stability.
 
     batch_size : int
         Mini-batch size.
@@ -143,10 +145,22 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
 
     def __post_init__(self):
         self.validate_dimension_parameters()
         self.validate_training_parameters()
+        self.validate_observation_model_parameters()
+
+    def validate_observation_model_parameters(self):
+        if self.learn_means is None or self.learn_covariances is None:
+            raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
 
 class Model(ModelBase):
@@ -471,6 +485,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_covariances,
         config.initial_covariances,
+        config.covariances_epsilon,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")

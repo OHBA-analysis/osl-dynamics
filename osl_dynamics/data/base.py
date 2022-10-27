@@ -112,6 +112,16 @@ class Data(RW, Processing, TensorFlowDataset):
         """Number of subjects."""
         return len(self.subjects)
 
+    def set_sampling_frequency(self, sampling_frequency):
+        """Sets the sampling_frequency attribute.
+
+        Parameters
+        ----------
+        sampling_frequency : float
+            Sampling frequency in Hz.
+        """
+        self.sampling_frequency = sampling_frequency
+
     def time_series(self, concatenate=False):
         """Time series data for all subjects.
 
