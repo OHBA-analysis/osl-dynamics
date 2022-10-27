@@ -46,22 +46,24 @@ class Processing:
     def prepare(
         self,
         amplitude_envelope=False,
+        low_freq=None,
+        high_freq=None,
         n_window=1,
         n_embeddings=1,
         n_pca_components=None,
         pca_components=None,
-        load_memmaps=True,
         whiten=False,
-        temporal_filter=None
+        load_memmaps=True,
     ):
         """Prepares data to train the model with.
 
-        If amplitude_envelope=True, performs temporal filtering,
-        a Hilbert transform, takes the absolute
-        value and standardizes the data (in that order).
+        If amplitude_envelope=True, first we filter the data then
+        calculate a Hilbert transform and take the absolute value.
+        We then apply a sliding window moving average. Finally, we
+        standardize the data.
 
-        Otherwise, performs standardization, time embedding
-        and principal component analysis (in that order).
+        Otherwise, we standardize the data, perform time-delay embedding,
+        then PCA, then whiten. Finally, the data is standardized again.
 
         If no arguments are passed, the data is just standardized.
 
@@ -69,25 +71,29 @@ class Processing:
         ----------
         amplitude_envelope : bool
             Should we prepare amplitude envelope data?
+        low_freq : float
+            Frequency in Hz for a high pass filter.
+            Only used if amplitude_envelope=True.
+        high_freq : float
+            Frequency in Hz for a low pass filter.
+            Only used if amplitude_envelope=True.
         n_window : int
             Number of data points in a sliding window to apply to the amplitude
-            envelope data.
+            envelope data. Only used if amplitude_envelope=True.
         n_embeddings : int
             Number of data points to embed the data.
+            Only used if amplitude_envelope=False.
         n_pca_components : int
             Number of PCA components to keep. Default is no PCA.
+            Only used if amplitude_envelope=False.
         pca_components : np.ndarray
             PCA components to apply if they have already been calculated.
-        load_memmaps: bool
-            Should we load the data into the memmaps?
+            Only used if amplitude_envelope=False.
         whiten : bool
             Should we whiten the PCA'ed data?
-        temporal_filter :
-            List of 3 values containing [low_freq, high_freq, sampling_rate] all in Hz
-            If high_freq=-1 then does highpass filter
-            If low_freq=-1 then does lowpass filter
-            Otherwise does bandpass filter between low_freq and high_freq
-            Default is None, which does no filtering
+            Only used if amplitude_envelope=False.
+        load_memmaps: bool
+            Should we load the data into the memmaps?
         """
         if self.prepared:
             warnings.warn(
@@ -95,6 +101,8 @@ class Processing:
             )
 
         self.amplitude_envelope = amplitude_envelope
+        self.low_freq = low_freq
+        self.high_freq = high_freq
         self.n_window = n_window
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
@@ -103,17 +111,26 @@ class Processing:
         self.whiten = whiten
         self.load_memmaps = load_memmaps
 
+        # Prepare data (either amplitude envelope or time-delay embedded)
         if amplitude_envelope:
-            # Prepare amplitude envelope data
-            self.prepare_amp_env(n_window, temporal_filter)
+            self.prepare_amp_env(low_freq, high_freq, n_window)
         else:
-            # Prepare time-delay embedded data
             self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
 
         self.prepared = True
 
-    def prepare_amp_env(self, n_window=1, temporal_filter=None):
+    def prepare_amp_env(self, low_freq=None, high_freq=None, n_window=1):
         """Prepare amplitude envelope data."""
+
+        # Validation
+        if (
+            low_freq is not None or high_freq is not None
+        ) and self.sampling_frequency is None:
+            raise ValueError(
+                "Data.sampling_frequency must be set if we are filtering the data. "
+                + "Use Data.set_sampling_frequency() or pass "
+                + "Data(..., sampling_frequency=...) when creating the Data object."
+            )
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -123,29 +140,10 @@ class Processing:
             tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
             self.prepared_data_filenames,
         ):
-            if temporal_filter is not None:
-
-                order = 5
-                if len(temporal_filter) != 3:
-                    raise ValueError("filter must be a list of scalars with the format [low_freq, high_freq, sampling_rate] all in Hz")
-
-                low_freq, high_freq, sampling_rate = temporal_filter
-
-                if low_freq < 0:
-                    btype = 'lowpass'
-                    Wn = high_freq
-                elif high_freq < 0:
-                    btype = 'highpass'
-                    Wn = low_freq
-                else:
-                    btype = 'bandpass'
-                    Wn = temporal_filter[0:2]
-
-                b, a = signal.butter(order, Wn=Wn, btype=btype, fs=sampling_rate)
-                prepared_data = signal.filtfilt(b, a, raw_data_memmap)
-
-            else:
-                prepared_data = raw_data_memmap
+            # Filtering
+            prepared_data = temporal_filter(
+                raw_data_memmap, low_freq, high_freq, self.sampling_frequency
+            )
 
             # Hilbert transform
             prepared_data = np.abs(signal.hilbert(prepared_data))
@@ -391,6 +389,52 @@ def time_embed(time_series, n_embeddings):
         .T[..., ::-1]
         .reshape(te_shape)
     )
+
+
+def temporal_filter(time_series, low_freq, high_freq, sampling_frequency, order=5):
+    """Apply temporal filtering.
+
+    Parameters
+    ----------
+    time_series : numpy.ndarray
+        Time series data. Shape is (n_samples, n_channels).
+    low_freq : float
+        Frequency in Hz for a high pass filter.
+        Only used if amplitude_envelope=True.
+    high_freq : float
+        Frequency in Hz for a low pass filter.
+        Only used if amplitude_envelope=True.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    order : int
+        Order for a butterworth filter.
+
+    Returns
+    -------
+    filtered_time_series : numpy.ndarray
+        Filtered time series. Shape is (n_samples, n_channels).
+    """
+    if low_freq is None and high_freq is None:
+        # No filtering
+        return time_series
+
+    if low_freq is None and high_freq is not None:
+        btype = "lowpass"
+        Wn = high_freq
+    elif low_freq is not None and high_freq is None:
+        btype = "highpass"
+        Wn = low_freq
+    else:
+        btype = "bandpass"
+        Wn = [low_freq, high_freq]
+
+    # Create the filter
+    b, a = signal.butter(order, Wn=Wn, btype=btype, fs=sampling_frequency)
+
+    # Apply the filter
+    filtered_time_series = signal.filtfilt(b, a, time_series).astype(time_series.dtype)
+
+    return filtered_time_series
 
 
 def trim_time_series(

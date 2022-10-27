@@ -60,16 +60,17 @@ makedirs(static_dir, exist_ok=True)
 # -------------------------------------------------------------
 # %% Plot AECs
 
-temporal_filters = [[4, 7, sampling_frequency], [8, 12, sampling_frequency], [13, 30, sampling_frequency]] # Hz
+temporal_filters = [[4, 7], [8, 12], [13, 30]] # Hz
 
 for temporal_filter in temporal_filters:
 
     # Use prepare data to compute AE
-    # Load data
-    data = Data(sf_files)
-
-    data.prepare(temporal_filter=temporal_filter, amplitude_envelope=True)
-
+    data = Data(sf_files, sampling_frequency=sampling_frequency)
+    data.prepare(
+        low_freq=temporal_filters[0],
+        high_freq=temporal_filters[1],
+        amplitude_envelope=True,
+    )
     ts = data.time_series()
 
     # Calculate functional connectivity (Pearson correlation)
