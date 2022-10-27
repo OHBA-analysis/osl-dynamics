@@ -194,9 +194,9 @@ def gmm_threshold(
     standardize=False,
     one_component_percentile=0,
     n_sigma=0,
-    sklearn_kwargs=None,
+    sklearn_kwargs={},
     filename=None,
-    plot_kwargs=None,
+    plot_kwargs={},
 ):
     """Threshold a connectivity matrix using the GMM method.
 
@@ -253,9 +253,9 @@ def fit_gmm(
     standardize=False,
     one_component_percentile=0,
     n_sigma=0,
-    sklearn_kwargs=None,
+    sklearn_kwargs={},
     filename=None,
-    plot_kwargs=None,
+    plot_kwargs={},
 ):
     """Fit a two component Gaussian mixture model to connections to identify a
     threshold.
@@ -299,7 +299,7 @@ def fit_gmm(
         + "or (n_channels, n_channels).",
     )
 
-    if sklearn_kwargs is None:
+    if sklearn_kwargs == {}:
         sklearn_kwargs = {"max_iter": 5000, "n_init": 10}
 
     # Number of components, modes and channels
