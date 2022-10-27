@@ -15,7 +15,10 @@ from osl_dynamics.analysis.spectral import get_frequency_args_range
 
 
 def variance_from_spectra(
-    frequencies, power_spectra, components=None, frequency_range=None,
+    frequencies,
+    power_spectra,
+    components=None,
+    frequency_range=None,
 ):
     """Calculates variance from power spectra.
 
@@ -240,7 +243,9 @@ def save(
             # A n_channels by n_channels array has been passed,
             # extract the diagonal (the np.copy is needed because np.diagonal
             # returns a read-only array (this started in NumPy 1.9))
-            power_map = np.copy(np.diagonal(power_map, axis1=-2, axis2=-1))
+            power_map = np.copy(np.diagonal(power_map, axis1=-2, axis2=-1))[
+                np.newaxis, ...
+            ]
     else:
         power_map = power_map[np.newaxis, ...]
 

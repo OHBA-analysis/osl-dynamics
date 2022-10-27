@@ -24,10 +24,6 @@ covariances = hmm.covariances
 # Convert the covariance matrix to a correlation matrix
 correlations = cov2corr(covariances)
 
-# Files used to source reconstruct the data the HMM was trained on
-mask_file = "MNI152_T1_8mm_brain.nii.gz"
-parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
-
 # We have many options for how to threshold the maps:
 # - Plot the top X % of connections.
 # - Plot the top X % of connections relative to the means across states/modes.
@@ -39,5 +35,5 @@ connectivity.save(
     connectivity_map=conn_map,
     threshold=0.98,
     filename="corr_.png",
-    parcellation_file=parcellation_file,
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
 )

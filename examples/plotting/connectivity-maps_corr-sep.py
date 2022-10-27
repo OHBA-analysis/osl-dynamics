@@ -25,7 +25,6 @@ covariances = hmm.covariances
 correlations = cov2corr(covariances)
 
 # Files used to source reconstruct the data the HMM was trained on
-mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
 
 # We have many options for how to threshold the maps:

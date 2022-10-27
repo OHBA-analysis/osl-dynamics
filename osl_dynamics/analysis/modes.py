@@ -3,11 +3,14 @@
 """
 
 import numpy as np
+
 from osl_dynamics import array_ops
 
 
 def autocorrelation_functions(
-    mode_covariances, n_embeddings, pca_components,
+    mode_covariances,
+    n_embeddings,
+    pca_components,
 ):
     """Auto/cross-correlation function from the mode covariance matrices.
 
@@ -63,7 +66,10 @@ def autocorrelation_functions(
 
 
 def raw_covariances(
-    mode_covariances, n_embeddings, pca_components, zero_lag=False,
+    mode_covariances,
+    n_embeddings,
+    pca_components,
+    zero_lag=False,
 ):
     """Covariance matrix of the raw channels.
 

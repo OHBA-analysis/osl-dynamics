@@ -6,7 +6,11 @@ import numpy as np
 
 
 def epoch(
-    data, time_index, pre=125, post=1000, pad=True,
+    data,
+    time_index,
+    pre=125,
+    post=1000,
+    pad=True,
 ):
     """Transform [time x channel] data to [time x channel x epoch] data.
 
