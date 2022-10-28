@@ -351,7 +351,7 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states*n_states).
+            Shape is (batch_size*sequence_length - 1, n_states, n_states).
         """
 
         # Get the likelihood
@@ -388,7 +388,7 @@ class Model(ModelBase):
             Probability of hidden state given data. Shape is (n_samples, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (n_samples - 1, n_states*n_states).
+            Shape is (n_samples - 1, n_states, n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -403,14 +403,14 @@ class Model(ModelBase):
         scale[0] = np.sum(alpha[0])
         alpha[0] /= scale[0] + EPS
         for i in range(1, n_samples):
-            alpha[i] = (alpha[i - 1] @ P) * B[:, i]
+            alpha[i] = B[:, i] * (alpha[i - 1] @ P)
             scale[i] = np.sum(alpha[i])
             alpha[i] /= scale[i] + EPS
 
         # Backward pass
         beta[-1] = 1.0 / (scale[-1] + EPS)
         for i in range(2, n_samples + 1):
-            beta[-i] = (beta[-i + 1] * B[:, -i + 1]) @ P.T
+            beta[-i] = P @ (beta[-i + 1] * B[:, -i + 1])
             beta[-i] /= scale[-i] + EPS
 
         # Marginal probabilities
@@ -418,12 +418,12 @@ class Model(ModelBase):
         gamma /= np.sum(gamma, axis=1, keepdims=True)
 
         b = beta[1:] * B[:, 1:].T
-        xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
+        xi = (
+            np.expand_dims(alpha[:-1], axis=2)
+            * P[np.newaxis, ...]
+            * np.expand_dims(b, axis=1)
+        )
         xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
-
-        # Reshape xi:
-        # (n_samples-1, n_states, n_states) -> (n_samples-1, n_states*n_states)
-        xi = xi.reshape(n_samples - 1, n_states * n_states)
 
         return gamma, xi
 
@@ -481,15 +481,11 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states*n_states).
+            Shape is (batch_size*sequence_length - 1, n_states, n_states).
         """
-        gamma = gamma.T
-        xi = xi.T
 
         # Use Baum-Welch algorithm
-        phi_interim = np.reshape(
-            np.sum(xi, axis=1), [self.config.n_states, self.config.n_states]
-        ).T / np.reshape(np.sum(gamma[:, :-1], axis=1), [self.config.n_states, 1])
+        phi_interim = np.sum(xi, axis=0) / np.sum(gamma[:-1], axis=0)[:, np.newaxis]
 
         # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
