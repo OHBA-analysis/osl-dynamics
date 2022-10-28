@@ -248,6 +248,7 @@ class Model(ModelBase):
                 best_loss = loss
                 best_history = history
                 best_weights = self.get_weights()
+                best_trans_prob = self.trans_prob
 
         if best_loss == np.Inf:
             print("Initialization failed")
@@ -256,6 +257,7 @@ class Model(ModelBase):
         print(f"Using initialization {best_initialization}")
         self.reset()
         self.set_weights(best_weights)
+        self.set_trans_prob(best_trans_prob)
 
         return best_history
 
@@ -321,6 +323,7 @@ class Model(ModelBase):
                 best_loss = loss
                 best_history = history
                 best_weights = self.get_weights()
+                best_trans_prob = self.trans_prob
 
         if best_loss == np.Inf:
             print("Initialization failed")
@@ -329,6 +332,7 @@ class Model(ModelBase):
         print(f"Using initialization {best_initialization}")
         self.reset()
         self.set_weights(best_weights)
+        self.set_trans_prob(best_trans_prob)
 
         return best_history
 
