@@ -20,9 +20,9 @@ from osl_dynamics import analysis, data, inference
 from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 
-# -------- #
-# Settings #
-# -------- #
+# --------
+# Settings
+
 # GPU settings
 inference.tf_ops.gpu_growth()
 
@@ -61,9 +61,9 @@ makedirs(model_dir, exist_ok=True)
 makedirs(analysis_dir, exist_ok=True)
 makedirs(maps_dir, exist_ok=True)
 
-# ---------------- #
-# Training dataset #
-# ---------------- #
+# ----------------
+# Training dataset
+
 # Directory containing source reconstructed data
 dataset_dir = "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec"
 
@@ -77,16 +77,14 @@ training_data = data.Data(
 # Prepare the data for training
 training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
 
-# --------------------------- #
-# Build the main DyNeMo model #
-# --------------------------- #
+# --------------
+# Model training
+
 print("Building model")
 model = Model(config)
 model.summary()
 
-# ------------------------------------------------------ #
-# Random subject initialisation for the mode covariances #
-# ------------------------------------------------------ #
+# Random subject initialisation for the mode covariances
 model.single_subject_initialization(
     training_data,
     n_kl_annealing_epochs=100,
@@ -94,17 +92,12 @@ model.single_subject_initialization(
     n_init=10,
 )
 
-# -------------------------- #
-# Multi-start initialization #
-# -------------------------- #
+# Multi-start initialization
 init_history = model.multistart_initialization(training_data, n_epochs=20, n_init=10)
 
 with open(f"{model_dir}/init_history.pkl", "wb") as file:
     pickle.dump(init_history.history, file)
 
-# --------------------------------- #
-# Main training on the full dataset #
-# --------------------------------- #
 print("Training final model")
 history = model.fit(
     training_data,
@@ -128,9 +121,9 @@ print(f"training loss: {loss}")
 with open(f"{model_dir}/loss.dat", "w") as file:
     file.write(f"training loss = {loss}\n")
 
-# ------------- #
-# Mode Analysis #
-# ------------- #
+# -------------
+# Mode Analysis
+
 # Alpha time course for each subject
 a = model.get_alpha(training_data)
 
@@ -169,9 +162,9 @@ mean_a_NW = np.mean(np.concatenate(a_NW), axis=0)
 
 print("mean_a_NW:", mean_a_NW)
 
-# ----------------- #
-# Spectral analysis #
-# ----------------- #
+# -----------------
+# Spectral analysis
+
 # Source reconstructed data
 src_rec_data = training_data.trim_time_series(
     sequence_length=config.sequence_length,
@@ -230,9 +223,9 @@ plotting.plot_line(
 # Average subject-specific coherences to get the group-level mode coherences
 gcoh = np.average(coh, axis=0, weights=w)
 
-# --------------------------- #
-# Power and connectivity maps #
-# --------------------------- #
+# ---------------------------
+# Power and connectivity maps
+
 # Source reconstruction files
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file = (
@@ -273,7 +266,7 @@ analysis.connectivity.save(
     parcellation_file=parcellation_file,
 )
 
-# -------- #
-# Clean up #
-# -------- #
+# --------
+# Clean up
+
 training_data.delete_dir()

@@ -420,6 +420,7 @@ class ModelBase:
         model
             Model object.
         """
+        print("Loading model:", filepath)
 
         # Get the config
         with open(f"{filepath}/config.yml", "r") as f:
