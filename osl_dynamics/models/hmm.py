@@ -259,8 +259,7 @@ class Model(ModelBase):
 
         print(f"Using initialization {best_initialization}")
         self.reset()
-        self.set_weights(best_weights)
-        self.set_trans_prob(best_trans_prob)
+        self.set_weights(best_weights, best_trans_prob)
 
         return best_history
 
@@ -334,8 +333,7 @@ class Model(ModelBase):
 
         print(f"Using initialization {best_initialization}")
         self.reset()
-        self.set_weights(best_weights)
-        self.set_trans_prob(best_trans_prob)
+        self.set_weights(best_weights, best_trans_prob)
 
         return best_history
 
@@ -753,6 +751,19 @@ class Model(ModelBase):
         """
         self.model.load_weights(op.join(dirname, "weights"))
         self.trans_prob = np.load(op.join(dirname, "trans_prob.npy"))
+
+    def set_weights(self, weights, trans_prob):
+        """Set model parameter weights.
+
+        Parameters
+        ----------
+        weights : tensorflow weights
+            TensorFlow weights for the observation model.
+        trans_prob : np.ndarray
+            Transition probability matrix.
+        """
+        self.model.set_weights(weights)
+        self.set_trans_prob(trans_prob)
 
     def reset_weights(self):
         """Resets trainable variables in the model to their initial value."""
