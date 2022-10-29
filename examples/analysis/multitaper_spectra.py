@@ -41,6 +41,7 @@ f, psd, coh, w = spectral.multitaper_spectra(
     n_tapers=7,
     frequency_range=[1, 45],
     return_weights=True,
+    n_jobs=5,
 )
 
 # Group average

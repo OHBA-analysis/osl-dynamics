@@ -11,6 +11,7 @@ dependencies:
     - pandas
     - pre-commit
     - pyyaml
+    - pqdm
     - scipy
     - scikit-learn
     - tensorflow
