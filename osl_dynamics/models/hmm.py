@@ -124,7 +124,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None):
+    def fit(self, dataset, epochs=None, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -137,6 +137,9 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
+        kwargs : keyword arguments
+            Keyword arguments for the TensorFlow observation model training.
+            These keywords arguments will be passed to self.model.fit().
 
         Returns
         -------
@@ -175,7 +178,7 @@ class Model(ModelBase):
 
                 # Update observation model
                 training_data = np.concatenate([x, gamma], axis=2)
-                h = self.model.fit(training_data, epochs=1, verbose=0)
+                h = self.model.fit(training_data, epochs=1, verbose=0, **kwargs)
 
                 l = h.history["loss"][0]
                 if np.isnan(l):
