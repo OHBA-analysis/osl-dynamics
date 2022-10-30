@@ -45,6 +45,7 @@ f, psd, coh, w = spectral.regression_spectra(
     n_sub_windows=8,
     return_weights=True,
     return_coef_int=True,
+    n_jobs=5,
 )
 
 # Group average
