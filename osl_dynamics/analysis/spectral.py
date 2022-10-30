@@ -420,7 +420,7 @@ def multitaper(
     return P
 
 
-def _multitaper_spectra(
+def single_multitaper_spectra(
     data,
     alpha,
     tapers,
@@ -429,7 +429,33 @@ def _multitaper_spectra(
     nfft,
     args_range,
 ):
-    """Calculate a multitaper spectrum for a single subject."""
+    """Calculate a multitaper spectrum for a single subject.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Raw time series data. Must have shape (n_samples, n_channels).
+    alpha : np.ndarray or list
+        Inferred mode mixing factors. Must have shape (n_samples, n_modes).
+    tapers : np.ndarray
+        Tapers for apply to each data segments.
+        Shape must be (n_tapers, segment_length).
+    n_f : int
+        Number of frequency bins.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    nfft : int
+        Number of data points to use in the FFT.
+    args_range : list
+        Minimum and maximum indices of the multitaper to keep.
+
+    Returns
+    -------
+    p : np.ndarray
+        Power spectra. Shape is (n_modes, n_channels, n_f).
+    c : np.ndarray
+        Coherence spectra. Shape is (n_modes, n_channels, n_channels, n_f).
+    """
 
     # Use the mode mixing factors to get a time series for each mode
     mode_time_series = time_series.get_mode_time_series(data, alpha)
@@ -488,6 +514,9 @@ def _multitaper_spectra(
     # Coherences for each mode
     c = coherence_spectra(p, print_message=False)
 
+    # Only need to keep the diagonal of the power spectra matrix
+    p = p[:, range(n_channels), range(n_channels)]
+
     return p, c
 
 
@@ -538,12 +567,16 @@ def multitaper_spectra(
     -------
     frequencies : np.ndarray
         Frequencies of the power spectra and coherences.
+        Shape is (n_f,).
     power_spectra : np.ndarray
         Power spectra for each mode.
+        Shape is (n_subjects, n_modes, n_channels, n_f).
     coherences : np.ndarray
         Coherences for each mode.
+        Shape is (n_subjects, n_modesl, n_channels, n_channels, n_f).
     weights : np.ndarray
         Weight for each subject-specific PSD. Only returned if return_weights=True.
+        Shape is (n_subjects,).
     """
 
     # Validation
@@ -623,7 +656,7 @@ def multitaper_spectra(
     # Calculate spectra in parallel
     print("Calculating power spectra")
     results = pqdm(
-        args, _multitaper_spectra, n_jobs=n_jobs, argument_type="args", ncols=98
+        args, single_multitaper_spectra, n_jobs=n_jobs, argument_type="args", ncols=98
     )
 
     # Unpack the results

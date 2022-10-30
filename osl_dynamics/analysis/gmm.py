@@ -142,6 +142,7 @@ def fit_gaussian_mixture(
         threshold = np.percentile(X[:, 0], percentile)
         ax.axvline(threshold, color="black", linestyle="--")
         plotting.save(fig, plot_filename)
+        plotting.close()
 
     if return_labels:
         return y

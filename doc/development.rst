@@ -1,22 +1,16 @@
 Development
 ===========
 
-If you want to request new features or if you’re confident that you have found a bug, please create a new issue on the `GitHub issues <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ page.
+If you want to request new features or if you're confident that you have found a bug, please create a new issue on the `GitHub issues <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ page.
 
 Current Status
 --------------
 This package is under active development. Some of the models and analysis functions are still a work in progress.
 The completed models (i.e. those without outstanding development plans) are:
 
+- Hidden Markov Model (HMM).
 - Dynamic Network Modes (DyNeMo).
 - Single-dynamic Adversarial Generator Encoder (SAGE).
-
-The remaining models are still a work in progress, we summarise their status below:
-
-- Hidden Markov Model (HMM).
-
-    - The core model has been written.
-    - Improvements in parameter intialisation and removal of the C library is planned.
 
 - State Dynamic Network Modelling (State-DyNeMo).
 
