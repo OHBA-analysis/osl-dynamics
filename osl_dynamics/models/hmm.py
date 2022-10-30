@@ -614,8 +614,7 @@ class Model(ModelBase):
         self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state
-        time course.
+        """Sets the initial means/covariances based on a random state time course.
 
         Parameters
         ----------

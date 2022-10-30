@@ -9,6 +9,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+import osl_dynamics.data.tf as dtf
+from osl_dynamics.simulation import HMM
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
 from osl_dynamics.models.dynemo import Model as DyNeMo
@@ -173,6 +175,125 @@ class Model(DyNeMo):
     def sample_alpha(self, n_samples):
         """Uses the model RNN to sample a state time course, alpha."""
         raise NotImplementedError("This method hasn't been coded yet.")
+
+    def random_state_time_course_initialization(
+        self, training_data, n_epochs, n_init, take=1, **kwargs
+    ):
+        """Random state time course initialization.
+
+        The model is trained for a few epochs with a sampled state time course
+        initialization. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float
+            Fraction of total batches to take.
+        kwargs : keyword arguments
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            print(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        print("Random state time course initialization:")
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_dataset)
+        n_batches = max(round(n_total_batches * take), 1)
+        print(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            print(f"Initialization {n}")
+            self.reset()
+            self.set_random_state_time_course_initialization(training_data)
+            training_dataset.shuffle(100000)
+            training_data_subset = training_dataset.take(n_batches)
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            loss = history.history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            print("Initialization failed")
+            return
+
+        print(f"Using initialization {best_initialization}")
+        self.reset()
+        self.set_weights(best_weights)
+
+        return best_history
+
+    def set_random_state_time_course_initialization(self, training_data):
+        """Sets the initial means/covariances based on a random state time course.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training data object.
+        """
+
+        # Loop over subjects
+        subject_means = []
+        subject_covariances = []
+        for data in training_data.subjects:
+
+            # Sample a state time course from an HMM
+            trans_prob = (
+                np.ones((self.config.n_states, self.config.n_states))
+                * 0.1
+                / (self.config.n_states - 1)
+            )
+            np.fill_diagonal(trans_prob, 0.9)
+            stc = HMM(trans_prob).generate_states(data.shape[0])
+
+            # Calculate the mean/covariance for each state for this subject
+            m = []
+            C = []
+            for j in range(self.config.n_states):
+                x = data[stc[:, j] == 1]
+                mu_j = np.mean(x, axis=0)
+                sigma_j = np.cov(x, rowvar=False)
+                m.append(mu_j)
+                C.append(sigma_j)
+
+            subject_means.append(m)
+            subject_covariances.append(C)
+
+        # Average over subjects
+        initial_means = np.mean(subject_means, axis=0)
+        initial_covariances = np.mean(subject_covariances, axis=0)
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(initial_means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(initial_covariances, update_initializer=True)
 
 
 def _model_structure(config):
