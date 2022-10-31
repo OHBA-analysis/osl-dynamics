@@ -404,14 +404,14 @@ class Model(ModelBase):
         scale[0] = np.sum(alpha[0])
         alpha[0] /= scale[0] + EPS
         for i in range(1, n_samples):
-            alpha[i] = B[:, i] * (alpha[i - 1] @ P)
+            alpha[i] = (alpha[i - 1] @ P) * B[:, i]
             scale[i] = np.sum(alpha[i])
             alpha[i] /= scale[i] + EPS
 
         # Backward pass
         beta[-1] = 1.0 / (scale[-1] + EPS)
         for i in range(2, n_samples + 1):
-            beta[-i] = P @ (beta[-i + 1] * B[:, -i + 1])
+            beta[-i] = (beta[-i + 1] * B[:, -i + 1]) @ P.T
             beta[-i] /= scale[-i] + EPS
 
         # Marginal probabilities
@@ -419,11 +419,7 @@ class Model(ModelBase):
         gamma /= np.sum(gamma, axis=1, keepdims=True)
 
         b = beta[1:] * B[:, 1:].T
-        xi = (
-            np.expand_dims(alpha[:-1], axis=2)
-            * P[np.newaxis, ...]
-            * np.expand_dims(b, axis=1)
-        )
+        xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
         xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
 
         return gamma, xi
@@ -484,7 +480,6 @@ class Model(ModelBase):
             Probability of hidden state given child and parent states, given data.
             Shape is (batch_size*sequence_length - 1, n_states, n_states).
         """
-
         # Use Baum-Welch algorithm
         phi_interim = np.sum(xi, axis=0) / np.sum(gamma[:-1], axis=0)[:, np.newaxis]
 
