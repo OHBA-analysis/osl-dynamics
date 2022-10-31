@@ -645,7 +645,7 @@ def multitaper_spectra(
     tapers = dpss(segment_length, NW=time_half_bandwidth, Kmax=n_tapers)
     tapers *= np.sqrt(sampling_frequency)
 
-    # Create arguments to pass to _multitaper_spectra, which will calculate
+    # Create arguments to pass to single_multitaper_spectra, which will calculate
     # spectra for each subject in parallel
     args = []
     for n in range(n_subjects):
@@ -677,6 +677,69 @@ def multitaper_spectra(
         return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
 
 
+def single_regression_spectra(
+    data,
+    alpha,
+    window_length,
+    sampling_frequency,
+    frequency_range,
+    calc_cpsd,
+    step_size,
+    n_sub_windows,
+):
+    """Calculate cross-spectra for a single subject using the regression method.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
+    alpha : np.ndarray
+        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
+    window_length : int
+        Number of data points to use when calculating the periodogram.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    calc_cpsd : bool
+        Should we calculate cross spectra?
+    step_size : int
+        Step size for shifting the window.
+    n_sub_windows : int
+        Should we split the window into a set of sub-windows and average the
+        spectra for each sub-window.
+
+    Returns
+    -------
+    t : np.ndarray
+        Time axis.
+    f : np.ndarray
+        Frequency axis.
+    coefs : np.ndarray
+        Regression coefficients.
+    intercept : np.ndarray
+        Regression intercept.
+    """
+    t, f, p = spectrogram(
+        data,
+        window_length,
+        sampling_frequency,
+        frequency_range,
+        calc_cpsd=calc_cpsd,
+        step_size=step_size,
+        n_sub_windows=n_sub_windows,
+        print_progress_bar=False,
+    )
+    a = time_series.window_mean(
+        alpha,
+        window_length,
+        step_size=step_size,
+        n_sub_windows=n_sub_windows,
+    )
+    coefs, intercept = regression.linear(
+        a, p, fit_intercept=True, normalize=True, print_message=False
+    )
+    return t, f, coefs, intercept
+
+
 def regression_spectra(
     data,
     alpha,
@@ -690,6 +753,7 @@ def regression_spectra(
     return_weights=False,
     return_coef_int=False,
     standardize=False,
+    n_jobs=1,
 ):
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
@@ -723,6 +787,8 @@ def regression_spectra(
         separately for the PSDs?
     standardize : bool
         Should we standardize the data before calculating the spectrogram?
+    n_jobs : int
+        Number of parallel jobs.
 
     Returns
     -------
@@ -776,27 +842,33 @@ def regression_spectra(
     # Remove the data points lost due to separating into sequences
     data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
+    # Create arguments to pass to single_regression_spectra, which will calculate
+    # spectra for each subject in parallel
+    args = []
+    for n in range(n_subjects):
+        args.append(
+            [
+                data[n],
+                alpha[n],
+                window_length,
+                sampling_frequency,
+                frequency_range,
+                calc_cpsd,
+                step_size,
+                n_sub_windows,
+            ]
+        )
+
     # Calculate a time-varying PSD and regress to get the mode PSDs
+    print("Calculating power spectra")
+    results = pqdm(
+        args, single_regression_spectra, n_jobs=n_jobs, argument_type="args", ncols=98
+    )
+
+    # Unpack results
     Pj = []
-    for i in range(n_subjects):
-        if n_subjects > 1:
-            print(f"Subject {i}:")
-        t, f, p = spectrogram(
-            data[i],
-            window_length,
-            sampling_frequency,
-            frequency_range,
-            calc_cpsd=calc_cpsd,
-            step_size=step_size,
-            n_sub_windows=n_sub_windows,
-        )
-        a = time_series.window_mean(
-            alpha[i],
-            window_length,
-            step_size=step_size,
-            n_sub_windows=n_sub_windows,
-        )
-        coefs, intercept = regression.linear(a, p, fit_intercept=True, normalize=True)
+    for result in results:
+        t, f, coefs, intercept = result
         Pj.append([coefs, [intercept] * coefs.shape[0]])
     Pj = np.array(Pj)
 
@@ -861,6 +933,7 @@ def spectrogram(
     calc_cpsd=True,
     step_size=1,
     n_sub_windows=1,
+    print_progress_bar=True,
 ):
     """Calculates a spectogram.
 
@@ -882,6 +955,8 @@ def spectrogram(
     n_sub_windows : int
         Should we split the window into a set of sub-windows and average the
         spectra for each sub-window.
+    print_progress_bar : bool
+        Should we print a progress bar?
 
     Returns
     -------
@@ -935,8 +1010,11 @@ def spectrogram(
         XY_sub_window = np.empty(
             [n_sub_windows, n_channels * (n_channels + 1) // 2, n_f], dtype=np.complex64
         )
-        for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
-
+        if print_progress_bar:
+            iterator = trange(n_psds, desc="Calculating spectrogram", ncols=98)
+        else:
+            iterator = range(n_psds)
+        for i in iterator:
             # Data in the window
             j = time_indices[i]
             x_window = data[j : j + window_length].T
@@ -967,8 +1045,11 @@ def spectrogram(
         # Calculate the periodogram for each segment of the data
         P = np.empty([n_psds, n_channels, n_f], dtype=np.float32)
         XX_sub_window = np.empty([n_sub_windows, n_channels, n_f], dtype=np.float32)
-        for i in trange(n_psds, desc="Calculating spectrogram", ncols=98):
-
+        if print_progress_bar:
+            iterator = trange(n_psds, desc="Calculating spectrogram", ncols=98)
+        else:
+            iterator = range(n_psds)
+        for i in iterator:
             # Data in the window
             j = time_indices[i]
             x_window = data[j : j + window_length].T
