@@ -7,6 +7,7 @@ dependencies:
     - matplotlib
     - nibabel
     - nilearn
+    - numba
     - numpy
     - pandas
     - pre-commit
