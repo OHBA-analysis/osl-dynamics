@@ -25,12 +25,6 @@ Developers might want to clone the repo using SSH:
 
     git clone git@github.com:OHBA-analysis/osl-dynamics.git
 
-To use the HMM you also need to install armadillo:
-
-.. code-block:: shell
-
-    conda install -c conda-forge armadillo
-
 Documentation
 =============
 

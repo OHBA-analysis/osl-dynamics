@@ -62,11 +62,12 @@ To submit a non-interactive GPU job, first create a ``submission.sh`` file:
     #$ -cwd
     #$ -j y
     #$ -o stdout.log
+    #$ -e error.log
 
     # Setup your environment
-    module load Anaconda3
+    module load Anaconda3/2022.05
     module load cuDNN
-    source activate osld-tf24
+    source activate osld
 
     # Run scripts
     python dynemo_hmm_mvn.py

@@ -30,7 +30,7 @@ alp = hmm.state_time_course()
 
 # Sanity check: make sure the length of alphas match the data
 # for i in range(len(ts)):
-#     print(ts[i].shape, alp.shape[i])
+#     print(ts[i].shape, alp[i].shape)
 
 # Calculate subject-specific PSDs and coherences using multitaper method
 f, psd, coh, w = spectral.multitaper_spectra(
@@ -41,6 +41,7 @@ f, psd, coh, w = spectral.multitaper_spectra(
     n_tapers=7,
     frequency_range=[1, 45],
     return_weights=True,
+    n_jobs=5,
 )
 
 # Group average
@@ -48,6 +49,6 @@ psd = np.average(psd, axis=0, weights=w)
 coh = np.average(coh, axis=0, weights=w)
 
 # Save the spectra
-np.save("f.psd", f)
-np.save("psd.psd", psd)
-np.save("coh.psd", coh)
+np.save("f.npy", f)
+np.save("psd.npy", psd)
+np.save("coh.npy", coh)

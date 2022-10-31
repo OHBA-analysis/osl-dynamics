@@ -8,6 +8,7 @@ import numpy as np
 from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
+from pqdm.processes import pqdm
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression, time_series
@@ -419,6 +420,106 @@ def multitaper(
     return P
 
 
+def single_multitaper_spectra(
+    data,
+    alpha,
+    tapers,
+    n_f,
+    sampling_frequency,
+    nfft,
+    args_range,
+):
+    """Calculate a multitaper spectrum for a single subject.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Raw time series data. Must have shape (n_samples, n_channels).
+    alpha : np.ndarray or list
+        Inferred mode mixing factors. Must have shape (n_samples, n_modes).
+    tapers : np.ndarray
+        Tapers for apply to each data segments.
+        Shape must be (n_tapers, segment_length).
+    n_f : int
+        Number of frequency bins.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    nfft : int
+        Number of data points to use in the FFT.
+    args_range : list
+        Minimum and maximum indices of the multitaper to keep.
+
+    Returns
+    -------
+    p : np.ndarray
+        Power spectra. Shape is (n_modes, n_channels, n_f).
+    c : np.ndarray
+        Coherence spectra. Shape is (n_modes, n_channels, n_channels, n_f).
+    """
+
+    # Use the mode mixing factors to get a time series for each mode
+    mode_time_series = time_series.get_mode_time_series(data, alpha)
+
+    # Number of subjects, modes, samples and channels
+    n_modes, n_samples, n_channels = mode_time_series.shape
+
+    # Number of tapers and segment length
+    n_tapers, segment_length = tapers.shape
+
+    # We will calculate the spectrum for several non-overlapping segments
+    # of the time series and return the average over these segments.
+
+    # Number of segments in the time series
+    n_segments = round(n_samples / segment_length)
+
+    # Power spectra for each mode
+    p = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex64)
+    for i in range(n_modes):
+        for j in range(n_segments):
+            # Time series for mode i and segment j
+            time_series_segment = mode_time_series[
+                i, j * segment_length : (j + 1) * segment_length
+            ]
+
+            # If we're missing samples we pad with zeros either side of the data
+            if time_series_segment.shape[0] != segment_length:
+                n_zeros = segment_length - time_series_segment.shape[0]
+                n_padding = round(n_zeros / 2)
+                time_series_segment = np.pad(time_series_segment, n_padding)[
+                    :segment_length, n_padding:-n_padding
+                ]
+                if time_series_segment.shape[0] == segment_length - 1:
+                    time_series_segment = np.append(
+                        time_series_segment,
+                        np.zeros([1, time_series_segment.shape[1]], dtype=np.float32),
+                        axis=0,
+                    )
+
+            # Calculate the power (and cross) spectrum using the multitaper method
+            p[i] += multitaper(
+                time_series_segment,
+                sampling_frequency,
+                nfft=nfft,
+                tapers=tapers,
+                args_range=args_range,
+            )
+
+    # Normalise the power spectra
+    # NOTE: We should be normalising using sum alpha instead of sum
+    # alpha^2, but this makes a small difference, so we left it like
+    # this for consistency with the HMM-MAR toolbox.
+    sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    p *= n_samples / (sum_alpha * n_tapers * n_segments)
+
+    # Coherences for each mode
+    c = coherence_spectra(p, print_message=False)
+
+    # Only need to keep the diagonal of the power spectra matrix
+    p = p[:, range(n_channels), range(n_channels)]
+
+    return p, c
+
+
 def multitaper_spectra(
     data,
     alpha,
@@ -429,6 +530,7 @@ def multitaper_spectra(
     frequency_range=None,
     return_weights=False,
     standardize=False,
+    n_jobs=1,
 ):
     """Calculates spectra for inferred modes using a multitaper.
 
@@ -458,17 +560,23 @@ def multitaper_spectra(
         Useful for calculating the group average PSD.
     standardize : bool
         Should we standardize the data before calculating the multitaper?
+    n_jobs : int
+        Number of parallel jobs.
 
     Returns
     -------
     frequencies : np.ndarray
         Frequencies of the power spectra and coherences.
+        Shape is (n_f,).
     power_spectra : np.ndarray
         Power spectra for each mode.
+        Shape is (n_subjects, n_modes, n_channels, n_f).
     coherences : np.ndarray
         Coherences for each mode.
+        Shape is (n_subjects, n_modesl, n_channels, n_channels, n_f).
     weights : np.ndarray
         Weight for each subject-specific PSD. Only returned if return_weights=True.
+        Shape is (n_subjects,).
     """
 
     # Validation
@@ -533,77 +641,29 @@ def multitaper_spectra(
     if standardize:
         data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
+    # Calculate tapers so we can estimate spectra with the multitaper method
+    tapers = dpss(segment_length, NW=time_half_bandwidth, Kmax=n_tapers)
+    tapers *= np.sqrt(sampling_frequency)
+
+    # Create arguments to pass to _multitaper_spectra, which will calculate
+    # spectra for each subject in parallel
+    args = []
+    for n in range(n_subjects):
+        args.append(
+            [data[n], alpha[n], tapers, n_f, sampling_frequency, nfft, args_range]
+        )
+
+    # Calculate spectra in parallel
     print("Calculating power spectra")
+    results = pqdm(
+        args, single_multitaper_spectra, n_jobs=n_jobs, argument_type="args", ncols=98
+    )
+
+    # Unpack the results
     power_spectra = []
     coherences = []
-    for n in range(n_subjects):
-        if n_subjects > 1:
-            print(f"Subject {n}:")
-
-        # Use the mode mixing factors to get a time series for each mode
-        mode_time_series = time_series.get_mode_time_series(data[n], alpha[n])
-
-        # Number of subjects, modes, samples and channels
-        n_modes, n_samples, n_channels = mode_time_series.shape
-
-        # Calculate tapers so we can estimate spectra with the multitaper method
-        tapers = dpss(segment_length, NW=time_half_bandwidth, Kmax=n_tapers)
-        tapers *= np.sqrt(sampling_frequency)
-
-        # We will calculate the spectrum for several non-overlapping segments
-        # of the time series and return the average over these segments.
-
-        # Number of segments in the time series
-        n_segments = round(n_samples / segment_length)
-
-        # Power spectra for each mode
-        p = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex64)
-        for i in range(n_modes):
-            for j in trange(n_segments, desc=f"Mode {i}", ncols=98):
-
-                # Time series for mode i and segment j
-                time_series_segment = mode_time_series[
-                    i, j * segment_length : (j + 1) * segment_length
-                ]
-
-                # If we're missing samples we pad with zeros either side of the data
-                if time_series_segment.shape[0] != segment_length:
-                    n_zeros = segment_length - time_series_segment.shape[0]
-                    n_padding = round(n_zeros / 2)
-                    time_series_segment = np.pad(time_series_segment, n_padding)[
-                        :segment_length, n_padding:-n_padding
-                    ]
-                    if time_series_segment.shape[0] == segment_length - 1:
-                        time_series_segment = np.append(
-                            time_series_segment,
-                            np.zeros(
-                                [1, time_series_segment.shape[1]], dtype=np.float32
-                            ),
-                            axis=0,
-                        )
-
-                # Calculate the power (and cross) spectrum using the multitaper method
-                p[i] += multitaper(
-                    time_series_segment,
-                    sampling_frequency,
-                    nfft=nfft,
-                    tapers=tapers,
-                    args_range=args_range,
-                )
-
-        # Normalise the power spectra
-        # NOTE: We should be normalising using sum alpha instead of sum
-        # alpha^2, but this makes a small difference, so we left it like
-        # this for consistency with the HMM-MAR toolbox.
-        sum_alpha = np.sum(alpha[n] ** 2, axis=0)[
-            ..., np.newaxis, np.newaxis, np.newaxis
-        ]
-        p *= n_samples / (sum_alpha * n_tapers * n_segments)
-
-        # Coherences for each mode
-        c = coherence_spectra(p, print_message=False)
-
-        # Add spectra to lists
+    for result in results:
+        p, c = result
         power_spectra.append(p)
         coherences.append(c)
 
