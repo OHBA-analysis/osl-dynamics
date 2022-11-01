@@ -12,6 +12,8 @@ The completed models (i.e. those without outstanding development plans) are:
 - Dynamic Network Modes (DyNeMo).
 - Single-dynamic Adversarial Generator Encoder (SAGE).
 
+The remaining models are still a work in progress, we summarise their status below:
+
 - State Dynamic Network Modelling (State-DyNeMo).
 
     - Core model has been written.
@@ -27,6 +29,10 @@ The completed models (i.e. those without outstanding development plans) are:
     - Core model has been added.
     - This model is currently being tested.
     - A full pipeline example scripts using the model to study fMRI data will be added.
+
+- Subject Embedding Dynamic Network Modes (SE-DyNeMo)
+
+    - Core model is under development.
 
 Development Team
 ----------------
