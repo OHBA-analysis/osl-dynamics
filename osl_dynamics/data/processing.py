@@ -146,7 +146,7 @@ class Processing:
             )
 
             # Hilbert transform
-            prepared_data = np.abs(signal.hilbert(prepared_data))
+            prepared_data = np.abs(signal.hilbert(prepared_data, axis=0))
 
             # Moving average filter
             prepared_data = np.array(
@@ -432,7 +432,9 @@ def temporal_filter(time_series, low_freq, high_freq, sampling_frequency, order=
     b, a = signal.butter(order, Wn=Wn, btype=btype, fs=sampling_frequency)
 
     # Apply the filter
-    filtered_time_series = signal.filtfilt(b, a, time_series).astype(time_series.dtype)
+    filtered_time_series = signal.filtfilt(b, a, time_series, axis=0).astype(
+        time_series.dtype
+    )
 
     return filtered_time_series
 
