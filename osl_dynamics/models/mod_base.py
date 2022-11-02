@@ -368,15 +368,15 @@ class ModelBase:
     def _repr_html_(self):
         return self.html_summary()
 
-    def save_config(self, filepath):
+    def save_config(self, dirname):
         """Saves config object as a .yml file.
 
         Parameters
         ----------
-        filepath : str
-            Filepath to save config.yml.
+        dirname : str
+            Directory to save config.yml.
         """
-        os.makedirs(filepath, exist_ok=True)
+        os.makedirs(dirname, exist_ok=True)
 
         config_dict = self.config.__dict__.copy()
         # for serialisability of the dict
@@ -387,49 +387,49 @@ class ModelBase:
         for key in non_serializable_keys:
             config_dict[key] = None
 
-        with open(f"{filepath}/config.yml", "w") as file:
+        with open(f"{dirname}/config.yml", "w") as file:
             yaml.dump(config_dict, file)
 
-    def save(self, filepath):
+    def save(self, dirname):
         """Saves config object and weights of the model.
 
         This is a wrapper for self.save_config and self.save_weights.
 
         Parameters
         ----------
-        filepath : str
-            Filepath to save the config object and weights of the model.
+        dirname : str
+            Directory to save the config object and weights of the model.
         """
-        self.save_config(filepath)
+        self.save_config(dirname)
         self.save_weights(
-            str(filepath) + "/weights"
+            f"{dirname}/weights"
         )  # will use the keras method: self.model.save_weights()
 
     @classmethod
-    def load(cls, filepath):
+    def load(cls, dirname):
         """
-        Load model from filepath.
+        Load model from dirname.
 
         Parameters
         ----------
-        filepath : str
-            Path where config.yml and weights are stored.
+        dirname : str
+            Directory where config.yml and weights are stored.
 
         Returns
         -------
         model
             Model object.
         """
-        print("Loading model:", filepath)
+        print("Loading model:", dirname)
 
         # Get the config
-        with open(f"{filepath}/config.yml", "r") as f:
+        with open(f"{dirname}/config.yml", "r") as f:
             config_dict = yaml.load(f, NumpyLoader)
 
         config = cls.config_type(**config_dict)
         model = cls(config)
 
         # Restore weights
-        model.load_weights(str(filepath) + "/weights")
+        model.load_weights(f"{dirname}/weights")
 
         return model

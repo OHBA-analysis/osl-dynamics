@@ -6,6 +6,7 @@ import sys
 import warnings
 import os.path as op
 from dataclasses import dataclass
+from pathlib import Path
 
 import numba
 import numpy as np
@@ -724,27 +725,27 @@ class Model(ModelBase):
             self.config.sequence_length, prepared=prepared, concatenate=concatenate
         )
 
-    def save_weights(self, dirname):
+    def save_weights(self, filepath):
         """Save all model weights.
 
         Parameters
         ----------
-        dirname : str
-            Location to save model parameters to.
+        filepath : str
+            Location to save model weights to.
         """
-        self.model.save_weights(op.join(dirname, "weights"))
-        np.save(op.join(dirname, "trans_prob.npy"), self.trans_prob)
+        self.model.save_weights(filepath)
+        np.save(op.join(str(Path(filepath).parent), "trans_prob.npy"), self.trans_prob)
 
-    def load_weights(self, dirname):
+    def load_weights(self, filepath):
         """Load all model parameters.
 
         Parameters
         ----------
-        dirname : str
-            Location to load model parameters from.
+        filepath : str
+            Location to load model weights from.
         """
-        self.model.load_weights(op.join(dirname, "weights"))
-        self.trans_prob = np.load(op.join(dirname, "trans_prob.npy"))
+        self.model.load_weights(filepath)
+        self.trans_prob = np.load(op.join(str(Path(filepath).parent), "trans_prob.npy"))
 
     def set_weights(self, weights, trans_prob):
         """Set model parameter weights.

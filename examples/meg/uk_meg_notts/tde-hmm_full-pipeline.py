@@ -1,4 +1,4 @@
-"""Example script for fitting an HMM to the Nottingham UK MEG partnership data.
+"""Example script for fitting a TDE-HMM to the Nottingham UK MEG partnership data.
 
 In this script we reproduce the wideband power/coherence maps presented
 in Diego Vidaurre's 2018 Nature Communications paper.
@@ -41,7 +41,7 @@ config = Config(
     learn_trans_prob=True,
     batch_size=32,
     learning_rate=1e-3,
-    n_epochs=15,
+    n_epochs=20,
 )
 
 # ----------------
@@ -62,11 +62,11 @@ training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
 # --------------
 # Model training
 
-# Build model
-model = Model(config)
-model.summary()
-
 if train_model:
+    # Build model
+    model = Model(config)
+    model.summary()
+
     # Initialization: train the HMM a few times with a randomly sampled state
     # time course used to calculate the initial observation model parameters
     model.random_state_time_course_initialization(training_data, n_epochs=2, n_init=3)
@@ -79,7 +79,7 @@ if train_model:
     pickle.dump(history, open(model_dir + "/history.pkl", "wb"))
 
 else:
-    model.load(model_dir)
+    model = Model.load(model_dir)
 
 # -------------------
 # Inferred parameters
