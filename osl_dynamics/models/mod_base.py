@@ -430,6 +430,6 @@ class ModelBase:
         model = cls(config)
 
         # Restore weights
-        model.load_weights(f"{dirname}/weights")
+        model.load_weights(f"{dirname}/weights").expect_partial()
 
         return model
