@@ -245,7 +245,7 @@ class ModelBase:
             Path to file containing model weights.
         """
         with self.config.strategy.scope():
-            self.model.load_weights(filepath)
+            return self.model.load_weights(filepath)
 
     def reset_weights(self):
         """Resets trainable variables in the model to their initial value."""
