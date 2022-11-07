@@ -760,9 +760,9 @@ def regression_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Data to calculate a time-varying PSD for. Shape must be (n_samples, n_channels).
+        Data to calculate a time-varying PSD for. Shape must be ([n_subjects,] n_samples, n_channels).
     alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
+        Inferred mode mixing factors. Shape must be ([n_subjects], n_samples, n_modes).
     window_length : int
         Number samples to use in the window to calculate a PSD.
     sampling_frequency : float
@@ -816,8 +816,11 @@ def regression_spectra(
             raise ValueError(
                 "data and alpha must both be lists or both be numpy arrays."
             )
-        data = [data]
-        alpha = [alpha]
+
+        if data.ndim == 2:
+            data = [data]
+        if alpha.ndim == 2:
+            alpha = [alpha]
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
