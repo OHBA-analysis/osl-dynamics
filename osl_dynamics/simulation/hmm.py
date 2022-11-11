@@ -302,8 +302,12 @@ class HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
+        means = np.mean(self.time_series, axis=0)
         standard_deviations = np.std(self.time_series, axis=0)
         super().standardize()
+        self.obs_mod.means = (
+            self.obs_mod.means - means[None, ...]
+        ) / standard_deviations[None, ...]
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...
         ]
@@ -409,6 +413,15 @@ class MDyn_HMM_MVN(Simulation):
             return getattr(self.obs_mod, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
+
+    def standardize(self):
+        means = np.mean(self.time_series, axis=0)
+        standard_deviations = np.std(self.time_series, axis=0)
+        super().standardize()
+        self.obs_mod.means = (
+            self.obs_mod.means - means[None, ...]
+        ) / standard_deviations[None, ...]
+        self.obs_mod.stds /= standard_deviations[None, ...]
 
 
 class MSubj_HMM_MVN(Simulation):
@@ -539,7 +552,15 @@ class MSubj_HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
+        means = np.mean(self.time_series, axis=1)
+        standard_deviations = np.std(self.time_series, axis=1)
         super().standardize(axis=1)
+        self.obs_mod.means = (
+            self.obs_mod.means - means[:, None, :]
+        ) / standard_deviations[:, None, :]
+        self.obs_mod.subject_covariances /= np.expand_dims(
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+        )
 
 
 class HierarchicalHMM_MVN(Simulation):
