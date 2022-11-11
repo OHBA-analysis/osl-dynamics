@@ -744,8 +744,8 @@ class Model(ModelBase):
         filepath : str
             Location to load model weights from.
         """
-        self.model.load_weights(filepath)
         self.trans_prob = np.load(op.join(str(Path(filepath).parent), "trans_prob.npy"))
+        return self.model.load_weights(filepath)
 
     def set_weights(self, weights, trans_prob):
         """Set model parameter weights.
