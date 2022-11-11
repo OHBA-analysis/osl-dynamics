@@ -8,7 +8,7 @@ import numpy as np
 class SingleSine:
     """Class that generates sinusoidal time series data.
 
-    The time series for each channel is a singe single wave. The amplitude
+    The time series for each channel is a single single wave. The amplitude
     and frequency of the sine wave can be different for different states and
     channels. A random phase is used each time a state is activated.
 
