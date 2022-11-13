@@ -606,7 +606,7 @@ def multitaper_spectra(
     if isinstance(data, np.ndarray):
         if alpha.shape[0] != data.shape[0]:
             raise ValueError("data and alpha must have the same shape.")
-        
+
         if data.ndim == 2:
             data = [data]
         if data.ndim == 2:

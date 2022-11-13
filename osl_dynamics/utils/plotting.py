@@ -689,7 +689,7 @@ def plot_gmm(
     data,
     amplitudes,
     means,
-    variances,
+    stddevs,
     bins=50,
     legend_loc=1,
     x_range=None,
@@ -710,8 +710,8 @@ def plot_gmm(
         Raw data to plot as a histogram.
     means : np.ndarray
         Mean of each Gaussian component.
-    variances : np.ndarray
-        Variance of each Gaussian component.
+    stddevs : np.ndarray
+        Standard deviation of each Gaussian component.
     bins : list of int
         Number of bins for the historgram.
     legend_loc : int
@@ -777,8 +777,8 @@ def plot_gmm(
 
     # Plot Gaussian components
     x = np.arange(min(data), max(data), (max(data) - min(data)) / bins)
-    y1 = amplitudes[0] * np.exp(-((x - means[0]) ** 2) / (2 * variances[0] ** 2))
-    y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * variances[1] ** 2))
+    y1 = amplitudes[0] * np.exp(-((x - means[0]) ** 2) / (2 * stddevs[0] ** 2))
+    y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * stddevs[1] ** 2))
     ax.plot(x, y1, label="Off")
     ax.plot(x, y2, label="On")
     ax.plot(x, y1 + y2)

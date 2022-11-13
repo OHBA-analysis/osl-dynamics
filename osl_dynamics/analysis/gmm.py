@@ -97,11 +97,11 @@ def fit_gaussian_mixture(
         2 * np.pi * np.squeeze(gm.covariances_)
     )
     means = np.squeeze(gm.means_)
-    variances = np.sqrt(np.squeeze(gm.covariances_))
+    stddevs = np.sqrt(np.squeeze(gm.covariances_))
     if label_order == "mean":
         order = np.argsort(means)
     elif label_order == "variance":
-        order = np.argsort(variances)
+        order = np.argsort(stddevs)
     else:
         raise NotImplementedError(label_order)
 
@@ -114,15 +114,15 @@ def fit_gaussian_mixture(
             # 1 -> 0; 0 -> 1
             y = (1 - y).astype(int)
     if label_order == "variance":
-        if variances[0] > variances[1]:
+        if stddevs[0] > stddevs[1]:
             y = (1 - y).astype(int)
     amplitudes = amplitudes[order]
     means = means[order]
-    variances = variances[order]
+    stddevs = stddevs[order]
 
     # Percentile threshold
     if (
-        abs(means[1] - means[0]) < n_sigma * np.sqrt(variances[0])
+        abs(means[1] - means[0]) < n_sigma * stddevs[0]
         and one_component_percentile is not None
     ):
         percentile = one_component_percentile
@@ -135,7 +135,7 @@ def fit_gaussian_mixture(
             X[:, 0],
             amplitudes,
             means,
-            variances,
+            stddevs,
             title=f"Percentile = {round(percentile)}",
             **plot_kwargs,
         )

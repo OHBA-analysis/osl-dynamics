@@ -206,7 +206,7 @@ def gmm_threshold(
     ----------
     conn_map : np.ndarray
         Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
-        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channesl).
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     standardize : bool
