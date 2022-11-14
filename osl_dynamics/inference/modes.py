@@ -478,7 +478,6 @@ def fit_gmm(
         sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
         mixture_label = analysis.gmm.fit_gaussian_mixture(
             a,
-            bayesian=False,
             logit_transform=logit_transform,
             standardize=standardize,
             sklearn_kwargs=sklearn_kwargs,
