@@ -193,7 +193,7 @@ def gmm_threshold(
     conn_map,
     subtract_mean=False,
     standardize=False,
-    p_value=0.01,
+    p_value=None,
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
@@ -250,11 +250,7 @@ def gmm_threshold(
         filename,
         plot_kwargs,
     )
-    edges = threshold(conn_map, percentile, subtract_mean, return_edges=True)
-    if subtract_mean:
-        conn_map -= np.mean(conn_map, axis=0, keepdims=True)
-    conn_map[~edges] = 0
-    conn_map[conn_map < 0] = 0
+    conn_map = threshold(conn_map, percentile, subtract_mean)
     return conn_map
 
 
@@ -262,7 +258,7 @@ def fit_gmm(
     conn_map,
     subtract_mean=False,
     standardize=False,
-    p_value=0.01,
+    p_value=None,
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
@@ -343,6 +339,9 @@ def fit_gmm(
 
             # Only keep positive entries
             c = c[c > 0]
+            if len(c) == 0:
+                percentiles[i, j] = 100
+                continue
 
             # Output filename
             if filename is not None:
@@ -372,7 +371,7 @@ def fit_gmm(
             )
 
             # Calculate the percentile from the threshold
-            percentiles[i, j] = stats.percentileofscore(c, threshold) 
+            percentiles[i, j] = stats.percentileofscore(c, threshold)
 
     return np.squeeze(percentiles)
 

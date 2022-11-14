@@ -98,15 +98,7 @@ def fit_gaussian_mixture(
     else:
         raise NotImplementedError(label_order)
 
-    # Calculate the probability of each data point belonging to each component
-    # The variable 'a' is the 'activation'
-    dX = max(X) / 100
-    x = np.arange(0, max(X) + dX, dX)
-    a = np.array([stats.norm.pdf(x, loc, scale) for loc, scale in zip(means, stddevs)]).T
-    a *= gm.weights_
-
     # Order the components
-    a = a[:, order]
     amplitudes = amplitudes[order]
     means = means[order]
     stddevs = stddevs[order]
@@ -124,14 +116,32 @@ def fit_gaussian_mixture(
         # to the 'off' component. We assign a data point to the 'on' component if
         # its probability of belonging to the 'off' component is less than the p_value
 
+        # Calculate the probability of each data point belonging to each component
+        # The variable 'a' is the 'activation'
+        dX = max(X_) / 100
+        x = np.arange(means[0], max(X_) + dX, dX)
+        a = np.array(
+            [stats.norm.pdf(x, loc, scale) for loc, scale in zip(means, stddevs)]
+        ).T
+        a *= gm.weights_
+
         # Find the index of the data point closest to the desired p-value
         # This defines the threshold in the standardised/logit transformed space
-        threshold = x[np.argmin(np.abs(a[:, 0] - p_value / X.shape[0]))]
-        index = np.argmin(np.abs(X_[:, 0] - threshold))
+        x_threshold = x[np.argmin(np.abs(a[:, 0] - p_value / X_.shape[0]))]
+        index = np.argmin(np.abs(X_[:, 0] - x_threshold))
 
     else:
+        # Calculate the probability of each data point belonging to each component
+        ascending = np.argsort(X_[:, 0])
+        X_ = X_[ascending]
+        X = X[ascending]
+        y = gm.predict_proba(X_)
+        y = y[:, order]
+
         # Get the index of the first data point classified as the 'on' component
-        index = np.argmax(a[:, 0] < a[:, 1])
+        on_prob_higher = y[:, 0] < y[:, 1]
+        on_prob_higher[X_[:, 0] < means[0]] = False
+        index = np.argmax(on_prob_higher)
 
     # Get the threshold in the standardised/logit transform and original space
     threshold_ = X_[index, 0]
@@ -144,7 +154,7 @@ def fit_gaussian_mixture(
             amplitudes,
             means,
             stddevs,
-            title=f"Threshold = {np.round(threshold_, 2)}",
+            title=f"Threshold = {threshold_:.3}",
             **plot_kwargs,
         )
         ax.axvline(threshold_, color="black", linestyle="--")
