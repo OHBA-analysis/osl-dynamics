@@ -166,9 +166,6 @@ def mean_coherence_from_spectra(
         # Concatenate over modes
         coh = coherence[i].reshape(-1, n_f)
 
-        # Same frequencies give nan coherences, replace with zero
-        coh = np.nan_to_num(coh)
-
         if components is not None:
             # Coherence for each spectral component
             coh = components @ coh.T

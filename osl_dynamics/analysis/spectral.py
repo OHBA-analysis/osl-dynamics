@@ -61,7 +61,8 @@ def coherence_spectra(power_spectra, print_message=True):
                     power_spectra[i, j, j].real * power_spectra[i, k, k].real
                 )
 
-    return coherences
+    # Zero nan values
+    return np.nan_to_num(coherences)
 
 
 def decompose_spectra(
