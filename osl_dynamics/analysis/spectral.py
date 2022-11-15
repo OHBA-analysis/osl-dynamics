@@ -428,6 +428,7 @@ def single_multitaper_spectra(
     sampling_frequency,
     nfft,
     args_range,
+    parallel,
 ):
     """Calculate a multitaper spectrum for a single subject.
 
@@ -448,6 +449,9 @@ def single_multitaper_spectra(
         Number of data points to use in the FFT.
     args_range : list
         Minimum and maximum indices of the multitaper to keep.
+    parallel : bool
+        Is this function being called in parallel? Only affects whether
+        a progress bar is displayed or not.
 
     Returns
     -------
@@ -475,7 +479,14 @@ def single_multitaper_spectra(
     # Power spectra for each mode
     p = np.zeros([n_modes, n_channels, n_channels, n_f], dtype=np.complex64)
     for i in range(n_modes):
-        for j in range(n_segments):
+        if parallel:
+            iterator = range(n_segments)
+        else:
+            if i == 0:
+                print("Calculating spectra:")
+            iterator = trange(n_segments, desc=f"Mode {i}", ncols=98)
+
+        for j in iterator:
             # Time series for mode i and segment j
             time_series_segment = mode_time_series[
                 i, j * segment_length : (j + 1) * segment_length
@@ -606,10 +617,8 @@ def multitaper_spectra(
     if isinstance(data, np.ndarray):
         if alpha.shape[0] != data.shape[0]:
             raise ValueError("data and alpha must have the same shape.")
-        
         if data.ndim == 2:
             data = [data]
-        if data.ndim == 2:
             alpha = [alpha]
 
     if segment_length is None:
@@ -648,19 +657,48 @@ def multitaper_spectra(
     tapers = dpss(segment_length, NW=time_half_bandwidth, Kmax=n_tapers)
     tapers *= np.sqrt(sampling_frequency)
 
-    # Create arguments to pass to single_multitaper_spectra, which will calculate
-    # spectra for each subject in parallel
-    args = []
-    for n in range(n_subjects):
-        args.append(
-            [data[n], alpha[n], tapers, n_f, sampling_frequency, nfft, args_range]
+    if n_subjects == 1:
+        # We only have one subject so we don't need to parallelise the
+        # calculation
+        results = single_multitaper_spectra(
+            data[0],
+            alpha[0],
+            tapers,
+            n_f,
+            sampling_frequency,
+            nfft,
+            args_range,
+            parallel=False,
         )
+        results = [results]
 
-    # Calculate spectra in parallel
-    print("Calculating power spectra")
-    results = pqdm(
-        args, single_multitaper_spectra, n_jobs=n_jobs, argument_type="args", ncols=98
-    )
+    else:
+        # Create arguments to pass to single_multitaper_spectra, which will
+        # calculate spectra for each subject in parallel
+        args = []
+        for n in range(n_subjects):
+            args.append(
+                [
+                    data[n],
+                    alpha[n],
+                    tapers,
+                    n_f,
+                    sampling_frequency,
+                    nfft,
+                    args_range,
+                    True,
+                ]
+            )
+
+        # Calculate spectra in parallel
+        print("Calculating spectra:")
+        results = pqdm(
+            args,
+            single_multitaper_spectra,
+            n_jobs=n_jobs,
+            argument_type="args",
+            ncols=98,
+        )
 
     # Unpack the results
     power_spectra = []
@@ -689,6 +727,7 @@ def single_regression_spectra(
     calc_cpsd,
     step_size,
     n_sub_windows,
+    parallel,
 ):
     """Calculate cross-spectra for a single subject using the regression method.
 
@@ -709,6 +748,9 @@ def single_regression_spectra(
     n_sub_windows : int
         Should we split the window into a set of sub-windows and average the
         spectra for each sub-window.
+    parallel : bool
+        Is this function being called in parallel? Only affects whether
+        a progress bar is displayed or not.
 
     Returns
     -------
@@ -721,6 +763,7 @@ def single_regression_spectra(
     intercept : np.ndarray
         Regression intercept.
     """
+    print_message = not parallel
     t, f, p = spectrogram(
         data,
         window_length,
@@ -729,7 +772,7 @@ def single_regression_spectra(
         calc_cpsd=calc_cpsd,
         step_size=step_size,
         n_sub_windows=n_sub_windows,
-        print_progress_bar=False,
+        print_progress_bar=print_message,
     )
     a = time_series.window_mean(
         alpha,
@@ -738,7 +781,11 @@ def single_regression_spectra(
         n_sub_windows=n_sub_windows,
     )
     coefs, intercept = regression.linear(
-        a, p, fit_intercept=True, normalize=True, print_message=False
+        a,
+        p,
+        fit_intercept=True,
+        normalize=True,
+        print_message=print_message,
     )
     return t, f, coefs, intercept
 
@@ -763,9 +810,11 @@ def regression_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Data to calculate a time-varying PSD for. Shape must be ([n_subjects,] n_samples, n_channels).
+        Data to calculate a time-varying PSD for. Shape must be (n_subjects,
+        n_samples, n_channels) or (n_samples, n_channels).
     alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be ([n_subjects], n_samples, n_modes).
+        Inferred mode mixing factors. Shape must be (n_subjects, n_samples,
+        n_modes) or (n_samples, n_modes).
     window_length : int
         Number samples to use in the window to calculate a PSD.
     sampling_frequency : float
@@ -819,10 +868,8 @@ def regression_spectra(
             raise ValueError(
                 "data and alpha must both be lists or both be numpy arrays."
             )
-
         if data.ndim == 2:
             data = [data]
-        if alpha.ndim == 2:
             alpha = [alpha]
 
     if frequency_range is None:
@@ -848,28 +895,50 @@ def regression_spectra(
     # Remove the data points lost due to separating into sequences
     data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-    # Create arguments to pass to single_regression_spectra, which will calculate
-    # spectra for each subject in parallel
-    args = []
-    for n in range(n_subjects):
-        args.append(
-            [
-                data[n],
-                alpha[n],
-                window_length,
-                sampling_frequency,
-                frequency_range,
-                calc_cpsd,
-                step_size,
-                n_sub_windows,
-            ]
+    if n_subjects == 1:
+        # We only have one subject so we don't need to parallelise the
+        # calculation
+        results = single_regression_spectra(
+            data[0],
+            alpha[0],
+            window_length,
+            sampling_frequency,
+            frequency_range,
+            calc_cpsd,
+            step_size,
+            n_sub_windows,
+            False,
         )
+        results = [results]
 
-    # Calculate a time-varying PSD and regress to get the mode PSDs
-    print("Calculating power spectra")
-    results = pqdm(
-        args, single_regression_spectra, n_jobs=n_jobs, argument_type="args", ncols=98
-    )
+    else:
+        # Create arguments to pass to single_regression_spectra, which will
+        # calculate spectra for each subject in parallel
+        args = []
+        for n in range(n_subjects):
+            args.append(
+                [
+                    data[n],
+                    alpha[n],
+                    window_length,
+                    sampling_frequency,
+                    frequency_range,
+                    calc_cpsd,
+                    step_size,
+                    n_sub_windows,
+                    True,
+                ]
+            )
+
+        # Calculate a time-varying PSD and regress to get the mode PSDs
+        print("Calculating power spectra")
+        results = pqdm(
+            args,
+            single_regression_spectra,
+            n_jobs=n_jobs,
+            argument_type="args",
+            ncols=98,
+        )
 
     # Unpack results
     Pj = []
