@@ -555,8 +555,8 @@ class MSubj_HMM_MVN(Simulation):
         means = np.mean(self.time_series, axis=1)
         standard_deviations = np.std(self.time_series, axis=1)
         super().standardize(axis=1)
-        self.obs_mod.means = (
-            self.obs_mod.means - means[:, None, :]
+        self.obs_mod.subject_means = (
+            self.obs_mod.subject_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
             standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
