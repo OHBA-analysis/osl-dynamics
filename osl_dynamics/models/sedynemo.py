@@ -29,13 +29,12 @@ from osl_dynamics.inference.layers import (
     ConcatenateLayer,
     SubjectDevEmbeddingLayer,
     SubjectMapLayer,
-    DummyLayer,
     MixSubjectEmbeddingParametersLayer,
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
-    ScalarLayer,
     SubjectMapKLDivergenceLayer,
+    MLPLayer,
 )
 
 
@@ -142,18 +141,29 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of dimensions for the subject embedding.
     mode_embedding_dim : int
         Number of dimensions for the mode embedding in the spatial maps encoder.
-    mode_embedding_activation : str
-        Activation for the mode encoders.
-    dev_reg : str
-        Type of regularisation applied to the deviations.
-    dev_reg_strength : float
-        Strength of regularisation to deviations.
-    dev_bayesian : bool
-        Do we want to be fully Bayesian on deviations?
-    learn_dev_mod_sigma : bool
-        Do we want to learn the prior std of the deviation.
-    initial_dev_mod_sigma : float
-        Initial value for prior std of the deviation.
+
+    dev_inf_n_layers : int
+        Number of layers for the inference MLP for deviations.
+    dev_inf_n_units : int
+        Number of units for the inference MLP for deviations.
+    dev_inf_normalization : str
+        Type of normalization for the inference MLP for deviations.
+        Either None, 'batch' or 'layer'.
+    dev_inf_activation : str
+        Type of activation to use for the inference MLP for deviations.
+        E.g. 'relu', 'sigmoid', 'tanh', etc.
+    dev_inf_dropout : float
+        Dropout rate for the inference MLP for deviations.
+    dev_mod_n_layers : int
+        Number of layers for the model MLP for deviations.
+    dev_mod_n_units : int
+        Number of units for the model MLP for deviations.
+    dev_mod_normalization : str
+        Type of normalization for the model MLP for deviations.
+    dev_mod_activation : str
+        Type of activation to use for the model MLP for deviations.
+    dev_mod_dropout : float
+        Dropout rate for the model MLP for deviations.
     """
 
     model_name: str = "SE-DyNeMo"
@@ -189,12 +199,17 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_subjects: int = None
     subject_embedding_dim: int = None
     mode_embedding_dim: int = None
-    mode_embedding_activation: str = None
-    dev_reg: str = None
-    dev_reg_strength: float = 0.0
-    dev_bayesian: bool = False
-    learn_dev_mod_sigma: bool = True
-    initial_dev_mod_sigma: float = 1
+
+    dev_inf_n_layers: int = 0
+    dev_inf_n_units: int = None
+    dev_inf_normalization: str = None
+    dev_inf_activation: str = None
+    dev_inf_dropout: float = 0.0
+    dev_mod_n_layers: int = 0
+    dev_mod_n_units: int = None
+    dev_mod_normalization: str = None
+    dev_mod_activation: str = None
+    dev_mod_dropout: float = 0.0
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -231,6 +246,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             raise ValueError(
                 "n_subjects, subject_embedding_dim and mode_embedding_dim must be passed."
             )
+
+        if self.dev_inf_n_layers != 0 and self.dev_inf_n_units is None:
+            raise ValueError("Please pass dev_inf_n_units.")
+
+        if self.dev_mod_n_layers != 0 and self.dev_mod_n_units is None:
+            raise ValueError("Plase pass dev_mod_n_units.")
 
 
 class Model(VariationalInferenceModelBase):
@@ -309,7 +330,7 @@ class Model(VariationalInferenceModelBase):
             Deviation of Cholesky factor of covs from the group.
             Shaoe is (n_subjects, n_modes, n_channels * (n_channels + 1) // 2).
         """
-        return sedynemo_obs.get_subject_dev(self.model, self.config.dev_bayesian)
+        return sedynemo_obs.get_subject_dev(self.model)
 
     def get_subject_means_covariances(self):
         """Get the means and covariances for each subject
@@ -321,9 +342,7 @@ class Model(VariationalInferenceModelBase):
         subject_covs : np.ndarray
             Mode covariances for each subject. Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covariances(
-            self.model, self.config.dev_bayesian
-        )
+        return sedynemo_obs.get_subject_means_covariances(self.model)
 
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
@@ -499,12 +518,10 @@ def _model_structure(config):
     )
     means_mode_embedding_layer = layers.Dense(
         config.mode_embedding_dim,
-        config.mode_embedding_activation,
         name="means_mode_embedding",
     )
     covs_mode_embedding_layer = layers.Dense(
         config.mode_embedding_dim,
-        config.mode_embedding_activation,
         name="covs_mode_embedding",
     )
     means_concat_embedding_layer = SubjectDevEmbeddingLayer(
@@ -519,84 +536,59 @@ def _model_structure(config):
         config.n_subjects,
         name="covs_concat_embedding",
     )
-    # ----------------------------------------- #
-    # Layers specific to the non Bayesian model #
-    # ----------------------------------------- #
-    if not config.dev_bayesian:
-        if config.learn_means:
-            means_dev_layer = layers.Dense(config.n_channels, name="means_dev")
-        else:
-            means_dev_layer = ZeroLayer(
-                shape=(config.n_subjects, config.n_modes, config.n_channels),
-                name="means_dev",
-            )
 
-        if config.learn_covariances:
-            covs_dev_layer = layers.Dense(
-                config.n_channels * (config.n_channels + 1) // 2,
-                name="covs_dev",
-            )
-        else:
-            covs_dev_layer = ZeroLayer(
-                shape=(
-                    config.n_subjects,
-                    config.n_modes,
-                    config.n_channels * (config.n_channels + 1) // 2,
-                ),
-                name="covs_dev",
-            )
-
-        means_dev_reg_layer = DummyLayer(
-            config.dev_reg,
-            config.dev_reg_strength,
-            name="means_dev_reg",
+    # Inference part of the deviation
+    means_dev_inf_input_layer = MLPLayer(
+        config.dev_inf_n_layers,
+        config.dev_inf_n_units,
+        config.dev_inf_normalization,
+        config.dev_inf_activation,
+        config.dev_inf_dropout,
+        name="means_dev_inf_input",
+    )
+    means_dev_inf_mu_layer = layers.Dense(config.n_channels, name="means_dev_inf_mu")
+    means_dev_inf_sigma_layer = layers.Dense(
+        config.n_channels, activation="softplus", name="means_dev_inf_sigma"
+    )
+    if config.learn_means:
+        means_dev_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon, name="means_dev"
         )
-        covs_dev_reg_layer = DummyLayer(
-            config.dev_reg,
-            config.dev_reg_strength,
-            name="covs_dev_reg",
-        )
-    # ------------------------------------- #
-    # Layers specific to the Bayesian model #
-    # ------------------------------------- #
     else:
-        means_dev_inf_mu_layer = layers.Dense(
-            config.n_channels, name="means_dev_inf_mu"
+        means_dev_layer = ZeroLayer(
+            shape=(config.n_subjects, config.n_modes, config.n_channels),
+            name="means_dev",
         )
-        means_dev_inf_sigma_layer = layers.Dense(
-            config.n_channels, activation="softplus", name="means_dev_inf_sigma"
-        )
-        if config.learn_means:
-            means_dev_layer = SampleNormalDistributionLayer(
-                config.theta_std_epsilon, name="means_dev"
-            )
-        else:
-            means_dev_layer = ZeroLayer(
-                shape=(config.n_subjects, config.n_modes, config.n_channels),
-                name="means_dev",
-            )
 
-        covs_dev_inf_mu_layer = layers.Dense(
-            config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_inf_mu"
+    covs_dev_inf_input_layer = MLPLayer(
+        config.dev_inf_n_layers,
+        config.dev_inf_n_units,
+        config.dev_inf_normalization,
+        config.dev_inf_activation,
+        config.dev_inf_dropout,
+        name="covs_dev_inf_input",
+    )
+    covs_dev_inf_mu_layer = layers.Dense(
+        config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_inf_mu"
+    )
+    covs_dev_inf_sigma_layer = layers.Dense(
+        config.n_channels * (config.n_channels + 1) // 2,
+        activation="softplus",
+        name="covs_dev_inf_sigma",
+    )
+    if config.learn_covariances:
+        covs_dev_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon, name="covs_dev"
         )
-        covs_dev_inf_sigma_layer = layers.Dense(
-            config.n_channels * (config.n_channels + 1) // 2,
-            activation="softplus",
-            name="covs_dev_inf_sigma",
+    else:
+        covs_dev_layer = ZeroLayer(
+            shape=(
+                config.n_subjects,
+                config.n_modes,
+                config.n_channels * (config.n_channels + 1) // 2,
+            ),
+            name="covs_dev",
         )
-        if config.learn_covariances:
-            covs_dev_layer = SampleNormalDistributionLayer(
-                config.theta_std_epsilon, name="covs_dev"
-            )
-        else:
-            covs_dev_layer = ZeroLayer(
-                shape=(
-                    config.n_subjects,
-                    config.n_modes,
-                    config.n_channels * (config.n_channels + 1) // 2,
-                ),
-                name="covs_dev",
-            )
 
     subject_means_layer = SubjectMapLayer(
         "means", config.theta_std_epsilon, name="subject_means"
@@ -630,20 +622,15 @@ def _model_structure(config):
         [subject_embeddings, covs_mode_embedding]
     )
 
-    if not config.dev_bayesian:
-        means_dev = means_dev_layer(means_concat_embedding)
-        means_dev = means_dev_reg_layer(means_dev)
+    means_dev_inf_input = means_dev_inf_input_layer(means_concat_embedding)
+    means_dev_inf_mu = means_dev_inf_mu_layer(means_dev_inf_input)
+    means_dev_inf_sigma = means_dev_inf_sigma_layer(means_dev_inf_input)
+    means_dev = means_dev_layer([means_dev_inf_mu, means_dev_inf_sigma])
 
-        covs_dev = covs_dev_layer(covs_concat_embedding)
-        covs_dev = covs_dev_reg_layer(covs_dev)
-    else:
-        means_dev_inf_mu = means_dev_inf_mu_layer(means_concat_embedding)
-        means_dev_inf_sigma = means_dev_inf_sigma_layer(means_concat_embedding)
-        means_dev = means_dev_layer([means_dev_inf_mu, means_dev_inf_sigma])
-
-        covs_dev_inf_mu = covs_dev_inf_mu_layer(covs_concat_embedding)
-        covs_dev_inf_sigma = covs_dev_inf_sigma_layer(covs_concat_embedding)
-        covs_dev = covs_dev_layer([covs_dev_inf_mu, covs_dev_inf_sigma])
+    covs_dev_inf_input = covs_dev_inf_input_layer(covs_concat_embedding)
+    covs_dev_inf_mu = covs_dev_inf_mu_layer(covs_dev_inf_input)
+    covs_dev_inf_sigma = covs_dev_inf_sigma_layer(covs_dev_inf_input)
+    covs_dev = covs_dev_layer([covs_dev_inf_mu, covs_dev_inf_sigma])
 
     mu = subject_means_layer([group_mu, means_dev])
     D = subject_covs_layer([group_D, covs_dev])
@@ -688,38 +675,62 @@ def _model_structure(config):
     mod_sigma = mod_sigma_layer(model_output_concat)
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
-    if not config.dev_bayesian:
-        kl_loss = kl_loss_layer(kl_div)
+    # Prior part of deviations
+    means_dev_mod_input_layer = MLPLayer(
+        config.dev_inf_n_layers,
+        config.dev_inf_n_units,
+        config.dev_inf_normalization,
+        config.dev_inf_activation,
+        config.dev_inf_dropout,
+        name="means_dev_mod_input",
+    )
+    means_dev_mod_sigma_layer = layers.Dense(
+        config.n_channels, activation="softplus", name="means_dev_mod_sigma"
+    )
+    covs_dev_mod_input_layer = MLPLayer(
+        config.dev_inf_n_layers,
+        config.dev_inf_n_units,
+        config.dev_inf_normalization,
+        config.dev_inf_activation,
+        config.dev_inf_dropout,
+        name="covs_dev_mod_input",
+    )
+    covs_dev_mod_sigma_layer = layers.Dense(
+        config.n_channels * (config.n_channels + 1) // 2,
+        activation="softplus",
+        name="covs_dev_mod_sigma",
+    )
+
+    if config.learn_means:
+        means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
+            config.theta_std_epsilon, name="means_dev_kl_loss"
+        )
     else:
-        # Layers for dev prior
-        dev_mod_sigma_layer = ScalarLayer(
-            config.learn_dev_mod_sigma,
-            config.initial_dev_mod_sigma,
-            name="dev_mod_sigma",
-        )
-        if config.learn_means:
-            means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                config.theta_std_epsilon, name="means_dev_kl_loss"
-            )
-        else:
-            means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
+        means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
-        if config.learn_covariances:
-            covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
-                config.theta_std_epsilon, name="covs_dev_kl_loss"
-            )
-        else:
-            covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")
+    if config.learn_covariances:
+        covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
+            config.theta_std_epsilon, name="covs_dev_kl_loss"
+        )
+    else:
+        covs_dev_kl_loss_layer = ZeroLayer((), name="covs_dev_kl_loss")
 
-        # Data flow
-        dev_mod_sigma = dev_mod_sigma_layer(data)  # Data not used
-        means_dev_kl_loss = means_dev_kl_loss_layer(
-            [data, means_dev_inf_mu, means_dev_inf_sigma, dev_mod_sigma]
-        )
-        covs_dev_kl_loss = covs_dev_kl_loss_layer(
-            [data, covs_dev_inf_mu, covs_dev_inf_sigma, dev_mod_sigma]
-        )
-        kl_loss = kl_loss_layer([kl_div, means_dev_kl_loss, covs_dev_kl_loss])
+    kl_loss_layer = KLLossLayer(do_annealing=config.do_kl_annealing, name="kl_loss")
+
+    # Data flow
+    means_dev_mod_input = means_dev_mod_input_layer(means_concat_embedding)
+    means_dev_mod_sigma = means_dev_mod_sigma_layer(means_dev_mod_input)
+
+    covs_dev_mod_input = covs_dev_mod_input_layer(covs_concat_embedding)
+    covs_dev_mod_sigma = covs_dev_mod_sigma_layer(covs_dev_mod_input)
+
+    means_dev_kl_loss = means_dev_kl_loss_layer(
+        [data, means_dev_inf_mu, means_dev_inf_sigma, means_dev_mod_sigma]
+    )
+    covs_dev_kl_loss = covs_dev_kl_loss_layer(
+        [data, covs_dev_inf_mu, covs_dev_inf_sigma, covs_dev_mod_sigma]
+    )
+    kl_loss = kl_loss_layer([kl_div, means_dev_kl_loss, covs_dev_kl_loss])
 
     return tf.keras.Model(
         inputs=[data, subj_id],

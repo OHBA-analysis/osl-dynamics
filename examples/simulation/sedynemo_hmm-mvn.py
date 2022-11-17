@@ -30,6 +30,14 @@ config = Config(
     initial_alpha_temperature=1.0,
     learn_means=False,
     learn_covariances=True,
+    dev_inf_n_layers=3,
+    dev_inf_n_units=32,
+    dev_inf_activation="tanh",
+    dev_inf_normalization="layer",
+    dev_mod_n_layers=3,
+    dev_mod_n_units=32,
+    dev_mod_activation="tanh",
+    dev_mod_normalization="layer",
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
@@ -57,11 +65,6 @@ sim = simulation.MSubj_HMM_MVN(
 )
 sim.standardize()
 training_data = data.Data([mtc for mtc in sim.time_series])
-
-# Bayesian about subject deviations?
-config.dev_bayesian = True
-config.learn_dev_mod_sigma = True
-config.initial_dev_mod_sigma = 100
 
 # Build model
 model = Model(config)

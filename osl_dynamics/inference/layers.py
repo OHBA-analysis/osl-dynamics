@@ -1311,3 +1311,27 @@ class SubjectMapKLDivergenceLayer(layers.Layer):
         kl_loss = tf.reduce_sum(kl_loss)
 
         return kl_loss
+
+
+class MLPLayer(layers.Layer):
+    def __init__(
+        self,
+        n_layers,
+        n_units,
+        norm_type,
+        act_type,
+        drop_rate,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.layers = []
+        for n in range(n_layers):
+            self.layers.append(layers.Dense(n_units))
+            self.layers.append(NormalizationLayer(norm_type))
+            self.layers.append(layers.Activation(act_type))
+            self.layers.append(layers.Dropout(drop_rate))
+
+    def call(self, inputs, **kwargs):
+        for layer in self.layers:
+            inputs = layer(inputs, **kwargs)
+        return inputs
