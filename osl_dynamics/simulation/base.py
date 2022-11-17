@@ -34,6 +34,6 @@ class Simulation:
         return 1
 
     def standardize(self, axis=0):
-        mu = np.mean(self.time_series, axis=axis)
-        sigma = np.std(self.time_series, axis=axis)
+        mu = np.mean(self.time_series, axis=axis, keepdims=True)
+        sigma = np.std(self.time_series, axis=axis, keepdims=True)
         self.time_series = (self.time_series - mu) / sigma
