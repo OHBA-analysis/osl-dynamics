@@ -590,11 +590,15 @@ def get_concatenated_embeddings(model):
 
 def get_subject_dev(model):
     means_concat_embedding, covs_concat_embedding = get_concatenated_embeddings(model)
-    means_dev_layer = model.get_layer("means_dev_inf_mu")
-    covs_dev_layer = model.get_layer("covs_dev_inf_mu")
+    means_dev_inf_input_layer = model.get_layer("means_dev_inf_input")
+    covs_dev_inf_input_layer = model.get_layer("covs_dev_inf_input")
+    means_dev_inf_layer = model.get_layer("means_dev_inf_mu")
+    covs_dev_inf_layer = model.get_layer("covs_dev_inf_mu")
 
-    means_dev = means_dev_layer(means_concat_embedding)
-    covs_dev = covs_dev_layer(covs_concat_embedding)
+    means_dev_inf_input = means_dev_inf_input_layer(means_concat_embedding)
+    covs_dev_inf_input = covs_dev_inf_input_layer(covs_concat_embedding)
+    means_dev = means_dev_inf_layer(means_dev_inf_input)
+    covs_dev = covs_dev_inf_layer(covs_dev_inf_input)
 
     return means_dev.numpy(), covs_dev.numpy()
 
