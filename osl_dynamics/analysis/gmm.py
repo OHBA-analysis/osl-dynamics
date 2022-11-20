@@ -80,15 +80,21 @@ def fit_gaussian_mixture(
 
     # Standardise the data
     if standardize:
-        X_ -= np.mean(X_, axis=0)
-        X_ /= np.std(X_, axis=0)
+        std = np.std(X_, axis=0)
+        if std == 0:
+            return max(X)
+        mu = np.mean(X_, axis=0)
+        X_ -= mu
+        X_ /= std
 
     # Fit a Gaussian mixture model
     gm = GaussianMixture(n_components=2, **sklearn_kwargs)
     gm.fit(X_)
 
     # Inferred parameters
-    amplitudes = np.squeeze(gm.weights_) / np.sqrt(2 * np.pi * np.squeeze(gm.covariances_))
+    amplitudes = np.squeeze(gm.weights_) / np.sqrt(
+        2 * np.pi * np.squeeze(gm.covariances_)
+    )
     means = np.squeeze(gm.means_)
     stddevs = np.sqrt(np.squeeze(gm.covariances_))
     if label_order == "mean":
