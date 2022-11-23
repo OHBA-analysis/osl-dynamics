@@ -5,6 +5,7 @@
 from pathlib import Path
 
 import numpy as np
+from scipy import stats
 from nilearn import plotting
 from tqdm import trange
 
@@ -165,9 +166,6 @@ def mean_coherence_from_spectra(
         # Concatenate over modes
         coh = coherence[i].reshape(-1, n_f)
 
-        # Same frequencies give nan coherences, replace with zero
-        coh = np.nan_to_num(coh)
-
         if components is not None:
             # Coherence for each spectral component
             coh = components @ coh.T
@@ -192,6 +190,7 @@ def gmm_threshold(
     conn_map,
     subtract_mean=False,
     standardize=False,
+    p_value=None,
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
@@ -206,11 +205,15 @@ def gmm_threshold(
     ----------
     conn_map : np.ndarray
         Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
-        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channesl).
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     standardize : bool
         Should we standardize the input to the GMM?
+    p_value : float
+        Used to determine a threshold. We ensure the data points assigned
+        to the 'on' component have a probability of less than p_value of
+        belonging to the 'off' component.
     one_component_percentile : float
         Percentile threshold if only one component is found.
         Should be a between 0 and 100. E.g. for the 95th percentile,
@@ -237,13 +240,14 @@ def gmm_threshold(
         conn_map,
         subtract_mean,
         standardize,
+        p_value,
         one_component_percentile,
         n_sigma,
         sklearn_kwargs,
         filename,
         plot_kwargs,
     )
-    conn_map = threshold(conn_map, percentile, subtract_mean, return_edges=False)
+    conn_map = threshold(conn_map, percentile, subtract_mean)
     return conn_map
 
 
@@ -251,6 +255,7 @@ def fit_gmm(
     conn_map,
     subtract_mean=False,
     standardize=False,
+    p_value=None,
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
@@ -268,6 +273,10 @@ def fit_gmm(
         Should we subtract the mean over modes before fitting a GMM?
     standardize : bool
         Should we standardize the input to the GMM?
+    p_value : float
+        Used to determine a threshold. We ensure the data points assigned
+        to the 'on' component have a probability of less than p_value of
+        belonging to the 'off' component.
     one_component_percentile : float
         Percentile threshold if only one component is found.
         Should be a between 0 and 100. E.g. for the 95th percentile,
@@ -278,7 +287,8 @@ def fit_gmm(
         have two components.
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
-        sklearn.mixture.BayesianGaussianMixture().
+        sklearn.mixture.GaussianMixture(). Default is
+        {"max_iter": 5000, "n_init": 10}.
     filename : str
         Filename to save fit to.
     plot_kwargs : dict
@@ -299,8 +309,8 @@ def fit_gmm(
         + "or (n_channels, n_channels).",
     )
 
-    if sklearn_kwargs == {}:
-        sklearn_kwargs = {"max_iter": 5000, "n_init": 10}
+    default_sklearn_kwargs = {"max_iter": 5000, "n_init": 10}
+    sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
 
     # Number of components, modes and channels
     n_components = conn_map.shape[0]
@@ -324,6 +334,12 @@ def fit_gmm(
             else:
                 c = conn_map[i, j, m, n]
 
+            # Only keep positive entries
+            c = c[c > 0]
+            if len(c) == 0:
+                percentiles[i, j] = 100
+                continue
+
             # Output filename
             if filename is not None:
                 plot_filename = (
@@ -339,17 +355,20 @@ def fit_gmm(
                 plot_filename = None
 
             # Fit a GMM to get class labels
-            percentiles[i, j] = gmm.fit_gaussian_mixture(
+            threshold = gmm.fit_gaussian_mixture(
                 c,
-                bayesian=True,
                 standardize=standardize,
-                sklearn_kwargs=sklearn_kwargs,
+                p_value=p_value,
                 one_component_percentile=one_component_percentile,
                 n_sigma=n_sigma,
+                sklearn_kwargs=sklearn_kwargs,
                 plot_filename=plot_filename,
                 plot_kwargs=plot_kwargs,
                 print_message=False,
             )
+
+            # Calculate the percentile from the threshold
+            percentiles[i, j] = stats.percentileofscore(c, threshold)
 
     return np.squeeze(percentiles)
 
