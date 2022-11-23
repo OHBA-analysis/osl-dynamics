@@ -452,7 +452,7 @@ class CovarianceMatricesLayer(layers.Layer):
         elif learn:
             # Use the identity matrix with a random error
             self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalIdentityCholeskyInitializer(mean=0, std=0.1)
+                osld_initializers.NormalIdentityCholeskyInitializer(0.1)
             )
 
         else:
@@ -562,7 +562,7 @@ class CorrelationMatricesLayer(layers.Layer):
         elif learn:
             # Use a correlation matrix with an error added
             self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalCorrelationCholeskyInitializer(mean=0, std=0.1)
+                osld_initializers.NormalCorrelationCholeskyInitializer(0.1)
             )
 
         else:
@@ -666,7 +666,7 @@ class DiagonalMatricesLayer(layers.Layer):
         elif learn:
             # Use random numbers
             self.diagonals_initializer = osld_initializers.NormalDiagonalInitializer(
-                mean=0, std=0.05
+                0.05
             )
 
         else:

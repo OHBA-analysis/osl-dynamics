@@ -21,8 +21,7 @@ class WeightInitializer(Initializer):
         Note, the shape is not checked.
     """
 
-    def __init__(self, initial_value, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, initial_value):
         self.initial_value = initial_value
 
     def __call__(self, shape, dtype=None):
@@ -32,9 +31,7 @@ class WeightInitializer(Initializer):
 class IdentityCholeskyInitializer(Initializer):
     """Initialize weights to a flattened cholesky factor of identity matrices."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    def __init__(self):
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
@@ -52,15 +49,11 @@ class NormalIdentityCholeskyInitializer(Initializer):
 
     Parameters
     ----------
-    mean : float
-        Mean of the error to add.
     std : float
         Standard deviation of the error to add.
     """
 
-    def __init__(self, mean, std, **kwargs):
-        super().__init__(**kwargs)
-        self.mean = mean
+    def __init__(self, std):
         self.std = std
 
         # Bijector used to transform learnable vectors to covariance matrices
@@ -69,7 +62,7 @@ class NormalIdentityCholeskyInitializer(Initializer):
     def __call__(self, shape, dtype=None):
         n = shape[0]  # n_modes
         m = int(np.sqrt(1 + 8 * shape[1]) / 2 - 0.5)  # n_channels
-        diagonals = np.random.normal(self.mean + 1, self.std, size=[n, m])
+        diagonals = np.random.normal(1, self.std, size=[n, m])
         matrices = np.array([np.diag(d) for d in diagonals], dtype=np.float32)
         return self.bijector.inverse(matrices)
 
@@ -86,9 +79,7 @@ class NormalCorrelationCholeskyInitializer(Initializer):
         Standard deviation of the error to add.
     """
 
-    def __init__(self, mean, std, **kwargs):
-        super().__init__(**kwargs)
-        self.mean = mean
+    def __init__(self, std):
         self.std = std
 
         # Bijector used to transform learnable vectors to covariance matrices
@@ -102,9 +93,7 @@ class NormalCorrelationCholeskyInitializer(Initializer):
         diagonals = np.ones([n, m])
         matrices = np.array([np.diag(d) for d in diagonals], dtype=np.float32)
         cholesky_factors = self.bijector.inverse(matrices)
-        cholesky_factors += np.random.normal(
-            self.mean, self.std, size=cholesky_factors.shape
-        )
+        cholesky_factors += np.random.normal(0, self.std, size=cholesky_factors.shape)
         return cholesky_factors
 
 
@@ -113,15 +102,11 @@ class NormalDiagonalInitializer(Initializer):
 
     Parameters
     ----------
-    mean : float
-        Mean of the error to add.
     std : float
         Standard deviation of the error to add.
     """
 
-    def __init__(self, mean, std, **kwargs):
-        super().__init__(**kwargs)
-        self.mean = mean
+    def __init__(self, std):
         self.std = std
 
         # Softplus transformation to ensure diagonal is positive
@@ -130,7 +115,7 @@ class NormalDiagonalInitializer(Initializer):
     def __call__(self, shape, dtype=None):
         n = shape[0]  # n_modes
         m = shape[1]  # n_channels
-        diagonals = np.random.normal(1, 0.05, size=[n, m]).astype(np.float32)
+        diagonals = np.random.normal(1, self.std, size=[n, m]).astype(np.float32)
         return self.bijector.inverse(diagonals)
 
 
