@@ -58,7 +58,7 @@ def fit_gaussian_mixture(
 
     Returns
     -------
-    y : float
+    threshold : float
         Threshold for the on class.
     """
     if print_message:
@@ -72,11 +72,12 @@ def fit_gaussian_mixture(
         raise ValueError("X must be a 1D numpy array.")
     else:
         X_ = X_[:, np.newaxis]
+        X = X[:, np.newaxis]
 
     # Logit transform
     if logit_transform:
         X_ = special.logit(X)
-        X_[np.isinf(X[:, 0]), :] = np.mean(X_[~np.isinf(X[:, 0]), 0])
+        X_[np.isinf(X_[:, 0]), :] = np.mean(X_[~np.isinf(X_[:, 0]), 0])
 
     # Standardise the data
     if standardize:
@@ -151,7 +152,7 @@ def fit_gaussian_mixture(
 
     # Get the threshold in the standardised/logit transform and original space
     threshold_ = X_[index, 0]
-    threshold = X[index]
+    threshold = X[index, 0]
 
     # Plots
     if plot_filename is not None:
