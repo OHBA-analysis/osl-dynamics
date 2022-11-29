@@ -189,8 +189,10 @@ def mean_coherence_from_spectra(
 def gmm_threshold(
     conn_map,
     subtract_mean=False,
+    mean_weights=None,
     standardize=False,
     p_value=None,
+    keep_positive_only=False,
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
@@ -208,12 +210,17 @@ def gmm_threshold(
         n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
+    mean_weights: np.ndarray
+        Numpy array with weightings for each mode/state to use to calculate the mean.
+        Default is equal weighting.
     standardize : bool
         Should we standardize the input to the GMM?
     p_value : float
         Used to determine a threshold. We ensure the data points assigned
         to the 'on' component have a probability of less than p_value of
         belonging to the 'off' component.
+    keep_positive_only : bool
+        Should we only keep positive values to fit a GMM to?
     one_component_percentile : float
         Percentile threshold if only one component is found.
         Should be a between 0 and 100. E.g. for the 95th percentile,
@@ -239,8 +246,10 @@ def gmm_threshold(
     percentile = fit_gmm(
         conn_map,
         subtract_mean,
+        mean_weights,
         standardize,
         p_value,
+        keep_positive_only,
         one_component_percentile,
         n_sigma,
         sklearn_kwargs,
@@ -254,8 +263,10 @@ def gmm_threshold(
 def fit_gmm(
     conn_map,
     subtract_mean=False,
+    mean_weights=None,
     standardize=False,
     p_value=None,
+    keep_positive_only=False,
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
@@ -271,12 +282,17 @@ def fit_gmm(
         Connectivity map.
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
+    mean_weights: np.ndarray
+        Numpy array with weightings for each mode/state to use to calculate the mean.
+        Default is equal weighting.
     standardize : bool
         Should we standardize the input to the GMM?
     p_value : float
         Used to determine a threshold. We ensure the data points assigned
         to the 'on' component have a probability of less than p_value of
         belonging to the 'off' component.
+    keep_positive_only : bool
+        Should we only keep positive values to fit a GMM to?
     one_component_percentile : float
         Percentile threshold if only one component is found.
         Should be a between 0 and 100. E.g. for the 95th percentile,
@@ -318,7 +334,7 @@ def fit_gmm(
     n_channels = conn_map.shape[2]
 
     # Mean over modes
-    mean_conn_map = np.mean(conn_map, axis=1)
+    mean_conn_map = np.average(conn_map, axis=1, weights=mean_weights)
 
     # Indices for off diagonal elements
     m, n = np.triu_indices(n_channels, k=1)
@@ -334,11 +350,13 @@ def fit_gmm(
             else:
                 c = conn_map[i, j, m, n]
 
-            # Only keep positive entries
-            c = c[c > 0]
-            if len(c) == 0:
-                percentiles[i, j] = 100
-                continue
+            if keep_positive_only:
+                # Only keep positive entries
+                # (this is what's done in MATLAB OSL's teh_graph_gmm_fit)
+                c = c[c > 0]
+                if len(c) == 0:
+                    percentiles[i, j] = 100
+                    continue
 
             # Output filename
             if filename is not None:
