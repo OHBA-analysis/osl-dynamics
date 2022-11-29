@@ -169,8 +169,6 @@ def plot_line(
     y_range=None,
     x_label=None,
     y_label=None,
-    log_xscale=False,
-    log_yscale=False,
     title=None,
     plot_kwargs=None,
     fig_kwargs=None,
