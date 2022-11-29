@@ -58,7 +58,7 @@ def fit_gaussian_mixture(
 
     Returns
     -------
-    y : float
+    threshold : float
         Threshold for the on class.
     """
     if print_message:
