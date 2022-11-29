@@ -3,6 +3,7 @@
 """
 
 import numpy as np
+from pqdm.processes import pqdm
 
 from osl_dynamics.analysis.spectral import spectrogram, coherence_spectra
 
@@ -46,6 +47,7 @@ def power_spectra(
     step_size=None,
     standardize=False,
     calc_coh=False,
+    n_jobs=1,
 ):
     """Calculate static power spectra.
 
@@ -65,6 +67,8 @@ def power_spectra(
         Should we standardise the data?
     calc_coh : bool
         Should we also return the coherence spectra?
+    n_jobs : int
+        Number of parallel jobs.
 
     Returns
     -------
@@ -87,24 +91,13 @@ def power_spectra(
     if step_size is None:
         step_size = window_length // 2
 
-    # List to hold the static PSD/coherence for each subject
-    psd = []
-    if calc_coh:
-        coh = []
+    # Standardise
+    if standardize:
+        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
-    # Loop over subjects
-    for i, d in enumerate(data):
-        if len(data) > 1:
-            print(f"Subject {i}")
-
-        # Standardisation
-        if standardize:
-            d = np.copy(d)
-            d -= np.mean(d, axis=0)
-            d /= np.std(d, axis=0)
-
-        # Calculate spectrogram (time-varying PSD)
-        _, f, p = spectrogram(
+    if len(data) == 1:
+        # We only have one subject so we don't need to parallelise the calculation
+        results = spectrogram(
             data=d,
             window_length=window_length,
             sampling_frequency=sampling_frequency,
@@ -112,9 +105,35 @@ def power_spectra(
             calc_cpsd=calc_coh,
             step_size=step_size,
             n_sub_windows=1,
+            print_progress_bar=True,
         )
+        results = [results]
 
-        # Average over time
+    else:
+        # Create arguments to pass to a function in parallel
+        args = []
+        for d in data:
+            args.append(
+                [
+                    d,
+                    window_length,
+                    sampling_frequency,
+                    frequency_range,
+                    calc_coh,
+                    step_size,
+                    1,
+                    False,
+                ]
+            )
+
+        # Calculate power spectra
+        print("Calculating power spectra")
+        results = pqdm(args, spectrogram, n_jobs=n_jobs, argument_type="args", ncols=98)
+
+    # Unpack results
+    psd = []
+    for result in results:
+        _, f, p = result
         psd.append(np.mean(p, axis=0))
 
     if calc_coh:
