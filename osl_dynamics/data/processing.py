@@ -10,7 +10,7 @@ from tqdm import tqdm
 from scipy import signal
 from osl_dynamics import array_ops
 from osl_dynamics.data.spm import SPM
-from osl_dynamics.utils.misc import MockArray
+from osl_dynamics.utils.misc import array_to_memmap
 
 
 class Processing:
@@ -40,7 +40,6 @@ class Processing:
                 n_embeddings=prep_settings.get("n_embeddings"),
                 n_pca_components=prep_settings.get("n_pca_components", None),
                 whiten=prep_settings.get("whiten", False),
-                load_memmaps=prep_settings.get("load_memmaps", True),
             )
 
     def prepare(
@@ -53,7 +52,6 @@ class Processing:
         n_pca_components=None,
         pca_components=None,
         whiten=False,
-        load_memmaps=True,
     ):
         """Prepares data to train the model with.
 
@@ -92,8 +90,6 @@ class Processing:
         whiten : bool
             Should we whiten the PCA'ed data?
             Only used if amplitude_envelope=False.
-        load_memmaps: bool
-            Should we load the data into the memmaps?
         """
         if self.prepared:
             warnings.warn(
@@ -109,7 +105,6 @@ class Processing:
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
         self.whiten = whiten
-        self.load_memmaps = load_memmaps
 
         # Prepare data (either amplitude envelope or time-delay embedded)
         if amplitude_envelope:
@@ -156,18 +151,26 @@ class Processing:
                     )
                     for i in range(prepared_data.shape[1])
                 ],
-                dtype=np.float32,
             ).T
 
-            # Create a memory map for the prepared data
+            # Finally, we standardise
+            prepared_data = standardize(prepared_data, create_copy=False)
+
+            # Make sure data is float32
+            prepared_data = prepared_data.astype(np.float32)
+
             if self.load_memmaps:
-                prepared_data_memmap = MockArray.get_memmap(
-                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                # Save the prepared data as a memmap
+                prepared_data_memmap = array_to_memmap(
+                    prepared_data_file, prepared_data
                 )
 
-            # Standardise to get the final data
-            prepared_data_memmap = standardize(prepared_data, create_copy=False)
-            self.prepared_data_memmaps.append(prepared_data_memmap.astype(np.float32))
+            else:
+                prepared_data_memmap = np.copy(prepared_data)
+            self.prepared_data_memmaps.append(prepared_data_memmap)
+
+            # Clear intermediate data
+            del prepared_data
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
@@ -237,14 +240,17 @@ class Processing:
             else:
                 prepared_data = te_std_data
 
-            # Create a memory map for the prepared data
+            # Finally, we standardise
+            prepared_data = standardize(prepared_data, create_copy=False)
+
             if self.load_memmaps:
-                prepared_data_memmap = MockArray.get_memmap(
-                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                # Save the prepared data as a memmap
+                prepared_data_memmap = array_to_memmap(
+                    prepared_data_file, prepared_data
                 )
 
-            # Standardise to get the final data
-            prepared_data_memmap = standardize(prepared_data, create_copy=False)
+            else:
+                prepared_data_memmap = np.copy(prepared_data)
             self.prepared_data_memmaps.append(prepared_data_memmap)
 
             # Clear intermediate data
