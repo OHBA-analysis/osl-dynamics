@@ -171,13 +171,9 @@ class Processing:
                 prepared_data_memmap = array_to_memmap(
                     prepared_data_file, prepared_data
                 )
-
             else:
-                prepared_data_memmap = np.copy(prepared_data)
+                prepared_data_memmap = prepared_data
             self.prepared_data_memmaps.append(prepared_data_memmap)
-
-            # Clear intermediate data
-            del prepared_data
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
@@ -238,9 +234,6 @@ class Processing:
                 # Calculate the covariance of the entire dataset
                 covariance += np.transpose(te_std_data) @ te_std_data
 
-                # Clear data in memory
-                del std_data, te_std_data
-
             # Use SVD to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
@@ -276,13 +269,9 @@ class Processing:
                 prepared_data_memmap = array_to_memmap(
                     prepared_data_file, prepared_data
                 )
-
             else:
-                prepared_data_memmap = np.copy(prepared_data)
+                prepared_data_memmap = prepared_data
             self.prepared_data_memmaps.append(prepared_data_memmap)
-
-            # Clear intermediate data
-            del std_data, te_std_data, prepared_data
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
