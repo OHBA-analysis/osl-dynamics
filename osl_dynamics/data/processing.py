@@ -10,7 +10,7 @@ from tqdm import tqdm
 from scipy import signal
 from osl_dynamics import array_ops
 from osl_dynamics.data.spm import SPM
-from osl_dynamics.utils.misc import MockArray
+from osl_dynamics.utils.misc import array_to_memmap
 
 
 class Processing:
@@ -40,7 +40,6 @@ class Processing:
                 n_embeddings=prep_settings.get("n_embeddings"),
                 n_pca_components=prep_settings.get("n_pca_components", None),
                 whiten=prep_settings.get("whiten", False),
-                load_memmaps=prep_settings.get("load_memmaps", True),
             )
 
     def prepare(
@@ -53,7 +52,6 @@ class Processing:
         n_pca_components=None,
         pca_components=None,
         whiten=False,
-        load_memmaps=True,
     ):
         """Prepares data to train the model with.
 
@@ -92,24 +90,11 @@ class Processing:
         whiten : bool
             Should we whiten the PCA'ed data?
             Only used if amplitude_envelope=False.
-        load_memmaps: bool
-            Should we load the data into the memmaps?
         """
         if self.prepared:
             warnings.warn(
                 "Previously prepared data will be overwritten.", RuntimeWarning
             )
-
-        self.amplitude_envelope = amplitude_envelope
-        self.low_freq = low_freq
-        self.high_freq = high_freq
-        self.n_window = n_window
-        self.n_embeddings = n_embeddings
-        self.n_te_channels = self.n_raw_data_channels * n_embeddings
-        self.n_pca_components = n_pca_components
-        self.pca_components = pca_components
-        self.whiten = whiten
-        self.load_memmaps = load_memmaps
 
         # Prepare data (either amplitude envelope or time-delay embedded)
         if amplitude_envelope:
@@ -117,10 +102,21 @@ class Processing:
         else:
             self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
 
-        self.prepared = True
-
     def prepare_amp_env(self, low_freq=None, high_freq=None, n_window=1):
-        """Prepare amplitude envelope data."""
+        """Prepare amplitude envelope data.
+
+        Parameters
+        ----------
+        low_freq : float
+            Frequency in Hz for a high pass filter.
+            Only used if amplitude_envelope=True.
+        high_freq : float
+            Frequency in Hz for a low pass filter.
+            Only used if amplitude_envelope=True.
+        n_window : int
+            Number of data points in a sliding window to apply to the amplitude
+            envelope data. Only used if amplitude_envelope=True.
+        """
 
         # Validation
         if (
@@ -131,6 +127,12 @@ class Processing:
                 + "Use Data.set_sampling_frequency() or pass "
                 + "Data(..., sampling_frequency=...) when creating the Data object."
             )
+
+        # Save settings
+        self.amplitude_envelope = True
+        self.low_freq = low_freq
+        self.high_freq = high_freq
+        self.n_window = n_window
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -156,21 +158,27 @@ class Processing:
                     )
                     for i in range(prepared_data.shape[1])
                 ],
-                dtype=np.float32,
             ).T
 
-            # Create a memory map for the prepared data
-            if self.load_memmaps:
-                prepared_data_memmap = MockArray.get_memmap(
-                    prepared_data_file, prepared_data.shape, dtype=np.float32
-                )
+            # Finally, we standardise
+            prepared_data = standardize(prepared_data, create_copy=False)
 
-            # Standardise to get the final data
-            prepared_data_memmap = standardize(prepared_data, create_copy=False)
-            self.prepared_data_memmaps.append(prepared_data_memmap.astype(np.float32))
+            # Make sure data is float32
+            prepared_data = prepared_data.astype(np.float32)
+
+            if self.load_memmaps:
+                # Save the prepared data as a memmap
+                prepared_data_memmap = array_to_memmap(
+                    prepared_data_file, prepared_data
+                )
+            else:
+                prepared_data_memmap = prepared_data
+            self.prepared_data_memmaps.append(prepared_data_memmap)
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
+
+        self.prepared = True
 
     def prepare_tde(
         self,
@@ -179,13 +187,32 @@ class Processing:
         pca_components=None,
         whiten=False,
     ):
-        """Prepares time-delay embedded data to train the model with."""
+        """Prepares time-delay embedded data to train the model with.
+
+        Parameters
+        ----------
+        n_embeddings : int
+            Number of data points to embed the data.
+        n_pca_components : int
+            Number of PCA components to keep. Default is no PCA.
+        pca_components : np.ndarray
+            PCA components to apply if they have already been calculated.
+        whiten : bool
+            Should we whiten the PCA'ed data?
+        """
 
         if n_pca_components is not None and pca_components is not None:
             raise ValueError("Please only pass n_pca_components or pca_components.")
 
         if pca_components is not None and not isinstance(pca_components, np.ndarray):
             raise ValueError("pca_components must be a numpy array.")
+
+        # Save settings
+        self.n_embeddings = n_embeddings
+        self.n_te_channels = self.n_raw_data_channels * n_embeddings
+        self.n_pca_components = n_pca_components
+        self.pca_components = pca_components
+        self.whiten = whiten
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -206,9 +233,6 @@ class Processing:
 
                 # Calculate the covariance of the entire dataset
                 covariance += np.transpose(te_std_data) @ te_std_data
-
-                # Clear data in memory
-                del std_data, te_std_data
 
             # Use SVD to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
@@ -237,21 +261,22 @@ class Processing:
             else:
                 prepared_data = te_std_data
 
-            # Create a memory map for the prepared data
+            # Finally, we standardise
+            prepared_data = standardize(prepared_data, create_copy=False)
+
             if self.load_memmaps:
-                prepared_data_memmap = MockArray.get_memmap(
-                    prepared_data_file, prepared_data.shape, dtype=np.float32
+                # Save the prepared data as a memmap
+                prepared_data_memmap = array_to_memmap(
+                    prepared_data_file, prepared_data
                 )
-
-            # Standardise to get the final data
-            prepared_data_memmap = standardize(prepared_data, create_copy=False)
+            else:
+                prepared_data_memmap = prepared_data
             self.prepared_data_memmaps.append(prepared_data_memmap)
-
-            # Clear intermediate data
-            del std_data, te_std_data, prepared_data
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
+
+        self.prepared = True
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
