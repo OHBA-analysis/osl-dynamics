@@ -21,6 +21,8 @@ class MVN:
     covariances : np.ndarray or str
         Covariance matrix for each mode, shape should be (n_modes,
         n_channels, n_channels). Either a numpy array or 'random'.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
@@ -33,10 +35,12 @@ class MVN:
         covariances,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         observation_error=0.0,
         random_seed=None,
     ):
         self._rng = np.random.default_rng(random_seed)
+        self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
         self.instantaneous_covs = None
 
@@ -103,12 +107,18 @@ class MVN:
             )
 
             # Add a large activation to a small number of the channels at random
-            n_active_channels = max(1, 2 * self.n_channels // self.n_modes)
-            for i in range(self.n_modes):
-                active_channels = np.unique(
-                    self._rng.integers(0, self.n_channels, size=n_active_channels)
-                )
-                W[i, active_channels] += activation_strength / self.n_channels
+            activation_strength_multipliers = np.linspace(1, 5, self.n_covariances_act)
+            for j in range(self.n_covariances_act):
+                n_active_channels = max(1, 2 * self.n_channels // self.n_modes)
+                for i in range(self.n_modes):
+                    active_channels = np.unique(
+                        self._rng.integers(0, self.n_channels, size=n_active_channels)
+                    )
+                    W[i, active_channels] += (
+                        activation_strength_multipliers[j]
+                        * activation_strength
+                        / self.n_channels
+                    )
 
             # A small value to add to the diagonal to ensure the covariances are
             # invertible
