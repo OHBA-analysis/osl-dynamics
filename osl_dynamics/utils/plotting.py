@@ -134,17 +134,17 @@ def rough_square_axes(n_plots):
     return short, long, empty
 
 
-def get_colors(n_modes, colormap="magma"):
+def get_colors(n, colormap="magma"):
     """Produce equidistant colors from a matplotlib colormap.
 
     Given a matplotlib colormap, produce a series of RGBA colors which are equally
     spaced by value. There is no guarantee that these colors will be perceptually
-    uniformly distributed and with many colors will likely be extremely close. Alpha is
-    1.0 for all colors.
+    uniformly distributed and with many colors will likely be extremely close.
+    Alpha is 1.0 for all colors.
 
     Parameters
     ----------
-    n_modes : int
+    n : int
         The number of colors to return.
     colormap : str
         The name of a matplotlib colormap.
@@ -155,7 +155,7 @@ def get_colors(n_modes, colormap="magma"):
         A list of colors in RGBA format. A = 1.0 in all cases.
     """
     colormap = plt.get_cmap(colormap)
-    colors = [colormap(1 * i / n_modes) for i in range(n_modes)]
+    colors = [colormap(1 * i / n) for i in range(n)]
     return colors
 
 
@@ -417,7 +417,10 @@ def plot_scatter(
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    colors = get_colors(len(x), colormap="tab10")
+    if len(x) > 10:
+        colors = get_colors(len(x), colormap="tab20")
+    else:
+        colors = get_colors(len(x), colormap="tab10")
 
     # Create figure
     if ax is None:
