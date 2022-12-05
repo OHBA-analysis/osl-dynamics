@@ -186,6 +186,22 @@ def mean_coherence_from_spectra(
     return np.squeeze(c)
 
 
+def mean_connections(conn_map):
+    """Average the edges for each node.
+
+    Parameters
+    ----------
+    conn_map : np.ndarray
+        A (..., n_channels, n_channels) connectivity matrix.
+
+    Returns
+    -------
+    mean_connections : np.ndarray
+        A (..., n_channels) matrix.
+    """
+    return np.mean(conn_map, axis=-1)
+
+
 def gmm_threshold(
     conn_map,
     subtract_mean=False,
