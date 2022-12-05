@@ -4,12 +4,16 @@
 """
 
 print("Setting up")
+import os
 import numpy as np
 from sklearn.decomposition import PCA
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.utils import plotting
 from osl_dynamics.models.sedynemo import Config, Model
+
+# Create directory to hold plots
+os.makedirs("figures", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -18,10 +22,10 @@ tf_ops.gpu_growth()
 config = Config(
     n_modes=5,
     n_channels=20,
-    n_subjects=20,
-    subject_embedding_dim=5,
+    n_subjects=100,
+    subject_embedding_dim=2,
     mode_embedding_dim=2,
-    sequence_length=100,
+    sequence_length=200,
     inference_n_units=128,
     inference_normalization="layer",
     model_n_units=128,
@@ -42,7 +46,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=100,
-    batch_size=256,
+    batch_size=128,
     learning_rate=0.005,
     n_epochs=200,
     multi_gpu=False,
@@ -52,16 +56,21 @@ config = Config(
 print("Simulating data")
 
 sim = simulation.MSubj_HMM_MVN(
-    n_samples=25600,
+    n_samples=3000,
     trans_prob="sequence",
     subject_means="zero",
     subject_covariances="random",
     n_states=config.n_modes,
     n_channels=config.n_channels,
+    n_covariances_act=10,
     n_subjects=config.n_subjects,
-    n_groups=1,
+    n_subject_embedding_dim=config.subject_embedding_dim,
+    n_mode_embedding_dim=config.mode_embedding_dim,
+    subject_embedding_scale=0.01,
+    n_groups=3,
+    between_group_scale=0.5,
     stay_prob=0.9,
-    random_seed=123,
+    random_seed=1234,
 )
 sim.standardize()
 training_data = data.Data([mtc for mtc in sim.time_series])
@@ -70,11 +79,19 @@ training_data = data.Data([mtc for mtc in sim.time_series])
 model = Model(config)
 model.summary()
 
+# Set regularizers
+model.set_regularizers(training_data)
+
 # Set scaling factor for devation kl loss
 model.set_bayesian_kl_scaling(training_data)
 
-# Set regularizers
-model.set_regularizers(training_data)
+# Initialise model
+model.random_subset_initialization(
+    training_data,
+    n_epochs=20,
+    n_init=5,
+    take=0.2,
+)
 
 print("Training model")
 history = model.fit(training_data, epochs=config.n_epochs)
@@ -95,37 +112,36 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
 
-# Get the subject embeddings
-subject_embeddings = model.get_subject_embeddings()
+# Plot the simulated subject embeddings with group labels
+sim_subject_embeddings = sim.subject_embeddings
+group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
+plotting.plot_scatter(
+    [sim_subject_embeddings[group_mask, 0] for group_mask in group_masks],
+    [sim_subject_embeddings[group_mask, 1] for group_mask in group_masks],
+    x_label="dim_1",
+    y_label="dim_2",
+    annotate=[
+        np.array([str(i) for i in range(config.n_subjects)])[group_mask]
+        for group_mask in group_masks
+    ],
+    filename="figures/sim_subject_embeddings.png",
+)
+
+# Get the inferred subject embeddings
+inf_subject_embeddings = model.get_subject_embeddings()
 
 # Perform PCA on the subject embeddings to visualise the embeddings
 pca = PCA(n_components=2)
-pca_subject_embeddings = pca.fit_transform(subject_embeddings)
+pca_inf_subject_embeddings = pca.fit_transform(inf_subject_embeddings)
 print("explained variances ratio:", pca.explained_variance_ratio_)
 plotting.plot_scatter(
-    [pca_subject_embeddings[:, 0]],
-    [pca_subject_embeddings[:, 1]],
+    [pca_inf_subject_embeddings[group_mask, 0] for group_mask in group_masks],
+    [pca_inf_subject_embeddings[group_mask, 1] for group_mask in group_masks],
     x_label="PC1",
     y_label="PC2",
-    annotate=[[str(i) for i in range(config.n_subjects)]],
-    filename="subject_embeddings.png",
+    annotate=[
+        np.array([str(i) for i in range(config.n_subjects)])[group_mask]
+        for group_mask in group_masks
+    ],
+    filename="figures/inf_subject_embeddings.png",
 )
-
-
-# Look at the ground truth group assignment
-assigned_groups = np.empty([config.n_subjects, 2])
-assigned_groups[:, 0] = (
-    sim.obs_mod.means_assigned_groups
-    if sim.obs_mod.means_assigned_groups is not None
-    else 0
-)
-assigned_groups[:, 1] = (
-    sim.obs_mod.covariances_assigned_groups
-    if sim.obs_mod.covariances_assigned_groups is not None
-    else 0
-)
-
-unique_groups = np.unique(assigned_groups, axis=0)
-for i in range(unique_groups.shape[0]):
-    print("group", unique_groups[i], ":")
-    print(np.where(np.all(assigned_groups == unique_groups[i], axis=1))[0])
