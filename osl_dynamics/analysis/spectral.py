@@ -527,7 +527,7 @@ def single_multitaper_spectra(
     c = coherence_spectra(p, print_message=False)
 
     # Only need to keep the diagonal of the power spectra matrix
-    p = p[:, range(n_channels), range(n_channels)]
+    p = p[:, range(n_channels), range(n_channels)].real
 
     return p, c
 
