@@ -125,8 +125,8 @@ def mean_coherence_from_spectra(
     -------
     coh : np.ndarray
         Mean coherence over a frequency band for each component of each mode.
-        Shape is (n_components, n_modes, n_channels, n_channels). Axis of
-        length 1 are squeezed.
+        Shape is (n_components, n_modes, n_channels, n_channels) or
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     """
 
     # Validation

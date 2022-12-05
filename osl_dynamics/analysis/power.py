@@ -38,7 +38,8 @@ def variance_from_spectra(
     -------
     var : np.ndarray
         Variance over a frequency band for each component of each mode.
-        Shape is (n_components, n_modes, n_channels, n_channels).
+        Shape is (n_components, n_modes, n_channels) or (n_modes, n_channels)
+        or (n_channels,).
     """
 
     # Validation
@@ -127,11 +128,7 @@ def variance_from_spectra(
                 p = np.mean(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
-
-        # Variance
-        v = np.zeros([n_components, n_modes, n_channels, n_channels])
-        v[:, :, range(n_channels), range(n_channels)] = p
-        var.append(v)
+        var.append(p)
 
     return np.squeeze(var)
 
