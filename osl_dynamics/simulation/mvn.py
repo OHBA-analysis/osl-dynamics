@@ -64,7 +64,7 @@ class MVN:
             self.n_modes = means.shape[0]
             self.n_channels = means.shape[1]
             self.means = means
-            self.covariances, self.W = self.create_covariances(covariances)
+            self.covariances = self.create_covariances(covariances)
 
         # Only the covariances were passed a numpy array
         elif not isinstance(means, np.ndarray) and isinstance(covariances, np.ndarray):
@@ -85,7 +85,7 @@ class MVN:
             self.n_modes = n_modes
             self.n_channels = n_channels
             self.means = self.create_means(means)
-            self.covariances, self.W = self.create_covariances(covariances)
+            self.covariances = self.create_covariances(covariances)
 
         else:
             raise ValueError("means and covariance arugments not passed correctly.")
@@ -130,7 +130,7 @@ class MVN:
         else:
             raise ValueError("covariances must be a np.ndarray or 'random'.")
 
-        return covariances, W
+        return covariances
 
     def simulate_data(self, mode_time_course):
         n_samples = mode_time_course.shape[0]
@@ -168,16 +168,18 @@ class MDyn_MVN(MVN):
 
     Parameters
     ----------
-    n_channels : int
-        Number of channels.
-    n_modes : int
-        Number of modes.
     means : np.ndarray or str
         Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or 'zero' or 'random'.
     covariances : np.ndarray or str
         Covariance matrix for each mode, shape should be (n_modes,
         n_channels, n_channels). Either a numpy array or 'random'.
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
@@ -190,6 +192,7 @@ class MDyn_MVN(MVN):
         covariances,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         observation_error=0.0,
         random_seed=None,
     ):
@@ -198,6 +201,7 @@ class MDyn_MVN(MVN):
             covariances=covariances,
             n_modes=n_modes,
             n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
             observation_error=observation_error,
             random_seed=random_seed,
         )
@@ -285,10 +289,21 @@ class MSubj_MVN(MVN):
         Number of modes.
     n_channels : int
         Number of channels.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
+
     n_subjects : int
         Number of subjects.
+    n_subject_embedding_dim : int
+        Dimension of subject embeddings.
+    n_mode_embedding_dim : int
+        Dimension of mode embeddings.
+    subject_embedding_scale : float
+        Standard deviation when generating subject embeddings with a normal distribution.
     n_groups : int
-        Number of groups of subjects when subject means or covariances are 'random'.
+        Number of groups of subjects when generating subject embeddings.
+    between_group_scale : float
+        Standard deviation when generating centroids of groups of subject embeddings.
     observation_error : float
         Standard deviation of the error added to the generated data.
     random_seed : int
@@ -301,15 +316,26 @@ class MSubj_MVN(MVN):
         subject_covariances,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         n_subjects=None,
-        n_groups=1,
+        n_subject_embedding_dim=None,
+        n_mode_embedding_dim=None,
+        subject_embedding_scale=None,
+        n_groups=None,
+        between_group_scale=None,
         observation_error=0.0,
         random_seed=None,
     ):
 
         self._rng = np.random.default_rng(random_seed)
+        self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
         self.instantaneous_covs = None
+        self.n_subject_embedding_dim = n_subject_embedding_dim
+        self.n_mode_embedding_dim = n_mode_embedding_dim
+        self.subject_embedding_scale = subject_embedding_scale
+        self.n_groups = n_groups
+        self.between_group_scale = between_group_scale
 
         # Both the subject means and covariances were passed as numpy arrays
         if isinstance(subject_means, np.ndarray) and isinstance(
@@ -340,14 +366,16 @@ class MSubj_MVN(MVN):
             self.n_modes = subject_means.shape[1]
             self.n_channels = subject_means.shape[2]
             self.n_groups = None
+            self.between_group_scale = None
+            self.n_subject_embedding_dim = None
+            self.n_mode_embedding_dim = None
+            self.subject_embedding_scale = None
 
             self.group_means = None
             self.subject_means = subject_means
-            self.means_assigned_groups = None
 
             self.group_covariances = None
             self.subject_covariances = subject_covariances
-            self.covariances_assigned_groups = None
 
         # Only the subject means were passed as a numpy array
         elif isinstance(subject_means, np.ndarray) and not isinstance(
@@ -356,19 +384,15 @@ class MSubj_MVN(MVN):
             self.n_subjects = subject_means.shape[0]
             self.n_modes = subject_means.shape[1]
             self.n_channels = subject_means.shape[2]
-            self.n_groups = n_groups
+
+            self.validate_subject_embedding_parameters()
+            self.create_subject_embeddings()
 
             self.group_means = None
             self.subject_means = subject_means
-            self.means_assigned_groups = None
 
-            self.group_covariances, self.group_W = self.create_group_covariances(
-                subject_covariances
-            )
-            (
-                self.subject_covariances,
-                self.covariances_assigned_groups,
-            ) = self.create_subject_covariances()
+            self.group_covariances = super().create_covariances(subject_covariances)
+            self.subject_covariances = self.create_subject_covariances()
 
         # Only the subject covariances were passed as a numpy array
         elif not isinstance(subject_means, np.ndarray) and isinstance(
@@ -377,16 +401,15 @@ class MSubj_MVN(MVN):
             self.n_subjects = subject_covariances.shape[0]
             self.n_modes = subject_covariances.shape[1]
             self.n_channels = subject_covariances.shape[2]
-            self.n_groups = n_groups
 
-            self.group_means = self.create_group_means(subject_means)
-            self.subject_means, self.means_assigned_groups = self.create_subject_means(
-                subject_means
-            )
+            self.validate_subject_embedding_parameters()
+            self.create_subject_embeddings()
+
+            self.group_means = super().create_means(subject_means)
+            self.subject_means = self.create_subject_means(subject_means)
 
             self.group_covariances = None
             self.subject_covariances = subject_covariances
-            self.covariances_assigned_groups = None
 
         # Neither subject means or nor covariances were passed as numpy arrays
         elif not isinstance(subject_means, np.ndarray) and not isinstance(
@@ -397,92 +420,181 @@ class MSubj_MVN(MVN):
                     "If we are generating subject means and covariances, "
                     + "n_subjects, n_modes, n_channels must be passed."
                 )
+
             self.n_subjects = n_subjects
             self.n_modes = n_modes
             self.n_channels = n_channels
-            self.n_groups = n_groups
 
-            self.group_means = self.create_group_means(subject_means)
-            self.subject_means, self.means_assigned_groups = self.create_subject_means(
-                subject_means
+            self.validate_subject_embedding_parameters()
+            self.create_subject_embeddings()
+
+            self.group_means = super().create_means(subject_means)
+            self.subject_means = self.create_subject_means(subject_means)
+
+            self.group_covariances = super().create_covariances(subject_covariances)
+            self.subject_covariances = self.create_subject_covariances()
+
+    def validate_subject_embedding_parameters(self):
+        if self.n_subject_embedding_dim is None:
+            raise ValueError(
+                "Subject means or covariances not passed, please pass 'n_subject_embedding_dim'!"
+            )
+        if self.n_mode_embedding_dim is None:
+            raise ValueError(
+                "Subject means or covariances not passed, please pass 'n_mode_embedding_dim'!"
+            )
+        if self.subject_embedding_scale is None:
+            raise ValueError(
+                "Subject means or covariances not passed, please pass 'subject_embedding_scale'!"
+            )
+        if self.n_groups is None:
+            raise ValueError(
+                "Subject means or covariances not passed, please pass 'n_groups'!"
+            )
+        if self.between_group_scale is None:
+            raise ValueError(
+                "Subject means or covariances not passed, please pass 'between_group_scale'!"
             )
 
-            self.group_covariances, self.group_W = self.create_group_covariances(
-                subject_covariances
-            )
-            (
-                self.subject_covariances,
-                self.covariances_assigned_groups,
-            ) = self.create_subject_covariances()
-
-    def create_group_means(self, option):
-        group_means = []
-        means_mu = np.arange(self.n_groups, dtype=np.float32) * 0.1
-        means_mu = means_mu - np.mean(means_mu)
-        for group in range(self.n_groups):
-            group_means.append(super().create_means(option, means_mu[group]))
-        return group_means
-
-    def create_group_covariances(self, option):
-        group_covariances = []
-        group_W = []
-        activation_strengths = np.linspace(
-            1, 1 + 0.1 * (self.n_groups - 1), self.n_groups
+    def create_subject_embeddings(self):
+        # Assign groups to subjects
+        assigned_groups = self._rng.choice(self.n_groups, self.n_subjects)
+        group_locs = self._rng.normal(
+            scale=self.between_group_scale,
+            size=[self.n_groups, self.n_subject_embedding_dim],
         )
-        for group in range(self.n_groups):
-            place_holder = super().create_covariances(
-                option, activation_strengths[group]
-            )
-            group_covariances.append(place_holder[0])
-            group_W.append(place_holder[1])
 
-        return group_covariances, group_W
+        subject_embeddings = np.zeros([self.n_subjects, self.n_subject_embedding_dim])
+        for i in range(self.n_groups):
+            group_mask = assigned_groups == i
+            subject_embeddings[group_mask] = self._rng.multivariate_normal(
+                mean=group_locs[i],
+                cov=self.subject_embedding_scale * np.eye(self.n_subject_embedding_dim),
+                size=[np.sum(group_mask)],
+            )
+
+        self.assigned_groups = assigned_groups
+        self.subject_embeddings = subject_embeddings
+
+    def create_linear_transform(self, input_dim, output_dim, scale=0.1):
+        linear_transform = self._rng.normal(scale=scale, size=(output_dim, input_dim))
+        return linear_transform / np.sqrt(
+            np.sum(np.square(linear_transform), axis=-1, keepdims=True)
+        )
+
+    def create_subject_means_deviations(self):
+        means_mode_embeddings_lienar_transform = self.create_linear_transform(
+            self.n_channels, self.n_mode_embedding_dim
+        )
+        self.means_mode_embeddings = (
+            means_mode_embeddings_lienar_transform @ self.group_means.T
+        ).T
+
+        # Match the shapes for concatenation
+        concat_subject_embeddings = np.broadcast_to(
+            self.subject_embeddings[:, None, :],
+            (
+                self.n_subjects,
+                self.n_modes,
+                self.n_subject_embedding_dim,
+            ),
+        )
+        concat_means_mode_embeddings = np.broadcast_to(
+            self.means_mode_embeddings[None, :, :],
+            (
+                self.n_subjects,
+                self.n_modes,
+                self.n_mode_embedding_dim,
+            ),
+        )
+        self.means_concat_embeddings = np.concatenate(
+            [concat_subject_embeddings, concat_means_mode_embeddings], axis=-1
+        )
+        means_linear_transform = self.create_linear_transform(
+            self.n_subject_embedding_dim + self.n_mode_embedding_dim,
+            self.n_channels,
+        )
+        self.means_deviations = np.squeeze(
+            means_linear_transform[None, None, ...]
+            @ self.means_concat_embeddings[..., None]
+        )
+
+    def create_subject_covariances_deviations(self):
+        covariances_mode_embeddings_linear_transform = self.create_linear_transform(
+            self.n_channels * (self.n_channels + 1) // 2, self.n_mode_embedding_dim
+        )
+        group_cholesky_covariances = np.linalg.cholesky(self.group_covariances)
+        m, n = np.tril_indices(self.n_channels)
+        flattened_group_cholesky_covariances = group_cholesky_covariances[:, m, n]
+        self.covariances_mode_embeddings = (
+            covariances_mode_embeddings_linear_transform
+            @ flattened_group_cholesky_covariances.T
+        ).T
+
+        # Match the shapes for concatenation
+        concat_subject_embeddings = np.broadcast_to(
+            self.subject_embeddings[:, None, :],
+            (
+                self.n_subjects,
+                self.n_modes,
+                self.n_subject_embedding_dim,
+            ),
+        )
+        concat_covarainces_mode_embeddings = np.broadcast_to(
+            self.covariances_mode_embeddings[None, :, :],
+            (
+                self.n_subjects,
+                self.n_modes,
+                self.n_mode_embedding_dim,
+            ),
+        )
+        self.covariances_concat_embeddings = np.concatenate(
+            [concat_subject_embeddings, concat_covarainces_mode_embeddings], axis=-1
+        )
+        covariances_linear_transform = self.create_linear_transform(
+            self.n_subject_embedding_dim + self.n_mode_embedding_dim,
+            self.n_channels * (self.n_channels + 1) // 2,
+        )
+        self.flattened_covariances_cholesky_deviations = np.squeeze(
+            covariances_linear_transform[None, None, ...]
+            @ self.covariances_concat_embeddings[..., None]
+        )
 
     def create_subject_means(self, option):
         if option == "zero":
             subject_means = np.zeros([self.n_subjects, self.n_modes, self.n_channels])
-            assigned_groups = None
         else:
-            # Assign each subject to a group
-            assigned_groups = self._rng.choice(self.n_groups, self.n_subjects)
-            subject_means = np.empty([self.n_subjects, self.n_modes, self.n_channels])
-
-            for group in range(self.n_groups):
-                group_mask = assigned_groups == group
-                subject_means[group_mask] = self._rng.normal(
-                    loc=self.group_means[group],
-                    scale=0.05,
-                    size=(np.sum(group_mask), self.n_modes, self.n_channels),
-                )
-        return subject_means, assigned_groups
+            self.create_subject_means_deviations()
+            subject_means = self.group_means[None, ...] + self.means_deviations
+        return subject_means
 
     def create_subject_covariances(self, eps=1e-6):
-        assigned_groups = self._rng.choice(self.n_groups, self.n_subjects)
-        subject_W = np.empty(
+        self.create_subject_covariances_deviations()
+        group_cholesky_covariances = np.linalg.cholesky(self.group_covariances)
+        m, n = np.tril_indices(self.n_channels)
+        flattened_group_cholesky_covariances = group_cholesky_covariances[:, m, n]
+        flattened_subject_cholesky_covariances = (
+            flattened_group_cholesky_covariances[None, ...]
+            + self.flattened_covariances_cholesky_deviations
+        )
+
+        subject_cholesky_covariances = np.zeros(
             [self.n_subjects, self.n_modes, self.n_channels, self.n_channels]
         )
+        for i in range(self.n_subjects):
+            for j in range(self.n_modes):
+                subject_cholesky_covariances[
+                    i, j, m, n
+                ] = flattened_subject_cholesky_covariances[i, j]
 
-        for group in range(self.n_groups):
-            group_mask = assigned_groups == group
-            subject_W[group_mask] = self._rng.normal(
-                loc=self.group_W[group],
-                scale=0.05,
-                size=(
-                    np.sum(group_mask),
-                    self.n_modes,
-                    self.n_channels,
-                    self.n_channels,
-                ),
-            )
+        subject_covariances = subject_cholesky_covariances @ np.transpose(
+            subject_cholesky_covariances, (0, 1, 3, 2)
+        )
 
         # A small value to add to the diagonal to ensure the covariances are invertible
-        eps = (
-            np.tile(np.eye(self.n_channels), [self.n_subjects, self.n_modes, 1, 1])
-            * eps
-        )
-        subject_covariances = subject_W @ subject_W.transpose([0, 1, 3, 2]) + eps
+        subject_covariances += eps * np.eye(self.n_channels)
 
-        return subject_covariances, assigned_groups
+        return subject_covariances
 
     def simulate_subject_data(self, subject, mode_time_course):
         """Simulate single subject data.
