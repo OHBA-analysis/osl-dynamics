@@ -132,27 +132,32 @@ class MVN:
 
         return covariances
 
-    def simulate_data(self, mode_time_course):
-        n_samples = mode_time_course.shape[0]
+    def simulate_data(self, state_time_course):
+        n_samples = state_time_course.shape[0]
 
         # Initialise array to hold data
         data = np.zeros((n_samples, self.n_channels))
+        self.instantaneous_covs = np.zeros(
+            [n_samples, self.n_channels, self.n_channels]
+        )
 
         # Loop through all unique combinations of modes
-        for alpha in np.unique(mode_time_course, axis=0):
+        for alpha in np.unique(state_time_course, axis=0):
 
             # Mean and covariance for this combination of modes
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
             sigma = np.sum(self.covariances * alpha[:, np.newaxis, np.newaxis], axis=0)
 
+            self.instantaneous_covs[np.all(state_time_course == alpha, axis=1)] = sigma
+
             # Generate data for the time points that this combination of modes is
             # active
             data[
-                np.all(mode_time_course == alpha, axis=1)
+                np.all(state_time_course == alpha, axis=1)
             ] = self._rng.multivariate_normal(
                 mu,
                 sigma,
-                size=np.count_nonzero(np.all(mode_time_course == alpha, axis=1)),
+                size=np.count_nonzero(np.all(state_time_course == alpha, axis=1)),
             )
 
         # Add an error to the data at all time points
@@ -660,4 +665,6 @@ class MSubj_MVN(MVN):
         self.instantaneous_covs = []
         for subject in range(self.n_subjects):
             data.append(self.simulate_subject_data(subject, mode_time_courses[subject]))
+
+        self.instantaneous_covs = np.array(self.instantaneous_covs)
         return np.array(data)

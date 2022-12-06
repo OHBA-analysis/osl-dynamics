@@ -315,6 +315,9 @@ class HMM_MVN(Simulation):
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...
         ]
+        self.obs_mod.instantaneous_covs /= np.outer(
+            standard_deviations, standard_deviations
+        )[np.newaxis, ...]
 
 
 class MDyn_HMM_MVN(Simulation):
@@ -430,6 +433,9 @@ class MDyn_HMM_MVN(Simulation):
             self.obs_mod.means - means[None, ...]
         ) / standard_deviations[None, ...]
         self.obs_mod.stds /= standard_deviations[None, ...]
+        self.obs_mod.instantaneous_covs /= np.outer(
+            standard_deviations, standard_deviations
+        )[np.newaxis, ...]
 
 
 class MSubj_HMM_MVN(Simulation):
@@ -579,6 +585,9 @@ class MSubj_HMM_MVN(Simulation):
             self.obs_mod.subject_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+        )
+        self.obs_mod.instantaneous_covs /= np.expand_dims(
             standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
         )
 
@@ -756,6 +765,9 @@ class HierarchicalHMM_MVN(Simulation):
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...
         ]
+        self.obs_mod.instantaneous_covs /= np.outer(
+            standard_deviations, standard_deviations
+        )[np.newaxis, ...]
 
 
 class HMM_Sine(Simulation):
