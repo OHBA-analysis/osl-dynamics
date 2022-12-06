@@ -232,6 +232,8 @@ class HMM_MVN(Simulation):
         Number of states. Can pass this argument with keyword n_modes instead.
     n_channels : int
         Number of channels.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
     observation_error : float
@@ -249,6 +251,7 @@ class HMM_MVN(Simulation):
         n_states=None,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         stay_prob=None,
         observation_error=0.0,
         random_seed=None,
@@ -262,6 +265,7 @@ class HMM_MVN(Simulation):
             covariances=covariances,
             n_modes=n_states,
             n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
             observation_error=observation_error,
             random_seed=random_seed,
         )
@@ -302,8 +306,8 @@ class HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        means = np.mean(self.time_series, axis=0)
-        standard_deviations = np.std(self.time_series, axis=0)
+        means = np.mean(self.time_series, axis=0).astype(np.float64)
+        standard_deviations = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
         self.obs_mod.means = (
             self.obs_mod.means - means[None, ...]
@@ -335,6 +339,8 @@ class MDyn_HMM_MVN(Simulation):
         Number of states. Can pass this argument with keyword n_modes instead.
     n_channels : int
         Number of channels.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
     observation_error : float
@@ -352,6 +358,7 @@ class MDyn_HMM_MVN(Simulation):
         n_states=None,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         stay_prob=None,
         observation_error=0.0,
         random_seed=None,
@@ -365,6 +372,7 @@ class MDyn_HMM_MVN(Simulation):
             covariances=covariances,
             n_modes=n_states,
             n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
             observation_error=observation_error,
             random_seed=random_seed,
         )
@@ -415,8 +423,8 @@ class MDyn_HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        means = np.mean(self.time_series, axis=0)
-        standard_deviations = np.std(self.time_series, axis=0)
+        means = np.mean(self.time_series, axis=0).astype(np.float64)
+        standard_deviations = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
         self.obs_mod.means = (
             self.obs_mod.means - means[None, ...]
@@ -446,6 +454,8 @@ class MSubj_HMM_MVN(Simulation):
         Number of modes.
     n_channels : int
         Number of channels.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     n_subjects : int
         Number of subjects.
     n_groups : int
@@ -469,8 +479,13 @@ class MSubj_HMM_MVN(Simulation):
         n_states=None,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         n_subjects=None,
-        n_groups=1,
+        n_subject_embedding_dim=None,
+        n_mode_embedding_dim=None,
+        subject_embedding_scale=None,
+        n_groups=None,
+        between_group_scale=None,
         subject_tc_std=0.0,
         stay_prob=None,
         observation_error=0.0,
@@ -489,8 +504,13 @@ class MSubj_HMM_MVN(Simulation):
             subject_covariances=subject_covariances,
             n_modes=n_states,
             n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
             n_subjects=n_subjects,
+            n_subject_embedding_dim=n_subject_embedding_dim,
+            n_mode_embedding_dim=n_mode_embedding_dim,
+            subject_embedding_scale=subject_embedding_scale,
             n_groups=n_groups,
+            between_group_scale=between_group_scale,
             observation_error=observation_error,
             random_seed=random_seed,
         )
@@ -552,8 +572,8 @@ class MSubj_HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        means = np.mean(self.time_series, axis=1)
-        standard_deviations = np.std(self.time_series, axis=1)
+        means = np.mean(self.time_series, axis=1).astype(np.float64)
+        standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
         self.obs_mod.subject_means = (
             self.obs_mod.subject_means - means[:, None, :]
@@ -590,6 +610,8 @@ class HierarchicalHMM_MVN(Simulation):
         Number of states. Can pass this argument with keyword n_modes instead.
     n_channels : int
         Number of channels.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     observation_error : float
         Standard deviation of random noise to be added to the observations.
     top_level_random_seed : int
@@ -624,6 +646,7 @@ class HierarchicalHMM_MVN(Simulation):
         n_states=None,
         n_modes=None,
         n_channels=None,
+        n_covariances_act=1,
         observation_error=0.0,
         top_level_random_seed=None,
         bottom_level_random_seeds=None,
@@ -643,6 +666,7 @@ class HierarchicalHMM_MVN(Simulation):
             covariances=covariances,
             n_modes=n_states,
             n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
             observation_error=observation_error,
             random_seed=data_random_seed,
         )
@@ -727,7 +751,7 @@ class HierarchicalHMM_MVN(Simulation):
         return stc
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0)
+        standard_deviations = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
         self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
             np.newaxis, ...

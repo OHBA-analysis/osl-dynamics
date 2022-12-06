@@ -199,7 +199,6 @@ def riemannian_distance(M1, M2, threshold=1e-3):
     eigvals = eigvalsh(M1, M2, driver="gv")
     if np.any(eigvals < 0):
         eigvals = np.maximum(eigvals, threshold)
-        print(f"Warning, negative eigenvalue, truncated with {threshold}")
 
     d = np.sqrt((np.log(eigvals) ** 2).sum())
     return d
@@ -221,6 +220,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
         Matrix containing the pairwise Riemannian distances between matrices.
         Shape is (n_matrices, n_matrices).
     """
+    matrices.astype(np.float64)
     n_matrices = matrices.shape[0]
     riemannian_distances = np.zeros([n_matrices, n_matrices])
     for i in trange(n_matrices, desc="Computing Riemannian distances", ncols=98):
