@@ -419,12 +419,12 @@ def fano_factor(
     return np.squeeze(F)
 
 
-def gmm_time_course(
+def gmm_time_courses(
     time_course,
     logit_transform=True,
     standardize=True,
     p_value=None,
-    gmm_filename=None,
+    filename=None,
     sklearn_kwargs=None,
 ):
     """Fit a two component GMM on the mode time courses to get a binary
@@ -442,7 +442,7 @@ def gmm_time_course(
         Used to determine a threshold. We ensure the data points assigned
         to the 'on' component have a probability of less than p_value of
         belonging to the 'off' component.
-    gmm_filename : str
+    filename : str
         Path to directory to plot the GMM fit plots.
     sklearn_kwargs : dict
         keyword arguments for sklearn's GaussianMixture.
@@ -470,9 +470,9 @@ def gmm_time_course(
         a = time_course[:, mode]
 
         # GMM plot filename
-        if gmm_filename is not None:
+        if filename is not None:
             plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
-                fn=Path(gmm_filename),
+                fn=Path(filename),
                 mode=mode,
                 w=len(str(n_modes)),
             )
