@@ -159,13 +159,34 @@ def frobenius_norm(A, B):
     return norm
 
 
-def pairwise_matrix_correlations(matrices, remove_diagonal=True):
+def pairwise_frobenius_distance(matrices):
+    """Calculates the pairwise frobenius distance of a set of matrices.
+
+    Parameters
+    ----------
+    matrices : np.ndarray
+        The set of matrices. Shape must be (n_matrices, n_channels, n_channels)
+
+    Returns
+    -------
+    pairwise_distance : np.ndarray
+        Matrix of pairwise Frobenius distance. Shape is (n_matrices, n_matrices)
+    """
+    return np.sqrt(
+        np.sum(
+            np.square(np.expand_dims(matrices, 0) - np.expand_dims(matrices, 1)),
+            axis=(-2, -1),
+        )
+    )
+
+
+def pairwise_matrix_correlations(matrices, remove_diagonal=False):
     """Calculate the correlation between elements of covariance matrices.
 
     Parameters
     ----------
     matrices : np.ndarray
-        Shape must be (n_matrices, n_channels, n_channels).
+        Shape must be (n_matrices, N, N).
 
     Returns
     -------
@@ -176,7 +197,8 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=True):
     n_matrices = matrices.shape[0]
     matrices = matrices.reshape(n_matrices, -1)
     correlations = np.corrcoef(matrices)
-    correlations -= np.eye(n_matrices)
+    if remove_diagonal:
+        correlations -= np.eye(n_matrices)
     return correlations
 
 
@@ -210,7 +232,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     Parameters
     ----------
     matrices : np.ndarray
-        Shape must be (n_matrices, n_channels, n_channels).
+        Shape must be (n_matrices, N, N).
     threshold : float
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
@@ -236,19 +258,20 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     return riemannian_distances
 
 
-def rv_coefficient(M):
+def pairwise_rv_coefficient(M, remove_diagonal=False):
     """Calculate the RV coefficient for two matrices.
 
     Parameters
     ----------
-    M : list of np.ndarray
-        List of matrices.
+    M : np.ndarray
+        Set of matrices. Shape is (n_matrices, N, N)
 
     Returns
     -------
-    C : float
-        RV coefficient.
+    C : np.ndarray
+        Matrix of pairwise RV coefficients. Shape is (n_matrices, n_matrices)
     """
+    n_matrices = M.shape[0]
     # First compute the scalar product matrices for each data set X
     scal_arr_list = []
 
@@ -257,7 +280,7 @@ def rv_coefficient(M):
         scal_arr_list.append(scal_arr)
 
     # Now compute the 'between study cosine matrix' C
-    C = np.zeros((len(M), len(M)), float)
+    C = np.zeros((n_matrices, n_matrices), float)
 
     for index, element in np.ndenumerate(C):
         nom = np.trace(
@@ -272,27 +295,35 @@ def rv_coefficient(M):
         Rv = nom / np.sqrt(np.dot(denom1, denom2))
         C[index[0], index[1]] = Rv
 
+    if remove_diagonal:
+        C -= np.eye(n_matrices)
+
     return C
 
 
-def congruence_coefficient(M):
+def pairwise_congruence_coefficient(M, remove_diagonal=False):
     """Computes the congruence coefficient between covariance/correlation matrices
     Parameters
     ----------
-    M : list of np.ndarray
-        List of symmetric semi-positive definite matrices.
+    M : np.ndarray
+        Set of symmetric semi-positive definite matrices. Shape is (n_matrices, N, N).
 
     Returns
     -------
     C : np.ndarray
-        Matrix of pairwise congruence coefficients between the matrices.
+        Matrix of pairwise congruence coefficients. Shape is (n_matrices, n_matrices).
     """
-    C = np.zeros((len(M), len(M)))
+
+    n_matrices = M.shape[0]
+    C = np.zeros(n_matrices, n_matrices)
     for index, element in np.ndenumerate(C):
         nom = np.trace(np.dot(np.transpose(M[index[0]]), M[index[1]]))
         denom1 = np.trace(np.dot(np.transpose(M[index[0]]), M[index[0]]))
         denom2 = np.trace(np.dot(np.transpose(M[index[1]]), M[index[1]]))
         cc = nom / np.sqrt(np.dot(denom1, denom2))
         C[index[0], index[1]] = cc
+
+    if remove_diagonal:
+        C -= np.eye(n_matrices)
 
     return C
