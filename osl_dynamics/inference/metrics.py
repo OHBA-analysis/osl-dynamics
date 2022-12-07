@@ -280,7 +280,7 @@ def pairwise_rv_coefficient(M, remove_diagonal=False):
         scal_arr_list.append(scal_arr)
 
     # Now compute the 'between study cosine matrix' C
-    C = np.zeros((n_matrices, n_matrices), float)
+    C = np.zeros([n_matrices, n_matrices])
 
     for index, element in np.ndenumerate(C):
         nom = np.trace(
@@ -315,7 +315,7 @@ def pairwise_congruence_coefficient(M, remove_diagonal=False):
     """
 
     n_matrices = M.shape[0]
-    C = np.zeros(n_matrices, n_matrices)
+    C = np.zeros([n_matrices, n_matrices])
     for index, element in np.ndenumerate(C):
         nom = np.trace(np.dot(np.transpose(M[index[0]]), M[index[1]]))
         denom1 = np.trace(np.dot(np.transpose(M[index[0]]), M[index[0]]))
