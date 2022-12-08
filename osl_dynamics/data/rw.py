@@ -123,6 +123,8 @@ class RW:
                 if "preparation.pkl" in file:
                     preparation = pickle.load(open(inputs + "/preparation.pkl", "rb"))
                     self.amplitude_envelope = preparation["amplitude_envelope"]
+                    self.low_freq = preparation["low_freq"]
+                    self.high_freq = preparation["high_freq"]
                     self.n_window = preparation["n_window"]
                     self.n_embeddings = preparation["n_embeddings"]
                     self.n_te_channels = preparation["n_te_channels"]
@@ -196,6 +198,8 @@ class RW:
         if self.prepared:
             preparation = {
                 "amplitude_envelope": self.amplitude_envelope,
+                "low_freq": self.low_freq,
+                "high_freq": self.high_freq,
                 "n_window": self.n_window,
                 "n_embeddings": self.n_embeddings,
                 "n_te_channels": self.n_te_channels,

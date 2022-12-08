@@ -133,6 +133,11 @@ class Processing:
         self.low_freq = low_freq
         self.high_freq = high_freq
         self.n_window = n_window
+        self.n_embeddings = 1
+        self.n_te_channels = self.n_raw_data_channels
+        self.n_pca_components = None
+        self.pca_components = None
+        self.whiten = None
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
@@ -208,6 +213,10 @@ class Processing:
             raise ValueError("pca_components must be a numpy array.")
 
         # Save settings
+        self.amplitude_envelope = False
+        self.low_freq = None
+        self.high_freq = None
+        self.n_window = 1
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
