@@ -345,7 +345,6 @@ class Model(ModelBase):
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-
         Returns
         -------
         gamma : np.ndarray
@@ -356,11 +355,8 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length - 1, n_states, n_states).
         """
 
-        # Get the likelihood
-        likelihood = self._get_likelihood(x)
-
         # Use Baum-Welch algorithm to calculate gamma, xi
-        B = likelihood
+        B = self._get_likelihood(x)
         Pi_0 = self.state_probs_t0
         P = self.trans_prob
 
@@ -390,7 +386,7 @@ class Model(ModelBase):
             Probability of hidden state given data. Shape is (n_samples, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (n_samples - 1, n_states, n_states).
+            Shape is (n_samples - 1, n_states*n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -420,8 +416,9 @@ class Model(ModelBase):
         gamma /= np.sum(gamma, axis=1, keepdims=True)
 
         b = beta[1:] * B[:, 1:].T
-        xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
-        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
+        t = P * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
+        xi = t.reshape(n_samples - 1, -1, order="F")
+        xi /= np.expand_dims(np.sum(xi, axis=1), axis=1) + EPS
 
         return gamma, xi
 
@@ -479,10 +476,12 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states, n_states).
+            Shape is (batch_size*sequence_length - 1, n_states*n_states).
         """
         # Use Baum-Welch algorithm
-        phi_interim = np.sum(xi, axis=0) / np.sum(gamma[:-1], axis=0)[:, np.newaxis]
+        phi_interim = np.sum(xi, axis=0).reshape(
+            self.config.n_states, self.config.n_states
+        ).T / np.sum(gamma[:-1], axis=0).reshape(self.config.n_states, 1)
 
         # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
