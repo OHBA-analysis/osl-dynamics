@@ -12,7 +12,7 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import layers, utils
+from tensorflow.keras import backend, layers, utils
 from numba.core.errors import NumbaWarning
 
 import osl_dynamics.data.tf as dtf
@@ -125,7 +125,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, take=1, **kwargs):
+    def fit(self, dataset, epochs=None, lr_decay=0.075, take=1, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -138,6 +138,9 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
+        lr_decay : float
+            We update the learning rate (lr) for the observation model as
+            lr = config.learning_rate * exp(-lr_decay * epoch).
         take : float
             Fraction of total batches to take.
         kwargs : keyword arguments
@@ -161,7 +164,7 @@ class Model(ModelBase):
             n_batches = max(round(n_total_batches * take), 1)
             print(f"Using {n_batches} out of {n_total_batches} batches")
 
-        history = {"loss": [], "rho": []}
+        history = {"loss": [], "rho": [], "lr": []}
         for n in range(epochs):
             if n == epochs - 1:
                 # If it's the last epoch, we train on the full dataset
@@ -180,6 +183,10 @@ class Model(ModelBase):
 
             # Update rho
             self._update_rho(n)
+
+            # Set learning rate for the observation model
+            lr = self.config.learning_rate * np.exp(-lr_decay * n)
+            backend.set_value(self.model.optimizer.lr, lr)
 
             # Loop over batches
             loss = []
@@ -206,10 +213,11 @@ class Model(ModelBase):
                     print("\nTraining failed!")
                     return
                 loss.append(l)
-                pb_i.add(1, values=[("loss", l)])
+                pb_i.add(1, values=[("lr", lr), ("loss", l)])
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
+            history["lr"].append(lr)
 
         return history
 
