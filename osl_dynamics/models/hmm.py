@@ -125,7 +125,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, lr_decay=0.075, take=1, **kwargs):
+    def fit(self, dataset, epochs=None, lr_decay=0.1, take=1, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -150,7 +150,7 @@ class Model(ModelBase):
         Returns
         -------
         history : dict
-            Dictionary with loss and rho history. Keys are 'loss' and 'rho'.
+            Dictionary with history of the loss and learning rates (lr and rho).
         """
         if epochs is None:
             epochs = self.config.n_epochs
@@ -170,6 +170,7 @@ class Model(ModelBase):
                 # If it's the last epoch, we train on the full dataset
                 take = 1
 
+            # Get the training data for this epoch
             if take != 1:
                 dataset.shuffle(100000)
                 n_batches = max(round(n_total_batches * take), 1)
@@ -213,7 +214,7 @@ class Model(ModelBase):
                     print("\nTraining failed!")
                     return
                 loss.append(l)
-                pb_i.add(1, values=[("lr", lr), ("loss", l)])
+                pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
@@ -395,8 +396,6 @@ class Model(ModelBase):
     @numba.jit
     def _baum_welch(self, B, Pi_0, P):
         """Hidden state inference using the Baum-Welch algorithm.
-
-        This is a python implementation of the C++ library: https://github.com/OHBA-analysis/HMM-MAR/tree/master/utils/hidden_state_inference.
 
         Parameters
         ----------
