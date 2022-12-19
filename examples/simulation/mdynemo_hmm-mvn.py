@@ -10,6 +10,10 @@ from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.mdynemo import Config, Model
 from osl_dynamics.utils import plotting
 import numpy as np
+import tensorflow as tf
+import os
+
+os.makedirs("figures", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -60,8 +64,18 @@ model.summary()
 # Set regularisers
 model.set_regularizers(training_data)
 
+# Set up learning rate schedule
+def lr_scheduler(epoch, lr):
+    if epoch < config.n_kl_annealing_epochs:
+        return config.learning_rate
+    else:
+        return config.learning_rate * 0.5
+
+
+lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
+
 print("Training model")
-history = model.fit(training_data)
+history = model.fit(training_data, callbacks=[lr_callback])
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
