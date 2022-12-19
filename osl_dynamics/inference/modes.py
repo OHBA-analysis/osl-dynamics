@@ -5,6 +5,7 @@
 import numpy as np
 from pathlib import Path
 from scipy.optimize import linear_sum_assignment
+
 from osl_dynamics import array_ops, analysis
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -361,6 +362,43 @@ def fractional_occupancies(mode_time_course):
     else:
         fo = np.sum(mode_time_course, axis=0) / mode_time_course.shape[0]
     return fo
+
+
+def calc_trans_prob_matrix(state_time_course, n_states=None):
+    """Calculate subject-specific transition probability matrices.
+
+    Parameters
+    ----------
+    state_time_course : list of np.ndarray or np.ndarray
+        State time courses.
+        Shape must be (n_subjects, n_samples, n_states) or (n_samples, n_states).
+    n_states : int
+        Number of states.
+
+    Returns
+    -------
+    trans_prob : np.ndarray
+        Subject-specific transition probability matrices.
+        Shape is (n_subjects, n_states, n_states).
+    """
+    if isinstance(state_time_course, np.ndarray):
+        state_time_course = [state_time_course]
+    trans_prob = []
+    for stc in state_time_course:
+        stc = stc.argmax(axis=1)
+        vals, counts = np.unique(
+            stc[np.arange(2)[None, :] + np.arange(len(stc) - 1)[:, None]],
+            axis=0,
+            return_counts=True,
+        )
+        if n_states is None:
+            n_states = stc.max() + 1
+        tp = np.zeros((n_states, n_states))
+        tp[vals[:, 0], vals[:, 1]] = counts
+        with np.errstate(divide="ignore", invalid="ignore"):
+            tp /= tp.sum(axis=1)[:, None]
+        trans_prob.append(np.nan_to_num(tp))
+    return np.squeeze(trans_prob)
 
 
 def fano_factor(
