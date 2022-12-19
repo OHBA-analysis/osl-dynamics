@@ -9,13 +9,24 @@ from osl_dynamics.data.rw import loadmat
 from osl_dynamics.inference import modes
 
 
-class OSL_HMM:
-    """Imports and encapsulates OSL HMMs as python objects.
+def OSL_HMM(filename):
+    """Wrapper for osl_dynamics.data.osl.HMM_MAR.
 
     Parameters
     ----------
     filename : str
-        The location of the OSL HMM saved as a mat7.3 file.
+        The location of the HMM-MAR object saved as a mat7.3 file.
+    """
+    return HMM_MAR(filename)
+
+
+class HMM_MAR:
+    """Imports and encapsulates HMM-MAR objects as a python class.
+
+    Parameters
+    ----------
+    filename : str
+        The location of the HMM-MAR object saved as a mat7.3 file.
     """
 
     def __init__(self, filename):
