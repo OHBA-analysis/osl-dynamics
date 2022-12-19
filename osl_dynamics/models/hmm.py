@@ -125,7 +125,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, **kwargs):
+    def fit(self, dataset, epochs=None, take=1, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -138,6 +138,8 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
+        take : float
+            Fraction of total batches to take.
         kwargs : keyword arguments
             Keyword arguments for the TensorFlow observation model training.
             These keywords arguments will be passed to self.model.fit().
@@ -153,17 +155,35 @@ class Model(ModelBase):
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
+        if take != 1:
+            # Print a message stating how many batches we'll use
+            n_total_batches = dtf.get_n_batches(dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            print(f"Using {n_batches} out of {n_total_batches} batches")
+
         history = {"loss": [], "rho": []}
         for n in range(epochs):
+            if n == epochs - 1:
+                # If it's the last epoch, we train on the full dataset
+                take = 1
+
+            if take != 1:
+                dataset.shuffle(100000)
+                n_batches = max(round(n_total_batches * take), 1)
+                data_subset = dataset.take(n_batches)
+            else:
+                data_subset = dataset
+
+            # Setup a progress bar
             print("Epoch {}/{}".format(n + 1, epochs))
-            pb_i = utils.Progbar(len(dataset))
+            pb_i = utils.Progbar(len(data_subset))
 
             # Update rho
             self._update_rho(n)
 
             # Loop over batches
             loss = []
-            for data in dataset:
+            for data in data_subset:
                 x = data["data"]
 
                 # Update state probabilities
@@ -345,7 +365,6 @@ class Model(ModelBase):
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-
         Returns
         -------
         gamma : np.ndarray
@@ -356,11 +375,8 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length - 1, n_states, n_states).
         """
 
-        # Get the likelihood
-        likelihood = self._get_likelihood(x)
-
         # Use Baum-Welch algorithm to calculate gamma, xi
-        B = likelihood
+        B = self._get_likelihood(x)
         Pi_0 = self.state_probs_t0
         P = self.trans_prob
 
@@ -390,7 +406,7 @@ class Model(ModelBase):
             Probability of hidden state given data. Shape is (n_samples, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (n_samples - 1, n_states, n_states).
+            Shape is (n_samples - 1, n_states*n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -420,8 +436,9 @@ class Model(ModelBase):
         gamma /= np.sum(gamma, axis=1, keepdims=True)
 
         b = beta[1:] * B[:, 1:].T
-        xi = P.T * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
-        xi /= np.sum(xi, axis=(1, 2), keepdims=True) + EPS
+        t = P * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
+        xi = t.reshape(n_samples - 1, -1, order="F")
+        xi /= np.expand_dims(np.sum(xi, axis=1), axis=1) + EPS
 
         return gamma, xi
 
@@ -479,10 +496,12 @@ class Model(ModelBase):
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
             Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states, n_states).
+            Shape is (batch_size*sequence_length - 1, n_states*n_states).
         """
         # Use Baum-Welch algorithm
-        phi_interim = np.sum(xi, axis=0) / np.sum(gamma[:-1], axis=0)[:, np.newaxis]
+        phi_interim = np.sum(xi, axis=0).reshape(
+            self.config.n_states, self.config.n_states
+        ).T / np.sum(gamma[:-1], axis=0).reshape(self.config.n_states, 1)
 
         # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
