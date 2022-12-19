@@ -1314,6 +1314,22 @@ class SubjectMapKLDivergenceLayer(layers.Layer):
 
 
 class MLPLayer(layers.Layer):
+    """Multi-Layer Perceptron layer.
+
+    Parameters
+    ----------
+    n_layers : int
+        Number of layers.
+    n_units : int
+        Number of units/neurons.
+    norm_type : str
+        Normalization layer type. Can be None, "layer" or "batch".
+    act_type : str
+        Activation type.
+    drop_rate : float
+        Dropout rate.
+    """
+
     def __init__(
         self,
         n_layers,
