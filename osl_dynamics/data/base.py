@@ -27,23 +27,38 @@ class Data:
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
-        Input files or data.
+            - A path to a directory containing .npy files.
+              Each .npy file should be a subject or session.
+            - A list of paths to .npy or .mat files. Each file should be a subject or
+              session.
+            - A numpy array. The array will be treated as continuous data from the
+              same subject.
+            - A list of numpy arrays. Each numpy array should be the data for a subject
+              or session.
+        The data files or numpy arrays should be in the format (n_samples, n_channels).
+        If your data is in (n_channels, n_samples) format, use time_axis_first=False.
     data_field : str
-        If a MATLAB filename is passed, this is the field that corresponds to the data.
-        By default we read the field 'X'. If a non-MALTAB file is passed, this is
-        ignored.
+        If a MATLAB (.mat) file is passed, this is the field that corresponds to the
+        time series data. By default we read the field 'X'. If a numpy (.npy) file is
+        passed, this is ignored. This argument is optional.
     sampling_frequency : float
-        Sampling frequency of the data in Hz.
+        Sampling frequency of the data in Hz.  This argument is optional.
     store_dir : str
-        Directory to save results and intermediate steps to. Default is ./tmp.
+        We don't read all the data into memory. Instead we create store them on
+        disk and create memmaps (unless load_memmaps=False is passed).
+        This is the directory to save memmaps to. Default is ./tmp.
+        This argument is optional.
     n_embeddings : int
         Number of embeddings. Can be passed if data has already been prepared.
+        This argument is optional.
     time_axis_first : bool
-        Is the input data of shape (n_samples, n_channels)?
+        Is the input data of shape (n_samples, n_channels)? Default is True.
+        If your data is in format (n_channels, n_samples), use
+        time_axis_first=False. This argument is optional.
     load_memmaps: bool
-        Should we load the data into the memmaps?
-    keep_memmaps_on_close : bool
-        Should we keep the memmaps?
+        Should we load the data as memory maps (memmaps)? If False, we will load data
+        into memory rather than storing it on disk. By default we will keep the data
+        on disk and use memmaps. This argument is optional.
     """
 
     def __init__(
@@ -55,10 +70,8 @@ class Data:
         n_embeddings=None,
         time_axis_first=True,
         load_memmaps=True,
-        keep_memmaps_on_close=False,
     ):
         self._identifier = id(self)
-        self.keep_memmaps_on_close = keep_memmaps_on_close
         self.load_memmaps = load_memmaps
         self.n_embeddings = n_embeddings
         self.prepared = False
@@ -669,18 +682,24 @@ class Data:
         alpha : list of np.ndarray
             List of mode mixing factors for each subject.
             If passed, we create a dataset that includes alpha at each time point.
-            Such a dataset can be used to train the observation model.
+            Optional. Such a dataset is used to train an observation model.
         gamma : list of np.ndarray
             List of mode mixing factors for the functional connectivity.
-            Used with a multi-time-scale model.
+            Optional. Used with a multi-dynamic model when training the observation
+            model only.
         n_alpha_embeddings : int
-            Number of embeddings used when inferring alpha.
+            Number of embeddings used when inferring alpha. Optional. Only should be
+            used if passing alpha (or gamma).
         concatenate : bool
-            Should we concatenate the datasets for each subject?
+            Should we concatenate the datasets for each subject? Optional, default
+            is True.
         subj_id : bool
-            Should we include the subject id in the dataset?
+            Should we include the subject id in the dataset? Optional, default is
+            False. This argument can be used to prepare datasets for subject-specific
+            models.
         step_size : int
-            Number of samples to slide the sequence across the dataset.
+            Number of samples to slide the sequence across the dataset. Optional.
+            Default is no overlap.
 
         Returns
         -------
