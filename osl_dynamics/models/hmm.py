@@ -65,6 +65,20 @@ class Config(BaseModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    trans_prob_update_delay : float
+        We update the transition probability matrix as
+        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
+        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
+        ** -trans_prob_update_forget. This is the delay parameter.
+    trans_prob_update_forget : float
+        We update the transition probability matrix as
+        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
+        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
+        ** -trans_prob_update_forget. This is the forget parameter.
+    observation_update_decay : float
+        Decay rate for the learning rate of the observation model.
+        We update the learning rate (lr) as
+        lr = config.learning_rate * exp(-observation_update_decay * epoch).
     n_epochs : int
         Number of training epochs.
     optimizer : str or tensorflow.keras.optimizers.Optimizer
@@ -88,8 +102,10 @@ class Config(BaseModelConfig):
     learn_trans_prob: bool = True
     state_probs_t0: np.ndarray = None
 
-    stochastic_update_delay: float = 5  # alpha
-    stochastic_update_forget: float = 0.7  # beta
+    # Learning rate schedule parameters
+    trans_prob_update_delay: float = 5  # alpha
+    trans_prob_update_forget: float = 0.7  # beta
+    observation_update_decay: float = 0.1
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
@@ -125,7 +141,9 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, lr_decay=0.1, take=1, **kwargs):
+    def fit(
+        self, dataset, epochs=None, observation_update_decay=None, take=1, **kwargs
+    ):
         """Fit model to a dataset.
 
         Iterates between:
@@ -138,9 +156,10 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
-        lr_decay : float
+        observation_update_decay : float
             We update the learning rate (lr) for the observation model as
-            lr = config.learning_rate * exp(-lr_decay * epoch).
+            lr = config.learning_rate * exp(-observation_update_decay * epoch).
+            If None, we use config.observation_update_decay.
         take : float
             Fraction of total batches to take.
         kwargs : keyword arguments
@@ -154,6 +173,8 @@ class Model(ModelBase):
         """
         if epochs is None:
             epochs = self.config.n_epochs
+        if observation_update_decay is None:
+            observation_update_decay = self.config.observation_update_decay
 
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
@@ -186,7 +207,7 @@ class Model(ModelBase):
             self._update_rho(n)
 
             # Set learning rate for the observation model
-            lr = self.config.learning_rate * np.exp(-lr_decay * n)
+            lr = self.config.learning_rate * np.exp(-observation_update_decay * n)
             backend.set_value(self.model.optimizer.lr, lr)
 
             # Loop over batches
@@ -526,8 +547,8 @@ class Model(ModelBase):
         # total number of iterations:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
         self.rho = np.power(
-            100 * ind / self.config.n_epochs + 1 + self.config.stochastic_update_delay,
-            -self.config.stochastic_update_forget,
+            100 * ind / self.config.n_epochs + 1 + self.config.trans_prob_update_delay,
+            -self.config.trans_prob_update_forget,
         )
 
     def sample_state_time_course(self, n_samples):
@@ -724,7 +745,7 @@ class Model(ModelBase):
                 x = data["data"]
                 g, _ = self._get_state_probs(x)
                 gamma.append(g)
-            alpha.append(np.concatenate(gamma))
+            alpha.append(np.concatenate(gamma).astype(np.float32))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
