@@ -210,3 +210,5 @@ def partial_covariances(data, alpha):
         pcovs.append(np.linalg.pinv(a) @ X)
 
     return np.squeeze(pcovs)
+
+

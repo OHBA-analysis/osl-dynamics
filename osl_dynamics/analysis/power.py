@@ -30,7 +30,7 @@ def variance_from_spectra(
         Power/cross spectra for each channel.
         Can be an (n_channels, n_channels) array or (n_channels,) array.
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f).
+        Spectral components. Shape is (n_components, n_freq).
     frequency_range : list
         Frequency range to integrate the PSD over (Hz). Default is full range.
 
@@ -46,13 +46,13 @@ def variance_from_spectra(
     if power_spectra.ndim == 2:
         # PSDs were passed
         power_spectra = power_spectra[np.newaxis, np.newaxis, ...]
-        n_subjects, n_modes, n_channels, n_f = power_spectra.shape
+        n_subjects, n_modes, n_channels, n_freq = power_spectra.shape
 
     elif power_spectra.shape[-2] != power_spectra.shape[-3]:
         # PSDs were passed, check dimensionality
         error_message = (
-            "A (n_channels, n_f), (n_modes, n_channels, n_f) or "
-            + "(n_subjects, n_modes, n_channels, n_f) array must be passed."
+            "A (n_channels, n_freq), (n_modes, n_channels, n_freq) or "
+            + "(n_subjects, n_modes, n_channels, n_freq) array must be passed."
         )
         power_spectra = array_ops.validate(
             power_spectra,
@@ -60,14 +60,14 @@ def variance_from_spectra(
             allow_dimensions=[2, 3],
             error_message=error_message,
         )
-        n_subjects, n_modes, n_channels, n_f = power_spectra.shape
+        n_subjects, n_modes, n_channels, n_freq = power_spectra.shape
 
     else:
         # Cross spectra were passed, check dimensionality
         error_message = (
-            "A (n_channels, n_channels, n_f), "
-            + "(n_modes, n_channels, n_channels, n_f) or "
-            + "(n_subjects, n_modes, n_channels, n_channels, n_f) "
+            "A (n_channels, n_channels, n_freq), "
+            + "(n_modes, n_channels, n_channels, n_freq) or "
+            + "(n_subjects, n_modes, n_channels, n_channels, n_freq) "
             + "array must be passed."
         )
         power_spectra = array_ops.validate(
@@ -76,7 +76,7 @@ def variance_from_spectra(
             allow_dimensions=[3, 4],
             error_message=error_message,
         )
-        n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
+        n_subjects, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
     if components is not None and frequency_range is not None:
         raise ValueError(
@@ -108,7 +108,7 @@ def variance_from_spectra(
             psd = power_spectra[i]
 
         # Concatenate over modes
-        psd = psd.reshape(-1, n_f)
+        psd = psd.reshape(-1, n_freq)
         psd = psd.real
 
         if components is not None:

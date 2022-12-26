@@ -73,11 +73,11 @@ def power_spectra(
     Returns
     -------
     f : np.ndarray
-        Frequency axis. Shape is (n_f,).
+        Frequency axis. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectral density. Shape is (n_subjects, n_channels, n_f).
+        Power spectral density. Shape is (n_subjects, n_channels, n_freq).
     coh : np.ndarray
-        Coherence spectra. Shape is (n_subjects, n_channels, n_channels, n_f).
+        Coherence spectra. Shape is (n_subjects, n_channels, n_channels, n_freq).
         Only returned is calc_coh=True.
     """
 
@@ -140,11 +140,13 @@ def power_spectra(
         psd = np.array(psd)
         n_subjects = psd.shape[0]
         n_channels = data[0].shape[1]
-        n_f = psd.shape[2]
+        n_freq = psd.shape[2]
 
         # Build an n_channels by n_channels cross spectra matrix
         m, n = np.triu_indices(n_channels)
-        cpsd = np.empty([n_subjects, n_channels, n_channels, n_f], dtype=np.complex64)
+        cpsd = np.empty(
+            [n_subjects, n_channels, n_channels, n_freq], dtype=np.complex64
+        )
         for i in range(n_subjects):
             cpsd[i, m, n] = psd[i]
             cpsd[i, n, m] = np.conj(psd[i])

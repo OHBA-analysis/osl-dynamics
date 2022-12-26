@@ -30,9 +30,9 @@ def covariance_from_spectra(
         Frequency axis of the PSDs. Only used if frequency_range is given.
     power_spectra : np.ndarray
         Power/cross spectra for each channel. Shape is (n_modes, n_channels,
-        n_channels, n_f).
+        n_channels, n_freq).
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f).
+        Spectral components. Shape is (n_components, n_freq).
     frequency_range : list
         Frequency range to integrate the PSD over (Hz). Default is full range.
 
@@ -45,9 +45,9 @@ def covariance_from_spectra(
 
     # Validation
     error_message = (
-        "A (n_channels, n_channels, n_frequency_bins), "
-        + "(n_modes, n_channels, n_channels, n_frequency_bins) or "
-        + "(n_subjects, n_modes, n_channels, n_channels, n_frequency_bins) "
+        "A (n_channels, n_channels, n_freq), "
+        + "(n_modes, n_channels, n_channels, n_freq) or "
+        + "(n_subjects, n_modes, n_channels, n_channels, n_freq) "
         + "array must be passed."
     )
     power_spectra = array_ops.validate(
@@ -68,7 +68,7 @@ def covariance_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_f = power_spectra.shape
+    n_subjects, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
     if components is None:
         n_components = 1
     else:
@@ -78,7 +78,7 @@ def covariance_from_spectra(
     covar = []
     for i in range(n_subjects):
         # Cross spectral densities
-        csd = power_spectra[i].reshape(-1, n_f)
+        csd = power_spectra[i].reshape(-1, n_freq)
         csd = abs(csd)
 
         if components is not None:
@@ -115,9 +115,9 @@ def mean_coherence_from_spectra(
         Frequency axis of the PSDs. Only used if frequency_range is given.
     coherence : np.ndarray
         Coherence for each channel. Shape is (n_modes, n_channels,
-        n_channels, n_f).
+        n_channels, n_freq).
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_f).
+        Spectral components. Shape is (n_components, n_freq).
     frequency_range : list
         Frequency range to integrate the PSD over (Hz).
 
@@ -131,9 +131,9 @@ def mean_coherence_from_spectra(
 
     # Validation
     error_message = (
-        "a 3D numpy array (n_channels, n_channels, n_frequency_bins) "
+        "a 3D numpy array (n_channels, n_channels, n_freq) "
         + "or 4D numpy array (n_modes, n_channels, n_channels, "
-        + "n_frequency_bins) must be passed for spectra."
+        + "n_freq) must be passed for spectra."
     )
     coherence = array_ops.validate(
         coherence,
@@ -153,7 +153,7 @@ def mean_coherence_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_f = coherence.shape
+    n_subjects, n_modes, n_channels, n_channels, n_freq = coherence.shape
     if components is None:
         n_components = 1
     else:
@@ -164,7 +164,7 @@ def mean_coherence_from_spectra(
     for i in range(n_subjects):
 
         # Concatenate over modes
-        coh = coherence[i].reshape(-1, n_f)
+        coh = coherence[i].reshape(-1, n_freq)
 
         if components is not None:
             # Coherence for each spectral component
