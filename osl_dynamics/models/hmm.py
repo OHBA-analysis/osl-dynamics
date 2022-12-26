@@ -21,7 +21,7 @@ from osl_dynamics.inference import initializers
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     CategoricalLogLikelihoodLossLayer,
 )
@@ -823,7 +823,7 @@ def _model_structure(config):
     data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
     # Definition of layers
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_states,
         config.n_channels,
         config.learn_means,

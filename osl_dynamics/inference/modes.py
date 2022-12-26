@@ -2,8 +2,9 @@
 
 """
 
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 from osl_dynamics import array_ops, analysis
@@ -59,6 +60,87 @@ def argmax_time_courses(
         stcs = alpha.argmax(axis=1)
         stcs = array_ops.get_one_hot(stcs, n_states=n_modes)
     return stcs
+
+
+def gmm_time_courses(
+    time_course,
+    logit_transform=True,
+    standardize=True,
+    p_value=None,
+    filename=None,
+    sklearn_kwargs=None,
+):
+    """Fit a two component GMM on the mode time courses to get a binary
+    time course.
+
+    Parameters
+    ----------
+    time_course : list of np.ndarray or np.ndarray
+        Mode time courses.
+    logit_transform : bool
+        Should we logit transform the mode time course?
+    standardize : bool
+        Should we standardize the mode time course?
+    p_value : float
+        Used to determine a threshold. We ensure the data points assigned
+        to the 'on' component have a probability of less than p_value of
+        belonging to the 'off' component.
+    filename : str
+        Path to directory to plot the GMM fit plots.
+    sklearn_kwargs : dict
+        keyword arguments for sklearn's GaussianMixture.
+
+    Returns
+    -------
+    gmm_time_course : list of np.ndarray or np.ndarray
+        GMM fitted mode time courses with binary entries.
+    """
+
+    if isinstance(time_course, list):
+        # Extract positions of discontinuities
+        discontinuities = [tc.shape[0] for tc in time_course]
+        time_course = np.concatenate(time_course)
+    else:
+        discontinuities = None
+
+    n_modes = time_course.shape[1]
+
+    # Initialise an array to hold the gmm thresholded time course
+    gmm_time_course = np.empty(time_course.shape, dtype=int)
+
+    # Loop over modes
+    for mode in range(n_modes):
+        a = time_course[:, mode]
+
+        # GMM plot filename
+        if filename is not None:
+            plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
+                fn=Path(filename),
+                mode=mode,
+                w=len(str(n_modes)),
+            )
+        else:
+            plot_filename = None
+
+        # Fit the GMM
+        default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3}
+        sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
+        threshold = analysis.gmm.fit_gaussian_mixture(
+            a,
+            logit_transform=logit_transform,
+            standardize=standardize,
+            p_value=p_value,
+            sklearn_kwargs=sklearn_kwargs,
+            plot_filename=plot_filename,
+            print_message=False,
+        )
+        print(f"GMM theshold {mode}: {threshold}")
+        gmm_time_course[:, mode] = a > threshold
+
+    if discontinuities is None:
+        return gmm_time_course
+
+    return np.split(gmm_time_course, np.cumsum(discontinuities))
 
 
 def correlate_modes(mode_time_course_1, mode_time_course_2):
@@ -455,84 +537,3 @@ def fano_factor(
             F[-1].append(np.std(counts, axis=0) ** 2 / np.mean(counts, axis=0))
 
     return np.squeeze(F)
-
-
-def gmm_time_courses(
-    time_course,
-    logit_transform=True,
-    standardize=True,
-    p_value=None,
-    filename=None,
-    sklearn_kwargs=None,
-):
-    """Fit a two component GMM on the mode time courses to get a binary
-    time course.
-
-    Parameters
-    ----------
-    time_course : list of np.ndarray or np.ndarray
-        Mode time courses.
-    logit_transform : bool
-        Should we logit transform the mode time course?
-    standardize : bool
-        Should we standardize the mode time course?
-    p_value : float
-        Used to determine a threshold. We ensure the data points assigned
-        to the 'on' component have a probability of less than p_value of
-        belonging to the 'off' component.
-    filename : str
-        Path to directory to plot the GMM fit plots.
-    sklearn_kwargs : dict
-        keyword arguments for sklearn's GaussianMixture.
-
-    Returns
-    -------
-    gmm_time_course : list of np.ndarray or np.ndarray
-        GMM fitted mode time courses with binary entries.
-    """
-
-    if isinstance(time_course, list):
-        # Extract positions of discontinuities
-        discontinuities = [tc.shape[0] for tc in time_course]
-        time_course = np.concatenate(time_course)
-    else:
-        discontinuities = None
-
-    n_modes = time_course.shape[1]
-
-    # Initialise an array to hold the gmm thresholded time course
-    gmm_time_course = np.empty(time_course.shape, dtype=int)
-
-    # Loop over modes
-    for mode in range(n_modes):
-        a = time_course[:, mode]
-
-        # GMM plot filename
-        if filename is not None:
-            plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
-                fn=Path(filename),
-                mode=mode,
-                w=len(str(n_modes)),
-            )
-        else:
-            plot_filename = None
-
-        # Fit the GMM
-        default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3}
-        sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
-        threshold = analysis.gmm.fit_gaussian_mixture(
-            a,
-            logit_transform=logit_transform,
-            standardize=standardize,
-            p_value=p_value,
-            sklearn_kwargs=sklearn_kwargs,
-            plot_filename=plot_filename,
-            print_message=False,
-        )
-        print(f"GMM theshold {mode}: {threshold}")
-        gmm_time_course[:, mode] = a > threshold
-
-    if discontinuities is None:
-        return gmm_time_course
-
-    return np.split(gmm_time_course, np.cumsum(discontinuities))

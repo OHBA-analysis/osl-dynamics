@@ -16,7 +16,7 @@ from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
     add_epsilon,
     LogLikelihoodLossLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     DiagonalMatricesLayer,
     CorrelationMatricesLayer,
     MixVectorsLayer,
@@ -216,7 +216,7 @@ def _model_structure(config):
     #   and the observation model.
 
     # Layers
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,
@@ -274,10 +274,14 @@ def get_means_stds_fcs(model):
 
     means = means_layer.vectors
     stds = add_epsilon(
-        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)), stds_layer.epsilon
+        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)),
+        stds_layer.epsilon,
+        diag=True,
     )
     fcs = add_epsilon(
-        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors), fcs_layer.epsilon
+        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors),
+        fcs_layer.epsilon,
+        diag=True,
     )
     return means.numpy(), stds.numpy(), fcs.numpy()
 

@@ -15,7 +15,7 @@ from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
     add_epsilon,
     LogLikelihoodLossLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
@@ -190,7 +190,7 @@ def _model_structure(config):
     #   and the observation model.
 
     # Definition of layers
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,
@@ -224,7 +224,9 @@ def _model_structure(config):
 def get_covariances(model):
     covs_layer = model.get_layer("covs")
     covs = add_epsilon(
-        covs_layer.bijector(covs_layer.flattened_cholesky_factors), covs_layer.epsilon
+        covs_layer.bijector(covs_layer.flattened_cholesky_factors),
+        covs_layer.epsilon,
+        diag=True,
     )
     return covs.numpy()
 

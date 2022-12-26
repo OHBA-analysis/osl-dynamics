@@ -19,7 +19,7 @@ from osl_dynamics.models.inf_mod_base import (
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     DiagonalMatricesLayer,
     CorrelationMatricesLayer,
     MixVectorsLayer,
@@ -480,7 +480,7 @@ def _model_structure(config):
     #
 
     # Layers
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,

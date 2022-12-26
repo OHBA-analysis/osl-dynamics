@@ -19,7 +19,7 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
-from osl_dynamics import data, models
+from osl_dynamics import data
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import get_argument, replace_argument, NumpyLoader
 from osl_dynamics.utils.model import HTMLTable, LatexTable

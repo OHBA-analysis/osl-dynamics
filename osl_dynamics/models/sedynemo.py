@@ -18,7 +18,7 @@ from osl_dynamics.models.inf_mod_base import (
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     ModelRNNLayer,
     NormalizationLayer,
@@ -499,7 +499,7 @@ def _model_structure(config):
         config.n_subjects, config.subject_embedding_dim, name="subject_embeddings"
     )
 
-    group_means_layer = MeanVectorsLayer(
+    group_means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,

@@ -14,9 +14,8 @@ from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
     add_epsilon,
-    DummyLayer,
     LogLikelihoodLossLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     SubjectDevEmbeddingLayer,
     SubjectMapLayer,
@@ -335,7 +334,7 @@ def _model_structure(config):
         config.n_subjects, config.subject_embedding_dim, name="subject_embeddings"
     )
 
-    group_means_layer = MeanVectorsLayer(
+    group_means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,
@@ -547,6 +546,7 @@ def get_group_means_covariances(model):
     group_covs = add_epsilon(
         group_covs_layer.bijector(group_covs_layer.flattened_cholesky_factors),
         group_covs_layer.epsilon,
+        diag=True,
     )
     return group_means.numpy(), group_covs.numpy()
 

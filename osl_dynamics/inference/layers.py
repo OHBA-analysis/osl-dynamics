@@ -13,30 +13,30 @@ tfb = tfp.bijectors
 
 
 @tf.function
-def add_epsilon(A, epsilon, diag=True):
+def add_epsilon(A, epsilon, diag=False):
     """Adds epsilon the the diagonal of batches of square matrices
     or all elements of matrices.
 
     Parameters
     ----------
     A : tf.Tensor
-        Batches of square matrices or vectors. Shape is (..., N, N) or (..., N)
+        Batches of square matrices or vectors.
+        Shape is (..., N, N) or (..., N).
     epsilon : float
-        Small error added to the diagonal of the matrices or every element of the vectors.
+        Small error added to the diagonal of the matrices or every element
+        of the vectors.
     diag : bool
-        Do we want to add epsilon to the diagonal?
+        Do we want to add epsilon to the diagonal only?
     """
-    # Make sure epsilon is float32
     epsilon = tf.cast(epsilon, dtype=tf.float32)
     A_shape = tf.shape(A)
     if diag:
-        e = tf.eye(A_shape[-1])
-
+        # Add epsilon to the diagonal only
+        I = tf.eye(A_shape[-1])
     else:
         # Add epsilon to all elements
-        e = 1.0
-
-    return A + epsilon * e
+        I = 1.0
+    return A + epsilon * I
 
 
 def NormalizationLayer(norm_type, *args, **kwargs):
@@ -76,27 +76,36 @@ def RNNLayer(rnn_type, *args, **kwargs):
 class DummyLayer(layers.Layer):
     """Dummy layer.
 
-    Returns the inputs without modification and optionally adds loss
-    according to the input.
+    Returns the inputs without modification.
+    """
+
+    def call(self, inputs, **kwargs):
+        return inputs
+
+
+class AddRegularizationLossLayer(layers.Layer):
+    """Adds a regularization loss.
+
+    Can be used as a wrapper for a keras regularizer. Inputs are used to
+    calculate the regularization loss and returned without modification.
 
     Parameters
     ----------
-    regularisation : str
-        Type of regularisation.
-    reg_strength : float
-        Strength of regularisation.
+    reg : str
+        Type of regularization.
+    strength : float
+        Strength of regularization. The regularization is multiplied
+        by the strength before being added to the loss
     """
 
-    def __init__(self, regularisation=None, reg_strength=0, **kwargs):
+    def __init__(self, reg, strength, **kwargs):
         super().__init__(**kwargs)
-        self.regularisation = regularisation
-        self.reg_strength = reg_strength
+        self.reg = tf.keras.regularizers.get(reg)
+        self.strength = strength
 
     def call(self, inputs, **kwargs):
-        if self.regularisation == "l2":
-            l2_norm = tf.reduce_sum(tf.square(inputs))
-            self.add_loss(self.reg_strength * l2_norm)
-
+        reg_loss = self.reg(inputs)
+        self.add_loss(self.strength * reg_loss)
         return inputs
 
 
@@ -152,7 +161,8 @@ class TFRangeLayer(layers.Layer):
 
 class ZeroLayer(layers.Layer):
     """Layer that outputs tensor of zeros.
-    Wrapper for tf.zeros.
+
+    Wrapper for tf.zeros(). Note, the inputs to this layer are not used.
 
     Parameters
     ----------
@@ -165,12 +175,17 @@ class ZeroLayer(layers.Layer):
         self.shape = shape
 
     def call(self, inputs):
-        # Input not used here
         return tf.zeros(self.shape)
 
 
 class InverseCholeskyLayer(layers.Layer):
-    """Layer for getting Cholesky vectors from postive definite symmetric matrices."""
+    """Layer for getting Cholesky vectors from postive definite symmetric matrices.
+
+    Parameters
+    ----------
+    epsilon : float
+        Small error added to the diagonal of the matrices.
+    """
 
     def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
@@ -178,7 +193,7 @@ class InverseCholeskyLayer(layers.Layer):
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
     def call(self, inputs):
-        inputs = add_epsilon(inputs, self.epsilon)
+        inputs = add_epsilon(inputs, self.epsilon, diag=True)
         return self.bijector.inverse(inputs)
 
 
@@ -200,7 +215,7 @@ class SampleNormalDistributionLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         mu, sigma = inputs
-        sigma = add_epsilon(sigma, self.epsilon, diag=False)
+        sigma = add_epsilon(sigma, self.epsilon)
         if training:
             N = tfp.distributions.Normal(loc=mu, scale=sigma)
             return N.sample()
@@ -294,8 +309,8 @@ class ScalarLayer(layers.Layer):
         return self.scalar
 
 
-class MeanVectorsLayer(layers.Layer):
-    """Layer to learn a set of mean vectors.
+class VectorsLayer(layers.Layer):
+    """Layer to learn a set of vectors.
 
     The vectors are free parameters.
 
@@ -331,7 +346,7 @@ class MeanVectorsLayer(layers.Layer):
             # Use value passed to initialise
             if initial_value.ndim != 2:
                 raise ValueError(
-                    "a (n_modes, n_channels) array must be passed for initial_means."
+                    "a (n_modes, n_channels) array must be passed for initial_value."
                 )
             if initial_value.shape[-1] != m:
                 raise ValueError(
@@ -350,13 +365,27 @@ class MeanVectorsLayer(layers.Layer):
 
         elif learn:
             # Use a random vector to initialise
-            self.vectors_initializer = initializers.TruncatedNormal(0, 0.02)
+            self.vectors_initializer = initializers.TruncatedNormal(mean=0, stddev=0.02)
         else:
-            # We're not learning the mean vectors, use zeros
+            # We're not learning the vectors, use zeros
             self.vectors_initializer = initializers.Zeros()
 
         # Regulariser
         self.regularizer = regularizer
+
+    def add_regularization(self, inputs):
+        # Calculate regularisation
+        reg = self.regularizer(self.vectors)
+
+        # Calculate the scaling factor for the regularisation
+        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+        n_batches = self.regularizer.n_batches
+        scaling_factor = batch_size * n_batches
+        reg /= scaling_factor
+
+        # Add to the loss function
+        self.add_loss(reg)
+        self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
         self.vectors = self.add_weight(
@@ -370,16 +399,7 @@ class MeanVectorsLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         if self.regularizer is not None:
-            reg = self.regularizer(self.vectors)
-
-            # Calculate the scaling on regularisation
-            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-            n_batches = self.regularizer.n_batches
-            scaling_factor = batch_size * n_batches
-            reg = reg / scaling_factor
-
-            self.add_loss(reg)
-            self.add_metric(reg, name=self.name)
+            self.add_regularization(inputs)
         return self.vectors
 
 
@@ -452,7 +472,7 @@ class CovarianceMatricesLayer(layers.Layer):
         elif learn:
             # Use the identity matrix with a random error
             self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalIdentityCholeskyInitializer(0.1)
+                osld_initializers.NormalIdentityCholeskyInitializer(std=0.1)
             )
 
         else:
@@ -463,6 +483,20 @@ class CovarianceMatricesLayer(layers.Layer):
 
         # Regulariser
         self.regularizer = regularizer
+
+    def add_regularization(self, covariances, inputs):
+        # Calculate regularisation
+        reg = self.regularizer(covariances)
+
+        # Calculate the scaling factor for the regularisation
+        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+        n_batches = self.regularizer.n_batches
+        scaling_factor = batch_size * n_batches
+        reg /= scaling_factor
+
+        # Add to the loss function
+        self.add_loss(reg)
+        self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
         self.flattened_cholesky_factors = self.add_weight(
@@ -476,19 +510,9 @@ class CovarianceMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         covariances = self.bijector(self.flattened_cholesky_factors)
-        covariances = add_epsilon(covariances, self.epsilon)
+        covariances = add_epsilon(covariances, self.epsilon, diag=True)
         if self.regularizer is not None:
-            reg = self.regularizer(covariances)
-
-            # Calculate the the scaling on regularisation
-            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-            n_batches = self.regularizer.n_batches
-            scaling_factor = batch_size * n_batches
-
-            reg = reg / scaling_factor
-
-            self.add_loss(reg)
-            self.add_metric(reg, name=self.name)
+            self.add_regularization(covariances, inputs)
         return covariances
 
 
@@ -562,7 +586,7 @@ class CorrelationMatricesLayer(layers.Layer):
         elif learn:
             # Use a correlation matrix with an error added
             self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalCorrelationCholeskyInitializer(0.1)
+                osld_initializers.NormalCorrelationCholeskyInitializer(std=0.1)
             )
 
         else:
@@ -573,6 +597,20 @@ class CorrelationMatricesLayer(layers.Layer):
 
         # Regulariser
         self.regularizer = regularizer
+
+    def add_regularization(self, correlation, inputs):
+        # Calculate regularisation
+        reg = self.regularizer(correlations)
+
+        # Calculate the scaling factor for the regularisation
+        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+        n_batches = self.regularizer.n_batches
+        scaling_factor = batch_size * n_batches
+        reg /= scaling_factor
+
+        # Add to the loss function
+        self.add_loss(reg)
+        self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
         self.flattened_cholesky_factors = self.add_weight(
@@ -586,18 +624,9 @@ class CorrelationMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         correlations = self.bijector(self.flattened_cholesky_factors)
-        correlations = add_epsilon(correlations, self.epsilon)
+        correlations = add_epsilon(correlations, self.epsilon, diag=True)
         if self.regularizer is not None:
-            reg = self.regularizer(correlations)
-
-            # Calculate the the scaling on regularisation
-            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-            n_batches = self.regularizer.n_batches
-            scaling_factor = batch_size * n_batches
-            reg = reg / scaling_factor
-
-            self.add_loss(reg)
-            self.add_metric(reg, name=self.name)
+            self.add_regularization(correlation, inputs)
         return correlations
 
 
@@ -666,7 +695,7 @@ class DiagonalMatricesLayer(layers.Layer):
         elif learn:
             # Use random numbers
             self.diagonals_initializer = osld_initializers.NormalDiagonalInitializer(
-                0.05
+                std=0.05
             )
 
         else:
@@ -680,6 +709,20 @@ class DiagonalMatricesLayer(layers.Layer):
         # Regulariser
         self.regularizer = regularizer
 
+    def add_regularization(self, diagonals, inputs):
+        # Calculate regularisation
+        reg = self.regularizer(diagonals)
+
+        # Calculate the scaling factor for the regularisation
+        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+        n_batches = self.regularizer.n_batches
+        scaling_factor = batch_size * n_batches
+        reg /= scaling_factor
+
+        # Add to the loss function
+        self.add_loss(reg)
+        self.add_metric(reg, name=self.name)
+
     def build(self, input_shape):
         self.diagonals = self.add_weight(
             "diagonals",
@@ -692,18 +735,9 @@ class DiagonalMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         D = self.bijector(self.diagonals)
-        D = add_epsilon(D, self.epsilon, diag=False)
+        D = add_epsilon(D, self.epsilon)
         if self.regularizer is not None:
-            reg = self.regularizer(D)
-
-            # Calculate the the scaling on regularisation
-            batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-            n_batches = self.regularizer.n_batches
-            scaling_factor = batch_size * n_batches
-            reg = reg / scaling_factor
-
-            self.add_loss(reg)
-            self.add_metric(reg, name=self.name)
+            self.add_regularization(diagonals, inputs)
         D = tf.linalg.diag(D)
         return D
 
@@ -721,14 +755,17 @@ class MatrixLayer(layers.Layer):
         Should the matrix be trainable?
     initial_value : np.ndarray
         Initial value for the matrix.
+    epsilon : float
+        Error added to the matrices for numerical stability.
+    regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the diagonal entries.
     """
 
-    def __init__(self, m, constraint, learn, initial_value, **kwargs):
-
+    def __init__(
+        self, m, constraint, learn, initial_value, epsilon, regularizer=None, **kwargs
+    ):
         super().__init__(**kwargs)
-        self.m = m
         self.constraint = constraint
-        self.learn = learn
 
         if initial_value is not None:
             if initial_value.shape[-1] != m:
@@ -738,9 +775,13 @@ class MatrixLayer(layers.Layer):
             initial_value = initial_value[np.newaxis, ...]
 
         if constraint == "covariance":
-            self.matrix_layer = CovarianceMatricesLayer(1, m, learn, initial_value)
+            self.matrix_layer = CovarianceMatricesLayer(
+                1, m, learn, initial_value, epsilon, regularizer
+            )
         elif constraint == "diagonal":
-            self.matrix_layer = DiagonalMatricesLayer(1, m, learn, initial_value)
+            self.matrix_layer = DiagonalMatricesLayer(
+                1, m, learn, initial_value, epsilon, regularizer
+            )
         else:
             raise ValueError("Please use constraint='diagonal' or 'covariance.'")
 
@@ -756,7 +797,6 @@ class MixVectorsLayer(layers.Layer):
     """
 
     def call(self, inputs, **kwargs):
-
         # Unpack the inputs:
         # - alpha.shape = (None, sequence_length, n_modes)
         # - mu.shape    = (n_modes, n_channels)
@@ -766,7 +806,6 @@ class MixVectorsLayer(layers.Layer):
         alpha = tf.expand_dims(alpha, axis=-1)
         mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
         m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-
         return m
 
 
@@ -778,7 +817,6 @@ class MixMatricesLayer(layers.Layer):
     """
 
     def call(self, inputs, **kwargs):
-
         # Unpack the inputs:
         # - alpha.shape = (None, sequence_length, n_modes)
         # - D.shape     = (n_modes, n_channels, n_channels)
@@ -788,7 +826,6 @@ class MixMatricesLayer(layers.Layer):
         alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
         D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
         C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
-
         return C
 
 
@@ -821,7 +858,8 @@ class LogLikelihoodLossLayer(layers.Layer):
     def call(self, inputs):
         x, mu, sigma = inputs
 
-        sigma = add_epsilon(sigma, self.epsilon)
+        # Add a small error for numerical stability
+        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
@@ -902,8 +940,9 @@ class KLDivergenceLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
 
-        inference_sigma = add_epsilon(inference_sigma, self.epsilon, diag=False)
-        model_sigma = add_epsilon(model_sigma, self.epsilon, diag=False)
+        # Add a small error for numerical stability
+        inference_sigma = add_epsilon(inference_sigma, self.epsilon)
+        model_sigma = add_epsilon(model_sigma, self.epsilon)
 
         # The model network predicts one time step into the future compared to
         # the inference network. We clip the sequences to ensure we are comparing
@@ -1133,7 +1172,9 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs = inputs
-        sigma = add_epsilon(sigma, self.epsilon)
+
+        # Add a small error for numerical stability
+        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1241,7 +1282,7 @@ class SubjectMapLayer(layers.Layer):
 
         if self.which_map == "covariances":
             subject_map = self.bijector(subject_map)
-            subject_map = add_epsilon(subject_map, self.epsilon)
+            subject_map = add_epsilon(subject_map, self.epsilon, diag=True)
 
         return subject_map
 
@@ -1257,10 +1298,11 @@ class MixSubjectEmbeddingParametersLayer(layers.Layer):
     """
 
     def call(self, inputs):
-        # alpha.shape = (None, sequence_length, n_modes)
-        # mu.shape = (n_subjects, n_modes, n_channels)
-        # D.shape = (n_subjects, n_modes, n_channels, n_channels)
-        # subj_id.shape = (None, sequence_length)
+        # Unpack inputs:
+        # - alpha.shape   = (None, sequence_length, n_modes)
+        # - mu.shape      = (n_subjects, n_modes, n_channels)
+        # - D.shape       = (n_subjects, n_modes, n_channels, n_channels)
+        # - subj_id.shape = (None, sequence_length)
         alpha, mu, D, subj_id = inputs
         subj_id = tf.cast(subj_id, tf.int32)
 
@@ -1295,18 +1337,22 @@ class SubjectMapKLDivergenceLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         data, inference_mu, inference_sigma, model_sigma = inputs
-        inference_sigma = add_epsilon(inference_sigma, self.epsilon, diag=False)
-        model_sigma = add_epsilon(model_sigma, self.epsilon, diag=False)
 
+        # Add a small error for numerical stability
+        inference_sigma = add_epsilon(inference_sigma, self.epsilon)
+        model_sigma = add_epsilon(model_sigma, self.epsilon)
+
+        # Calculate the KL divergence
         prior = tfp.distributions.Normal(loc=0.0, scale=model_sigma)
         posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
         kl_loss = tfp.distributions.kl_divergence(
             posterior, prior, allow_nan_stats=False
         )
+
         # Calculate the scaling for KL loss
         batch_size = tf.cast(tf.shape(data)[0], tf.float32)
         scaling_factor = batch_size * self.n_batches
-        kl_loss = kl_loss / scaling_factor
+        kl_loss /= scaling_factor
 
         kl_loss = tf.reduce_sum(kl_loss)
 

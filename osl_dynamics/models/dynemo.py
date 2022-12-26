@@ -20,7 +20,7 @@ from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     LogLikelihoodLossLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
@@ -403,7 +403,7 @@ def _model_structure(config):
     #   and the observation model.
 
     # Definition of layers
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,

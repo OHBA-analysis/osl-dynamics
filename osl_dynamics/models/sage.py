@@ -14,7 +14,7 @@ from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
@@ -473,7 +473,7 @@ def _build_inference_model(config):
     #   and the observation model.
 
     # Definition of layers
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_modes,
         config.n_channels,
         config.learn_means,

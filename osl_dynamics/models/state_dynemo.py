@@ -19,7 +19,7 @@ from osl_dynamics.inference.layers import (
     ModelRNNLayer,
     SoftmaxLayer,
     SampleGumbelSoftmaxDistributionLayer,
-    MeanVectorsLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     CategoricalLogLikelihoodLossLayer,
     CategoricalKLDivergenceLayer,
@@ -327,7 +327,7 @@ def _model_structure(config):
     # Observation model:
     # - p(x_t) = N(m_t, C_t), where m_t and C_t are state dependent
     #   means/covariances
-    means_layer = MeanVectorsLayer(
+    means_layer = VectorsLayer(
         config.n_states,
         config.n_channels,
         config.learn_means,
