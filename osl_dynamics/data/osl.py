@@ -6,7 +6,6 @@ import numpy as np
 from osl_dynamics import array_ops
 from osl_dynamics.data.processing import trim_time_series
 from osl_dynamics.data.rw import loadmat
-from osl_dynamics.inference import modes
 
 
 def OSL_HMM(filename):
@@ -142,17 +141,6 @@ class HMM_MAR:
         return trim_time_series(
             self.gamma(), sequence_length=sequence_length, concatenate=concatenate
         )
-
-    def fractional_occupancies(self):
-        """Fractional Occupancy of each state.
-
-        Returns
-        -------
-        fo : np.ndarray
-            Fractional occupancies.
-        """
-        stc = self.state_time_course(concatenate=True)
-        return modes.fractional_occupancies(stc)
 
     def state_time_course(self, concatenate=False, pad=None):
         """State time course for each subject.

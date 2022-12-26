@@ -113,17 +113,14 @@ fo = modes.fractional_occupancies(stc)
 print("Fractional occupancies:", fo)
 
 # Lifetimes
-mean_lt, _ = modes.lifetime_statistics(
-    stc, sampling_frequency=training_data.sampling_frequency
-)
+lt = modes.mean_lifetimes(stc, sampling_frequency=training_data.sampling_frequency)
 
-print("Lifetimes:", mean_lt)
+print("Lifetimes:", lt)
 
 # Intervals
-intv = modes.intervals(stc, sampling_frequency=training_data.sampling_frequency)
-mean_intv = np.array([np.mean(i) for i in intv])
+intv = modes.mean_intervals(stc, sampling_frequency=training_data.sampling_frequency)
 
-print("Intervals:", mean_intv)
+print("Intervals:", intv)
 
 # -----------------
 # Spectral analysis
