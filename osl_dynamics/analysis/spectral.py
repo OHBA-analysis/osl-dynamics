@@ -311,9 +311,11 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     Parameters
     ----------
     coeffs : np.ndarray
-        MAR coefficients.
+        MAR coefficients. Shape must be (n_modes, n_channels, n_channels) or
+        (n_channels, n_channels) or (n_channels,).
     covs : np.ndarray
-        MAR covariances.
+        MAR covariances. Shape must be (n_modes, n_channels, n_channels) or
+        (n_channels, n_channels).
     sampling_frequency : float
         Sampling frequency in Hertz.
     n_freq : int
@@ -322,11 +324,10 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     Returns
     -------
     f : np.ndarray
-        Frequency axis.
+        Frequency axis. Shape is (n_freq,).
     P : np.ndarray
-        Cross power spectral densities.
-        Shape is (n_freq, n_modes, n_channels, n_channels) or
-        (n_freq, n_channels, n_channels).
+        Cross power spectral densities. Shape is (n_freq, n_modes, n_channels,
+        n_channels) or (n_freq, n_channels, n_channels).
     """
     # Validation
     if covs.shape[-1] != covs.shape[-2]:
@@ -373,9 +374,10 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
 
     # Transfer function
     I = np.identity(n_channels)[np.newaxis, np.newaxis, ...]
-    H = np.linalg.inv(I - A)
+    e = 1e-6 * I
+    H = np.linalg.inv(I - A + e)
 
-    # PSDs
+    # Cross PSDs
     P = H @ covs[np.newaxis, ...] @ np.transpose(np.conj(H), axes=[0, 1, 3, 2])
 
     return f, np.squeeze(P)
