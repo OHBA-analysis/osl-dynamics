@@ -1359,7 +1359,7 @@ class SubjectMapKLDivergenceLayer(layers.Layer):
         return kl_loss
 
 
-class MLPLayer(layers.Layer):
+class MultiLayerPerceptronLayer(layers.Layer):
     """Multi-Layer Perceptron layer.
 
     Parameters

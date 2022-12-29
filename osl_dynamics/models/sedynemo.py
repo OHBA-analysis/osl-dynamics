@@ -34,7 +34,7 @@ from osl_dynamics.inference.layers import (
     ZeroLayer,
     InverseCholeskyLayer,
     SubjectMapKLDivergenceLayer,
-    MLPLayer,
+    MultiLayerPerceptronLayer,
 )
 
 
@@ -538,7 +538,7 @@ def _model_structure(config):
     )
 
     # Inference part of the deviation
-    means_dev_inf_input_layer = MLPLayer(
+    means_dev_inf_input_layer = MultiLayerPerceptronLayer(
         config.dev_inf_n_layers,
         config.dev_inf_n_units,
         config.dev_inf_normalization,
@@ -560,7 +560,7 @@ def _model_structure(config):
             name="means_dev",
         )
 
-    covs_dev_inf_input_layer = MLPLayer(
+    covs_dev_inf_input_layer = MultiLayerPerceptronLayer(
         config.dev_inf_n_layers,
         config.dev_inf_n_units,
         config.dev_inf_normalization,
@@ -676,7 +676,7 @@ def _model_structure(config):
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
     # Prior part of deviations
-    means_dev_mod_input_layer = MLPLayer(
+    means_dev_mod_input_layer = MultiLayerPerceptronLayer(
         config.dev_inf_n_layers,
         config.dev_inf_n_units,
         config.dev_inf_normalization,
@@ -687,7 +687,7 @@ def _model_structure(config):
     means_dev_mod_sigma_layer = layers.Dense(
         config.n_channels, activation="softplus", name="means_dev_mod_sigma"
     )
-    covs_dev_mod_input_layer = MLPLayer(
+    covs_dev_mod_input_layer = MultiLayerPerceptronLayer(
         config.dev_inf_n_layers,
         config.dev_inf_n_units,
         config.dev_inf_normalization,
