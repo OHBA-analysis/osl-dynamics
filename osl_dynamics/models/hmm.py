@@ -141,9 +141,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(
-        self, dataset, epochs=None, observation_update_decay=None, take=1, **kwargs
-    ):
+    def fit(self, dataset, epochs=None, take=1, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -156,10 +154,6 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
-        observation_update_decay : float
-            We update the learning rate (lr) for the observation model as
-            lr = config.learning_rate * exp(-observation_update_decay * epoch).
-            If None, we use config.observation_update_decay.
         take : float
             Fraction of total batches to take.
         kwargs : keyword arguments
@@ -173,8 +167,6 @@ class Model(ModelBase):
         """
         if epochs is None:
             epochs = self.config.n_epochs
-        if observation_update_decay is None:
-            observation_update_decay = self.config.observation_update_decay
 
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
@@ -207,7 +199,9 @@ class Model(ModelBase):
             self._update_rho(n)
 
             # Set learning rate for the observation model
-            lr = self.config.learning_rate * np.exp(-observation_update_decay * n)
+            lr = self.config.learning_rate * np.exp(
+                -self.config.observation_update_decay * n
+            )
             backend.set_value(self.model.optimizer.lr, lr)
 
             # Loop over batches
