@@ -318,6 +318,55 @@ class Data:
                 whiten=prep_settings.get("whiten", False),
             )
 
+    def filter(self, low_freq=None, high_freq=None):
+        """Filter the raw data.
+
+        Parameters
+        ----------
+        low_freq : float
+            Frequency in Hz for a high pass filter.
+        high_freq : float
+            Frequency in Hz for a low pass filter.
+        """
+        if (
+            low_freq is not None or high_freq is not None
+        ) and self.sampling_frequency is None:
+            raise ValueError(
+                "Data.sampling_frequency must be set if we are filtering the data. "
+                + "Use Data.set_sampling_frequency() or pass "
+                + "Data(..., sampling_frequency=...) when creating the Data object."
+            )
+
+        self.low_freq = low_freq
+        self.high_freq = high_freq
+
+        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
+        self.prepare_memmap_filenames()
+
+        # Prepare the data
+        for raw_data_memmap, prepared_data_file in zip(
+            tqdm(self.raw_data_memmaps, desc="Filtering data", ncols=98),
+            self.prepared_data_filenames,
+        ):
+            # Filtering
+            prepared_data = processing.temporal_filter(
+                raw_data_memmap, low_freq, high_freq, self.sampling_frequency
+            )
+
+            if self.load_memmaps:
+                # Save the prepared data as a memmap
+                prepared_data_memmap = misc.array_to_memmap(
+                    prepared_data_file, prepared_data
+                )
+            else:
+                prepared_data_memmap = prepared_data
+            self.prepared_data_memmaps.append(prepared_data_memmap)
+
+        # Update subjects to return the prepared data
+        self.subjects = self.prepared_data_memmaps
+
+        self.prepared = True
+
     def prepare(
         self,
         amplitude_envelope=False,
@@ -385,13 +434,11 @@ class Data:
         ----------
         low_freq : float
             Frequency in Hz for a high pass filter.
-            Only used if amplitude_envelope=True.
         high_freq : float
             Frequency in Hz for a low pass filter.
-            Only used if amplitude_envelope=True.
         n_window : int
             Number of data points in a sliding window to apply to the amplitude
-            envelope data. Only used if amplitude_envelope=True.
+            envelope data.
         """
 
         # Validation
