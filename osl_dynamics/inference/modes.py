@@ -307,3 +307,8 @@ def mean_lifetimes(state_time_course, sampling_frequency=None):
 def mean_intervals(state_time_course, sampling_frequency=None):
     """Wrapper for osl_dynamics.analysis.modes.mean_intervals."""
     return analysis.modes.mean_intervals(state_time_course, sampling_frequency)
+
+
+def switching_rates(state_time_course, sampling_frequency=None):
+    """Wrapper for osl_dynamics.analysis.modes.switching_rates."""
+    return analysis.modes.switching_rates(state_time_course, sampling_frequency)

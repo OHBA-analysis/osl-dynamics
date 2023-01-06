@@ -303,8 +303,8 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course. Shape must be (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
@@ -338,8 +338,8 @@ def mean_lifetimes(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course. Shape must be (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
@@ -395,8 +395,8 @@ def interval_statistics(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course. Shape must be (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
@@ -430,8 +430,8 @@ def mean_intervals(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course. Shape must be (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the intervals in seconds.
 
@@ -450,8 +450,8 @@ def fractional_occupancies(state_time_course):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course. Shape must be (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
 
     Returns
     -------
@@ -466,26 +466,64 @@ def fractional_occupancies(state_time_course):
     return np.array(fo, dtype=np.float32)
 
 
+def switching_rates(state_time_course, sampling_frequency=None):
+    """Calculates the switching rate.
+
+    This is defined as the number of state activations per second.
+
+    Parameters
+    ----------
+    state_time_course : list or np.ndarray
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
+    sampling_frequency : float
+        Sampling frequency in Hz. If None, defaults to 1 Hz.
+
+    Returns
+    -------
+    sr : np.ndarray
+        The switching rate of each state. Shape is (n_subjects, n_states)
+        or (n_states,).
+    """
+    if isinstance(state_time_course, np.ndarray):
+        state_time_course = [state_time_course]
+
+    # Loop through subjects
+    sr = []
+    for subject in state_time_course:
+        n_samples, n_states = subject.shape
+
+        # Number of activations for each state
+        d = np.diff(subject, axis=0)
+        counts = np.array([len(d[:, i][d[:, i] == 1]) for i in range(n_states)])
+
+        # Calculate switching rates
+        sr.append(counts * sampling_frequency / n_samples)
+
+    return np.squeeze(sr)
+
+
 def fano_factor(
     state_time_course,
     window_lengths,
     sampling_frequency=1.0,
 ):
-    """Calculates the FANO factor.
+    """Calculates the Fano factor.
 
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time courses.
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
     window_lengths : list or np.ndarray
-        Window lengths to use.
+        Window lengths to use. Must be in samples.
     sampling_frequency : float
-        Sampling frequency of the time courses.
+        Sampling frequency in Hz.
 
     Returns
     -------
     F : list of np.ndarray
-        FANO factor. Shape is (n_subjects, n_window_lengths, n_states)
+        Fano factor. Shape is (n_subjects, n_window_lengths, n_states)
         or (n_window_lengths, n_states).
     """
     if isinstance(state_time_course, np.ndarray):
@@ -516,7 +554,7 @@ def fano_factor(
                     c.append(len(d[:, i][d[:, i] == 1]))
                 counts.append(c)
 
-            # Calculate FANO factor
+            # Calculate Fano factor
             counts = np.array(counts)
             F[-1].append(np.std(counts, axis=0) ** 2 / np.mean(counts, axis=0))
 
