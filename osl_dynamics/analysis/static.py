@@ -5,7 +5,7 @@
 import numpy as np
 from pqdm.processes import pqdm
 
-from osl_dynamics.analysis.spectral import spectrogram, coherence_spectra
+from osl_dynamics.analysis import spectral
 
 
 def functional_connectivity(data, conn_type="corr"):
@@ -50,6 +50,8 @@ def power_spectra(
     n_jobs=1,
 ):
     """Calculate static power spectra.
+
+    This function uses Welch's method to calculate the spectra.
 
     Parameters
     ----------
@@ -97,7 +99,7 @@ def power_spectra(
 
     if len(data) == 1:
         # We only have one subject so we don't need to parallelise the calculation
-        results = spectrogram(
+        results = spectral.spectrogram(
             data=d,
             window_length=window_length,
             sampling_frequency=sampling_frequency,
@@ -128,7 +130,9 @@ def power_spectra(
 
         # Calculate power spectra
         print("Calculating power spectra")
-        results = pqdm(args, spectrogram, n_jobs=n_jobs, argument_type="args", ncols=98)
+        results = pqdm(
+            args, spectral.spectrogram, n_jobs=n_jobs, argument_type="args", ncols=98
+        )
 
     # Unpack results
     psd = []
@@ -152,7 +156,7 @@ def power_spectra(
             cpsd[i, n, m] = np.conj(psd[i])
 
         # Calculate coherences
-        coh = coherence_spectra(cpsd)
+        coh = spectral.coherence_spectra(cpsd)
 
         # The PSD is the diagonal of the cross spectra matrix
         psd = cpsd[:, range(n_channels), range(n_channels)].real
@@ -161,3 +165,72 @@ def power_spectra(
 
     else:
         return f, np.squeeze(psd)
+
+
+def multitaper_spectra(
+    data,
+    sampling_frequency,
+    time_half_bandwidth,
+    n_tapers,
+    segment_length=None,
+    frequency_range=None,
+    return_weights=False,
+    standardize=False,
+    n_jobs=1,
+):
+    """Calculate static power spectra using a multitaper.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Raw time series data. Must have shape (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    time_half_bandwidth : float
+        Parameter to control the resolution of the spectra.
+    n_tapers : int
+        Number of tapers to use when calculating the multitaper.
+    segment_length : int
+        Length of the data segement to use to calculate the multitaper.
+    frequency_range : list
+        Minimum and maximum frequency to keep.
+    return_weights : bool
+        Should we return the weights for subject-specific PSDs?
+        Useful for calculating the group average PSD.
+    standardize : bool
+        Should we standardize the data before calculating the multitaper?
+    n_jobs : int
+        Number of parallel jobs.
+
+    Returns
+    -------
+    frequencies : np.ndarray
+        Frequencies of the power spectra and coherences.
+        Shape is (n_freq,).
+    power_spectra : np.ndarray
+        Power spectra for each state.
+        Shape is (n_subjects, n_channels, n_freq).
+    coherences : np.ndarray
+        Coherences for each state.
+        Shape is (n_subjects, n_channels, n_channels, n_freq).
+    weights : np.ndarray
+        Weight for each subject-specific PSD. Only returned if return_weights=True.
+        Shape is (n_subjects,).
+    """
+    if isinstance(data, np.ndarray):
+        if data.ndim != 3:
+            data = [data]
+    alpha = [np.ones([d.shape[0], 1], dtype=np.float32) for d in data]
+    return spectral.multitaper_spectra(
+        data,
+        alpha,
+        sampling_frequency,
+        time_half_bandwidth,
+        n_tapers,
+        segment_length,
+        frequency_range,
+        return_weights,
+        standardize,
+        n_jobs,
+    )
