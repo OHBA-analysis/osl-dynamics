@@ -1034,7 +1034,7 @@ def regression_spectra(
             calc_cpsd,
             step_size,
             n_sub_windows,
-            False,
+            parallel=False,
         )
         results = [results]
 
@@ -1043,15 +1043,17 @@ def regression_spectra(
         results = []
         for n in range(n_subjects):
             results.append(
-                data[n],
-                alpha[n],
-                window_length,
-                sampling_frequency,
-                frequency_range,
-                calc_cpsd,
-                step_size,
-                n_sub_windows,
-                False,
+                single_regression_spectra(
+                    data[n],
+                    alpha[n],
+                    window_length,
+                    sampling_frequency,
+                    frequency_range,
+                    calc_cpsd,
+                    step_size,
+                    n_sub_windows,
+                    parallel=False,
+                )
             )
     else:
         # Create arguments to pass to single_regression_spectra, which will
