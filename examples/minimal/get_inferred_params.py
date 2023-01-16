@@ -24,7 +24,7 @@ model_dir = "model"
 model = load(model_dir)
 
 # Load the data used to train the model
-data = Data(data_dir)
+training_data = Data(data_dir)
 
 # Get the inferred parameters
 #

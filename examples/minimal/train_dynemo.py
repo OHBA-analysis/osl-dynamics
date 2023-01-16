@@ -47,7 +47,7 @@ config = Config(
 
 # Load the prepared data
 # - pass the path to the directory created by Data.save() in prepare_data.py
-data = Data(data_dir)
+training_data = Data(data_dir)
 
 # Build the model
 model = Model(config)
