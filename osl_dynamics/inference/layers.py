@@ -598,7 +598,7 @@ class CorrelationMatricesLayer(layers.Layer):
         # Regulariser
         self.regularizer = regularizer
 
-    def add_regularization(self, correlation, inputs):
+    def add_regularization(self, correlations, inputs):
         # Calculate regularisation
         reg = self.regularizer(correlations)
 
@@ -626,7 +626,7 @@ class CorrelationMatricesLayer(layers.Layer):
         correlations = self.bijector(self.flattened_cholesky_factors)
         correlations = add_epsilon(correlations, self.epsilon, diag=True)
         if self.regularizer is not None:
-            self.add_regularization(correlation, inputs)
+            self.add_regularization(correlations, inputs)
         return correlations
 
 
@@ -737,7 +737,7 @@ class DiagonalMatricesLayer(layers.Layer):
         D = self.bijector(self.diagonals)
         D = add_epsilon(D, self.epsilon)
         if self.regularizer is not None:
-            self.add_regularization(diagonals, inputs)
+            self.add_regularization(D, inputs)
         D = tf.linalg.diag(D)
         return D
 
