@@ -202,6 +202,54 @@ def mean_connections(conn_map):
     return np.mean(conn_map, axis=-1)
 
 
+def first_eigenvector(conn_map, absolute_value=False, as_network=False):
+    """Calculate the first eigenvector of a connectivity matrix.
+
+    Parameters
+    ----------
+    conn_map : np.ndarray
+        Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+    absolute_value : bool
+        Should we take the absolute value of the connectivity matrix before
+        calculating the eigen decomposition?
+    as_network : bool
+        Should we return a matrix?
+
+    Returns
+    -------
+    first_eigenvector : np.ndarray.
+        First eigenvector of the matrix. Shape is (..., n_channels, n_channels)
+        if as_network=True, otherwise it is (..., n_channels).
+    """
+    # Validation
+    conn_map = array_ops.validate(
+        conn_map,
+        correct_dimensionality=5,
+        allow_dimensions=[2, 3, 4],
+        error_message=(
+            "conn_map must be (n_components, n_modes, n_channels, n_channels) "
+            + "(n_modes, n_channels, n_channels) or (n_channels, n_channels)."
+        ),
+    )
+
+    if absolute_value:
+        # Take absolute value
+        conn_map = abs(conn_map)
+
+    # Calculate eigen decomposition
+    eigenvalues, eigenvectors = np.linalg.eig(conn_map)
+
+    # Get the eigenvector with the largest eigenvalue
+    first_eigenvector = eigenvectors[..., np.argmax(eigenvalues)]
+
+    if as_network:
+        # Calculate the outer product using the eigenvector to calculate a matrix
+        first_eigenvector = np.outer(first_eigenvector, first_eigenvector)
+
+    return np.squeeze(first_eigenvector)
+
+
 def gmm_threshold(
     conn_map,
     subtract_mean=False,
