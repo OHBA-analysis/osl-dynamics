@@ -295,7 +295,8 @@ def fit_gmm(
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity map.
+        Connectivity map. Shape must be (n_components, n_modes, n_channels, n_channels)
+        or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     mean_weights: np.ndarray
@@ -425,7 +426,8 @@ def threshold(
         (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     percentile : float or np.ndarray
         Percentile to threshold with. Should be between 0 and 100.
-        Can be a numpy array of shape (n_modes,) or (n_components, n_modes).
+        Can be a numpy array of shape (n_components, n_modes), (n_modes,)
+        or a float.
     subtract_mean : bool
         Should we subtract the mean over modes before thresholding?
         The thresholding is only done to identify edges, the values returned in
@@ -462,12 +464,17 @@ def threshold(
     n_modes = conn_map.shape[1]
     n_channels = conn_map.shape[2]
 
+    # Validatation
     if isinstance(percentile, float) or isinstance(percentile, int):
         percentile = percentile * np.ones([n_components, n_modes])
 
-    if percentile.ndim == 1:
-        # A (n_modes,) array has been passed, add the n_components dimension
-        percentile = percentile[np.newaxis, ...]
+    percentile = array_ops.validate(
+        percentile,
+        correct_dimensionality=2,
+        allow_dimensions=[0, 1],
+        error_message="percentile must be of shape "
+        + "(n_components, n_modes), (n_modes,) or float",
+    )
 
     # Copy the original connectivity map
     c = conn_map.copy()
