@@ -1274,8 +1274,8 @@ def plot_matrices(
             axis.remove()
             continue
         if group_color_scale:
-            v_min = matrix.min()
-            v_max = matrix.max()
+            v_min = np.nanmin(matrix)
+            v_max = np.nanmax(matrix)
             if log_norm:
                 im = axis.matshow(
                     grid,
