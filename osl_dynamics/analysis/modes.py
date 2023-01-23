@@ -599,29 +599,31 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
 
 
 def simple_moving_average(data, window_length, step_size):
-    """Calculates moving averages by computing the unweighted mean of n observations 
-       over the current time window. Can be used to smooth the fractional occupancy 
-       time courses as in Baker et al. (2014).
+    """Simple moving average.
 
-       Parameters
-       ----------
-       data: np.ndarray
-             Time series data with a shape (n_samples, n_modes)
-       window_length : int
-                       Number of data points in a window
-       step_size : int
-                   Step size for shifting the window
+    Calculates moving averages by computing the unweighted mean of n
+    observations over the current time window. Can be used to smooth
+    the fractional occupancy time courses as in Baker et al. (2014).
 
-       Returns
-       -------
-       mov_avg : np.ndarray
-                 Mean for each window
+    Parameters
+    ----------
+    data: np.ndarray
+        Time series data with a shape (n_samples, n_modes).
+    window_length : int
+        Number of data points in a window.
+    step_size : int
+        Step size for shifting the window.
+
+    Returns
+    -------
+    mov_avg : np.ndarray
+        Mean for each window.
     """
     # Get number of samples and modes
     n_samples = data.shape[0]
     n_modes = data.shape[1]
 
-    # Pad the data    
+    # Pad the data
     data = np.pad(data, window_length // 2)[
         :, window_length // 2 : window_length // 2 + n_modes
     ]
@@ -632,11 +634,11 @@ def simple_moving_average(data, window_length, step_size):
 
     # Preallocate an array to hold moving average values
     mov_avg = np.empty([n_windows, n_modes], dtype=np.float32)
-    
-    # Compute moving average
+
+    # Compute simple moving average
     for n in range(n_windows):
         j = time_idx[n]
-        mov_window = data[j : j + window_length, :] # equivalent to applying a uniform window
-        mov_avg[n, :] = np.mean(mov_window, axis=0)
+        mov_window = data[j : j + window_length]
+        mov_avg[n] = np.mean(mov_window, axis=0)
 
     return mov_avg
