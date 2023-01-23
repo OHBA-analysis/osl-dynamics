@@ -27,14 +27,15 @@ class Data:
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
-            - A path to a directory containing .npy files.
-              Each .npy file should be a subject or session.
-            - A list of paths to .npy or .mat files. Each file should be a subject or
-              session.
-            - A numpy array. The array will be treated as continuous data from the
-              same subject.
-            - A list of numpy arrays. Each numpy array should be the data for a subject
-              or session.
+        - A path to a directory containing .npy files.
+          Each .npy file should be a subject or session.
+        - A list of paths to .npy or .mat files. Each file should be a subject or
+          session.
+        - A numpy array. The array will be treated as continuous data from the
+          same subject.
+        - A list of numpy arrays. Each numpy array should be the data for a subject
+          or session.
+
         The data files or numpy arrays should be in the format (n_samples, n_channels).
         If your data is in (n_channels, n_samples) format, use time_axis_first=False.
     data_field : str

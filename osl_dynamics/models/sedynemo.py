@@ -1,4 +1,4 @@
-"""Subject Embedding Dynamic Network Modes (Se-DyNeMo).
+"""Subject Embedding Dynamic Network Modes (SE-DyNeMo).
 """
 
 from dataclasses import dataclass
@@ -255,10 +255,11 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
 
 class Model(VariationalInferenceModelBase):
-    """Subject Embedded RNN Inference/model network and Gaussian observatons (SERIGO).
+    """SE-DyNeMo model class.
+
     Parameters
     ----------
-    config : dynemo.models.serigo.Config
+    config : dynemo.models.sedynemo.Config
     """
 
     config_type = Config
@@ -273,6 +274,7 @@ class Model(VariationalInferenceModelBase):
 
     def get_group_means_covariances(self):
         """Get the group means and covariances of each mode
+
         Returns
         -------
         means : np.ndarray
@@ -288,10 +290,11 @@ class Model(VariationalInferenceModelBase):
 
     def get_subject_embeddings(self):
         """Get the subject embedding vectors
+
         Returns
         -------
         subject_embeddings : np.ndarray
-            Embedding vectors for subjects. Shape is (n_subjects, subject_embedding_dim)
+            Embedding vectors for subjects. Shape is (n_subjects, subject_embedding_dim).
         """
         return sedynemo_obs.get_subject_embeddings(self.model)
 
@@ -309,6 +312,7 @@ class Model(VariationalInferenceModelBase):
 
     def get_concatenated_embeddings(self):
         """Get the concatenated embedding vectors of deviations.
+
         Returns
         -------
         means_embedding : np.ndarray
@@ -322,13 +326,14 @@ class Model(VariationalInferenceModelBase):
 
     def get_subject_dev(self):
         """Get the subject specific deviations of means and covs from the group.
+
         Returns
         -------
         means_dev : np.ndarray
             Deviation of means from the group. Shape is (n_subjects, n_modes, n_channels).
         covs_dev : np.ndarray
             Deviation of Cholesky factor of covs from the group.
-            Shaoe is (n_subjects, n_modes, n_channels * (n_channels + 1) // 2).
+            Shape is (n_subjects, n_modes, n_channels * (n_channels + 1) // 2).
         """
         return sedynemo_obs.get_subject_dev(self.model)
 
@@ -340,7 +345,8 @@ class Model(VariationalInferenceModelBase):
         subject_means : np.ndarray
             Mode means for each subject. Shape is (n_subjects, n_modes, n_channels).
         subject_covs : np.ndarray
-            Mode covariances for each subject. Shape is (n_subjects, n_modes, n_channels, n_channels).
+            Mode covariances for each subject.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
         return sedynemo_obs.get_subject_means_covariances(self.model)
 
@@ -429,9 +435,13 @@ class Model(VariationalInferenceModelBase):
     def random_subject_initialization(
         self, training_data, n_epochs, n_subjects, n_kl_annealing_epochs=None, **kwargs
     ):
-        """random subject initialisation not compatible with SE-DyNeMo."""
+        """Random subject initialisation.
+
+        Currently not implemented in osl-dynamics. This method will raise
+        an Attribute error.
+        """
         raise AttributeError(
-            " 'Model' object has no attribute 'random_subject_initialization'."
+            "'Model' object has no attribute 'random_subject_initialization'."
         )
 
 
