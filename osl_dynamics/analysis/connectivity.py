@@ -692,3 +692,44 @@ def save(
                 output_file=output_file,
                 **kwargs,
             )
+
+
+def spectral_reordering(corr_mat):
+    """Spectral re-ordering for correlation matrices.
+
+    Parameters
+    ----------
+    corr_mat : np.ndarray
+        Correlation matrix.
+
+    Returns
+    -------
+    reorder_corr_mat : np.ndarray
+        Re-ordered correlation matrix.
+    """
+    # Add one to make all entries postive
+    C = corr_mat + 1
+
+    # Compute Q
+    Q = -C
+    np.fill_diagonal(Q, 0)
+    Q -= np.sum(Q, axis=0)
+
+    # Compute t
+    t = np.diag(1.0 / np.sqrt(np.sum(C, axis=0)))
+
+    # Compute D
+    D = np.dot(np.dot(t, Q), t)
+
+    # Eigevalue decomposition
+    D, W = np.linalg.eig(D)
+    v = W[:, 1]
+
+    # Scale v
+    v = np.dot(t, v)
+
+    # Find permutations
+    perm = np.argsort(v)
+
+    # Reorder
+    return corr_mat[perm, :][:, perm]
