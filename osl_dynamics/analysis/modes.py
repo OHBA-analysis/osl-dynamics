@@ -596,3 +596,49 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
             tp /= tp.sum(axis=1)[:, None]
         trans_prob.append(np.nan_to_num(tp))
     return np.squeeze(trans_prob)
+
+
+def simple_moving_average(data, window_length, step_size):
+    """Simple moving average.
+
+    Calculates moving averages by computing the unweighted mean of n
+    observations over the current time window. Can be used to smooth
+    the fractional occupancy time courses as in Baker et al. (2014).
+
+    Parameters
+    ----------
+    data: np.ndarray
+        Time series data with a shape (n_samples, n_modes).
+    window_length : int
+        Number of data points in a window.
+    step_size : int
+        Step size for shifting the window.
+
+    Returns
+    -------
+    mov_avg : np.ndarray
+        Mean for each window.
+    """
+    # Get number of samples and modes
+    n_samples = data.shape[0]
+    n_modes = data.shape[1]
+
+    # Pad the data
+    data = np.pad(data, window_length // 2)[
+        :, window_length // 2 : window_length // 2 + n_modes
+    ]
+
+    # Define indices of time points to calculate a moving average
+    time_idx = range(0, n_samples, step_size)
+    n_windows = n_samples // step_size
+
+    # Preallocate an array to hold moving average values
+    mov_avg = np.empty([n_windows, n_modes], dtype=np.float32)
+
+    # Compute simple moving average
+    for n in range(n_windows):
+        j = time_idx[n]
+        mov_window = data[j : j + window_length]
+        mov_avg[n] = np.mean(mov_window, axis=0)
+
+    return mov_avg
