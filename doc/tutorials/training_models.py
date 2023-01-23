@@ -49,15 +49,13 @@ config = Config(
 # ^^^^^^^^^^^^^^^^^^^^^^
 #
 # In the `Data Object and Preparation` tutorial we saved some simulated data to a numpy file `X.npy`. Let's use this data to train our model.
-# We load this data using the Data object and prepare a TensorFlow training dataset:
+# We load this data using the Data object and prepare it using the prepare() method.
 
 training_data = data.Data("X.npy")
 training_data.prepare()
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
+
+#%%
+# Here, we didn't pass anything to prepare(). This means the only operation applied to the data is standardisation. See the Data object's documentation in API reference to see what else we can pass to prepare().
 
 #%%
 # Build and Train a Model
@@ -73,17 +71,17 @@ model = Model(config)
 model.summary()
 
 #%%
-# To train the model we use the `fit` method:
+# To train the model we use the fit() method:
 
-model.fit(training_dataset, epochs=config.n_epochs)
+model.fit(training_data)
 
 #%%
 # Saving Trained Models
 # ^^^^^^^^^^^^^^^^^^^^^
 #
-# To save a trained model we can use the `save_weights` method:
+# To save a trained model we can use:
 
-model.save_weights("trained_model/weights")
+model.save("trained_model")
 
 #%%
 # See the 'Analysing Trained Models' tutorial for how to load a trained model.

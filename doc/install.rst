@@ -1,51 +1,46 @@
-Install
-=======
+Installation
+============
 
-The recommended installation is described below.
+OSL Dynamics can be installed in three steps. Open a Terminal and execute the following commands:
 
-Conda Environments
-------------------
-We recommend installing osl-dynamics within a conda environment, see https://docs.conda.io/en/latest for further details.
-A conda environment can be created and activated with:
+#. Create a virtual environment, we recommend using Anaconda: https://docs.anaconda.com/anaconda/install/index.html.
 
-::
+    Once you have installed Anaconda (or Miniconda) execute:
 
-    conda create --name osld python=3
-    conda activate osld
+    ::
 
+        conda create --name osld python=3
+        conda activate osld
 
-NOTE: this conda environment must be activated everytime you would like to use osl-dynamics.
+    Note, this environment must be activated every time you want to use osl-dynamics.
 
-Pip Installation
-----------------
+#. Install the deep learning library TensorFlow: https://www.tensorflow.org/overview.
 
-osl-dynamics can be installed in your conda environment with:
+    ::
 
-::
+        pip install tensorflow
 
-    pip install osl-dynamics
+    If you are using an Apple computer with an M1/M2 chip the above command won't work, instead you can install TensorFlow with:
 
-This will install the latest version of TensorFlow compatible with your Python version.
+    ::
 
-For Developers
---------------
+        pip install tensorflow-macos
 
-Developers will want to install from source in editable mode:
+    If you have GPU resources you need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions. You maybe able you install a GPU-enabled version of TensorFlow using Anaconda:
 
-::
+    ::
 
-    git clone git@github.com:OHBA-analysis/osl-dynamics.git
-    cd osl-dynamics
-    conda env create -f envs/linux.yml
-    conda activate osld
-    pip install -e .
+        conda install -c conda-forge tensorflow-gpu
 
-Additional packages needed for development can be installed with:
+#. Install osl-dynamics:
+
+    ::
+
+        pip install osl-dynamics
+
+To remove osl-dynamics simply delete the conda environment:
 
 ::
 
-    pip install black
-    pip install -r doc/requirements.txt
-    pip install build twine
-
-Depending on the machine you are installing on you may want to use the system specific conda environments: bmrc.yml, hbaws.yml, m1_mac.yml.
+    conda env remove -n osld
+    conda clean --all

@@ -4,10 +4,10 @@ osl-dynamics
 
 See the read the docs page for a description of this project: `https://osl-dynamics.readthedocs.io <https://osl-dynamics.readthedocs.io>`_.
 
-Installation
-============
+Installation (for Developers)
+=============================
 
-osl-dynamics can be installed using the conda environment files in ``/envs``. For a generic linux machine, osl-dynamics can be installed in editable mode with:
+Here, we describe how to install osl-dynamics from source. We recommend using the conda environment files in ``/envs``. For a generic linux machine, osl-dynamics can be installed in editable mode with:
 
 .. code-block:: shell
 
@@ -19,7 +19,9 @@ osl-dynamics can be installed using the conda environment files in ``/envs``. Fo
 
 If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``.
 
-Developers might want to clone the repo using SSH:
+Note, the conda environments use ``pip`` to install TensorFlow, you may need to load/install additional libraries (such as CUDA/cuDNN) if you have GPU support.
+
+Developers might want to clone the repo using SSH instead of HTTPS:
 
 .. code-block:: shell
 
