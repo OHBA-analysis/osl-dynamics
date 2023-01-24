@@ -1561,9 +1561,9 @@ def topoplot(
 
 def plot_brain_surface(
     values,
-    filename,
     mask_file,
     parcellation_file,
+    filename=None,
     subtract_mean=False,
     mean_weights=None,
     **plot_kwargs,
@@ -1576,13 +1576,14 @@ def plot_brain_surface(
         Data to plot. Can be of shape: (n_maps, n_channels) or (n_channels,).
         A (..., n_channels, n_channels) array can also be passed.
         Warning: this function cannot be used if n_maps is equal to n_channels.
-    filename : str
-        Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcelate the training data.
+    filename : str
+        Output filename. If extension is .nii.gz the power map is saved as a
+        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
+        Optional, if None is passed then the image is shown on screen.
     subtract_mean : bool
         Should we subtract the mean power across modes?
     mean_weights: np.ndarray

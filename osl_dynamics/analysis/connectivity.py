@@ -531,8 +531,8 @@ def separate_edges(conn_map):
 
 def save(
     connectivity_map,
-    filename,
     parcellation_file,
+    filename=None,
     component=None,
     threshold=0,
     glassbrain=False,
@@ -549,10 +549,11 @@ def save(
     connectivity_map : np.ndarray
         Matrices containing connectivity strengths to plot.
         Shape must be (n_modes, n_channels, n_channels) or (n_channels, n_channels).
-    filename : str
-        Output filename.
     parcellation_file : str
         Name of parcellation file used.
+    filename : str
+        Output filename.
+        Optional, if None is passed then the image is shown on screen.
     component : int
         Spectral component to save.
     threshold : float or np.ndarray
@@ -566,10 +567,11 @@ def save(
         Keyword arguments to pass to the nilearn plotting function.
     """
     # Validation
-    if glassbrain and Path(filename).suffix != ".html":
-        raise ValueError(
-            "If glassbrain=True then filename must have a .html extension."
-        )
+    if filename is not None:
+        if glassbrain and Path(filename).suffix != ".html":
+            raise ValueError(
+                "If glassbrain=True then filename must have a .html extension."
+            )
 
     error_message = (
         "Dimensionality of connectivity_map must be 3 or 4, "
@@ -608,9 +610,12 @@ def save(
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
         # Output filename
-        output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-            fn=Path(filename), i=i, w=len(str(n_modes))
-        )
+        if filename is None:
+            output_file = None
+        else:
+            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                fn=Path(filename), i=i, w=len(str(n_modes))
+            )
 
         if glassbrain:
             # The colour bar range is determined by the max value in the matrix
@@ -628,7 +633,10 @@ def save(
                 edge_threshold=f"{threshold[i] * 100}%",
                 **kwargs,
             )
-            connectome.save_as_html(output_file)
+            if filename is not None:
+                connectome.save_as_html(output_file)
+            else:
+                return connectome
 
         else:
             # If all connections are zero don't add a colourbar
