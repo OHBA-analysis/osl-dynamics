@@ -20,9 +20,7 @@ Tutorials
 The following tutorials cover the basic usage of osl-dynamics.
 More complete scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
 
-- :doc:`tutorials_build/data_object_and_preparation`.
-- :doc:`tutorials_build/training_models`.
-- :doc:`tutorials_build/analysing_trained_models`.
+- :doc:`tutorials_build/basic_usage`.
 
 Full Pipelines
 --------------
