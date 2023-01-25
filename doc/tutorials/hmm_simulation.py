@@ -9,6 +9,8 @@ In this tutorial we will train a Hidden Markov Model (HMM) on simulated data. Th
 3. Training the HMM
 4. Getting Inferred Model Parameters
 5. Post-hoc Analysis
+
+Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine.
 """
 
 #%%

@@ -17,9 +17,10 @@ Various models are implemented in osl-dynamics. Links to a description of each a
 Tutorials
 ---------
 
-The following tutorials illustrate some of the analysis that can be done with osl-dynamics.
+The following tutorials illustrate some of the analysis that can be done with osl-dynamics:
 
 - :doc:`tutorials_build/static_network_analysis`.
+- :doc:`tutorials_build/sliding_window_network_analysis`.
 - :doc:`tutorials_build/dynemo_minimal_code`.
 - :doc:`tutorials_build/hmm_simulation`.
 

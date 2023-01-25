@@ -18,6 +18,8 @@ The output of this script is:
 - A plot of the power spectrum for each subject.
 - Plots of the static power as a surface heat map for a particular frequency band.
 - Glass brain plots of static networks for a particular frequency band. We will use the amplitude envelope correlation (AEC) for our measure of connectivity.
+
+Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine.
 """
 
 #%%
