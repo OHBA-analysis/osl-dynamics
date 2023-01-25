@@ -1,7 +1,7 @@
 """
-Basic Usage
-===========
-This tutorial covers minimal code examples of the basic use of osl-dynamics. In this tutorial we will focus on the DyNeMo model.
+DyNeMo with Minimal Code
+========================
+This tutorial covers example use of DyNeMo (Dynamic Network Modes) with the minimum amount of code possible.
 
 """
 
@@ -11,11 +11,9 @@ This tutorial covers minimal code examples of the basic use of osl-dynamics. In 
 #
 # We start by importing the necessary packages:
 
-from osl_dynamics.analysis import modes
 from osl_dynamics.data import Data
 from osl_dynamics.models import load
 from osl_dynamics.models.dynemo import Config, Model
-from osl_dynamics.utils import plotting
 
 #%%
 # Loading Data
@@ -33,17 +31,7 @@ from osl_dynamics.utils import plotting
 # - If a .mat file is passed, it must have a field called "X" that contains the data.
 # - The data must be in the format (n_samples, n_channels), if you have the data in (n_channels, n_samples) format you can pass `time_axis_first=False`.
 
-training_data = Data("X.npy")
-
-#%%
-# To look at a summary of the data we can use:
-
-print(training_data)
-
-#%%
-# The time series data can be accessed with the `time_series` method.
-
-X = training_data.time_series()
+training_data = Data([f"subject{i}.npy" for i in range(10)])
 
 #%%
 # Preparing the Data
@@ -115,8 +103,8 @@ config = Config(
 # - `n_kl_annealing_epochs` and `n_epochs`. We found using `n_kl_annealing_epochs = n_epochs // 2` works well. You want to choice `n_epochs` to be enough for the loss to converge during training.
 
 #%%
-# Build and Train a Model
-# ^^^^^^^^^^^^^^^^^^^^^^^
+# Building a Model
+# ^^^^^^^^^^^^^^^^
 #
 # We build a model using the Model class and Config object:
 
@@ -128,13 +116,16 @@ model = Model(config)
 model.summary()
 
 #%%
+# Training a Model
+# ^^^^^^^^^^^^^^^^
+#
 # To train the model we use the fit() method:
 
 model.fit(training_data)
 
 #%%
 # Saving and Loading Trained Models
-# ^^^^^^^^^^^^^^^^^^^^^
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # To save a trained model we can use:
 
@@ -155,25 +146,10 @@ free_energy = model.free_energy(training_data)
 print("Free energy:", free_energy)
 
 #%%
+# Getting Inferred Parameters
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
 # We are often interested in interpreting latent variables. In DyNeMo, these are the mode mixing coefficients, alpha, and mode means and covariances. The DyNeMo model has methods to get the inferred parameters:
 
 alpha = model.get_alpha(training_data)
 means, covs = model.get_means_covariances()
-
-#%%
-# osl-dynamics has many built in functions to summarise the inferred alphas. Most of these are found in the `osl_dynamics.analysis.modes` subpackage.
-# For example, we can calculate the fractional occupancy of each mode with:
-
-fo = modes.fractional_occupancies(alpha)
-print("Fractional occupancies:", fo)
-
-#%%
-# Plotting
-# ^^^^^^^^
-#
-# osl-dynamics has many built in functions for plotting. To plot the inferred alphas, we can use
-
-plotting.plot_alpha(alpha, n_samples=2000)
-
-#%%
-# Note, all functions in osl_dynamics.utils.plotting have a `filename` argument where you can pass a string to save an image file instead of opening it interactivately.

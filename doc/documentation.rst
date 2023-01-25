@@ -3,7 +3,7 @@ Documentation
 
 Welcome to the osl-dynamics documentation!
 
-The :doc:`API reference <autoapi/index>` provides documentation for the classes, functions and methods in osl-dynamics.
+The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics.
 
 Models
 ------
@@ -17,10 +17,13 @@ Various models are implemented in osl-dynamics. Links to a description of each a
 Tutorials
 ---------
 
-The following tutorials cover the basic usage of osl-dynamics.
-More complete scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
+The following tutorials illustrate some of the analysis that can be done with osl-dynamics.
 
-- :doc:`tutorials_build/basic_usage`.
+- :doc:`tutorials_build/static_network_analysis`.
+- :doc:`tutorials_build/dynemo_minimal_code`.
+- :doc:`tutorials_build/hmm_simulation`.
+
+More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
 
 Full Pipelines
 --------------
