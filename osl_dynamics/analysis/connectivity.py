@@ -212,6 +212,7 @@ def gmm_threshold(
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
+    show=False,
     filename=None,
     plot_kwargs={},
 ):
@@ -248,6 +249,8 @@ def gmm_threshold(
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
         sklearn.mixture.BayesianGaussianMixture().
+    show : bool
+        Should we show the GMM fit to the distribution of conn_map.
     filename : str
         Filename to save fit to.
     plot_kwargs : dict
@@ -269,6 +272,7 @@ def gmm_threshold(
         one_component_percentile,
         n_sigma,
         sklearn_kwargs,
+        show,
         filename,
         plot_kwargs,
     )
@@ -286,6 +290,7 @@ def fit_gmm(
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
+    show=False,
     filename=None,
     plot_kwargs={},
 ):
@@ -322,6 +327,8 @@ def fit_gmm(
         Dictionary of keyword arguments to pass to
         sklearn.mixture.GaussianMixture(). Default is
         {"max_iter": 5000, "n_init": 10}.
+    show : bool
+        Should we show the GMM fit to the distribution of conn_map.
     filename : str
         Filename to save fit to.
     plot_kwargs : dict
@@ -397,6 +404,7 @@ def fit_gmm(
                 one_component_percentile=one_component_percentile,
                 n_sigma=n_sigma,
                 sklearn_kwargs=sklearn_kwargs,
+                show_plot=show,
                 plot_filename=plot_filename,
                 plot_kwargs=plot_kwargs,
                 print_message=False,

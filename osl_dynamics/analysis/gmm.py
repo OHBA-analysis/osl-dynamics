@@ -18,6 +18,7 @@ def fit_gaussian_mixture(
     n_sigma=0,
     label_order="mean",
     sklearn_kwargs={},
+    show_plot=False,
     plot_filename=None,
     plot_kwargs={},
     print_message=True,
@@ -27,7 +28,7 @@ def fit_gaussian_mixture(
     Parameters
     ----------
     X : np.ndarray
-        Data to fit Gaussian mixture model to.
+        Data to fit Gaussian mixture model to. Must be 1D.
     logit_transform : bool
         Should we logit transform the X?
     standardize : bool
@@ -48,6 +49,8 @@ def fit_gaussian_mixture(
         How do we order the inferred classes?
     sklearn_kwargs : dict
         Keyword arguments to pass to the sklearn class.
+    show_plot : bool
+        Should we show the GMM fit to the distribution of X.
     plot_filename : str
         Filename to save a plot of the Gaussian mixture model.
     plot_kwargs : dict
@@ -155,7 +158,7 @@ def fit_gaussian_mixture(
     threshold = X[index, 0]
 
     # Plots
-    if plot_filename is not None:
+    if show_plot or plot_filename is not None:
         fig, ax = plotting.plot_gmm(
             X_[:, 0],
             amplitudes,
@@ -165,7 +168,8 @@ def fit_gaussian_mixture(
             **plot_kwargs,
         )
         ax.axvline(threshold_, color="black", linestyle="--")
-        plotting.save(fig, plot_filename)
-        plotting.close()
+        if plot_filename is not None:
+            plotting.save(fig, plot_filename)
+            plotting.close()
 
     return threshold
