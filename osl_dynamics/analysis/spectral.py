@@ -649,7 +649,7 @@ def multitaper_spectra(
     segment_length=None,
     frequency_range=None,
     return_weights=False,
-    standardize=False,
+    standardize=True,
     n_jobs=1,
 ):
     """Calculates spectra for inferred states using a multitaper.
@@ -929,7 +929,7 @@ def regression_spectra(
     n_sub_windows=1,
     return_weights=False,
     return_coef_int=False,
-    standardize=False,
+    standardize=True,
     n_jobs=1,
 ):
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.

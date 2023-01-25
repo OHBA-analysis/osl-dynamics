@@ -45,7 +45,7 @@ def power_spectra(
     sampling_frequency=1.0,
     frequency_range=None,
     step_size=None,
-    standardize=False,
+    standardize=True,
     calc_coh=False,
     n_jobs=1,
 ):
@@ -175,7 +175,7 @@ def multitaper_spectra(
     segment_length=None,
     frequency_range=None,
     return_weights=False,
-    standardize=False,
+    standardize=True,
     n_jobs=1,
 ):
     """Calculate static power spectra using a multitaper.
