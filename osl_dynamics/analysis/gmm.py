@@ -115,6 +115,11 @@ def fit_gaussian_mixture(
         abs(means[1] - means[0]) < n_sigma * stddevs[0]
         and one_component_percentile is not None
     ):
+        # Reorder data in an ascending order
+        ascending = np.argsort(X_[:, 0])
+        X_ = X_[ascending]
+        X = X[ascending]
+
         # The Gaussians are not sufficiently distinct to define a threshold
         index = one_component_percentile * len(X) // 100
 
