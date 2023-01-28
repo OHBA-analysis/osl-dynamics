@@ -18,7 +18,7 @@ The output of this script is:
 
 - Glass brain plots of a set of dynamics networks calculated using the data.
 
-Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine.
+Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine. The expected output of this script can be found `here <https://osf.io/zc259>`_.
 """
 
 #%%
@@ -36,7 +36,7 @@ Note, this webpage does not contain the output of each cell. We advise downloadi
 # Download the dataset
 # ********************
 # 
-# We will download the data from OSL workshop project hosted on OSF.
+# We will download the data a project hosted on OSF.
 
 import os
 

@@ -23,6 +23,8 @@ The following tutorials illustrate some of the analysis that can be done with os
 - :doc:`tutorials_build/sliding_window_network_analysis`.
 - :doc:`tutorials_build/dynemo_minimal_code`.
 - :doc:`tutorials_build/hmm_simulation`.
+- :doc:`tutorials_build/hmm_resting_network_analysis_part1`.
+- :doc:`tutorials_build/hmm_resting_network_analysis_part2`.
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
 

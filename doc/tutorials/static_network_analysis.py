@@ -1,38 +1,39 @@
 """
 Static Network Analysis
 =======================
- 
+
 In this tutorial we will perform static network analysis on source space MEG data. This tutorial covers:
- 
+
 1. Getting the Data
 2. Power Spectra Analysis
 3. Power Analysis
-4. Network Connectivity Analysis
- 
+4. Network Analysis
+5. Statistical Significance Testing
+
 The input to this script is:
 
 - A set of time series (one for each subject you have). In this tutorial we will download some example data.
-
+ 
 The output of this script is:
 
 - A plot of the power spectrum for each subject.
 - Plots of the static power as a surface heat map for a particular frequency band.
 - Glass brain plots of static networks for a particular frequency band. We will use the amplitude envelope correlation (AEC) for our measure of connectivity.
 
-Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine.
+Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine. The expected output of this script can be found `here <https://osf.io/a24bn>`_.
 """
 
 #%%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^
-#
+# 
 # We will use eyes open resting-state data that has already been source reconstructed. We call this the 'Nottingham dataset'. This dataset is:
 #
 # - From 10 subjects.
 # - Parcellated to 42 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
-#
+# 
 # Download the dataset
 # ********************
 # 
@@ -51,7 +52,6 @@ def get_notts_data():
 
 # Download the dataset (it is 113 MB)
 get_notts_data()
-
 
 # List the contents of the downloaded directory containing the dataset
 get_ipython().system('ls notts_dataset')
@@ -241,8 +241,7 @@ print(p.shape)
 #%%
 # From this, we can see it is a subjects by ROIs array. It has integrated the power spectrum for each ROI separately. If we wanted the alpha power at each ROI for the first subject, we would use `p[0]`, which would be a `(42,)` shaped array.
 # 
-# Differences in power between groups
-# ***********************************
+# ### Differences in power between groups
 # 
 # We are often interested in comparing different groups of subjects. Using the `p` array we can easily calculate the group mean of subsets of the full dataset. E.g. let's say subjects \[0, 3, 4\] belong to one group and \[1, 2, 5, 6, 7, 8, 9\] belong to another group. We can calculate the group means with:
 
@@ -298,8 +297,8 @@ power.save(
 )
 
 #%%
-# Network Connectivity Analysis
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Network Analysis
+# ^^^^^^^^^^^^^^^^
 # 
 # Next, we will estimate static networks for each subject. For this we need to define a metric for connectivity between ROIs. There are a lot of options for this. In this tutorial we'll look at the amplitude envelope correlation (AEC).
 # 
@@ -326,9 +325,7 @@ ts = data.time_series()
 # Calculate the correlation between amplitude envelope time series
 aec = static.functional_connectivity(ts)
 
-#%%
 # We can understand the `aec` array by printing its shape.
-
 print(aec.shape)
 
 #%%
@@ -386,7 +383,8 @@ connectivity.save(
 # 
 # In the group average network we can see the strongest connections are in posterior regions as expected.
 # 
-# ### Data-driven thresholding for selecting network connections
+# Data-driven thresholding for selecting network connections
+# **********************************************************
 # 
 # Another option is rather than specifying a percentile by hand to threshold the connections, we can use a Gaussian Mixture Model (GMM) fit with two components (an 'on' and an 'off' component) to determine a threshold for selecting connections. The way this works is we fit two Gaussians to the distribution of connections. To understand this, let's first examine the distribution of connections.
 
@@ -462,6 +460,94 @@ connectivity.save(
 #%%
 # Now we have a data driven threshold which shows good posterior connectivity in the alpha band.
 # 
-# Note, osl-dynamics has a wrapper function to return the thresholded network directly (so you don't need to threshold yourself): `connectivity.gmm_threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.gmm_threshold>`_. Using this function, we can the threshold connectivity matrix in one line::
+# Note, osl-dynamics has a wrapper function to return the thresholded network directly (so you don't need to threshold yourself): `connectivity.gmm_threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.gmm_threshold>`_. Using this function, we can threshold connectivity matrix in one line::
 #
-#    thres_aec_mean = connectivity.gmm_threshold(aec_mean, p_value=0.01)
+#     thres_aec_mean = connectivity.gmm_threshold(aec_mean, p_value=0.01)
+#
+# 
+# Statistical Significance Testing
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# 
+# Let's say we are interested in comparing two groups. We can calculate the mean static power (at each ROI) for each group. Alternative, we can calculate the mean AEC for each group. We can represent each of these quantities as a vector. The mean power for each group was calculated in Section 3. This is already a vector. To turn the AEC connectivity matrix into a vector we can take the upper triangle.
+# 
+# Maximum statistic permutation testing
+# *************************************
+# 
+# In this section, let's focus on the mean power for each group. We want to see if the two group means are significantly different. In other words, we want to show the difference between the mean power for the two groups is not due to chance. We will use **maximum statistic permutation testing** to do this. This involves a few steps:
+# 
+# 1. Obtain a estimate for the power at each parcel for each subject, this is a `(42,)` array for each subject.
+# 2. Randomly assign each subject a binary label: 0 or 1 with a change of 50/50.
+# 3. Calculate a mean for the subjects labelled with 0 and another mean for the subjects labelled with 1. These means are vectors of length 42.
+# 4. Calculate the difference between the means. This gives a single vector of length 42.
+# 5. Record the maximum value in the 42 dimensional vector. This steps is why this method is known as a **maximum statistic** test. This step is necessary to account for the fact that you're making multiple comparisons because you have a 42-dimensional vector.
+# 6. Repeat a large number of times, e.g. 1000. This gives a distribution of possible values the maximum statistic can take, when the groups have been assigned completely randomly. This distribution is known as the **null distribution**.
+# 7. We look at the bottom 2.5 percentile and top 97.5.
+# 8. Calculate the group means using the real assignment of subjects to each group and calculate the difference.
+# 9. The above gives a 42-dimensional vector. The elements of this vector that are below (above) the 2.5 (97.5) percentile are deems to be significant with a p-value of 0.05.
+# 
+# Let's implement the above in code to see if the difference between our two group is significant.
+
+from tqdm import trange
+
+def null_distribution(vectors, n_perm):
+    """Builds a null."""
+    n_subjects = vectors.shape[0]
+    dist = []
+    for i in trange(n_perm):
+        assignment = np.random.randint(2, size=n_subjects)
+        group1 = vectors[assignment == 0]
+        group2 = vectors[assignment == 1]
+        mean1 = np.mean(group1, axis=0)
+        mean2 = np.mean(group2, axis=0)
+        diff = mean1 - mean2
+        max_stat = np.max(diff)
+        if not np.isnan(max_stat):
+            dist.append(max_stat)
+    return np.array(dist)
+
+# Create the null using 1000 permutations
+null_dist = null_distribution(p, 1000)
+
+# Get the threshold for significant for a p-value of 0.05
+bottom_percentile = np.percentile(null_dist, 2.5)
+top_percentile = np.percentile(null_dist, 97.5)
+
+# Check what elements of the observed group means are significant
+significant_elements = np.logical_or(p_diff < bottom_percentile, p_diff > top_percentile)
+
+print("Number of significant elements:", np.sum(significant_elements))  # np.sum will count the number of Trues
+
+#%%
+# We see all the elements in the difference vector are significant. You will notice if you increase the p-value (by pushing the percentiles further out) less parcels will become significant. E.g. let's see what parcels are significant with a p-value of 0.01.
+
+# Get the threshold for significant for a p-value of 0.01
+bottom_percentile = np.percentile(null_dist, 0.5)
+top_percentile = np.percentile(null_dist, 99.5)
+
+# Check what elements of the observed group means are significant
+significant_elements = np.logical_or(p_diff < bottom_percentile, p_diff > top_percentile)
+
+print("Number of significant elements:", np.sum(significant_elements))  # np.sum will count the number of Trues
+
+#%%
+# We now see a few non-significant elements. Finally, let's create a plot of power difference only retaining the significant parcels.
+
+# Set non-significant elements to zero
+p_diff[~significant_elements] = 0
+
+# Plot
+power.save(
+    p_diff,
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+)
+
+#%%
+# We see the main difference in power between the groups is in posterior regions.
+# 
+# Although, we looked at the difference in power between two groups, we could easily do the same with the AEC because first creating a vector from the AEC connectivity matrix. This can be done with::
+#
+#     # Extract the upper triagle
+#     n_channels = aec.shape[-1]
+#     i, j. = np.triu_indices(n_channels)
+#     aec_vector = aec[..., i, j]
