@@ -17,7 +17,7 @@ def functional_connectivity(data, conn_type="corr"):
         Time series data. Shape must be (n_subjects, n_samples, n_channels)
         or (n_samples, n_channels).
     conn_type : str
-        What metric should we use?"corr" or "cov".
+        What metric should we use? "corr" (Pearson correlation) or "cov" (covariance).
 
     Returns
     -------

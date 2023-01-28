@@ -182,9 +182,9 @@ def power_map_grid(mask_file, parcellation_file, power_map):
 
 def save(
     power_map,
-    filename,
     mask_file,
     parcellation_file,
+    filename=None,
     component=0,
     subtract_mean=False,
     mean_weights=None,
@@ -199,13 +199,14 @@ def save(
         (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
         array can also be passed. Warning: this function cannot be used if n_modes
         is equal to n_channels.
-    filename : str
-        Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcelate the training data.
+    filename : str
+        Output filename. If extension is .nii.gz the power map is saved as a
+        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
+        Optional, if None is passed then the image is shown on screen.
     component : int
         Spectral component to save.
     subtract_mean : bool
@@ -220,12 +221,13 @@ def save(
     power_map = np.copy(power_map)
 
     # Validation
-    allowed_extensions = [".nii.gz", ".png", ".svg", ".pdf"]
-    if not any([ext in filename for ext in allowed_extensions]):
-        raise ValueError(
-            "filename must have one of following extensions: "
-            + f"{' '.join(allowed_extensions)}."
-        )
+    if filename is not None:
+        allowed_extensions = [".nii.gz", ".png", ".svg", ".pdf"]
+        if not any([ext in filename for ext in allowed_extensions]):
+            raise ValueError(
+                "filename must have one of following extensions: "
+                + f"{' '.join(allowed_extensions)}."
+            )
     mask_file = files.check_exists(mask_file, files.mask.directory)
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
@@ -272,19 +274,23 @@ def save(
     mask = nib.load(mask_file)
 
     # Save as nii file
-    if ".nii.gz" in filename:
-        print(f"Saving {filename}")
-        nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
-        nib.save(nii, filename)
+    if filename is not None:
+        if ".nii.gz" in filename:
+            print(f"Saving {filename}")
+            nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
+            nib.save(nii, filename)
 
     # Save each map as an image
     else:
         n_modes = power_map.shape[-1]
         for i in trange(n_modes, desc="Saving images", ncols=98):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-                fn=Path(filename), i=i, w=len(str(n_modes))
-            )
+            if filename is None:
+                output_file = None
+            else:
+                output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                    fn=Path(filename), i=i, w=len(str(n_modes))
+                )
             plotting.plot_img_on_surf(
                 nii,
                 views=["lateral", "medial"],
@@ -298,9 +304,9 @@ def save(
 def multi_save(
     group_power_map,
     subject_power_map,
-    filename,
     mask_file,
     parcellation_file,
+    filename=None,
     subjects=None,
     component=0,
     subtract_mean=False,
@@ -325,13 +331,14 @@ def multi_save(
         (n_subjects, n_modes, n_channels), (n_modes, n_channels) or (n_channels,).
         A (..., n_channels, n_channels) array can also be passed.
         Warning: this function cannot be used if n_modes = n_channels.
-    filename : str
-        Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png, it is saved as images.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcelate the training data.
+    filename : str
+        Output filename. If extension is .nii.gz the power map is saved as a
+        NIFTI file. Or if the extension is png, it is saved as images.
+        Optional, if None is passed then the image is shown on screen.
     subjects : list
         List of subject indices to be plot power maps for.
     component : int

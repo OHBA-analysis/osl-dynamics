@@ -10,10 +10,89 @@ from nilearn import plotting
 from tqdm import trange
 
 from osl_dynamics import array_ops
-from osl_dynamics.analysis import gmm
+from osl_dynamics.analysis import gmm, static
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils.parcellation import Parcellation
 from osl_dynamics.utils.misc import override_dict_defaults
+
+
+def sliding_window_connectivity(
+    data,
+    window_length,
+    step_size=None,
+    conn_type="corr",
+    concatenate=False,
+):
+    """Calculate sliding window connectivity.
+
+    Parameters
+    ----------
+    data : list or np.ndarray
+        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
+    window_length : int
+        Window length in samples.
+    step_size : int
+        Number of samples to slide the window along the time series.
+        If None is passed, then a 50% overlap is used.
+    conn_type : str
+        Metric to use to calculate pairwise connectivity in the network.
+        Should "corr" for Pearson correlation or "cov" for covariance.
+    concatenate : bool
+        Should we concatenate the sliding window connectivities from each subject
+        into one big time series?
+
+    Returns
+    -------
+    sliding_window_conn : list or np.ndarray
+        Time series of connectivity matrices. Shape is (n_subjects, n_windows,
+        n_channels, n_channels) or (n_windows, n_channels, n_channels).
+    """
+    # Validation
+    if conn_type not in ["corr", "cov"]:
+        raise ValueError("conn_type must be 'corr' or 'cov'.")
+
+    if conn_type == "cov":
+        metric = np.cov
+    else:
+        metric = np.corrcoef
+
+    if step_size is None:
+        step_size = window_length // 2
+
+    if isinstance(data, np.ndarray):
+        if data.ndim != 3:
+            data = [data]
+
+    # Calculate sliding window connectivity for each subject
+    sliding_window_conn = []
+    for i in trange(len(data), desc="Calculating connectivity", ncols=98):
+        n_samples = data[i].shape[0]
+        n_channels = data[i].shape[1]
+
+        # Define indices of time points that start windows
+        time_idx = range(0, n_samples, step_size)
+        n_windows = n_samples // step_size
+
+        # Trim the data to only include complete window
+        data[i] = data[i][: n_windows * window_length]
+
+        # Preallocate an array to hold moving average values
+        swc = np.empty([n_windows, n_channels, n_channels], dtype=np.float32)
+
+        # Compute connectivity matrix for each window
+        for k in range(n_windows):
+            j = time_idx[k]
+            window = data[i][j : j + window_length]
+            swc[k] = metric(window, rowvar=False)
+
+        # Add to list to return
+        sliding_window_conn.append(swc)
+
+    if concatenate or len(sliding_window_conn) == 1:
+        sliding_window_conn = sliding_window_conn[0]
+
+    return sliding_window_conn
 
 
 def covariance_from_spectra(
@@ -212,6 +291,7 @@ def gmm_threshold(
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
+    show=False,
     filename=None,
     plot_kwargs={},
 ):
@@ -248,6 +328,8 @@ def gmm_threshold(
     sklearn_kwargs : dict
         Dictionary of keyword arguments to pass to
         sklearn.mixture.BayesianGaussianMixture().
+    show : bool
+        Should we show the GMM fit to the distribution of conn_map.
     filename : str
         Filename to save fit to.
     plot_kwargs : dict
@@ -269,6 +351,7 @@ def gmm_threshold(
         one_component_percentile,
         n_sigma,
         sklearn_kwargs,
+        show,
         filename,
         plot_kwargs,
     )
@@ -286,6 +369,7 @@ def fit_gmm(
     one_component_percentile=0,
     n_sigma=0,
     sklearn_kwargs={},
+    show=False,
     filename=None,
     plot_kwargs={},
 ):
@@ -322,6 +406,8 @@ def fit_gmm(
         Dictionary of keyword arguments to pass to
         sklearn.mixture.GaussianMixture(). Default is
         {"max_iter": 5000, "n_init": 10}.
+    show : bool
+        Should we show the GMM fit to the distribution of conn_map.
     filename : str
         Filename to save fit to.
     plot_kwargs : dict
@@ -397,6 +483,7 @@ def fit_gmm(
                 one_component_percentile=one_component_percentile,
                 n_sigma=n_sigma,
                 sklearn_kwargs=sklearn_kwargs,
+                show_plot=show,
                 plot_filename=plot_filename,
                 plot_kwargs=plot_kwargs,
                 print_message=False,
@@ -531,8 +618,8 @@ def separate_edges(conn_map):
 
 def save(
     connectivity_map,
-    filename,
     parcellation_file,
+    filename=None,
     component=None,
     threshold=0,
     glassbrain=False,
@@ -549,10 +636,11 @@ def save(
     connectivity_map : np.ndarray
         Matrices containing connectivity strengths to plot.
         Shape must be (n_modes, n_channels, n_channels) or (n_channels, n_channels).
-    filename : str
-        Output filename.
     parcellation_file : str
         Name of parcellation file used.
+    filename : str
+        Output filename.
+        Optional, if None is passed then the image is shown on screen.
     component : int
         Spectral component to save.
     threshold : float or np.ndarray
@@ -566,10 +654,11 @@ def save(
         Keyword arguments to pass to the nilearn plotting function.
     """
     # Validation
-    if glassbrain and Path(filename).suffix != ".html":
-        raise ValueError(
-            "If glassbrain=True then filename must have a .html extension."
-        )
+    if filename is not None:
+        if glassbrain and Path(filename).suffix != ".html":
+            raise ValueError(
+                "If glassbrain=True then filename must have a .html extension."
+            )
 
     error_message = (
         "Dimensionality of connectivity_map must be 3 or 4, "
@@ -608,9 +697,12 @@ def save(
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
         # Output filename
-        output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-            fn=Path(filename), i=i, w=len(str(n_modes))
-        )
+        if filename is None:
+            output_file = None
+        else:
+            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                fn=Path(filename), i=i, w=len(str(n_modes))
+            )
 
         if glassbrain:
             # The colour bar range is determined by the max value in the matrix
@@ -628,7 +720,10 @@ def save(
                 edge_threshold=f"{threshold[i] * 100}%",
                 **kwargs,
             )
-            connectome.save_as_html(output_file)
+            if filename is not None:
+                connectome.save_as_html(output_file)
+            else:
+                return connectome
 
         else:
             # If all connections are zero don't add a colourbar
