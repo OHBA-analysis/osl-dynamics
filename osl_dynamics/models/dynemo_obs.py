@@ -45,7 +45,8 @@ class Config(BaseModelConfig):
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialisation for state covariances. If diagonal_covariances=True
+        and full matrices are passed, the diagonal is extracted.
     diagonal_covariances : bool
         Should we learn diagonal mode covariances?
     covariances_epsilon : float

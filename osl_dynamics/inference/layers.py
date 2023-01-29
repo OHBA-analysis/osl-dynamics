@@ -397,8 +397,8 @@ class VectorsLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, **kwargs):
-        if self.regularizer is not None:
+    def call(self, inputs, training=None, **kwargs):
+        if self.regularizer is not None and training:
             self.add_regularization(inputs)
         return self.vectors
 
@@ -508,10 +508,10 @@ class CovarianceMatricesLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         covariances = self.bijector(self.flattened_cholesky_factors)
         covariances = add_epsilon(covariances, self.epsilon, diag=True)
-        if self.regularizer is not None:
+        if self.regularizer is not None and training:
             self.add_regularization(covariances, inputs)
         return covariances
 
@@ -622,10 +622,10 @@ class CorrelationMatricesLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         correlations = self.bijector(self.flattened_cholesky_factors)
         correlations = add_epsilon(correlations, self.epsilon, diag=True)
-        if self.regularizer is not None:
+        if self.regularizer is not None and training:
             self.add_regularization(correlations, inputs)
         return correlations
 
@@ -733,10 +733,10 @@ class DiagonalMatricesLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         D = self.bijector(self.diagonals)
         D = add_epsilon(D, self.epsilon)
-        if self.regularizer is not None:
+        if self.regularizer is not None and training:
             self.add_regularization(D, inputs)
         D = tf.linalg.diag(D)
         return D

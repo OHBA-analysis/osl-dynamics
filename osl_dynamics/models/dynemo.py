@@ -96,7 +96,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialisation for state covariances. If diagonal_covariances=True
+        and full matrices are passed, the diagonal is extracted.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
     diagonal_covariances : bool
