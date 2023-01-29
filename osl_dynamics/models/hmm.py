@@ -23,6 +23,7 @@ from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
     VectorsLayer,
     CovarianceMatricesLayer,
+    DiagonalMatricesLayer,
     CategoricalLogLikelihoodLossLayer,
 )
 
@@ -46,15 +47,17 @@ class Config(BaseModelConfig):
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
     learn_means : bool
-        Should we make the mean vectors for each mode trainable?
+        Should we make the mean vectors for each state trainable?
     learn_covariances : bool
-        Should we make the covariance matrix for each mode trainable?
+        Should we make the covariance matrix for each staet trainable?
     initial_means : np.ndarray
-        Initialisation for mean vectors.
+        Initialisation for state means.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialisation for state covariances.
+    diagonal_covariances : bool
+        Should we learn diagonal covariances?
     covariances_epsilon : float
-        Error added to mode covariances for numerical stability.
+        Error added to state covariances for numerical stability.
     initial_trans_prob : np.ndarray
         Initialisation for trans prob matrix
     learn_trans_prob : bool
@@ -96,6 +99,7 @@ class Config(BaseModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    diagonal_covariances: bool = False
     covariances_epsilon: float = None
 
     initial_trans_prob: np.ndarray = None
@@ -573,34 +577,36 @@ class Model(ModelBase):
         return self.trans_prob
 
     def get_covariances(self):
-        """Get the covariances of each mode.
+        """Get the covariances of each state.
 
         Returns
         -------
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         """
-        return dynemo_obs.get_covariances(self.model)
+        return dynemo_obs.get_covariances(self.model, self.config.diagonal_covariances)
 
     def get_means_covariances(self):
-        """Get the means and covariances of each mode.
+        """Get the means and covariances of each state.
 
         Returns
         -------
         means : np.ndarary
-            Mode means.
+            State means.
         covariances : np.ndarray
-            Mode covariances.
+            State covariances.
         """
-        return dynemo_obs.get_means_covariances(self.model)
+        return dynemo_obs.get_means_covariances(
+            self.model, self.config.diagonal_covariances
+        )
 
     def set_means(self, means, update_initializer=True):
-        """Set the means of each mode.
+        """Set the means of each state.
 
         Parameters
         ----------
         means : np.ndarray
-            Mode covariances.
+            State covariances.
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model?
@@ -608,17 +614,22 @@ class Model(ModelBase):
         dynemo_obs.set_means(self.model, means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each mode.
+        """Set the covariances of each state.
 
         Parameters
         ----------
         covariances : np.ndarray
-            Mode covariances.
+            State covariances.
         update_initializer : bool
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(self.model, covariances, update_initializer)
+        dynemo_obs.set_covariances(
+            self.model,
+            covariances,
+            self.config.diagonal_covariances,
+            update_initializer,
+        )
 
     def set_trans_prob(self, trans_prob):
         """Sets the transition probability matrix.
@@ -697,8 +708,10 @@ class Model(ModelBase):
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
-        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(range).
+        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
+        normal prior is applied to the diagonal of the covariances matrices with mu=0,
+        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
+        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
 
         Parameters
         ----------
@@ -711,7 +724,9 @@ class Model(ModelBase):
             dynemo_obs.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(self.model, training_dataset)
+            dynemo_obs.set_covariances_regularizer(
+                self.model, training_dataset, self.config.diagonal_covariances
+            )
 
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
@@ -824,14 +839,24 @@ def _model_structure(config):
         config.initial_means,
         name="means",
     )
-    covs_layer = CovarianceMatricesLayer(
-        config.n_states,
-        config.n_channels,
-        config.learn_covariances,
-        config.initial_covariances,
-        config.covariances_epsilon,
-        name="covs",
-    )
+    if config.diagonal_covariances:
+        covs_layer = DiagonalMatricesLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            name="covs",
+        )
+    else:
+        covs_layer = CovarianceMatricesLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            name="covs",
+        )
     ll_loss_layer = CategoricalLogLikelihoodLossLayer(
         config.n_states, config.covariances_epsilon, name="ll_loss"
     )

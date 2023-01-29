@@ -22,6 +22,7 @@ from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
+    DiagonalMatricesLayer,
     MixVectorsLayer,
     MixMatricesLayer,
     ModelRNNLayer,
@@ -98,6 +99,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mode covariances.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
+    diagonal_covariances : bool
+        Should we learn diagonal mode covariances?
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -155,6 +158,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    diagonal_covariances: bool = False
     covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
@@ -207,7 +211,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarary
             Mode covariances.
         """
-        return dynemo_obs.get_covariances(self.model)
+        return dynemo_obs.get_covariances(self.model, self.config.diagonal_covariances)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -219,7 +223,9 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return dynemo_obs.get_means_covariances(self.model)
+        return dynemo_obs.get_means_covariances(
+            self.model, self.config.diagonal_covariances
+        )
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_covariances."""
@@ -249,7 +255,12 @@ class Model(VariationalInferenceModelBase):
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(self.model, covariances, update_initializer)
+        dynemo_obs.set_covariances(
+            self.model,
+            covariances,
+            self.config.diagonal_covariances,
+            update_initializer,
+        )
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
@@ -268,8 +279,10 @@ class Model(VariationalInferenceModelBase):
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
-        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
+        normal prior is applied to the diagonal of the covariances matrices with mu=0,
+        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
+        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
 
         Parameters
         ----------
@@ -282,7 +295,9 @@ class Model(VariationalInferenceModelBase):
             dynemo_obs.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(self.model, training_dataset)
+            dynemo_obs.set_covariances_regularizer(
+                self.model, training_dataset, self.config.diagonal_covariances
+            )
 
     def sample_alpha(self, n_samples, theta_norm=None):
         """Uses the model RNN to sample mode mixing factors, alpha.
@@ -411,15 +426,26 @@ def _model_structure(config):
         config.means_regularizer,
         name="means",
     )
-    covs_layer = CovarianceMatricesLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_covariances,
-        config.initial_covariances,
-        config.covariances_epsilon,
-        config.covariances_regularizer,
-        name="covs",
-    )
+    if config.diagonal_covariances:
+        covs_layer = DiagonalMatricesLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="covs",
+        )
+    else:
+        covs_layer = CovarianceMatricesLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="covs",
+        )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
     ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
