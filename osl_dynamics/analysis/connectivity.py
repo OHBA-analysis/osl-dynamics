@@ -281,6 +281,51 @@ def mean_connections(conn_map):
     return np.mean(conn_map, axis=-1)
 
 
+def eigenvectors(conn_map, n_eigenvectors=1, absolute_value=False, as_network=False):
+    """Calculate eigenvectors of a connectivity matrix.
+
+    Parameters
+    ----------
+    conn_map : np.ndarray
+        Connectivity matrix. Shape must be (..., n_channels, n_channels).
+    n_eigenvectors : int
+        Number of eigenvectors to include.
+    absolute_value : bool
+        Should we take the absolute value of the connectivity matrix before
+        calculating the eigen decomposition?
+    as_network : bool
+        Should we return a matrix?
+
+    Returns
+    -------
+    eigenvectors : np.ndarray.
+        Eigenvectors. Shape is (n_eigenvectors, ..., n_channels, n_channels)
+        if as_network=True, otherwise it is (n_eigenvectors, ..., n_channels).
+        If n_eigenvectors=1, the first dimension is removed.
+    """
+    if absolute_value:
+        # Take absolute value
+        conn_map = abs(conn_map)
+
+    # Calculate eigen decomposition
+    _, eigenvectors = np.linalg.eigh(conn_map)
+
+    # Reorder from ascending eigenvalues to descending
+    eigenvectors = eigenvectors[..., ::-1]
+
+    # Keep the requested number of eigenvectors and make the first axis
+    # specify the eigenvector
+    eigenvectors = np.rollaxis(eigenvectors[..., :n_eigenvectors], -1)
+
+    if as_network:
+        # Calculate the outer product using the eigenvectors
+        eigenvectors = np.expand_dims(eigenvectors, axis=-1) @ np.expand_dims(
+            eigenvectors, axis=-2
+        )
+
+    return np.squeeze(eigenvectors)
+
+
 def gmm_threshold(
     conn_map,
     subtract_mean=False,
@@ -739,3 +784,44 @@ def save(
                 output_file=output_file,
                 **kwargs,
             )
+
+
+def spectral_reordering(corr_mat):
+    """Spectral re-ordering for correlation matrices.
+
+    Parameters
+    ----------
+    corr_mat : np.ndarray
+        Correlation matrix.
+
+    Returns
+    -------
+    reorder_corr_mat : np.ndarray
+        Re-ordered correlation matrix.
+    """
+    # Add one to make all entries postive
+    C = corr_mat + 1
+
+    # Compute Q
+    Q = -C
+    np.fill_diagonal(Q, 0)
+    Q -= np.sum(Q, axis=0)
+
+    # Compute t
+    t = np.diag(1.0 / np.sqrt(np.sum(C, axis=0)))
+
+    # Compute D
+    D = np.dot(np.dot(t, Q), t)
+
+    # Eigevalue decomposition
+    D, W = np.linalg.eig(D)
+    v = W[:, 1]
+
+    # Scale v
+    v = np.dot(t, v)
+
+    # Find permutations
+    perm = np.argsort(v)
+
+    # Reorder
+    return corr_mat[perm, :][:, perm]
