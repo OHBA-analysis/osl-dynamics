@@ -202,14 +202,15 @@ def mean_connections(conn_map):
     return np.mean(conn_map, axis=-1)
 
 
-def first_eigenvector(conn_map, absolute_value=False, as_network=False):
-    """Calculate the first eigenvector of a connectivity matrix.
+def eigenvectors(conn_map, n_eigenvectors=1, absolute_value=False, as_network=False):
+    """Calculate eigenvectors of a connectivity matrix.
 
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
-        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+        Connectivity matrix. Shape must be (..., n_channels, n_channels).
+    n_eigenvectors : int
+        Number of eigenvectors to include.
     absolute_value : bool
         Should we take the absolute value of the connectivity matrix before
         calculating the eigen decomposition?
@@ -218,36 +219,32 @@ def first_eigenvector(conn_map, absolute_value=False, as_network=False):
 
     Returns
     -------
-    first_eigenvector : np.ndarray.
-        First eigenvector of the matrix. Shape is (..., n_channels, n_channels)
-        if as_network=True, otherwise it is (..., n_channels).
+    eigenvectors : np.ndarray.
+        Eigenvectors. Shape is (n_eigenvectors, ..., n_channels, n_channels)
+        if as_network=True, otherwise it is (n_eigenvectors, ..., n_channels).
+        If n_eigenvectors=1, the first dimension is removed.
     """
-    # Validation
-    conn_map = array_ops.validate(
-        conn_map,
-        correct_dimensionality=5,
-        allow_dimensions=[2, 3, 4],
-        error_message=(
-            "conn_map must be (n_components, n_modes, n_channels, n_channels) "
-            + "(n_modes, n_channels, n_channels) or (n_channels, n_channels)."
-        ),
-    )
-
     if absolute_value:
         # Take absolute value
         conn_map = abs(conn_map)
 
     # Calculate eigen decomposition
-    eigenvalues, eigenvectors = np.linalg.eig(conn_map)
+    _, eigenvectors = np.linalg.eigh(conn_map)
 
-    # Get the eigenvector with the largest eigenvalue
-    first_eigenvector = eigenvectors[..., np.argmax(eigenvalues)]
+    # Reorder from ascending eigenvalues to descending
+    eigenvectors = eigenvectors[..., ::-1]
+
+    # Keep the requested number of eigenvectors and make the first axis
+    # specify the eigenvector
+    eigenvectors = np.rollaxis(eigenvectors[..., :n_eigenvectors], -1)
 
     if as_network:
-        # Calculate the outer product using the eigenvector to calculate a matrix
-        first_eigenvector = np.outer(first_eigenvector, first_eigenvector)
+        # Calculate the outer product using the eigenvectors
+        eigenvectors = np.expand_dims(eigenvectors, axis=-1) @ np.expand_dims(
+            eigenvectors, axis=-2
+        )
 
-    return np.squeeze(first_eigenvector)
+    return np.squeeze(eigenvectors)
 
 
 def gmm_threshold(
