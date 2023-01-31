@@ -222,7 +222,7 @@ def save(
 
     # Validation
     if filename is not None:
-        allowed_extensions = [".nii.gz", ".png", ".svg", ".pdf"]
+        allowed_extensions = [".nii", ".nii.gz", ".png", ".svg", ".pdf"]
         if not any([ext in filename for ext in allowed_extensions]):
             raise ValueError(
                 "filename must have one of following extensions: "
@@ -273,32 +273,43 @@ def save(
     # Load the mask
     mask = nib.load(mask_file)
 
-    # Save as nii file
-    if filename is not None:
-        if ".nii.gz" in filename:
-            print(f"Saving {filename}")
-            nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
-            nib.save(nii, filename)
+    # Number of modes
+    n_modes = power_map.shape[-1]
 
-    # Save each map as an image
-    else:
-        n_modes = power_map.shape[-1]
+    # Just display the power map
+    if filename is None:
         for i in trange(n_modes, desc="Saving images", ncols=98):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            if filename is None:
-                output_file = None
-            else:
-                output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-                    fn=Path(filename), i=i, w=len(str(n_modes))
-                )
             plotting.plot_img_on_surf(
                 nii,
                 views=["lateral", "medial"],
                 hemispheres=["left", "right"],
                 colorbar=True,
-                output_file=output_file,
                 **plot_kwargs,
             )
+
+    else:
+        # Save as nii file
+        if ".nii" in filename:
+            print(f"Saving {filename}")
+            nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
+            nib.save(nii, filename)
+
+        else:
+            # Save each map as an image
+            for i in trange(n_modes, desc="Saving images", ncols=98):
+                nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
+                output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                    fn=Path(filename), i=i, w=len(str(n_modes))
+                )
+                plotting.plot_img_on_surf(
+                    nii,
+                    views=["lateral", "medial"],
+                    hemispheres=["left", "right"],
+                    colorbar=True,
+                    output_file=output_file,
+                    **plot_kwargs,
+                )
 
 
 def multi_save(
