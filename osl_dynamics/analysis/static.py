@@ -100,7 +100,7 @@ def power_spectra(
     if len(data) == 1:
         # We only have one subject so we don't need to parallelise the calculation
         results = spectral.spectrogram(
-            data=d,
+            data=data[0],
             window_length=window_length,
             sampling_frequency=sampling_frequency,
             frequency_range=frequency_range,
