@@ -1301,3 +1301,73 @@ def spectrogram(
     P /= sampling_frequency * np.sum(window**2)
 
     return t, f, P
+
+
+def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windows=1):
+    """Rescales regression coefficients with maximum regressor values.
+
+    Parameters
+    ----------
+    psd : np.ndarray
+        Mode PSDs. Shape must be (n_subjects, 2, n_modes, n_channels, n_freq)
+    alpha : np.ndarray or list
+        Inferred mode mixing factors. Shape must be (n_subjects, n_samples,
+        n_modes) or (n_samples, n_modes).
+    window_length : int
+        Number samples used as the window to calcualte a PSD.
+    step_size : int
+        Step size used for shifting the window.
+    n_sub_windows : int
+        Number of sub-windows used to average the spectra. window_length
+        must be divisible by n_sub_windows.
+
+    Returns
+    -------
+    psd : np.ndarray
+        Mode PSDs, rescaled with maximum regressor values.
+        Shape is identical to the input.
+    """
+
+    # Validation
+    if psd.ndim == 4:
+        psd = psd[np.newaxis, ...]
+
+    if psd.ndim != 5:
+        raise ValueError(
+            "psd must have shape (n_subjects, 2, n_modes, n_channels, n_freqs)."
+        )
+
+    if isinstance(alpha, np.ndarray):
+        alpha = [alpha]
+
+    if len(psd) != len(alpha):
+        raise ValueError(
+            "A different number of subjects has been passed for "
+            + f"psd and alpha: len(psd)={len(psd)}, "
+            + f"len(alpha)={len(alpha)}."
+        )
+
+    for i in range(len(alpha)):
+        if alpha[i].shape[1] != psd[i].shape[1]:
+            raise ValueError("psd and alpha must have same number of modes.")
+
+    # Number of subjects
+    n_subjects = len(alpha)
+
+    # Window alphas to match the windowing of STFT
+    for i, a in enumerate(alpha):
+        alpha[i] = window_mean(
+            a, window_length, step_size=step_size, n_sub_windows=n_sub_windows
+        )
+
+    # Normalize the alphas
+    alpha = [(a - np.mean(a, axis=0)) / np.std(a, axis=0) for a in alpha]
+
+    # Get maximum regressor values
+    max_alpha = [np.max(a, axis=0) for a in alpha]
+
+    # Rescale the regression coefficients
+    for n in range(n_subjects):
+        psd[n, 0] *= np.expand_dims(max_alpha[n], axis=(1, 2))
+
+    return psd
