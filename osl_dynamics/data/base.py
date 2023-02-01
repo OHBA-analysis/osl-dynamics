@@ -2,22 +2,21 @@
 
 """
 
-import pickle
 import pathlib
+import pickle
 import warnings
+from functools import partial
 from os import path
 from shutil import rmtree
 
 import numpy as np
 import yaml
-from tqdm import tqdm
-from scipy import signal
-
-from osl_dynamics.data import rw, processing, tf
-from osl_dynamics.utils import misc
-
 from pqdm.processes import pqdm
-from functools import partial
+from scipy import signal
+from tqdm import tqdm
+
+from osl_dynamics.data import processing, rw, tf
+from osl_dynamics.utils import misc
 
 
 class Data:
@@ -260,12 +259,20 @@ class Data:
         # self.raw_data_filenames is not used if self.inputs is a list of strings,
         # where the strings are paths to .npy files
 
-        partial_make_memmap = partial(self.make_memmap, data_field=data_field, time_axis_first=time_axis_first)
+        partial_make_memmap = partial(
+            self.make_memmap, data_field=data_field, time_axis_first=time_axis_first
+        )
         args = zip(self.inputs, raw_data_filenames)
-        memmaps = pqdm(args, partial_make_memmap, n_jobs=n_jobs, desc="Loading files", argument_type='args')
+        memmaps = pqdm(
+            args,
+            partial_make_memmap,
+            n_jobs=n_jobs,
+            desc="Loading files",
+            argument_type="args",
+        )
 
         return memmaps, raw_data_filenames
-    
+
     def make_memmap(self, raw_data, mmap_location, data_field, time_axis_first):
         """Make a memory map for a single file.
 
@@ -288,13 +295,10 @@ class Data:
         """
         if not self.load_memmaps:
             mmap_location = None
-        raw_data_mmap = rw.load_data(
-            raw_data, data_field, mmap_location, mmap_mode="r"
-        )
+        raw_data_mmap = rw.load_data(raw_data, data_field, mmap_location, mmap_mode="r")
         if not time_axis_first:
             raw_data_mmap = raw_data_mmap.T
         return raw_data_mmap
-
 
     def save(self, output_dir="."):
         """Saves data to numpy files.
