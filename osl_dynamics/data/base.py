@@ -74,6 +74,7 @@ class Data:
         n_embeddings=None,
         time_axis_first=True,
         load_memmaps=True,
+        n_load_jobs=2,
     ):
         self._identifier = id(self)
         self.load_memmaps = load_memmaps
@@ -93,10 +94,8 @@ class Data:
 
         # Load and validate the raw data
         self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data(
-            data_field, time_axis_first
+            data_field, time_axis_first, n_load_jobs
         )
-        # print([type(x) for x in self.raw_data_memmaps])
-        print(self.raw_data_memmaps[0])
         self.validate_data()
 
         # Get data prepration attributes if the raw data has been prepared
@@ -234,6 +233,7 @@ class Data:
         self,
         data_field,
         time_axis_first,
+        n_jobs,
     ):
         """Import data into a list of memory maps.
 
@@ -262,7 +262,7 @@ class Data:
 
         partial_make_memmap = partial(self.make_memmap, data_field=data_field, time_axis_first=time_axis_first)
         args = zip(self.inputs, raw_data_filenames)
-        memmaps = pqdm(args, partial_make_memmap, n_jobs=12, desc="Loading files", argument_type='args')
+        memmaps = pqdm(args, partial_make_memmap, n_jobs=n_jobs, desc="Loading files", argument_type='args')
 
         return memmaps, raw_data_filenames
     
