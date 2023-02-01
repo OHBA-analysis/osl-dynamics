@@ -1329,6 +1329,9 @@ def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windo
     """
 
     # Validation
+    if psd.ndim == 4:
+        psd = psd[np.newaxis, ...]
+
     if psd.ndim != 5:
         raise ValueError(
             "psd must have shape (n_subjects, 2, n_modes, n_channels, n_freqs)."
@@ -1343,6 +1346,10 @@ def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windo
             + f"psd and alpha: len(psd)={len(psd)}, "
             + f"len(alpha)={len(alpha)}."
         )
+
+    for i in range(len(alpha)):
+        if alpha[i].shape[1] != psd[i].shape[1]:
+            raise ValueError("psd and alpha must have same number of modes.")
 
     # Number of subjects
     n_subjects = len(alpha)
