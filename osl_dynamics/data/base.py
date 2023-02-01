@@ -16,6 +16,9 @@ from scipy import signal
 from osl_dynamics.data import rw, processing, tf
 from osl_dynamics.utils import misc
 
+from pqdm.processes import pqdm
+from functools import partial
+
 
 class Data:
     """Data Class.
@@ -92,6 +95,8 @@ class Data:
         self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data(
             data_field, time_axis_first
         )
+        # print([type(x) for x in self.raw_data_memmaps])
+        print(self.raw_data_memmaps[0])
         self.validate_data()
 
         # Get data prepration attributes if the raw data has been prepared
@@ -255,20 +260,41 @@ class Data:
         # self.raw_data_filenames is not used if self.inputs is a list of strings,
         # where the strings are paths to .npy files
 
-        memmaps = []
-        for raw_data, mmap_location in zip(
-            tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
-        ):
-            if not self.load_memmaps:  # do not load into the memory maps
-                mmap_location = None
-            raw_data_mmap = rw.load_data(
-                raw_data, data_field, mmap_location, mmap_mode="r"
-            )
-            if not time_axis_first:
-                raw_data_mmap = raw_data_mmap.T
-            memmaps.append(raw_data_mmap)
+        partial_make_memmap = partial(self.make_memmap, data_field=data_field, time_axis_first=time_axis_first)
+        args = zip(self.inputs, raw_data_filenames)
+        memmaps = pqdm(args, partial_make_memmap, n_jobs=12, desc="Loading files", argument_type='args')
 
         return memmaps, raw_data_filenames
+    
+    def make_memmap(self, raw_data, mmap_location, data_field, time_axis_first):
+        """Make a memory map for a single file.
+
+        Parameters
+        ----------
+        raw_data : str
+            Path to file.
+        mmap_location : str
+            Path to save memory map to.
+        data_field : str
+            If a MATLAB filename is passed, this is the field that corresponds
+            to the data. By default we read the field 'X'.
+        time_axis_first : bool
+            Is the input data of shape (n_samples, n_channels)?
+
+        Returns
+        -------
+        np.memmap
+            Memory map.
+        """
+        if not self.load_memmaps:
+            mmap_location = None
+        raw_data_mmap = rw.load_data(
+            raw_data, data_field, mmap_location, mmap_mode="r"
+        )
+        if not time_axis_first:
+            raw_data_mmap = raw_data_mmap.T
+        return raw_data_mmap
+
 
     def save(self, output_dir="."):
         """Saves data to numpy files.
