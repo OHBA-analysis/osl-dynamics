@@ -62,6 +62,8 @@ class Data:
         Should we load the data as memory maps (memmaps)? If False, we will load data
         into memory rather than storing it on disk. By default we will keep the data
         on disk and use memmaps. This argument is optional.
+    n_jobs : int
+        Number of processes to use when loading data. This argument is optional. Default 2.
     """
 
     def __init__(
@@ -73,7 +75,7 @@ class Data:
         n_embeddings=None,
         time_axis_first=True,
         load_memmaps=True,
-        n_load_jobs=2,
+        n_jobs=2,
     ):
         self._identifier = id(self)
         self.load_memmaps = load_memmaps
@@ -93,7 +95,7 @@ class Data:
 
         # Load and validate the raw data
         self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data(
-            data_field, time_axis_first, n_load_jobs
+            data_field, time_axis_first, n_jobs
         )
         self.validate_data()
 
@@ -243,6 +245,8 @@ class Data:
             to the data. By default we read the field 'X'.
         time_axis_first : bool
             Is the input data of shape (n_samples, n_channels)?
+        n_jobs : int
+            Number of processes to use to load data.
 
         Returns
         -------
