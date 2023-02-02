@@ -246,8 +246,10 @@ class Data:
 
         Returns
         -------
-        list
-            list of np.memmap.
+        memmaps : list of np.memmap
+            List of memory maps.
+        raw_data_filenames : list of str
+            List of paths to the raw data memmaps.
         """
         raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
@@ -290,8 +292,8 @@ class Data:
 
         Returns
         -------
-        np.memmap
-            Memory map.
+        raw_data_mmap: np.memmap
+            Memory map of the raw data.
         """
         if not self.load_memmaps:
             mmap_location = None
