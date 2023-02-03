@@ -314,10 +314,12 @@ class LearnableTensorLayer(layers.Layer):
                     "Shape of initial_value must match that of the tensor. "
                     + f"Expected {shape}, got {self.initial_value.shape}."
                 )
-            self.initializer = osld_initializers.WeightInitializer(self.initial_value)
+            self.tensor_initializer = osld_initializers.WeightInitializer(
+                self.initial_value
+            )
         else:
             # Use the initializer passed, initial_value is ignored
-            self.initializer = initializer
+            self.tensor_initializer = initializer
 
         # Regularizer for the tensor
         # This should be a function of the tensor that returns a float
@@ -344,7 +346,7 @@ class LearnableTensorLayer(layers.Layer):
             "tensor",
             shape=self.shape,
             dtype=tf.float32,
-            initializer=self.initializer,
+            initializer=self.tensor_initializer,
             trainable=self.learn,
         )
         self.built = True

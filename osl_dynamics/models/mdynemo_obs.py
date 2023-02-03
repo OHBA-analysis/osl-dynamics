@@ -341,11 +341,9 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
 
     fcs_layer = model.get_layer("fcs")
     learnable_tensor_layer = fcs_layer.layers[0]
-    learnable_tensor_layer.regularizer = (
-        regularizers.MarginalInverseWishart(
-            nu,
-            epsilon,
-            n_channels,
-            n_batches,
-        )
+    learnable_tensor_layer.regularizer = regularizers.MarginalInverseWishart(
+        nu,
+        epsilon,
+        n_channels,
+        n_batches,
     )

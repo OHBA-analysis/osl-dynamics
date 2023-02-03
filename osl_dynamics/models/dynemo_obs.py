@@ -257,11 +257,7 @@ def get_means(model):
 
 def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    covs = add_epsilon(
-        covs_layer(1),
-        covs_layer.epsilon,
-        diag=True,
-    )
+    covs = covs_layer(1)
     return covs.numpy()
 
 
@@ -274,11 +270,10 @@ def get_means_covariances(model):
 def set_means(model, means, update_initializer=True, layer_name="means"):
     means = means.astype(np.float32)
     means_layer = model.get_layer(layer_name)
-    layer_weights = means_layer.vectors_layer.tensor
-    layer_weights.assign(means)
-
+    learnable_tensor_layer = means_layer.layers[0]
+    leanable_tensor_layer.tensor.assign(means)
     if update_initializer:
-        means_layer.vectors_layer.tensor_initializer = WeightInitializer(means)
+        learnable_tensor_layer.tensor_initializer = WeightInitializer(means)
 
 
 def set_covariances(
@@ -286,26 +281,23 @@ def set_covariances(
 ):
     covariances = covariances.astype(np.float32)
     covs_layer = model.get_layer(layer_name)
+    learnable_tensor_layer = covs_layer.layers[0]
 
     if diagonal:
         if covariances.ndim == 3:
             # Only keep the diagonal as a vector
             covariances = np.diagonal(covariances, axis1=1, axis2=2)
         diagonals = covs_layer.bijector.inverse(covariances)
-        layer_weights = covs_layer.diagonals_layer.tensor
-        layer_weights.assign(diagonals)
-
+        learnable_tensor_layer.tensor.assign(diagonals)
         if update_initializer:
-            covs_layer.diagonals_layer.tensor_initializer = WeightInitializer(diagonals)
+            learnable_tensor_layer.tensor_initializer = WeightInitializer(diagonals)
 
     else:
         flattened_cholesky_factors = covs_layer.bijector.inverse(covariances)
-        layer_weights = covs_layer.flattened_cholesky_factors_layer.tensor
-        layer_weights.assign(flattened_cholesky_factors)
-
+        learnable_tensor_layer.tensor.assign(flatten_cholesky_factors)
         if update_initializer:
-            covs_layer.flattened_cholesky_factors_layer.tensor_initializer = (
-                WeightInitializer(flattened_cholesky_factors)
+            learnable_tensor_layer.tensor_initializer = WeightInitializer(
+                flattened_cholesky_factors
             )
 
 
@@ -348,6 +340,6 @@ def set_covariances_regularizer(
         nu = n_channels - 1 + 0.1
         psi = np.diag(range_)
         learnable_tensor_layer = covs_layer.layers[0]
-        learnable_tensor_layer.regularizer = (
-            regularizers.InverseWishart(nu, psi, epsilon, n_batches)
+        learnable_tensor_layer.regularizer = regularizers.InverseWishart(
+            nu, psi, epsilon, n_batches
         )
