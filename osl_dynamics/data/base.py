@@ -11,7 +11,7 @@ from shutil import rmtree
 
 import numpy as np
 import yaml
-from pqdm.processes import pqdm
+from pqdm.threads import pqdm
 from scipy import signal
 from tqdm import tqdm
 
@@ -613,12 +613,9 @@ class Data:
         # ):
 
         #     self.prepared_data_memmaps.append(prepared_data_memmap)
-        args = list(
-            zip(
-                range(len(self.raw_data_memmaps)),
-                self.raw_data_filenames,
-                self.prepared_data_filenames,
-            )
+        args = zip(
+            self.raw_data_memmaps,
+            self.prepared_data_filenames,
         )
 
         partial_prepare_tde = partial(
@@ -628,19 +625,13 @@ class Data:
             load_memmaps=self.load_memmaps,
         )
 
-        print(f"Preparing data with {self.n_jobs} jobs")
         prepared_data_memmaps = pqdm(
             args,
             partial_prepare_tde,
             desc="Preparing data",
-            n_jobs=12,
+            n_jobs=self.n_jobs,
             argument_type="args",
         )
-        if self.load_memmaps:
-            prepared_data_memmaps = [
-                np.load(prepared_data_memmap, mmap_mode="r")
-                for prepared_data_memmap in prepared_data_memmaps
-            ]
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
         # Update subjects to return the prepared data
@@ -650,16 +641,13 @@ class Data:
 
     @staticmethod
     def _prepare_tde(
-        job_number,
-        raw_data_memmap_file,
+        raw_data_memmap,
         prepared_data_file,
         n_embeddings,
         pca_components,
         load_memmaps,
     ):
-        # print(job_number)
         # Standardise and time embed the data
-        raw_data_memmap = np.load(raw_data_memmap_file, mmap_mode="r")
         std_data = processing.standardize(raw_data_memmap)
         te_std_data = processing.time_embed(std_data, n_embeddings)
 
@@ -679,12 +667,10 @@ class Data:
             prepared_data_memmap = misc.array_to_memmap(
                 prepared_data_file, prepared_data
             )
-            return prepared_data_file
         else:
             prepared_data_memmap = prepared_data
-            # print(f"completed job {job_number}")
-            return prepared_data_memmap
-        # print(f"completed job {job_number}")
+
+        return prepared_data_memmap
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
