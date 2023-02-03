@@ -63,7 +63,8 @@ class Data:
         into memory rather than storing it on disk. By default we will keep the data
         on disk and use memmaps. This argument is optional.
     n_jobs : int
-        Number of processes to use when loading data. This argument is optional. Default 2.
+        Number of processes to load the data in parallel. This argument is optional.
+        Default is 1, which loads data in serial.
     """
 
     def __init__(
@@ -75,11 +76,15 @@ class Data:
         n_embeddings=None,
         time_axis_first=True,
         load_memmaps=True,
-        n_jobs=2,
+        n_jobs=1,
     ):
         self._identifier = id(self)
-        self.load_memmaps = load_memmaps
+        self.data_field = data_field
+        self.sampling_frequency = sampling_frequency
         self.n_embeddings = n_embeddings
+        self.time_axis_first = time_axis_first
+        self.load_memmaps = load_memmaps
+        self.n_jobs = n_jobs
         self.prepared = False
         self.prepared_data_filenames = []
 
@@ -94,18 +99,14 @@ class Data:
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load and validate the raw data
-        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data(
-            data_field, time_axis_first, n_jobs
-        )
+        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data()
         self.validate_data()
 
         # Get data prepration attributes if the raw data has been prepared
         if not isinstance(inputs, list):
             self.load_preparation(inputs)
 
-        # Attributes describing the raw data
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
-        self.sampling_frequency = sampling_frequency
 
         # Use raw data for the subject data
         self.subjects = self.raw_data_memmaps
@@ -230,23 +231,8 @@ class Data:
                     self.whiten = preparation["whiten"]
                     self.prepared = True
 
-    def load_raw_data(
-        self,
-        data_field,
-        time_axis_first,
-        n_jobs,
-    ):
+    def load_raw_data(self):
         """Import data into a list of memory maps.
-
-        Parameters
-        ----------
-        data_field : str
-            If a MATLAB filename is passed, this is the field that corresponds
-            to the data. By default we read the field 'X'.
-        time_axis_first : bool
-            Is the input data of shape (n_samples, n_channels)?
-        n_jobs : int
-            Number of processes to use to load data.
 
         Returns
         -------
@@ -265,21 +251,30 @@ class Data:
         # self.raw_data_filenames is not used if self.inputs is a list of strings,
         # where the strings are paths to .npy files
 
-        partial_make_memmap = partial(
-            self.make_memmap, data_field=data_field, time_axis_first=time_axis_first
-        )
-        args = zip(self.inputs, raw_data_filenames)
-        memmaps = pqdm(
-            args,
-            partial_make_memmap,
-            n_jobs=n_jobs,
-            desc="Loading files",
-            argument_type="args",
-        )
+        if self.n_jobs == 1:
+            # Load data in serial
+            memmaps = []
+            for raw_data, mmap_location in zip(
+                tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
+            ):
+                memmaps.append(self.make_memmap(raw_data, mmap_location))
+
+        else:
+            # Load data in parallel
+            partial_make_memmap = partial(self.make_memmap)
+            args = zip(self.inputs, raw_data_filenames)
+            memmaps = pqdm(
+                args,
+                partial_make_memmap,
+                n_jobs=self.n_jobs,
+                desc="Loading files",
+                argument_type="args",
+                ncols=98,
+            )
 
         return memmaps, raw_data_filenames
 
-    def make_memmap(self, raw_data, mmap_location, data_field, time_axis_first):
+    def make_memmap(self, raw_data, mmap_location):
         """Make a memory map for a single file.
 
         Parameters
@@ -288,21 +283,18 @@ class Data:
             Path to file.
         mmap_location : str
             Path to save memory map to.
-        data_field : str
-            If a MATLAB filename is passed, this is the field that corresponds
-            to the data. By default we read the field 'X'.
-        time_axis_first : bool
-            Is the input data of shape (n_samples, n_channels)?
 
         Returns
         -------
         raw_data_mmap: np.memmap
             Memory map of the raw data.
         """
-        if not self.load_memmaps:
+        if not self.load_memmaps:  # do not load into the memory maps
             mmap_location = None
-        raw_data_mmap = rw.load_data(raw_data, data_field, mmap_location, mmap_mode="r")
-        if not time_axis_first:
+        raw_data_mmap = rw.load_data(
+            raw_data, self.data_field, mmap_location, mmap_mode="r"
+        )
+        if not self.time_axis_first:
             raw_data_mmap = raw_data_mmap.T
         return raw_data_mmap
 
@@ -312,8 +304,7 @@ class Data:
         Parameters
         ----------
         output_dir : str
-            Path to save data files to. Default is the current working
-            directory.
+            Path to save data files to. Default is the current working directory.
         """
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
