@@ -302,10 +302,14 @@ class Model(VariationalInferenceModelBase):
             dynemo_obs.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_stds:
-            mdynemo_obs.set_stds_regularizer(self.model, training_dataset)
+            mdynemo_obs.set_stds_regularizer(
+                self.model, training_dataset, self.config.stds_epsilon
+            )
 
         if self.config.learn_fcs:
-            mdynemo_obs.set_fcs_regularizer(self.model, training_dataset)
+            mdynemo_obs.set_fcs_regularizer(
+                self.model, training_dataset, self.config.fcs_epsilon
+            )
 
     def sample_time_courses(self, n_samples: int):
         """Uses the model RNN to sample mode mixing factors, alpha and gamma.

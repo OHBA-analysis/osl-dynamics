@@ -187,7 +187,10 @@ class Model(ModelBase):
 
         if self.config.learn_covariances:
             set_covariances_regularizer(
-                self.model, training_dataset, self.config.diagonal_covariances
+                self.model,
+                training_dataset,
+                self.config.covariances_epsilon,
+                self.config.diagonal_covariances,
             )
 
 
@@ -321,7 +324,11 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
 
 
 def set_covariances_regularizer(
-    model, training_dataset, diagonal=False, layer_name="covs"
+    model,
+    training_dataset,
+    epsilon,
+    diagonal=False,
+    layer_name="covs",
 ):
     n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
@@ -331,9 +338,13 @@ def set_covariances_regularizer(
     if diagonal:
         mu = np.zeros([n_channels], dtype=np.float32)
         sigma = np.sqrt(np.log(2 * range_))
-        covs_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
+        covs_layer.diagonals_layer.regularizer = regularizers.LogNormal(
+            mu, sigma, epsilon, n_batches
+        )
 
     else:
         nu = n_channels - 1 + 0.1
         psi = np.diag(range_)
-        covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)
+        covs_layer.flattened_cholesky_factors_layer.regularizer = (
+            regularizers.InverseWishart(nu, psi, epsilon, n_batches)
+        )

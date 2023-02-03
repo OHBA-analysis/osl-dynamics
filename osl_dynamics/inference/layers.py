@@ -255,6 +255,7 @@ class SoftmaxLayer(layers.Layer):
             initial_value=initial_temperature,
             initializer=None,
             regularizer=None,
+            name=self.name + "_kernel",
         )
         self.layers = [self.temperature_layer]
 
@@ -376,6 +377,7 @@ class VectorsLayer(layers.Layer):
             initializer=initializer,
             shape=(n, m),
             regularizer=regularizer,
+            name=self.name + "_kernel",
         )
         # for resetting weights
         self.layers = [self.vectors_layer]
@@ -445,34 +447,16 @@ class CovarianceMatricesLayer(layers.Layer):
             initial_value=initial_flattened_cholesky_factors,
             initializer=initializer,
             shape=(n, m * (m + 1) // 2),
-            regularizer=None,
+            regularizer=regularizer,
+            name=self.name + "_kernel",
         )
         self.layers = [self.flattened_cholesky_factors_layer]
-
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, covariances, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(covariances)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
 
     def call(self, inputs, training=None, **kwargs):
         covariances = self.bijector(
             self.flattened_cholesky_factors_layer(inputs=inputs, training=training)
         )
         covariances = add_epsilon(covariances, self.epsilon, diag=True)
-        if self.regularizer is not None and training:
-            self.add_regularization(covariances, inputs)
         return covariances
 
 
@@ -536,34 +520,16 @@ class CorrelationMatricesLayer(layers.Layer):
             initial_value=initial_flattened_cholesky_factors,
             initializer=initializer,
             shape=(n, m * (m - 1) // 2),
-            regularizer=None,
+            regularizer=regularizer,
+            name=self.name + "_kernel",
         )
         self.layers = [self.flattened_cholesky_factors_layer]
-
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, correlations, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(correlations)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
 
     def call(self, inputs, training=None, **kwargs):
         correlations = self.bijector(
             self.flattened_cholesky_factors_layer(inputs=inputs, training=training)
         )
         correlations = add_epsilon(correlations, self.epsilon, diag=True)
-        if self.regularizer is not None and training:
-            self.add_regularization(correlations, inputs)
         return correlations
 
 
@@ -622,32 +588,14 @@ class DiagonalMatricesLayer(layers.Layer):
             initial_value=initial_diagonals,
             initializer=initializer,
             shape=(n, m),
-            regularizer=None,
+            regularizer=regularizer,
+            name=self.name + "_kernel",
         )
         self.layers = [self.diagonals_layer]
-
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, diagonals, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(diagonals)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
 
     def call(self, inputs, training=None, **kwargs):
         D = self.bijector(self.diagonals_layer(inputs=inputs, training=training))
         D = add_epsilon(D, self.epsilon)
-        if self.regularizer is not None and training:
-            self.add_regularization(D, inputs)
         D = tf.linalg.diag(D)
         return D
 

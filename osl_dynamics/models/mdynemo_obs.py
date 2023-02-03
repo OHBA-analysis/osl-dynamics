@@ -194,10 +194,10 @@ class Model(ModelBase):
             dynemo_obs.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_stds:
-            set_stds_regularizer(self.model, training_dataset)
+            set_stds_regularizer(self.model, training_dataset, self.config.stds_epsilon)
 
         if self.config.learn_fcs:
-            set_fcs_regularizer(self.model, training_dataset)
+            set_fcs_regularizer(self.model, training_dataset, self.config.fcs_epsilon)
 
 
 def _model_structure(config):
@@ -318,7 +318,7 @@ def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
         )
 
 
-def set_stds_regularizer(model, training_dataset):
+def set_stds_regularizer(model, training_dataset, epsilon):
     n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
@@ -327,18 +327,23 @@ def set_stds_regularizer(model, training_dataset):
     sigma = np.sqrt(np.log(2 * range_))
 
     stds_layer = model.get_layer("stds")
-    stds_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
+    stds_layer.diagonals_layer.regularizer = regularizers.LogNormal(
+        mu, sigma, epsilon, n_batches
+    )
 
 
-def set_fcs_regularizer(model, training_dataset):
+def set_fcs_regularizer(model, training_dataset, epsilon):
     n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
 
     nu = n_channels - 1 + 0.1
 
     fcs_layer = model.get_layer("fcs")
-    fcs_layer.regularizer = regularizers.MarginalInverseWishart(
-        nu,
-        n_channels,
-        n_batches,
+    fcs_layer.flattened_cholesky_factors_layer.regularizer = (
+        regularizers.MarginalInverseWishart(
+            nu,
+            epsilon,
+            n_channels,
+            n_batches,
+        )
     )

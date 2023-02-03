@@ -295,7 +295,10 @@ class Model(VariationalInferenceModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(
-                self.model, training_dataset, self.config.diagonal_covariances
+                self.model,
+                training_dataset,
+                self.config.covariances_epsilon,
+                self.config.diagonal_covariances,
             )
 
     def sample_alpha(self, n_samples, theta_norm=None):

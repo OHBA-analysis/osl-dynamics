@@ -272,7 +272,10 @@ class Model(ModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(
-                self.model, training_dataset, layer_name="group_covs"
+                self.model,
+                self.config.covariances_epsilon,
+                training_dataset,
+                layer_name="group_covs",
             )
 
     def set_bayesian_deviation_parameters(self, training_dataset):

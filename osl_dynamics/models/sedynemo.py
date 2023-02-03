@@ -371,7 +371,10 @@ class Model(VariationalInferenceModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(
-                self.model, training_dataset, layer_name="group_covs"
+                self.model,
+                training_dataset,
+                self.config.covariances_epsilon,
+                layer_name="group_covs",
             )
 
     def set_group_means(self, group_means, update_initializer=True):

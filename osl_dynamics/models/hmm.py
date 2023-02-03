@@ -585,7 +585,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         """
-        return dynemo_obs.get_covariances(self.model, self.config.diagonal_covariances)
+        return dynemo_obs.get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each state.
@@ -597,9 +597,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             State covariances.
         """
-        return dynemo_obs.get_means_covariances(
-            self.model, self.config.diagonal_covariances
-        )
+        return dynemo_obs.get_means_covariances(self.model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each state.
@@ -726,7 +724,10 @@ class Model(ModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(
-                self.model, training_dataset, self.config.diagonal_covariances
+                self.model,
+                training_dataset,
+                self.config.covariances_epsilon,
+                self.config.diagonal_covariances,
             )
 
     def get_alpha(self, dataset, concatenate=False):
