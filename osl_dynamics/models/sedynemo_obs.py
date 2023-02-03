@@ -542,9 +542,9 @@ def get_group_means_covariances(model):
     group_means_layer = model.get_layer("group_means")
     group_covs_layer = model.get_layer("group_covs")
 
-    group_means = group_means_layer.vectors
+    group_means = group_means_layer(1)
     group_covs = add_epsilon(
-        group_covs_layer.bijector(group_covs_layer.flattened_cholesky_factors),
+        group_covs_layer(1),
         group_covs_layer.epsilon,
         diag=True,
     )

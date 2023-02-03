@@ -272,14 +272,14 @@ def get_means_stds_fcs(model):
     stds_layer = model.get_layer("stds")
     fcs_layer = model.get_layer("fcs")
 
-    means = means_layer.vectors
+    means = means_layer(1)
     stds = add_epsilon(
-        tf.linalg.diag(stds_layer.bijector(stds_layer.diagonals)),
+        stds_layer(1),
         stds_layer.epsilon,
         diag=True,
     )
     fcs = add_epsilon(
-        fcs_layer.bijector(fcs_layer.flattened_cholesky_factors),
+        fcs_layer(1),
         fcs_layer.epsilon,
         diag=True,
     )
@@ -305,16 +305,16 @@ def set_means_stds_fcs(model, means, stds, fcs, update_initializer=True):
     flattened_cholesky_factors = fcs_layer.bijector.inverse(fcs)
 
     # Set values
-    means_layer.vectors.assign(means)
-    stds_layer.diagonals.assign(diagonals)
-    fcs_layer.flattened_cholesky_factors.assign(flattened_cholesky_factors)
+    means_layer.vectors_layer.tensor.assign(means)
+    stds_layer.diagonals_layer.tensor.assign(diagonals)
+    fcs_layer.flattened_cholesky_factors_layer.tensor.assign(flattened_cholesky_factors)
 
     # Update initialisers
     if update_initializer:
-        means_layer.vectors_initializer = WeightInitializer(means)
-        stds_layer.diagonals_initializer = WeightInitializer(diagonals)
-        fcs_layer.flattened_cholesky_factors_initializer = WeightInitializer(
-            flattened_cholesky_factors
+        means_layer.vectors_layer.tensor_initializer = WeightInitializer(means)
+        stds_layer.diagonals_layer.tensor_initializer = WeightInitializer(diagonals)
+        fcs_layer.flattened_cholesky_factors_layer.tensor_initializer = (
+            WeightInitializer(flattened_cholesky_factors)
         )
 
 

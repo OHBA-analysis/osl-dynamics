@@ -123,7 +123,7 @@ class Model(ModelBase):
         covariances : np.ndarary
             Mode covariances.
         """
-        return get_covariances(self.model, self.config.diagonal_covariances)
+        return get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -135,7 +135,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return get_means_covariances(self.model, self.config.diagonal_covariances)
+        return get_means_covariances(self.model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
@@ -248,41 +248,34 @@ def _model_structure(config):
 
 def get_means(model):
     means_layer = model.get_layer("means")
-    means = means_layer.vectors
+    means = means_layer(1)
     return means.numpy()
 
 
-def get_covariances(model, diagonal=False):
+def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    if diagonal:
-        covs = add_epsilon(
-            tf.linalg.diag(covs_layer.bijector(covs_layer.diagonals)),
-            covs_layer.epsilon,
-            diag=True,
-        )
-    else:
-        covs = add_epsilon(
-            covs_layer.bijector(covs_layer.flattened_cholesky_factors),
-            covs_layer.epsilon,
-            diag=True,
-        )
+    covs = add_epsilon(
+        covs_layer(1),
+        covs_layer.epsilon,
+        diag=True,
+    )
     return covs.numpy()
 
 
-def get_means_covariances(model, diagonal=False):
+def get_means_covariances(model):
     means = get_means(model)
-    covs = get_covariances(model, diagonal)
+    covs = get_covariances(model)
     return means, covs
 
 
 def set_means(model, means, update_initializer=True, layer_name="means"):
     means = means.astype(np.float32)
     means_layer = model.get_layer(layer_name)
-    layer_weights = means_layer.vectors
+    layer_weights = means_layer.vectors_layer.tensor
     layer_weights.assign(means)
 
     if update_initializer:
-        means_layer.vectors_initializer = WeightInitializer(means)
+        means_layer.vectors_layer.tensor_initializer = WeightInitializer(means)
 
 
 def set_covariances(
@@ -296,20 +289,20 @@ def set_covariances(
             # Only keep the diagonal as a vector
             covariances = np.diagonal(covariances, axis1=1, axis2=2)
         diagonals = covs_layer.bijector.inverse(covariances)
-        layer_weights = covs_layer.diagonals
+        layer_weights = covs_layer.diagonals_layer.tensor
         layer_weights.assign(diagonals)
 
         if update_initializer:
-            covs_layer.diagonals_initializer = WeightInitializer(diagonals)
+            covs_layer.diagonals_layer.tensor_initializer = WeightInitializer(diagonals)
 
     else:
         flattened_cholesky_factors = covs_layer.bijector.inverse(covariances)
-        layer_weights = covs_layer.flattened_cholesky_factors
+        layer_weights = covs_layer.flattened_cholesky_factors_layer.tensor
         layer_weights.assign(flattened_cholesky_factors)
 
         if update_initializer:
-            covs_layer.flattened_cholesky_factors_initializer = WeightInitializer(
-                flattened_cholesky_factors
+            covs_layer.flattened_cholesky_factors_layer.tensor_initializer = (
+                WeightInitializer(flattened_cholesky_factors)
             )
 
 
@@ -322,7 +315,9 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     sigma = np.diag((range_ / 2) ** 2)
 
     means_layer = model.get_layer(layer_name)
-    means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
+    means_layer.vectors_layer.regularizer = regularizers.MultivariateNormal(
+        mu, sigma, n_batches
+    )
 
 
 def set_covariances_regularizer(
