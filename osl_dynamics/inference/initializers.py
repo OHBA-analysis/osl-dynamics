@@ -186,15 +186,15 @@ def reinitialize_model_weights(model, keep=None):
         # If the layer consists and multiple layers pass the layer back
         # to this function
         if isinstance(layer, Model) or "layers" in dir(layer):
-            for rnn_or_model_layer in layer.layers:
+            for layer_ in layer.layers:
                 # If the layer is bidirectional we need to re-initialise the
                 # forward and backward layers
-                if isinstance(rnn_or_model_layer, layers.Bidirectional):
-                    reinitialize_layer_weights(rnn_or_model_layer.forward_layer)
-                    reinitialize_layer_weights(rnn_or_model_layer.backward_layer)
+                if isinstance(layer_, layers.Bidirectional):
+                    reinitialize_layer_weights(layer_.forward_layer)
+                    reinitialize_layer_weights(layer_.backward_layer)
                 # Otherwise, just re-initialise as a normal layer
                 else:
-                    reinitialize_layer_weights(rnn_or_model_layer)
+                    reinitialize_layer_weights(layer_)
 
         # Otherwise, this is just a single layer
         else:
