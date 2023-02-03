@@ -327,7 +327,8 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     sigma = np.sqrt(np.log(2 * range_))
 
     stds_layer = model.get_layer("stds")
-    stds_layer.diagonals_layer.regularizer = regularizers.LogNormal(
+    learnable_tensor_layer = stds_layer.layers[0]
+    learnable_tensor_layer.regularizer = regularizers.LogNormal(
         mu, sigma, epsilon, n_batches
     )
 
@@ -339,7 +340,8 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     nu = n_channels - 1 + 0.1
 
     fcs_layer = model.get_layer("fcs")
-    fcs_layer.flattened_cholesky_factors_layer.regularizer = (
+    learnable_tensor_layer = fcs_layer.layers[0]
+    learnable_tensor_layer.regularizer = (
         regularizers.MarginalInverseWishart(
             nu,
             epsilon,

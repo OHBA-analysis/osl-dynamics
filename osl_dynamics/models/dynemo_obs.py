@@ -318,7 +318,8 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     sigma = np.diag((range_ / 2) ** 2)
 
     means_layer = model.get_layer(layer_name)
-    means_layer.vectors_layer.regularizer = regularizers.MultivariateNormal(
+    learnable_tensor_layer = means_layer.layers[0]
+    learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(
         mu, sigma, n_batches
     )
 
@@ -338,13 +339,15 @@ def set_covariances_regularizer(
     if diagonal:
         mu = np.zeros([n_channels], dtype=np.float32)
         sigma = np.sqrt(np.log(2 * range_))
-        covs_layer.diagonals_layer.regularizer = regularizers.LogNormal(
+        learnable_tensor_layer = covs_layer.layers[0]
+        learnable_tensor_layer.regularizer = regularizers.LogNormal(
             mu, sigma, epsilon, n_batches
         )
 
     else:
         nu = n_channels - 1 + 0.1
         psi = np.diag(range_)
-        covs_layer.flattened_cholesky_factors_layer.regularizer = (
+        learnable_tensor_layer = covs_layer.layers[0]
+        learnable_tensor_layer.regularizer = (
             regularizers.InverseWishart(nu, psi, epsilon, n_batches)
         )

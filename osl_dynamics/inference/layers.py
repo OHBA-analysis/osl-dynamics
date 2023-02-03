@@ -249,18 +249,18 @@ class SoftmaxLayer(layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        initial_temperature = np.array(initial_temperature).astype("float32")
-        self.temperature_layer = LearnableTensorLayer(
-            learn=learn_temperature,
-            initial_value=initial_temperature,
-            initializer=None,
-            regularizer=None,
-            name=self.name + "_kernel",
-        )
-        self.layers = [self.temperature_layer]
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(),
+                learn=learn_temperature,
+                initial_value=initial_temperature,
+                name=self.name + "_kernel",
+            )
+        ]
 
     def call(self, inputs, **kwargs):
-        return activations.softmax(inputs / self.temperature_layer(inputs), axis=2)
+        temperature = self.layers[0](inputs)
+        return activations.softmax(inputs / temperature, axis=2)
 
 
 class LearnableTensorLayer(layers.Layer):
@@ -268,60 +268,83 @@ class LearnableTensorLayer(layers.Layer):
 
     Parameters
     ----------
-    learn : bool
-        Should we learn the tensor?
-    initial_value : float
-        Initial value for the tensor.
-    initializer : tf.keras.initializers.Initializer
-        Initializer for the tensor if initial_value = None.
     shape : tuple
         Shape of the tensor.
-    regularizer : tf.keras.regularizers.Regularizer
-        Regularizer for the tensor.
+    learn : bool
+        Should we learn the tensor?
+    initializer : tf.keras.initializers.Initializer
+        Initializer for the tensor.
+    initial_value : float
+        Initial value for the tensor if initializer is not passed.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
         self,
-        learn,
-        initial_value,
-        initializer,
-        shape=(),
+        shape,
+        learn=True,
+        initializer=None,
+        initial_value=None,
         regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.learn = learn
-        self.shape = shape
-        if initial_value is not None:
-            if initial_value.shape != shape:
-                raise ValueError(
-                    "Shape of initial_value must match that of the tensor."
-                )
-            initial_value = initial_value.astype("float32")
-            self.tensor_initializer = osld_initializers.WeightInitializer(initial_value)
-        else:
-            self.tensor_initializer = initializer
 
+        # Bool for if we're learning the tensor
+        self.learn = learn
+
+        # Shape of the tensor
+        if shape is None:
+            raise ValueError("A shape must be passed to LearnableTensorLayer.")
+        self.shape = shape
+
+        # Initial value of the tensor
+        self.initial_value = initial_value
+        if self.initial_value is not None:
+            self.initial_value = np.array(initial_value).astype(np.float32)
+
+        # Setup the tensor initializer
+        if initializer is None:
+            # Initializer not passed, use the initial value
+            if self.initial_value is None:
+                raise ValueError("initializer or initial_value must be passed.")
+            elif self.initial_value.shape != shape:
+                raise ValueError(
+                    "Shape of initial_value must match that of the tensor. "
+                    + f"Expected {shape}, got {self.initial_value.shape}."
+                )
+            self.initializer = osld_initializers.WeightInitializer(self.initial_value)
+        else:
+            # Use the initializer passed, initial_value is ignored
+            self.initializer = initializer
+
+        # Regularizer for the tensor
+        # This should be a function of the tensor that returns a float
         self.regularizer = regularizer
 
     def add_regularization(self, tensor, inputs):
+        # Calculate the regularisation from the tensor
         reg = self.regularizer(tensor)
 
-        # Calculate the scaling factor for the regularisation
+        # Calculate the scaling factor for the regularization
+        # Note, inputs.shape[0] must be the batch size
         batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
         n_batches = self.regularizer.n_batches
         scaling_factor = batch_size * n_batches
         reg /= scaling_factor
 
+        # Add regularization to the loss and display while training
         self.add_loss(reg)
         self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
+        # Create a weight for the tensor
         self.tensor = self.add_weight(
             "tensor",
             shape=self.shape,
             dtype=tf.float32,
-            initializer=self.tensor_initializer,
+            initializer=self.initializer,
             trainable=self.learn,
         )
         self.built = True
@@ -334,7 +357,6 @@ class LearnableTensorLayer(layers.Layer):
 
 class VectorsLayer(layers.Layer):
     """Layer to learn a set of vectors.
-    This is a special case of LearnableTensorLayer.
 
     Parameters
     ----------
@@ -347,7 +369,7 @@ class VectorsLayer(layers.Layer):
     initial_value : np.ndarray
         Initial value for the vectors.
     initializer : tf.keras.initializers.Initializer
-        Initializer for the vectors if initial_value = None.
+        Initializer for the vectors if initial_value is None.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for vectors.
     """
@@ -364,26 +386,30 @@ class VectorsLayer(layers.Layer):
     ):
         super().__init__(**kwargs)
 
-        # Set initializer if both initial_value and initializer are None.
+        # Set initializer and initial value
         if initial_value is None and initializer is None:
             if learn:
                 initializer = initializers.TruncatedNormal(mean=0, stddev=0.02)
             else:
                 initializer = initializers.Zeros()
 
-        self.vectors_layer = LearnableTensorLayer(
-            learn=learn,
-            initial_value=initial_value,
-            initializer=initializer,
-            shape=(n, m),
-            regularizer=regularizer,
-            name=self.name + "_kernel",
-        )
-        # for resetting weights
-        self.layers = [self.vectors_layer]
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_value,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
+            )
+        ]
 
-    def call(self, inputs, training=None, **kwargs):
-        return self.vectors_layer(inputs, training)
+    def call(self, inputs, **kwargs):
+        learnable_tensors_layer = self.layers[0]
+        vectors = learnable_tensors_layer(inputs, **kwargs)
+        return vectors
 
 
 class CovarianceMatricesLayer(layers.Layer):
@@ -406,7 +432,7 @@ class CovarianceMatricesLayer(layers.Layer):
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
     initializer : tf.keras.initializers.Initializer
-        Initializer for the covariances if initial_value = None.
+        Initializer for the covariances if initial_value is None.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for matrices.
     """
@@ -428,34 +454,47 @@ class CovarianceMatricesLayer(layers.Layer):
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
+        # Do we have an initial value?
         if initial_value is not None:
+            # Check it's the correct shape
+            if initial_value.shape != (n, m, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
+
+            # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
         else:
-            # else we need to provide an initializer, create one if initializer not provided.
+            # No initial value has been passed
             initial_flattened_cholesky_factors = None
             if initializer is None:
                 if learn:
+                    # Use a random initializer
                     initializer = osld_initializers.NormalIdentityCholeskyInitializer(
                         std=0.1
                     )
                 else:
+                    # Use the identity matrix for each mode/state
                     initializer = osld_initializers.IdentityCholeskyInitializer()
 
-        self.flattened_cholesky_factors_layer = LearnableTensorLayer(
-            learn=learn,
-            initial_value=initial_flattened_cholesky_factors,
-            initializer=initializer,
-            shape=(n, m * (m + 1) // 2),
-            regularizer=regularizer,
-            name=self.name + "_kernel",
-        )
-        self.layers = [self.flattened_cholesky_factors_layer]
+        # Create a layer to learn the covariance matrices
+        #
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m * (m + 1) // 2),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_flattened_cholesky_factors,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
+            )
+        ]
 
-    def call(self, inputs, training=None, **kwargs):
-        covariances = self.bijector(
-            self.flattened_cholesky_factors_layer(inputs=inputs, training=training)
-        )
+    def call(self, inputs, **kwargs):
+        learnable_tensor_layer = self.layers[0]
+        flattened_cholesky_factors = learnable_tensor_layer(inputs, **kwargs)
+        covariances = self.bijector(flattened_cholesky_factors)
         covariances = add_epsilon(covariances, self.epsilon, diag=True)
         return covariances
 
@@ -501,34 +540,47 @@ class CorrelationMatricesLayer(layers.Layer):
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
 
+        # Do we have an initial value?
         if initial_value is not None:
+            # Check it's the correct shape
+            if initial_value.shape != (n, m, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
+
+            # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
         else:
-            # else we need to provide an initializer, create one if initializer not provided.
+            # No initial value has been passed
             initial_flattened_cholesky_factors = None
             if initializer is None:
                 if learn:
+                    # Use a random initializer
                     initializer = (
                         osld_initializers.NormalCorrelationCholeskyInitializer(std=0.1)
                     )
                 else:
+                    # Use the identity matrix for each mode/state
                     initializer = osld_initializers.IdentityCholeskyInitializer()
 
-        self.flattened_cholesky_factors_layer = LearnableTensorLayer(
-            learn=learn,
-            initial_value=initial_flattened_cholesky_factors,
-            initializer=initializer,
-            shape=(n, m * (m - 1) // 2),
-            regularizer=regularizer,
-            name=self.name + "_kernel",
-        )
-        self.layers = [self.flattened_cholesky_factors_layer]
+        # Create a layer to learn the correlation matrices
+        #
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m * (m - 1) // 2),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_flattened_cholesky_factors,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
+            )
+        ]
 
-    def call(self, inputs, training=None, **kwargs):
-        correlations = self.bijector(
-            self.flattened_cholesky_factors_layer(inputs=inputs, training=training)
-        )
+    def call(self, inputs, **kwargs):
+        learnable_tensor_layer = self.layers[0]
+        flattened_cholesky_factors = learnable_tensor_layer(inputs, **kwargs)
+        correlations = self.bijector(flattened_cholesky_factors)
         correlations = add_epsilon(correlations, self.epsilon, diag=True)
         return correlations
 
@@ -571,33 +623,47 @@ class DiagonalMatricesLayer(layers.Layer):
         # Softplus transformation to ensure diagonal is positive
         self.bijector = tfb.Softplus()
 
+        # Do we have an initial value?
         if initial_value is not None:
+            # Check it's the correct shape
+            if initial_value.shape != (n, m, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}).")
+
+            # Calculate the initial value of the learnable tensor
             initial_value = initial_value.astype("float32")
             initial_diagonals = self.bijector.inverse(initial_value)
         else:
-            # else we need to provide an initializer, create one if initializer not provided.
+            # No initial value has been passed
             initial_diagonals = None
             if initializer is None:
                 if learn:
+                    # Use a random initializer
                     initializer = osld_initializers.NormalDiagonalInitializer(std=0.05)
                 else:
+                    # Use the identity matrix for each mode/state
                     initializer = osld_initializers.IdentityCholeskyInitializer()
 
-        self.diagonals_layer = LearnableTensorLayer(
-            learn=learn,
-            initial_value=initial_diagonals,
-            initializer=initializer,
-            shape=(n, m),
-            regularizer=regularizer,
-            name=self.name + "_kernel",
-        )
-        self.layers = [self.diagonals_layer]
+        # Create a layer to learn the matrices
+        #
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_diagonals,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
+            )
+        ]
 
-    def call(self, inputs, training=None, **kwargs):
-        D = self.bijector(self.diagonals_layer(inputs=inputs, training=training))
-        D = add_epsilon(D, self.epsilon)
-        D = tf.linalg.diag(D)
-        return D
+    def call(self, inputs, **kwargs):
+        learnable_tensor_layer = self.layers[0]
+        diagonals = learnable_tensor_layer(inputs, **kwargs)
+        diagonals = self.bijector(diagonals)
+        diagonals = add_epsilon(diagonals, self.epsilon)
+        return tf.linalg.diag(diagonals)
 
 
 class MatrixLayer(layers.Layer):
@@ -646,7 +712,7 @@ class MatrixLayer(layers.Layer):
         self.layers = [self.matrix_layer]
 
     def call(self, inputs, **kwargs):
-        return self.matrix_layer(inputs)[0]
+        return self.matrix_layer(inputs, **kwargs)[0]
 
 
 class MixVectorsLayer(layers.Layer):
