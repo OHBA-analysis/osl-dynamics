@@ -10,15 +10,12 @@ from os import path
 from shutil import rmtree
 
 import numpy as np
-import yaml
-from pqdm.threads import pqdm
 from scipy import signal
 from tqdm import tqdm
+from pqdm.threads import pqdm
 
 from osl_dynamics.data import processing, rw, tf
 from osl_dynamics.utils import misc
-
-from time import sleep
 
 
 class Data:
@@ -177,34 +174,6 @@ class Data:
         else:
             return self.subjects
 
-    @classmethod
-    def from_yaml(cls, file, **kwargs):
-        instance = misc.class_from_yaml(cls, file, kwargs)
-
-        with open(file) as f:
-            settings = yaml.load(f, Loader=yaml.Loader)
-
-        if issubclass(cls, Data):
-            try:
-                cls._process_from_yaml(instance, file, **kwargs)
-            except AttributeError:
-                pass
-
-        training_dataset = instance.training_dataset(
-            sequence_length=settings["sequence_length"],
-            batch_size=settings["batch_size"],
-        )
-        prediction_dataset = instance.prediction_dataset(
-            sequence_length=settings["sequence_length"],
-            batch_size=settings["batch_size"],
-        )
-
-        return {
-            "data": instance,
-            "training_dataset": training_dataset,
-            "prediction_dataset": prediction_dataset,
-        }
-
     def delete_dir(self):
         """Deletes store_dir."""
         if self.store_dir.exists():
@@ -335,18 +304,6 @@ class Data:
         n_channels = [memmap.shape[-1] for memmap in self.raw_data_memmaps]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
-
-    def _process_from_yaml(self, file, **kwargs):
-        with open(file) as f:
-            settings = yaml.load(f, Loader=yaml.Loader)
-
-        prep_settings = settings.get("prepare", {})
-        if prep_settings.get("do", False):
-            self.prepare(
-                n_embeddings=prep_settings.get("n_embeddings"),
-                n_pca_components=prep_settings.get("n_pca_components", None),
-                whiten=prep_settings.get("whiten", False),
-            )
 
     def filter(self, low_freq=None, high_freq=None):
         """Filter the raw data.
