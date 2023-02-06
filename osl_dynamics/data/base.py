@@ -222,26 +222,18 @@ class Data:
         # self.raw_data_filenames is not used if self.inputs is a list of strings,
         # where the strings are paths to .npy files
 
-        if self.n_jobs == 1:
-            # Load data in serial
-            memmaps = []
-            for raw_data, mmap_location in zip(
-                tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
-            ):
-                memmaps.append(self.make_memmap(raw_data, mmap_location))
-
-        else:
-            # Load data in parallel
-            partial_make_memmap = partial(self.make_memmap)
-            args = zip(self.inputs, raw_data_filenames)
-            memmaps = pqdm(
-                args,
-                partial_make_memmap,
-                n_jobs=self.n_jobs,
-                desc="Loading files",
-                argument_type="args",
-                ncols=98,
-            )
+        # Load data
+        partial_make_memmap = partial(self.make_memmap)
+        args = zip(self.inputs, raw_data_filenames)
+        memmaps = pqdm(
+            args,
+            partial_make_memmap,
+            n_jobs=self.n_jobs,
+            desc="Loading files",
+            argument_type="args",
+            ncols=98,
+            total=len(self.inputs),
+        )
 
         return memmaps, raw_data_filenames
 
@@ -460,10 +452,11 @@ class Data:
 
         prepared_data_memmaps = pqdm(
             prepare_args,
-            self._prepare_amp_env,
+            self.apply_amp_env,
             desc="Preparing data",
             n_jobs=self.n_jobs,
             argument_type="args",
+            ncols=98,
             total=len(self.raw_data_memmaps),
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
@@ -473,7 +466,22 @@ class Data:
 
         self.prepared = True
 
-    def _prepare_amp_env(self, raw_data_memmap, prepared_data_file):
+    def apply_amp_env(self, raw_data_memmap, prepared_data_file):
+        """Applies filtering, a Hilbert transform and standardization to raw data.
+
+        Parameters
+        ----------
+        raw_data_memmap : np.memmap or np.ndarray
+            Raw data.
+        prepared_data_file : str
+            Name of memory map file to save prepared data to.
+            Can be None if we are not using memory maps.
+
+        Returns
+        -------
+        prepared_data_memmap : np.memmap or np.ndarray
+            Prepared data.
+        """
         # Filtering
         prepared_data = processing.temporal_filter(
             raw_data_memmap, self.low_freq, self.high_freq, self.sampling_frequency
@@ -584,10 +592,11 @@ class Data:
 
         prepared_data_memmaps = pqdm(
             prepare_args,
-            self._prepare_tde,
+            self.apply_tde_pca,
             desc="Preparing data",
             n_jobs=self.n_jobs,
             argument_type="args",
+            ncols=98,
             total=len(self.raw_data_memmaps),
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
@@ -597,11 +606,24 @@ class Data:
 
         self.prepared = True
 
-    def _prepare_tde(
-        self,
-        raw_data_memmap,
-        prepared_data_file,
-    ):
+    def apply_tde_pca(self, raw_data_memmap, prepared_data_file):
+        """Applies time-delay embeddings, principal component analysis and
+        standardization to raw data.
+
+        Parameters
+        ----------
+        raw_data_memmap : np.memmap or np.ndarray
+            Raw data.
+        prepared_data_file : str
+            Name of memory map file to save prepared data to.
+            Can be None if we are not using memory maps.
+
+        Returns
+        -------
+        prepared_data_memmap : np.memmap or np.ndarray
+            Prepared data.
+        """
+
         # Standardise and time embed the data
         std_data = processing.standardize(raw_data_memmap)
         te_std_data = processing.time_embed(std_data, self.n_embeddings)
