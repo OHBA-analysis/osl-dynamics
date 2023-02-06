@@ -17,19 +17,32 @@ Various models are implemented in osl-dynamics. Links to a description of each a
 Tutorials
 ---------
 
-The following tutorials illustrate some of the analysis that can be done with osl-dynamics:
+The following tutorials illustrate basic usage and analysis that can be done with osl-dynamics.
 
-- :doc:`tutorials_build/static_network_analysis`.
-- :doc:`tutorials_build/sliding_window_network_analysis`.
-- :doc:`tutorials_build/dynemo_minimal_code`.
+**Data tutorials**:
+
+- :doc:`tutorials_build/data_loading`.
+- :doc:`tutorials_build/data_preparation`.
+
+**Static modelling tutorials**:
+
+- :doc:`tutorials_build/static_spectra_analysis`.
+- :doc:`tutorials_build/static_power_analysis`.
+- :doc:`tutorials_build/static_aec_analysis`.
+
+**Dynamic modelling tutorials**:
+
+- :doc:`tutorials_build/sliding_window_analysis`.
 - :doc:`tutorials_build/hmm_simulation`.
-- :doc:`tutorials_build/hmm_resting_network_analysis_part1`.
-- :doc:`tutorials_build/hmm_resting_network_analysis_part2`.
+- :doc:`tutorials_build/hmm_training_real_data`.
+- :doc:`tutorials_build/hmm_summary_stats_analysis`.
+- :doc:`tutorials_build/hmm_power_analysis`.
+- :doc:`tutorials_build/hmm_coherence_analysis`.
+- :doc:`tutorials_build/hmm_evoked_response_analysis`.
+- :doc:`tutorials_build/dynemo_minimal_code`.
+
+**Other**:
+
+- :doc:`tutorials_build/statistical_significance_testing`.
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
-
-Full Pipelines
---------------
-
-The repo contains `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ for full analysis pipelines.
-Scripts to reproduce published results are in the examples directory.

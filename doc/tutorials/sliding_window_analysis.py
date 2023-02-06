@@ -1,80 +1,68 @@
 """
-Sliding Window Network Analysis
-===============================
-
-In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyse source space MEG data. We will use the same dataset as the Static Network Analysis tutorial.
+Sliding Window Analysis
+=======================
+ 
+In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyse source space MEG data.
  
 This tutorial covers:
  
 1. Getting the Data
 2. Estimating Networks using a Sliding Window
 3. Clustering the Networks
- 
-The input to this script is:
 
-- A set of time series (one for each subject you have). In this tutorial we will download some example data.
- 
-The output of this script is:
-
-- Glass brain plots of a set of dynamics networks calculated using the data.
-
-Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine. The expected output of this script can be found `here <https://osf.io/zc259>`_.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/8ac7v>`_ for the expected output.
 """
 
 #%%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^
 # 
-# We will use eyes open resting-state data that has already been source reconstructed. We call this the 'Nottingham dataset'. This dataset is:
+# We will use eyes open resting-state data that has already been source reconstructed. This dataset is:
 #
 # - From 10 subjects.
 # - Parcellated to 42 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
-
-#%%
+# 
 # Download the dataset
 # ********************
 # 
-# We will download the data a project hosted on OSF.
+# We will download example data hosted on `OSF <https://osf.io/zxb6c/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
+#
+#     !pip install osfclient
 
 import os
 
-def get_notts_data():
-    """Downloads the Nottingham dataset from OSF."""
-    if os.path.exists("notts_dataset"):
-        return "notts_dataset already downloaded. Skipping.."
-    os.system("osf -p zxb6c fetch Dynamics/notts_dataset.zip")
-    os.system("unzip -o notts_dataset.zip -d notts_dataset")
-    os.remove("notts_dataset.zip")
-    return "Data downloaded to: notts_dataset"
+def get_data(name):
+    if os.path.exists(name):
+        return f"{name} already downloaded. Skipping.."
+    os.system(f"osf -p zxb6c fetch Dynamics/data/datasets/{name}.zip")
+    os.system(f"unzip -o {name}.zip -d {name}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {name}"
 
-# Download the dataset (it is 113 MB)
-get_notts_data()
+# Download the dataset (approximately 113 MB)
+get_data("notts_rest_10_subj")
 
-#%%
 # List the contents of the downloaded directory containing the dataset
-get_ipython().system('ls notts_dataset')
+os.listdir("notts_rest_10_subj")
 
 #%%
 # Load the data
 # *************
 # 
-# We now load the data into osl-dynamics using the Data object. This is a python class which has a lot of useful methods that can be used to modify the data. See the `API reference guide <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osf.io/ejxut>`_ for further details.
 
 from osl_dynamics.data import Data
 
-data = Data("notts_dataset")
+data = Data("notts_rest_10_subj")
 
 # Display some summary information
 print(data)
 
 #%%
-# Note, when we load data using the Data object, it creates a `/tmp` directory which is used for storing temporary data. This directory can be safely deleted after you run your script. You can specify the name of the temporary directory by pass the `store_dir="..."` argument to the Data object.
-# 
-# For static analysis we just need the time series for the parcellated data. We can access this using the `Data.time_series` method. This returns a list of numpy arrays. Each numpy array is a `(n_samples, n_channels)` time series for each subject.
+# For the sliding window analysis we just need the time series for the parcellated data. We can access this using the `time_series` method.
 
-# Get the parcellated data time series as a list of numpy arrays
 ts = data.time_series()
 
 #%%
@@ -98,7 +86,7 @@ ts = data.time_series()
 # Sliding window connectivity using the Pearson correlation
 # *********************************************************
 # 
-# Now that we have loaded the data we want to study, let's estimate sliding window networks. The first thing we need to do is choose the the metric for connectivity we will use. In this tutorial we're use the absolute value of the Pearson correlation of the source space time series. osl-dynamics has a function for calculating sliding window networks: analysis.connectivity.sliding_window_connectivity. Let's use this function to calculate dynamics networks.
+# Now that we have loaded the data we want to study, let's estimate sliding window networks. The first thing we need to do is choose the the metric for connectivity we will use. In this tutorial we're use the absolute value of the Pearson correlation of the source space time series. osl-dynamics has a function for calculating sliding window networks: `analysis.connectivity.sliding_window_connectivity <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.sliding_window_connectivity>`_. Let's use this function to calculate dynamics networks.
 
 from osl_dynamics.analysis import connectivity
 
@@ -126,25 +114,24 @@ connectivity.save(
 
 #%%
 # Clearly, these networks are very noisy. The large number of networks also makes the sliding window networks difficult to intepret. A common next step is to cluster the sliding window networks to give a discrete set of networks. We'll do this next.
-
-#%%
+#
 # Clustering the Networks
 # ^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# Kmeans clustering
-# *****************
+# K-means clustering
+# ******************
 #
-# The most common approach used for clustering is the Kmeans algorithm. We will use sci-kit learn's Kmeans class to cluster the sliding window connectivities. The documentation for sci-kit learn's Kmeans class is `here <https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html>`_.
+# The most common approach used for clustering is the K-means algorithm. We will use sci-kit learn's K-means class to cluster the sliding window connectivities. The documentation for sci-kit learn's K-means class is `here <https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html>`_.
 # 
-# First, let's initiate a Kmeans object. When we do this we need to specify the number of clusters. We will use 6.
+# First, let's initiate a K-means object. When we do this we need to specify the number of clusters. We will use 6.
 
 from sklearn.cluster import KMeans
 
-# Initiate the Kmeans class
-kmeans = KMeans(n_clusters=6, verbose=1)
+# Initiate the K-means class
+kmeans = KMeans(n_clusters=6, verbose=0)
 
 #%%
-# Next, we need to prepare the input for the Kmeans algorithm. It requires a set of vectors, which is stored as a 2D numpy array. To convert our connectivity matrices to vectors, we will simply take the upper right triangle. We can do this because we know correlation matrices are symmetric.
+# Next, we need to prepare the input for the K-means algorithm. It requires a set of vectors, which is stored as a 2D numpy array. To convert our connectivity matrices to vectors, we will simply take the upper right triangle. We can do this because we know correlation matrices are symmetric.
 
 # Get indices that correspond to an upper triangle of a matrix
 # (not including the diagonal)
@@ -195,19 +182,10 @@ connectivity.save(
 )
 
 #%%
-# We can see clustering the networks significantly improves them. We can see well known functional systems in these networks, for example:
+# We can see clustering the networks significantly improves them.
 #
-# - The 1st network shows parietal connectivity.
-# - The 2nd network shows frontal connectivity.
-# - The 3rd network shows parietal/temporal connectivity.
-# - The 4rd network shows occiptal connectivity.
-# - The 5th network shows sensorimotor connectivity.
-# - The 6th network shows temporal/frontal connectivity.
-
-#%%
 # Wrap Up
 # ^^^^^^^
 # 
 # - We have applied a sliding window analysis to MEG data.
 # - We have shown clustering sliding window connectivity matrices gives reasonable functional networks.
-
