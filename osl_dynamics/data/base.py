@@ -496,12 +496,6 @@ class Data:
         self.prepare_memmap_filenames()
 
         # Prepare the data
-        # for raw_data_memmap, prepared_data_file in zip(
-        #     tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
-        #     self.prepared_data_filenames,
-        # ):
-        #     self.prepared_data_memmaps.append(prepared_data_memmap)
-
         prepare_args = zip(
             self.raw_data_memmaps,
             self.prepared_data_filenames,
