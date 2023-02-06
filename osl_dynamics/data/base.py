@@ -631,6 +631,7 @@ class Data:
             desc="Preparing data",
             n_jobs=self.n_jobs,
             argument_type="args",
+            total=len(self.raw_data_memmaps),
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
