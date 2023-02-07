@@ -19,6 +19,7 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
+import osl_dynamics
 from osl_dynamics import data
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import get_argument, replace_argument, NumpyLoader
@@ -99,6 +100,7 @@ class ModelBase:
     Acts as a wrapper for a standard Keras model.
     """
 
+    osld_version = None
     config_type = None
 
     def __init__(self, config):
@@ -388,6 +390,7 @@ class ModelBase:
             config_dict[key] = None
 
         with open(f"{dirname}/config.yml", "w") as file:
+            file.write(f"# osl-dynamics version: {osl_dynamics.__version__}\n")
             yaml.dump(config_dict, file)
 
     def save(self, dirname):
@@ -405,10 +408,48 @@ class ModelBase:
             f"{dirname}/weights"
         )  # will use the keras method: self.model.save_weights()
 
+    @staticmethod
+    def load_config(dirname):
+        """Load a config object from a .yml file.
+
+        Parameters
+        ----------
+        dirname : str
+            Directory to load config.yml from.
+
+        Returns
+        -------
+        config : dict
+            Dictionary containing values used to create the Config object.
+        version : str
+            Version used to train the model.
+        """
+
+        # Load config dict
+        with open(f"{dirname}/config.yml", "r") as file:
+            config_dict = yaml.load(file, NumpyLoader)
+
+        # Check what version the model was trained with
+        version_comments = []
+        with open(f"{dirname}/config.yml", "r") as file:
+            for line in file.readlines():
+                if "osl-dynamics version" in line:
+                    version_comments.append(line)
+        if len(version_comments) == 0:
+            model.osld_version = "<1.1.6"
+        elif len(version_comments) == 1:
+            version = version_comments[0].split(":")[-1].strip()
+        else:
+            raise ValueError(
+                "version could not be read from config.yml. Make sure there "
+                + "is only one comment containing the version in config.yml"
+            )
+
+        return config_dict, version
+
     @classmethod
     def load(cls, dirname):
-        """
-        Load model from dirname.
+        """Load model from dirname.
 
         Parameters
         ----------
@@ -417,17 +458,18 @@ class ModelBase:
 
         Returns
         -------
-        model
+        model : Model
             Model object.
         """
         print("Loading model:", dirname)
 
-        # Get the config
-        with open(f"{dirname}/config.yml", "r") as f:
-            config_dict = yaml.load(f, NumpyLoader)
-
+        # Load config
+        config_dict, version = cls.load_config(dirname)
         config = cls.config_type(**config_dict)
+
+        # Create model
         model = cls(config)
+        model.osld_version = version
 
         # Restore weights
         model.load_weights(f"{dirname}/weights").expect_partial()
