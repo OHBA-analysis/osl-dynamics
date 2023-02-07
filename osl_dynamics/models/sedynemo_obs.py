@@ -308,7 +308,10 @@ class Model(ModelBase):
             the model?
         """
         dynemo_obs.set_covariances(
-            self.model, group_covariances, update_initializer, layer_name="group_covs"
+            model=self.model,
+            covariances=group_covariances,
+            update_initializer=update_initializer,
+            layer_name="group_covs",
         )
 
 
