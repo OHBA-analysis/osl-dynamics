@@ -2,8 +2,6 @@
 DyNeMo with Minimal Code
 ========================
 This tutorial covers example use of DyNeMo (Dynamic Network Modes) with the minimum amount of code possible.
-
-Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine.
 """
 
 #%%
@@ -35,9 +33,8 @@ from osl_dynamics.models.dynemo import Config, Model
 training_data = Data([f"subject{i}.npy" for i in range(10)])
 
 #%%
-# You can pass your own data to the Data object, any numpy file containing a 2D array should be fine. If you would like to download example data, see the Static Network Analysis tutorial.
-
-#%%
+# You can pass your own data to the Data object, any numpy file containing a 2D array should be fine.
+#
 # Preparing the Data
 # ^^^^^^^^^^^^^^^^^^
 #
@@ -54,8 +51,7 @@ training_data.prepare(amplitude_envelope=True)
 
 #%%
 # Calling `training_data.time_series()` will now return the prepared data. The original data is still accessible with the `raw_data` attribute.
-
-#%%
+#
 # Saving and Loading Prepared Data
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
