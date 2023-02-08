@@ -1126,7 +1126,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class ConcatEmbeddingLayer(layers.Layer):
+class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.
 
     The concatenated embeddings are obtained by concatenating subject embeddings
@@ -1214,7 +1214,7 @@ class SubjectMapLayer(layers.Layer):
         return subject_map
 
 
-class MixSubjectEmbeddingParametersLayer(layers.Layer):
+class MixSubjectSpecificParametersLayer(layers.Layer):
     """Class for mixing means and covariances for the
     subject embedding model.
 

@@ -17,9 +17,9 @@ from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
-    ConcatEmbeddingLayer,
+    ConcatEmbeddingsLayer,
     SubjectMapLayer,
-    MixSubjectEmbeddingParametersLayer,
+    MixSubjectSpecificParametersLayer,
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
@@ -61,10 +61,10 @@ class Config(BaseModelConfig):
 
     n_subjects : int
         Number of subjects.
-    subject_embedding_dim : int
-        Number of dimensions for the subject embedding.
-    mode_embedding_dim : int
-        Number of dimensions for the mode embedding in the spatial maps encoder.
+    subject_embeddings_dim : int
+        Number of dimensions for the subject embeddings.
+    mode_embeddings_dim : int
+        Number of dimensions for the mode embeddings in the spatial maps encoder.
 
     dev_inf_n_layers : int
         Number of layers for the inference MLP for deviations.
@@ -119,8 +119,8 @@ class Config(BaseModelConfig):
 
     # Parameters specific to subject embedding model
     n_subjects: int = None
-    subject_embedding_dim: int = None
-    mode_embedding_dim: int = None
+    subject_embeddings_dim: int = None
+    mode_embeddings_dim: int = None
 
     dev_inf_n_layers: int = 0
     dev_inf_n_units: int = None
@@ -152,11 +152,11 @@ class Config(BaseModelConfig):
     def validate_subject_embedding_parameters(self):
         if (
             self.n_subjects is None
-            or self.subject_embedding_dim is None
-            or self.mode_embedding_dim is None
+            or self.subject_embeddings_dim is None
+            or self.mode_embeddings_dim is None
         ):
             raise ValueError(
-                "n_subjects, subject_embedding_dim and mode_embedding_dim must be passed."
+                "n_subjects, subject_embeddings_dim and mode_embeddings_dim must be passed."
             )
 
         if self.dev_inf_n_layers != 0 and self.dev_inf_n_units is None:
@@ -198,7 +198,7 @@ class Model(ModelBase):
         Returns
         -------
         subject_embeddings : np.ndarray
-            Embedding vectors for subjects. Shape is (n_subjects, subject_embedding_dim).
+            Embedding vectors for subjects. Shape is (n_subjects, subject_embeddings_dim).
         """
         return get_subject_embeddings(self.model)
 
@@ -208,9 +208,9 @@ class Model(ModelBase):
         Returns
         -------
         means_mode_embeddings : np.ndarray
-            Mode embeddings for means. Shape is (n_modes, mode_embedding_dim).
+            Mode embeddings for means. Shape is (n_modes, mode_embeddings_dim).
         covs_mode_embeddings : np.ndarray
-            Mode embeddings for covs. Shape is (n_modes, mode_embedding_dim).
+            Mode embeddings for covs. Shape is (n_modes, mode_embeddings_dim).
         """
         return get_mode_embeddings(self.model)
 
@@ -219,12 +219,12 @@ class Model(ModelBase):
 
         Returns
         -------
-        means_embedding : np.ndarray
+        means_embeddings : np.ndarray
             Embedding vectors for the mean deviations.
-            Shape is (n_subjects, n_modes, subject_embedding_dim + mode_embedding_dim).
-        covs_embedding : np.ndarray
+            Shape is (n_subjects, n_modes, subject_embeddings_dim + mode_embeddings_dim).
+        covs_embeddings : np.ndarray
             Embedding vectors for the covs deviations.
-            Shape is (n_subjects, n_modes, subject_embedding_dim + mode_embedding_dim).
+            Shape is (n_subjects, n_modes, subject_embeddings_dim + mode_embeddings_dim).
         """
         return get_concatenated_embeddings(self.model)
 
@@ -333,8 +333,8 @@ def _model_structure(config):
 
     # Subject embedding layer
     subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
-    subject_embedding_layer = layers.Embedding(
-        config.n_subjects, config.subject_embedding_dim, name="subject_embeddings"
+    subject_embeddings_layer = layers.Embedding(
+        config.n_subjects, config.subject_embeddings_dim, name="subject_embeddings"
     )
 
     group_means_layer = VectorsLayer(
@@ -354,25 +354,25 @@ def _model_structure(config):
         config.covariances_regularizer,
         name="group_covs",
     )
-    means_mode_embedding_layer = layers.Dense(
-        config.mode_embedding_dim,
-        name="means_mode_embedding",
+    means_mode_embeddings_layer = layers.Dense(
+        config.mode_embeddings_dim,
+        name="means_mode_embeddings",
     )
-    covs_mode_embedding_layer = layers.Dense(
-        config.mode_embedding_dim,
-        name="covs_mode_embedding",
+    covs_mode_embeddings_layer = layers.Dense(
+        config.mode_embeddings_dim,
+        name="covs_mode_embeddings",
     )
-    means_concat_embedding_layer = ConcatEmbeddingLayer(
+    means_concat_embeddings_layer = ConcatEmbeddingsLayer(
         config.n_modes,
         config.n_channels,
         config.n_subjects,
-        name="means_concat_embedding",
+        name="means_concat_embeddings",
     )
-    covs_concat_embedding_layer = ConcatEmbeddingLayer(
+    covs_concat_embeddings_layer = ConcatEmbeddingsLayer(
         config.n_modes,
         config.n_channels,
         config.n_subjects,
-        name="covs_concat_embedding",
+        name="covs_concat_embeddings",
     )
 
     # Inference part of the deviation
@@ -434,38 +434,38 @@ def _model_structure(config):
     subject_covs_layer = SubjectMapLayer(
         "covariances", config.covariances_epsilon, name="subject_covs"
     )
-    mix_subject_means_covs_layer = MixSubjectEmbeddingParametersLayer(
+    mix_subject_means_covs_layer = MixSubjectSpecificParametersLayer(
         name="mix_subject_means_covs"
     )
     ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
 
     # Data flow
     subjects = subjects_layer(data)  # data not used here
-    subject_embeddings = subject_embedding_layer(subjects)
+    subject_embeddings = subject_embeddings_layer(subjects)
 
     group_mu = group_means_layer(data)  # data not used
     group_D = group_covs_layer(data)  # data not used
 
     # spatial map embeddings
-    means_mode_embedding = means_mode_embedding_layer(group_mu)
-    covs_mode_embedding = covs_mode_embedding_layer(
+    means_mode_embeddings = means_mode_embeddings_layer(group_mu)
+    covs_mode_embeddings = covs_mode_embeddings_layer(
         InverseCholeskyLayer(config.covariances_epsilon)(group_D)
     )
 
     # Now get the subject specific spatial maps
-    means_concat_embedding = means_concat_embedding_layer(
-        [subject_embeddings, means_mode_embedding]
+    means_concat_embeddings = means_concat_embeddings_layer(
+        [subject_embeddings, means_mode_embeddings]
     )
-    covs_concat_embedding = covs_concat_embedding_layer(
-        [subject_embeddings, covs_mode_embedding]
+    covs_concat_embeddings = covs_concat_embeddings_layer(
+        [subject_embeddings, covs_mode_embeddings]
     )
 
-    means_dev_inf_input = means_dev_inf_input_layer(means_concat_embedding)
+    means_dev_inf_input = means_dev_inf_input_layer(means_concat_embeddings)
     means_dev_inf_mu = means_dev_inf_mu_layer(means_dev_inf_input)
     means_dev_inf_sigma = means_dev_inf_sigma_layer(means_dev_inf_input)
     means_dev = means_dev_layer([means_dev_inf_mu, means_dev_inf_sigma])
 
-    covs_dev_inf_input = covs_dev_inf_input_layer(covs_concat_embedding)
+    covs_dev_inf_input = covs_dev_inf_input_layer(covs_concat_embeddings)
     covs_dev_inf_mu = covs_dev_inf_mu_layer(covs_dev_inf_input)
     covs_dev_inf_sigma = covs_dev_inf_sigma_layer(covs_dev_inf_input)
     covs_dev = covs_dev_layer([covs_dev_inf_mu, covs_dev_inf_sigma])
@@ -520,10 +520,10 @@ def _model_structure(config):
     kl_loss_layer = KLLossLayer(do_annealing=config.do_kl_annealing, name="kl_loss")
 
     # Data flow
-    means_dev_mod_input = means_dev_mod_input_layer(means_concat_embedding)
+    means_dev_mod_input = means_dev_mod_input_layer(means_concat_embeddings)
     means_dev_mod_sigma = means_dev_mod_sigma_layer(means_dev_mod_input)
 
-    covs_dev_mod_input = covs_dev_mod_input_layer(covs_concat_embedding)
+    covs_dev_mod_input = covs_dev_mod_input_layer(covs_concat_embeddings)
     covs_dev_mod_sigma = covs_dev_mod_sigma_layer(covs_dev_mod_input)
 
     means_dev_kl_loss = means_dev_kl_loss_layer(
@@ -555,51 +555,51 @@ def get_group_means_covariances(model):
 
 
 def get_subject_embeddings(model):
-    subject_embedding_layer = model.get_layer("subject_embeddings")
-    n_subjects = subject_embedding_layer.input_dim
-    return subject_embedding_layer(np.arange(n_subjects)).numpy()
+    subject_embeddings_layer = model.get_layer("subject_embeddings")
+    n_subjects = subject_embeddings_layer.input_dim
+    return subject_embeddings_layer(np.arange(n_subjects)).numpy()
 
 
 def get_mode_embeddings(model):
     cholesky_bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
     group_means, group_covs = get_group_means_covariances(model)
-    means_mode_embedding_layer = model.get_layer("means_mode_embedding")
-    covs_mode_embedding_layer = model.get_layer("covs_mode_embedding")
+    means_mode_embeddings_layer = model.get_layer("means_mode_embeddings")
+    covs_mode_embeddings_layer = model.get_layer("covs_mode_embeddings")
 
-    means_mode_embedding = means_mode_embedding_layer(group_means)
-    covs_mode_embedding = covs_mode_embedding_layer(
+    means_mode_embeddings = means_mode_embeddings_layer(group_means)
+    covs_mode_embeddings = covs_mode_embeddings_layer(
         cholesky_bijector.inverse(group_covs)
     )
 
-    return means_mode_embedding.numpy(), covs_mode_embedding.numpy()
+    return means_mode_embeddings.numpy(), covs_mode_embeddings.numpy()
 
 
 def get_concatenated_embeddings(model):
     subject_embeddings = get_subject_embeddings(model)
-    means_mode_embedding, covs_mode_embedding = get_mode_embeddings(model)
+    means_mode_embeddings, covs_mode_embeddings = get_mode_embeddings(model)
 
-    means_concat_embedding_layer = model.get_layer("means_concat_embedding")
-    covs_concat_embedding_layer = model.get_layer("covs_concat_embedding")
+    means_concat_embeddings_layer = model.get_layer("means_concat_embeddings")
+    covs_concat_embeddings_layer = model.get_layer("covs_concat_embeddings")
 
-    means_concat_embedding = means_concat_embedding_layer(
-        [subject_embeddings, means_mode_embedding]
+    means_concat_embeddings = means_concat_embeddings_layer(
+        [subject_embeddings, means_mode_embeddings]
     )
-    covs_concat_embedding = covs_concat_embedding_layer(
-        [subject_embeddings, covs_mode_embedding]
+    covs_concat_embeddings = covs_concat_embeddings_layer(
+        [subject_embeddings, covs_mode_embeddings]
     )
-    return means_concat_embedding.numpy(), covs_concat_embedding.numpy()
+    return means_concat_embeddings.numpy(), covs_concat_embeddings.numpy()
 
 
 def get_subject_dev(model):
-    means_concat_embedding, covs_concat_embedding = get_concatenated_embeddings(model)
+    means_concat_embeddings, covs_concat_embeddings = get_concatenated_embeddings(model)
     means_dev_inf_input_layer = model.get_layer("means_dev_inf_input")
     covs_dev_inf_input_layer = model.get_layer("covs_dev_inf_input")
     means_dev_inf_layer = model.get_layer("means_dev_inf_mu")
     covs_dev_inf_layer = model.get_layer("covs_dev_inf_mu")
 
-    means_dev_inf_input = means_dev_inf_input_layer(means_concat_embedding)
-    covs_dev_inf_input = covs_dev_inf_input_layer(covs_concat_embedding)
+    means_dev_inf_input = means_dev_inf_input_layer(means_concat_embeddings)
+    covs_dev_inf_input = covs_dev_inf_input_layer(covs_concat_embeddings)
     means_dev = means_dev_inf_layer(means_dev_inf_input)
     covs_dev = covs_dev_inf_layer(covs_dev_inf_input)
 
