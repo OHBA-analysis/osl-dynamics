@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm import trange
 

@@ -54,7 +54,7 @@ model.summary()
 model.random_state_time_course_initialization(training_data, n_epochs=20, n_init=5)
 
 print("Training model")
-history = model.fit(training_data, epochs=config.n_epochs)
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)

@@ -4,7 +4,6 @@
 
 import os
 import re
-import pprint as pp
 from abc import abstractmethod
 from io import StringIO
 from dataclasses import dataclass
@@ -436,7 +435,7 @@ class ModelBase:
                 if "osl-dynamics version" in line:
                     version_comments.append(line)
         if len(version_comments) == 0:
-            model.osld_version = "<1.1.6"
+            version = "<1.1.6"
         elif len(version_comments) == 1:
             version = version_comments[0].split(":")[-1].strip()
         else:
