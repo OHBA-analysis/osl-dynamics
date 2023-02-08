@@ -62,13 +62,13 @@ sim = simulation.MSubj_HMM_MVN(
     subject_covariances="random",
     n_states=config.n_modes,
     n_channels=config.n_channels,
-    n_covariances_act=10,
+    n_covariances_act=2,
     n_subjects=config.n_subjects,
     n_subject_embedding_dim=config.subject_embedding_dim,
     n_mode_embedding_dim=config.mode_embedding_dim,
-    subject_embedding_scale=0.01,
+    subject_embedding_scale=0.001,
     n_groups=3,
-    between_group_scale=0.5,
+    between_group_scale=0.2,
     stay_prob=0.9,
     random_seed=1234,
 )
@@ -84,14 +84,6 @@ model.set_regularizers(training_data)
 
 # Set scaling factor for devation kl loss
 model.set_bayesian_kl_scaling(training_data)
-
-# Initialise model
-model.random_subset_initialization(
-    training_data,
-    n_epochs=20,
-    n_init=5,
-    take=0.2,
-)
 
 print("Training model")
 history = model.fit(training_data, epochs=config.n_epochs)

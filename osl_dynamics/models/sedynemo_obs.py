@@ -17,14 +17,14 @@ from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
-    SubjectDevEmbeddingLayer,
+    ConcatEmbeddingLayer,
     SubjectMapLayer,
     MixSubjectEmbeddingParametersLayer,
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
     SampleNormalDistributionLayer,
-    SubjectMapKLDivergenceLayer,
+    StaticKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
 )
@@ -362,13 +362,13 @@ def _model_structure(config):
         config.mode_embedding_dim,
         name="covs_mode_embedding",
     )
-    means_concat_embedding_layer = SubjectDevEmbeddingLayer(
+    means_concat_embedding_layer = ConcatEmbeddingLayer(
         config.n_modes,
         config.n_channels,
         config.n_subjects,
         name="means_concat_embedding",
     )
-    covs_concat_embedding_layer = SubjectDevEmbeddingLayer(
+    covs_concat_embedding_layer = ConcatEmbeddingLayer(
         config.n_modes,
         config.n_channels,
         config.n_subjects,
@@ -504,14 +504,14 @@ def _model_structure(config):
     )
 
     if config.learn_means:
-        means_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
+        means_dev_kl_loss_layer = StaticKLDivergenceLayer(
             config.theta_std_epsilon, name="means_dev_kl_loss"
         )
     else:
         means_dev_kl_loss_layer = ZeroLayer((), name="means_dev_kl_loss")
 
     if config.learn_covariances:
-        covs_dev_kl_loss_layer = SubjectMapKLDivergenceLayer(
+        covs_dev_kl_loss_layer = StaticKLDivergenceLayer(
             config.theta_std_epsilon, name="covs_dev_kl_loss"
         )
     else:
