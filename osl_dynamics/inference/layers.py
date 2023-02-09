@@ -1327,3 +1327,22 @@ class MultiLayerPerceptronLayer(layers.Layer):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
+
+
+class StandardizationLayer(layers.Layer):
+    """Layer to standardize input tensor along a given axis.
+
+    Parameters
+    ----------
+    axis : int
+        Axis along which to perform standardization.
+    """
+
+    def __init__(self, axis, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+
+    def call(self, inputs, **kwargs):
+        mean = tf.math.reduce_mean(inputs, axis=self.axis, keepdims=True)
+        std = tf.math.reduce_std(inputs, axis=self.axis, keepdims=True)
+        return (inputs - mean) / std

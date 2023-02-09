@@ -4,7 +4,7 @@
 
 import numpy as np
 import tensorflow_probability as tfp
-from tensorflow.keras import Model, layers
+from tensorflow.keras import Model, layers, initializers
 from tensorflow.keras.initializers import Initializer
 from osl_dynamics import inference
 
@@ -117,6 +117,19 @@ class NormalDiagonalInitializer(Initializer):
         m = shape[1]  # n_channels
         diagonals = np.random.normal(1, self.std, size=[n, m]).astype(np.float32)
         return self.bijector.inverse(diagonals)
+
+
+class SoftplusNormalInitializer(Initializer):
+    def __init__(self, mean=0, std=1):
+        self.mean = mean
+        self.std = std
+        self.bijector = tfb.Softplus()
+
+    def __call__(self, shape, dtype=None):
+        x = initializers.TruncatedNormal(mean=self.mean, stddev=self.std).__call__(
+            shape=shape, dtype=dtype
+        )
+        return self.bijector(x)
 
 
 class CopyTensorInitializer(Initializer):
