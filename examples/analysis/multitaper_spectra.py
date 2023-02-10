@@ -6,7 +6,7 @@ from an HMM fit.
 print("Setting up")
 import numpy as np
 from osl_dynamics.analysis import spectral
-from osl_dynamics.data import OSL_HMM, Data
+from osl_dynamics.data import Data, HMM_MAR
 
 # Load the source reconstructed data
 src_data = Data(
@@ -20,8 +20,8 @@ src_data = Data(
 # loss due to to time delay embedding
 ts = src_data.trim_time_series(n_embeddings=15)
 
-# Load an HMM fit
-hmm = OSL_HMM(
+# Load an HMM fit from the MATLAB toolbox
+hmm = HMM_MAR(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-10_K-6/hmm.mat"
 )
 
@@ -29,8 +29,8 @@ hmm = OSL_HMM(
 alp = hmm.state_time_course()
 
 # Sanity check: make sure the length of alphas match the data
-# for i in range(len(ts)):
-#     print(ts[i].shape, alp[i].shape)
+# for x, a in zip(ts, alp):
+#     print(x.shape, a.shape)
 
 # Calculate subject-specific PSDs and coherences using multitaper method
 f, psd, coh, w = spectral.multitaper_spectra(
@@ -44,11 +44,8 @@ f, psd, coh, w = spectral.multitaper_spectra(
     n_jobs=5,
 )
 
-# Group average
-psd = np.average(psd, axis=0, weights=w)
-coh = np.average(coh, axis=0, weights=w)
-
 # Save the spectra
 np.save("f.npy", f)
 np.save("psd.npy", psd)
 np.save("coh.npy", coh)
+np.save("w..npy", w)
