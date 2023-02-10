@@ -1290,6 +1290,10 @@ def plot_matrices(
             else:
                 im = axis.matshow(grid, cmap=cmap)
         axis.set_title(title)
+        if grid.shape[0] > 30:
+            # Don't label the ticks if there's too many
+            axis.set_xticklabels([])
+            axis.set_yticklabels([])
 
     if group_color_scale:
         fig.subplots_adjust(right=0.8)
