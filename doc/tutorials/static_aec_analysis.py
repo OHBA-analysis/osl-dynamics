@@ -1,9 +1,9 @@
 """
 Static: Amplitude Envelope Correlation (AEC) Analysis
 =====================================================
- 
+
 In this tutorial we will perform static AEC analysis on source space MEG data. This tutorial covers:
- 
+
 1. Getting the Data
 2. Calculating AEC Networks
 3. Network Analysis
@@ -116,7 +116,27 @@ print(aec.shape)
 # Visualising networks
 # ********************
 # 
-# We can plot a network using the `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ to plot the first subject's AEC network.
+# A common approach for plotting a network is as a matrix. We can do this with the `plotting.plot_matrices <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_matrices>`_ function in osl-dynamics.
+
+from osl_dynamics.utils import plotting
+
+plotting.plot_matrices(aec, titles=[f"Subject {i+1}" for i in range(len(aec))])
+
+#%%
+# The diagonal is full of ones and is a lot larger then the off-diagonal values. This means our colour scale doesn't show the off-diagonal structure very well. We can zero the diagonal to improve this.
+
+import numpy as np
+
+mat = np.copy(aec)  # we don't want to change the original aec array
+for m in mat:
+    np.fill_diagonal(m, 0)
+
+plotting.plot_matrices(mat, titles=[f"Subject {i+1}" for i in range(len(aec))])
+
+#%%
+# We can now see the off-diagonal structure a bit better. We also see there is a lot of variability between subjects.
+# 
+# Another way we can visualise the network is a glass brain plot. We can do this using the `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ to plot the first subject's AEC network.
 
 from osl_dynamics.analysis import connectivity
 
@@ -169,8 +189,6 @@ connectivity.save(
 # ***********************
 # 
 # Estimating subject-specific connectivity networks is often very noisy. Cleaner networks come out when we average over groups as this removes noise. Let's plot the group average AEC network.
-
-import numpy as np
 
 # Average over the group
 group_aec = np.mean(aec, axis=0)
