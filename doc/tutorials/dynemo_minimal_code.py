@@ -1,5 +1,5 @@
 """
-DyNeMo with Minimal Code
+DyNeMo: Minimal Code
 ========================
 This tutorial covers example use of DyNeMo (Dynamic Network Modes) with the minimum amount of code possible.
 """

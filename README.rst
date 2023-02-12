@@ -4,8 +4,8 @@ osl-dynamics
 
 See the read the docs page for a description of this project: `https://osl-dynamics.readthedocs.io <https://osl-dynamics.readthedocs.io>`_.
 
-Installation (for Developers)
-=============================
+Installation
+============
 
 Here, we describe how to install osl-dynamics from source. We recommend using the conda environment files in ``/envs``. For a generic linux machine, osl-dynamics can be installed in editable mode with:
 
