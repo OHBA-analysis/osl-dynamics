@@ -1774,7 +1774,7 @@ def plot_mode_lifetimes(
     ax : matplotlib.pyplot.axis.
         Matplotlib axis object(s).
     """
-    from osl_dynamics.inference import modes
+    from osl_dynamics.analysis import modes
 
     n_plots = mode_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)

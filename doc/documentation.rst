@@ -40,8 +40,11 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/hmm_coherence_analysis`.
 - :doc:`tutorials_build/hmm_evoked_response_analysis`.
 - :doc:`tutorials_build/dynemo_minimal_code`.
+- :doc:`tutorials_build/dynemo_soft_mix_simulation`.
+- :doc:`tutorials_build/dynemo_long_range_dep_simulation`.
 - :doc:`tutorials_build/dynemo_training_real_data`.
 - :doc:`tutorials_build/dynemo_mixing_coef_analysis`.
+- :doc:`tutorials_build/dynemo_plotting_networks`.
 
 **Other**:
 

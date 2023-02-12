@@ -1,6 +1,6 @@
 """
-HMM: Simulation Tutorial
-========================
+HMM: Simulation
+===============
  
 In this tutorial we will train a Hidden Markov Model (HMM) on simulated data. This tutorial covers:
  
