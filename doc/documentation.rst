@@ -8,11 +8,11 @@ The :doc:`API reference <autoapi/index>` provides documentation for the classes,
 Models
 ------
 
-Various models are implemented in osl-dynamics. Links to a description of each are below.
+Various models are implemented in osl-dynamics. Finalised models that have been used in published papers are described below.
 
-- :doc:`Hidden Markov Model (HMM) <models/hmm>`
-- :doc:`[Multi-] Dynamic Network Modes (M-/DyNeMo) <models/dynemo>`
-- :doc:`[Single/Multi-] Adversarial Generator Encoder (S/MAGE) <models/mage>`
+- :doc:`Hidden Markov Model (HMM) <models/hmm>`.
+- :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
+- :doc:`Multi-Dynamic Adversarial Generator Encoder (MAGE) <models/mage>`.
 
 Tutorials
 ---------
