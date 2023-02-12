@@ -4,6 +4,7 @@
 
 import numpy as np
 import tensorflow_probability as tfp
+import tensorflow as tf
 from tensorflow.keras import Model, layers, initializers
 from tensorflow.keras.initializers import Initializer
 from osl_dynamics import inference
@@ -62,7 +63,9 @@ class NormalIdentityCholeskyInitializer(Initializer):
     def __call__(self, shape, dtype=None):
         n = shape[0]  # n_modes
         m = int(np.sqrt(1 + 8 * shape[1]) / 2 - 0.5)  # n_channels
-        diagonals = np.random.normal(1, self.std, size=[n, m])
+        diagonals = initializers.TruncatedNormal(mean=1, stddev=self.std).__call__(
+            shape=(n, m), dtype=tf.float32
+        )
         matrices = np.array([np.diag(d) for d in diagonals], dtype=np.float32)
         return self.bijector.inverse(matrices)
 
@@ -93,7 +96,9 @@ class NormalCorrelationCholeskyInitializer(Initializer):
         diagonals = np.ones([n, m])
         matrices = np.array([np.diag(d) for d in diagonals], dtype=np.float32)
         cholesky_factors = self.bijector.inverse(matrices)
-        cholesky_factors += np.random.normal(0, self.std, size=cholesky_factors.shape)
+        cholesky_factors += initializers.TruncatedNormal(
+            mean=0, stddev=self.std
+        ).__call__(shape=cholesky_factors.shape, dtype=tf.float32)
         return cholesky_factors
 
 
@@ -115,7 +120,9 @@ class NormalDiagonalInitializer(Initializer):
     def __call__(self, shape, dtype=None):
         n = shape[0]  # n_modes
         m = shape[1]  # n_channels
-        diagonals = np.random.normal(1, self.std, size=[n, m]).astype(np.float32)
+        diagonals = initializers.TruncatedNormal(mean=1, stddev=self.std).__call__(
+            shape=(n, m), dtype=tf.float32
+        )
         return self.bijector.inverse(diagonals)
 
 
@@ -127,7 +134,7 @@ class SoftplusNormalInitializer(Initializer):
 
     def __call__(self, shape, dtype=None):
         x = initializers.TruncatedNormal(mean=self.mean, stddev=self.std).__call__(
-            shape=shape, dtype=dtype
+            shape=shape, dtype=tf.float32
         )
         return self.bijector(x)
 
