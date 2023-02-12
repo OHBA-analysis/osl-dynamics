@@ -52,7 +52,7 @@ sim = simulation.MixedSine_MVN(
     covariances="random",
     random_seed=123,
 )
-sim_stc = sim.mode_time_course
+sim_alp = sim.mode_time_course
 training_data = data.Data(sim.time_series)
 
 # Plot ground truth logits
@@ -77,26 +77,26 @@ print(f"Free energy: {free_energy}")
 
 # Inferred alpha and mode time course
 inf_alp = model.get_alpha(training_data)
-sim_stc, inf_stc = modes.match_modes(sim_stc, inf_alp)
+sim_alp, inf_alp = modes.match_modes(sim_alp, inf_alp)
 
 # Compare the inferred mode time course to the ground truth
 plotting.plot_alpha(
-    sim_stc,
+    sim_alp,
     n_samples=2000,
     title="Ground Truth",
     y_labels=r"$\alpha_{jt}$",
-    filename="figures/sim_stc.png",
+    filename="figures/sim_alp.png",
 )
 plotting.plot_alpha(
-    inf_stc,
+    inf_alp,
     n_samples=2000,
     title="DyNeMo",
     y_labels=r"$\alpha_{jt}$",
-    filename="figures/inf_stc.png",
+    filename="figures/inf_alp.png",
 )
 
 # Correlation between mode time courses
-corr = metrics.alpha_correlation(inf_stc, sim_stc)
+corr = metrics.alpha_correlation(inf_alp, sim_alp)
 print("Correlation (DyNeMo vs Simulation):", corr)
 
 # Reconstruction of the time-varying covariance
@@ -104,7 +104,7 @@ sim_cov = sim.covariances
 inf_cov = model.get_covariances()
 
 sim_tvcov = np.sum(
-    sim_stc[:, :, np.newaxis, np.newaxis] * sim_cov[np.newaxis, :, :, :], axis=1
+    sim_alp[:, :, np.newaxis, np.newaxis] * sim_cov[np.newaxis, :, :, :], axis=1
 )
 inf_tvcov = np.sum(
     inf_alp[:, :, np.newaxis, np.newaxis] * inf_cov[np.newaxis, :, :, :], axis=1
