@@ -629,7 +629,10 @@ class DiagonalMatricesLayer(layers.Layer):
         if initial_value is not None:
             # Check it's the correct shape
             if initial_value.shape != (n, m, m):
-                raise ValueError(f"initial_value shape must be ({n}, {m}).")
+                raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
+
+            # Keep the diagonal only
+            initial_value = np.diagonal(initial_value, axis1=1, axis2=2)
 
             # Calculate the initial value of the learnable tensor
             initial_value = initial_value.astype("float32")

@@ -20,6 +20,7 @@ from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
+    DiagonalMatricesLayer,
     ModelRNNLayer,
     NormalizationLayer,
     KLDivergenceLayer,
@@ -102,6 +103,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
         Initialisation for mode covariances.
+    diagonal_covariances : bool
+        Should we learn diagonal mode covariances?
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
@@ -191,6 +194,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    diagonal_covariances: bool = False
     covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
@@ -272,17 +276,31 @@ class Model(VariationalInferenceModelBase):
         """SE-DyNeMo requires subject id to be included in the dataset."""
         return super().make_dataset(inputs, shuffle, concatenate, subj_id)
 
-    def get_group_means_covariances(self):
-        """Get the group means and covariances of each mode
+    def get_group_means(self):
+        """Get the group means.
 
         Returns
         -------
-        means : np.ndarray
-            Mode means for the group. Shape is (n_modes, n_channels).
-        covariances : np.ndarray
-            Mode covariances for the group. Shape is (n_modes, n_channels, n_channels).
+        group_means : np.ndarray
+            Group means. Shape is (n_modes, n_channels)
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)
+        return dynemo_obs.get_means(self.model, "group_means")
+
+    def get_group_covariances(self):
+        """Get the group covariances.
+
+        Returns
+        -------
+        group_covariances : np.ndarray
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
+        """
+        return dynemo_obs.get_covariances(self.model, "group_covs")
+
+    def get_group_means_covariances(self):
+        """Get the group means and covariances."""
+        group_means = self.get_group_means()
+        group_covariances = self.get_group_covariances()
+        return group_means, group_covariances
 
     def get_observation_model_parameters(self):
         """Wrapper for get_group_means_covariances."""
@@ -359,11 +377,10 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tensorflow.data.Dataset
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
-
         if self.config.learn_means:
             dynemo_obs.set_means_regularizer(
                 self.model, training_dataset, layer_name="group_means"
@@ -374,6 +391,7 @@ class Model(VariationalInferenceModelBase):
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
+                self.config.diagonal_covariances,
                 layer_name="group_covs",
             )
 
@@ -403,7 +421,11 @@ class Model(VariationalInferenceModelBase):
             the model?
         """
         dynemo_obs.set_covariances(
-            self.model, group_covariances, update_initializer, layer_name="group_covs"
+            self.model,
+            group_covariances,
+            self.config.diagonal_covariances,
+            update_initializer,
+            layer_name="group_covs",
         )
 
     def set_observation_model_parameters(
@@ -520,15 +542,26 @@ def _model_structure(config):
         config.means_regularizer,
         name="group_means",
     )
-    group_covs_layer = CovarianceMatricesLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_covariances,
-        config.initial_covariances,
-        config.covariances_epsilon,
-        config.covariances_regularizer,
-        name="group_covs",
-    )
+    if config.diagonal_covariances:
+        group_covs_layer = DiagonalMatricesLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="group_covs",
+        )
+    else:
+        group_covs_layer = CovarianceMatricesLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="group_covs",
+        )
     means_mode_embeddings_layer = layers.Dense(
         config.mode_embeddings_dim,
         name="means_mode_embeddings",
