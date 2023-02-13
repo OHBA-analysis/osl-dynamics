@@ -35,12 +35,12 @@ models = {
 }
 
 
-def load(filepath):
-    """Load model from filepath.
+def load(dirname):
+    """Load model from dirname.
 
     Parameters
     ----------
-    filepath : str
+    dirname : str
         Path to directory where the config.yml and weights are stored.
 
     Returns
@@ -48,8 +48,8 @@ def load(filepath):
     model : DyNeMo model
         Model object.
     """
-    with open(f"{filepath}/config.yml", "r") as f:
-        config_dict = yaml.load(f, NumpyLoader)
+    with open(f"{dirname}/config.yml", "r") as file:
+        config_dict = yaml.load(file, NumpyLoader)
 
     if "model_name" not in config_dict:
         raise ValueError(
@@ -65,4 +65,4 @@ def load(filepath):
             + f"Options are {', '.join(models.keys())}"
         )
 
-    return model_type.load(filepath)
+    return model_type.load(dirname)

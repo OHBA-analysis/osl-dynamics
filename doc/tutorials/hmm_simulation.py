@@ -1,6 +1,6 @@
 """
-HMM: Simulation Tutorial
-========================
+HMM: Simulation
+===============
  
 In this tutorial we will train a Hidden Markov Model (HMM) on simulated data. This tutorial covers:
  
@@ -10,12 +10,12 @@ In this tutorial we will train a Hidden Markov Model (HMM) on simulated data. Th
 4. Getting Inferred Model Parameters
 5. Post-hoc Analysis
 
-Note, this webpage does not contain the output of each cell. We advise downloading the notebook and working through it locally on your machine. The expected output of this script can be found `here <https://osf.io/qbu9e>`_.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ze63d>`_ for the expected output.
 """
 
 #%%
 # Simulating HMM Data
-# ^^^^^^^^^^^^^^^^^^^^^^
+# ^^^^^^^^^^^^^^^^^^^
 # 
 # In this tutorial we will simulate data using a pre-specified HMM. A HMM has two sets of parameters:
 #
@@ -54,6 +54,7 @@ from osl_dynamics.utils import plotting
 # Simulated transition probability matrix
 sim_tp = sim.trans_prob
 
+# Plot
 plotting.plot_matrices(sim_tp)
 
 #%%
@@ -64,6 +65,7 @@ plotting.plot_matrices(sim_tp)
 # Simulated state time course
 sim_stc = sim.state_time_course
 
+# Plot
 plotting.plot_alpha(sim_stc)
 
 #%%
@@ -77,12 +79,13 @@ plotting.plot_alpha(sim_stc, n_samples=2000)
 # Simulated covariances
 sim_covs = sim.covariances
 
+# Plot
 plotting.plot_matrices(sim_covs, titles=[f"State {i}" for i in range(1, 6)])
 
 #%%
 # We see each state has a unique covariance pattern. The hidden state at a particular time point determines which covariance is used to generate the observed data.
 # 
-# Finally, we load the simulated time series into an osl-dynamics `Data object <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_. This will be helpful for when we want to train a model.
+# Finally, we load the simulated time series into an osl-dynamics `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_. This will be helpful for when we want to train a model.
 
 from osl_dynamics.data import Data
 
@@ -107,14 +110,13 @@ print(training_data)
 # - `n_states`, the number of states. Unfortunately, this is a hyperparameters that must be pre-specified. We advise starting with something between 6-14 and making sure any results based on the HMM are not critically sensitive to the choice for `n_states`.
 # - `sequence_length` and `batch_size`. We have found a sequence length between 100-400 works well. You want a large batch size for fast training. However, you will find that holding large batches of long sequences requires a lot of memory. Therefore, you should pick the largest values that you can hold in memory.
 # - `learn_means` and `learn_covariances`. Typically, if we train on amplitude envelope data we set `learn_means` and `learn_covariances` to `True`, whereas if you're training on time-delay embedded/PCA data, then we only learn the covariances, i.e. we set `learn_means=False`.
-# - `learning_rate`. On large datasets, we find a lower learning rate leads to a lower final loss. We recommend a value between 1e-2 - 1e-4. We advice training a few values and seeing which produces the lowest loss value.
+# - `learning_rate`. On large datasets, we find a lower learning rate leads to a lower final loss. We recommend a value between 1e-2 and 1e-4. We advice training a few values and seeing which produces the lowest loss value.
 # - `n_epochs`, the number of epochs. This is the number of times you loop through the data. We recommend a value between 15-40. You can look at the loss as a function of epochs (see below) to see when the model has stopped improving. You can use this as an indicator for when you can stop training.
 # 
 # In this tutorial, we will set `n_states` to the ground truth we used in the simulation.
 
 from osl_dynamics.models.hmm import Config
 
-# Create a config object
 config = Config(
     n_states=5,
     n_channels=11,
@@ -150,8 +152,7 @@ model.summary()
 # - Next we have the `means` layer. All this layer does is return the state means: `means[0][0]`. Although `tf.split[0][0]` is inputted to this layer, it is not used.
 # - Next we have the `covariances` layer. This layer returns the state covariances: `covs[0][0]`, again the input `tf.split[0][0]` is not used in the layer.
 # - Finally, the last layer is `ll_Loss`, which takes the channel data `tf.split[0][0]`, the state means `means[0][0]`, the state covariances `covs[0][0]` and the state time course `tf.split[0][1]` and calculates the negative log-likelihood loss. During training we try to minimise this loss by updating the state time course, state means and covariances.
-
-#%%
+#
 # Training the HMM
 # ^^^^^^^^^^^^^^^^
 # 
@@ -177,8 +178,7 @@ plotting.plot_line(
 
 #%%
 # We can see as training progresses we reduce the loss. We also see the loss drops quickly at the start of training and slows down - the model is converging to a particular loss value. We can use the final loss as a metric to compare models - the lower the better. We want to train for enough epochs that the loss flattens off to a particular value.
-
-#%%
+# 
 # Getting Inferred Model Parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # 
@@ -194,12 +194,11 @@ plotting.plot_line(
 # Get the inferred state probabilities for the training data
 alpha = model.get_alpha(training_data)
 
-
+#%%
 # Let's print the shape of the `alpha` array to check that it matches the training data time series.
 
 print(alpha.shape)
 print(ts.shape)
-
 
 #%%
 # Although the second dimension is different (because `alpha` is a `(n_samples, n_states)` array and `(n_samples, n_channels)` array), we can see the number of samples matches, which is good news.
@@ -274,14 +273,12 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc_ord))
 plotting.plot_matrices(sim_covs, main_title="Ground Truth")
 plotting.plot_matrices(inf_covs_ord, main_title="Inferred")
 
-#%%
 # Compare the transition probabilty matrices
 plotting.plot_matrices([sim_tp, inf_tp_ord], titles=["Ground Truth", "Inferred"])
 
 #%%
 # We can see all the parameters have been inferred correctly, therefore we can have confidence the HMM is working well.
-
-#%%
+# 
 # Post-hoc Analysis
 # ^^^^^^^^^^^^^^^^^
 # 
@@ -309,8 +306,7 @@ print("Mean lifetimes:", mlt)
 
 #%%
 # We see the mean lifetime is roughly equaly for each state.
-
-#%%
+#
 # Wrap up
 # ^^^^^^^
 # 

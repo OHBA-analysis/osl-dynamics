@@ -46,31 +46,19 @@ sim = simulation.HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-# Prepare dataset
-training_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=True,
-)
-prediction_dataset = training_data.dataset(
-    config.sequence_length,
-    config.batch_size,
-    shuffle=False,
-)
-
 # Build model
 model = Model(config)
 model.summary()
 
 print("Training model")
-history = model.fit(training_dataset, epochs=config.n_epochs)
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(prediction_dataset)
+free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors and mode time course
-inf_alp = model.get_alpha(prediction_dataset)
+inf_alp = model.get_alpha(training_data)
 inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.state_time_course
 

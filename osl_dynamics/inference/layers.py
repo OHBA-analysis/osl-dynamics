@@ -224,11 +224,31 @@ class SampleNormalDistributionLayer(layers.Layer):
 
 
 class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
-    """Layer for sampling from a Gumbel-Softmax distribution."""
+    """Layer for sampling from a Gumbel-Softmax distribution.
+
+    Parameters
+    ----------
+    temperature : float
+        Temperature for the Gumbel-Softmax distribution.
+    """
+
+    def __init__(self, temperature, **kwargs):
+        super().__init__(**kwargs)
+        self.temperature = temperature
 
     def call(self, inputs, **kwargs):
-        gs = tfp.distributions.RelaxedOneHotCategorical(temperature=0.01, logits=inputs)
+        gs = tfp.distributions.RelaxedOneHotCategorical(
+            temperature=temperature, logits=inputs
+        )
         return gs.sample()
+
+
+class SampleOneHotCategoricalDistributionLayer(layers.Layer):
+    """Layer for sampling from a Categorical distribution."""
+
+    def call(self, inputs, **kwargs):
+        cat = tfp.distributions.OneHotCategorical(logits=inputs, dtype=tf.float32)
+        return cat.sample()
 
 
 class SoftmaxLayer(layers.Layer):

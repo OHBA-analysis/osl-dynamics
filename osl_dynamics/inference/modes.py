@@ -69,6 +69,7 @@ def gmm_time_courses(
     p_value=None,
     filename=None,
     sklearn_kwargs=None,
+    plot_kwargs={},
 ):
     """Fit a two component GMM on the mode time courses to get a binary
     time course.
@@ -88,7 +89,10 @@ def gmm_time_courses(
     filename : str
         Path to directory to plot the GMM fit plots.
     sklearn_kwargs : dict
-        keyword arguments for sklearn's GaussianMixture.
+        Keyword arguments for sklearn's GaussianMixture.
+    plot_kwargs : dict
+        Dictionary of keyword arguments to pass to
+        osl_dynamics.utils.plotting.plot_gmm().
 
     Returns
     -------
@@ -132,6 +136,7 @@ def gmm_time_courses(
             p_value=p_value,
             sklearn_kwargs=sklearn_kwargs,
             plot_filename=plot_filename,
+            plot_kwargs=plot_kwargs,
             print_message=False,
         )
         print(f"GMM theshold {mode}: {threshold}")

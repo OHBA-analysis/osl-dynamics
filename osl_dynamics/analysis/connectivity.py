@@ -798,6 +798,8 @@ def spectral_reordering(corr_mat):
     -------
     reorder_corr_mat : np.ndarray
         Re-ordered correlation matrix.
+    order : np.ndarray
+        New ordering.
     """
     # Add one to make all entries postive
     C = corr_mat + 1
@@ -821,7 +823,9 @@ def spectral_reordering(corr_mat):
     v = np.dot(t, v)
 
     # Find permutations
-    perm = np.argsort(v)
+    order = np.argsort(v)
 
     # Reorder
-    return corr_mat[perm, :][:, perm]
+    reorder_corr_mat = corr_mat[order, :][:, order]
+
+    return reorder_corr_mat, order

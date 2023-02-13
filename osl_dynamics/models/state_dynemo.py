@@ -18,9 +18,10 @@ from osl_dynamics.inference.layers import (
     InferenceRNNLayer,
     ModelRNNLayer,
     SoftmaxLayer,
-    SampleGumbelSoftmaxDistributionLayer,
+    SampleOneHotCategoricalDistributionLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
+    DiagonalMatricesLayer,
     CategoricalLogLikelihoodLossLayer,
     CategoricalKLDivergenceLayer,
     KLLossLayer,
@@ -84,6 +85,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Initialisation for mode covariances.
     covariances_epsilon : float
         Error added to standard deviations for numerical stability.
+    diagonal_covariances : bool
+        Should we learn diagonal mode covariances?
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for covariance matrices.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -137,7 +144,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances: bool = None
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
+    diagonal_covariances: bool = False
     covariances_epsilon: float = 1e-6
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -317,7 +327,7 @@ def _model_structure(config):
     alpha_layer = SoftmaxLayer(
         initial_temperature=1.0, learn_temperature=False, name="alpha"
     )
-    states_layer = SampleGumbelSoftmaxDistributionLayer(name="states")
+    states_layer = SampleOneHotCategoricalDistributionLayer(name="states")
 
     inf_rnn = inf_rnn_layer(data)
     inf_theta = inf_theta_layer(inf_rnn)
@@ -332,16 +342,29 @@ def _model_structure(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
-    covs_layer = CovarianceMatricesLayer(
-        config.n_states,
-        config.n_channels,
-        config.learn_covariances,
-        config.initial_covariances,
-        config.covariances_epsilon,
-        name="covs",
-    )
+    if config.diagonal_covariances:
+        covs_layer = DiagonalMatricesLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="covs",
+        )
+    else:
+        covs_layer = CovarianceMatricesLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="covs",
+        )
     ll_loss_layer = CategoricalLogLikelihoodLossLayer(
         config.n_states, config.covariances_epsilon, name="ll_loss"
     )

@@ -150,7 +150,9 @@ class Model(ModelBase):
         """Fit model to a dataset.
 
         Iterates between:
-        - Baum-Welch updates of latent variable time courses and transition probability matrix.
+
+        - Baum-Welch updates of latent variable time courses and transition
+          probability matrix.
         - TensorFlow updates of observation model parameters.
 
         Parameters

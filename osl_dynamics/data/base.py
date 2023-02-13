@@ -2,18 +2,19 @@
 
 """
 
-import pickle
 import pathlib
+import pickle
 import warnings
+from functools import partial
 from os import path
 from shutil import rmtree
 
 import numpy as np
-import yaml
-from tqdm import tqdm
 from scipy import signal
+from tqdm import tqdm
+from pqdm.threads import pqdm
 
-from osl_dynamics.data import rw, processing, tf
+from osl_dynamics.data import processing, rw, tf
 from osl_dynamics.utils import misc
 
 
@@ -60,6 +61,9 @@ class Data:
         Should we load the data as memory maps (memmaps)? If False, we will load data
         into memory rather than storing it on disk. By default we will keep the data
         on disk and use memmaps. This argument is optional.
+    n_jobs : int
+        Number of processes to load the data in parallel. This argument is optional.
+        Default is 1, which loads data in serial.
     """
 
     def __init__(
@@ -71,10 +75,15 @@ class Data:
         n_embeddings=None,
         time_axis_first=True,
         load_memmaps=True,
+        n_jobs=1,
     ):
         self._identifier = id(self)
-        self.load_memmaps = load_memmaps
+        self.data_field = data_field
+        self.sampling_frequency = sampling_frequency
         self.n_embeddings = n_embeddings
+        self.time_axis_first = time_axis_first
+        self.load_memmaps = load_memmaps
+        self.n_jobs = n_jobs
         self.prepared = False
         self.prepared_data_filenames = []
 
@@ -89,18 +98,14 @@ class Data:
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load and validate the raw data
-        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data(
-            data_field, time_axis_first
-        )
+        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data()
         self.validate_data()
 
         # Get data prepration attributes if the raw data has been prepared
         if not isinstance(inputs, list):
             self.load_preparation(inputs)
 
-        # Attributes describing the raw data
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
-        self.sampling_frequency = sampling_frequency
 
         # Use raw data for the subject data
         self.subjects = self.raw_data_memmaps
@@ -169,34 +174,6 @@ class Data:
         else:
             return self.subjects
 
-    @classmethod
-    def from_yaml(cls, file, **kwargs):
-        instance = misc.class_from_yaml(cls, file, kwargs)
-
-        with open(file) as f:
-            settings = yaml.load(f, Loader=yaml.Loader)
-
-        if issubclass(cls, Data):
-            try:
-                cls._process_from_yaml(instance, file, **kwargs)
-            except AttributeError:
-                pass
-
-        training_dataset = instance.training_dataset(
-            sequence_length=settings["sequence_length"],
-            batch_size=settings["batch_size"],
-        )
-        prediction_dataset = instance.prediction_dataset(
-            sequence_length=settings["sequence_length"],
-            batch_size=settings["batch_size"],
-        )
-
-        return {
-            "data": instance,
-            "training_dataset": training_dataset,
-            "prediction_dataset": prediction_dataset,
-        }
-
     def delete_dir(self):
         """Deletes store_dir."""
         if self.store_dir.exists():
@@ -225,25 +202,15 @@ class Data:
                     self.whiten = preparation["whiten"]
                     self.prepared = True
 
-    def load_raw_data(
-        self,
-        data_field,
-        time_axis_first,
-    ):
+    def load_raw_data(self):
         """Import data into a list of memory maps.
-
-        Parameters
-        ----------
-        data_field : str
-            If a MATLAB filename is passed, this is the field that corresponds
-            to the data. By default we read the field 'X'.
-        time_axis_first : bool
-            Is the input data of shape (n_samples, n_channels)?
 
         Returns
         -------
-        list
-            list of np.memmap.
+        memmaps : list of np.memmap
+            List of memory maps.
+        raw_data_filenames : list of str
+            List of paths to the raw data memmaps.
         """
         raw_data_pattern = "raw_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(len(self.inputs))), identifier=self._identifier
@@ -255,20 +222,44 @@ class Data:
         # self.raw_data_filenames is not used if self.inputs is a list of strings,
         # where the strings are paths to .npy files
 
-        memmaps = []
-        for raw_data, mmap_location in zip(
-            tqdm(self.inputs, desc="Loading files", ncols=98), raw_data_filenames
-        ):
-            if not self.load_memmaps:  # do not load into the memory maps
-                mmap_location = None
-            raw_data_mmap = rw.load_data(
-                raw_data, data_field, mmap_location, mmap_mode="r"
-            )
-            if not time_axis_first:
-                raw_data_mmap = raw_data_mmap.T
-            memmaps.append(raw_data_mmap)
+        # Load data
+        partial_make_memmap = partial(self.make_memmap)
+        args = zip(self.inputs, raw_data_filenames)
+        memmaps = pqdm(
+            args,
+            partial_make_memmap,
+            n_jobs=self.n_jobs,
+            desc="Loading files",
+            argument_type="args",
+            ncols=98,
+            total=len(self.inputs),
+        )
 
         return memmaps, raw_data_filenames
+
+    def make_memmap(self, raw_data, mmap_location):
+        """Make a memory map for a single file.
+
+        Parameters
+        ----------
+        raw_data : str
+            Path to file.
+        mmap_location : str
+            Path to save memory map to.
+
+        Returns
+        -------
+        raw_data_mmap: np.memmap
+            Memory map of the raw data.
+        """
+        if not self.load_memmaps:  # do not load into the memory maps
+            mmap_location = None
+        raw_data_mmap = rw.load_data(
+            raw_data, self.data_field, mmap_location, mmap_mode="r"
+        )
+        if not self.time_axis_first:
+            raw_data_mmap = raw_data_mmap.T
+        return raw_data_mmap
 
     def save(self, output_dir="."):
         """Saves data to numpy files.
@@ -276,8 +267,7 @@ class Data:
         Parameters
         ----------
         output_dir : str
-            Path to save data files to. Default is the current working
-            directory.
+            Path to save data files to. Default is the current working directory.
         """
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -306,18 +296,6 @@ class Data:
         n_channels = [memmap.shape[-1] for memmap in self.raw_data_memmaps]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
-
-    def _process_from_yaml(self, file, **kwargs):
-        with open(file) as f:
-            settings = yaml.load(f, Loader=yaml.Loader)
-
-        prep_settings = settings.get("prepare", {})
-        if prep_settings.get("do", False):
-            self.prepare(
-                n_embeddings=prep_settings.get("n_embeddings"),
-                n_pca_components=prep_settings.get("n_pca_components", None),
-                whiten=prep_settings.get("whiten", False),
-            )
 
     def filter(self, low_freq=None, high_freq=None):
         """Filter the raw data.
@@ -467,47 +445,77 @@ class Data:
         self.prepare_memmap_filenames()
 
         # Prepare the data
-        for raw_data_memmap, prepared_data_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
+        prepare_args = zip(
+            self.raw_data_memmaps,
             self.prepared_data_filenames,
-        ):
-            # Filtering
-            prepared_data = processing.temporal_filter(
-                raw_data_memmap, low_freq, high_freq, self.sampling_frequency
-            )
+        )
 
-            # Hilbert transform
-            prepared_data = np.abs(signal.hilbert(prepared_data, axis=0))
-
-            # Moving average filter
-            prepared_data = np.array(
-                [
-                    np.convolve(
-                        prepared_data[:, i], np.ones(n_window) / n_window, mode="valid"
-                    )
-                    for i in range(prepared_data.shape[1])
-                ],
-            ).T
-
-            # Finally, we standardise
-            prepared_data = processing.standardize(prepared_data, create_copy=False)
-
-            # Make sure data is float32
-            prepared_data = prepared_data.astype(np.float32)
-
-            if self.load_memmaps:
-                # Save the prepared data as a memmap
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            self.prepared_data_memmaps.append(prepared_data_memmap)
+        prepared_data_memmaps = pqdm(
+            prepare_args,
+            self.apply_amp_env,
+            desc="Preparing data",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            ncols=98,
+            total=len(self.raw_data_memmaps),
+        )
+        self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
 
         self.prepared = True
+
+    def apply_amp_env(self, raw_data_memmap, prepared_data_file):
+        """Applies filtering, a Hilbert transform and standardization to raw data.
+
+        Parameters
+        ----------
+        raw_data_memmap : np.memmap or np.ndarray
+            Raw data.
+        prepared_data_file : str
+            Name of memory map file to save prepared data to.
+            Can be None if we are not using memory maps.
+
+        Returns
+        -------
+        prepared_data_memmap : np.memmap or np.ndarray
+            Prepared data.
+        """
+        # Filtering
+        prepared_data = processing.temporal_filter(
+            raw_data_memmap, self.low_freq, self.high_freq, self.sampling_frequency
+        )
+
+        # Hilbert transform
+        prepared_data = np.abs(signal.hilbert(prepared_data, axis=0))
+
+        # Moving average filter
+        prepared_data = np.array(
+            [
+                np.convolve(
+                    prepared_data[:, i],
+                    np.ones(self.n_window) / self.n_window,
+                    mode="valid",
+                )
+                for i in range(prepared_data.shape[1])
+            ],
+        ).T
+
+        # Finally, we standardise
+        prepared_data = processing.standardize(prepared_data, create_copy=False)
+
+        # Make sure data is float32
+        prepared_data = prepared_data.astype(np.float32)
+
+        if self.load_memmaps:
+            # Save the prepared data as a memmap
+            prepared_data_memmap = misc.array_to_memmap(
+                prepared_data_file, prepared_data
+            )
+        else:
+            prepared_data_memmap = prepared_data
+        return prepared_data_memmap
 
     def prepare_tde(
         self,
@@ -577,39 +585,69 @@ class Data:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
 
-        # Prepare the data
-        for raw_data_memmap, prepared_data_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Preparing data", ncols=98),
+        prepare_args = zip(
+            self.raw_data_memmaps,
             self.prepared_data_filenames,
-        ):
-            # Standardise and time embed the data
-            std_data = processing.standardize(raw_data_memmap)
-            te_std_data = processing.time_embed(std_data, n_embeddings)
+        )
 
-            # Apply PCA to get the prepared data
-            if self.pca_components is not None:
-                prepared_data = te_std_data @ self.pca_components
-
-            # Otherwise, the time embedded data is the prepared data
-            else:
-                prepared_data = te_std_data
-
-            # Finally, we standardise
-            prepared_data = processing.standardize(prepared_data, create_copy=False)
-
-            if self.load_memmaps:
-                # Save the prepared data as a memmap
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            self.prepared_data_memmaps.append(prepared_data_memmap)
+        prepared_data_memmaps = pqdm(
+            prepare_args,
+            self.apply_tde_pca,
+            desc="Preparing data",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            ncols=98,
+            total=len(self.raw_data_memmaps),
+        )
+        self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
         # Update subjects to return the prepared data
         self.subjects = self.prepared_data_memmaps
 
         self.prepared = True
+
+    def apply_tde_pca(self, raw_data_memmap, prepared_data_file):
+        """Applies time-delay embeddings, principal component analysis and
+        standardization to raw data.
+
+        Parameters
+        ----------
+        raw_data_memmap : np.memmap or np.ndarray
+            Raw data.
+        prepared_data_file : str
+            Name of memory map file to save prepared data to.
+            Can be None if we are not using memory maps.
+
+        Returns
+        -------
+        prepared_data_memmap : np.memmap or np.ndarray
+            Prepared data.
+        """
+
+        # Standardise and time embed the data
+        std_data = processing.standardize(raw_data_memmap)
+        te_std_data = processing.time_embed(std_data, self.n_embeddings)
+
+        # Apply PCA to get the prepared data
+        if self.pca_components is not None:
+            prepared_data = te_std_data @ self.pca_components
+
+        # Otherwise, the time embedded data is the prepared data
+        else:
+            prepared_data = te_std_data
+
+        # Finally, we standardise
+        prepared_data = processing.standardize(prepared_data, create_copy=False)
+
+        if self.load_memmaps:
+            # Save the prepared data as a memmap
+            prepared_data_memmap = misc.array_to_memmap(
+                prepared_data_file, prepared_data
+            )
+        else:
+            prepared_data_memmap = prepared_data
+
+        return prepared_data_memmap
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(

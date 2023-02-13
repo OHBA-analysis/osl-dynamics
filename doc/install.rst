@@ -1,6 +1,9 @@
 Installation
 ============
 
+Instructions
+------------
+
 OSL Dynamics can be installed in three steps. Open a Terminal and execute the following commands:
 
 #. Create a virtual environment, we recommend using Anaconda: https://docs.anaconda.com/anaconda/install/index.html.
@@ -44,3 +47,31 @@ To remove osl-dynamics simply delete the conda environment:
 
     conda env remove -n osld
     conda clean --all
+
+
+Training Speed
+--------------
+
+You can test if you've succesfully installed osl-dynamics by running the HMM and DyNeMo simulation example scripts:
+
+- `HMM example <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_hmm-mvn.py>`_.
+- `DyNeMo example <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/dynemo_hmm-mvn.py>`_.
+
+A rough indication of the expected training speeds is given below. You could expect variations up to a factor of 2.
+
+.. list-table:: Training speed: **ms/step**
+   :widths: 25 25 25
+   :header-rows: 1
+
+   * - Computer
+     - HMM
+     - DyNeMo
+   * - M1/M2 Macbook
+     - 50
+     - 60
+   * - Linux with 1 GPU
+     - 100
+     - 20
+   * - Linux CPU
+     - 100
+     - 100
