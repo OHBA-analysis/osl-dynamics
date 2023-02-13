@@ -99,7 +99,7 @@ class Config(BaseModelConfig):
         Strategy for distributed learning.
     """
 
-    model_name: str = "SE-DyNeMo-Obs"
+    model_name: str = "d-SE-DyNeMo-Obs"
 
     # Observation model parameters
     learn_means: bool = None

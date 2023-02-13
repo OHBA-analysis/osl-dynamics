@@ -156,7 +156,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Dropout rate for the MLP for deviations.
     """
 
-    model_name: str = "SE-DyNeMo"
+    model_name: str = "d-SE-DyNeMo"
 
     # Inference network parameters
     inference_rnn: Literal["gru", "lstm"] = "lstm"
