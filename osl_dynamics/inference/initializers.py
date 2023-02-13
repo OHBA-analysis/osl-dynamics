@@ -154,15 +154,39 @@ def reinitialize_layer_weights(layer):
     else:
         init_container = layer
 
-    # Re-initialise
-    for key, initializer in init_container.__dict__.items():
+    # Loop through the attributes of the container
+    for key in init_container.__dict__:
         if "initializer" not in key:
+            # This attribute's not an initializer
             continue
+
+        # Get the initializer object
+        initializer = init_container.__dict__[key]
+        initializer_type = type(initializer)
+
+        if initializer_type.__name__ in dir(inference.initializers):
+            # We have an osl-dynamics initializer
+            #
+            # By default these will return new random values when
+            # called, so we don't need to create a new initializer
+            new_initializer = initializer
+
+        elif isinstance(init_container.__dict__[key], Initializer):
+            # We have a standard TensorFlow initializer
+            #
+            # We need to create a new initializer to get new
+            # random values
+            new_initializer = initializer_type()
+            init_container.__dict__[key] = new_initializer
+
+        # Get the variable (i.e. weights) we want to re-initialize
         if key == "recurrent_initializer":
             var = getattr(init_container, "recurrent_kernel")
         else:
             var = getattr(init_container, key.replace("_initializer", ""))
-        var.assign(initializer(var.shape, var.dtype))
+
+        # Assign new random values to the variable
+        var.assign(new_initializer(var.shape, var.dtype))
 
 
 def reinitialize_model_weights(model, keep=None):

@@ -3,7 +3,7 @@ DyNeMo: Soft Mixture Simulation
 ===============================
 
 In this tutorial we will train a DyNeMo on simulated data which contains a mixture of modes. This tutorial covers:
- 
+
 1. Simulating Data
 2. Training DyNeMo
 3. Getting Inferred Model Parameters
@@ -22,9 +22,11 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # 
 # We can use the `simulation.MixedSine_MVN <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/simulation/sm/index.html#osl_dynamics.simulation.sm.MixedSine_MVN>`_ class to simulate a soft mixture of multivariate normals. This simulation (with zero mean) is very close to the DyNeMo model:
 # 
-# $m_t = 0, ~~~~~~  C_t = \displaystyle\sum_j \alpha_{jt} D_j$,
+# .. math::
+#     m_t = 0, \\
+#     C_t = \displaystyle\sum_j \alpha_{jt} D_j,
 # 
-# where $\alpha_{jt}$ are mixing coefficients and $D_j$ are mode covariances. The `simulation.MixedSine_MVN <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/simulation/sm/index.html#osl_dynamics.simulation.sm.MixedSine_MVN>`_ class generates the mixing coefficients with sinusoidal logits. I.e. $\alpha_{jt} = \{ \mathrm{softmax}(\theta_t) \}_j$, where $\theta_{jt} = A_j \sin (2 \pi f_j t + \phi_j)$. Let's first simulate some data then we'll look at these components in more detail.
+# where :math:`\alpha_{jt}` are mixing coefficients and :math:`D_j` are mode covariances. The `simulation.MixedSine_MVN <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/simulation/sm/index.html#osl_dynamics.simulation.sm.MixedSine_MVN>`_ class generates the mixing coefficients with sinusoidal logits. I.e. :math:`\alpha_{jt} = \{ \mathrm{softmax}(\theta_t) \}_j`, where :math:`\theta_{jt} = A_j \sin (2 \pi f_j t + \phi_j)`. Let's first simulate some data then we'll look at these components in more detail.
 
 from osl_dynamics.simulation import MixedSine_MVN
 
@@ -52,7 +54,7 @@ sim_ts = sim.time_series
 print(sim_ts.shape)
 
 #%%
-# We can see we have the expected number of samples and channels. Now let's examine the mode covariances ($D_j$).
+# We can see we have the expected number of samples and channels. Now let's examine the mode covariances (:math:`D_j`).
 
 from osl_dynamics.utils import plotting
 
