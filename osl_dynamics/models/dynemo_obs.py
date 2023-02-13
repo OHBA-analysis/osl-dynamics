@@ -13,7 +13,6 @@ from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
-    add_epsilon,
     LogLikelihoodLossLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
@@ -249,14 +248,14 @@ def _model_structure(config):
     return tf.keras.Model(inputs=[data, alpha], outputs=[ll_loss], name="DyNeMo-Obs")
 
 
-def get_means(model):
-    means_layer = model.get_layer("means")
+def get_means(model, layer_name="means"):
+    means_layer = model.get_layer(layer_name)
     means = means_layer(1)
     return means.numpy()
 
 
-def get_covariances(model):
-    covs_layer = model.get_layer("covs")
+def get_covariances(model, layer_name="covs"):
+    covs_layer = model.get_layer(layer_name)
     covs = covs_layer(1)
     return covs.numpy()
 
@@ -271,7 +270,7 @@ def set_means(model, means, update_initializer=True, layer_name="means"):
     means = means.astype(np.float32)
     means_layer = model.get_layer(layer_name)
     learnable_tensor_layer = means_layer.layers[0]
-    leanable_tensor_layer.tensor.assign(means)
+    learnable_tensor_layer.tensor.assign(means)
     if update_initializer:
         learnable_tensor_layer.tensor_initializer = WeightInitializer(means)
 
@@ -294,7 +293,7 @@ def set_covariances(
 
     else:
         flattened_cholesky_factors = covs_layer.bijector.inverse(covariances)
-        learnable_tensor_layer.tensor.assign(flatten_cholesky_factors)
+        learnable_tensor_layer.tensor.assign(flattened_cholesky_factors)
         if update_initializer:
             learnable_tensor_layer.tensor_initializer = WeightInitializer(
                 flattened_cholesky_factors

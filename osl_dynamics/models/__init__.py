@@ -12,6 +12,8 @@ from osl_dynamics.models import (
     mdynemo_obs,
     sedynemo,
     sedynemo_obs,
+    directional_sedynemo,
+    directional_sedynemo_obs,
     state_dynemo,
     hmm,
 )
@@ -26,6 +28,8 @@ models = {
     "M-DyNeMo-Obs": mdynemo_obs.Model,
     "SE-DyNeMo": sedynemo.Model,
     "SE-DyNeMo-Obs": sedynemo_obs.Model,
+    "d-SE-DyNeMo": directional_sedynemo.Model,
+    "d-SE-DyNeMo-Obs": directional_sedynemo_obs.Model,
     "State-DyNeMo": state_dynemo.Model,
     "HMM": hmm.Model,
 }

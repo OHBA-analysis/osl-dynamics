@@ -648,8 +648,13 @@ class DiagonalMatricesLayer(layers.Layer):
         # Do we have an initial value?
         if initial_value is not None:
             # Check it's the correct shape
-            if initial_value.shape != (n, m, m):
-                raise ValueError(f"initial_value shape must be ({n}, {m}).")
+            if initial_value.shape == (n, m, m):
+                # Keep the diagonal only
+                initial_value = np.diagonal(initial_value, axis1=1, axis2=2)
+            elif initial_value.shape != (n, m):
+                raise ValueError(
+                    f"initial_value shape must be ({n}, {m}, {m}) or ({n}, {m})."
+                )
 
             # Calculate the initial value of the learnable tensor
             initial_value = initial_value.astype("float32")
@@ -1146,12 +1151,11 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class SubjectDevEmbeddingLayer(layers.Layer):
+class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.
 
     The concatenated embeddings are obtained by concatenating subject embeddings
-    and mode spatial map embeddings. The concatenated embeddings are used to
-    generate subject specific deviations from the group spatial map.
+    and mode spatial map embeddings.
 
     Parameters
     ----------
@@ -1215,27 +1219,27 @@ class SubjectMapLayer(layers.Layer):
         self.epsilon = epsilon
         if which_map == "covariances":
             self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
-        elif which_map != "means":
+        elif which_map == "means":
+            self.bijector = tfb.Identity()
+        else:
             raise ValueError("which_map must be one of 'means' and 'covariances'.")
 
     def call(self, inputs):
         group_map, dev = inputs
-
-        if self.which_map == "covariances":
-            group_map = self.bijector.inverse(group_map)
+        group_map = self.bijector.inverse(group_map)
 
         # Match dimensions for addition
         group_map = tf.expand_dims(group_map, axis=0)
         subject_map = tf.add(group_map, dev)
+        subject_map = self.bijector(subject_map)
 
         if self.which_map == "covariances":
-            subject_map = self.bijector(subject_map)
             subject_map = add_epsilon(subject_map, self.epsilon, diag=True)
 
         return subject_map
 
 
-class MixSubjectEmbeddingParametersLayer(layers.Layer):
+class MixSubjectSpecificParametersLayer(layers.Layer):
     """Class for mixing means and covariances for the
     subject embedding model.
 
@@ -1268,14 +1272,17 @@ class MixSubjectEmbeddingParametersLayer(layers.Layer):
         return m, C
 
 
-class SubjectMapKLDivergenceLayer(layers.Layer):
-    """Layer to calculate KL divergence between posterior and prior of
-    subject specific deviation.
+class StaticKLDivergenceLayer(layers.Layer):
+    """Layer to calculate KL divergence between posterior and prior
+    for static parameters
 
     Parameters
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
+    n_batches : int
+        Number of batches in the data. This is for calculating
+        the scaling factor.
     """
 
     def __init__(self, epsilon, n_batches=1, **kwargs):
@@ -1345,3 +1352,22 @@ class MultiLayerPerceptronLayer(layers.Layer):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
+
+
+class StandardizationLayer(layers.Layer):
+    """Layer to standardize input tensor along a given axis.
+
+    Parameters
+    ----------
+    axis : int
+        Axis along which to perform standardization.
+    """
+
+    def __init__(self, axis, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+
+    def call(self, inputs, **kwargs):
+        mean = tf.math.reduce_mean(inputs, axis=self.axis, keepdims=True)
+        std = tf.math.reduce_std(inputs, axis=self.axis, keepdims=True)
+        return (inputs - mean) / std

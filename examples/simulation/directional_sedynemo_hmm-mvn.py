@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.utils import plotting
-from osl_dynamics.models.sedynemo import Config, Model
+from osl_dynamics.models.directional_sedynemo import Config, Model
 
 # Create directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -34,14 +34,10 @@ config = Config(
     initial_alpha_temperature=1.0,
     learn_means=False,
     learn_covariances=True,
-    dev_inf_n_layers=3,
-    dev_inf_n_units=32,
-    dev_inf_activation="tanh",
-    dev_inf_normalization="layer",
-    dev_mod_n_layers=3,
-    dev_mod_n_units=32,
-    dev_mod_activation="tanh",
-    dev_mod_normalization="layer",
+    dev_n_layers=3,
+    dev_n_units=32,
+    dev_activation="tanh",
+    dev_normalization="layer",
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
