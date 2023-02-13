@@ -211,7 +211,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarary
             Mode covariances.
         """
-        return dynemo_obs.get_covariances(self.model, self.config.diagonal_covariances)
+        return dynemo_obs.get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -223,9 +223,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return dynemo_obs.get_means_covariances(
-            self.model, self.config.diagonal_covariances
-        )
+        return dynemo_obs.get_means_covariances(self.model)
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_covariances."""
@@ -296,7 +294,10 @@ class Model(VariationalInferenceModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(
-                self.model, training_dataset, self.config.diagonal_covariances
+                self.model,
+                training_dataset,
+                self.config.covariances_epsilon,
+                self.config.diagonal_covariances,
             )
 
     def sample_alpha(self, n_samples, theta_norm=None):

@@ -269,70 +269,116 @@ class SoftmaxLayer(layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.initial_temperature = initial_temperature
-        self.learn_temperature = learn_temperature
-        self.temperature_initializer = osld_initializers.WeightInitializer(
-            self.initial_temperature
-        )
-
-    def build(self, input_shape):
-        self.temperature = self.add_weight(
-            "temperature",
-            shape=(),
-            dtype=tf.float32,
-            initializer=self.temperature_initializer,
-            trainable=self.learn_temperature,
-        )
-        self.built = True
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(),
+                learn=learn_temperature,
+                initial_value=initial_temperature,
+                name=self.name + "_kernel",
+            )
+        ]
 
     def call(self, inputs, **kwargs):
-        return activations.softmax(inputs / self.temperature, axis=2)
+        temperature = self.layers[0](inputs)
+        return activations.softmax(inputs / temperature, axis=2)
 
 
-class ScalarLayer(layers.Layer):
-    """Layer to learn a single scalar.
+class LearnableTensorLayer(layers.Layer):
+    """Layer to learn a tensor.
 
     Parameters
     ----------
+    shape : tuple
+        Shape of the tensor.
     learn : bool
-        Should we learn the scalar?
+        Should we learn the tensor?
+    initializer : tf.keras.initializers.Initializer
+        Initializer for the tensor.
     initial_value : float
-        Initial value for the scalar.
+        Initial value for the tensor if initializer is not passed.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
         self,
-        learn,
-        initial_value,
+        shape,
+        learn=True,
+        initializer=None,
+        initial_value=None,
+        regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
+
+        # Bool for if we're learning the tensor
         self.learn = learn
-        if initial_value is None:
-            self.initial_value = 1
+
+        # Shape of the tensor
+        if shape is None:
+            raise ValueError("A shape must be passed to LearnableTensorLayer.")
+        self.shape = shape
+
+        # Initial value of the tensor
+        self.initial_value = initial_value
+        if self.initial_value is not None:
+            self.initial_value = np.array(initial_value).astype(np.float32)
+
+        # Setup the tensor initializer
+        if initializer is None:
+            # Initializer not passed, use the initial value
+            if self.initial_value is None:
+                raise ValueError("initializer or initial_value must be passed.")
+            elif self.initial_value.shape != shape:
+                raise ValueError(
+                    "Shape of initial_value must match that of the tensor. "
+                    + f"Expected {shape}, got {self.initial_value.shape}."
+                )
+            self.tensor_initializer = osld_initializers.WeightInitializer(
+                self.initial_value
+            )
         else:
-            self.initial_value = initial_value
-        self.scalar_initializer = osld_initializers.WeightInitializer(
-            self.initial_value
-        )
+            # Use the initializer passed, initial_value is ignored
+            self.tensor_initializer = initializer
+
+        # Regularizer for the tensor
+        # This should be a function of the tensor that returns a float
+        self.regularizer = regularizer
+
+    def add_regularization(self, tensor, inputs):
+        # Calculate the regularisation from the tensor
+        reg = self.regularizer(tensor)
+
+        # Calculate the scaling factor for the regularization
+        # Note, inputs.shape[0] must be the batch size
+        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+        n_batches = self.regularizer.n_batches
+        scaling_factor = batch_size * n_batches
+        reg /= scaling_factor
+
+        # Add regularization to the loss and display while training
+        self.add_loss(reg)
+        self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
-        self.scalar = self.add_weight(
-            "scalar",
+        # Create a weight for the tensor
+        self.tensor = self.add_weight(
+            "tensor",
+            shape=self.shape,
             dtype=tf.float32,
-            initializer=self.scalar_initializer,
+            initializer=self.tensor_initializer,
             trainable=self.learn,
         )
         self.built = True
 
-    def call(self, inputs, **kwargs):
-        return self.scalar
+    def call(self, inputs, training=None, **kwargs):
+        if self.regularizer is not None and training:
+            self.add_regularization(self.tensor, inputs)
+        return self.tensor
 
 
 class VectorsLayer(layers.Layer):
     """Layer to learn a set of vectors.
-
-    The vectors are free parameters.
 
     Parameters
     ----------
@@ -344,6 +390,8 @@ class VectorsLayer(layers.Layer):
         Should we learn the vectors?
     initial_value : np.ndarray
         Initial value for the vectors.
+    initializer : tf.keras.initializers.Initializer
+        Initializer for the vectors if initial_value is None.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for vectors.
     """
@@ -354,73 +402,36 @@ class VectorsLayer(layers.Layer):
         m,
         learn,
         initial_value,
+        initializer=None,
         regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n = n
-        self.m = m
-        self.learn = learn
 
-        if initial_value is not None:
-            # Use value passed to initialise
-            if initial_value.ndim != 2:
-                raise ValueError(
-                    "a (n_modes, n_channels) array must be passed for initial_value."
-                )
-            if initial_value.shape[-1] != m:
-                raise ValueError(
-                    f"mismatch between the number of channels ({m}) and number of "
-                    + f"elements in initial_means ({initial_value.shape[-1]})."
-                )
-            if initial_value.shape[0] != n:
-                raise ValueError(
-                    "mismatch bettwen the number of modes and vectors in "
-                    + f"initial_means ({initial_value.shape[0]})."
-                )
-            initial_value = initial_value.astype("float32")
-            self.vectors_initializer = osld_initializers.WeightInitializer(
-                initial_value
+        # Set initializer and initial value
+        if initial_value is None and initializer is None:
+            if learn:
+                initializer = initializers.TruncatedNormal(mean=0, stddev=0.02)
+            else:
+                initializer = initializers.Zeros()
+
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_value,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
             )
+        ]
 
-        elif learn:
-            # Use a random vector to initialise
-            self.vectors_initializer = initializers.TruncatedNormal(mean=0, stddev=0.02)
-        else:
-            # We're not learning the vectors, use zeros
-            self.vectors_initializer = initializers.Zeros()
-
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(self.vectors)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
-
-    def build(self, input_shape):
-        self.vectors = self.add_weight(
-            "vectors",
-            shape=(self.n, self.m),
-            dtype=tf.float32,
-            initializer=self.vectors_initializer,
-            trainable=self.learn,
-        )
-        self.built = True
-
-    def call(self, inputs, training=None, **kwargs):
-        if self.regularizer is not None and training:
-            self.add_regularization(inputs)
-        return self.vectors
+    def call(self, inputs, **kwargs):
+        learnable_tensors_layer = self.layers[0]
+        vectors = learnable_tensors_layer(inputs, **kwargs)
+        return vectors
 
 
 class CovarianceMatricesLayer(layers.Layer):
@@ -442,6 +453,8 @@ class CovarianceMatricesLayer(layers.Layer):
         Initial values for the matrices.
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
+    initializer : tf.keras.initializers.Initializer
+        Initializer for the covariances if initial_value is None.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for matrices.
     """
@@ -453,86 +466,58 @@ class CovarianceMatricesLayer(layers.Layer):
         learn,
         initial_value,
         epsilon,
+        initializer=None,
         regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n = n
-        self.m = m
-        self.learn = learn
         self.epsilon = epsilon
 
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
+        # Do we have an initial value?
         if initial_value is not None:
-            # Used passed value to initialise
-            if initial_value.ndim != 3:
-                raise ValueError(
-                    "a (n_modes, n_channels, n_channels) array must be passed for "
-                    + "initial_covariances."
-                )
-            if initial_value.shape[-1] != m:
-                raise ValueError(
-                    f"mismatch between the number of channels ({m}) and number of "
-                    + "rows/columns in initial_covariances "
-                    + f"({initial_value.shape[-1]})."
-                )
-            if initial_value.shape[0] != n:
-                raise ValueError(
-                    "mismatch bettwen the number of modes and matrices in "
-                    + f"initial_covariances ({initial_value.shape[0]})."
-                )
+            # Check it's the correct shape
+            if initial_value.shape != (n, m, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
+
+            # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.WeightInitializer(initial_flattened_cholesky_factors)
-            )
-
-        elif learn:
-            # Use the identity matrix with a random error
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalIdentityCholeskyInitializer(std=0.1)
-            )
-
         else:
-            # Use the identity matrix
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.IdentityCholeskyInitializer()
+            # No initial value has been passed
+            initial_flattened_cholesky_factors = None
+            if initializer is None:
+                if learn:
+                    # Use a random initializer
+                    initializer = osld_initializers.NormalIdentityCholeskyInitializer(
+                        std=0.1
+                    )
+                else:
+                    # Use the identity matrix for each mode/state
+                    initializer = osld_initializers.IdentityCholeskyInitializer()
+
+        # Create a layer to learn the covariance matrices
+        #
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m * (m + 1) // 2),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_flattened_cholesky_factors,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
             )
+        ]
 
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, covariances, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(covariances)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
-
-    def build(self, input_shape):
-        self.flattened_cholesky_factors = self.add_weight(
-            "flattened_cholesky_factors",
-            shape=(self.n, self.m * (self.m + 1) // 2),
-            dtype=tf.float32,
-            initializer=self.flattened_cholesky_factors_initializer,
-            trainable=self.learn,
-        )
-        self.built = True
-
-    def call(self, inputs, training=None, **kwargs):
-        covariances = self.bijector(self.flattened_cholesky_factors)
+    def call(self, inputs, **kwargs):
+        learnable_tensor_layer = self.layers[0]
+        flattened_cholesky_factors = learnable_tensor_layer(inputs, **kwargs)
+        covariances = self.bijector(flattened_cholesky_factors)
         covariances = add_epsilon(covariances, self.epsilon, diag=True)
-        if self.regularizer is not None and training:
-            self.add_regularization(covariances, inputs)
         return covariances
 
 
@@ -565,13 +550,11 @@ class CorrelationMatricesLayer(layers.Layer):
         learn,
         initial_value,
         epsilon,
+        initializer=None,
         regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n = n
-        self.m = m
-        self.learn = learn
         self.epsilon = epsilon
 
         # Bijector used to transform learnable vectors to correlation matrices
@@ -579,74 +562,48 @@ class CorrelationMatricesLayer(layers.Layer):
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
 
+        # Do we have an initial value?
         if initial_value is not None:
-            # Use passed value for initialisation
-            if initial_value.ndim != 3:
-                raise ValueError(
-                    "a (n_modes, n_channels, n_channels) array must be passed for "
-                    + "initial_fcs."
-                )
-            if initial_value.shape[-1] != m:
-                raise ValueError(
-                    f"mismatch between the number of channels ({m}) and number of "
-                    + "rows/columns in initial_fcs "
-                    + f"({initial_value.shape[-1]})."
-                )
-            if initial_value.shape[0] != n:
-                raise ValueError(
-                    "mismatch bettwen the number of modes and matrices in "
-                    + f"initial_fcs ({initial_value.shape[0]})."
-                )
+            # Check it's the correct shape
+            if initial_value.shape != (n, m, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
+
+            # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.WeightInitializer(initial_flattened_cholesky_factors)
-            )
-
-        elif learn:
-            # Use a correlation matrix with an error added
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.NormalCorrelationCholeskyInitializer(std=0.1)
-            )
-
         else:
-            # Use an identity matrix
-            self.flattened_cholesky_factors_initializer = (
-                osld_initializers.IdentityCholeskyInitializer()
+            # No initial value has been passed
+            initial_flattened_cholesky_factors = None
+            if initializer is None:
+                if learn:
+                    # Use a random initializer
+                    initializer = (
+                        osld_initializers.NormalCorrelationCholeskyInitializer(std=0.1)
+                    )
+                else:
+                    # Use the identity matrix for each mode/state
+                    initializer = osld_initializers.IdentityCholeskyInitializer()
+
+        # Create a layer to learn the correlation matrices
+        #
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m * (m - 1) // 2),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_flattened_cholesky_factors,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
             )
+        ]
 
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, correlations, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(correlations)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
-
-    def build(self, input_shape):
-        self.flattened_cholesky_factors = self.add_weight(
-            "flattened_cholesky_factors",
-            shape=(self.n, self.m * (self.m - 1) // 2),
-            dtype=tf.float32,
-            initializer=self.flattened_cholesky_factors_initializer,
-            trainable=self.learn,
-        )
-        self.built = True
-
-    def call(self, inputs, training=None, **kwargs):
-        correlations = self.bijector(self.flattened_cholesky_factors)
+    def call(self, inputs, **kwargs):
+        learnable_tensor_layer = self.layers[0]
+        flattened_cholesky_factors = learnable_tensor_layer(inputs, **kwargs)
+        correlations = self.bijector(flattened_cholesky_factors)
         correlations = add_epsilon(correlations, self.epsilon, diag=True)
-        if self.regularizer is not None and training:
-            self.add_regularization(correlations, inputs)
         return correlations
 
 
@@ -678,88 +635,57 @@ class DiagonalMatricesLayer(layers.Layer):
         learn,
         initial_value,
         epsilon,
+        initializer=None,
         regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.n = n
-        self.m = m
-        self.learn = learn
         self.epsilon = epsilon
 
         # Softplus transformation to ensure diagonal is positive
         self.bijector = tfb.Softplus()
 
+        # Do we have an initial value?
         if initial_value is not None:
-            # Used passed value for initialisation
-            if initial_value.ndim != 2:
-                raise ValueError(
-                    "a (n_modes, n_channels) array must be passed for initial_value."
-                )
-            if initial_value.shape[-1] != m:
-                raise ValueError(
-                    f"mismatch between the number of channels ({m}) and number of "
-                    + f"elements in initial_value ({initial_value.shape[-1]})."
-                )
-            if initial_value.shape[0] != n:
-                raise ValueError(
-                    "mismatch bettwen the number of modes and vectors in "
-                    + f"initial_value ({initial_value.shape[0]})."
-                )
+            # Check it's the correct shape
+            if initial_value.shape != (n, m, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}).")
+
+            # Calculate the initial value of the learnable tensor
             initial_value = initial_value.astype("float32")
             initial_diagonals = self.bijector.inverse(initial_value)
-            self.diagonals_initializer = osld_initializers.WeightInitializer(
-                initial_diagonals
-            )
-
-        elif learn:
-            # Use random numbers
-            self.diagonals_initializer = osld_initializers.NormalDiagonalInitializer(
-                std=0.05
-            )
-
         else:
-            # Use ones
-            initial_value = np.ones(size=[n, m]).astype(np.float32)
-            initial_diagonals = self.bijector.inverse(initial_value)
-            self.diagonals_initializer = osld_initializers.WeightInitializer(
-                initial_diagonals
+            # No initial value has been passed
+            initial_diagonals = None
+            if initializer is None:
+                if learn:
+                    # Use a random initializer
+                    initializer = osld_initializers.NormalDiagonalInitializer(std=0.05)
+                else:
+                    # Use the identity matrix for each mode/state
+                    initializer = osld_initializers.IdentityCholeskyInitializer()
+
+        # Create a layer to learn the matrices
+        #
+        # We use self.layers for compatibility with
+        # initializers.reinitialize_model_weights
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n, m),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_diagonals,
+                regularizer=regularizer,
+                name=self.name + "_kernel",
             )
+        ]
 
-        # Regulariser
-        self.regularizer = regularizer
-
-    def add_regularization(self, diagonals, inputs):
-        # Calculate regularisation
-        reg = self.regularizer(diagonals)
-
-        # Calculate the scaling factor for the regularisation
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
-
-        # Add to the loss function
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
-
-    def build(self, input_shape):
-        self.diagonals = self.add_weight(
-            "diagonals",
-            shape=(self.n, self.m),
-            dtype=tf.float32,
-            initializer=self.diagonals_initializer,
-            trainable=self.learn,
-        )
-        self.built = True
-
-    def call(self, inputs, training=None, **kwargs):
-        D = self.bijector(self.diagonals)
-        D = add_epsilon(D, self.epsilon)
-        if self.regularizer is not None and training:
-            self.add_regularization(D, inputs)
-        D = tf.linalg.diag(D)
-        return D
+    def call(self, inputs, **kwargs):
+        learnable_tensor_layer = self.layers[0]
+        diagonals = learnable_tensor_layer(inputs, **kwargs)
+        diagonals = self.bijector(diagonals)
+        diagonals = add_epsilon(diagonals, self.epsilon)
+        return tf.linalg.diag(diagonals)
 
 
 class MatrixLayer(layers.Layer):
@@ -805,8 +731,10 @@ class MatrixLayer(layers.Layer):
         else:
             raise ValueError("Please use constraint='diagonal' or 'covariance.'")
 
+        self.layers = [self.matrix_layer]
+
     def call(self, inputs, **kwargs):
-        return self.matrix_layer(inputs)[0]
+        return self.matrix_layer(inputs, **kwargs)[0]
 
 
 class MixVectorsLayer(layers.Layer):

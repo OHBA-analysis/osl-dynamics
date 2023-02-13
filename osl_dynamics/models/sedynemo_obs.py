@@ -272,7 +272,10 @@ class Model(ModelBase):
 
         if self.config.learn_covariances:
             dynemo_obs.set_covariances_regularizer(
-                self.model, training_dataset, layer_name="group_covs"
+                self.model,
+                self.config.covariances_epsilon,
+                training_dataset,
+                layer_name="group_covs",
             )
 
     def set_bayesian_deviation_parameters(self, training_dataset):
@@ -545,9 +548,9 @@ def get_group_means_covariances(model):
     group_means_layer = model.get_layer("group_means")
     group_covs_layer = model.get_layer("group_covs")
 
-    group_means = group_means_layer.vectors
+    group_means = group_means_layer(1)
     group_covs = add_epsilon(
-        group_covs_layer.bijector(group_covs_layer.flattened_cholesky_factors),
+        group_covs_layer(1),
         group_covs_layer.epsilon,
         diag=True,
     )

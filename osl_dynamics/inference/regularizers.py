@@ -5,6 +5,10 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import regularizers
+import tensorflow_probability as tfp
+from osl_dynamics.inference.layers import add_epsilon
+
+tfb = tfp.bijectors
 
 
 class InverseWishart(regularizers.Regularizer):
@@ -17,16 +21,20 @@ class InverseWishart(regularizers.Regularizer):
     psi : np.ndarray
         Scale matrix. Must be a symmetric positive definite matrix.
         Shape must be (n_channels, n_channels).
+    epsilon : float
+        Error added to the diagonal of the covariances.
     n_batches : int
         Number of batches in the data.
     """
 
-    def __init__(self, nu, psi, n_batches, **kwargs):
+    def __init__(self, nu, psi, epsilon, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.psi = psi
+        self.epsilon = epsilon
         self.n_batches = n_batches
         self.n_channels = psi.shape[-1]
+        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
         # Validation
         if not self.nu > self.n_channels - 1:
@@ -45,9 +53,12 @@ class InverseWishart(regularizers.Regularizer):
                 "Cholesky decomposition of psi failed. psi must be positive definite."
             )
 
-    def __call__(self, cov):
-        log_det_cov = tf.linalg.logdet(cov)
-        inv_cov = tf.linalg.inv(cov)
+    def __call__(self, flattened_cholesky_factors):
+        covariances = add_epsilon(
+            self.bijector(flattened_cholesky_factors), self.epsilon, diag=True
+        )
+        log_det_cov = tf.linalg.logdet(covariances)
+        inv_cov = tf.linalg.inv(covariances)
         reg = tf.reduce_sum(
             ((self.nu + self.n_channels + 1) / 2) * log_det_cov
             + (1 / 2) * tf.linalg.trace(tf.matmul(tf.expand_dims(self.psi, 0), inv_cov))
@@ -120,24 +131,34 @@ class MarginalInverseWishart(regularizers.Regularizer):
     ----------
     nu : int
         Degrees of freedom. Must be greater than (n_channels - 1).
+    epsilon : float
+        Error added to the correlations.
     n_channels : int
         Number of channels of the correlation matrices.
     n_batches : int
         Number of batches in the data.
     """
 
-    def __init__(self, nu, n_channels, n_batches, **kwargs):
+    def __init__(self, nu, epsilon, n_channels, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
+        self.epsilon = epsilon
         self.n_channels = n_channels
         self.n_batches = n_batches
+        self.bijector = tfb.Chain(
+            [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
+        )
+
         # Validation
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
 
-    def __call__(self, corr):
-        log_det_corr = tf.linalg.logdet(corr)
-        inv_corr = tf.linalg.inv(corr)
+    def __call__(self, flattened_cholesky_factor):
+        correlations = add_epsilon(
+            self.bijector(flattened_cholesky_factor), self.epsilon, diag=True
+        )
+        log_det_corr = tf.linalg.logdet(correlations)
+        inv_corr = tf.linalg.inv(correlations)
         reg = tf.reduce_sum(
             ((self.nu + self.n_channels + 1) / 2) * log_det_corr
         ) + tf.reduce_sum((self.nu / 2) * tf.math.log(tf.linalg.diag_part(inv_corr)))
@@ -155,15 +176,19 @@ class LogNormal(regularizers.Regularizer):
     sigma : np.ndarray
         Sigma parameters of the log normal distribution.
         Shape is (n_channels,). All entries must be positive.
+    epsilon : float
+        Error added to the standard deviations.
     n_batches : int
         Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, n_batches, **kwargs):
+    def __init__(self, mu, sigma, epsilon, n_batches, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
+        self.epsilon = epsilon
         self.n_batches = n_batches
+        self.bijector = tfb.Softplus()
 
         # Validation
         if self.mu.ndim != 1:
@@ -178,7 +203,8 @@ class LogNormal(regularizers.Regularizer):
         if np.any(self.sigma < 0):
             raise ValueError("Entries of sigma must be positive.")
 
-    def __call__(self, std):
+    def __call__(self, diagonals):
+        std = add_epsilon(self.bijector(diagonals), self.epsilon)
         log_std = tf.math.log(std)
         reg = tf.reduce_sum(
             log_std

@@ -123,7 +123,7 @@ class Model(ModelBase):
         covariances : np.ndarary
             Mode covariances.
         """
-        return get_covariances(self.model, self.config.diagonal_covariances)
+        return get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -135,7 +135,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return get_means_covariances(self.model, self.config.diagonal_covariances)
+        return get_means_covariances(self.model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
@@ -187,7 +187,10 @@ class Model(ModelBase):
 
         if self.config.learn_covariances:
             set_covariances_regularizer(
-                self.model, training_dataset, self.config.diagonal_covariances
+                self.model,
+                training_dataset,
+                self.config.covariances_epsilon,
+                self.config.diagonal_covariances,
             )
 
 
@@ -248,41 +251,29 @@ def _model_structure(config):
 
 def get_means(model):
     means_layer = model.get_layer("means")
-    means = means_layer.vectors
+    means = means_layer(1)
     return means.numpy()
 
 
-def get_covariances(model, diagonal=False):
+def get_covariances(model):
     covs_layer = model.get_layer("covs")
-    if diagonal:
-        covs = add_epsilon(
-            tf.linalg.diag(covs_layer.bijector(covs_layer.diagonals)),
-            covs_layer.epsilon,
-            diag=True,
-        )
-    else:
-        covs = add_epsilon(
-            covs_layer.bijector(covs_layer.flattened_cholesky_factors),
-            covs_layer.epsilon,
-            diag=True,
-        )
+    covs = covs_layer(1)
     return covs.numpy()
 
 
-def get_means_covariances(model, diagonal=False):
+def get_means_covariances(model):
     means = get_means(model)
-    covs = get_covariances(model, diagonal)
+    covs = get_covariances(model)
     return means, covs
 
 
 def set_means(model, means, update_initializer=True, layer_name="means"):
     means = means.astype(np.float32)
     means_layer = model.get_layer(layer_name)
-    layer_weights = means_layer.vectors
-    layer_weights.assign(means)
-
+    learnable_tensor_layer = means_layer.layers[0]
+    leanable_tensor_layer.tensor.assign(means)
     if update_initializer:
-        means_layer.vectors_initializer = WeightInitializer(means)
+        learnable_tensor_layer.tensor_initializer = WeightInitializer(means)
 
 
 def set_covariances(
@@ -290,25 +281,22 @@ def set_covariances(
 ):
     covariances = covariances.astype(np.float32)
     covs_layer = model.get_layer(layer_name)
+    learnable_tensor_layer = covs_layer.layers[0]
 
     if diagonal:
         if covariances.ndim == 3:
             # Only keep the diagonal as a vector
             covariances = np.diagonal(covariances, axis1=1, axis2=2)
         diagonals = covs_layer.bijector.inverse(covariances)
-        layer_weights = covs_layer.diagonals
-        layer_weights.assign(diagonals)
-
+        learnable_tensor_layer.tensor.assign(diagonals)
         if update_initializer:
-            covs_layer.diagonals_initializer = WeightInitializer(diagonals)
+            learnable_tensor_layer.tensor_initializer = WeightInitializer(diagonals)
 
     else:
         flattened_cholesky_factors = covs_layer.bijector.inverse(covariances)
-        layer_weights = covs_layer.flattened_cholesky_factors
-        layer_weights.assign(flattened_cholesky_factors)
-
+        learnable_tensor_layer.tensor.assign(flatten_cholesky_factors)
         if update_initializer:
-            covs_layer.flattened_cholesky_factors_initializer = WeightInitializer(
+            learnable_tensor_layer.tensor_initializer = WeightInitializer(
                 flattened_cholesky_factors
             )
 
@@ -322,11 +310,18 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     sigma = np.diag((range_ / 2) ** 2)
 
     means_layer = model.get_layer(layer_name)
-    means_layer.regularizer = regularizers.MultivariateNormal(mu, sigma, n_batches)
+    learnable_tensor_layer = means_layer.layers[0]
+    learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(
+        mu, sigma, n_batches
+    )
 
 
 def set_covariances_regularizer(
-    model, training_dataset, diagonal=False, layer_name="covs"
+    model,
+    training_dataset,
+    epsilon,
+    diagonal=False,
+    layer_name="covs",
 ):
     n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
@@ -336,9 +331,15 @@ def set_covariances_regularizer(
     if diagonal:
         mu = np.zeros([n_channels], dtype=np.float32)
         sigma = np.sqrt(np.log(2 * range_))
-        covs_layer.regularizer = regularizers.LogNormal(mu, sigma, n_batches)
+        learnable_tensor_layer = covs_layer.layers[0]
+        learnable_tensor_layer.regularizer = regularizers.LogNormal(
+            mu, sigma, epsilon, n_batches
+        )
 
     else:
         nu = n_channels - 1 + 0.1
         psi = np.diag(range_)
-        covs_layer.regularizer = regularizers.InverseWishart(nu, psi, n_batches)
+        learnable_tensor_layer = covs_layer.layers[0]
+        learnable_tensor_layer.regularizer = regularizers.InverseWishart(
+            nu, psi, epsilon, n_batches
+        )
