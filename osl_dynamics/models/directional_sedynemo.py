@@ -345,7 +345,10 @@ class Model(VariationalInferenceModelBase):
             the model?
         """
         dynemo_obs.set_covariances(
-            self.model, group_covariances, update_initializer, layer_name="group_covs"
+            self.model,
+            group_covariances,
+            update_initializer=update_initializer,
+            layer_name="group_covs",
         )
 
     def set_observation_model_parameters(
