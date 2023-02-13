@@ -462,8 +462,17 @@ class ModelBase:
         """
         print("Loading model:", dirname)
 
-        # Load config
+        # Load config dict and version from yml file
         config_dict, version = cls.load_config(dirname)
+
+        if version in ["<1.1.6", "1.1.6", "1.1.7"]:
+            raise ValueError(
+                f"model was trained using osl-dynamics version {version}. "
+                + "This is incompatible with the current version. "
+                + "Please revert to v1.1.7 to load this model."
+            )
+
+        # Create config object
         config = cls.config_type(**config_dict)
 
         # Create model
