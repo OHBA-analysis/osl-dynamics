@@ -3,8 +3,8 @@
 """
 
 import numpy as np
-from tqdm import tqdm
 from scipy import signal
+from tqdm import tqdm
 
 from osl_dynamics import array_ops
 from osl_dynamics.data.spm import SPM
@@ -196,7 +196,7 @@ def make_channels_consistent(spm_filenames, scanner, output_folder="."):
 
     # Get the channel labels
     channel_labels = []
-    for filename in tqdm(spm_filenames, desc="Loading files", ncols=98):
+    for filename in tqdm(spm_filenames, desc="Loading files"):
         spm = SPM(filename, load_data=False)
         channel_labels.append(spm.channel_labels)
 
@@ -215,7 +215,7 @@ def make_channels_consistent(spm_filenames, scanner, output_folder="."):
                 file.write(channel + "\n")
 
     # Write data to file only keeping the common channels
-    for i in tqdm(range(len(spm_filenames)), desc="Writing files", ncols=98):
+    for i in tqdm(range(len(spm_filenames)), desc="Writing files"):
         spm = SPM(spm_filenames[i], load_data=True)
         channels = [label in common_channels for label in spm.channel_labels]
 

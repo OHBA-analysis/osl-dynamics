@@ -167,7 +167,7 @@ def image(cifti_left, cifti_right, file_name, inflation=0, temp_scene=None):
     pathlib.Path(file_path).parent.mkdir(exist_ok=True, parents=True)
     file_pattern = f"{file_path}{{:0{max_int_length}d}}{suffix}"
 
-    for i in trange(n_modes, desc="Saving images", ncols=98):
+    for i in trange(n_modes, desc="Saving images"):
         subprocess.run(
             [
                 "wb_command",

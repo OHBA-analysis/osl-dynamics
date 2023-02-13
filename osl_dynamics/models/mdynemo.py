@@ -10,29 +10,29 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tqdm import trange
 
-from osl_dynamics.models import dynemo_obs, mdynemo_obs
-from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.models.inf_mod_base import (
-    VariationalInferenceModelConfig,
-    VariationalInferenceModelBase,
-)
 from osl_dynamics.inference.layers import (
-    InferenceRNNLayer,
-    LogLikelihoodLossLayer,
-    VectorsLayer,
-    DiagonalMatricesLayer,
+    ConcatenateLayer,
     CorrelationMatricesLayer,
-    MixVectorsLayer,
-    MixMatricesLayer,
-    ModelRNNLayer,
-    NormalizationLayer,
+    DiagonalMatricesLayer,
+    InferenceRNNLayer,
     KLDivergenceLayer,
     KLLossLayer,
+    LogLikelihoodLossLayer,
+    MatMulLayer,
+    MixMatricesLayer,
+    MixVectorsLayer,
+    ModelRNNLayer,
+    NormalizationLayer,
     SampleNormalDistributionLayer,
     SoftmaxLayer,
-    ConcatenateLayer,
-    MatMulLayer,
+    VectorsLayer,
 )
+from osl_dynamics.models import dynemo_obs, mdynemo_obs
+from osl_dynamics.models.inf_mod_base import (
+    VariationalInferenceModelBase,
+    VariationalInferenceModelConfig,
+)
+from osl_dynamics.models.mod_base import BaseModelConfig
 
 
 @dataclass
@@ -361,7 +361,7 @@ class Model(VariationalInferenceModelBase):
         # Sample the mode time courses
         alpha = np.empty([n_samples, self.config.n_modes])
         gamma = np.empty([n_samples, self.config.n_fc_modes])
-        for i in trange(n_samples, desc="Sampling mode time courses", ncols=98):
+        for i in trange(n_samples, desc="Sampling mode time courses"):
             # If there are leading zeros we trim theta so that we don't pass the zeros
             trimmed_mean_theta = mean_theta_norm[~np.all(mean_theta_norm == 0, axis=1)][
                 np.newaxis, :, :
@@ -396,7 +396,6 @@ class Model(VariationalInferenceModelBase):
 
 
 def _model_structure(config):
-
     # Layer for input
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"

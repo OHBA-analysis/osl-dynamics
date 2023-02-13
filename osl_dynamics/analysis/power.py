@@ -3,10 +3,10 @@
 """
 
 from os import makedirs
+from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-from pathlib import Path
 from nilearn import plotting
 from tqdm import trange
 
@@ -97,7 +97,6 @@ def variance_from_spectra(
     # Calculate power maps for each subject
     var = []
     for i in range(n_subjects):
-
         # Get PSDs
         if power_spectra.shape[-2] == power_spectra.shape[-3]:
             # Cross-spectra densities were passed
@@ -278,7 +277,7 @@ def save(
 
     # Just display the power map
     if filename is None:
-        for i in trange(n_modes, desc="Saving images", ncols=98):
+        for i in trange(n_modes, desc="Saving images"):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
             plotting.plot_img_on_surf(
                 nii,
@@ -297,7 +296,7 @@ def save(
 
         else:
             # Save each map as an image
-            for i in trange(n_modes, desc="Saving images", ncols=98):
+            for i in trange(n_modes, desc="Saving images"):
                 nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
