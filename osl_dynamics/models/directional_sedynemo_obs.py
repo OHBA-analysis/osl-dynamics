@@ -226,7 +226,7 @@ class Model(ModelBase):
                 layer_name="group_covs",
             )
 
-    def set_bayesian_deviation_parameters(self, training_dataset):
+    def set_bayesian_kl_scaling(self, training_dataset):
         """Set the correct scaling for KL loss between deviation posterior and prior."""
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
