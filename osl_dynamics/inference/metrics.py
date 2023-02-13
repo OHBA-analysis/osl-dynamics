@@ -3,8 +3,8 @@
 """
 
 import numpy as np
-from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from scipy.linalg import eigvalsh
+from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from tqdm import trange
 
 
@@ -245,7 +245,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     matrices.astype(np.float64)
     n_matrices = matrices.shape[0]
     riemannian_distances = np.zeros([n_matrices, n_matrices])
-    for i in trange(n_matrices, desc="Computing Riemannian distances", ncols=98):
+    for i in trange(n_matrices, desc="Computing Riemannian distances"):
         for j in range(i + 1, n_matrices):
             riemannian_distances[i][j] = riemannian_distance(
                 matrices[i], matrices[j], threshold=threshold

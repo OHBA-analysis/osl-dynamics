@@ -10,9 +10,9 @@ from os import path
 from shutil import rmtree
 
 import numpy as np
+from pqdm.threads import pqdm
 from scipy import signal
 from tqdm import tqdm
-from pqdm.threads import pqdm
 
 from osl_dynamics.data import processing, rw, tf
 from osl_dynamics.utils import misc
@@ -231,7 +231,6 @@ class Data:
             n_jobs=self.n_jobs,
             desc="Loading files",
             argument_type="args",
-            ncols=98,
             total=len(self.inputs),
         )
 
@@ -273,7 +272,7 @@ class Data:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Save time series data
-        for i in tqdm(range(self.n_subjects), desc="Saving data", ncols=98):
+        for i in tqdm(range(self.n_subjects), desc="Saving data"):
             np.save(f"{output_dir}/subject{i}.npy", self.subjects[i])
 
         # Save preparation info if .prepared has been called
@@ -324,7 +323,7 @@ class Data:
 
         # Prepare the data
         for raw_data_memmap, prepared_data_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Filtering data", ncols=98),
+            tqdm(self.raw_data_memmaps, desc="Filtering data"),
             self.prepared_data_filenames,
         ):
             # Filtering
@@ -456,7 +455,6 @@ class Data:
             desc="Preparing data",
             n_jobs=self.n_jobs,
             argument_type="args",
-            ncols=98,
             total=len(self.raw_data_memmaps),
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
@@ -561,12 +559,11 @@ class Data:
         # Principle component analysis (PCA)
         # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
-
             # Calculate the PCA components by performing SVD on the covariance
             # of the data
             covariance = np.zeros([self.n_te_channels, self.n_te_channels])
             for raw_data_memmap in tqdm(
-                self.raw_data_memmaps, desc="Calculating PCA components", ncols=98
+                self.raw_data_memmaps, desc="Calculating PCA components"
             ):
                 # Standardise and time embed the data
                 std_data = processing.standardize(raw_data_memmap)
@@ -596,7 +593,6 @@ class Data:
             desc="Preparing data",
             n_jobs=self.n_jobs,
             argument_type="args",
-            ncols=98,
             total=len(self.raw_data_memmaps),
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
@@ -706,7 +702,6 @@ class Data:
 
         trimmed_time_series = []
         for memmap in memmaps:
-
             # Remove data points lost to time embedding
             if n_embeddings != 1:
                 memmap = memmap[n_embeddings // 2 : -(n_embeddings // 2)]
@@ -917,7 +912,6 @@ class Data:
                 training_datasets = []
                 validation_datasets = []
                 for i in range(len(full_datasets)):
-
                     # Calculate the number of batches in the training dataset
                     dataset_size = len(full_datasets[i])
                     training_dataset_size = round(

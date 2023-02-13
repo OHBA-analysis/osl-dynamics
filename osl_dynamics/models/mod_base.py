@@ -5,12 +5,12 @@
 import os
 import re
 from abc import abstractmethod
-from io import StringIO
 from dataclasses import dataclass
+from io import StringIO
 
 import numpy as np
-import yaml
 import tensorflow
+import yaml
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -21,7 +21,7 @@ from tqdm.keras import TqdmCallback
 import osl_dynamics
 from osl_dynamics import data
 from osl_dynamics.inference import callbacks, initializers
-from osl_dynamics.utils.misc import get_argument, replace_argument, NumpyLoader
+from osl_dynamics.utils.misc import NumpyLoader, get_argument, replace_argument
 from osl_dynamics.utils.model import HTMLTable, LatexTable
 
 
@@ -208,7 +208,7 @@ class ModelBase:
                 # Create a tqdm class with a progress bar width of 98 characters
                 class tqdm_class(tqdm_auto):
                     def __init__(self, *args, **kwargs):
-                        super().__init__(*args, **kwargs, ncols=98)
+                        super().__init__(*args, **kwargs)
 
                 tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
             additional_callbacks.append(tqdm_callback)

@@ -4,12 +4,14 @@
 
 print("Setting up")
 import os
+
 import numpy as np
+from tqdm import trange
+
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
-from tqdm import trange
 
 # Create directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -113,7 +115,7 @@ inf_tvcov = np.sum(
 # Calculate the Riemannian distance between the ground truth and inferred covariance
 print("Calculating riemannian distances")
 rd = np.empty(2000)
-for i in trange(2000, ncols=98):
+for i in trange(2000):
     rd[i] = metrics.riemannian_distance(sim_tvcov[i], inf_tvcov[i])
 
 plotting.plot_line(

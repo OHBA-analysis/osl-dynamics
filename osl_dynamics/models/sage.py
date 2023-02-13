@@ -10,18 +10,18 @@ import numpy as np
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm import trange
 
+from osl_dynamics.inference.layers import (
+    AdversarialLogLikelihoodLossLayer,
+    ConcatVectorsMatricesLayer,
+    CovarianceMatricesLayer,
+    InferenceRNNLayer,
+    MixMatricesLayer,
+    MixVectorsLayer,
+    ModelRNNLayer,
+    VectorsLayer,
+)
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
-from osl_dynamics.inference.layers import (
-    InferenceRNNLayer,
-    VectorsLayer,
-    CovarianceMatricesLayer,
-    MixVectorsLayer,
-    MixMatricesLayer,
-    ModelRNNLayer,
-    ConcatVectorsMatricesLayer,
-    AdversarialLogLikelihoodLossLayer,
-)
 
 
 @dataclass
@@ -421,7 +421,6 @@ class Model(ModelBase):
         for i in trange(
             n_samples - self.config.sequence_length,
             desc="Predicting mode time course",
-            ncols=98,
         ):
             # Extract the sequence
             alpha_input = alpha[i : i + self.config.sequence_length]

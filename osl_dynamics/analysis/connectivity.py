@@ -5,15 +5,15 @@
 from pathlib import Path
 
 import numpy as np
-from scipy import stats
 from nilearn import plotting
+from scipy import stats
 from tqdm import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import gmm, static
 from osl_dynamics.analysis.spectral import get_frequency_args_range
-from osl_dynamics.utils.parcellation import Parcellation
 from osl_dynamics.utils.misc import override_dict_defaults
+from osl_dynamics.utils.parcellation import Parcellation
 
 
 def sliding_window_connectivity(
@@ -66,7 +66,7 @@ def sliding_window_connectivity(
 
     # Calculate sliding window connectivity for each subject
     sliding_window_conn = []
-    for i in trange(len(data), desc="Calculating connectivity", ncols=98):
+    for i in trange(len(data), desc="Calculating connectivity"):
         n_samples = data[i].shape[0]
         n_channels = data[i].shape[1]
 
@@ -241,7 +241,6 @@ def mean_coherence_from_spectra(
     # Calculate connectivity for each subject
     c = []
     for i in range(n_subjects):
-
         # Concatenate over modes
         coh = coherence[i].reshape(-1, n_freq)
 
@@ -491,7 +490,6 @@ def fit_gmm(
     percentiles = np.empty([n_components, n_modes])
     for i in range(n_components):
         for j in range(n_modes):
-
             # Off diagonal connectivity values to fit a GMM to
             if subtract_mean:
                 c = conn_map[i, j, m, n] - mean_conn_map[i, m, n]
@@ -736,8 +734,7 @@ def save(
 
     # Loop through each connectivity map
     n_modes = conn_map.shape[0]
-    for i in trange(n_modes, desc="Saving images", ncols=98):
-
+    for i in trange(n_modes, desc="Saving images"):
         # Overwrite keyword arguments if passed
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 

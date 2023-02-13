@@ -5,10 +5,10 @@
 import warnings
 
 import numpy as np
+from pqdm.processes import pqdm
 from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm import trange
-from pqdm.processes import pqdm
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
@@ -111,7 +111,6 @@ def window_mean(data, window_length, step_size=1, n_sub_windows=1):
     # Array to hold mean of data multiplied by the windowing function
     a = np.empty([n_windows, n_modes], dtype=np.float32)
     for i in range(n_windows):
-
         # Alpha in the window
         j = time_indices[i]
         a_window = data[j : j + window_length]
@@ -494,7 +493,6 @@ def multitaper(
 
     # If tapers are not passed we generate them here
     if tapers is None:
-
         # Check the time half width bandwidth and number of tapers has been passed
         if time_half_bandwidth is None or n_tapers is None:
             raise ValueError("time_half_bandwidth and n_tapers must be passed.")
@@ -593,7 +591,7 @@ def single_multitaper_spectra(
         else:
             if i == 0:
                 print("Calculating spectra:")
-            iterator = trange(n_segments, desc=f"Mode {i}", ncols=98)
+            iterator = trange(n_segments, desc=f"Mode {i}")
 
         for j in iterator:
             # Time series for state i and segment j
@@ -824,7 +822,6 @@ def multitaper_spectra(
             single_multitaper_spectra,
             n_jobs=n_jobs,
             argument_type="args",
-            ncols=98,
         )
 
     # Unpack the results
@@ -1081,7 +1078,6 @@ def regression_spectra(
             single_regression_spectra,
             n_jobs=n_jobs,
             argument_type="args",
-            ncols=98,
         )
 
     # Unpack results
@@ -1233,7 +1229,7 @@ def spectrogram(
             dtype=np.complex64,
         )
         if print_progress_bar:
-            iterator = trange(n_psds, desc="Calculating spectrogram", ncols=98)
+            iterator = trange(n_psds, desc="Calculating spectrogram")
         else:
             iterator = range(n_psds)
         for i in iterator:
@@ -1268,7 +1264,7 @@ def spectrogram(
         P = np.empty([n_psds, n_channels, n_freq], dtype=np.float32)
         XX_sub_window = np.empty([n_sub_windows, n_channels, n_freq], dtype=np.float32)
         if print_progress_bar:
-            iterator = trange(n_psds, desc="Calculating spectrogram", ncols=98)
+            iterator = trange(n_psds, desc="Calculating spectrogram")
         else:
             iterator = range(n_psds)
         for i in iterator:
