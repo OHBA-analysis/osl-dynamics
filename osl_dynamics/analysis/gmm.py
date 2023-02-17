@@ -2,11 +2,15 @@
 
 """
 
+import logging
+
 import numpy as np
-from scipy import stats, special
+from scipy import special, stats
 from sklearn.mixture import GaussianMixture
 
 from osl_dynamics.utils import plotting
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def fit_gaussian_mixture(
@@ -65,7 +69,7 @@ def fit_gaussian_mixture(
         Threshold for the on class.
     """
     if print_message:
-        print("Fitting GMM")
+        _logger.info("Fitting GMM")
 
     # Copy the data so we don't modify it
     X_ = np.copy(X)
