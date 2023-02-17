@@ -2,9 +2,10 @@
 
 """
 
+import logging
+import os.path as op
 import sys
 import warnings
-import os.path as op
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,20 +13,22 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import backend, layers, utils
 from numba.core.errors import NumbaWarning
+from tensorflow.keras import backend, layers, utils
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import initializers
-from osl_dynamics.models import dynemo_obs
-from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.inference.layers import (
-    VectorsLayer,
+    CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
-    CategoricalLogLikelihoodLossLayer,
+    VectorsLayer,
 )
+from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+from osl_dynamics.simulation import HMM
+
+_logger = logging.getLogger("osl-dynamics")
 
 warnings.filterwarnings("ignore", category=NumbaWarning)
 
@@ -182,7 +185,7 @@ class Model(ModelBase):
             # Print a message stating how many batches we'll use
             n_total_batches = dtf.get_n_batches(dataset)
             n_batches = max(round(n_total_batches * take), 1)
-            print(f"Using {n_batches} out of {n_total_batches} batches")
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         history = {"loss": [], "rho": [], "lr": []}
         for n in range(epochs):
@@ -199,6 +202,7 @@ class Model(ModelBase):
                 data_subset = dataset
 
             # Setup a progress bar
+            # TODO: Can this be tqdm or logging?
             print("Epoch {}/{}".format(n + 1, epochs))
             pb_i = utils.Progbar(len(data_subset))
 
@@ -233,7 +237,7 @@ class Model(ModelBase):
 
                 l = h.history["loss"][0]
                 if np.isnan(l):
-                    print("\nTraining failed!")
+                    _logger.error("Training failed!")
                     return
                 loss.append(l)
                 pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
@@ -271,13 +275,13 @@ class Model(ModelBase):
             The training history of the best initialization.
         """
         if n_init is None or n_init == 0:
-            print(
+            _logger.info(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
             )
             return
 
-        print("Random subset initialization:")
+        _logger.info("Random subset initialization:")
 
         # Make a TensorFlow Dataset
         training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
@@ -285,12 +289,13 @@ class Model(ModelBase):
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_data)
         n_batches = max(round(n_total_batches * take), 1)
-        print(f"Using {n_batches} out of {n_total_batches} batches")
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
+        # TODO: This can be done with tqdm. Option to use leave=False.
         for n in range(n_init):
-            print(f"Initialization {n}")
+            _logger.info(f"Initialization {n}")
             self.reset()
             training_data.shuffle(100000)
             training_data_subset = training_data.take(n_batches)
@@ -306,10 +311,10 @@ class Model(ModelBase):
                 best_trans_prob = self.trans_prob
 
         if best_loss == np.Inf:
-            print("Initialization failed")
+            _logger.error("Initialization failed")
             return
 
-        print(f"Using initialization {best_initialization}")
+        _logger.info(f"Using initialization {best_initialization}")
         self.reset()
         self.set_weights(best_weights, best_trans_prob)
 
@@ -342,13 +347,13 @@ class Model(ModelBase):
             The training history of the best initialization.
         """
         if n_init is None or n_init == 0:
-            print(
+            _logger.info(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
             )
             return
 
-        print("Random state time course initialization:")
+        _logger.info("Random state time course initialization:")
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
@@ -358,12 +363,13 @@ class Model(ModelBase):
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_dataset)
         n_batches = max(round(n_total_batches * take), 1)
-        print(f"Using {n_batches} out of {n_total_batches} batches")
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
+        # TODO: This can be done with tqdm. Option to use leave=False.
         for n in range(n_init):
-            print(f"Initialization {n}")
+            _logger.info(f"Initialization {n}")
             self.reset()
             self.set_random_state_time_course_initialization(training_data)
             training_dataset.shuffle(100000)
@@ -380,10 +386,10 @@ class Model(ModelBase):
                 best_trans_prob = self.trans_prob
 
         if best_loss == np.Inf:
-            print("Initialization failed")
+            _logger.error("Initialization failed")
             return
 
-        print(f"Using initialization {best_initialization}")
+        _logger.info(f"Using initialization {best_initialization}")
         self.reset()
         self.set_weights(best_weights, best_trans_prob)
 
@@ -675,7 +681,6 @@ class Model(ModelBase):
         subject_means = []
         subject_covariances = []
         for data in training_data.subjects:
-
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
