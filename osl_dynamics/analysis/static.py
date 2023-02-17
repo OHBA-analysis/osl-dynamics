@@ -2,10 +2,14 @@
 
 """
 
+import logging
+
 import numpy as np
 from pqdm.processes import pqdm
 
 from osl_dynamics.analysis import spectral
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def functional_connectivity(data, conn_type="corr"):
@@ -129,7 +133,7 @@ def power_spectra(
             )
 
         # Calculate power spectra
-        print("Calculating power spectra")
+        _logger.info("Calculating power spectra")
         results = pqdm(args, spectral.spectrogram, n_jobs=n_jobs, argument_type="args")
 
     # Unpack results
