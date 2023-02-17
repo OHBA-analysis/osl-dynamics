@@ -2,6 +2,7 @@
 
 """
 
+import logging
 import warnings
 
 import numpy as np
@@ -12,6 +13,8 @@ from tqdm import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def nextpow2(x):
@@ -137,7 +140,7 @@ def window_mean(data, window_length, step_size=1, n_sub_windows=1):
     return a
 
 
-def coherence_spectra(power_spectra, print_message=True):
+def coherence_spectra(power_spectra, print_message=False):
     """Calculates coherences from (cross) power spectral densities.
 
     Parameters
@@ -145,7 +148,7 @@ def coherence_spectra(power_spectra, print_message=True):
     power_spectra : np.ndarray
         Power spectra. Shape is (n_modes, n_channels, n_channels, n_freq).
     print_message : bool
-        Should we print a message to screen?
+        Should we print a message to screen? (deprecated, use logging module)
 
     Returns
     -------
@@ -156,7 +159,9 @@ def coherence_spectra(power_spectra, print_message=True):
     n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
     if print_message:
-        print("Calculating coherences")
+        print("print_message interface is deprecated. Use logging module instead.")
+    
+    _logger.info("Calculating coherences")
 
     coherences = np.empty([n_modes, n_channels, n_channels, n_freq])
     for i in range(n_modes):
@@ -200,7 +205,7 @@ def decompose_spectra(
     components : np.ndarray
         Spectral components. Shape is (n_components, n_freq).
     """
-    print("Performing spectral decomposition")
+    _logger.info("Performing spectral decomposition")
 
     # Validation
     error_message = (
@@ -419,7 +424,7 @@ def mode_covariance_spectra(
         Coherences calculated for each mode. Shape is (n_modes, n_channels,
         n_channels, n_freq).
     """
-    print("Calculating power spectra")
+    _logger.info("Calculating power spectra")
 
     # Validation
     if frequency_range is None:
@@ -590,7 +595,7 @@ def single_multitaper_spectra(
             iterator = range(n_segments)
         else:
             if i == 0:
-                print("Calculating spectra:")
+                _logger.info("Calculating spectra:")
             iterator = trange(n_segments, desc=f"Mode {i}")
 
         for j in iterator:
@@ -816,7 +821,7 @@ def multitaper_spectra(
             )
 
         # Calculate spectra in parallel
-        print("Calculating spectra:")
+        _logger.info("Calculating spectra:")
         results = pqdm(
             args,
             single_multitaper_spectra,
@@ -1072,7 +1077,7 @@ def regression_spectra(
             )
 
         # Calculate a time-varying PSD and regress to get the mode PSDs
-        print("Calculating power spectra")
+        _logger.info("Calculating power spectra")
         results = pqdm(
             args,
             single_regression_spectra,
