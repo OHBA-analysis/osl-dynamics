@@ -2,11 +2,15 @@
 
 """
 
+import logging
+
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
+_logger = logging.getLogger("osl-dynamics")
 
-def linear(X, y, fit_intercept, normalize=False, print_message=True):
+
+def linear(X, y, fit_intercept, normalize=False, print_message=False):
     """Wrapper for sklearn's LinearRegression.
 
     Parameters
@@ -21,7 +25,7 @@ def linear(X, y, fit_intercept, normalize=False, print_message=True):
     normalize : bool
         Should we z-transform the regressors?
     print_message : bool
-        Should we print a message?
+        Should we print a message? This interface is deprecated. Use the logging module.
 
     Returns
     -------
@@ -32,7 +36,9 @@ def linear(X, y, fit_intercept, normalize=False, print_message=True):
         Returned if fit_intercept=True.
     """
     if print_message:
-        print("Fitting linear regression")
+        print("Use logging module. This interface is deprecated.")
+    
+    _logger.info("Fitting linear regression")
 
     # Reshape in case non 2D matrices were passed
     original_shape = y.shape
