@@ -2,6 +2,7 @@
 
 """
 
+import logging
 import os
 import re
 from abc import abstractmethod
@@ -23,6 +24,8 @@ from osl_dynamics import data
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import NumpyLoader, get_argument, replace_argument
 from osl_dynamics.utils.model import HTMLTable, LatexTable
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -460,7 +463,7 @@ class ModelBase:
         model : Model
             Model object.
         """
-        print("Loading model:", dirname)
+        _logger.info("Loading model:", dirname)
 
         # Load config dict and version from yml file
         config_dict, version = cls.load_config(dirname)
