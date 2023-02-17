@@ -3,18 +3,21 @@
 """
 
 
-import numpy as np
+import logging
+from itertools import zip_longest
+
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-from itertools import zip_longest
 
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
 
+_logger = logging.getLogger("osl-dynamics")
 
 QUAL_CMAPS = [
     "Pastel1",
@@ -87,7 +90,7 @@ def save(fig, filename, tight_layout=True):
     tight_layout : bool
         Should we call fig.tight_layout()?
     """
-    print(f"Saving {filename}")
+    _logger.info(f"Saving {filename}")
     if tight_layout:
         fig.tight_layout()
     fig.savefig(filename)
@@ -273,7 +276,7 @@ def plot_line(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot lines
-    for (x_data, y_data, label, e_min, e_max) in zip(
+    for x_data, y_data, label, e_min, e_max in zip(
         x, y, labels, errors_min, errors_max
     ):
         ax.plot(x_data, y_data, label=label, **plot_kwargs)
@@ -560,7 +563,7 @@ def plot_hist(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot histograms
-    for (d, b, l) in zip(data, bins, labels):
+    for d, b, l in zip(data, bins, labels):
         ax.hist(d, bins=b, label=l, histtype="step")
 
     # Set axis range
