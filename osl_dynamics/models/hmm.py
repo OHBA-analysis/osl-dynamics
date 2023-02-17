@@ -755,7 +755,7 @@ class Model(ModelBase):
         """
         dataset = self.make_dataset(dataset, concatenate=False)
 
-        print("Getting alpha")
+        _logger.info("Getting alpha")
         alpha = []
         for ds in dataset:
             gamma = []
