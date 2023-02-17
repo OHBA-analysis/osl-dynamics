@@ -463,7 +463,7 @@ class ModelBase:
         model : Model
             Model object.
         """
-        _logger.info("Loading model:", dirname)
+        _logger.info(f"Loading model: {dirname}")
 
         # Load config dict and version from yml file
         config_dict, version = cls.load_config(dirname)

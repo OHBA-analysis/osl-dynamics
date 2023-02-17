@@ -397,7 +397,7 @@ class Model(ModelBase):
             )
 
         # Load the weights for the best model
-        _logger.info("Loading best model:", save_filepath)
+        _logger.info(f"Loading best model: {save_filepath}")
         self.load_weights(save_filepath)
 
         return history

@@ -262,7 +262,7 @@ class VariationalInferenceModelBase(ModelBase):
         best_loss = np.Inf
         losses = []
         for subject in subjects_to_use:
-            _logger.info("Using subject", subject)
+            _logger.info(f"Using subject {subject}")
 
             # Get the dataset for this subject
             subject_dataset = training_data[subject]
