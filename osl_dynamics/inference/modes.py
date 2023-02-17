@@ -2,14 +2,17 @@
 
 """
 
+import logging
 from pathlib import Path
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from osl_dynamics import array_ops, analysis
+from osl_dynamics import analysis, array_ops
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils.misc import override_dict_defaults
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def argmax_time_courses(
@@ -139,7 +142,7 @@ def gmm_time_courses(
             plot_kwargs=plot_kwargs,
             print_message=False,
         )
-        print(f"GMM theshold {mode}: {threshold}")
+        _logger.info(f"GMM theshold {mode}: {threshold}")
         gmm_time_course[:, mode] = a > threshold
 
     if discontinuities is None:
