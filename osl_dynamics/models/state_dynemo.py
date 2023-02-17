@@ -2,6 +2,7 @@
 
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Literal
 
@@ -10,22 +11,24 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.simulation import HMM
-from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
-from osl_dynamics.models.dynemo import Model as DyNeMo
 from osl_dynamics.inference.layers import (
-    InferenceRNNLayer,
-    ModelRNNLayer,
-    SoftmaxLayer,
-    SampleOneHotCategoricalDistributionLayer,
-    VectorsLayer,
+    CategoricalKLDivergenceLayer,
+    CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
-    CategoricalLogLikelihoodLossLayer,
-    CategoricalKLDivergenceLayer,
+    InferenceRNNLayer,
     KLLossLayer,
+    ModelRNNLayer,
+    SampleOneHotCategoricalDistributionLayer,
+    SoftmaxLayer,
+    VectorsLayer,
 )
+from osl_dynamics.models.dynemo import Model as DyNeMo
+from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
+from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.simulation import HMM
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -213,13 +216,13 @@ class Model(DyNeMo):
             The training history of the best initialization.
         """
         if n_init is None or n_init == 0:
-            print(
+            _logger.warning(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
             )
             return
 
-        print("Random state time course initialization:")
+        _logger.info("Random state time course initialization:")
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
@@ -229,12 +232,13 @@ class Model(DyNeMo):
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_dataset)
         n_batches = max(round(n_total_batches * take), 1)
-        print(f"Using {n_batches} out of {n_total_batches} batches")
+        _logging.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
+        # TODO: This can be done with tqdm.
         for n in range(n_init):
-            print(f"Initialization {n}")
+            _logger.info(f"Initialization {n}")
             self.reset()
             self.set_random_state_time_course_initialization(training_data)
             training_dataset.shuffle(100000)
@@ -248,10 +252,10 @@ class Model(DyNeMo):
                 best_weights = self.get_weights()
 
         if best_loss == np.Inf:
-            print("Initialization failed")
+            _logger.error("Initialization failed")
             return
 
-        print(f"Using initialization {best_initialization}")
+        _logger.info(f"Using initialization {best_initialization}")
         self.reset()
         self.set_weights(best_weights)
 
@@ -270,7 +274,6 @@ class Model(DyNeMo):
         subject_means = []
         subject_covariances = []
         for data in training_data.subjects:
-
             # Sample a state time course from an HMM
             trans_prob = (
                 np.ones((self.config.n_states, self.config.n_states))
@@ -307,7 +310,6 @@ class Model(DyNeMo):
 
 
 def _model_structure(config):
-
     # Layer for input
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
 
