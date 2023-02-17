@@ -2,6 +2,7 @@
 
 """
 
+import logging
 import pathlib
 import pickle
 import warnings
@@ -16,6 +17,8 @@ from tqdm import tqdm
 
 from osl_dynamics.data import processing, rw, tf
 from osl_dynamics.utils import misc
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 class Data:
@@ -576,7 +579,7 @@ class Data:
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
             explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            print(f"Explained variance: {100 * explained_variance:.1f}%")
+            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
@@ -879,7 +882,7 @@ class Data:
                 # Split the full dataset into a training and validation dataset
                 training_dataset = full_dataset.take(training_dataset_size)
                 validation_dataset = full_dataset.skip(training_dataset_size)
-                print(
+                _logger.info(
                     f"{len(training_dataset)} batches in training dataset, "
                     + f"{len(validation_dataset)} batches in the validation dataset."
                 )
@@ -925,7 +928,7 @@ class Data:
                     validation_datasets.append(
                         full_datasets[i].skip(training_dataset_size)
                     )
-                    print(
+                    _logger.info(
                         f"Subject {i}: "
                         + f"{len(training_datasets[i])} batches in training dataset, "
                         + f"{len(validation_datasets[i])} batches in the validation dataset."
