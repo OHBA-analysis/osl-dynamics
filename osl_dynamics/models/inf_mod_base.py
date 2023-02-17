@@ -2,15 +2,18 @@
 
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.inference import callbacks, initializers
+from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils.misc import replace_argument
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -152,13 +155,13 @@ class VariationalInferenceModelBase(ModelBase):
             The training history of the best initialization.
         """
         if n_init is None or n_init == 0:
-            print(
+            _logger.warning(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
             )
             return
 
-        print("Random subset initialization:")
+        _logger.info("Random subset initialization:")
 
         # Original number of KL annealing epochs
         original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
@@ -174,12 +177,13 @@ class VariationalInferenceModelBase(ModelBase):
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_data)
         n_batches = max(round(n_total_batches * take), 1)
-        print(f"Using {n_batches} out of {n_total_batches} batches")
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
+        # TODO: This can be done with tqdm.
         for n in range(n_init):
-            print(f"Initialization {n}")
+            _logger.info(f"Initialization {n}")
             self.reset()
             training_data.shuffle(100000)
             training_data_subset = training_data.take(n_batches)
@@ -191,7 +195,7 @@ class VariationalInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        print(f"Using initialization {best_initialization}")
+        _logger.info(f"Using initialization {best_initialization}")
         self.reset()
         self.set_weights(best_weights)
         self.reset_kl_annealing_factor()
@@ -224,13 +228,13 @@ class VariationalInferenceModelBase(ModelBase):
             Keyword arguments for the fit method.
         """
         if n_init is None or n_init == 0:
-            print(
+            _logger.warning(
                 "Number of initializations was set to zero. "
                 + "Skipping initialization."
             )
             return
 
-        print("Single subject initialization:")
+        _logger.info("Single subject initialization:")
 
         # Original number of KL annealing epochs
         original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
@@ -258,7 +262,7 @@ class VariationalInferenceModelBase(ModelBase):
         best_loss = np.Inf
         losses = []
         for subject in subjects_to_use:
-            print("Using subject", subject)
+            _logger.info("Using subject", subject)
 
             # Get the dataset for this subject
             subject_dataset = training_data[subject]
@@ -268,7 +272,7 @@ class VariationalInferenceModelBase(ModelBase):
             history = self.fit(subject_dataset, epochs=n_epochs, **kwargs)
             loss = history.history["loss"][-1]
             losses.append(loss)
-            print(f"Subject {subject} loss: {loss}")
+            _logger.info(f"Subject {subject} loss: {loss}")
 
             # Record the loss of this subject's data
             if loss < best_loss:
@@ -276,7 +280,7 @@ class VariationalInferenceModelBase(ModelBase):
                 subject_chosen = subject
                 best_weights = self.get_weights()
 
-        print(f"Using means and covariances from subject {subject_chosen}")
+        _logger.info(f"Using means and covariances from subject {subject_chosen}")
 
         # Use the weights from the best initialisation for the full training
         self.reset()
@@ -370,7 +374,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         inputs = self.make_dataset(inputs, concatenate=concatenate)
 
-        print("Getting alpha:")
+        _logger.info("Getting alpha:")
         outputs = []
         for dataset in inputs:
             alpha = self.predict(dataset)["alpha"]
@@ -408,7 +412,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         inputs = self.make_dataset(inputs, concatenate=concatenate)
 
-        print("Getting mode time courses:")
+        _logger.info("Getting mode time courses:")
         outputs_alpha = []
         outputs_gamma = []
         for dataset in inputs:
@@ -445,7 +449,7 @@ class VariationalInferenceModelBase(ModelBase):
             KL divergence loss.
         """
         dataset = self.make_dataset(dataset, concatenate=True)
-        print("Getting losses:")
+        _logger.info("Getting losses:")
         predictions = self.predict(dataset)
         ll_loss = np.mean(predictions["ll_loss"])
         kl_loss = np.mean(predictions["kl_loss"])
