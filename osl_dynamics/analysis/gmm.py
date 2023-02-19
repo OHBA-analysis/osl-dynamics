@@ -25,7 +25,7 @@ def fit_gaussian_mixture(
     show_plot=False,
     plot_filename=None,
     plot_kwargs={},
-    print_message=True,
+    log_message=True,
 ):
     """Fits a two component Bayesian Gaussian mixture model.
 
@@ -60,15 +60,15 @@ def fit_gaussian_mixture(
     plot_kwargs : dict
         Keyword arguments to pass to plotting function.
         Only used if plot_filename is not None.
-    print_message : bool
-        Should we print a message?
+    log_message : bool
+        Should we log a message?
 
     Returns
     -------
     threshold : float
         Threshold for the on class.
     """
-    if print_message:
+    if log_message:
         _logger.info("Fitting GMM")
 
     # Copy the data so we don't modify it

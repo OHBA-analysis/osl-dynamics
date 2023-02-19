@@ -10,7 +10,7 @@ from sklearn.linear_model import LinearRegression
 _logger = logging.getLogger("osl-dynamics")
 
 
-def linear(X, y, fit_intercept, normalize=False, print_message=False):
+def linear(X, y, fit_intercept, normalize=False, log_message=False):
     """Wrapper for sklearn's LinearRegression.
 
     Parameters
@@ -24,8 +24,8 @@ def linear(X, y, fit_intercept, normalize=False, print_message=False):
         Should we fit an intercept?
     normalize : bool
         Should we z-transform the regressors?
-    print_message : bool
-        Should we print a message? This interface is deprecated. Use the logging module.
+    log_message : bool
+        Should we log a message?
 
     Returns
     -------
@@ -35,10 +35,8 @@ def linear(X, y, fit_intercept, normalize=False, print_message=False):
         1D or higher dimension array. Regression intercept.
         Returned if fit_intercept=True.
     """
-    if print_message:
-        print("Use logging module. This interface is deprecated.")
-    
-    _logger.info("Fitting linear regression")
+    if log_message:
+        _logger.info("Fitting linear regression")
 
     # Reshape in case non 2D matrices were passed
     original_shape = y.shape

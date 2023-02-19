@@ -133,7 +133,7 @@ def power_spectra(
             )
 
         # Calculate power spectra
-        _logger.info("Calculating power spectra")
+        _logger.info("Calculating spectra")
         results = pqdm(args, spectral.spectrogram, n_jobs=n_jobs, argument_type="args")
 
     # Unpack results
