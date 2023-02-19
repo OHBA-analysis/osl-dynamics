@@ -9,5 +9,6 @@ from osl_dynamics.analysis import (
     power,
     regression,
     spectral,
+    static,
     workbench,
 )

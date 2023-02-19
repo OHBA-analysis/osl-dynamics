@@ -10,7 +10,7 @@ from scipy import stats
 from tqdm import trange
 
 from osl_dynamics import array_ops
-from osl_dynamics.analysis import gmm, static
+from osl_dynamics.analysis import gmm
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.parcellation import Parcellation
@@ -529,7 +529,7 @@ def fit_gmm(
                 show_plot=show,
                 plot_filename=plot_filename,
                 plot_kwargs=plot_kwargs,
-                print_message=False,
+                log_message=False,
             )
 
             # Calculate the percentile from the threshold

@@ -2,6 +2,7 @@
 
 """
 
+import logging
 import warnings
 
 import numpy as np
@@ -12,6 +13,8 @@ from tqdm import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def nextpow2(x):
@@ -137,15 +140,15 @@ def window_mean(data, window_length, step_size=1, n_sub_windows=1):
     return a
 
 
-def coherence_spectra(power_spectra, print_message=True):
+def coherence_spectra(power_spectra, log_message=False):
     """Calculates coherences from (cross) power spectral densities.
 
     Parameters
     ----------
     power_spectra : np.ndarray
         Power spectra. Shape is (n_modes, n_channels, n_channels, n_freq).
-    print_message : bool
-        Should we print a message to screen?
+    log_message : bool
+        Should we log a message to screen?
 
     Returns
     -------
@@ -155,8 +158,8 @@ def coherence_spectra(power_spectra, print_message=True):
     """
     n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
-    if print_message:
-        print("Calculating coherences")
+    if log_message:
+        _logger.info("Calculating coherences")
 
     coherences = np.empty([n_modes, n_channels, n_channels, n_freq])
     for i in range(n_modes):
@@ -200,7 +203,7 @@ def decompose_spectra(
     components : np.ndarray
         Spectral components. Shape is (n_components, n_freq).
     """
-    print("Performing spectral decomposition")
+    _logger.info("Performing spectral decomposition")
 
     # Validation
     error_message = (
@@ -419,7 +422,7 @@ def mode_covariance_spectra(
         Coherences calculated for each mode. Shape is (n_modes, n_channels,
         n_channels, n_freq).
     """
-    print("Calculating power spectra")
+    _logger.info("Calculating power spectra")
 
     # Validation
     if frequency_range is None:
@@ -589,8 +592,6 @@ def single_multitaper_spectra(
         if parallel:
             iterator = range(n_segments)
         else:
-            if i == 0:
-                print("Calculating spectra:")
             iterator = trange(n_segments, desc=f"Mode {i}")
 
         for j in iterator:
@@ -630,7 +631,7 @@ def single_multitaper_spectra(
     p *= n_samples / (sum_alpha * n_tapers * n_segments)
 
     # Coherences for each state
-    c = coherence_spectra(p, print_message=False)
+    c = coherence_spectra(p, log_message=False)
 
     # Only need to keep the diagonal of the power spectra matrix
     p = p[:, range(n_channels), range(n_channels)].real
@@ -768,6 +769,7 @@ def multitaper_spectra(
     if n_subjects == 1:
         # We only have one subject so we don't need to parallelise the
         # calculation
+        _logger.info("Calculating spectra:")
         results = single_multitaper_spectra(
             data[0],
             alpha[0],
@@ -784,6 +786,7 @@ def multitaper_spectra(
         # We have multiple subjects but we're running in serial
         results = []
         for n in range(n_subjects):
+            _logger.info(f"Subject {n}:")
             results.append(
                 single_multitaper_spectra(
                     data[n],
@@ -816,7 +819,7 @@ def multitaper_spectra(
             )
 
         # Calculate spectra in parallel
-        print("Calculating spectra:")
+        _logger.info("Calculating spectra:")
         results = pqdm(
             args,
             single_multitaper_spectra,
@@ -887,7 +890,7 @@ def single_regression_spectra(
     intercept : np.ndarray
         Regression intercept.
     """
-    print_message = not parallel
+    log_message = not parallel
     t, f, p = spectrogram(
         data,
         window_length,
@@ -896,7 +899,7 @@ def single_regression_spectra(
         calc_cpsd=calc_cpsd,
         step_size=step_size,
         n_sub_windows=n_sub_windows,
-        print_progress_bar=print_message,
+        print_progress_bar=log_message,
     )
     a = window_mean(
         alpha,
@@ -909,7 +912,7 @@ def single_regression_spectra(
         p,
         fit_intercept=True,
         normalize=True,
-        print_message=print_message,
+        log_message=log_message,
     )
     return t, f, coefs, intercept
 
@@ -1039,6 +1042,7 @@ def regression_spectra(
         # We have multiple subjects but we're running in serial
         results = []
         for n in range(n_subjects):
+            _logger.info(f"Subject {n}:")
             results.append(
                 single_regression_spectra(
                     data[n],
@@ -1072,7 +1076,7 @@ def regression_spectra(
             )
 
         # Calculate a time-varying PSD and regress to get the mode PSDs
-        print("Calculating power spectra")
+        _logger.info("Calculating spectra")
         results = pqdm(
             args,
             single_regression_spectra,
@@ -1130,7 +1134,7 @@ def regression_spectra(
 
         # Coherences
         p = np.sum(P[i], axis=0)  # sum coefs and intercept
-        coh[i] = coherence_spectra(p, print_message=False)
+        coh[i] = coherence_spectra(p, log_message=False)
 
     if not return_coef_int:
         # Sum coefficients and intercept

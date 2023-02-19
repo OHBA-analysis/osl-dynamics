@@ -2,11 +2,15 @@
 
 """
 
+import logging
+
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
+_logger = logging.getLogger("osl-dynamics")
 
-def linear(X, y, fit_intercept, normalize=False, print_message=True):
+
+def linear(X, y, fit_intercept, normalize=False, log_message=False):
     """Wrapper for sklearn's LinearRegression.
 
     Parameters
@@ -20,8 +24,8 @@ def linear(X, y, fit_intercept, normalize=False, print_message=True):
         Should we fit an intercept?
     normalize : bool
         Should we z-transform the regressors?
-    print_message : bool
-        Should we print a message?
+    log_message : bool
+        Should we log a message?
 
     Returns
     -------
@@ -31,8 +35,8 @@ def linear(X, y, fit_intercept, normalize=False, print_message=True):
         1D or higher dimension array. Regression intercept.
         Returned if fit_intercept=True.
     """
-    if print_message:
-        print("Fitting linear regression")
+    if log_message:
+        _logger.info("Fitting linear regression")
 
     # Reshape in case non 2D matrices were passed
     original_shape = y.shape

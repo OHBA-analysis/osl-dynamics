@@ -2,6 +2,7 @@
 
 """
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Literal
@@ -22,6 +23,8 @@ from osl_dynamics.inference.layers import (
 )
 from osl_dynamics.models import dynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -173,11 +176,12 @@ class Model(ModelBase):
 
     config_type = Config
 
+    # TODO: Tidy up to remove newline print statements.
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
         and the full SAGE model.
         """
-        print("Build models")
+        _logger.info("Build models")
         self.inference_model = _build_inference_model(self.config)
         self.inference_model.summary()
         print()
@@ -271,6 +275,7 @@ class Model(ModelBase):
 
         history = []
         best_val_loss = np.Inf
+        # TODO: Can this use tqdm?
         for epoch in range(epochs):
             if verbose:
                 print("Epoch {}/{}".format(epoch + 1, epochs))
@@ -297,7 +302,7 @@ class Model(ModelBase):
 
             if generator_loss[0] < best_val_loss:
                 self.save_weights(save_filepath)
-                print(
+                _logger.info(
                     "Best model w/ val loss (generator) {} saved to {}".format(
                         generator_loss[0], save_filepath
                     )
@@ -308,7 +313,7 @@ class Model(ModelBase):
             history.append({"D": discriminator_loss[1], "G": generator_loss[0]})
 
         # Load the weights for the best model
-        print("Loading best model:", save_filepath)
+        _logger.info(f"Loading best model: {save_filepath}")
         self.load_weights(save_filepath)
 
         return history
@@ -340,7 +345,7 @@ class Model(ModelBase):
         """
         inputs = self.make_dataset(inputs, concatenate=concatenate)
 
-        print("Getting alpha:")
+        _logger.info("Getting alpha:")
         outputs = []
         for dataset in inputs:
             alpha = self.inference_model.predict(dataset)[1]

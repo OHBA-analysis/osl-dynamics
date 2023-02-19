@@ -2,7 +2,10 @@
 
 """
 
+import logging
 import os
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def gpu_growth():
@@ -19,10 +22,10 @@ def gpu_growth():
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
             logical_gpus = tf.config.experimental.list_logical_devices("GPU")
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            _logger.info(f"{len(gpus)} Physical GPUs, {len(logical_gpus)} Logical GPUs")
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
-            print(e)
+            _logger.error(e)
 
 
 def select_gpu(gpu_numbers):
@@ -38,7 +41,7 @@ def select_gpu(gpu_numbers):
     else:
         gpu_numbers = ",".join([str(gn) for gn in gpu_numbers])
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_numbers
-    print(f"Using GPU {gpu_numbers}")
+    _logger.info(f"Using GPU {gpu_numbers}")
 
 
 def suppress_messages(level=3):

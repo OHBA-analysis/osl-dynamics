@@ -2,6 +2,7 @@
 
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Literal
 
@@ -33,6 +34,8 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -219,7 +222,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         super().validate_dimension_parameters()
         if self.n_fc_modes is None:
             self.n_fc_modes = self.n_modes
-            print("Warning: n_fc_modes is None, set to n_modes.")
+            _logger.warning("n_fc_modes is None, set to n_modes.")
 
 
 class Model(VariationalInferenceModelBase):

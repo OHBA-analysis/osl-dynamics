@@ -3,6 +3,7 @@
 """
 
 import inspect
+import logging
 import sys
 from copy import copy
 from pathlib import Path
@@ -10,6 +11,8 @@ from pathlib import Path
 import numpy as np
 import yaml
 from yaml.constructor import ConstructorError
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def override_dict_defaults(default_dict, override_dict=None):
@@ -378,9 +381,9 @@ def class_from_yaml(cls, file, kwargs):
     if actually_missing.size > 0:
         raise ValueError(f"Missing arguments: {', '.join(actually_missing[:, 0])}")
     if extra:
-        print(f"Extra arguments: {', '.join(extra)}")
+        _logger.warning(f"Extra arguments: {', '.join(extra)}")
     if using_default.size > 0:
-        print(f"Using defaults for: {', '.join(using_default[:, 0])}")
+        _logger.warning(f"Using defaults for: {', '.join(using_default[:, 0])}")
 
     return cls(**{key: value for key, value in args.items() if key not in extra})
 

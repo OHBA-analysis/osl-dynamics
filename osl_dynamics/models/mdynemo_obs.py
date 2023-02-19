@@ -2,6 +2,7 @@
 
 """
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,20 +10,22 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
-from osl_dynamics.models import dynemo_obs
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
-    add_epsilon,
-    LogLikelihoodLossLayer,
-    VectorsLayer,
-    DiagonalMatricesLayer,
     CorrelationMatricesLayer,
-    MixVectorsLayer,
-    MixMatricesLayer,
+    DiagonalMatricesLayer,
+    LogLikelihoodLossLayer,
     MatMulLayer,
+    MixMatricesLayer,
+    MixVectorsLayer,
+    VectorsLayer,
+    add_epsilon,
 )
+from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -128,7 +131,7 @@ class Config(BaseModelConfig):
         super().validate_dimension_parameters()
         if self.n_fc_modes is None:
             self.n_fc_modes = self.n_modes
-            print("Warning: n_fc_modes is None, set to n_modes.")
+            _logger.warning("n_fc_modes is None, set to n_modes.")
 
 
 class Model(ModelBase):
@@ -201,7 +204,6 @@ class Model(ModelBase):
 
 
 def _model_structure(config):
-
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
     alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")

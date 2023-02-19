@@ -2,9 +2,13 @@
 
 """
 
+import logging
+
 import numpy as np
 
 from osl_dynamics import array_ops
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def autocorrelation_functions(
@@ -251,7 +255,7 @@ def state_activation(state_time_course):
             state_on.append(on)
             state_off.append(off)
         except IndexError:
-            print(f"No activation in state {i}.")
+            _logger.info(f"No activation in state {i}.")
             state_on.append(np.array([]))
             state_off.append(np.array([]))
 
@@ -546,7 +550,6 @@ def fano_factor(
             # Loop through windows
             counts = []
             for window in tc:
-
                 # Number of activations
                 d = np.diff(window, axis=0)
                 c = []
