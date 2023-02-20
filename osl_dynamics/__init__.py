@@ -1,6 +1,8 @@
 from pkg_resources import DistributionNotFound, get_distribution
 import logging
 
+from .pipeline import run_pipeline
+
 try:
     __version__ = get_distribution("osl-dynamics").version
 except DistributionNotFound:
