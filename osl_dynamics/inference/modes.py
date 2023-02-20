@@ -2,71 +2,64 @@
 
 """
 
-import logging
 from pathlib import Path
 
 import numpy as np
+from tqdm import trange
 from scipy.optimize import linear_sum_assignment
 
 from osl_dynamics import analysis, array_ops
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils.misc import override_dict_defaults
 
-_logger = logging.getLogger("osl-dynamics")
 
-
-def argmax_time_courses(
-    alpha,
-    concatenate=False,
-    n_modes=None,
-):
-    """Calculates mode time courses.
-
-    Hard classifies the modes so that only one mode is active.
+def argmax_time_courses(alpha, concatenate=False, n_modes=None):
+    """Hard classifies a time course using an argmax operation.
 
     Parameters
     ----------
-    alpha : list, np.ndarray
-        Mode mixing factors with shape (n_subjects, n_samples, n_modes)
-        or (n_samples, n_modes).
+    alpha : list or np.ndarray
+        Mode mixing factors or state probabilities with shape
+        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
     concatenate : bool
-        If alpha is a list, should we concatenate the mode time course?
+        If alpha is a list, should we concatenate the time courses?
     n_modes : int
-        Number of modes there should be.
+        Number of modes/states there should be. Useful if there are
+        modes/states which never activate.
 
     Returns
     -------
-    stcs : list, np.ndarray
-        Mode time courses.
+    argmax_tcs : list or np.ndarray
+        Argmax time courses.
     """
     if isinstance(alpha, list):
         if n_modes is None:
             n_modes = alpha[0].shape[1]
-        stcs = [a.argmax(axis=1) for a in alpha]
-        stcs = [array_ops.get_one_hot(stc, n_states=n_modes) for stc in stcs]
-        if len(stcs) == 1:
-            stcs = stcs[0]
+        tcs = [a.argmax(axis=1) for a in alpha]
+        tcs = [array_ops.get_one_hot(tc, n_states=n_modes) for tc in tcs]
+        if len(tcs) == 1:
+            tcs = tcs[0]
         elif concatenate:
-            stcs = np.concatenate(stcs)
+            tcs = np.concatenate(tcs)
     elif alpha.ndim == 3:
         if n_modes is None:
             n_modes = alpha.shape[-1]
-        stcs = alpha.argmax(axis=2)
-        stcs = np.array([array_ops.get_one_hot(stc, n_states=n_modes) for stc in stcs])
-        if len(stcs) == 1:
-            stcs = stcs[0]
+        tcs = alpha.argmax(axis=2)
+        tcs = np.array([array_ops.get_one_hot(tc, n_states=n_modes) for tc in tcs])
+        if len(tcs) == 1:
+            tcs = tcs[0]
         elif concatenate:
-            stcs = np.concatenate(stcs)
+            tcs = np.concatenate(tcs)
     else:
         if n_modes is None:
             n_modes = alpha.shape[1]
-        stcs = alpha.argmax(axis=1)
-        stcs = array_ops.get_one_hot(stcs, n_states=n_modes)
-    return stcs
+        tcs = alpha.argmax(axis=1)
+        tcs = array_ops.get_one_hot(tcs, n_states=n_modes)
+    return tcs
 
 
 def gmm_time_courses(
-    time_course,
+    alpha,
     logit_transform=True,
     standardize=True,
     p_value=None,
@@ -74,12 +67,11 @@ def gmm_time_courses(
     sklearn_kwargs=None,
     plot_kwargs={},
 ):
-    """Fit a two component GMM on the mode time courses to get a binary
-    time course.
+    """Fit a two component GMM to time courses to get a binary time course.
 
     Parameters
     ----------
-    time_course : list of np.ndarray or np.ndarray
+    alpha : list of np.ndarray or np.ndarray
         Mode time courses.
     logit_transform : bool
         Should we logit transform the mode time course?
@@ -99,56 +91,58 @@ def gmm_time_courses(
 
     Returns
     -------
-    gmm_time_course : list of np.ndarray or np.ndarray
-        GMM fitted mode time courses with binary entries.
+    gmm_tcs : list of np.ndarray or np.ndarray
+        GMM time courses with binary entries.
     """
 
-    if isinstance(time_course, list):
-        # Extract positions of discontinuities
-        discontinuities = [tc.shape[0] for tc in time_course]
-        time_course = np.concatenate(time_course)
-    else:
-        discontinuities = None
+    if not isinstance(alpha, list):
+        alpha = [alpha]
 
-    n_modes = time_course.shape[1]
+    n_subjects = len(alpha)
+    n_modes = alpha[0].shape[1]
 
-    # Initialise an array to hold the gmm thresholded time course
-    gmm_time_course = np.empty(time_course.shape, dtype=int)
+    gmm_tcs = []
+    for sub in trange(n_subjects, desc="Fitting GMMs"):
+        # Initialise an array to hold the gmm thresholded time course
+        gmm_tc = np.empty(alpha[sub].shape, dtype=int)
 
-    # Loop over modes
-    for mode in range(n_modes):
-        a = time_course[:, mode]
+        # Loop over modes
+        for mode in range(n_modes):
+            a = alpha[sub][:, mode]
 
-        # GMM plot filename
-        if filename is not None:
-            plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
-                fn=Path(filename),
-                mode=mode,
-                w=len(str(n_modes)),
+            # GMM plot filename
+            if filename is not None:
+                plot_filename = "{fn.parent}/{fn.stem}_{sub:0{w1}d}_{mode:0{w2}d}{fn.suffix}".format(
+                    fn=Path(filename),
+                    sub=sub,
+                    mode=mode,
+                    w1=len(str(n_subjects)),
+                    w2=len(str(n_modes)),
+                )
+            else:
+                plot_filename = None
+
+            # Fit the GMM
+            default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3}
+            sklearn_kwargs = override_dict_defaults(
+                default_sklearn_kwargs, sklearn_kwargs
             )
-        else:
-            plot_filename = None
+            threshold = analysis.gmm.fit_gaussian_mixture(
+                a,
+                logit_transform=logit_transform,
+                standardize=standardize,
+                p_value=p_value,
+                sklearn_kwargs=sklearn_kwargs,
+                plot_filename=plot_filename,
+                plot_kwargs=plot_kwargs,
+                log_message=False,
+            )
+            gmm_tc[:, mode] = a > threshold
 
-        # Fit the GMM
-        default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3}
-        sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
-        threshold = analysis.gmm.fit_gaussian_mixture(
-            a,
-            logit_transform=logit_transform,
-            standardize=standardize,
-            p_value=p_value,
-            sklearn_kwargs=sklearn_kwargs,
-            plot_filename=plot_filename,
-            plot_kwargs=plot_kwargs,
-            log_message=False,
-        )
-        _logger.info(f"GMM theshold {mode}: {threshold}")
-        gmm_time_course[:, mode] = a > threshold
+        # Add to list containing subject-specific time courses
+        gmm_tcs.append(gmm_tc)
 
-    if discontinuities is None:
-        return gmm_time_course
-
-    return np.split(gmm_time_course, np.cumsum(discontinuities))
+    return gmm_tcs
 
 
 def correlate_modes(mode_time_course_1, mode_time_course_2):
