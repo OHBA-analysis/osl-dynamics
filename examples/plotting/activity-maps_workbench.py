@@ -2,7 +2,6 @@
 
 """
 
-print("Setting up")
 from osl_dynamics.analysis import power, workbench
 from osl_dynamics.data import OSL_HMM
 

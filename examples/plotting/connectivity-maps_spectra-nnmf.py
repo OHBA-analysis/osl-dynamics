@@ -4,20 +4,13 @@ from state/mode spectra.
 The spectra can be calculate with a multitaper (in the case of a state time
 course) or regression (in the case of a mode time course).
 
-See examples/analysis/multitaper_spectra.py for how to calculate a multitaper
-and examples/analysis/regression_spectra.py for how to calculate a regression.
-
-NOTE: this script requires the subject-specific spectra. To get this we need
-to modify the multitaper_spectra.py/regression_spectra.py script to save
-the subject specific spectra instead of the group average. We do this by
-commenting the np.average() line and optionally saving the weights "w" (as
-w.npy).
+See examples/minimal/multitaper_spectra.py for how to calculate a multitaper
+and examples/minimal/regression_spectra.py for how to calculate a regression.
 """
 
-print("Setting up")
 import numpy as np
+
 from osl_dynamics.analysis import connectivity, spectral
-from osl_dynamics.data import OSL_HMM
 from osl_dynamics.utils import plotting
 
 # Source reconstruction files used to create the training data
@@ -26,17 +19,21 @@ parcellation_file = (
 )
 
 # Load subject-specific state/mode spectra
+f = np.load("f.npy")
 coh = np.load("coh.npy")
 w = np.load("w.npy")
 
-# Group-level coherence matrix
-gcoh = np.average(coh, axis=0, weights=w)
-
 # Calculate spectral components using subject-specific coherences
-wideband_components = spectral.decompose_spectra(coh, n_components=2)
+wb_comp = spectral.decompose_spectra(coh, n_components=2)
 
 # Plot the spectral components
-plotting.plot_line([f, f], wideband_components, filename="wideband.png")
+plotting.plot_line([f, f], wb_comp, filename="wideband.png")
+
+# Group-level coherences
+gcoh = np.average(coh, axis=0, weights=w)
+
+# Calculate connectivity maps from coherence spectra for each spectral component
+conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, wb_comp)
 
 # We have many options for how to threshold the maps:
 # - Plot the top X % of connections.

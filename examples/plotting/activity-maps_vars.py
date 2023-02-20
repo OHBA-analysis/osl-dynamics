@@ -5,7 +5,6 @@ extract from the diagonal of the covariance matrix directly. This approach is
 typically used when we train with zero mean.
 """
 
-print("Setting up")
 from osl_dynamics.analysis import power
 from osl_dynamics.data import OSL_HMM
 

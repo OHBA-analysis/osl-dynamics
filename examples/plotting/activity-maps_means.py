@@ -4,7 +4,6 @@ In this example we plot the state means from an HMM fit, but this can be
 easily substituted with mode means from DyNeMo.
 """
 
-print("Setting up")
 from osl_dynamics.analysis import power
 from osl_dynamics.data import OSL_HMM
 
