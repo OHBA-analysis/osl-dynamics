@@ -238,7 +238,7 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         gs = tfp.distributions.RelaxedOneHotCategorical(
-            temperature=temperature, logits=inputs
+            temperature=self.temperature, logits=inputs
         )
         return gs.sample()
 
