@@ -74,9 +74,27 @@ The full model (inference and generative) is shown below.
     :width: 600
     :align: center
 
+Post-hoc Analysis
+-----------------
+
+In the post-hoc analysis of a DyNeMo fit, we are interested in interpreting the inferred mixing coefficient time course. We discuss two common analyses below.
+
+Summary Statistics
+^^^^^^^^^^^^^^^^^^
+
+We can calculate the usual statistics we study with the `HMM <hmm.html>`_ by binarizing the mixing coefficient time course. The `DyNeMo Mixing Coefficients Analysis tutorial <https://osf.io/kxtsj>`_ discusses how to do this.
+
+Spectral Analysis
+^^^^^^^^^^^^^^^^^
+
+If we train on time-delay embedded data (see the `Data Preparation tutorial <https://osf.io/dx4k2>`_) we can learn spectrally distinct modes, i.e. modes with oscillatory activity at different frequencies. To calculate the spectral properties of each mode the multitaper approach used with the HMM is no longer feasible due to the mixture description. The problem is we can't cleanly identify time points where we know only one mode is active. Instead we calculate the spectral properties of each mode using a new approach outlined in [4] called the **GLM-spectrum**. This involves first calculating a spectrogram from the training data (before time-delay embedding) and regressing the mixing coefficient time course onto the spectrogram. The regression coefficients correspond to the mode-specific power spectral densities (PSDs) and the intercept corresponds to the static PSD. This can be done with the `analysis.spectral.regression_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.regression_spectra>`_ function in osl-dynamics.
+
+**The regression spectra approach is the recommended method for calculating spectral properties with DyNeMo.**
+
 References
 ----------
 
 #. Long-short term memory. `Wikipedia <https://en.wikipedia.org/wiki/Long_short-term_memory>`_.
 #. C Gohil, et al., Mixtures of large-scale dynamic functional brain network modes. `Neuroimage, 2022 <https://www.sciencedirect.com/science/article/pii/S1053811922007108>`_.
-#. D Kingma and M Welling, Auto-Encoding Variational Bayes. `arxiv:1312.6114 <https://arxiv.org/abs/1312.6114>`_.
+#. D Kingma and M Welling, Auto-Encoding Variational Bayes. `arxiv:1312.6114, 2013 <https://arxiv.org/abs/1312.6114>`_.
+#. A Quinn, et al. The GLM-Spectrum: A multilevel framework for spectrum analysis with covariate and confound modelling. `bioRxiv, 2022 <https://www.biorxiv.org/content/10.1101/2022.11.14.516449v1>`_.

@@ -6,7 +6,7 @@ Hidden Markov Model (HMM)
 Introduction
 ------------
 
-The HMM is a popular model for studying time series data. The HMM has been used successfully to study neuroimaging data [1-7].
+The HMM is a popular model for studying time series data. The HMM has been used successfully to study neuroimaging data [1-8].
 
 This model consists of two parts:
 
@@ -70,6 +70,39 @@ HMM-MAR Toolbox
 ---------------
 
 Our group has previously implemented an HMM in MATLAB: `HMM-MAR <https://github.com/OHBA-analysis/HMM-MAR>`_. The model in HMM-MAR is fully Bayesian, i.e. it learns the uncertainty in all model parameters.
+
+Post-hoc Analysis
+-----------------
+
+After we fit an HMM we're often interested in interpreting the hidden states. We typically do two types of analysis: studying statistics that summarise the hidden state time course (called summary statistics) and re-estimating spectral properties from the training data given the state time course. These are discussed below.
+
+Summary Statistics
+^^^^^^^^^^^^^^^^^^
+
+We normally look at three summary statistics:
+
+- The **fractional occupancy**, which is the fraction of total that is spent in a particular state.
+- The **mean lifetime**, which is the average duration of a state visit. This is called known as the 'dwell time'.
+- The **mean interval**, which is the average duration between successive state visits.
+
+Summary statistics can be calculated for individual subjects or for a group. See the `HMM Summary Statistics tutorial <https://osf.io/ryb9q>`_ for example code of how to calculate these quantities.
+
+Spectral Analysis
+^^^^^^^^^^^^^^^^^
+
+When we train using the time-delay embedding (see the `Data Preparation tutorial <https://osf.io/dx4k2>`_ for further details) we can learn spectrally distinct states. I.e. states that exhibit oscillatory activity at different frequencies. We can estimate the power spectral density (PSD) of each state using the unprepared training data (i.e. before time-delay emebdding) and the hidden state time course. We normally a **multitaper** approach for this. This involves a few steps:
+
+- Multiple the (unprepared) training data by the hidden state time course (or state probability time course). This essentially picks out the time points that corresponds to when the state is activity.
+- Split the time series into windows with no overlap. Typically we use twice the sampling frequency for the window length to give us a frequency resolution of 0.5 Hz.
+- Multiply each window by a number of 'tapers' (hence the name 'multitaper') to give a number of tapered windows.
+- For each tapered window, calculate the Fourier transform and square to give a PSD for the tapered window. Next, we average the PSD of each tapered window to give an estimate of the PSD of the window.
+- Then, average over each window's PSD to give an estimate of the PSD of the entire time series.
+
+The above is performed in the `analysis.spectral.multitaper_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_ function in osl-dynamics.
+
+We find high frequency activity (above ~25 Hz) sometimes leads to noisy estimates for coherence networks. To remove this noise, we often use a non-negative matrix factorization (NNMF) approach to separate different bands of oscillatory activity. These bands are sometimes referred to as 'spectral components'. The `HMM Coherence Analysis tutorial <https://osf.io/wf34k>`_ goes into this in more detail.
+
+**When calculating power and coherence maps for HMM states the multitaper and NNMF approach is recommended.**
 
 References
 ----------
