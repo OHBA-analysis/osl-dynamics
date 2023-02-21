@@ -3,6 +3,7 @@
 """
 
 import pickle
+
 from osl_dynamics.data import Data
 from osl_dynamics.inference import tf_ops
 from osl_dynamics.models.dynemo import Config, Model

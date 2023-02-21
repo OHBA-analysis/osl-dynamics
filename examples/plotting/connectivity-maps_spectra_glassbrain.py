@@ -7,12 +7,16 @@ course) or regression (in the case of a mode time course).
 See examples/analysis/multitaper_spectra.py for how to calculate a multitaper
 and examples/analysis/regression_spectra.py for how to calculate a regression.
 
-In this script we assume this has been done and we have the group-average spectra
-files: f.npy and coh.npy. (The other file: psd.npy is not needed for this script.)
+In this script we assume this has been done and we have the subject-specific spectra:
+- f.npy, the frequency axis.
+- coh.npy, the coherence specrta.
+- w.npy, the weight for each subject (used for calculating the group average).
+
+The other file: psd.npy is not needed for this script.
 """
 
-print("Setting up")
 import numpy as np
+
 from osl_dynamics.analysis import connectivity
 
 # Source reconstruction files used to create the training data
@@ -20,14 +24,18 @@ parcellation_file = (
     "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
 )
 
-# Load group-level state/mode spectra
+# Load subject-specific spectra
 f = np.load("f.npy")
 coh = np.load("coh.npy")
+w = np.load("w.npy")
+
+# Calculate the group average
+gcoh = np.average(coh, axis=0, weight=w)
 
 # Calculate connectivity maps from coherence spectra
 # The frequency_range argument is optional. It can be replaced with a
 # spectral component calculate with NNMF, see connectivity-maps_spectra-nnmf.py
-conn_map = connectivity.mean_coherence_from_spectra(f, coh, frequency_range=[1, 25])
+conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, frequency_range=[1, 25])
 
 # We have many options for how to threshold the maps:
 # - Plot the top X % of connections.

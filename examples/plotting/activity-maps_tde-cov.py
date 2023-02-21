@@ -4,7 +4,6 @@ on time-delay embedded training data.
 In this example we use the inferred matrix directly.
 """
 
-print("Setting up")
 from osl_dynamics.analysis import power, modes
 from osl_dynamics.data import OSL_HMM, rw
 
