@@ -15,7 +15,7 @@ from yaml.constructor import ConstructorError
 _logger = logging.getLogger("osl-dynamics")
 
 
-def leading_zeros(number: int, largest_number: int):
+def leading_zeros(number, largest_number):
     """Pad a number with leading zeros.
 
     This is useful for creating a consistent naming scheme for files.
@@ -32,10 +32,10 @@ def leading_zeros(number: int, largest_number: int):
     padded_number : str
         Number padded with leading zeros.
     """
-
     min_length = len(str(largest_number))
     padded_number = str(number).zfill(min_length)
     return padded_number
+
 
 def override_dict_defaults(default_dict, override_dict=None):
     """Helper function to update default dictionary values with user values.
