@@ -275,8 +275,9 @@ class Data:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Save time series data
-        for i in tqdm(range(self.n_subjects), desc="Saving data"):
-            np.save(f"{output_dir}/subject{i}.npy", self.subjects[i])
+        for i, subject_data in enumerate(tqdm(self.subjects, desc="Saving data")):
+            padded_number = misc.leading_zeros(i, self.n_subjects)
+            np.save(f"{output_dir}/subject{padded_number}.npy", subject_data)
 
         # Save preparation info if .prepared has been called
         if self.prepared:
