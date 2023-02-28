@@ -371,7 +371,7 @@ class Model(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            self.set_random_state_time_course_initialization(training_data)
+            self.set_random_state_time_course_initialization(training_dataset)
             training_dataset.shuffle(100000)
             training_data_subset = training_dataset.take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
@@ -673,19 +673,32 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : osl_dynamics.data.Data
-            Training data object.
+        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Training data.
         """
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
 
-        # Loop over subjects
-        subject_means = []
-        subject_covariances = []
-        for data in training_data.subjects:
+        # Mean and covariance for each state
+        means = np.zeros(
+            [self.config.n_states, self.config.n_channels], dtype=np.float32
+        )
+        covariances = np.zeros(
+            [self.config.n_states, self.config.n_channels, self.config.n_channels],
+            dtype=np.float32,
+        )
+
+        for batch in training_dataset:
+            # Concatenate all the sequences in this batch
+            data = np.concatenate(batch["data"])
+
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
 
-            # Calculate the mean/covariance for each state for this subject
+            # Calculate the mean/covariance for each state for this batch
             m = []
             C = []
             for j in range(self.config.n_states):
@@ -694,21 +707,21 @@ class Model(ModelBase):
                 sigma_j = np.cov(x, rowvar=False)
                 m.append(mu_j)
                 C.append(sigma_j)
+            means += m
+            covariances += C
 
-            subject_means.append(m)
-            subject_covariances.append(C)
-
-        # Average over subjects
-        initial_means = np.mean(subject_means, axis=0)
-        initial_covariances = np.mean(subject_covariances, axis=0)
+        # Calculate the average from the running total
+        n_batches = dtf.get_n_batches(training_dataset)
+        means /= n_batches
+        covariances /= n_batches
 
         if self.config.learn_means:
             # Set initial means
-            self.set_means(initial_means, update_initializer=True)
+            self.set_means(means, update_initializer=True)
 
         if self.config.learn_covariances:
             # Set initial covariances
-            self.set_covariances(initial_covariances, update_initializer=True)
+            self.set_covariances(covariances, update_initializer=True)
 
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
