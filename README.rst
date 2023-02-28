@@ -17,8 +17,6 @@ Here, we describe how to install osl-dynamics from source. We recommend using th
     conda activate osld
     pip install -e .
 
-If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``.
-
 Note, the conda environments use ``pip`` to install TensorFlow, you may need to load/install additional libraries (such as CUDA/cuDNN) if you have GPU support.
 
 Developers might want to clone the repo using SSH instead of HTTPS:
@@ -26,6 +24,28 @@ Developers might want to clone the repo using SSH instead of HTTPS:
 .. code-block:: shell
 
     git clone git@github.com:OHBA-analysis/osl-dynamics.git
+
+Oxford specific computers
+-------------------------
+
+If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``. Note, if you want to install spyder on hbaws, you can install this with:
+
+.. code-block:: shell
+
+    conda activate osld
+    pip install spyder==5.1.5
+
+Installing within an osl environment
+------------------------------------
+
+If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you can install osl-dynamics in the ``osl`` environment with:
+
+.. code-block:: shell
+
+    conda activate osl
+    cd osl-dynamics
+    pip install tensorflow
+    pip install -e .
 
 Documentation
 =============
