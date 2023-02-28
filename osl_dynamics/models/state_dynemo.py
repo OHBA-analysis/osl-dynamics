@@ -236,7 +236,6 @@ class Model(DyNeMo):
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
-        # TODO: This can be done with tqdm.
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()

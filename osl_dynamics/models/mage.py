@@ -206,7 +206,6 @@ class Model(ModelBase):
 
     config_type = Config
 
-    # TODO: Tidy up to remove newline prints.
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
         and the full MAGE model.
@@ -330,7 +329,6 @@ class Model(ModelBase):
 
         history = []
         best_val_loss = np.Inf
-        # TODO: Can this be done with tqdm?
         for epoch in range(epochs):
             if verbose:
                 print("Epoch {}/{}".format(epoch + 1, epochs))
