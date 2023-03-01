@@ -1,5 +1,7 @@
-"""Directional Subject Embedding DyNeMo.
+"""Subject Embedding DyNeMo (SE-DyNeMo).
+
 """
+
 from dataclasses import dataclass
 from typing import Literal
 
@@ -241,7 +243,7 @@ class Model(VariationalInferenceModelBase):
 
     Parameters
     ----------
-    config : osl_dynamics_models.directional_sedynemo.Config
+    config : osl_dynamics_models.sedynemo.Config
     """
 
     config_type = Config
@@ -256,6 +258,7 @@ class Model(VariationalInferenceModelBase):
 
     def get_group_means_covariances(self):
         """Get the group means and covariances of each mode
+
         Returns
         -------
         means : np.ndarray
@@ -271,10 +274,12 @@ class Model(VariationalInferenceModelBase):
 
     def get_subject_embeddings(self):
         """Get the subject embedding vectors
+
         Returns
         -------
         subject_embeddings : np.ndarray
-            Embedding vectors for subjects. Shape is (n_subjects, subject_embedding_dim)
+            Embedding vectors for subjects.
+            Shape is (n_subjects, subject_embedding_dim).
         """
         return sedynemo_obs.get_subject_embeddings(self.model)
 
@@ -286,7 +291,8 @@ class Model(VariationalInferenceModelBase):
         subject_means : np.ndarray
             Mode means for each subject. Shape is (n_subjects, n_modes, n_channels).
         subject_covs : np.ndarray
-            Mode covariances for each subject. Shape is (n_subjects, n_modes, n_channels, n_channels).
+            Mode covariances for each subject.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
         return sedynemo_obs.get_subject_means_covariances(
             self.model, self.config.learn_means, self.config.learn_covariances
