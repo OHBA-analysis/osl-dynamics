@@ -149,7 +149,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, take=1, **kwargs):
+    def fit(self, dataset, epochs=None, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -164,8 +164,6 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
-        take : float
-            Fraction of total batches to take.
         kwargs : keyword arguments
             Keyword arguments for the TensorFlow observation model training.
             These keywords arguments will be passed to self.model.fit().
@@ -181,30 +179,11 @@ class Model(ModelBase):
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
-        if take != 1:
-            # Print a message stating how many batches we'll use
-            n_total_batches = dtf.get_n_batches(dataset)
-            n_batches = max(round(n_total_batches * take), 1)
-            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
-
         history = {"loss": [], "rho": [], "lr": []}
         for n in range(epochs):
-            if n == epochs - 1:
-                # If it's the last epoch, we train on the full dataset
-                take = 1
-
-            # Get the training data for this epoch
-            if take != 1:
-                dataset.shuffle(100000)
-                n_batches = max(round(n_total_batches * take), 1)
-                data_subset = dataset.take(n_batches)
-            else:
-                data_subset = dataset
-
             # Setup a progress bar
-            # TODO: Can this be tqdm or logging?
             print("Epoch {}/{}".format(n + 1, epochs))
-            pb_i = utils.Progbar(len(data_subset))
+            pb_i = utils.Progbar(len(dataset))
 
             # Update rho
             self._update_rho(n)
@@ -217,7 +196,7 @@ class Model(ModelBase):
 
             # Loop over batches
             loss = []
-            for data in data_subset:
+            for data in dataset:
                 x = data["data"]
 
                 # Update state probabilities
@@ -232,8 +211,8 @@ class Model(ModelBase):
                 gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
 
                 # Update observation model
-                training_data = np.concatenate([x, gamma], axis=2)
-                h = self.model.fit(training_data, epochs=1, verbose=0, **kwargs)
+                x_and_gamma = np.concatenate([x, gamma], axis=2)
+                h = self.model.fit(x_and_gamma, epochs=1, verbose=0, **kwargs)
 
                 l = h.history["loss"][0]
                 if np.isnan(l):
@@ -281,10 +260,10 @@ class Model(ModelBase):
             )
             return
 
-        _logger.info("Random subset initialization:")
+        _logger.info("Random subset initialization")
 
         # Make a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+        training_data = self.make_dataset(training_data, concatenate=True)
 
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_data)
@@ -293,12 +272,10 @@ class Model(ModelBase):
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
-        # TODO: This can be done with tqdm. Option to use leave=False.
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data.shuffle(100000)
-            training_data_subset = training_data.take(n_batches)
+            training_data_subset = training_dataset.shuffle(100000).take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -315,7 +292,6 @@ class Model(ModelBase):
             return
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.reset()
         self.set_weights(best_weights, best_trans_prob)
 
         return best_history
@@ -353,12 +329,10 @@ class Model(ModelBase):
             )
             return
 
-        _logger.info("Random state time course initialization:")
+        _logger.info("Random state time course initialization")
 
         # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
-        )
+        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_dataset)
@@ -367,13 +341,11 @@ class Model(ModelBase):
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
-        # TODO: This can be done with tqdm. Option to use leave=False.
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            self.set_random_state_time_course_initialization(training_dataset)
-            training_dataset.shuffle(100000)
-            training_data_subset = training_dataset.take(n_batches)
+            training_data_subset = training_dataset.shuffle(100000).take(n_batches)
+            self.set_random_state_time_course_initialization(training_data_subset)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -390,7 +362,6 @@ class Model(ModelBase):
             return
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.reset()
         self.set_weights(best_weights, best_trans_prob)
 
         return best_history
@@ -676,10 +647,10 @@ class Model(ModelBase):
         training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
             Training data.
         """
+        _logger.info("Setting random means and covariances")
+
         # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
-        )
+        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -755,8 +726,8 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset
-            Prediction dataset for each subject.
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for each subject.
         concatenate : bool
             Should we concatenate alpha for each subject?
 
@@ -766,7 +737,7 @@ class Model(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset, concatenate=False)
+        dataset = self.make_dataset(dataset)
 
         _logger.info("Getting alpha")
         alpha = []

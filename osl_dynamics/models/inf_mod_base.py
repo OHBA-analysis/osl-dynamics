@@ -161,7 +161,7 @@ class VariationalInferenceModelBase(ModelBase):
             )
             return
 
-        _logger.info("Random subset initialization:")
+        _logger.info("Random subset initialization")
 
         # Original number of KL annealing epochs
         original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
@@ -181,12 +181,10 @@ class VariationalInferenceModelBase(ModelBase):
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
-        # TODO: This can be done with tqdm.
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data.shuffle(100000)
-            training_data_subset = training_data.take(n_batches)
+            training_data_subset = training_data.shuffle(100000).take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             loss = history.history["loss"][-1]
             if loss < best_loss:
@@ -196,7 +194,6 @@ class VariationalInferenceModelBase(ModelBase):
                 best_weights = self.get_weights()
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.reset()
         self.set_weights(best_weights)
         self.reset_kl_annealing_factor()
 
@@ -234,7 +231,7 @@ class VariationalInferenceModelBase(ModelBase):
             )
             return
 
-        _logger.info("Single subject initialization:")
+        _logger.info("Single subject initialization")
 
         # Original number of KL annealing epochs
         original_n_kl_annealing_epochs = self.config.n_kl_annealing_epochs
@@ -245,9 +242,7 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Make a list of tensorflow Datasets if the data
-        training_data = self.make_dataset(
-            training_data, shuffle=True, concatenate=False
-        )
+        training_data = self.make_dataset(training_data, shuffle=True)
 
         if not isinstance(training_data, list):
             raise ValueError(
@@ -283,7 +278,6 @@ class VariationalInferenceModelBase(ModelBase):
         _logger.info(f"Using means and covariances from subject {subject_chosen}")
 
         # Use the weights from the best initialisation for the full training
-        self.reset()
         self.set_weights(best_weights)
         self.reset_kl_annealing_factor()
 
@@ -353,13 +347,13 @@ class VariationalInferenceModelBase(ModelBase):
 
         return predictions_dict
 
-    def get_alpha(self, inputs, concatenate=False):
+    def get_alpha(self, dataset, concatenate=False):
         """Mode mixing factors, alpha.
 
         Parameters
         ----------
-        inputs : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Prediction data.
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for each subject.
         concatenate : bool
             Should we concatenate alpha for each subject?
 
@@ -370,33 +364,33 @@ class VariationalInferenceModelBase(ModelBase):
             (n_samples, n_modes).
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_time_courses(inputs, concatenate=concatenate)
+            return self.get_mode_time_courses(dataset)
 
-        inputs = self.make_dataset(inputs, concatenate=concatenate)
+        dataset = self.make_dataset(dataset)
 
-        _logger.info("Getting alpha:")
-        outputs = []
-        for dataset in inputs:
-            alpha = self.predict(dataset)["alpha"]
-            alpha = np.concatenate(alpha)
-            outputs.append(alpha)
+        _logger.info("Getting alpha")
+        alpha = []
+        for ds in dataset:
+            a = self.predict(ds)["alpha"]
+            a = np.concatenate(a)
+            alpha.append(a)
 
         if concatenate or len(outputs) == 1:
-            outputs = np.concatenate(outputs)
+            alpha = np.concatenate(alpha)
 
-        return outputs
+        return alpha
 
-    def get_mode_time_courses(self, inputs, concatenate=False):
+    def get_mode_time_courses(self, dataset, concatenate=False):
         """Get mode time courses.
 
         This method is used to get mode time courses for the multi-time-scale model.
 
         Parameters
         ----------
-        inputs : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Prediction data.
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction data. This can be a list of datasets, one for each subject.
         concatenate : bool
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha/gamma for each subject?
 
         Returns
         -------
@@ -410,28 +404,25 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
-        inputs = self.make_dataset(inputs, concatenate=concatenate)
+        dataset = self.make_dataset(dataset)
 
-        _logger.info("Getting mode time courses:")
-        outputs_alpha = []
-        outputs_gamma = []
-        for dataset in inputs:
-            predictions = self.predict(dataset)
+        _logger.info("Getting mode time courses")
+        alpha = []
+        gamma = []
+        for ds in dataset:
+            predictions = self.predict(ds)
+            a = predictions["alpha"]
+            g = predictions["gamma"]
+            a = np.concatenate(a)
+            g = np.concatenate(g)
+            alpha.append(a)
+            gamma.append(g)
 
-            alpha = predictions["alpha"]
-            gamma = predictions["gamma"]
-
+        if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
             gamma = np.concatenate(gamma)
 
-            outputs_alpha.append(alpha)
-            outputs_gamma.append(gamma)
-
-        if concatenate or len(outputs_alpha) == 1:
-            outputs_alpha = np.concatenate(outputs_alpha)
-            outputs_gamma = np.concatenate(outputs_gamma)
-
-        return outputs_alpha, outputs_gamma
+        return alpha, gamma
 
     def losses(self, dataset):
         """Calculates the log-likelihood and KL loss for a dataset.
@@ -449,7 +440,7 @@ class VariationalInferenceModelBase(ModelBase):
             KL divergence loss.
         """
         dataset = self.make_dataset(dataset, concatenate=True)
-        _logger.info("Getting losses:")
+        _logger.info("Getting losses")
         predictions = self.predict(dataset)
         ll_loss = np.mean(predictions["ll_loss"])
         kl_loss = np.mean(predictions["kl_loss"])
