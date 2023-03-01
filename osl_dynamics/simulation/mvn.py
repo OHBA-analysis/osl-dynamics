@@ -371,6 +371,7 @@ class MSubj_MVN(MVN):
             self.n_modes = subject_means.shape[1]
             self.n_channels = subject_means.shape[2]
             self.n_groups = None
+            self.group_centroids = None
             self.between_group_scale = None
             self.n_subject_embedding_dim = None
             self.n_mode_embedding_dim = None
@@ -464,7 +465,7 @@ class MSubj_MVN(MVN):
     def create_subject_embeddings(self):
         # Assign groups to subjects
         assigned_groups = self._rng.choice(self.n_groups, self.n_subjects)
-        group_locs = self._rng.normal(
+        self.group_centroids = self._rng.normal(
             scale=self.between_group_scale,
             size=[self.n_groups, self.n_subject_embedding_dim],
         )
@@ -473,7 +474,7 @@ class MSubj_MVN(MVN):
         for i in range(self.n_groups):
             group_mask = assigned_groups == i
             subject_embeddings[group_mask] = self._rng.multivariate_normal(
-                mean=group_locs[i],
+                mean=self.group_centroids[i],
                 cov=self.subject_embedding_scale * np.eye(self.n_subject_embedding_dim),
                 size=[np.sum(group_mask)],
             )
