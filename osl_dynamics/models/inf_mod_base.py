@@ -375,7 +375,7 @@ class VariationalInferenceModelBase(ModelBase):
             a = np.concatenate(a)
             alpha.append(a)
 
-        if concatenate or len(outputs) == 1:
+        if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
 
         return alpha
