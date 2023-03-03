@@ -197,6 +197,36 @@ class InverseCholeskyLayer(layers.Layer):
         return self.bijector.inverse(inputs)
 
 
+class SampleGammaDistributionLayer(layers.Layer):
+    """Layer for sampling from a gamma distribution.
+
+    This layer accepts the shape and rate
+    and outputs samples from a gamma distribution.
+
+    Parameters
+    ----------
+    epsilon : float
+        Error to add to the shape and rate for numerical stability.
+    """
+
+    def __init__(self, epsilon, **kwargs):
+        super().__init__(**kwargs)
+        self.epsilon = epsilon
+
+    def call(self, inputs, training=None, **kwargs):
+        alpha, beta = inputs
+        alpha = add_epsilon(alpha, self.epsilon)
+        beta = add_epsilon(beta, self.epsilon)
+        if training:
+            N = tfp.distributions.Gamma(
+                concentration=alpha, rate=beta, allow_nan_stats=False
+            )
+            return N.sample()
+        else:
+            mode = (alpha - 1) / beta
+            return tf.maximum(mode, 0)
+
+
 class SampleNormalDistributionLayer(layers.Layer):
     """Layer for sampling from a normal distribution.
 
@@ -1291,15 +1321,19 @@ class StaticKLDivergenceLayer(layers.Layer):
         self.n_batches = n_batches
 
     def call(self, inputs, **kwargs):
-        data, inference_mu, inference_sigma, model_sigma = inputs
+        data, inference_alpha, inference_beta, model_alpha, model_beta = inputs
 
         # Add a small error for numerical stability
-        inference_sigma = add_epsilon(inference_sigma, self.epsilon)
-        model_sigma = add_epsilon(model_sigma, self.epsilon)
+        inference_alpha = add_epsilon(inference_alpha, self.epsilon)
+        inference_beta = add_epsilon(inference_beta, self.epsilon)
+        model_alpha = add_epsilon(model_alpha, self.epsilon)
+        model_beta = add_epsilon(model_beta, self.epsilon)
 
         # Calculate the KL divergence
-        prior = tfp.distributions.Normal(loc=0.0, scale=model_sigma)
-        posterior = tfp.distributions.Normal(loc=inference_mu, scale=inference_sigma)
+        prior = tfp.distributions.Gamma(concentration=model_alpha, rate=model_beta)
+        posterior = tfp.distributions.Gamma(
+            concentration=inference_alpha, rate=inference_beta
+        )
         kl_loss = tfp.distributions.kl_divergence(
             posterior, prior, allow_nan_stats=False
         )
@@ -1369,5 +1403,8 @@ class StandardizationLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         mean = tf.math.reduce_mean(inputs, axis=self.axis, keepdims=True)
-        std = tf.math.reduce_std(inputs, axis=self.axis, keepdims=True)
-        return (inputs - mean) / std
+        inputs -= mean
+        l2_norm = tf.math.sqrt(
+            tf.math.reduce_sum(tf.math.square(inputs), axis=self.axis, keepdims=True)
+        )
+        return inputs / l2_norm

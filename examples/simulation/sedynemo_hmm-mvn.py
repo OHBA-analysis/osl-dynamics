@@ -34,7 +34,7 @@ config = Config(
     initial_alpha_temperature=1.0,
     learn_means=False,
     learn_covariances=True,
-    dev_n_layers=3,
+    dev_n_layers=5,
     dev_n_units=32,
     dev_activation="tanh",
     dev_normalization="layer",
@@ -81,6 +81,7 @@ model.set_regularizers(training_data)
 # Set scaling factor for devation kl loss
 model.set_bayesian_kl_scaling(training_data)
 
+model.random_subset_initialization(training_data, n_init=5, n_epochs=10, take=0.25)
 print("Training model")
 history = model.fit(training_data, epochs=config.n_epochs)
 

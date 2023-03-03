@@ -24,6 +24,7 @@ from osl_dynamics.inference.layers import (
     KLDivergenceLayer,
     KLLossLayer,
     SampleNormalDistributionLayer,
+    SampleGammaDistributionLayer,
     SoftmaxLayer,
     ConcatenateLayer,
     ConcatEmbeddingsLayer,
@@ -37,7 +38,6 @@ from osl_dynamics.inference.layers import (
     StandardizationLayer,
     LearnableTensorLayer,
 )
-import osl_dynamics.inference.initializers as osld_initializers
 
 
 @dataclass
@@ -263,7 +263,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances for the group. Shape is (n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)
+        return sedynemo_obs.get_group_means_covs(self.model)
 
     def get_observation_model_parameters(self):
         """Wrapper for get_group_means_covariances."""
@@ -288,7 +288,7 @@ class Model(VariationalInferenceModelBase):
         subject_covs : np.ndarray
             Mode covariances for each subject. Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covariances(
+        return sedynemo_obs.get_subject_means_covs(
             self.model, self.config.learn_means, self.config.learn_covariances
         )
 
@@ -495,25 +495,27 @@ def _model_structure(config):
             axis=-1, name="norm_means_dev_map"
         )
 
-        means_dev_mag_inf_mu_layer = LearnableTensorLayer(
+        means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_means,
             initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
-            name="means_dev_mag_inf_mu",
+            name="means_dev_mag_inf_alpha_input",
         )
-        means_dev_mag_inf_sigma_input_layer = LearnableTensorLayer(
+        means_dev_mag_inf_alpha_layer = layers.Activation(
+            "softplus", name="means_dev_mag_inf_alpha"
+        )
+        means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_means,
-            initializer=osld_initializers.SoftplusNormalInitializer(mean=0, std=0.02),
-            name="means_dev_mag_inf_sigma_input",
+            initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
+            name="means_dev_mag_inf_beta_input",
         )
-        means_dev_mag_inf_sigma_layer = layers.Activation(
-            "softplus", name="means_dev_mag_inf_sigma"
+        means_dev_mag_inf_beta_layer = layers.Activation(
+            "softplus", name="means_dev_mag_inf_beta"
         )
-        means_dev_mag_input_layer = SampleNormalDistributionLayer(
-            config.covariances_epsilon, name="means_dev_mag_input"
+        means_dev_mag_layer = SampleGammaDistributionLayer(
+            config.covariances_epsilon, name="means_dev_mag"
         )
-        means_dev_mag_layer = layers.Activation("softplus", name="means_dev_mag")
 
         means_dev_layer = layers.Multiply(name="means_dev")
 
@@ -532,15 +534,17 @@ def _model_structure(config):
 
         # Get the deviation magnitudes (scale deviation maps globally)
 
-        means_dev_mag_inf_mu = means_dev_mag_inf_mu_layer(data)
-        means_dev_mag_inf_sigma_input = means_dev_mag_inf_sigma_input_layer(data)
-        means_dev_mag_inf_sigma = means_dev_mag_inf_sigma_layer(
-            means_dev_mag_inf_sigma_input
+        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
+        means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
+            means_dev_mag_inf_alpha_input
         )
-        means_dev_mag_input = means_dev_mag_input_layer(
-            [means_dev_mag_inf_mu, means_dev_mag_inf_sigma]
+        means_dev_mag_inf_beta_input = means_dev_mag_inf_beta_input_layer(data)
+        means_dev_mag_inf_beta = means_dev_mag_inf_beta_layer(
+            means_dev_mag_inf_beta_input
         )
-        means_dev_mag = means_dev_mag_layer(means_dev_mag_input)
+        means_dev_mag = means_dev_mag_layer(
+            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta]
+        )
         means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
     else:
         means_dev_layer = ZeroLayer(
@@ -580,25 +584,27 @@ def _model_structure(config):
             axis=-1, name="norm_covs_dev_map"
         )
 
-        covs_dev_mag_inf_mu_layer = LearnableTensorLayer(
+        covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_covariances,
             initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
-            name="covs_dev_mag_inf_mu",
+            name="covs_dev_mag_inf_alpha_input",
         )
-        covs_dev_mag_inf_sigma_input_layer = LearnableTensorLayer(
+        covs_dev_mag_inf_alpha_layer = layers.Activation(
+            "softplus", name="covs_dev_mag_inf_alpha"
+        )
+        covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_covariances,
-            initializer=osld_initializers.SoftplusNormalInitializer(mean=0, std=0.02),
-            name="covs_dev_mag_inf_sigma_input",
+            initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
+            name="covs_dev_mag_inf_beta_input",
         )
-        covs_dev_mag_inf_sigma_layer = layers.Activation(
-            "softplus", name="covs_dev_mag_inf_sigma"
+        covs_dev_mag_inf_beta_layer = layers.Activation(
+            "softplus", name="covs_dev_mag_inf_beta"
         )
-        covs_dev_mag_input_layer = SampleNormalDistributionLayer(
-            config.covariances_epsilon, name="covs_dev_mag_input"
+        covs_dev_mag_layer = SampleGammaDistributionLayer(
+            config.covariances_epsilon, name="covs_dev_mag"
         )
-        covs_dev_mag_layer = layers.Activation("softplus", name="covs_dev_mag")
         covs_dev_layer = layers.Multiply(name="covs_dev")
 
         # Data flow to get subject specific deviations of covariances
@@ -617,15 +623,15 @@ def _model_structure(config):
         norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
 
         # Get the deviation magnitudes (scale deviation maps globally)
-        covs_dev_mag_inf_mu = covs_dev_mag_inf_mu_layer(data)
-        covs_dev_mag_inf_sigma_input = covs_dev_mag_inf_sigma_input_layer(data)
-        covs_dev_mag_inf_sigma = covs_dev_mag_inf_sigma_layer(
-            covs_dev_mag_inf_sigma_input
+        covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(data)
+        covs_dev_mag_inf_alpha = covs_dev_mag_inf_alpha_layer(
+            covs_dev_mag_inf_alpha_input
         )
-        covs_dev_mag_input = covs_dev_mag_input_layer(
-            [covs_dev_mag_inf_mu, covs_dev_mag_inf_sigma]
+        covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
+        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
+        covs_dev_mag = covs_dev_mag_layer(
+            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta]
         )
-        covs_dev_mag = covs_dev_mag_layer(covs_dev_mag_input)
         covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
     else:
         covs_dev_layer = ZeroLayer(
@@ -704,21 +710,59 @@ def _model_structure(config):
     # For the observation model (static KL loss)
     if config.learn_means:
         # Layer definitions
-        means_dev_mag_mod_sigma_layer = layers.Dense(
-            1, activation="softplus", name="means_dev_mag_mod_sigma"
+        means_dev_mag_mod_alpha_input_layer = MultiLayerPerceptronLayer(
+            config.dev_n_layers,
+            config.dev_n_units,
+            config.dev_normalization,
+            config.dev_activation,
+            config.dev_dropout,
+            name="means_dev_mag_mod_alpha_input",
         )
+        means_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
+            config.dev_n_layers,
+            config.dev_n_units,
+            config.dev_normalization,
+            config.dev_activation,
+            config.dev_dropout,
+            name="means_dev_mag_mod_beta_input",
+        )
+        means_dev_mag_mod_alpha_layer = layers.Dense(
+            1,
+            activation="softplus",
+            use_bias=False,
+            name="means_dev_mag_mod_alpha",
+        )
+        means_dev_mag_mod_beta_layer = layers.Dense(
+            1,
+            activation="softplus",
+            use_bias=False,
+            name="means_dev_mag_mod_beta",
+        )
+
         means_dev_mag_kl_loss_layer = StaticKLDivergenceLayer(
             config.covariances_epsilon, name="means_dev_mag_kl_loss"
         )
 
         # Data flow
-        means_dev_mag_mod_sigma = means_dev_mag_mod_sigma_layer(means_concat_embeddings)
+        means_dev_mag_mod_alpha_input = means_dev_mag_mod_alpha_input_layer(
+            means_concat_embeddings
+        )
+        means_dev_mag_mod_alpha = means_dev_mag_mod_alpha_layer(
+            means_dev_mag_mod_alpha_input
+        )
+        means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
+            means_concat_embeddings
+        )
+        means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(
+            means_dev_mag_mod_beta_input
+        )
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
             [
                 data,
-                means_dev_mag_inf_mu,
-                means_dev_mag_inf_sigma,
-                means_dev_mag_mod_sigma,
+                means_dev_mag_inf_alpha,
+                means_dev_mag_inf_beta,
+                means_dev_mag_mod_alpha,
+                means_dev_mag_mod_beta,
             ]
         )
     else:
@@ -727,26 +771,62 @@ def _model_structure(config):
 
     if config.learn_covariances:
         # Layer definitions
-        covs_dev_mag_mod_sigma_layer = layers.Dense(
-            1, activation="softplus", name="covs_dev_mag_mod_sigma"
+        covs_dev_mag_mod_alpha_input_layer = MultiLayerPerceptronLayer(
+            config.dev_n_layers,
+            config.dev_n_units,
+            config.dev_normalization,
+            config.dev_activation,
+            config.dev_dropout,
+            name="covs_dev_mag_mod_alpha_input",
         )
+        covs_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
+            config.dev_n_layers,
+            config.dev_n_units,
+            config.dev_normalization,
+            config.dev_activation,
+            config.dev_dropout,
+            name="covs_dev_mag_mod_beta_input",
+        )
+        covs_dev_mag_mod_alpha_layer = layers.Dense(
+            1,
+            activation="softplus",
+            use_bias=False,
+            name="covs_dev_mag_mod_alpha",
+        )
+        covs_dev_mag_mod_beta_layer = layers.Dense(
+            1,
+            activation="softplus",
+            use_bias=False,
+            name="covs_dev_mag_mod_beta",
+        )
+
         covs_dev_mag_kl_loss_layer = StaticKLDivergenceLayer(
             config.covariances_epsilon, name="covs_dev_mag_kl_loss"
         )
 
         # Data flow
-        covs_dev_mag_mod_sigma = covs_dev_mag_mod_sigma_layer(covs_concat_embeddings)
+        covs_dev_mag_mod_alpha_input = covs_dev_mag_mod_alpha_input_layer(
+            covs_concat_embeddings
+        )
+        covs_dev_mag_mod_alpha = covs_dev_mag_mod_alpha_layer(
+            covs_dev_mag_mod_alpha_input
+        )
+        covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
+            covs_concat_embeddings
+        )
+        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
             [
                 data,
-                covs_dev_mag_inf_mu,
-                covs_dev_mag_inf_sigma,
-                covs_dev_mag_mod_sigma,
+                covs_dev_mag_inf_alpha,
+                covs_dev_mag_inf_beta,
+                covs_dev_mag_mod_alpha,
+                covs_dev_mag_mod_beta,
             ]
         )
     else:
         covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
-        covs_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
+        covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
 
     # Total KL loss
     # Layer definitions
