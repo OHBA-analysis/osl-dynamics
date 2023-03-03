@@ -44,5 +44,5 @@ covs = model.get_covariances()
 
 # Save the inferred parameters (this will save them to the same
 # directory as the model)
-pickle.dump(alp, open(model_dir + "/alp.pkl"))
+pickle.dump(alp, open(model_dir + "/alp.pkl", "wb"))
 np.save(model_dir + "/covs.npy", covs)
