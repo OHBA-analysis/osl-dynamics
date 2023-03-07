@@ -529,6 +529,93 @@ class Model(ModelBase):
             -self.config.trans_prob_update_forget,
         )
 
+    def _get_gamma_entropy(self, gamma, xi):
+        """Get gamma entropy.
+        int q(s) log q(s) ds = first_term - second_term
+            = sum_{t=2}^T int q(s_{t-1}, s_t) log q(s_{t-1}, s_t) ds_{t-1} ds_t
+             - sum_{t=3}^T int q(s_{t-1}) log q(s_{t-1}) ds_{t-1}
+        Parameters
+        ----------
+        gamma : np.ndarray
+            Posterior probability of state given data.
+            Shape is (batch_size*sequence_length, n_states)
+        xi : np.ndarray
+            Joint posterior probability of states at two consecutive time points.
+            Shape is (batch_size * sequence_length - 1, n_states * n_states).
+
+        Return
+        ------
+        gamma_entropy : scalar
+            Gamma entropy of this batch.
+        """
+        first_term = np.sum(xi * np.log(xi))
+        second_term = np.sum((gamma * np.log(gamma))[1:])
+        gamma_entropy = first_term - second_term
+        return gamma_entropy
+
+    def _get_posterior_expected_loglikelihood(self, x, gamma):
+        """Get the expected log-likelihood with respect to
+        the posterior distribution of the states.
+        int q(s) log p(x | s) ds
+            = sum_{t=1}^T int q(s_t) log p(x_t | s_t) ds_t
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Data. Shape is (batch_size, sequence_length, n_channels).
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states.
+            Shape is (batch_size * sequence_length, n_states).
+
+        Returns
+        -------
+        post_expected_ll : scalar
+            Posterior expected log-likelihood.
+        """
+
+        # Reshape gamma to (batch_size, sequence_length, n_channels).
+        gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
+
+        means, covs = self.get_means_covariances()
+
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
+        )
+        ll = mvn.log_prob(tf.expand_dims(x, 2))
+
+        post_expected_ll = tf.reduce_sum(ll * gamma)
+        return post_expected_ll
+
+    def _get_posterior_expected_prior_prob(self, gamma, xi):
+        """Get the expected prior probability of states
+        with respect to the posterior distribution of the states.
+        int q(s) log p(s) ds = first_term + remaining_terms
+            = int q(s_1) log p(s_1) ds_1
+             + sum_{t=2}^T int q(s_{t-1}, s_t) log p(s_t | s_{t-1}) ds_{t-1} ds_t
+
+        Parameters
+        ----------
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states.
+            Shape is (batch_size * sequence_length, n_states).
+        xi : np.ndarray
+            Joint posterior probability of states at two consecutive time points.
+            Shape is (batch_size * sequence_length - 1, n_states * n_states).
+
+        Returns
+        -------
+        post_expected_prior : scalar
+            Posterior expected prior probability.
+        """
+        n_samples, n_states = gamma.shape
+        first_term = np.sum(gamma[0] * np.log(self.state_probs_t0))
+        remaining_terms = np.sum(
+            xi.reshape(n_samples - 1, n_states, n_states, order="F")
+            * np.log(np.expand_dims(self.trans_prob, 0))
+        )
+        post_expected_prior = first_term + remaining_terms
+        return post_expected_prior
+
     def sample_state_time_course(self, n_samples):
         """Sample a state time course.
 
@@ -720,6 +807,21 @@ class Model(ModelBase):
                 self.config.covariances_epsilon,
                 self.config.diagonal_covariances,
             )
+
+    def free_energy(self, dataset):
+        """Get the variational free energy."""
+        dataset = self.make_dataset(dataset, concatenate=True)
+        _logger.info("Getting free energy")
+        free_energy = []
+        for data in dataset:
+            x = data["data"]
+            gamma, xi = self._get_state_probs(x)
+
+            gamma_entropy = self._get_gamma_entropy(gamma, xi)
+            post_expected_ll = self._get_posterior_expected_loglikelihood(x, gamma)
+            post_expected_prior = self._get_posterior_expected_prior_prob(gamma, xi)
+            free_energy.append(gamma_entropy - post_expected_ll - post_expected_prior)
+            return np.mean(free_energy) / self.config.batch_size
 
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
