@@ -13,6 +13,7 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from scipy.special import xlogy
 from numba.core.errors import NumbaWarning
 from tensorflow.keras import backend, layers, utils
 
@@ -548,8 +549,8 @@ class Model(ModelBase):
         gamma_entropy : scalar
             Gamma entropy of this batch.
         """
-        first_term = np.sum(xi * np.log(xi))
-        second_term = np.sum((gamma * np.log(gamma))[1:])
+        first_term = np.sum(xlogy(xi, xi))
+        second_term = np.sum(xlogy(gamma, gamma)[1:])
         gamma_entropy = first_term - second_term
         return gamma_entropy
 
@@ -608,10 +609,12 @@ class Model(ModelBase):
             Posterior expected prior probability.
         """
         n_samples, n_states = gamma.shape
-        first_term = np.sum(gamma[0] * np.log(self.state_probs_t0))
+        first_term = np.sum(xlogy(gamma[0], self.state_probs_t0))
         remaining_terms = np.sum(
-            xi.reshape(n_samples - 1, n_states, n_states, order="F")
-            * np.log(np.expand_dims(self.trans_prob, 0))
+            xlogy(
+                xi.reshape(n_samples - 1, n_states, n_states, order="F"),
+                np.expand_dims(self.trans_prob, 0),
+            )
         )
         post_expected_prior = first_term + remaining_terms
         return post_expected_prior
