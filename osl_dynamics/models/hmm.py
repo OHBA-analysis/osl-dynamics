@@ -824,7 +824,7 @@ class Model(ModelBase):
             post_expected_ll = self._get_posterior_expected_loglikelihood(x, gamma)
             post_expected_prior = self._get_posterior_expected_prior_prob(gamma, xi)
             free_energy.append(gamma_entropy - post_expected_ll - post_expected_prior)
-            return np.mean(free_energy) / self.config.batch_size
+        return np.mean(free_energy) / self.config.batch_size
 
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
