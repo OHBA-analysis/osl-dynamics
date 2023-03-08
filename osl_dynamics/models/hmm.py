@@ -475,14 +475,12 @@ class Model(ModelBase):
 
         # Calculate the log-likelihood for each state to have generated the
         # observed data
-        log_likelihood = np.empty([n_states, n_samples])
-        for state in range(n_states):
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=means[state],
-                scale_tril=tf.linalg.cholesky(covs[state]),
-                allow_nan_stats=False,
-            )
-            log_likelihood[state] = np.reshape(mvn.log_prob(x), n_samples)
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
+        )
+        log_likelihood = np.reshape(
+            mvn.log_prob(tf.expand_dims(x, 2)), (n_samples, n_states)
+        ).T.copy()
 
         # We add a constant to the log-likelihood for time points where all states
         # have a negative log-likelihood. This is critical for numerical stability.
@@ -600,7 +598,7 @@ class Model(ModelBase):
             loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
         )
         log_likelihood = mvn.log_prob(tf.expand_dims(x, 2))
-        return tf.reduce_sum(ll * gamma)
+        return tf.reduce_sum(log_likelihood * gamma)
 
     def _get_posterior_expected_prior(self, gamma, xi):
         """Posterior expected prior.
