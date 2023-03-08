@@ -62,7 +62,7 @@ The process of inference is also known as 'training the model' or 'fitting a mod
 HMM in osl-dynamics
 -------------------
 
-This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`\theta_t`, but learn point estimates (i.e. not Bayesian) for the state means and covariances. Given the state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
+This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`\theta_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
 
 A derivation of the cost function used to train the HMM in osl-dynamics is :download:`here <images/hmm-cost-function.pdf>`. Note, we use different symbols in this derivation compared to the previous section.
 
