@@ -478,9 +478,9 @@ class Model(ModelBase):
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
         )
-        log_likelihood = np.reshape(
-            mvn.log_prob(tf.expand_dims(x, 2)), (n_samples, n_states)
-        ).T.copy()
+        x = tf.expand_dims(x, axis=2)  # (batch_size, sequence_length, 1, n_channels)
+        ll = mvn.log_prob(x).numpy()  # (batch_size, sequence_length, n_states)
+        log_likelihood = ll.reshape(n_samples, n_states).T
 
         # We add a constant to the log-likelihood for time points where all states
         # have a negative log-likelihood. This is critical for numerical stability.

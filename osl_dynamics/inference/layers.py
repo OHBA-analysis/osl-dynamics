@@ -1129,6 +1129,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         # Add a small error for numerical stability
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
+        # Calculate the log-likelihood
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=mu, scale_tril=tf.linalg.cholesky(sigma), allow_nan_stats=False
         )
