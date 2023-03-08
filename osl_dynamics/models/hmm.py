@@ -374,14 +374,15 @@ class Model(ModelBase):
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
+
         Returns
         -------
         gamma : np.ndarray
-            Probability of hidden state given data.
+            Marginal posterior distribution of hidden states given the data, q(s_t).
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states, n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
         """
 
         # Use Baum-Welch algorithm to calculate gamma, xi
@@ -410,10 +411,11 @@ class Model(ModelBase):
         Returns
         -------
         gamma : np.ndarray
-            Probability of hidden state given data. Shape is (n_samples, n_states).
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (n_samples, n_states).
         xi : np.ndarray
-            Probability of hidden state given child and parent states, given data.
-            Shape is (n_samples - 1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (n_samples-1, n_states*n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -499,13 +501,19 @@ class Model(ModelBase):
         Parameters
         ----------
         gamma : np.ndarray
-            Probability of hidden state given data.
+            Marginal posterior distribution of hidden states given the data, q(s_t).
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
         """
-        # Use Baum-Welch algorithm
+        # Calculate the new transition probability matrix using the posterior from
+        # the Baum-Welch algorithm:
+        #
+        # p(s_t+1 | s_t) = E{q(s_t, s_t+1)} / E{q(s_t)}
+        #                = sum^{T-1}_{t=1} xi(t, t+1) / sum^{T-1}_{t=1} gamma(t)
+        #
+        # where E{.} denotes the expectation.
         phi_interim = np.sum(xi, axis=0).reshape(
             self.config.n_states, self.config.n_states
         ).T / np.sum(gamma[:-1], axis=0).reshape(self.config.n_states, 1)
@@ -530,94 +538,110 @@ class Model(ModelBase):
             -self.config.trans_prob_update_forget,
         )
 
-    def _get_gamma_entropy(self, gamma, xi):
-        """Get gamma entropy.
-        int q(s) log q(s) ds = first_term - second_term
-            = sum_{t=2}^T int q(s_{t-1}, s_t) log q(s_{t-1}, s_t) ds_{t-1} ds_t
-             - sum_{t=3}^T int q(s_{t-1}) log q(s_{t-1}) ds_{t-1}
+    def _get_posterior_entropy(self, gamma, xi):
+        """Posterior entropy.
+
+        Calculate the entropy of the posterior distribution:
+
+        .. math::
+            E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
+
+              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \displaystyle\sum_{t=2}^{T-1} \int q(s_t) \log q(s_t) ds_t
+
         Parameters
         ----------
         gamma : np.ndarray
-            Posterior probability of state given data.
-            Shape is (batch_size*sequence_length, n_states)
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior probability of states at two consecutive time points.
-            Shape is (batch_size * sequence_length - 1, n_states * n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
 
-        Return
-        ------
-        gamma_entropy : scalar
-            Gamma entropy of this batch.
+        Returns
+        -------
+        entropy : float
+            Entropy.
         """
+        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1) log(q(s_t, s_t+1)) ds_t ds_t+1
         first_term = np.sum(xlogy(xi, xi))
-        second_term = np.sum(xlogy(gamma, gamma)[1:])
-        gamma_entropy = first_term - second_term
-        return gamma_entropy
+
+        # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
+        second_term = np.sum(xlogy(gamma, gamma)[1:-1])
+
+        return first_term - second_term
 
     def _get_posterior_expected_loglikelihood(self, x, gamma):
-        """Get the expected log-likelihood with respect to
-        the posterior distribution of the states.
-        int q(s) log p(x | s) ds
-            = sum_{t=1}^T int q(s_t) log p(x_t | s_t) ds_t
+        """Expected log-likelihood.
+
+        Calculates the expected log-likelihood with respect to the posterior
+        distribution of the states:
+
+        .. math::
+            LL &= \int q(s_{1:T}) \log \prod_{t=1}^T p(x_t | s_t) ds_{1:T}
+
+               &= \sum_{t=1}^T \int q(s_t) \log p(x_t | s_t) ds_t
 
         Parameters
         ----------
         x : np.ndarray
             Data. Shape is (batch_size, sequence_length, n_channels).
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states.
-            Shape is (batch_size * sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (batch_size*sequence_length, n_states).
 
         Returns
         -------
-        post_expected_ll : scalar
+        log_likelihood : float
             Posterior expected log-likelihood.
         """
-
-        # Reshape gamma to (batch_size, sequence_length, n_channels).
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
-
         means, covs = self.get_means_covariances()
-
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
         )
-        ll = mvn.log_prob(tf.expand_dims(x, 2))
+        log_likelihood = mvn.log_prob(tf.expand_dims(x, 2))
+        return tf.reduce_sum(ll * gamma)
 
-        post_expected_ll = tf.reduce_sum(ll * gamma)
-        return post_expected_ll
+    def _get_posterior_expected_prior(self, gamma, xi):
+        """Posterior expected prior.
 
-    def _get_posterior_expected_prior_prob(self, gamma, xi):
-        """Get the expected prior probability of states
-        with respect to the posterior distribution of the states.
-        int q(s) log p(s) ds = first_term + remaining_terms
-            = int q(s_1) log p(s_1) ds_1
-             + sum_{t=2}^T int q(s_{t-1}, s_t) log p(s_t | s_{t-1}) ds_{t-1} ds_t
+        Calculates the expected prior probability of states with respect to the
+        posterior distribution of the states:
+
+        .. math::
+            P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
+
+              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
 
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states.
-            Shape is (batch_size * sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior probability of states at two consecutive time points.
-            Shape is (batch_size * sequence_length - 1, n_states * n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
 
         Returns
         -------
-        post_expected_prior : scalar
+        prior : float
             Posterior expected prior probability.
         """
         n_samples, n_states = gamma.shape
+
+        # first_term = int q(s_1) log p(s_1) ds_1
         first_term = np.sum(xlogy(gamma[0], self.state_probs_t0))
+
+        # remaining_terms =
+        # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
         remaining_terms = np.sum(
             xlogy(
                 xi.reshape(n_samples - 1, n_states, n_states, order="F"),
                 np.expand_dims(self.trans_prob, 0),
             )
         )
-        post_expected_prior = first_term + remaining_terms
-        return post_expected_prior
+
+        return first_term + remaining_terms
 
     def sample_state_time_course(self, n_samples):
         """Sample a state time course.
@@ -812,19 +836,50 @@ class Model(ModelBase):
             )
 
     def free_energy(self, dataset):
-        """Get the variational free energy."""
-        dataset = self.make_dataset(dataset, concatenate=True)
+        """Get the variational free energy.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the free energy for.
+
+        Returns
+        -------
+        free_energy : float
+            Variational free energy.
+        """
         _logger.info("Getting free energy")
+
+        # Convert to a TensorFlow dataset if not already
+        dataset = self.make_dataset(dataset, concatenate=True)
+
+        # Calculate variational free energy for each batch
         free_energy = []
         for data in dataset:
             x = data["data"]
+            batch_size = x.shape[0]
+
+            # Get the marginal and join posterior to calculate the free energy
             gamma, xi = self._get_state_probs(x)
 
-            gamma_entropy = self._get_gamma_entropy(gamma, xi)
-            post_expected_ll = self._get_posterior_expected_loglikelihood(x, gamma)
-            post_expected_prior = self._get_posterior_expected_prior_prob(gamma, xi)
-            free_energy.append(gamma_entropy - post_expected_ll - post_expected_prior)
-        return np.mean(free_energy) / self.config.batch_size
+            # Calculate the free energy:
+            #
+            # F = int q(s) log[q(s) / p(x, s)] ds
+            #   = int q(s) log[q(s) / p(x | s) p(s)] ds
+            #   = - int q(s) log p(x | s) ds    [log_likelihood]
+            #     + int q(s) log q(s) ds        [entropy]
+            #     - int q(s) log p(s) ds        [prior]
+
+            log_likelihood = self._get_posterior_expected_loglikelihood(x, gamma)
+            entropy = self._get_posterior_entropy(gamma, xi)
+            prior = self._get_posterior_expected_prior(gamma, xi)
+
+            # Average free energy for a sequence in this batch
+            seq_fe = (-log_likelihood + entropy - prior) / batch_size
+            free_energy.append(seq_fe)
+
+        # Return average over batches
+        return np.mean(free_energy)
 
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
