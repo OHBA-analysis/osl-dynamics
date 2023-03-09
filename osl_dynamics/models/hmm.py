@@ -13,7 +13,7 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from scipy.special import xlogy
+from scipy.special import xlogy, logsumexp
 from numba.core.errors import NumbaWarning
 from tensorflow.keras import backend, layers, utils
 
@@ -475,11 +475,9 @@ class Model(ModelBase):
 
         # Calculate the log-likelihood for each state to have generated the
         # observed data
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
-        )
-        x = tf.expand_dims(x, axis=2)  # (batch_size, sequence_length, 1, n_channels)
-        ll = mvn.log_prob(x).numpy()  # (batch_size, sequence_length, n_states)
+        ll = self._get_conditional_log_likelihood(
+            x
+        )  # (batch_size, sequence_length, n_states)
         log_likelihood = ll.reshape(n_samples, n_states).T
 
         # We add a constant to the log-likelihood for time points where all states
@@ -593,11 +591,7 @@ class Model(ModelBase):
             Posterior expected log-likelihood.
         """
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
-        means, covs = self.get_means_covariances()
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
-        )
-        log_likelihood = mvn.log_prob(tf.expand_dims(x, 2))
+        log_likelihood = self._get_conditional_log_likelihood(x)
         return tf.reduce_sum(log_likelihood * gamma)
 
     def _get_posterior_expected_prior(self, gamma, xi):
@@ -640,6 +634,94 @@ class Model(ModelBase):
         )
 
         return first_term + remaining_terms
+
+    def _evidence_predict_step(self, log_smoothing_distribution):
+        """Predict step for calculating the evidence.
+
+        .. math::
+            p(s_t = j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) p(s_{t-1} = i | x_{1:t-1})
+
+        Parameters
+        ----------
+        log_smoothing_distribution : np.ndarray
+            log p(s_{t-1} | x_{1:t-1}). Shape is (batch_size, n_states).
+
+        Returns
+        -------
+        log_prediction_distribution : np.ndarray
+            log p(s_t | x_{1:t-1}). Shape is (batch_size, n_states).
+        """
+        log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
+        log_smoothing_distribution = np.expand_dims(log_smoothing_distribution, -1)
+        log_prediction_distribution = logsumexp(
+            log_trans_prob + log_smoothing_distribution, -2
+        )
+        return log_prediction_distribution
+
+    def _get_conditional_log_likelihood(self, data):
+        """Get conditional log likelihood of data given the hidden states.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data. Shape is (batch_size, ..., n_channels).
+
+        Returns
+        -------
+        log_conditional_distribution : np.ndarray
+            log p(x_t | s_t). Shape is (batch_size, ..., n_states)
+        """
+        means, covs = self.get_means_covariances()
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
+        )
+        log_likelihood = mvn.log_prob(tf.expand_dims(data, -2))
+        return log_likelihood.numpy()
+
+    def _evidence_update_step(self, data, log_prediction_distribution):
+        """Update step for calcuating the evidence.
+
+        .. math::
+            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
+
+            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) p(s_t = i | x_{1:t-1})
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for the update step. Shape is (batch_size, n_channels).
+        log_prediction_distribution : np.ndarray
+            log p(s_t | x_{1:t-1}). Shape is (batch_size, n_states).
+
+        Returns
+        -------
+        log_smoothing_distribution : np.ndarray
+            log p(s_t | x_{1:t}). Shape is (batch_size, n_states).
+        predictive_log_likelihood : np.ndarray
+            log p(x_t | x_{1:t-1}). Shape is (batch_size).
+        """
+        conditional_ll = self._get_conditional_log_likelihood(data)
+        log_smoothing_distribution = conditional_ll + log_prediction_distribution
+        predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
+
+        # Normalise the log smoothing distribution
+        log_smoothing_distribution -= np.expand_dims(predictive_log_likelihood, -1)
+        return log_smoothing_distribution, predictive_log_likelihood
+
+    def get_stationary_distribution(self):
+        """Get the stationary distribution of the Markov chain.
+        This is the left eigenvector of the trans_prob
+        corresponding to eigenvalue = 1.
+
+        Returns
+        -------
+        stationary_distribution : np.ndarray
+            Stationary distribution of the Markov chain. Shape is (n_states,).
+        """
+        eigval, eigvec = np.linalg.eig(self.trans_prob.T)
+        stationary_distribution = np.squeeze(eigvec[:, np.isclose(eigval, 1)]).real
+        stationary_distribution /= np.sum(stationary_distribution)
+        return stationary_distribution
 
     def sample_state_time_course(self, n_samples):
         """Sample a state time course.
@@ -878,6 +960,56 @@ class Model(ModelBase):
 
         # Return average over batches
         return np.mean(free_energy)
+
+    def evidence(self, dataset):
+        """Calculate the model evidence of HMM on a dataset.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the model evidence on.
+
+        Returns
+        -------
+        evidence : float
+            Model evidence p(x_{1:T}).
+        """
+        _logger.info("Getting model evidence")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
+
+        evidence = 0
+        for n, data in enumerate(dataset):
+            x = data["data"]
+            print("Batch {}/{}".format(n + 1, n_batches))
+            pb_i = utils.Progbar(self.config.sequence_length)
+            batch_size = tf.shape(x)[0]
+            batch_evidence = np.zeros((batch_size))
+            for t in range(self.config.sequence_length):
+                # Prediction step
+                if t == 0:
+                    initial_distribution = self.get_stationary_distribution()
+                    log_prediction_distribution = np.broadcast_to(
+                        np.expand_dims(initial_distribution, axis=0),
+                        (batch_size, self.config.n_states),
+                    )
+                else:
+                    log_prediction_distribution = self._evidence_predict_step(
+                        log_smoothing_distribution
+                    )
+
+                # Update step
+                (
+                    log_smoothing_distribution,
+                    predictive_log_likelihood,
+                ) = self._evidence_update_step(x[:, t, :], log_prediction_distribution)
+
+                # Update the batch evidence
+                batch_evidence += predictive_log_likelihood
+                pb_i.add(1)
+            evidence += np.mean(batch_evidence)
+
+        return evidence / n_batches
 
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
