@@ -452,7 +452,7 @@ class Model(ModelBase):
         return gamma, xi
 
     def _get_likelihood(self, x):
-        """Get likelihood time series.
+        """Get the likelihood, p(x_t | s_t).
 
         Parameters
         ----------
@@ -462,23 +462,16 @@ class Model(ModelBase):
         Returns
         -------
         likelihood : np.ndarray
-            Likelihood time series. Shape is (n_states, batch_size*sequence_length).
+            Likelihood. Shape is (n_states, batch_size*sequence_length).
         """
-
-        # Get the current observation model parameters
-        means, covs = self.get_means_covariances()
-
-        n_states = means.shape[0]
-        batch_size = x.shape[0]
-        sequence_length = x.shape[1]
-        n_samples = batch_size * sequence_length
-
         # Calculate the log-likelihood for each state to have generated the
         # observed data
-        ll = self._get_conditional_log_likelihood(
-            x
-        )  # (batch_size, sequence_length, n_states)
-        log_likelihood = ll.reshape(n_samples, n_states).T
+        ll = self._get_log_likelihood(x)
+
+        # Reshape the log-likelihood:
+        # (batch_size, sequence_length, n_states)
+        # -> (n_states, batch_size*sequence_length)
+        log_likelihood = ll.reshape(-1, ll.shape[-1]).T
 
         # We add a constant to the log-likelihood for time points where all states
         # have a negative log-likelihood. This is critical for numerical stability.
@@ -566,7 +559,7 @@ class Model(ModelBase):
 
         return first_term - second_term
 
-    def _get_posterior_expected_loglikelihood(self, x, gamma):
+    def _get_posterior_expected_log_likelihood(self, x, gamma):
         """Expected log-likelihood.
 
         Calculates the expected log-likelihood with respect to the posterior
@@ -591,7 +584,7 @@ class Model(ModelBase):
             Posterior expected log-likelihood.
         """
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
-        log_likelihood = self._get_conditional_log_likelihood(x)
+        log_likelihood = self._get_log_likelihood(x)
         return tf.reduce_sum(log_likelihood * gamma)
 
     def _get_posterior_expected_prior(self, gamma, xi):
@@ -639,17 +632,17 @@ class Model(ModelBase):
         """Predict step for calculating the evidence.
 
         .. math::
-            p(s_t = j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) p(s_{t-1} = i | x_{1:t-1})
+            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) p(s_{t-1} = i | x_{1:t-1})
 
         Parameters
         ----------
         log_smoothing_distribution : np.ndarray
-            log p(s_{t-1} | x_{1:t-1}). Shape is (batch_size, n_states).
+            log p(s_t-1 | x_1:t-1). Shape is (batch_size, n_states).
 
         Returns
         -------
         log_prediction_distribution : np.ndarray
-            log p(s_t | x_{1:t-1}). Shape is (batch_size, n_states).
+            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
         """
         log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
         log_smoothing_distribution = np.expand_dims(log_smoothing_distribution, -1)
@@ -658,8 +651,8 @@ class Model(ModelBase):
         )
         return log_prediction_distribution
 
-    def _get_conditional_log_likelihood(self, data):
-        """Get conditional log likelihood of data given the hidden states.
+    def _get_log_likelihood(self, data):
+        """Get the log-likelihood of data, log p(x_t | s_t).
 
         Parameters
         ----------
@@ -668,18 +661,18 @@ class Model(ModelBase):
 
         Returns
         -------
-        log_conditional_distribution : np.ndarray
-            log p(x_t | s_t). Shape is (batch_size, ..., n_states)
+        log_likelihood : np.ndarray
+            Log-likelihood. Shape is (batch_size, ..., n_states)
         """
         means, covs = self.get_means_covariances()
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
         )
-        log_likelihood = mvn.log_prob(tf.expand_dims(data, -2))
+        log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
         return log_likelihood.numpy()
 
     def _evidence_update_step(self, data, log_prediction_distribution):
-        """Update step for calcuating the evidence.
+        """Update step for calculating the evidence.
 
         .. math::
             p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
@@ -691,16 +684,16 @@ class Model(ModelBase):
         data : np.ndarray
             Data for the update step. Shape is (batch_size, n_channels).
         log_prediction_distribution : np.ndarray
-            log p(s_t | x_{1:t-1}). Shape is (batch_size, n_states).
+            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
 
         Returns
         -------
         log_smoothing_distribution : np.ndarray
-            log p(s_t | x_{1:t}). Shape is (batch_size, n_states).
+            log p(s_t | x_1:t). Shape is (batch_size, n_states).
         predictive_log_likelihood : np.ndarray
-            log p(x_t | x_{1:t-1}). Shape is (batch_size).
+            log p(x_t | x_1:t-1). Shape is (batch_size).
         """
-        conditional_ll = self._get_conditional_log_likelihood(data)
+        conditional_ll = self._get_log_likelihood(data)
         log_smoothing_distribution = conditional_ll + log_prediction_distribution
         predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
 
@@ -710,7 +703,8 @@ class Model(ModelBase):
 
     def get_stationary_distribution(self):
         """Get the stationary distribution of the Markov chain.
-        This is the left eigenvector of the trans_prob
+
+        This is the left eigenvector of the transition probability matrix
         corresponding to eigenvalue = 1.
 
         Returns
@@ -918,6 +912,11 @@ class Model(ModelBase):
     def free_energy(self, dataset):
         """Get the variational free energy.
 
+        This calculates:
+
+        .. math::
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+
         Parameters
         ----------
         dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
@@ -950,7 +949,7 @@ class Model(ModelBase):
             #     + int q(s) log q(s) ds        [entropy]
             #     - int q(s) log p(s) ds        [prior]
 
-            log_likelihood = self._get_posterior_expected_loglikelihood(x, gamma)
+            log_likelihood = self._get_posterior_expected_log_likelihood(x, gamma)
             entropy = self._get_posterior_entropy(gamma, xi)
             prior = self._get_posterior_expected_prior(gamma, xi)
 
@@ -962,7 +961,7 @@ class Model(ModelBase):
         return np.mean(free_energy)
 
     def evidence(self, dataset):
-        """Calculate the model evidence of HMM on a dataset.
+        """Calculate the model evidence, p(x), of HMM on a dataset.
 
         Parameters
         ----------
@@ -972,7 +971,7 @@ class Model(ModelBase):
         Returns
         -------
         evidence : float
-            Model evidence p(x_{1:T}).
+            Model evidence.
         """
         _logger.info("Getting model evidence")
         dataset = self.make_dataset(dataset, concatenate=True)
