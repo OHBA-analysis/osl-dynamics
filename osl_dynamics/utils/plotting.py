@@ -2,7 +2,6 @@
 
 """
 
-
 import logging
 from itertools import zip_longest
 
@@ -12,10 +11,13 @@ import numpy as np
 from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+from nilearn.plotting import plot_markers
 
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
+from osl_dynamics.utils.parcellation import Parcellation
+
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -214,9 +216,9 @@ def plot_line(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -300,7 +302,8 @@ def plot_line(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_scatter(
@@ -361,9 +364,9 @@ def plot_scatter(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -462,7 +465,8 @@ def plot_scatter(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_hist(
@@ -514,9 +518,9 @@ def plot_hist(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -583,7 +587,8 @@ def plot_hist(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_bar_chart(
@@ -629,9 +634,9 @@ def plot_bar_chart(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -686,7 +691,8 @@ def plot_bar_chart(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_gmm(
@@ -742,9 +748,9 @@ def plot_gmm(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -803,7 +809,8 @@ def plot_gmm(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_violin(
@@ -858,9 +865,9 @@ def plot_violin(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -930,7 +937,8 @@ def plot_violin(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_time_series(
@@ -964,9 +972,9 @@ def plot_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
     time_series = np.asarray(time_series)
     n_samples = min(n_samples or np.inf, time_series.shape[0])
@@ -1023,7 +1031,8 @@ def plot_time_series(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_separate_time_series(
@@ -1153,9 +1162,9 @@ def plot_epoched_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
     from osl_dynamics.data.task import epoch_mean
 
@@ -1213,7 +1222,8 @@ def plot_epoched_time_series(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if ax is None:
+        return fig, ax
 
 
 def plot_matrices(
@@ -1859,3 +1869,72 @@ def plot_mode_lifetimes(
         save(fig, filename)
 
     return fig, axes
+
+
+def plot_psd_topo(
+    f, psd, parcellation_file=None, topomap_pos=[0.45, 0.55, 0.5, 0.55], filename=None
+):
+    """PLot PSDs for parcels and a topomap.
+
+    Parameters
+    ----------
+    f : np.ndarray
+        Frequency axis. Shape must be (n_freq,).
+    psd : np.ndarray
+        PSD for each parcel. Shape must be (n_parcels, n_freq).
+    parcellation_file : str
+        Path to parcellation file.
+    topomap_pos : list
+        Positioning and size of the topomap: [x0, y0, width, height].
+        x0, y0, width, height should be floats between 0 and 1.
+        E.g. [0.45, 0.55, 0.5, 0.55] to place the topomap on the top
+        right. This is not used if parcellation_file=None.
+    filename : str
+        Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
+    """
+
+    if parcellation_file is not None:
+        # Get the center of each parcel
+        parcellation = Parcellation(parcellation_file)
+        roi_centers = parcellation.roi_centers()
+
+        # Re-order to use colour to indicate anterior->posterior location
+        order = np.argsort(roi_centers[:, 1])
+        roi_centers = roi_centers[order]
+        psd = np.copy(psd)[order]
+
+    n_parcels = psd.shape[0]
+
+    # Plot PSDs
+    fig, ax = create_figure()
+    cmap = plt.get_cmap()
+    for i in range(n_parcels):
+        ax.plot(f, psd[i], c=cmap(i / n_parcels))
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("PSD (a.u.)")
+    ax.set_xlim(f[0], f[-1])
+    plt.tight_layout()
+
+    if parcellation_file is not None:
+        # Plot parcel topomap
+        inside_ax = ax.inset_axes(topomap_pos)
+        plot_markers(
+            np.arange(parcellation.n_parcels),
+            roi_centers,
+            node_size=12,
+            colorbar=False,
+            axes=inside_ax,
+        )
+
+    # Save
+    if filename is not None:
+        save(fig, filename, tight_layout=False)
+
+    return fig, ax
