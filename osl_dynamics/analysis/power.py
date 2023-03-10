@@ -208,7 +208,8 @@ def save(
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
-        Optional, if None is passed then the image is shown on screen.
+        Optional, if None is passed then the image is shown on screen and the
+        Matplotlib objects are returned.
     component : int
         Spectral component to save.
     subtract_mean : bool
@@ -218,6 +219,13 @@ def save(
         Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+
+    Returns
+    -------
+    figures : list of matplotlib.pyplot.figure
+        List of Matplotlib figure object.
+    axes : list of matplotlib.pyplot.axis.
+        List of Matplotlib axis object(s).
     """
     # Create a copy of the power map so we don't modify it
     power_map = np.copy(power_map)
@@ -280,15 +288,19 @@ def save(
 
     # Just display the power map
     if filename is None:
+        figures, axes = [], []
         for i in trange(n_modes, desc="Saving images"):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            plotting.plot_img_on_surf(
+            fig, ax = plotting.plot_img_on_surf(
                 nii,
                 views=["lateral", "medial"],
                 hemispheres=["left", "right"],
                 colorbar=True,
                 **plot_kwargs,
             )
+            figures.append(fig)
+            axes.append(ax)
+        return figures, axes
 
     else:
         # Save as nii file

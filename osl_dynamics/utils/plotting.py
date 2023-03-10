@@ -1590,7 +1590,8 @@ def plot_brain_surface(
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
-        Optional, if None is passed then the image is shown on screen.
+        Optional, if None is passed then the image is shown on screen and the
+        Matplotlib objects are returned.
     subtract_mean : bool
         Should we subtract the mean power across modes?
     mean_weights: np.ndarray
@@ -1598,8 +1599,27 @@ def plot_brain_surface(
         Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+
+    Returns
+    -------
+    figures : list of matplotlib.pyplot.figure
+        List of Matplotlib figure object.
+    axes : list of matplotlib.pyplot.axis.
+        List of Matplotlib axis object(s).
     """
     from osl_dynamics.analysis import power
+
+    if filename is None:
+        figures, axes = power.save(
+            power_map=values,
+            filename=filename,
+            mask_file=mask_file,
+            parcellation_file=parcellation_file,
+            subtract_mean=subtract_mean,
+            mean_weights=mean_weights,
+            **plot_kwargs,
+        )
+        return figures, axes
 
     power.save(
         power_map=values,
