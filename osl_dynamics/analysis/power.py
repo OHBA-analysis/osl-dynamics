@@ -191,6 +191,7 @@ def save(
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
+    display=True,
 ):
     """Saves power maps.
 
@@ -208,7 +209,8 @@ def save(
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
-        Optional, if None is passed then the image is shown on screen.
+        Optional, if None is passed then the image is shown on screen or the
+        Matplotlib objects are returned, depending on the `display` argument.
     component : int
         Spectral component to save.
     subtract_mean : bool
@@ -218,6 +220,16 @@ def save(
         Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+    display: bool
+        Whether to display the image on screen. Filename must be set as None for
+        the argument to be active. If False, the Matplotlib objects are returned.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     # Create a copy of the power map so we don't modify it
     power_map = np.copy(power_map)
@@ -282,13 +294,23 @@ def save(
     if filename is None:
         for i in trange(n_modes, desc="Saving images"):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            plotting.plot_img_on_surf(
-                nii,
-                views=["lateral", "medial"],
-                hemispheres=["left", "right"],
-                colorbar=True,
-                **plot_kwargs,
-            )
+            if display:
+                plotting.plot_img_on_surf(
+                    nii,
+                    views=["lateral", "medial"],
+                    hemispheres=["left", "right"],
+                    colorbar=True,
+                    **plot_kwargs,
+                )
+            else:
+                fig, ax = plotting.plot_img_on_surf(
+                    nii,
+                    views=["lateral", "medial"],
+                    hemispheres=["left", "right"],
+                    colorbar=True,
+                    **plot_kwargs,
+                )
+                return fig, ax
 
     else:
         # Save as nii file

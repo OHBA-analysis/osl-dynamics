@@ -1573,6 +1573,7 @@ def plot_brain_surface(
     filename=None,
     subtract_mean=False,
     mean_weights=None,
+    display=True,
     **plot_kwargs,
 ):
     """Plot a 2D heat map on the surface of the brain.
@@ -1590,16 +1591,41 @@ def plot_brain_surface(
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
-        Optional, if None is passed then the image is shown on screen.
+        Optional, if None is passed then the image is shown on screen or the
+        Matplotlib objects are returned, depending on the `display` argument.
     subtract_mean : bool
         Should we subtract the mean power across modes?
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
+    display: bool
+        Whether to display the image on screen. Filename must be set as None for
+        the argument to be active. If False, the Matplotlib objects are returned.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
     """
     from osl_dynamics.analysis import power
+
+    if filename is None and not display:
+        fig, ax = power.save(
+            power_map=values,
+            filename=filename,
+            mask_file=mask_file,
+            parcellation_file=parcellation_file,
+            subtract_mean=subtract_mean,
+            mean_weights=mean_weights,
+            display=display,
+            **plot_kwargs,
+        )
+
+        return fig, ax
 
     power.save(
         power_map=values,
