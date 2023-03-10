@@ -1928,7 +1928,7 @@ def plot_psd_topo(
         # Re-order to use colour to indicate anterior->posterior location
         order = np.argsort(roi_centers[:, 1])
         roi_centers = roi_centers[order]
-        psd = np.copy(psd)[order]
+        psd = np.copy(psd)[order[::-1]]
 
     n_parcels = psd.shape[0]
 
