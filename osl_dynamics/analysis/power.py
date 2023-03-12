@@ -11,7 +11,7 @@ import numpy as np
 from nilearn import plotting
 from tqdm import trange
 
-from osl_dynamics import array_ops, files
+from osl_dynamics import array_ops, files, utils
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 
 _logger = logging.getLogger("osl-dynamics")
@@ -156,7 +156,7 @@ def power_map_grid(mask_file, parcellation_file, power_map):
     # check parcellation is compatible:
     if power_map.shape[1] is not n_parcels:
         _logger.error(
-            "Parcellation_file has a different number of parcels to the power_maps"
+            "parcellation_file has a different number of parcels to the power_maps"
         )
 
     voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
@@ -218,14 +218,22 @@ def save(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict
-        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_img_on_surf.html>`_.
+        By default we pass:
+
+        - views=["lateral", "medial"]
+        - hemispheres=["left", "right"]
+        - colorbar=True
+
+        Any keyword passed in plot_kwargs will override these.
 
     Returns
     -------
     figures : list of matplotlib.pyplot.figure
-        List of Matplotlib figure object.
+        List of Matplotlib figure object. Only returned if filename=None.
     axes : list of matplotlib.pyplot.axis.
-        List of Matplotlib axis object(s).
+        List of Matplotlib axis object(s). Only returned if filename=None.
     """
     # Create a copy of the power map so we don't modify it
     power_map = np.copy(power_map)
@@ -286,18 +294,20 @@ def save(
     # Number of modes
     n_modes = power_map.shape[-1]
 
+    # Keyword arguments to pass to nilearn.plotting.plot_img_on_surf
+    default_plot_kwargs = {
+        "views": ["lateral", "medial"],
+        "hemisphere": ["left", "right"],
+        "colorbar": True,
+    }
+    plot_kwargs = utils.misc.override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
     # Just display the power map
     if filename is None:
         figures, axes = [], []
         for i in trange(n_modes, desc="Saving images"):
             nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            fig, ax = plotting.plot_img_on_surf(
-                nii,
-                views=["lateral", "medial"],
-                hemispheres=["left", "right"],
-                colorbar=True,
-                **plot_kwargs,
-            )
+            fig, ax = plotting.plot_img_on_surf(nii, output_file=None, **plot_kwargs)
             figures.append(fig)
             axes.append(ax)
         return figures, axes
@@ -316,14 +326,7 @@ def save(
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
                 )
-                plotting.plot_img_on_surf(
-                    nii,
-                    views=["lateral", "medial"],
-                    hemispheres=["left", "right"],
-                    colorbar=True,
-                    output_file=output_file,
-                    **plot_kwargs,
-                )
+                plotting.plot_img_on_surf(nii, output_file=output_file, **plot_kwargs)
 
 
 def multi_save(

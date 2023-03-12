@@ -1609,29 +1609,25 @@ def plot_brain_surface(
         Default is equal weighting.
     plot_kwargs : dict
         Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        By default we pass:
+
+        - views=["lateral", "medial"]
+        - hemispheres=["left", "right"]
+        - colorbar=True
+        - output_file=filename
+
+        Any keyword arguments passed here will override these.
 
     Returns
     -------
     figures : list of matplotlib.pyplot.figure
-        List of Matplotlib figure object.
+        List of Matplotlib figure object. Only returned if filename=None.
     axes : list of matplotlib.pyplot.axis.
-        List of Matplotlib axis object(s).
+        List of Matplotlib axis object(s). Only returned if filename=None.
     """
     from osl_dynamics.analysis import power
 
-    if filename is None:
-        figures, axes = power.save(
-            power_map=values,
-            filename=filename,
-            mask_file=mask_file,
-            parcellation_file=parcellation_file,
-            subtract_mean=subtract_mean,
-            mean_weights=mean_weights,
-            **plot_kwargs,
-        )
-        return figures, axes
-
-    power.save(
+    return power.save(
         power_map=values,
         filename=filename,
         mask_file=mask_file,
