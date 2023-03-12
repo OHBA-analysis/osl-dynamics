@@ -226,9 +226,8 @@ def save(
         - hemispheres=["left", "right"]
         - colorbar=True
 
-        Any keyword passed in plot_kwargs will override these. Example use:
+        Any keyword passed in plot_kwargs will override these. Example use::
 
-        .. code-block:: python
             power.save(
                 ...,
                 plot_kwargs={"cmap": "RdBu_r", "bg_on_data": 1, "darkness": 0.4, "alpha": 1},
