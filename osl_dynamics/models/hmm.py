@@ -664,12 +664,26 @@ class Model(ModelBase):
         log_likelihood : np.ndarray
             Log-likelihood. Shape is (batch_size, ..., n_states)
         """
+
+        # Get the current observation model parameters
         means, covs = self.get_means_covariances()
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
-        )
-        log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
-        return log_likelihood.numpy()
+
+        n_states = means.shape[0]
+        batch_size = data.shape[0]
+        sequence_length = data.shape[1]
+
+        # Calculate the log-likelihood for each state to have generated the
+        # observed data
+        log_likelihood = np.empty([batch_size, sequence_length, n_states])
+        for state in range(n_states):
+            mvn = tfp.distributions.MultivariateNormalTriL(
+                loc=means[state],
+                scale_tril=tf.linalg.cholesky(covs[state]),
+                allow_nan_stats=False,
+            )
+            log_likelihood[:, :, state] = mvn.log_prob(data)
+
+        return log_likelihood
 
     def _evidence_update_step(self, data, log_prediction_distribution):
         """Update step for calculating the evidence.
