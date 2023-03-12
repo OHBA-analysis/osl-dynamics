@@ -2,6 +2,7 @@
 
 """
 
+import logging
 import warnings
 from os import listdir, path
 
@@ -10,6 +11,8 @@ import numpy as np
 import scipy.io
 
 from osl_dynamics.data import spm
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def validate_inputs(inputs):
@@ -47,8 +50,10 @@ def validate_inputs(inputs):
             for inp in inputs:
                 if path.isdir(inp):
                     validated_inputs += list_dir(inp, keep_ext=[".npy", ".mat", ".txt"])
-                else:
+                elif path.exists(inp):
                     validated_inputs.append(inp)
+                else:
+                    _logger.warn(f"{inp} not found")
         else:
             validated_inputs = inputs
 
