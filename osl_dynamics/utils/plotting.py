@@ -1608,7 +1608,8 @@ def plot_brain_surface(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict
-        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_img_on_surf.html>`_.
         By default we pass:
 
         - views=["lateral", "medial"]

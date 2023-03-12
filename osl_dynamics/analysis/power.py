@@ -2,8 +2,8 @@
 
 """
 
+import os
 import logging
-from os import makedirs
 from pathlib import Path
 
 import nibabel as nib
@@ -226,7 +226,13 @@ def save(
         - hemispheres=["left", "right"]
         - colorbar=True
 
-        Any keyword passed in plot_kwargs will override these.
+        Any keyword passed in plot_kwargs will override these. Example use:
+
+        .. code-block:: python
+            power.save(
+                ...,
+                plot_kwargs={"cmap": "RdBu_r", "bg_on_data": 1, "darkness": 0.4, "alpha": 1},
+            )
 
     Returns
     -------
@@ -336,28 +342,27 @@ def multi_save(
     parcellation_file,
     filename=None,
     subjects=None,
-    component=0,
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
 ):
     """Saves group level and subject level power maps.
 
-    This is a multi-subject wrapper of save.
+    When training subject-specific models we want to plot the group-level map
+    and subject-specific deviations. This function is a wrapper for power.save,
+    which helps us plot power maps for subject-specific models.
 
     Parameters
     ----------
     group_power_map : np.ndarray
         Group level power map to save.
-        Can be of shape: (n_components, n_modes, n_channels),
-        (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
-        array can also be passed. Warning: this function cannot be used if n_modes
-        is equal to n_channels.
+        Can be of shape: (n_modes, n_channels) or (n_channels,).
+        A (..., n_channels, n_channels) can also be passed.
+        Warning: this function cannot be used if n_modes is equal to n_channels.
     subject_power_map : np.ndarray
         Subject level power maps to save.
-        Can be of shape: (n_components, n_subjects, n_modes, n_channels),
-        (n_subjects, n_modes, n_channels), (n_modes, n_channels) or (n_channels,).
-        A (..., n_channels, n_channels) array can also be passed.
+        Can be of shape: (n_subjects, n_modes, n_channels), (n_modes, n_channels)
+        or (n_channels,). A (..., n_channels, n_channels) array can also be passed.
         Warning: this function cannot be used if n_modes = n_channels.
     mask_file : str
         Mask file used to preprocess the training data.
@@ -365,19 +370,26 @@ def multi_save(
         Parcellation file used to parcelate the training data.
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png, it is saved as images.
-        Optional, if None is passed then the image is shown on screen.
+        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
+        Optional, if None is passed then the image is shown on screen and the
+        Matplotlib objects are returned.
     subjects : list
         List of subject indices to be plot power maps for.
-    component : int
-        Spectral component to save.
     subtract_mean : bool
-        Should we subtract the mean power of the group level power across modes?
+        Should we subtract the mean power across modes?
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict
-        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_img_on_surf.html>`_.
+        By default we pass:
+
+        - views=["lateral", "medial"]
+        - hemispheres=["left", "right"]
+        - colorbar=True
+
+        Any keyword passed in plot_kwargs will override these.
     """
     # Create a copy of the power maps so we don't modify them
     group_power_map = np.copy(group_power_map)
@@ -402,20 +414,16 @@ def multi_save(
 
     group_power_map = array_ops.validate(
         group_power_map,
-        correct_dimensionality=3,
-        allow_dimensions=[2],
+        correct_dimensionality=2,
+        allow_dimensions=[1],
         error_message="group_power_map.shape is incorrect.",
     )
     subject_power_map = array_ops.validate(
         subject_power_map,
-        correct_dimensionality=4,
-        allow_dimensions=[2, 3],
+        correct_dimensionality=3,
+        allow_dimensions=[1, 2],
         error_message="subject_power_map.shape is incorrect",
     )
-
-    # Select component to plot
-    group_power_map = group_power_map[component]
-    subject_power_map = subject_power_map[component]
 
     if group_power_map.shape[0] != subject_power_map.shape[1]:
         raise ValueError(
@@ -434,12 +442,12 @@ def multi_save(
     # Save the group power map
     filename = Path(filename)
     group_dir = f"{filename.parent}/group"
-    makedirs(group_dir, exist_ok=True)
+    os.makedirs(group_dir, exist_ok=True)
     group_filename = f"{group_dir}/{filename.stem}{filename.suffix}"
 
     _logger.info("Saving group level power map:")
     save(
-        power_map=group_power_map,
+        group_power_map,
         filename=group_filename,
         mask_file=mask_file,
         parcellation_file=parcellation_file,
@@ -455,12 +463,12 @@ def multi_save(
         subject_dir = "{fn.parent}/sub_{sub:0{v}d}".format(
             fn=filename, sub=sub, v=len(str(n_subjects))
         )
-        makedirs(subject_dir, exist_ok=True)
+        os.makedirs(subject_dir, exist_ok=True)
         subject_filename = f"{subject_dir}/{filename.stem}{filename.suffix}"
 
         _logger.info(f"Saving subject {sub} power map:")
         save(
-            power_map=subject_power_map[sub],
+            subject_power_map[sub],
             filename=subject_filename,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
