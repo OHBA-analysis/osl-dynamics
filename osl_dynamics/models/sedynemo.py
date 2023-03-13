@@ -710,14 +710,6 @@ def _model_structure(config):
     # For the observation model (static KL loss)
     if config.learn_means:
         # Layer definitions
-        means_dev_mag_mod_alpha_input_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            name="means_dev_mag_mod_alpha_input",
-        )
         means_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
@@ -726,16 +718,9 @@ def _model_structure(config):
             config.dev_dropout,
             name="means_dev_mag_mod_beta_input",
         )
-        means_dev_mag_mod_alpha_layer = layers.Dense(
-            1,
-            activation="softplus",
-            use_bias=False,
-            name="means_dev_mag_mod_alpha",
-        )
         means_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
-            use_bias=False,
             name="means_dev_mag_mod_beta",
         )
 
@@ -744,12 +729,6 @@ def _model_structure(config):
         )
 
         # Data flow
-        means_dev_mag_mod_alpha_input = means_dev_mag_mod_alpha_input_layer(
-            means_concat_embeddings
-        )
-        means_dev_mag_mod_alpha = means_dev_mag_mod_alpha_layer(
-            means_dev_mag_mod_alpha_input
-        )
         means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
             means_concat_embeddings
         )
@@ -761,7 +740,6 @@ def _model_structure(config):
                 data,
                 means_dev_mag_inf_alpha,
                 means_dev_mag_inf_beta,
-                means_dev_mag_mod_alpha,
                 means_dev_mag_mod_beta,
             ]
         )
@@ -771,14 +749,6 @@ def _model_structure(config):
 
     if config.learn_covariances:
         # Layer definitions
-        covs_dev_mag_mod_alpha_input_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            name="covs_dev_mag_mod_alpha_input",
-        )
         covs_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
@@ -787,16 +757,9 @@ def _model_structure(config):
             config.dev_dropout,
             name="covs_dev_mag_mod_beta_input",
         )
-        covs_dev_mag_mod_alpha_layer = layers.Dense(
-            1,
-            activation="softplus",
-            use_bias=False,
-            name="covs_dev_mag_mod_alpha",
-        )
         covs_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
-            use_bias=False,
             name="covs_dev_mag_mod_beta",
         )
 
@@ -805,12 +768,6 @@ def _model_structure(config):
         )
 
         # Data flow
-        covs_dev_mag_mod_alpha_input = covs_dev_mag_mod_alpha_input_layer(
-            covs_concat_embeddings
-        )
-        covs_dev_mag_mod_alpha = covs_dev_mag_mod_alpha_layer(
-            covs_dev_mag_mod_alpha_input
-        )
         covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
             covs_concat_embeddings
         )
@@ -820,7 +777,6 @@ def _model_structure(config):
                 data,
                 covs_dev_mag_inf_alpha,
                 covs_dev_mag_inf_beta,
-                covs_dev_mag_mod_alpha,
                 covs_dev_mag_mod_beta,
             ]
         )

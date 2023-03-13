@@ -1321,16 +1321,15 @@ class StaticKLDivergenceLayer(layers.Layer):
         self.n_batches = n_batches
 
     def call(self, inputs, **kwargs):
-        data, inference_alpha, inference_beta, model_alpha, model_beta = inputs
+        data, inference_alpha, inference_beta, model_beta = inputs
 
         # Add a small error for numerical stability
         inference_alpha = add_epsilon(inference_alpha, self.epsilon)
         inference_beta = add_epsilon(inference_beta, self.epsilon)
-        model_alpha = add_epsilon(model_alpha, self.epsilon)
         model_beta = add_epsilon(model_beta, self.epsilon)
 
         # Calculate the KL divergence
-        prior = tfp.distributions.Gamma(concentration=model_alpha, rate=model_beta)
+        prior = tfp.distributions.Exponential(rate=model_beta)
         posterior = tfp.distributions.Gamma(
             concentration=inference_alpha, rate=inference_beta
         )
@@ -1402,8 +1401,6 @@ class StandardizationLayer(layers.Layer):
         self.axis = axis
 
     def call(self, inputs, **kwargs):
-        mean = tf.math.reduce_mean(inputs, axis=self.axis, keepdims=True)
-        inputs -= mean
         l2_norm = tf.math.sqrt(
             tf.math.reduce_sum(tf.math.square(inputs), axis=self.axis, keepdims=True)
         )
