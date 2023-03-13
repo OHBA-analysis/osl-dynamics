@@ -707,8 +707,12 @@ class Model(ModelBase):
         predictive_log_likelihood : np.ndarray
             log p(x_t | x_1:t-1). Shape is (batch_size).
         """
-        conditional_ll = self._get_log_likelihood(data)
-        log_smoothing_distribution = conditional_ll + log_prediction_distribution
+        means, covs = self.get_means_covariances()
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=means, scale_tril=tf.linalg.cholesky(covs), allow_nan_stats=False
+        )
+        log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2)).numpy()
+        log_smoothing_distribution = log_likelihood + log_prediction_distribution
         predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
 
         # Normalise the log smoothing distribution
