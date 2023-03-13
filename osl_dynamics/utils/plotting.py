@@ -274,7 +274,8 @@ def plot_line(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot lines
@@ -302,7 +303,7 @@ def plot_line(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -429,7 +430,8 @@ def plot_scatter(
         colors = get_colors(len(x), colormap="tab10")
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot data
@@ -465,7 +467,7 @@ def plot_scatter(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -563,7 +565,8 @@ def plot_hist(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot histograms
@@ -587,7 +590,7 @@ def plot_hist(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -672,7 +675,8 @@ def plot_bar_chart(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot bar chart
@@ -691,7 +695,7 @@ def plot_bar_chart(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -779,7 +783,8 @@ def plot_gmm(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot histogram
@@ -809,7 +814,7 @@ def plot_gmm(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -906,7 +911,8 @@ def plot_violin(
     data = [np.array([np.nan, np.nan]) if len(d) == 0 else d for d in data]
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot violins
@@ -937,7 +943,7 @@ def plot_violin(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -1009,7 +1015,8 @@ def plot_time_series(
     gaps = np.arange(n_channels)[::-1] * separation
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot data
@@ -1031,7 +1038,7 @@ def plot_time_series(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
@@ -1196,7 +1203,8 @@ def plot_epoched_time_series(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Baseline correct
@@ -1222,7 +1230,7 @@ def plot_epoched_time_series(
     if filename is not None:
         save(fig, filename)
 
-    if ax is None:
+    if create_fig:
         return fig, ax
 
 
