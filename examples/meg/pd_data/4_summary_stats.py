@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy import stats
 
 import glmtools as glm
 from osl_dynamics.inference import modes
@@ -27,7 +28,7 @@ alp = pickle.load(open(inf_params_dir + "/alp.pkl", "rb"))
 # Calculate a state time course by taking the most likely state
 stc = modes.argmax_time_courses(alp)
 
-#%% Calcualte summary statistics
+#%% Calculate summary statistics
 
 # Fractional occupancy
 fo = modes.fractional_occupancies(stc)
@@ -87,12 +88,8 @@ for metric in ["fo", "lt", "intv", "sr"]:
     DC.add_regressor(name="HC", rtype="Categorical", codes=1)
     DC.add_regressor(name="PD", rtype="Categorical", codes=2)
     DC.add_regressor(name="Gender", rtype="Parametric", datainfo="gender", preproc="z")
-    DC.add_regressor(
-        name="Handedness", rtype="Parametric", datainfo="handedness", preproc="z"
-    )
-    DC.add_regressor(
-        name="Education", rtype="Parametric", datainfo="education", preproc="z"
-    )
+    DC.add_regressor(name="Handedness", rtype="Parametric", datainfo="handedness", preproc="z")
+    DC.add_regressor(name="Education", rtype="Parametric", datainfo="education", preproc="z")
     DC.add_regressor(name="Age", rtype="Parametric", datainfo="covariate", preproc="z")
 
     DC.add_simple_contrasts()
@@ -105,16 +102,14 @@ for metric in ["fo", "lt", "intv", "sr"]:
     model = glm.fit.OLSModel(des, data)
 
     # Permutation Test Pooling Across States
-    contrast = 6  # select Group Contrast
+    contrast = 6  # select "HC < PD"
     metric_perm = "tstats"  # add the t-stats to the null rather than the copes
     nperms = 10000  # for a real analysis 1000+ is best but 100 is a reasonable approximation.
-    pooled_dims = (
-        2  # Pool max t-stats across this dimension to correct for multiple comparisons
-    )
+    pooled_dims = 2  # Pool max t-stats across this dimension to correct for multiple comparisons
     nprocesses = 4  # number of parallel processing cores to use
 
     # Calculate GLM
-    P = glm.permutations.MaxStatPermutation(
+    perm = glm.permutations.MaxStatPermutation(
         des,
         data,
         contrast,
@@ -126,14 +121,13 @@ for metric in ["fo", "lt", "intv", "sr"]:
 
     # Create variables for further plotting
     tstats = model.tstats[contrast]
-    thresh = P.get_thresh([97.5, 99.5])
+    thresh = perm.get_thresh([97.5, 99.5])
     sig_mask = abs(tstats) > thresh[0]  # Mask of tstats < .05
+    nulls = perm.nulls
 
-    # Get p - two sided/undirected
-    nulls = P.nulls
-    p = [
-        (abs(tstats[:, t]) < abs(nulls)).sum() / nulls.size for t in range(tstats.size)
-    ]
+    # Get p-values - two sided/undirected
+    percentiles = stats.percentileofscore(nulls, tstats)
+    pvalues = 1 - percentiles / 100
 
     # Results for further
     mdict = {
@@ -141,9 +135,9 @@ for metric in ["fo", "lt", "intv", "sr"]:
         "thresh": thresh,
         "sig_mask": sig_mask,
         "model": model,
-        "P": P,
+        "perm": perm,
         "metric": metric,
-        "p": p,
+        "pvalues": pvalues,
     }
     pickle.dump(mdict, open(f"{summary_stats_dir}/{metric}_GroupComp_GLM.pkl", "wb"))
 
@@ -226,7 +220,7 @@ for metric in ["fo", "lt", "intv", "sr"]:
     tstats[metric] = np.squeeze(glm["tstats"])
     thresh[metric] = np.squeeze(glm["thresh"])
 
-# Plot frational occupancies
+# Plot fractional occupancies
 sns.violinplot(data=ss_df, x="State", y="Fractional Occupancy", hue="Group", split=True)
 save("plots/fo.png")
 print_significance(tstats["fo"], thresh["fo"])
