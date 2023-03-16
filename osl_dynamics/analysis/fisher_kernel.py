@@ -8,7 +8,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 class FisherKernel:
     def __init__(self, model):
-        compatible_models = ["HMM"]
+        compatible_models = ["HMM", "DyNeMo", "M-DyNeMo"]
         if model.config.model_name not in compatible_models:
             raise NotImplementedError(
                 f"{model.config.model_name} was not found."
@@ -44,51 +44,55 @@ class FisherKernel:
         for i in trange(n_subjects, desc="Getting subject features"):
             subject_data = dataset[i]
 
-            # Initialise list to hold gradients from different batches
-            # Gradients specific to HMM
-            d_initial_distribution, d_trans_prob = [], []
+            # Initialise dictionary for holding gradients
+            d_model = dict()
 
-            # Gradients wrt the observation model parameters
-            d_means, d_covariances = [], []
+            if self.model.config.model_name == "HMM":
+                d_model["d_initial_distribution"] = []
+                d_model["d_trans_prob"] = []
+
+            trainable_variable_names = [
+                var.name for var in self.model.trainable_weights
+            ]
+            for name in trainable_variable_names:
+                if (
+                    "mod" in name
+                    or "alpha" in name
+                    or "gamma" in name
+                    or "means" in name
+                    or "covs" in name
+                    or "stds" in name
+                    or "fcs" in name
+                ):
+                    d_model[name] = []
+
+            # Set means and covariances for gradients
+            self.model.set_means(means[i])
+            self.model.set_covariances(covariances[i])
 
             for data in subject_data:
-                x = data["data"]
-                gamma, xi = self.model._get_state_probs(x)
+                if self.model.config.model_name == "HMM":
+                    x = data["data"]
+                    gamma, xi = self.model._get_state_probs(x)
+                    d_model["d_initial_distribution"].append(
+                        self._d_initial_distribution(gamma)
+                    )
+                    d_model["d_trans_prob"].append(self._d_trans_prob(xi))
 
-                # Derivative wrt the temporal model parameters
-                d_initial_distribution.append(self._d_initial_distribution(gamma))
-                d_trans_prob.append(self._d_trans_prob(xi))
+                    inputs = np.concatenate(
+                        [x, gamma.reshape(x.shape[0], x.shape[1], -1)], 2
+                    )
+                else:
+                    inputs = data
 
-                # Get the gradient wrt the observation model parameters
-                self.model.set_means(means[i])
-                self.model.set_covariances(covariances[i])
-                x_and_gamma = np.concatenate(
-                    [x, gamma.reshape(x.shape[0], x.shape[1], -1)], 2
-                )
-                with tf.GradientTape() as tape:
-                    loss = self.model.model(x_and_gamma)
-                    trainable_weights = {
-                        var.name: var for var in self.model.trainable_weights
-                    }
-                    gradients = tape.gradient(loss, trainable_weights)
+                gradients = self._get_tf_gradients(inputs)
 
-                if self.model.config.learn_means:
-                    d_means.append(gradients["means/means_kernel/tensor:0"])
-                if self.model.config.learn_covariances:
-                    d_covariances.append(gradients["covs/covs_kernel/tensor:0"])
+                for name in d_model.keys():
+                    d_model[name].append(gradients[name])
 
             # Concatenate the flattened gradients to get the subject_features
             subject_features = np.concatenate(
-                [
-                    np.sum(d_initial_distribution, axis=0).flatten(),
-                    np.sum(d_trans_prob, axis=0).flatten(),
-                    np.sum(d_means, axis=0).flatten()
-                    if self.model.config.learn_means
-                    else [],
-                    np.sum(d_covariances, axis=0).flatten()
-                    if self.model.config.learn_covariances
-                    else [],
-                ]
+                [np.sum(grad, axis=0).flatten() for grad in d_model.values()]
             )
             features.append(subject_features)
 
@@ -151,3 +155,23 @@ class FisherKernel:
 
         d_initial_distribution = -gamma[0] / initial_distribution
         return d_initial_distribution
+
+    def _get_tf_gradients(self, inputs):
+        """Get the gradient with respect to means and covariances.
+
+        Parameters
+        ----------
+        inputs
+            Input to the tensorflow models.
+
+        Returns
+        -------
+        gradients : dict
+            Gradients with respect to trainable variables.
+        """
+        with tf.GradientTape() as tape:
+            loss = self.model.model(inputs)
+            trainable_weights = {var.name: var for var in self.model.trainable_weights}
+            gradients = tape.gradient(loss, trainable_weights)
+
+        return gradients
