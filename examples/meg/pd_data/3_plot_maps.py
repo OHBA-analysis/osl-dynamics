@@ -22,9 +22,7 @@ parcellation_file = "fmri_d100_parcellation_with_PCC_tighterMay15_v2_8mm.nii.gz"
 
 f = np.load(spectra_dir + "/f.npy")  # (n_freq,)
 psd = np.load(spectra_dir + "/psd.npy")  # (n_subjects, n_states, n_parcels, n_freq)
-coh = np.load(
-    spectra_dir + "coh.npy"
-)  # (n_subjects, n_states, n_parcels, n_parcels, n_freq)
+coh = np.load(spectra_dir + "/coh.npy")  # (n_subjects, n_states, n_parcels, n_parcels, n_freq)
 w = np.load(spectra_dir + "/w.npy")  # (n_subjects,)
 
 #%% Plot power spectra
