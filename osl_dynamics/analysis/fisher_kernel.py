@@ -88,6 +88,8 @@ class FisherKernel:
                 gradients = self._get_tf_gradients(inputs)
 
                 for name in d_model.keys():
+                    if name == "d_initial_distribution" or name == "d_trans_prob":
+                        continue
                     d_model[name].append(gradients[name])
 
             # Concatenate the flattened gradients to get the subject_features
