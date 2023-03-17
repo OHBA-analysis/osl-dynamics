@@ -444,6 +444,7 @@ class Model(ModelBase):
         gamma = alpha * beta
         gamma /= np.sum(gamma, axis=1, keepdims=True)
 
+        # Joint probabilities
         b = beta[1:] * B[:, 1:].T
         t = P * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
         xi = t.reshape(n_samples - 1, -1, order="F")
