@@ -1186,42 +1186,21 @@ class ConcatEmbeddingsLayer(layers.Layer):
 
     The concatenated embeddings are obtained by concatenating subject embeddings
     and mode spatial map embeddings.
-
-    Parameters
-    ----------
-    n_modes : int
-        Number of modes.
-    n_channels: int
-        Number of channels.
-    n_subjects : int
-        Number of subjects.
     """
-
-    def __init__(
-        self,
-        n_modes,
-        n_channels,
-        n_subjects,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-        self.n_subjects = n_subjects
 
     def call(self, inputs):
         subject_embeddings, mode_embeddings = inputs
-        subject_embedding_dim = subject_embeddings.shape[-1]
-        mode_embedding_dim = mode_embeddings.shape[-1]
+        n_subjects, subject_embedding_dim = subject_embeddings.shape
+        n_modes, mode_embedding_dim = mode_embeddings.shape
 
         # Match dimensions for concatenation
         subject_embeddings = tf.broadcast_to(
             tf.expand_dims(subject_embeddings, axis=1),
-            [self.n_subjects, self.n_modes, subject_embedding_dim],
+            [n_subjects, n_modes, subject_embedding_dim],
         )
         mode_embeddings = tf.broadcast_to(
             tf.expand_dims(mode_embeddings, axis=0),
-            [self.n_subjects, self.n_modes, mode_embedding_dim],
+            [n_subjects, n_modes, mode_embedding_dim],
         )
 
         # Concatenate the embeddings

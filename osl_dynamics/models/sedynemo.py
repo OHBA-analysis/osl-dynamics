@@ -476,9 +476,6 @@ def _model_structure(config):
             name="means_mode_embeddings",
         )
         means_concat_embeddings_layer = ConcatEmbeddingsLayer(
-            config.n_modes,
-            config.n_channels,
-            config.n_subjects,
             name="means_concat_embeddings",
         )
 
@@ -564,9 +561,6 @@ def _model_structure(config):
             name="covs_mode_embeddings",
         )
         covs_concat_embeddings_layer = ConcatEmbeddingsLayer(
-            config.n_modes,
-            config.n_channels,
-            config.n_subjects,
             name="covs_concat_embeddings",
         )
 
