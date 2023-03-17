@@ -405,8 +405,16 @@ class VectorsLayer(layers.Layer):
     ):
         super().__init__(**kwargs)
 
-        # Set initializer and initial value
-        if initial_value is None:
+        if initial_value is not None:
+            # Check initial_value is the correct shape
+            if initial_value.shape != (n, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}).")
+            initial_value = initial_value.astype("float32")
+
+            # We don't need an initializer
+            initializer = None
+        else:
+            # No initial value has been passed, set the initializer
             if learn:
                 initializer = initializers.TruncatedNormal(mean=0, stddev=0.02)
             else:
@@ -479,6 +487,9 @@ class CovarianceMatricesLayer(layers.Layer):
             # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
+
+            # We don't need an initializer
+            initializer = None
         else:
             # No initial value has been passed
             initial_flattened_cholesky_factors = None
@@ -563,6 +574,9 @@ class CorrelationMatricesLayer(layers.Layer):
             # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
+
+            # We don't need an initializer
+            initializer = None
         else:
             # No initial value has been passed
             initial_flattened_cholesky_factors = None
@@ -649,6 +663,9 @@ class DiagonalMatricesLayer(layers.Layer):
             # Calculate the initial value of the learnable tensor
             initial_value = initial_value.astype("float32")
             initial_diagonals = self.bijector.inverse(initial_value)
+
+            # We don't need an initializer
+            initializer = None
         else:
             # No initial value has been passed
             initial_diagonals = None
