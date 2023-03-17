@@ -326,7 +326,7 @@ def _model_structure(config):
             name="means_dev_map_input",
         )
         means_dev_map_layer = layers.Dense(config.n_channels, name="means_dev_map")
-        norm_means_dev_map_layer = StandardizationLayer(
+        norm_means_dev_map_layer = layers.LayerNormalization(
             axis=-1, name="norm_means_dev_map"
         )
 
@@ -415,7 +415,7 @@ def _model_structure(config):
         covs_dev_map_layer = layers.Dense(
             config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_map"
         )
-        norm_covs_dev_map_layer = StandardizationLayer(
+        norm_covs_dev_map_layer = layers.LayerNormalization(
             axis=-1, name="norm_covs_dev_map"
         )
 
