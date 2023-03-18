@@ -46,6 +46,10 @@ class Data:
         If a MATLAB (.mat) file is passed, this is the field that corresponds to the
         time series data. By default we read the field 'X'. If a numpy (.npy) file is
         passed, this is ignored. This argument is optional.
+    reject_by_annotation : str
+        If a fif file is passed we load the data using the MNE object's get_data()
+        method. If the fif file contains a mne.Raw object, we pass this argument to
+        the get_data() method.
     sampling_frequency : float
         Sampling frequency of the data in Hz.  This argument is optional.
     store_dir : str
@@ -73,6 +77,7 @@ class Data:
         self,
         inputs,
         data_field="X",
+        reject_by_annotation="omit",
         sampling_frequency=None,
         store_dir="tmp",
         n_embeddings=None,
@@ -82,6 +87,7 @@ class Data:
     ):
         self._identifier = id(self)
         self.data_field = data_field
+        self.reject_by_annotation = reject_by_annotation
         self.sampling_frequency = sampling_frequency
         self.n_embeddings = n_embeddings
         self.time_axis_first = time_axis_first
@@ -257,7 +263,11 @@ class Data:
         if not self.load_memmaps:  # do not load into the memory maps
             mmap_location = None
         raw_data_mmap = rw.load_data(
-            raw_data, self.data_field, mmap_location, mmap_mode="r"
+            raw_data,
+            self.data_field,
+            self.reject_by_annotation,
+            mmap_location,
+            mmap_mode="r",
         )
         if not self.time_axis_first:
             raw_data_mmap = raw_data_mmap.T
