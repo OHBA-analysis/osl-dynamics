@@ -76,6 +76,14 @@ def run_pipeline(config, inputs, savedir="./"):
         e = ValueError("Multiple models are specified in the config. Please pass one.")
         _logger.error(e)
 
+    # See if we pass parameters related to initialisation (n_init, n_init_epochs)
+    n_init = config["hmm"].pop("n_init", None)
+    n_init_epochs = config["hmm"].pop("n_init_epochs", None)
+    if n_init is not None and n_init_epochs is None:
+        n_init_epochs = 1
+    if n_init_epochs is not None and n_init is None:
+        n_init = 1
+
     if "multitaper_spectra" in config and "regression_spectra" in config:
         e = ValueError("Please only specify one spectra section.")
         _logger.error(e)
@@ -108,8 +116,15 @@ def run_pipeline(config, inputs, savedir="./"):
 
     model_config = module_files[model_name].Config
     model_class = module_files[model_name].Model
+    config[model_name]["n_channels"] = training_data.n_channels
     model = model_class(model_config(**config[model_name]))
     model.summary()
+
+    # Initialisation
+    if n_init is not None and model_name == "hmm":
+        model.random_state_time_course_initialization(
+            training_data, n_init_epochs, n_init
+        )
 
     # Train the model
     _logger.info("Training model")
@@ -119,10 +134,13 @@ def run_pipeline(config, inputs, savedir="./"):
     trained_model_dir = savedir + "/trained_model"
     _logger.info(f"Saving model to: {trained_model_dir}")
     model.save(trained_model_dir)
+
+    # Save the free energy and training history
+    free_energy = model.free_energy(training_data)
+    history["free_energy"] = free_energy
     pickle.dump(history, open(trained_model_dir + "/history.pkl", "wb"))
 
     # Get inferred parameters
-    _logger.info("Getting inferred parameters")
     alpha = model.get_alpha(training_data)
     means, covs = model.get_means_covariances()
 
@@ -141,7 +159,7 @@ def run_pipeline(config, inputs, savedir="./"):
         )  # moved inside the function for fast imports
 
         # Use unprepared data to calculate the spectra
-        data = model.get_training_time_series(training_data, prepared=True)
+        data = model.get_training_time_series(training_data, prepared=False)
 
         spectra_functions = {
             "multitaper_spectra": spectral.multitaper_spectra,
@@ -149,7 +167,6 @@ def run_pipeline(config, inputs, savedir="./"):
         }
 
         # Calculate spectra
-        _logger.info(f"Calculating {spectra_name.replace('_', ' ')}")
         f, psd, coh, w = spectra_functions[spectra_name](
             data, alpha, return_weights=True, **config[spectra_name]
         )
