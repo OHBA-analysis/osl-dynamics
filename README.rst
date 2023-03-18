@@ -28,12 +28,7 @@ Developers might want to clone the repo using SSH instead of HTTPS:
 Oxford specific computers
 -------------------------
 
-If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``. Note, if you want to install spyder on hbaws, you can install this with:
-
-.. code-block:: shell
-
-    conda activate osld
-    pip install spyder==5.1.5
+If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``. Note, the ``hbaws.yml`` environment will automatically install spyder and jupyter notebooks.
 
 Installing within an osl environment
 ------------------------------------
