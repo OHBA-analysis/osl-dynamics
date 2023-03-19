@@ -111,7 +111,8 @@ def list_dir(path, keep_ext=None):
 def load_data(
     data,
     data_field="X",
-    reject_by_annotation="omit",
+    picks=None,
+    reject_by_annotation=None,
     mmap_location=None,
     mmap_mode="r+",
 ):
@@ -126,9 +127,11 @@ def load_data(
     data_field : str
         If a MATLAB filename is passed, this is the field that corresponds to
         the data.
+    picks : str or list of str
+        Argument passed to mne.Raw.get_data() or mne.Epochs.get_data().
+        Only used if a fif file is passed.
     reject_by_annotation : str
-        Argument passed to mne.Raw.get_data(). Only used if a fif file
-        is passed.
+        Argument passed to mne.Raw.get_data(). Only used if a fif file is passed.
     mmap_location : str
         Filename to save the data as a numpy memory map.
     mmap_mode : str
@@ -190,7 +193,7 @@ def load_data(
 
         # Load a fif file
         elif ext == ".fif":
-            data = load_fif(data, reject_by_annotation)
+            data = load_fif(data, picks, reject_by_annotation)
             data = data.astype(np.float32)
             if mmap_location is None:
                 return data
@@ -205,36 +208,38 @@ def load_data(
     return data
 
 
-def load_fif(filename, reject_by_annotation=None):
+def load_fif(filename, picks=None, reject_by_annotation=None):
     """Load a fif file.
 
     Parameters
     ----------
     filename : str
-        Path to fif file. Must end with '-raw.fif' or '-epo.fif'.
+        Path to fif file. Must end with 'raw.fif' or 'epo.fif'.
+    picks : str or list of str
+        Argument passed to mne.Raw.get_data() or mne.Epochs.get_data().
     reject_by_annotation : str
-        Argument passed to mne.Raw.get_data() if filename contains
-        '-raw.fif'.
+        Argument passed to mne.Raw.get_data() if filename contains 'raw.fif'.
 
     Returns
     -------
     data : np.ndarray
         Time series data in format (n_samples, n_channels).
-        If an mne.Epochs fif file is pass ('-epo.fif') the we
+        If an mne.Epochs fif file is pass ('epo.fif') the we
         concatenate the epochs in the first axis.
     """
     if "raw.fif" in filename:
         raw = mne.io.read_raw_fif(filename, verbose=False)
         data = raw.get_data(
+            picks=picks,
             reject_by_annotation=reject_by_annotation,
             verbose=False,
         ).T
     elif "epo.fif" in filename:
         epochs = mne.read_epochs(filename, verbose=False)
-        data = epochs.get_data()
+        data = epochs.get_data(picks=picks)
         data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
     else:
-        raise ValueError(f"a fif file must end with '-raw.fif' or '-epo.fif'.")
+        raise ValueError(f"a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
 
 
