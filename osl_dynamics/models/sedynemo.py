@@ -1,4 +1,4 @@
-"""Directional Subject Embedding DyNeMo.
+"""Subject Embedding DyNeMo.
 """
 from dataclasses import dataclass
 from typing import Literal
@@ -35,7 +35,6 @@ from osl_dynamics.inference.layers import (
     InverseCholeskyLayer,
     StaticKLDivergenceLayer,
     MultiLayerPerceptronLayer,
-    StandardizationLayer,
     LearnableTensorLayer,
 )
 
@@ -278,8 +277,15 @@ class Model(VariationalInferenceModelBase):
         """
         return sedynemo_obs.get_subject_embeddings(self.model)
 
-    def get_subject_means_covariances(self):
-        """Get the means and covariances for each subject
+    def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
+        """Get the means and covariances for each subject.
+
+        Parameters
+        ----------
+        subject_embeddings : np.ndarray
+            Input embedding vectors for subjects. Shape is (n_subjects, subject_embeddings_dim).
+        n_neighbours : int
+            Number of nearest neighbours. Ignored if subject_embedding=None.
 
         Returns
         -------
@@ -289,7 +295,11 @@ class Model(VariationalInferenceModelBase):
             Mode covariances for each subject. Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
         return sedynemo_obs.get_subject_means_covs(
-            self.model, self.config.learn_means, self.config.learn_covariances
+            self.model,
+            self.config.learn_means,
+            self.config.learn_covariances,
+            subject_embeddings,
+            n_neighbours,
         )
 
     def set_regularizers(self, training_dataset):

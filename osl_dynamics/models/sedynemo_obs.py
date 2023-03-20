@@ -27,7 +27,6 @@ from osl_dynamics.inference.layers import (
     StaticKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
-    StandardizationLayer,
 )
 
 
@@ -185,8 +184,15 @@ class Model(ModelBase):
         """
         return get_subject_embeddings(self.model)
 
-    def get_subject_means_covariances(self):
-        """Get the means and covariances for each subject
+    def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
+        """Get the means and covariances for each subject.
+
+        Parameters
+        ----------
+        subject_embeddings : np.ndarray
+            Input embedding vectors for subjects. Shape is (n_subjects, subject_embeddings_dim).
+        n_neighbours : int
+            Number of nearest neighbours. Ignored if subject_embedding=None.
 
         Returns
         -------
@@ -196,7 +202,11 @@ class Model(ModelBase):
             Mode covariances for each subject. Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
         return get_subject_means_covs(
-            self.model, self.config.learn_means, self.config.learn_covariances
+            self.model,
+            self.config.learn_means,
+            self.config.learn_covariances,
+            subject_embeddings,
+            n_neighbours,
         )
 
     def set_regularizers(self, training_dataset):
@@ -613,14 +623,138 @@ def get_subject_embeddings(model):
     return subject_embeddings_layer(np.arange(n_subjects)).numpy()
 
 
-def get_means_mode_embeddings(model):
+def get_mode_embeddings(model, map):
+    """Wrapper for getting the mode embeddings for the means and covariances."""
+    if map == "means":
+        return _get_means_mode_embeddings(model)
+    elif map == "covs":
+        return _get_covs_mode_embeddings(model)
+    else:
+        raise ValueError("map must be either 'means' or 'covs'")
+
+
+def get_concatenated_embeddings(model, map, subject_embeddings=None):
+    """Getting the concatenated embeddings for the means and covariances."""
+    if subject_embeddings is None:
+        subject_embeddings = get_subject_embeddings(model)
+    if map == "means":
+        mode_embeddings = _get_means_mode_embeddings(model)
+        concat_embeddings_layer = model.get_layer("means_concat_embeddings")
+    elif map == "covs":
+        mode_embeddings = _get_covs_mode_embeddings(model)
+        concat_embeddings_layer = model.get_layer("covs_concat_embeddings")
+    else:
+        raise ValueError("map must be either 'means' or 'covs'")
+    concat_embeddings = concat_embeddings_layer([subject_embeddings, mode_embeddings])
+    return concat_embeddings.numpy()
+
+
+def get_dev_mag_parameters(model, map):
+    """Wrapper for getting the deviance magnitude parameters
+    for the means and covariances."""
+    if map == "means":
+        return _get_means_dev_mag_parameters(model)
+    elif map == "covs":
+        return _get_covs_dev_mag_parameters(model)
+    else:
+        raise ValueError("map must be either 'means' or 'covs'")
+
+
+def get_dev_mag(model, map):
+    """Getting the deviance magnitude for the means and covariances."""
+    if map == "means":
+        alpha, beta = _get_means_dev_mag_parameters(model)
+        dev_mag_layer = model.get_layer("means_dev_mag")
+    elif map == "covs":
+        alpha, beta = _get_covs_dev_mag_parameters(model)
+        dev_mag_layer = model.get_layer("covs_dev_mag")
+    else:
+        raise ValueError("map must be either 'means' or 'covs'")
+    dev_mag = dev_mag_layer([alpha, beta])
+    return dev_mag.numpy()
+
+
+def get_dev_map(model, map, subject_embeddings=None):
+    """Getting the deviance map for the means and covariances."""
+    concat_embeddings = get_concatenated_embeddings(model, map, subject_embeddings)
+    if map == "means":
+        dev_map_input_layer = model.get_layer("means_dev_map_input")
+        dev_map_layer = model.get_layer("means_dev_map")
+        norm_dev_map_layer = model.get_layer("norm_means_dev_map")
+    elif map == "covs":
+        dev_map_input_layer = model.get_layer("covs_dev_map_input")
+        dev_map_layer = model.get_layer("covs_dev_map")
+        norm_dev_map_layer = model.get_layer("norm_covs_dev_map")
+    else:
+        raise ValueError("map must be either 'means' or 'covs'")
+    dev_map_input = dev_map_input_layer(concat_embeddings)
+    dev_map = dev_map_layer(dev_map_input)
+    norm_dev_map = norm_dev_map_layer(dev_map)
+    return norm_dev_map.numpy()
+
+
+def get_subject_dev(
+    model, learn_means, learn_covariances, subject_embeddings=None, n_neighbours=2
+):
+    means_dev_layer = model.get_layer("means_dev")
+    covs_dev_layer = model.get_layer("covs_dev")
+
+    if subject_embeddings is not None:
+        nearest_neighbours = get_nearest_neighbours(
+            model, subject_embeddings, n_neighbours
+        )
+
+    if learn_means:
+        means_dev_mag = get_dev_mag(model, "means")
+        if subject_embeddings is not None:
+            means_dev_mag = np.mean(
+                tf.gather(means_dev_mag, nearest_neighbours, axis=0),
+                axis=1,
+            )
+        means_dev_map = get_dev_map(model, "means", subject_embeddings)
+        means_dev = means_dev_layer([means_dev_mag, means_dev_map])
+    else:
+        means_dev = means_dev_layer(1)
+
+    if learn_covariances:
+        covs_dev_mag = get_dev_mag(model, "covs")
+        if subject_embeddings is not None:
+            covs_dev_mag = np.mean(
+                tf.gather(covs_dev_mag, nearest_neighbours, axis=0),
+                axis=1,
+            )
+        covs_dev_map = get_dev_map(model, "covs", subject_embeddings)
+        covs_dev = covs_dev_layer([covs_dev_mag, covs_dev_map])
+    else:
+        covs_dev = covs_dev_layer(1)
+
+    return means_dev.numpy(), covs_dev.numpy()
+
+
+def get_subject_means_covs(
+    model, learn_means, learn_covariances, subject_embeddings=None, n_neighbours=2
+):
+    group_means, group_covs = get_group_means_covs(model)
+    means_dev, covs_dev = get_subject_dev(
+        model, learn_means, learn_covariances, subject_embeddings, n_neighbours
+    )
+
+    subject_means_layer = model.get_layer("subject_means")
+    subject_covs_layer = model.get_layer("subject_covs")
+
+    mu = subject_means_layer([group_means, means_dev])
+    D = subject_covs_layer([group_covs, covs_dev])
+    return mu.numpy(), D.numpy()
+
+
+def _get_means_mode_embeddings(model):
     group_means, _ = get_group_means_covs(model)
     means_mode_embeddings_layer = model.get_layer("means_mode_embeddings")
     means_mode_embeddings = means_mode_embeddings_layer(group_means)
     return means_mode_embeddings.numpy()
 
 
-def get_covs_mode_embeddings(model):
+def _get_covs_mode_embeddings(model):
     cholesky_bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
     _, group_covs = get_group_means_covs(model)
     covs_mode_embeddings_layer = model.get_layer("covs_mode_embeddings")
@@ -630,27 +764,7 @@ def get_covs_mode_embeddings(model):
     return covs_mode_embeddings.numpy()
 
 
-def get_means_concatenated_embeddings(model):
-    subject_embeddings = get_subject_embeddings(model)
-    means_mode_embeddings = get_means_mode_embeddings(model)
-    means_concat_embeddings_layer = model.get_layer("means_concat_embeddings")
-    means_concat_embeddings = means_concat_embeddings_layer(
-        [subject_embeddings, means_mode_embeddings]
-    )
-    return means_concat_embeddings.numpy()
-
-
-def get_covs_concatenated_embeddings(model):
-    subject_embeddings = get_subject_embeddings(model)
-    covs_mode_embeddings = get_covs_mode_embeddings(model)
-    covs_concat_embeddings_layer = model.get_layer("covs_concat_embeddings")
-    covs_concat_embeddings = covs_concat_embeddings_layer(
-        [subject_embeddings, covs_mode_embeddings]
-    )
-    return covs_concat_embeddings.numpy()
-
-
-def get_means_dev_mag_parameters(model):
+def _get_means_dev_mag_parameters(model):
     means_dev_mag_inf_alpha_input_layer = model.get_layer(
         "means_dev_mag_inf_alpha_input"
     )
@@ -668,7 +782,7 @@ def get_means_dev_mag_parameters(model):
     return means_dev_mag_inf_alpha.numpy(), means_dev_mag_inf_beta.numpy()
 
 
-def get_covs_dev_mag_parameters(model):
+def _get_covs_dev_mag_parameters(model):
     covs_dev_mag_inf_alpha_input_layer = model.get_layer("covs_dev_mag_inf_alpha_input")
     covs_dev_mag_inf_alpha_layer = model.get_layer("covs_dev_mag_inf_alpha")
     covs_dev_mag_inf_beta_input_layer = model.get_layer("covs_dev_mag_inf_beta_input")
@@ -682,82 +796,6 @@ def get_covs_dev_mag_parameters(model):
     return covs_dev_mag_inf_alpha.numpy(), covs_dev_mag_inf_beta.numpy()
 
 
-def get_means_dev_mag(model):
-    means_dev_mag_inf_alpha, means_dev_mag_inf_beta = get_means_dev_mag_parameters(
-        model
-    )
-    means_dev_mag_layer = model.get_layer("means_dev_mag")
-    means_dev_mag = means_dev_mag_layer(
-        [means_dev_mag_inf_alpha, means_dev_mag_inf_beta]
-    )
-    return means_dev_mag.numpy()
-
-
-def get_covs_dev_mag(model):
-    covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta = get_covs_dev_mag_parameters(model)
-    covs_dev_mag_layer = model.get_layer("covs_dev_mag")
-    covs_dev_mag = covs_dev_mag_layer([covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta])
-    return covs_dev_mag.numpy()
-
-
-def get_means_dev_map(model):
-    means_concat_embeddings = get_means_concatenated_embeddings(model)
-
-    means_dev_map_input_layer = model.get_layer("means_dev_map_input")
-    means_dev_map_layer = model.get_layer("means_dev_map")
-    norm_means_dev_map_layer = model.get_layer("norm_means_dev_map")
-
-    means_dev_map_input = means_dev_map_input_layer(means_concat_embeddings)
-    means_dev_map = means_dev_map_layer(means_dev_map_input)
-    norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
-    return norm_means_dev_map.numpy()
-
-
-def get_covs_dev_map(model):
-    covs_concat_embeddings = get_covs_concatenated_embeddings(model)
-
-    covs_dev_map_input_layer = model.get_layer("covs_dev_map_input")
-    covs_dev_map_layer = model.get_layer("covs_dev_map")
-    norm_covs_dev_map_layer = model.get_layer("norm_covs_dev_map")
-
-    covs_dev_map_input = covs_dev_map_input_layer(covs_concat_embeddings)
-    covs_dev_map = covs_dev_map_layer(covs_dev_map_input)
-    norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
-    return norm_covs_dev_map.numpy()
-
-
-def get_subject_dev(model, learn_means, learn_covariances):
-    means_dev_layer = model.get_layer("means_dev")
-    covs_dev_layer = model.get_layer("covs_dev")
-    if learn_means:
-        means_dev_mag = get_means_dev_mag(model)
-        means_dev_map = get_means_dev_map(model)
-        means_dev = means_dev_layer([means_dev_mag, means_dev_map])
-    else:
-        means_dev = means_dev_layer(1)
-
-    if learn_covariances:
-        covs_dev_mag = get_covs_dev_mag(model)
-        covs_dev_map = get_covs_dev_map(model)
-        covs_dev = covs_dev_layer([covs_dev_mag, covs_dev_map])
-    else:
-        covs_dev = covs_dev_layer(1)
-
-    return means_dev.numpy(), covs_dev.numpy()
-
-
-def get_subject_means_covs(model, learn_means, learn_covariances):
-    group_means, group_covs = get_group_means_covs(model)
-    means_dev, covs_dev = get_subject_dev(model, learn_means, learn_covariances)
-
-    subject_means_layer = model.get_layer("subject_means")
-    subject_covs_layer = model.get_layer("subject_covs")
-
-    mu = subject_means_layer([group_means, means_dev])
-    D = subject_covs_layer([group_covs, covs_dev])
-    return mu.numpy(), D.numpy()
-
-
 def set_bayesian_kl_scaling(model, n_batches, learn_means, learn_covariances):
     if learn_means:
         means_dev_mag_kl_loss_layer = model.get_layer("means_dev_mag_kl_loss")
@@ -766,3 +804,18 @@ def set_bayesian_kl_scaling(model, n_batches, learn_means, learn_covariances):
     if learn_covariances:
         covs_dev_mag_kl_loss_layer = model.get_layer("covs_dev_mag_kl_loss")
         covs_dev_mag_kl_loss_layer.n_batches = n_batches
+
+
+def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
+    """Get nearest neighbours for each subject in the embedding space."""
+    model_subject_embeddings = get_subject_embeddings(model)
+    distances = np.linalg.norm(
+        np.expand_dims(subject_embeddings, axis=1)
+        - np.expand_dims(model_subject_embeddings, axis=0),
+        axis=-1,
+    )
+
+    # Sort distances and get indices of nearest neighbours
+    sorted_distances = np.argsort(distances, axis=1)
+    nearest_neighbours = sorted_distances[:, :n_neighbours]
+    return nearest_neighbours

@@ -1282,8 +1282,8 @@ class MixSubjectSpecificParametersLayer(layers.Layer):
 
 
 class StaticKLDivergenceLayer(layers.Layer):
-    """Layer to calculate KL divergence between posterior and prior
-    for static parameters
+    """Layer to calculate KL divergence between Gamma posterior
+    and exponential prior for static parameters.
 
     Parameters
     ----------
@@ -1364,23 +1364,3 @@ class MultiLayerPerceptronLayer(layers.Layer):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
-
-
-class StandardizationLayer(layers.Layer):
-    """Layer to standardize input tensor along a given axis.
-
-    Parameters
-    ----------
-    axis : int
-        Axis along which to perform standardization.
-    """
-
-    def __init__(self, axis, **kwargs):
-        super().__init__(**kwargs)
-        self.axis = axis
-
-    def call(self, inputs, **kwargs):
-        l2_norm = tf.math.sqrt(
-            tf.math.reduce_sum(tf.math.square(inputs), axis=self.axis, keepdims=True)
-        )
-        return inputs / l2_norm
