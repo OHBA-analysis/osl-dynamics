@@ -126,19 +126,6 @@ class NormalDiagonalInitializer(Initializer):
         return self.bijector.inverse(diagonals)
 
 
-class SoftplusNormalInitializer(Initializer):
-    def __init__(self, mean=0, std=1):
-        self.mean = mean
-        self.std = std
-        self.bijector = tfb.Softplus()
-
-    def __call__(self, shape, dtype=None):
-        x = initializers.TruncatedNormal(mean=self.mean, stddev=self.std).__call__(
-            shape=shape, dtype=tf.float32
-        )
-        return self.bijector(x)
-
-
 class CopyTensorInitializer(Initializer):
     """Initialize weights to another Tensor's value.
 
