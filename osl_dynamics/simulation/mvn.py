@@ -143,7 +143,6 @@ class MVN:
 
         # Loop through all unique combinations of modes
         for alpha in np.unique(state_time_course, axis=0):
-
             # Mean and covariance for this combination of modes
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
             sigma = np.sum(self.covariances * alpha[:, np.newaxis, np.newaxis], axis=0)
@@ -244,7 +243,6 @@ class MDyn_MVN(MVN):
 
         # Loop through all unique combinations of states
         for time_courses in np.unique(state_time_courses, axis=0):
-
             # Extract the different time courses
             alpha = time_courses[:, 0]
             gamma = time_courses[:, 1]
@@ -331,7 +329,6 @@ class MSubj_MVN(MVN):
         observation_error=0.0,
         random_seed=None,
     ):
-
         self._rng = np.random.default_rng(random_seed)
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
@@ -625,7 +622,6 @@ class MSubj_MVN(MVN):
 
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
-
             # Mean and covariance for this combination of modes
             mu = np.sum(self.subject_means[subject] * alpha[:, None], axis=0)
             sigma = np.sum(

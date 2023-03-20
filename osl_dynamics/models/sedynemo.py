@@ -404,7 +404,6 @@ class Model(VariationalInferenceModelBase):
 
 
 def _model_structure(config):
-
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
     subj_id = layers.Input(shape=(config.sequence_length,), name="subj_id")

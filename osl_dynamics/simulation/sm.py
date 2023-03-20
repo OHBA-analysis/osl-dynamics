@@ -58,7 +58,6 @@ class MixedSine:
         self._rng = np.random.default_rng(random_seed)
 
     def generate_modes(self, n_samples):
-
         # Simulate a random initial phase for each sinusoid
         self.phases = self._rng.uniform(0, 2 * np.pi, self.n_modes)
 

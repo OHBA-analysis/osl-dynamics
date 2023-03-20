@@ -194,7 +194,6 @@ class Model(ModelBase):
 
 
 def _model_structure(config):
-
     # Layers for inputs
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
     alpha = layers.Input(shape=(config.sequence_length, config.n_modes), name="alpha")

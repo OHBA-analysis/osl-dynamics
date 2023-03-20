@@ -39,7 +39,6 @@ class HMM:
         n_states=None,
         random_seed=None,
     ):
-
         if isinstance(trans_prob, list):
             trans_prob = np.ndarray(trans_prob)
 
