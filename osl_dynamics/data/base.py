@@ -33,8 +33,8 @@ class Data:
     inputs : list of str or str or np.ndarray
         - A path to a directory containing .npy files.
           Each .npy file should be a subject or session.
-        - A list of paths to .npy or .mat files. Each file should be a subject or
-          session.
+        - A list of paths to .npy, .mat or .fif files. Each file should be a subject
+          or session. If a .fif file is passed is must end with 'raw.fif' or 'epo.fif'.
         - A numpy array. The array will be treated as continuous data from the
           same subject.
         - A list of numpy arrays. Each numpy array should be the data for a subject
@@ -46,8 +46,20 @@ class Data:
         If a MATLAB (.mat) file is passed, this is the field that corresponds to the
         time series data. By default we read the field 'X'. If a numpy (.npy) file is
         passed, this is ignored. This argument is optional.
+    picks : str or list of str
+        If a fif file is passed we load the data using the MNE object's get_data()
+        method. We pass this argument to the get_data() method. See the
+        `MNE docs <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw.get_data>`_
+        for further details. This argument is optional. By default picks=None retrieves
+        all channel types.
+    reject_by_annotation : str
+        If a fif file is passed we load the data using the MNE object's get_data()
+        method. If the fif file contains a mne.Raw object, we pass this argument to
+        the get_data() method. This argument is optional. By default
+        reject_by_annotation=None retrieves all time points. Use
+        reject_by_annotation="omit" to remove segments marked as bad.
     sampling_frequency : float
-        Sampling frequency of the data in Hz.  This argument is optional.
+        Sampling frequency of the data in Hz. This argument is optional.
     store_dir : str
         We don't read all the data into memory. Instead we create store them on
         disk and create memmaps (unless load_memmaps=False is passed).
@@ -73,6 +85,8 @@ class Data:
         self,
         inputs,
         data_field="X",
+        picks=None,
+        reject_by_annotation=None,
         sampling_frequency=None,
         store_dir="tmp",
         n_embeddings=None,
@@ -82,6 +96,8 @@ class Data:
     ):
         self._identifier = id(self)
         self.data_field = data_field
+        self.picks = picks
+        self.reject_by_annotation = reject_by_annotation
         self.sampling_frequency = sampling_frequency
         self.n_embeddings = n_embeddings
         self.time_axis_first = time_axis_first
@@ -257,7 +273,12 @@ class Data:
         if not self.load_memmaps:  # do not load into the memory maps
             mmap_location = None
         raw_data_mmap = rw.load_data(
-            raw_data, self.data_field, mmap_location, mmap_mode="r"
+            raw_data,
+            self.data_field,
+            self.picks,
+            self.reject_by_annotation,
+            mmap_location,
+            mmap_mode="r",
         )
         if not self.time_axis_first:
             raw_data_mmap = raw_data_mmap.T
@@ -319,8 +340,16 @@ class Data:
                 + "Data(..., sampling_frequency=...) when creating the Data object."
             )
 
+        # Save settings
+        self.amplitude_envelope = False
         self.low_freq = low_freq
         self.high_freq = high_freq
+        self.n_window = 1
+        self.n_embeddings = 1
+        self.n_te_channels = self.n_raw_data_channels
+        self.n_pca_components = None
+        self.pca_components = None
+        self.whiten = None
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()

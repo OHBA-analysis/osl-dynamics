@@ -13,6 +13,7 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from scipy.special import xlogy, logsumexp
 from numba.core.errors import NumbaWarning
 from tensorflow.keras import backend, layers, utils
 
@@ -149,7 +150,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, take=1, **kwargs):
+    def fit(self, dataset, epochs=None, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -164,8 +165,6 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
-        take : float
-            Fraction of total batches to take.
         kwargs : keyword arguments
             Keyword arguments for the TensorFlow observation model training.
             These keywords arguments will be passed to self.model.fit().
@@ -181,30 +180,11 @@ class Model(ModelBase):
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
-        if take != 1:
-            # Print a message stating how many batches we'll use
-            n_total_batches = dtf.get_n_batches(dataset)
-            n_batches = max(round(n_total_batches * take), 1)
-            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
-
         history = {"loss": [], "rho": [], "lr": []}
         for n in range(epochs):
-            if n == epochs - 1:
-                # If it's the last epoch, we train on the full dataset
-                take = 1
-
-            # Get the training data for this epoch
-            if take != 1:
-                dataset.shuffle(100000)
-                n_batches = max(round(n_total_batches * take), 1)
-                data_subset = dataset.take(n_batches)
-            else:
-                data_subset = dataset
-
             # Setup a progress bar
-            # TODO: Can this be tqdm or logging?
             print("Epoch {}/{}".format(n + 1, epochs))
-            pb_i = utils.Progbar(len(data_subset))
+            pb_i = utils.Progbar(len(dataset))
 
             # Update rho
             self._update_rho(n)
@@ -217,7 +197,7 @@ class Model(ModelBase):
 
             # Loop over batches
             loss = []
-            for data in data_subset:
+            for data in dataset:
                 x = data["data"]
 
                 # Update state probabilities
@@ -232,8 +212,8 @@ class Model(ModelBase):
                 gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
 
                 # Update observation model
-                training_data = np.concatenate([x, gamma], axis=2)
-                h = self.model.fit(training_data, epochs=1, verbose=0, **kwargs)
+                x_and_gamma = np.concatenate([x, gamma], axis=2)
+                h = self.model.fit(x_and_gamma, epochs=1, verbose=0, **kwargs)
 
                 l = h.history["loss"][0]
                 if np.isnan(l):
@@ -281,10 +261,10 @@ class Model(ModelBase):
             )
             return
 
-        _logger.info("Random subset initialization:")
+        _logger.info("Random subset initialization")
 
         # Make a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+        training_data = self.make_dataset(training_data, concatenate=True)
 
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_data)
@@ -293,12 +273,10 @@ class Model(ModelBase):
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
-        # TODO: This can be done with tqdm. Option to use leave=False.
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data.shuffle(100000)
-            training_data_subset = training_data.take(n_batches)
+            training_data_subset = training_data.shuffle(100000).take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -315,7 +293,6 @@ class Model(ModelBase):
             return
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.reset()
         self.set_weights(best_weights, best_trans_prob)
 
         return best_history
@@ -353,12 +330,10 @@ class Model(ModelBase):
             )
             return
 
-        _logger.info("Random state time course initialization:")
+        _logger.info("Random state time course initialization")
 
         # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
-        )
+        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_dataset)
@@ -367,13 +342,11 @@ class Model(ModelBase):
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
-        # TODO: This can be done with tqdm. Option to use leave=False.
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            self.set_random_state_time_course_initialization(training_dataset)
-            training_dataset.shuffle(100000)
-            training_data_subset = training_dataset.take(n_batches)
+            training_data_subset = training_dataset.shuffle(100000).take(n_batches)
+            self.set_random_state_time_course_initialization(training_data_subset)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -390,7 +363,6 @@ class Model(ModelBase):
             return
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.reset()
         self.set_weights(best_weights, best_trans_prob)
 
         return best_history
@@ -402,14 +374,15 @@ class Model(ModelBase):
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
+
         Returns
         -------
         gamma : np.ndarray
-            Probability of hidden state given data.
+            Marginal posterior distribution of hidden states given the data, q(s_t).
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states, n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
         """
 
         # Use Baum-Welch algorithm to calculate gamma, xi
@@ -438,10 +411,11 @@ class Model(ModelBase):
         Returns
         -------
         gamma : np.ndarray
-            Probability of hidden state given data. Shape is (n_samples, n_states).
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (n_samples, n_states).
         xi : np.ndarray
-            Probability of hidden state given child and parent states, given data.
-            Shape is (n_samples - 1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (n_samples-1, n_states*n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -470,6 +444,7 @@ class Model(ModelBase):
         gamma = alpha * beta
         gamma /= np.sum(gamma, axis=1, keepdims=True)
 
+        # Joint probabilities
         b = beta[1:] * B[:, 1:].T
         t = P * np.expand_dims(alpha[:-1], axis=2) * np.expand_dims(b, axis=1)
         xi = t.reshape(n_samples - 1, -1, order="F")
@@ -478,7 +453,7 @@ class Model(ModelBase):
         return gamma, xi
 
     def _get_likelihood(self, x):
-        """Get likelihood time series.
+        """Get the likelihood, p(x_t | s_t).
 
         Parameters
         ----------
@@ -488,27 +463,26 @@ class Model(ModelBase):
         Returns
         -------
         likelihood : np.ndarray
-            Likelihood time series. Shape is (n_states, batch_size*sequence_length).
+            Likelihood. Shape is (n_states, batch_size*sequence_length).
         """
-
         # Get the current observation model parameters
         means, covs = self.get_means_covariances()
 
         n_states = means.shape[0]
         batch_size = x.shape[0]
         sequence_length = x.shape[1]
-        n_samples = batch_size * sequence_length
 
         # Calculate the log-likelihood for each state to have generated the
         # observed data
-        log_likelihood = np.empty([n_states, n_samples])
+        log_likelihood = np.empty([n_states, batch_size, sequence_length])
         for state in range(n_states):
             mvn = tfp.distributions.MultivariateNormalTriL(
                 loc=means[state],
                 scale_tril=tf.linalg.cholesky(covs[state]),
                 allow_nan_stats=False,
             )
-            log_likelihood[state] = np.reshape(mvn.log_prob(x), n_samples)
+            log_likelihood[state] = mvn.log_prob(x)
+        log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
 
         # We add a constant to the log-likelihood for time points where all states
         # have a negative log-likelihood. This is critical for numerical stability.
@@ -527,13 +501,19 @@ class Model(ModelBase):
         Parameters
         ----------
         gamma : np.ndarray
-            Probability of hidden state given data.
+            Marginal posterior distribution of hidden states given the data, q(s_t).
             Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Probability of hidden state given child and parent states, given data.
-            Shape is (batch_size*sequence_length - 1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
         """
-        # Use Baum-Welch algorithm
+        # Calculate the new transition probability matrix using the posterior from
+        # the Baum-Welch algorithm:
+        #
+        # p(s_t+1 | s_t) = E{q(s_t, s_t+1)} / E{q(s_t)}
+        #                = sum^{T-1}_{t=1} xi(t, t+1) / sum^{T-1}_{t=1} gamma(t)
+        #
+        # where E{.} denotes the expectation.
         phi_interim = np.sum(xi, axis=0).reshape(
             self.config.n_states, self.config.n_states
         ).T / np.sum(gamma[:-1], axis=0).reshape(self.config.n_states, 1)
@@ -557,6 +537,198 @@ class Model(ModelBase):
             100 * ind / self.config.n_epochs + 1 + self.config.trans_prob_update_delay,
             -self.config.trans_prob_update_forget,
         )
+
+    def _get_posterior_entropy(self, gamma, xi):
+        """Posterior entropy.
+
+        Calculate the entropy of the posterior distribution:
+
+        .. math::
+            E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
+
+              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \displaystyle\sum_{t=2}^{T-1} \int q(s_t) \log q(s_t) ds_t
+
+        Parameters
+        ----------
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (batch_size*sequence_length, n_states).
+        xi : np.ndarray
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+
+        Returns
+        -------
+        entropy : float
+            Entropy.
+        """
+        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1) log(q(s_t, s_t+1)) ds_t ds_t+1
+        first_term = np.sum(xlogy(xi, xi))
+
+        # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
+        second_term = np.sum(xlogy(gamma, gamma)[1:-1])
+
+        return first_term - second_term
+
+    def _get_posterior_expected_log_likelihood(self, x, gamma):
+        """Expected log-likelihood.
+
+        Calculates the expected log-likelihood with respect to the posterior
+        distribution of the states:
+
+        .. math::
+            LL &= \int q(s_{1:T}) \log \prod_{t=1}^T p(x_t | s_t) ds_{1:T}
+
+               &= \sum_{t=1}^T \int q(s_t) \log p(x_t | s_t) ds_t
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Data. Shape is (batch_size, sequence_length, n_channels).
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (batch_size*sequence_length, n_states).
+
+        Returns
+        -------
+        log_likelihood : float
+            Posterior expected log-likelihood.
+        """
+        gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
+        log_likelihood = self._get_log_likelihood(x)
+        return tf.reduce_sum(log_likelihood * gamma)
+
+    def _get_posterior_expected_prior(self, gamma, xi):
+        """Posterior expected prior.
+
+        Calculates the expected prior probability of states with respect to the
+        posterior distribution of the states:
+
+        .. math::
+            P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
+
+              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
+
+        Parameters
+        ----------
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data, q(s_t).
+            Shape is (batch_size*sequence_length, n_states).
+        xi : np.ndarray
+            Joint posterior distribution of hidden states at two consecutive time points,
+            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+
+        Returns
+        -------
+        prior : float
+            Posterior expected prior probability.
+        """
+        n_samples, n_states = gamma.shape
+
+        # first_term = int q(s_1) log p(s_1) ds_1
+        first_term = np.sum(xlogy(gamma[0], self.state_probs_t0))
+
+        # remaining_terms =
+        # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
+        remaining_terms = np.sum(
+            xlogy(
+                xi.reshape(n_samples - 1, n_states, n_states, order="F"),
+                np.expand_dims(self.trans_prob, 0),
+            )
+        )
+
+        return first_term + remaining_terms
+
+    def _evidence_predict_step(self, log_smoothing_distribution):
+        """Predict step for calculating the evidence.
+
+        .. math::
+            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) p(s_{t-1} = i | x_{1:t-1})
+
+        Parameters
+        ----------
+        log_smoothing_distribution : np.ndarray
+            log p(s_t-1 | x_1:t-1). Shape is (batch_size, n_states).
+
+        Returns
+        -------
+        log_prediction_distribution : np.ndarray
+            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
+        """
+        log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
+        log_smoothing_distribution = np.expand_dims(log_smoothing_distribution, -1)
+        log_prediction_distribution = logsumexp(
+            log_trans_prob + log_smoothing_distribution, -2
+        )
+        return log_prediction_distribution
+
+    def _get_log_likelihood(self, data):
+        """Get the log-likelihood of data, log p(x_t | s_t).
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data. Shape is (batch_size, ..., n_channels).
+
+        Returns
+        -------
+        log_likelihood : np.ndarray
+            Log-likelihood. Shape is (batch_size, ..., n_states)
+        """
+        means, covs = self.get_means_covariances()
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=means,
+            scale_tril=tf.linalg.cholesky(covs),
+            allow_nan_stats=False,
+        )
+        log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
+        return log_likelihood.numpy()
+
+    def _evidence_update_step(self, data, log_prediction_distribution):
+        """Update step for calculating the evidence.
+
+        .. math::
+            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
+
+            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) p(s_t = i | x_{1:t-1})
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for the update step. Shape is (batch_size, n_channels).
+        log_prediction_distribution : np.ndarray
+            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
+
+        Returns
+        -------
+        log_smoothing_distribution : np.ndarray
+            log p(s_t | x_1:t). Shape is (batch_size, n_states).
+        predictive_log_likelihood : np.ndarray
+            log p(x_t | x_1:t-1). Shape is (batch_size).
+        """
+        log_likelihood = self._get_log_likelihood(data)
+        log_smoothing_distribution = log_likelihood + log_prediction_distribution
+        predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
+
+        # Normalise the log smoothing distribution
+        log_smoothing_distribution -= np.expand_dims(predictive_log_likelihood, -1)
+        return log_smoothing_distribution, predictive_log_likelihood
+
+    def get_stationary_distribution(self):
+        """Get the stationary distribution of the Markov chain.
+
+        This is the left eigenvector of the transition probability matrix
+        corresponding to eigenvalue = 1.
+
+        Returns
+        -------
+        stationary_distribution : np.ndarray
+            Stationary distribution of the Markov chain. Shape is (n_states,).
+        """
+        eigval, eigvec = np.linalg.eig(self.trans_prob.T)
+        stationary_distribution = np.squeeze(eigvec[:, np.isclose(eigval, 1)]).real
+        stationary_distribution /= np.sum(stationary_distribution)
+        return stationary_distribution
 
     def sample_state_time_course(self, n_samples):
         """Sample a state time course.
@@ -676,10 +848,10 @@ class Model(ModelBase):
         training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
             Training data.
         """
+        _logger.info("Setting random means and covariances")
+
         # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
-        )
+        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -750,13 +922,114 @@ class Model(ModelBase):
                 self.config.diagonal_covariances,
             )
 
+    def free_energy(self, dataset):
+        """Get the variational free energy.
+
+        This calculates:
+
+        .. math::
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the free energy for.
+
+        Returns
+        -------
+        free_energy : float
+            Variational free energy.
+        """
+        _logger.info("Getting free energy")
+
+        # Convert to a TensorFlow dataset if not already
+        dataset = self.make_dataset(dataset, concatenate=True)
+
+        # Calculate variational free energy for each batch
+        free_energy = []
+        for data in dataset:
+            x = data["data"]
+            batch_size = x.shape[0]
+
+            # Get the marginal and join posterior to calculate the free energy
+            gamma, xi = self._get_state_probs(x)
+
+            # Calculate the free energy:
+            #
+            # F = int q(s) log[q(s) / p(x, s)] ds
+            #   = int q(s) log[q(s) / p(x | s) p(s)] ds
+            #   = - int q(s) log p(x | s) ds    [log_likelihood]
+            #     + int q(s) log q(s) ds        [entropy]
+            #     - int q(s) log p(s) ds        [prior]
+
+            log_likelihood = self._get_posterior_expected_log_likelihood(x, gamma)
+            entropy = self._get_posterior_entropy(gamma, xi)
+            prior = self._get_posterior_expected_prior(gamma, xi)
+
+            # Average free energy for a sequence in this batch
+            seq_fe = (-log_likelihood + entropy - prior) / batch_size
+            free_energy.append(seq_fe)
+
+        # Return average over batches
+        return np.mean(free_energy)
+
+    def evidence(self, dataset):
+        """Calculate the model evidence, p(x), of HMM on a dataset.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the model evidence on.
+
+        Returns
+        -------
+        evidence : float
+            Model evidence.
+        """
+        _logger.info("Getting model evidence")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
+
+        evidence = 0
+        for n, data in enumerate(dataset):
+            x = data["data"]
+            print("Batch {}/{}".format(n + 1, n_batches))
+            pb_i = utils.Progbar(self.config.sequence_length)
+            batch_size = tf.shape(x)[0]
+            batch_evidence = np.zeros((batch_size))
+            for t in range(self.config.sequence_length):
+                # Prediction step
+                if t == 0:
+                    initial_distribution = self.get_stationary_distribution()
+                    log_prediction_distribution = np.broadcast_to(
+                        np.expand_dims(initial_distribution, axis=0),
+                        (batch_size, self.config.n_states),
+                    )
+                else:
+                    log_prediction_distribution = self._evidence_predict_step(
+                        log_smoothing_distribution
+                    )
+
+                # Update step
+                (
+                    log_smoothing_distribution,
+                    predictive_log_likelihood,
+                ) = self._evidence_update_step(x[:, t, :], log_prediction_distribution)
+
+                # Update the batch evidence
+                batch_evidence += predictive_log_likelihood
+                pb_i.add(1)
+            evidence += np.mean(batch_evidence)
+
+        return evidence / n_batches
+
     def get_alpha(self, dataset, concatenate=False):
         """Get state probabilities.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset
-            Prediction dataset for each subject.
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for each subject.
         concatenate : bool
             Should we concatenate alpha for each subject?
 
@@ -766,7 +1039,7 @@ class Model(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset, concatenate=False)
+        dataset = self.make_dataset(dataset)
 
         _logger.info("Getting alpha")
         alpha = []

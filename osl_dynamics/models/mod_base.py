@@ -205,15 +205,8 @@ class ModelBase:
 
         # Callback to display a progress bar with tqdm
         if use_tqdm:
-            if tqdm_class is not None:
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-            else:
-                # Create a tqdm class with a progress bar width of 98 characters
-                class tqdm_class(tqdm_auto):
-                    def __init__(self, *args, **kwargs):
-                        super().__init__(*args, **kwargs)
-
-                tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
+            tqdm_class = tqdm_class or tqdm_auto
+            tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
             additional_callbacks.append(tqdm_callback)
 
         # Callback to save the best model after a certain number of epochs

@@ -2,14 +2,19 @@
 
 """
 
+import logging
 import warnings
 from os import listdir, path
 
+import mne
 import mat73
 import numpy as np
 import scipy.io
 
 from osl_dynamics.data import spm
+
+_logger = logging.getLogger("osl-dynamics")
+_allowed_ext = [".npy", ".mat", ".txt", ".fif"]
 
 
 def validate_inputs(inputs):
@@ -27,7 +32,7 @@ def validate_inputs(inputs):
     """
     if isinstance(inputs, str):
         if path.isdir(inputs):
-            validated_inputs = list_dir(inputs, keep_ext=[".npy", ".mat", ".txt"])
+            validated_inputs = list_dir(inputs, keep_ext=_allowed_ext)
         else:
             validated_inputs = [inputs]
 
@@ -46,9 +51,11 @@ def validate_inputs(inputs):
             validated_inputs = []
             for inp in inputs:
                 if path.isdir(inp):
-                    validated_inputs += list_dir(inp, keep_ext=[".npy", ".mat", ".txt"])
-                else:
+                    validated_inputs += list_dir(inp, keep_ext=_allowed_ext)
+                elif path.exists(inp):
                     validated_inputs.append(inp)
+                else:
+                    _logger.warn(f"{inp} not found")
         else:
             validated_inputs = inputs
 
@@ -104,20 +111,27 @@ def list_dir(path, keep_ext=None):
 def load_data(
     data,
     data_field="X",
+    picks=None,
+    reject_by_annotation=None,
     mmap_location=None,
     mmap_mode="r+",
 ):
     """Loads time series data.
 
-    Checks the data shape is time by channel and that the data is float32.
+    Checks the data shape is time by channels and that the data is float32.
 
     Parameters
     ----------
     data : numpy.ndarray or str or list
-        An array or filename of a .npy, .txt, or .mat file containing the data.
+        An array or path to a .npy, .mat, .txt or .fif file containing the data.
     data_field : str
         If a MATLAB filename is passed, this is the field that corresponds to
         the data.
+    picks : str or list of str
+        Argument passed to mne.Raw.get_data() or mne.Epochs.get_data().
+        Only used if a fif file is passed.
+    reject_by_annotation : str
+        Argument passed to mne.Raw.get_data(). Only used if a fif file is passed.
     mmap_location : str
         Filename to save the data as a numpy memory map.
     mmap_mode : str
@@ -144,8 +158,8 @@ def load_data(
 
         # Check extension
         ext = file_ext(data)
-        if ext not in [".npy", ".mat", ".txt"]:
-            raise ValueError("Data file must be .npy, .txt or .mat.")
+        if ext not in _allowed_ext:
+            raise ValueError(f"Data file must have extension: {_allowed_ext}.")
 
         # Load a MATLAB file
         if ext == ".mat":
@@ -177,10 +191,55 @@ def load_data(
                 np.save(mmap_location, data)
                 data = mmap_location
 
+        # Load a fif file
+        elif ext == ".fif":
+            data = load_fif(data, picks, reject_by_annotation)
+            data = data.astype(np.float32)
+            if mmap_location is None:
+                return data
+            else:
+                np.save(mmap_location, data)
+                data = mmap_location
+
     # Load data as memmap
     data = np.load(mmap_location, mmap_mode=mmap_mode)
     data = data.astype(np.float32)
 
+    return data
+
+
+def load_fif(filename, picks=None, reject_by_annotation=None):
+    """Load a fif file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to fif file. Must end with 'raw.fif' or 'epo.fif'.
+    picks : str or list of str
+        Argument passed to mne.Raw.get_data() or mne.Epochs.get_data().
+    reject_by_annotation : str
+        Argument passed to mne.Raw.get_data() if filename contains 'raw.fif'.
+
+    Returns
+    -------
+    data : np.ndarray
+        Time series data in format (n_samples, n_channels).
+        If an mne.Epochs fif file is pass ('epo.fif') the we
+        concatenate the epochs in the first axis.
+    """
+    if "raw.fif" in filename:
+        raw = mne.io.read_raw_fif(filename, verbose=False)
+        data = raw.get_data(
+            picks=picks,
+            reject_by_annotation=reject_by_annotation,
+            verbose=False,
+        ).T
+    elif "epo.fif" in filename:
+        epochs = mne.read_epochs(filename, verbose=False)
+        data = epochs.get_data(picks=picks)
+        data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
+    else:
+        raise ValueError(f"a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
 
 

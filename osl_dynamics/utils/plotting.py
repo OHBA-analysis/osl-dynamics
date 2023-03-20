@@ -2,7 +2,6 @@
 
 """
 
-
 import logging
 from itertools import zip_longest
 
@@ -12,10 +11,13 @@ import numpy as np
 from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+from nilearn.plotting import plot_markers
 
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
+from osl_dynamics.utils.parcellation import Parcellation
+
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -214,9 +216,9 @@ def plot_line(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -272,7 +274,8 @@ def plot_line(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot lines
@@ -300,7 +303,8 @@ def plot_line(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_scatter(
@@ -361,9 +365,9 @@ def plot_scatter(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -426,7 +430,8 @@ def plot_scatter(
         colors = get_colors(len(x), colormap="tab10")
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot data
@@ -462,7 +467,8 @@ def plot_scatter(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_hist(
@@ -514,9 +520,9 @@ def plot_hist(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -559,7 +565,8 @@ def plot_hist(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot histograms
@@ -583,7 +590,8 @@ def plot_hist(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_bar_chart(
@@ -629,9 +637,9 @@ def plot_bar_chart(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -667,7 +675,8 @@ def plot_bar_chart(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot bar chart
@@ -686,7 +695,8 @@ def plot_bar_chart(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_gmm(
@@ -742,9 +752,9 @@ def plot_gmm(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -773,7 +783,8 @@ def plot_gmm(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot histogram
@@ -803,7 +814,8 @@ def plot_gmm(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_violin(
@@ -858,9 +870,9 @@ def plot_violin(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
 
     # Validation
@@ -899,7 +911,8 @@ def plot_violin(
     data = [np.array([np.nan, np.nan]) if len(d) == 0 else d for d in data]
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot violins
@@ -930,7 +943,8 @@ def plot_violin(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_time_series(
@@ -964,9 +978,9 @@ def plot_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
     time_series = np.asarray(time_series)
     n_samples = min(n_samples or np.inf, time_series.shape[0])
@@ -1001,7 +1015,8 @@ def plot_time_series(
     gaps = np.arange(n_channels)[::-1] * separation
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot data
@@ -1023,7 +1038,8 @@ def plot_time_series(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_separate_time_series(
@@ -1153,9 +1169,9 @@ def plot_epoched_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if ax=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if ax=None.
     """
     from osl_dynamics.data.task import epoch_mean
 
@@ -1187,7 +1203,8 @@ def plot_epoched_time_series(
         plot_kwargs = {}
 
     # Create figure
-    if ax is None:
+    create_fig = ax is None
+    if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Baseline correct
@@ -1213,7 +1230,8 @@ def plot_epoched_time_series(
     if filename is not None:
         save(fig, filename)
 
-    return fig, ax
+    if create_fig:
+        return fig, ax
 
 
 def plot_matrices(
@@ -1590,18 +1608,35 @@ def plot_brain_surface(
     filename : str
         Output filename. If extension is .nii.gz the power map is saved as a
         NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
-        Optional, if None is passed then the image is shown on screen.
+        Optional, if None is passed then the image is shown on screen and the
+        Matplotlib objects are returned.
     subtract_mean : bool
         Should we subtract the mean power across modes?
     mean_weights: np.ndarray
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict
-        Keyword arguments to pass to nilearn.plotting.plot_img_on_surf.
+        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_img_on_surf.html>`_.
+        By default we pass:
+
+        - views=["lateral", "medial"]
+        - hemispheres=["left", "right"]
+        - colorbar=True
+        - output_file=filename
+
+        Any keyword arguments passed here will override these.
+
+    Returns
+    -------
+    figures : list of matplotlib.pyplot.figure
+        List of Matplotlib figure object. Only returned if filename=None.
+    axes : list of matplotlib.pyplot.axis.
+        List of Matplotlib axis object(s). Only returned if filename=None.
     """
     from osl_dynamics.analysis import power
 
-    power.save(
+    return power.save(
         power_map=values,
         filename=filename,
         mask_file=mask_file,
@@ -1859,3 +1894,72 @@ def plot_mode_lifetimes(
         save(fig, filename)
 
     return fig, axes
+
+
+def plot_psd_topo(
+    f, psd, parcellation_file=None, topomap_pos=[0.45, 0.55, 0.5, 0.55], filename=None
+):
+    """PLot PSDs for parcels and a topomap.
+
+    Parameters
+    ----------
+    f : np.ndarray
+        Frequency axis. Shape must be (n_freq,).
+    psd : np.ndarray
+        PSD for each parcel. Shape must be (n_parcels, n_freq).
+    parcellation_file : str
+        Path to parcellation file.
+    topomap_pos : list
+        Positioning and size of the topomap: [x0, y0, width, height].
+        x0, y0, width, height should be floats between 0 and 1.
+        E.g. [0.45, 0.55, 0.5, 0.55] to place the topomap on the top
+        right. This is not used if parcellation_file=None.
+    filename : str
+        Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s).
+    """
+
+    if parcellation_file is not None:
+        # Get the center of each parcel
+        parcellation = Parcellation(parcellation_file)
+        roi_centers = parcellation.roi_centers()
+
+        # Re-order to use colour to indicate anterior->posterior location
+        order = np.argsort(roi_centers[:, 1])
+        roi_centers = roi_centers[order]
+        psd = np.copy(psd)[order[::-1]]
+
+    n_parcels = psd.shape[0]
+
+    # Plot PSDs
+    fig, ax = create_figure()
+    cmap = plt.get_cmap()
+    for i in range(n_parcels):
+        ax.plot(f, psd[i], c=cmap(i / n_parcels))
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("PSD (a.u.)")
+    ax.set_xlim(f[0], f[-1])
+    plt.tight_layout()
+
+    if parcellation_file is not None:
+        # Plot parcel topomap
+        inside_ax = ax.inset_axes(topomap_pos)
+        plot_markers(
+            np.arange(parcellation.n_parcels),
+            roi_centers,
+            node_size=12,
+            colorbar=False,
+            axes=inside_ax,
+        )
+
+    # Save
+    if filename is not None:
+        save(fig, filename, tight_layout=False)
+
+    return fig, ax

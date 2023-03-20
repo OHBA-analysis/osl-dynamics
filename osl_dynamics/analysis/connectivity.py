@@ -670,10 +670,6 @@ def save(
 ):
     """Save connectivity maps.
 
-    If glassbrain=True, this function is a wrapper for
-    nilearn.plotting.view_connectome, otherwise this function is a wrapper for
-    nilearn.plotting.plot_connectome.
-
     Parameters
     ----------
     connectivity_map : np.ndarray
@@ -694,8 +690,22 @@ def save(
         Sholud we create a 3D glass brain plot (as an interactive HTML file)
         or a 2D image plot (as a png, pdf, svg, etc. file).
     plot_kwargs : dict
-        Keyword arguments to pass to the nilearn plotting function.
+        Keyword arguments to pass to the nilearn plotting function:
+
+        - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ if glassbrain=False.
+        - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.view_connectome.html>`_ if glassbrain=True.
+
+        Example use::
+
+            connectivity.save(
+                ...,
+                plot_kwargs={
+                    "edge_cmap": "red_transparent_full_alpha_range",
+                    "display_mode": "lyrz",
+                },
+            )
     """
+
     # Validation
     if filename is not None:
         if glassbrain and Path(filename).suffix != ".html":
@@ -703,6 +713,7 @@ def save(
                 "If glassbrain=True then filename must have a .html extension."
             )
 
+    connectivity_map = np.copy(connectivity_map)
     error_message = (
         "Dimensionality of connectivity_map must be 3 or 4, "
         + f"got ndim={connectivity_map.ndim}."

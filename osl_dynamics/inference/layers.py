@@ -420,8 +420,6 @@ class VectorsLayer(layers.Layer):
         Should we learn the vectors?
     initial_value : np.ndarray
         Initial value for the vectors.
-    initializer : tf.keras.initializers.Initializer
-        Initializer for the vectors if initial_value is None.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for vectors.
     """
@@ -432,14 +430,21 @@ class VectorsLayer(layers.Layer):
         m,
         learn,
         initial_value,
-        initializer=None,
         regularizer=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        # Set initializer and initial value
-        if initial_value is None and initializer is None:
+        if initial_value is not None:
+            # Check initial_value is the correct shape
+            if initial_value.shape != (n, m):
+                raise ValueError(f"initial_value shape must be ({n}, {m}).")
+            initial_value = initial_value.astype("float32")
+
+            # We don't need an initializer
+            initializer = None
+        else:
+            # No initial value has been passed, set the initializer
             if learn:
                 initializer = initializers.TruncatedNormal(mean=0, stddev=0.02)
             else:
@@ -483,8 +488,6 @@ class CovarianceMatricesLayer(layers.Layer):
         Initial values for the matrices.
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
-    initializer : tf.keras.initializers.Initializer
-        Initializer for the covariances if initial_value is None.
     regularizer : tf.keras.regularizers.Regularizer
         Regularizer for matrices.
     """
@@ -496,7 +499,6 @@ class CovarianceMatricesLayer(layers.Layer):
         learn,
         initial_value,
         epsilon,
-        initializer=None,
         regularizer=None,
         **kwargs,
     ):
@@ -515,18 +517,20 @@ class CovarianceMatricesLayer(layers.Layer):
             # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
+
+            # We don't need an initializer
+            initializer = None
         else:
             # No initial value has been passed
             initial_flattened_cholesky_factors = None
-            if initializer is None:
-                if learn:
-                    # Use a random initializer
-                    initializer = osld_initializers.NormalIdentityCholeskyInitializer(
-                        std=0.1
-                    )
-                else:
-                    # Use the identity matrix for each mode/state
-                    initializer = osld_initializers.IdentityCholeskyInitializer()
+            if learn:
+                # Use a random initializer
+                initializer = osld_initializers.NormalIdentityCholeskyInitializer(
+                    std=0.1
+                )
+            else:
+                # Use the identity matrix for each mode/state
+                initializer = osld_initializers.IdentityCholeskyInitializer()
 
         # Create a layer to learn the covariance matrices
         #
@@ -580,7 +584,6 @@ class CorrelationMatricesLayer(layers.Layer):
         learn,
         initial_value,
         epsilon,
-        initializer=None,
         regularizer=None,
         **kwargs,
     ):
@@ -601,18 +604,20 @@ class CorrelationMatricesLayer(layers.Layer):
             # Calculate the flattened cholesky factors
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(initial_value)
+
+            # We don't need an initializer
+            initializer = None
         else:
             # No initial value has been passed
             initial_flattened_cholesky_factors = None
-            if initializer is None:
-                if learn:
-                    # Use a random initializer
-                    initializer = (
-                        osld_initializers.NormalCorrelationCholeskyInitializer(std=0.1)
-                    )
-                else:
-                    # Use the identity matrix for each mode/state
-                    initializer = osld_initializers.IdentityCholeskyInitializer()
+            if learn:
+                # Use a random initializer
+                initializer = osld_initializers.NormalCorrelationCholeskyInitializer(
+                    std=0.1
+                )
+            else:
+                # Use the identity matrix for each mode/state
+                initializer = osld_initializers.IdentityCholeskyInitializer()
 
         # Create a layer to learn the correlation matrices
         #
@@ -665,7 +670,6 @@ class DiagonalMatricesLayer(layers.Layer):
         learn,
         initial_value,
         epsilon,
-        initializer=None,
         regularizer=None,
         **kwargs,
     ):
@@ -689,16 +693,18 @@ class DiagonalMatricesLayer(layers.Layer):
             # Calculate the initial value of the learnable tensor
             initial_value = initial_value.astype("float32")
             initial_diagonals = self.bijector.inverse(initial_value)
+
+            # We don't need an initializer
+            initializer = None
         else:
             # No initial value has been passed
             initial_diagonals = None
-            if initializer is None:
-                if learn:
-                    # Use a random initializer
-                    initializer = osld_initializers.NormalDiagonalInitializer(std=0.05)
-                else:
-                    # Use the identity matrix for each mode/state
-                    initializer = osld_initializers.IdentityCholeskyInitializer()
+            if learn:
+                # Use a random initializer
+                initializer = osld_initializers.NormalDiagonalInitializer(std=0.05)
+            else:
+                # Use the identity matrix for each mode/state
+                initializer = osld_initializers.IdentityCholeskyInitializer()
 
         # Create a layer to learn the matrices
         #

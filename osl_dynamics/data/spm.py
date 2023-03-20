@@ -53,7 +53,6 @@ class SPM:
         return "\n ".join(info)
 
     def get_discontinuities(self):
-
         discontinuities = [1]
         for i in range(self.n_samples - 1):
             if self.good_samples[i] != self.good_samples[i + 1]:

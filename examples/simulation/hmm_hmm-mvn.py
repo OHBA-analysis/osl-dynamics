@@ -61,6 +61,10 @@ plotting.plot_line(
     filename="figures/loss.png",
 )
 
+# Calculate the free energy
+free_energy = model.free_energy(training_data)
+print("Free energy:", free_energy)
+
 # Get inferred parameters
 inf_stc = model.get_alpha(training_data)
 inf_means, inf_covs = model.get_means_covariances()

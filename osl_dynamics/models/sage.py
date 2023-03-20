@@ -176,7 +176,6 @@ class Model(ModelBase):
 
     config_type = Config
 
-    # TODO: Tidy up to remove newline print statements.
     def build_model(self):
         """Builds a keras model for the inference, generator and discriminator model
         and the full SAGE model.
@@ -275,7 +274,6 @@ class Model(ModelBase):
 
         history = []
         best_val_loss = np.Inf
-        # TODO: Can this use tqdm?
         for epoch in range(epochs):
             if verbose:
                 print("Epoch {}/{}".format(epoch + 1, epochs))

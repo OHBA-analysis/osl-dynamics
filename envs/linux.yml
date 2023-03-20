@@ -5,6 +5,7 @@ dependencies:
   - pip:
     - mat73
     - matplotlib
+    - mne
     - nibabel
     - nilearn
     - numba
@@ -15,6 +16,7 @@ dependencies:
     - pqdm
     - scipy
     - scikit-learn
+    - seaborn
     - tensorflow
     - tensorflow_probability
     - tqdm
