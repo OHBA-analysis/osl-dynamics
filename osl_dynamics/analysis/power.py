@@ -140,7 +140,7 @@ def power_map_grid(mask_file, parcellation_file, power_map):
 
     # Load the mask
     mask = nib.load(mask_file)
-    mask_grid = mask.get_data()
+    mask_grid = mask.get_fdata()
     mask_grid = mask_grid.ravel(order="F")
 
     # Get indices of non-zero elements, i.e. those which contain the brain
@@ -148,7 +148,7 @@ def power_map_grid(mask_file, parcellation_file, power_map):
 
     # Load the parcellation
     parcellation = nib.load(parcellation_file)
-    parcellation_grid = parcellation.get_data()
+    parcellation_grid = parcellation.get_fdata()
 
     # Make a 2D array of voxel weights for each parcel
     n_parcels = parcellation.shape[-1]
