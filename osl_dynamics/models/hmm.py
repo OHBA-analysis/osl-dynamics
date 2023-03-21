@@ -13,9 +13,10 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from scipy.special import xlogy, logsumexp
 from numba.core.errors import NumbaWarning
+from scipy.special import logsumexp, xlogy
 from tensorflow.keras import backend, layers, utils
+from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
@@ -150,7 +151,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, **kwargs):
+    def fit(self, dataset, epochs=None, use_tqdm=False, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -180,11 +181,19 @@ class Model(ModelBase):
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
+        # Training curves
         history = {"loss": [], "rho": [], "lr": []}
-        for n in range(epochs):
-            # Setup a progress bar
-            print("Epoch {}/{}".format(n + 1, epochs))
-            pb_i = utils.Progbar(len(dataset))
+
+        # Loop through epochs
+        if use_tqdm:
+            _range = trange(epochs)
+        else:
+            _range = range(epochs)
+        for n in _range:
+            # Setup a progress bar for this epoch
+            if not use_tqdm:
+                print("Epoch {}/{}".format(n + 1, epochs))
+                pb_i = utils.Progbar(len(dataset))
 
             # Update rho
             self._update_rho(n)
@@ -215,16 +224,25 @@ class Model(ModelBase):
                 x_and_gamma = np.concatenate([x, gamma], axis=2)
                 h = self.model.fit(x_and_gamma, epochs=1, verbose=0, **kwargs)
 
+                # Get new loss
                 l = h.history["loss"][0]
                 if np.isnan(l):
                     _logger.error("Training failed!")
                     return
                 loss.append(l)
-                pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
+
+                # Update progress bar
+                if use_tqdm:
+                    _range.set_postfix(rho=self.rho, lr=lr, loss=l)
+                else:
+                    pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
             history["lr"].append(lr)
+
+        if use_tqdm:
+            _range.close()
 
         return history
 
