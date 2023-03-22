@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from nilearn import plotting
 from scipy import stats
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import gmm

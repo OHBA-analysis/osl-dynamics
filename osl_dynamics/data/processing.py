@@ -4,7 +4,7 @@
 
 import numpy as np
 from scipy import signal
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from osl_dynamics import array_ops
 from osl_dynamics.data.spm import SPM

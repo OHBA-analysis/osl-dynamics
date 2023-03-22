@@ -13,7 +13,7 @@ from shutil import rmtree
 import numpy as np
 from pqdm.threads import pqdm
 from scipy import signal
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from osl_dynamics.data import processing, rw, tf
 from osl_dynamics.utils import misc

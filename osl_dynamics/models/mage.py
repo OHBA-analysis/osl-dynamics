@@ -9,7 +9,7 @@ from typing import Literal
 
 import numpy as np
 from tensorflow.keras import layers, models, optimizers, utils
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics.inference.layers import (
     AdversarialLogLikelihoodLossLayer,

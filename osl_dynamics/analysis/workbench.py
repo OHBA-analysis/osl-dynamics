@@ -9,7 +9,7 @@ import subprocess
 import warnings
 
 import nibabel as nib
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics import files
 

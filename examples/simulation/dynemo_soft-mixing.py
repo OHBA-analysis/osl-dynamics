@@ -6,7 +6,7 @@ print("Setting up")
 import os
 
 import numpy as np
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
