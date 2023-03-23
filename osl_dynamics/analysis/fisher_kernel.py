@@ -16,19 +16,13 @@ class FisherKernel:
             )
         self.model = model
 
-    def get_kernel_matrix(self, dataset, means, covariances):
+    def get_kernel_matrix(self, dataset):
         """Get the Fisher kernel matrix.
 
         Parameters
         ----------
         dataset : osl_dynamics.data.Data
             Data.
-        means : np.ndarray
-            Means for each subject.
-            Shape is (n_subjects, n_modes, n_channels).
-        covariances : np.ndarray
-            Covariances for each subject.
-            Shape is (n_subjects, n_modes, n_channels, n_channels).
 
         Returns
         -------
@@ -66,10 +60,7 @@ class FisherKernel:
                 ):
                     d_model[name] = []
 
-            # Set means and covariances for gradients
-            self.model.set_means(means[i])
-            self.model.set_covariances(covariances[i])
-
+            # Loop over data for each subject
             for data in subject_data:
                 if self.model.config.model_name == "HMM":
                     x = data["data"]

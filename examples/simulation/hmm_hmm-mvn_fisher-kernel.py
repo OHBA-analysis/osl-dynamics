@@ -67,22 +67,10 @@ model.fit(training_data)
 alpha = model.get_alpha(training_data)
 argmax_alpha = inference.modes.argmax_time_courses(alpha)
 
-# Dual estimation
-time_series = training_data.time_series()
-means = np.zeros([sim.n_subjects, config.n_states, config.n_channels])
-covariances = np.array([[np.eye(config.n_channels)] * config.n_states] * sim.n_subjects)
-for n in range(sim.n_subjects):
-    masked_ts = np.expand_dims(time_series[n], 1) * np.expand_dims(alpha[n], -1)
-    masked_ts = np.transpose(masked_ts, (1, 0, 2))
-    for i, ts in enumerate(masked_ts):
-        state_ts = ts[~np.all(np.isclose(ts, 0), axis=1)]
-        if config.learn_means:
-            means[n, i] = np.mean(state_ts, axis=0)
-        if config.learn_covariances:
-            covariances[n, i] = np.cov(state_ts, rowvar=False)
-
+# Get the Fisher kernel matrix
 fk = fisher_kernel.FisherKernel(model)
-kernel = fk.get_kernel_matrix(training_data, means, covariances)
+kernel = fk.get_kernel_matrix(training_data)
+
 # 5-fold cross validation
 scores = []
 kf = KFold(5, shuffle=True, random_state=234)
@@ -96,9 +84,8 @@ for train_index, validation_index in kf.split(range(sim.n_subjects)):
     clf.fit(kernel_train, labels_train)
 
     labels_predict = clf.predict(kernel_validation)
-    wrong_subjects = validation_index[labels_predict != labels_validation]
     scores.append(clf.score(kernel_validation, labels_validation))
-    print(wrong_subjects)
+
 
 print("Mean score:", np.mean(scores))
 print("Score std:", np.std(scores))
