@@ -49,6 +49,7 @@ def power_spectra(
     sampling_frequency=1.0,
     frequency_range=None,
     step_size=None,
+    return_weights=False,
     standardize=True,
     calc_coh=False,
     n_jobs=1,
@@ -69,6 +70,9 @@ def power_spectra(
     step_size : int
         Step size for shifting the window. By default we will use half
         the window length.
+    return_weights : bool
+        Should we return the weights for subject-specific PSDs?
+        Useful for calculating the group average PSD.
     standardize : bool
         Should we standardise the data?
     calc_coh : bool
@@ -85,6 +89,8 @@ def power_spectra(
     coh : np.ndarray
         Coherence spectra. Shape is (n_subjects, n_channels, n_channels, n_freq).
         Only returned is calc_coh=True.
+    weights : np.ndarray
+        Weight for each subject-specific PSD. Only returned if return_weights=True.
     """
 
     # Validation
@@ -142,6 +148,10 @@ def power_spectra(
         _, f, p = result
         psd.append(np.mean(p, axis=0))
 
+    # Weights for calculating the group average PSD
+    n_samples = [d.shape[0] for d in data]
+    weights = np.array(n_samples) / np.sum(n_samples)
+
     if calc_coh:
         psd = np.array(psd)
         n_subjects = psd.shape[0]
@@ -163,10 +173,16 @@ def power_spectra(
         # The PSD is the diagonal of the cross spectra matrix
         psd = cpsd[:, range(n_channels), range(n_channels)].real
 
-        return f, np.squeeze(psd), np.squeeze(coh)
+        if return_weights:
+            return f, np.squeeze(psd), np.squeeze(coh), weights
+        else:
+            return f, np.squeeze(psd), np.squeeze(coh)
 
     else:
-        return f, np.squeeze(psd)
+        if return_weights:
+            return f, np.squeeze(psd), weights
+        else:
+            return f, np.squeeze(psd)
 
 
 def multitaper_spectra(
