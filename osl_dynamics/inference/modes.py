@@ -5,7 +5,7 @@
 from pathlib import Path
 
 import numpy as np
-from tqdm import trange
+from tqdm.auto import trange
 from scipy.optimize import linear_sum_assignment
 
 from osl_dynamics import analysis, array_ops

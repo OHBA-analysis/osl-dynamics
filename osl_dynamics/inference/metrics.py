@@ -5,7 +5,7 @@
 import numpy as np
 from scipy.linalg import eigvalsh
 from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
-from tqdm import trange
+from tqdm.auto import trange
 
 
 def alpha_correlation(alpha_1, alpha_2):

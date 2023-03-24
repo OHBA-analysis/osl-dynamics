@@ -9,7 +9,7 @@ from typing import Literal
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics.inference.layers import (
     ConcatenateLayer,

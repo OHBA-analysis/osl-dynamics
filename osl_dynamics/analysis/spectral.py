@@ -9,7 +9,7 @@ import numpy as np
 from pqdm.processes import pqdm
 from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression

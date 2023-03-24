@@ -9,7 +9,7 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 from nilearn import plotting
-from tqdm import trange
+from tqdm.auto import trange
 
 from osl_dynamics import array_ops, files, utils
 from osl_dynamics.analysis.spectral import get_frequency_args_range
