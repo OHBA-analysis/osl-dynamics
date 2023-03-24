@@ -4,6 +4,7 @@
 
 from pathlib import Path
 
+import mne
 import numpy as np
 from tqdm.auto import trange
 from scipy.optimize import linear_sum_assignment
@@ -314,3 +315,98 @@ def mean_intervals(state_time_course, sampling_frequency=None):
 def switching_rates(state_time_course, sampling_frequency=None):
     """Wrapper for osl_dynamics.analysis.modes.switching_rates."""
     return analysis.modes.switching_rates(state_time_course, sampling_frequency)
+
+
+def convert_to_mne_raw(alpha, raw, ch_names=None, n_embeddings=1, verbose=False):
+    """Convert a time series to an MNE Raw object.
+
+    Parameters
+    ----------
+    alpha : np.ndarray
+        Time series containing raw data. Shape must be (n_samples, n_channels).
+    raw : mne.io.Raw or str
+        MNE Raw object to extract info from. If a str is passed, it must be the
+        path to a fif file containing the Raw object.
+    ch_names : list
+        Name for each channel.
+    n_embeddings : int
+        Number of embeddings that was used to prepare the training data.
+    verbose : bool
+        Should we print a verbose?
+
+    Returns
+    -------
+    alpha_raw : mne.io.Raw
+        Raw object for alpha.
+    """
+
+    # Load the Raw object
+    if isinstance(raw, str):
+        raw = mne.io.read_raw_fif(raw, verbose=verbose)
+
+    # Get time indices excluding bad segments from raw
+    _, times = raw.get_data(
+        reject_by_annotation="omit", return_times=True, verbose=verbose
+    )
+    indices = raw.time_as_index(times)
+
+    # Create an array for the full time series including bad segments
+    n_samples = raw.times.shape[0]
+    n_channels = alpha.shape[1]
+    alpha_ = np.zeros([n_samples, n_channels], dtype=np.float32)
+
+    # Shift the indices to account for the impact of time embedding
+    indices += n_embeddings // 2
+
+    # Trim the indices we lost when we separate the time series into sequences
+    indices = indices[: alpha.shape[0]]
+
+    # Fill in the value for the time series for non-bad segments
+    alpha_[indices] = alpha
+
+    # Create info object
+    if ch_names is None:
+        ch_names = [str(ch) for ch in range(n_channels)]
+    alpha_info = mne.create_info(
+        ch_names=ch_names, ch_types="misc", sfreq=raw.info["sfreq"], verbose=verbose
+    )
+
+    # Create Raw object
+    alpha_raw = mne.io.RawArray(alpha_.T, alpha_info, verbose=verbose)
+
+    # Copy timing info
+    alpha_raw.set_meas_date(raw.info["meas_date"])
+    alpha_raw.__dict__["_first_samps"] = raw.__dict__["_first_samps"]
+    alpha_raw.__dict__["_last_samps"] = raw.__dict__["_last_samps"]
+    alpha_raw.__dict__["_cropped_samp"] = raw.__dict__["_cropped_samp"]
+
+    # Copy annotations from raw
+    alpha_raw.set_annotations(raw._annotations)
+
+    # Add stim channel
+    if "stim" in raw:
+        stim_raw = raw.copy().pick_types(stim=True)
+        stim_data = stim_raw.get_data()
+        stim_info = mne.create_info(
+            stim_raw.ch_names,
+            raw.info["sfreq"],
+            ["stim"] * stim_data.shape[0],
+            verbose=verbose,
+        )
+        stim_raw = mne.io.RawArray(stim_data, stim_info, verbose=verbose)
+        alpha_raw.add_channels([stim_raw], force_update_info=True)
+
+    # Add EMG channel
+    if "emg" in raw:
+        emg_raw = raw.copy().pick_types(emg=True)
+        emg_data = emg_raw.get_data()
+        emg_info = mne.create_info(
+            emg_raw.ch_names,
+            raw.info["sfreq"],
+            ["emg"] * emg_data.shape[0],
+            verbose=verbose,
+        )
+        emg_raw = mne.io.RawArray(emg_data, emg_info, verbose=verbose)
+        alpha_raw.add_channels([emg_raw], force_update_info=True)
+
+    return alpha_raw
