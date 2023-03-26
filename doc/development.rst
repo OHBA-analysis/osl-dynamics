@@ -16,7 +16,6 @@ The core development team is:
 * Chetan Gohil <chetan.gohil@psych.ox.ac.uk>
 * Evan Roberts <evan.roberts@kellogg.ox.ac.uk>
 * Rukuang Huang <rukuang.huang@jesus.ox.ac.uk>
-* Usama Pervaiz <usama.pervaiz@ndcn.ox.ac.uk>
 * Hongyu Qian <hongyu.qian@queens.ox.ac.uk>
 * Miguel Farinha <miguel.farinha@balliol.ox.ac.uk>
 * SungJun Cho <sungjun.cho@hertford.ox.ac.uk>
@@ -24,6 +23,7 @@ The core development team is:
 
 With contributions from former group members:
 
+* Usama Pervaiz
 * Ryan Timms
 * Alex Skates
 

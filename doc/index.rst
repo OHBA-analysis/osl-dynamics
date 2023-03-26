@@ -19,7 +19,6 @@ Contents
 
    Install <install>
    Development <development>
-   Using BMRC <using_bmrc>
    Documentation <documentation>
 
 
