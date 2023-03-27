@@ -465,6 +465,8 @@ class MSubj_HMM_MVN(Simulation):
         Number of subjects.
     n_groups : int
         Number of groups of subjects when subject means or covariances are 'random'.
+    between_group_scale : float
+        Scale of variability between subject observation parameters.
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
     subject_tc_std : float

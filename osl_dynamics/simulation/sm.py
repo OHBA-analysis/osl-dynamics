@@ -5,7 +5,7 @@
 import numpy as np
 from scipy.special import softmax
 
-from osl_dynamics.simulation.mvn import MVN
+from osl_dynamics.simulation.mvn import MVN, MSubj_MVN
 from osl_dynamics.simulation.base import Simulation
 
 
@@ -101,6 +101,8 @@ class MixedSine_MVN(Simulation):
     covariances : np.ndarray or str
         Covariance matrix for each mode, shape should be (n_modes,
         n_channels, n_channels). Either a numpy array or 'random'.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
     n_modes : int
         Number of modes.
     n_channels : int
@@ -120,6 +122,7 @@ class MixedSine_MVN(Simulation):
         sampling_frequency,
         means,
         covariances,
+        n_covariances_act=1,
         n_modes=None,
         n_channels=None,
         observation_error=0.0,
@@ -129,6 +132,7 @@ class MixedSine_MVN(Simulation):
         self.obs_mod = MVN(
             means=means,
             covariances=covariances,
+            n_covariances_act=n_covariances_act,
             n_modes=n_modes,
             n_channels=n_channels,
             observation_error=observation_error,
@@ -161,3 +165,139 @@ class MixedSine_MVN(Simulation):
             return getattr(self.sm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
+
+
+class MSubj_MixedSine_MVN(Simulation):
+    """Simulates sinusoidal alphas with a multivariable normal observation model
+    for each subject.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples per subject to draw from the model.
+    relative_activation : np.ndarray or list
+        Average value for each sine wave. Note, this might not be the
+        mean value for each mode time course because there is a softmax
+        operation. This argument can use use to change the relative values
+        of each mode time course.
+    amplitudes : np.ndarray or list
+        Amplitude of each sinusoid.
+    frequencies : np.ndarray or list
+        Frequency of each sinusoid.
+    sampling_frequency : float
+        Sampling frequency.
+    subject_means : np.ndarray or str
+        Subject mean vector for each state, shape should be (n_subjects, n_states, n_channels).
+        Either a numpy array or 'zero' or 'random'.
+    subject_covariances : np.ndarray or str
+        Subject covariance matrix for each state, shape should be
+        (n_subjects, n_states, n_channels, n_channels). Either a numpy array or 'random'.
+    n_covariances_act : int
+        Number of iterations to add activations to covariance matrices.
+    n_modes : int
+        Number of modes.
+    n_channels : int
+        Number of channels.
+    n_subjects : int
+        Number of subjects.
+    n_subject_embedding_dim : int
+        Number of dimensions for subject embedding.
+    n_mode_embedding_dim : int
+        Number of dimensions for mode embedding.
+    subject_embedding_scale : float
+        Scale of variability between subject observation parameters.
+    n_groups : int
+        Number of groups of subjects when subject means or covariances are 'random'.
+    between_group_scale : float
+        Scale of variability between groups.
+    observation_error : float
+        Standard deviation of the error added to the generated data.
+    random_seed : int
+        Seed for random number generator.
+    """
+
+    def __init__(
+        self,
+        n_samples,
+        relative_activation,
+        amplitudes,
+        frequencies,
+        sampling_frequency,
+        subject_means,
+        subject_covariances,
+        n_covariances_act=1,
+        n_modes=None,
+        n_channels=None,
+        n_subjects=None,
+        n_subject_embedding_dim=None,
+        n_mode_embedding_dim=None,
+        subject_embedding_scale=None,
+        n_groups=None,
+        between_group_scale=None,
+        observation_error=0.0,
+        random_seed=None,
+    ):
+        # Observation model
+        self.obs_mod = MSubj_MVN(
+            subject_means=subject_means,
+            subject_covariances=subject_covariances,
+            n_covariances_act=n_covariances_act,
+            n_modes=n_modes,
+            n_channels=n_channels,
+            n_subjects=n_subjects,
+            n_subject_embedding_dim=n_subject_embedding_dim,
+            n_mode_embedding_dim=n_mode_embedding_dim,
+            subject_embedding_scale=subject_embedding_scale,
+            n_groups=n_groups,
+            between_group_scale=between_group_scale,
+            observation_error=observation_error,
+            random_seed=random_seed,
+        )
+
+        self.n_modes = self.obs_mod.n_modes
+        self.n_channels = self.obs_mod.n_channels
+        self.n_subjecs = self.obs_mod.n_subjects
+
+        super().__init__(n_samples=n_samples)
+
+        # Simulate mode time courses for all subjects
+        self.mode_time_course = []
+        self.sm = []
+
+        for _ in range(self.n_subjects):
+            sm = MixedSine(
+                n_modes=self.n_modes,
+                relative_activation=relative_activation,
+                amplitudes=amplitudes,
+                frequencies=frequencies,
+                sampling_frequency=sampling_frequency,
+                random_seed=random_seed,
+            )
+            self.sm.append(sm)
+            self.mode_time_course.append(sm.generate_modes(self.n_samples))
+        self.mode_time_course = np.array(self.mode_time_course)
+
+        # Simulate data
+        self.time_series = self.obs_mod.simulate_multi_subject_data(
+            self.mode_time_course
+        )
+
+    def __getattr__(self, attr):
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+    def standardize(self):
+        means = np.mean(self.time_series, axis=1).astype(np.float64)
+        standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
+        super().standardize(axis=1)
+        self.obs_mod.subject_means = (
+            self.obs_mod.subject_means - means[:, None, :]
+        ) / standard_deviations[:, None, :]
+        self.obs_mod.subject_covariances /= np.expand_dims(
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+        )
+        self.obs_mod.instantaneous_covs /= np.expand_dims(
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+        )
