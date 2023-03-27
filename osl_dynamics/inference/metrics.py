@@ -327,3 +327,33 @@ def pairwise_congruence_coefficient(M, remove_diagonal=False):
         C -= np.eye(n_matrices)
 
     return C
+
+
+def pairwise_l2_distance(arrays, batch_dims=0):
+    """Calculate the pairwise L2 distance
+    along the first axis after the batch dims.
+
+    Parameters
+    ----------
+    arrays : np.ndarray
+        Set of arrays. Shape is (..., n_arrays, ...).
+    batch_dims : int
+        Number of batch dimensions.
+
+    Returns
+    -------
+    pairwise_distance : np.ndarray
+        Matrix of pairwise L2 distance. Shape is (..., n_arrays, n_arrays)
+    """
+    if batch_dims > arrays.ndim - 1:
+        raise ValueError("batch_dims must be less than arrays.ndim - 1")
+    pairwise_axis = batch_dims
+    return np.sqrt(
+        np.sum(
+            np.square(
+                np.expand_dims(arrays, pairwise_axis)
+                - np.expand_dims(arrays, pairwise_axis + 1)
+            ),
+            axis=tuple(range(pairwise_axis + 2, arrays.ndim + 1)),
+        )
+    )
