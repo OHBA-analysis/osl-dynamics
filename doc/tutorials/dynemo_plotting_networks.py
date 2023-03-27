@@ -8,21 +8,21 @@ In this tutorial we will analyse the dynamic networks inferred by DyNeMo on rest
 2. Power Maps
 3. Coherence Networks
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/mzxb8>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ejn2r>`_ for the expected output.
 """
 
 #%%
 # Downloading a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# First, let's download a model that's already been trained on a resting-state dataset. See the `DyNeMo Training on Real Data tutorial <https://osf.io/u2gfm>`_ for how to train DyNeMo.
+# First, let's download a model that's already been trained on a resting-state dataset. See the `DyNeMo Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/dynemo_training_real_data.html>`_ for how to train DyNeMo.
 
 import os
 
 def get_trained_model(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/trained_models/{name}.zip")
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {name}"

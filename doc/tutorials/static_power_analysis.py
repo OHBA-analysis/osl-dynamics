@@ -9,7 +9,7 @@ In this tutorial we will perform static power analysis on source space MEG data.
 3. Group-Level Power Analysis
 4. Subject-Level Power Analysis
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/mkd2e>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/bk56q>`_ for the expected output.
 """
 
 #%%
@@ -26,7 +26,7 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # Download the dataset
 # ********************
 # 
-# We will download example data hosted on `OSF <https://osf.io/zxb6c/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
+# We will download example data hosted on `OSF <https://osf.io/by2tc/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
 #
 #     !pip install osfclient
 #
@@ -36,7 +36,7 @@ import os
 def get_data(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/datasets/{name}.zip")
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
@@ -51,7 +51,7 @@ os.listdir("notts_task_10_subj")
 # Load the data
 # *************
 # 
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osf.io/ejxut>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
 from osl_dynamics.data import Data
 
@@ -185,7 +185,7 @@ power.save(
 # Statistical Significance Testing
 # ********************************
 # 
-# When we see differences in groups, we should perform a statistical significance test to rule out the possibility that we're observing the effect purely by chance. To compare the groups we'll use a **maximum statistic permutation test**. See the `Statistical Significance Testing tutorial <https://osf.io/ft3rm>`_ for a detailed explanation.
+# When we see differences in groups, we should perform a statistical significance test to rule out the possibility that we're observing the effect purely by chance. To compare the groups we'll use a **maximum statistic permutation test**. See the `Statistical Significance Testing tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/statistical_significance_testing.html>`_ for a detailed explanation.
 
 def null_distribution(vectors, real_assignments, n_perm):
     # Randomly generate group assignments by shuffling the real assignments

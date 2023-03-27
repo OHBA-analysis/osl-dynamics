@@ -8,7 +8,7 @@ In this tutorial we will perform static AEC analysis on source space MEG data. T
 2. Calculating AEC Networks
 3. Network Analysis
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/k9qzw>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/quwyp>`_ for the expected output.
 """
 
 #%%
@@ -25,7 +25,7 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # Download the dataset
 # ********************
 # 
-# We will download example data hosted on `OSF <https://osf.io/zxb6c/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
+# We will download example data hosted on `OSF <https://osf.io/by2tc/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
 #
 #     !pip install osfclient
 #
@@ -35,7 +35,7 @@ import os
 def get_data(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/datasets/{name}.zip")
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
@@ -50,7 +50,7 @@ os.listdir("notts_task_10_subj")
 # Load the data
 # *************
 # 
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osf.io/ejxut>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
 from osl_dynamics.data import Data
 
@@ -302,7 +302,7 @@ connectivity.save(
 # Comparing groups
 # ****************
 # 
-# We could also average over sub-groups. For example, these sub-groups can be healthy vs diseased participants. Let's use the same grouping as the `Static Power Analysis tutorial <https://osf.io/mkd2e>`_.
+# We could also average over sub-groups. For example, these sub-groups can be healthy vs diseased participants. Let's use the same grouping as the `Static Power Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/static_power_analysis.html>`_.
 
 # Group assignments:
 # - 0 is group 1
@@ -337,7 +337,7 @@ connectivity.save(
 # Statistical Significance Testing
 # ********************************
 # 
-# Let's see if the difference in AEC is significant. We'll use a **maximum statistic permutation test**. See the `Statistical Significance Testing tutorial <https://osf.io/ft3rm>`_ for more details.
+# Let's see if the difference in AEC is significant. We'll use a **maximum statistic permutation test**. See the `Statistical Significance Testing tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/statistical_significance_testing.html>`_ for more details.
 # 
 # First, we need to turn the subject-specific connectivity matrices into subject-specific vectors. To do this we simple take the upper triangle.
 

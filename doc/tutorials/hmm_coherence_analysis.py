@@ -8,21 +8,21 @@ In this tutorial we will analyse the dynamic networks inferred by a Hidden Marko
 2. State Coherence Analysis
 3. Coherence vs Power Plots
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/wf34k>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/2jcux>`_ for the expected output.
 """
 
 #%%
 # Downloading a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# First, let's download a model that's already been trained. See the `HMM Training on Real Data tutorial <https://osf.io/cvd7m>`_ for how to train an HMM.
+# First, let's download a model that's already been trained. See the `HMM Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_training_real_data.html>`_ for how to train an HMM.
 
 import os
 
 def get_trained_model(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/trained_models/{name}.zip")
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {name}"
@@ -170,7 +170,7 @@ connectivity.save(
 # Data-driven thresholding: Gaussian Mixture Model (GMM)
 # ******************************************************
 # 
-# In the above plots we arbitrarily selected a percentile to plot. However, different coherence networks would have a differing number of interesting connections. One approach to improve the thresholding in a data driven way is to use a two-component GMM to select edges. This was described in more detail in the `Static AEC Analysis tutorial <https://osf.io/k9qzw>`_.
+# In the above plots we arbitrarily selected a percentile to plot. However, different coherence networks would have a differing number of interesting connections. One approach to improve the thresholding in a data driven way is to use a two-component GMM to select edges. This was described in more detail in the `Static AEC Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/static_aec_analysis.html>`_.
 # 
 # Let's look at the coherence maps we get using a GMM to threshold. We will look at the first spectral component.
 

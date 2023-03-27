@@ -8,21 +8,21 @@ In this tutorial we will analyse the dynamic networks inferred by a Hidden Marko
 2. State Power Spectra
 3. State Power Maps
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/a423j>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/tyjac>`_ for the expected output.
 """
 
 #%%
 # Download a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# First, let's download a model that's already been trained on a resting-state dataset. See the `HMM Training on Real Data tutorial <https://osf.io/cvd7m>`_ for how to train an HMM.
+# First, let's download a model that's already been trained on a resting-state dataset. See the `HMM Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_training_real_data.html>`_ for how to train an HMM.
 
 import os
 
 def get_trained_model(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/trained_models/{name}.zip")
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {name}"

@@ -8,21 +8,21 @@ In this tutorial we will analyse the dynamic networks inferred by a Hidden Marko
 2. Summary Statistics
 3. Comparing Groups
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ryb9q>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/2zp4e>`_ for the expected output.
 """
 
 #%%
 # Download a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# First, let's download a model that's already been trained on a resting-state dataset. See the `HMM Training on Real Data tutorial <https://osf.io/cvd7m>`_ for how to train an HMM.
+# First, let's download a model that's already been trained on a resting-state dataset. See the `HMM Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for how to train an HMM.
 
 import os
 
 def get_trained_model(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/trained_models/{name}.zip")
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {name}"
@@ -202,7 +202,7 @@ sns.violinplot(data=ss_df, x="state", y="fo", hue="group", split=True)
 # Statistical Significance Testing
 # ********************************
 #
-# We will use a **maximum statistic permutation test** to see if any differences in summary statistics between our groups are significant. See the `Statistical Significance Testing tutorial <https://osf.io/ft3rm>`_ for further details.
+# We will use a **maximum statistic permutation test** to see if any differences in summary statistics between our groups are significant. See the `Statistical Significance Testing tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/statistical_significance_testing.html>`_ for further details.
 
 def null_distribution(vectors, real_assignments, n_perm):
     # Randomly generate group assignments by shuffling the real assignments

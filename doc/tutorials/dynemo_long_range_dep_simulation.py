@@ -9,7 +9,7 @@ In this tutorial we will train a DyNeMo on simulated data and demonstrate its ab
 3. Getting Inferred Model Parameters
 4. Sampling from the Generative Model
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/6mrh3>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/neshp>`_ for the expected output.
 """
 
 #%%

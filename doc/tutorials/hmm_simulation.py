@@ -10,7 +10,7 @@ In this tutorial we will train a Hidden Markov Model (HMM) on simulated data. Th
 4. Getting Inferred Model Parameters
 5. Post-hoc Analysis
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ze63d>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/wc5sj>`_ for the expected output.
 """
 
 #%%

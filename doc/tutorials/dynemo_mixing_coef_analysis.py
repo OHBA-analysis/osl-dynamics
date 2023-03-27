@@ -8,21 +8,21 @@ In this tutorial we will analyse the dynamic networks inferred by DyNeMo on rest
 2. Summarizing the Mixing Coefficient Time Course
 3. Binarizing the Mixing Coefficeint Time Course
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/kxtsj>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/68cxf>`_ for the expected output.
 """
 
 #%%
 # Downloading a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# First, let's download a model that's already been trained on a resting-state dataset. See the `DyNeMo Training on Real Data tutorial <https://osf.io/u2gfm>`_ for how to train DyNeMo.
+# First, let's download a model that's already been trained on a resting-state dataset. See the `DyNeMo Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_training_real_data.html>`_ for how to train DyNeMo.
 
 import os
 
 def get_trained_model(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/trained_models/{name}.zip")
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {name}"
@@ -114,7 +114,7 @@ print(std_norm_alpha)
 # Binarizing the Mixing Coefficient Time Course
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the `HMM Summary Statistics Analysis tutorial <https://osf.io/ryb9q>`_ for further details.
+# If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the `HMM Summary Statistics Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for further details.
 # 
 # We have a couple options for binarizing the mixing coefficient time course:
 # 
@@ -240,7 +240,7 @@ print(fo)
 #%%
 # We can see the GMM thresholds identify more mode activations, which are reflected in the higher fractional occupancies.
 # 
-# We a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics Analysis tutorial <https://osf.io/ryb9q>`_ for more details.
+# We a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for more details.
 # 
 # Wrap Up
 # ^^^^^^^

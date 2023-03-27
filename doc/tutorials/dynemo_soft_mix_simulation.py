@@ -8,7 +8,7 @@ In this tutorial we will train a DyNeMo on simulated data which contains a mixtu
 2. Training DyNeMo
 3. Getting Inferred Model Parameters
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/2s64v>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/w3g7a>`_ for the expected output.
 """
 
 #%%

@@ -8,7 +8,7 @@ In this tutorial we will analyse the dynamic networks inferred by a Hidden Marko
 2. Epoching the Raw Data
 3. Epoching the HMM State Time Course
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/qrxwu>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/agrvz>`_ for the expected output.
 """
 
 #%%
@@ -18,14 +18,14 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # Download a trained model
 # ************************
 # 
-# First, let's download a model that's already been trained on a task dataset. See the `HMM Training on Real Data tutorial <https://osf.io/cvd7m>`_ for how to train an HMM.
+# First, let's download a model that's already been trained on a task dataset. See the `HMM Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_training_real_data.html>`_ for how to train an HMM.
 
 import os
 
 def get_trained_model(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/trained_models/{name}.zip")
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {name}"
@@ -49,7 +49,7 @@ for sub_dir in sub_dirs:
 def get_data(name):
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p zxb6c fetch Dynamics/data/datasets/{name}.zip")
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
@@ -61,7 +61,7 @@ get_data("notts_task_10_subj")
 os.listdir("notts_task_10_subj")
 
 #%%
-# We can see the dataset contains numpy files for 10 subjects and a pickle file called `events.pkl`. Let's load the subject data using the Data class. See the `Loading Data tutorial <https://osf.io/ejxut>`_ for further details.
+# We can see the dataset contains numpy files for 10 subjects and a pickle file called `events.pkl`. Let's load the subject data using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
 from osl_dynamics.data import Data
 
@@ -219,7 +219,7 @@ plotting.plot_alpha(stc[0], n_samples=2000)
 # State power maps
 # ****************
 # 
-# Another thing we could to do to get a feel for the HMM fit is plot the state power maps, see the `HMM Power Analysis tutorial <https://osf.io/a423j>`_ for more details on how this is calculated.
+# Another thing we could to do to get a feel for the HMM fit is plot the state power maps, see the `HMM Power Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_power_analysis.html>`_ for more details on how this is calculated.
 
 from osl_dynamics.analysis import power
 
@@ -247,7 +247,7 @@ power.save(
 # Aligning the state time course to the event timings
 # ***************************************************
 # 
-# When we trained the HMM, we prepared the data using time-delay embedding and principal component analysis. As explained in the `HMM Training on Real Data tutorial <https://osf.io/cvd7m>`_ when we do this, we lose a few time points from each subject. This means the event timings in `event_indices` are slightly off. To prepare the data we used `n_embedding=15`, which meant 7 data points are lost from the start and end of each subject's time series. To account for this we simply need to subtract 7 from the event timings. Let's do this.
+# When we trained the HMM, we prepared the data using time-delay embedding and principal component analysis. As explained in the `HMM Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_training_real_data.html>`_ when we do this, we lose a few time points from each subject. This means the event timings in `event_indices` are slightly off. To prepare the data we used `n_embedding=15`, which meant 7 data points are lost from the start and end of each subject's time series. To account for this we simply need to subtract 7 from the event timings. Let's do this.
 
 # Account for losing 7 data points due to time-delay embedding
 event_indices_tde = [v - 7 for v in event_indices]
@@ -357,7 +357,7 @@ plotting.plot_line(
 # Statistical significance testing
 # ********************************
 # 
-# To test for significance we will use a sign flipping permutation test and correct for multiple comparisons using the maximum statistic. See the `Statistical Significance Testing tutorial <https://osf.io/ft3rm>`_ for further details. To perform the test we will build our null distribution by:
+# To test for significance we will use a sign flipping permutation test and correct for multiple comparisons using the maximum statistic. See the `Statistical Significance Testing tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/statistical_significance_testing.html>`_ for further details. To perform the test we will build our null distribution by:
 # 
 # - Multiplying the subject-specific average state activations by +/-1 - this is the 'sign flipping' part of the test.
 # - Calculating a one-sample t-statistic using zero for the population mean. This will tell us how far from zero the group average is accounting for the variance. We will use scipy's `ttest_1samp <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ttest_1samp.html>`_ function to calculate this.

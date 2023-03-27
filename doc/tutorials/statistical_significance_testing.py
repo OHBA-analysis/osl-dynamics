@@ -8,7 +8,7 @@ In this tutorial we'll covers how to perform permutation tests for checking whet
 2. Permutation testing with a Bonferroni correction for multiple comparisons
 3. Maximum statistic permutation testing
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ft3rm>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/trfky>`_ for the expected output.
 """
 
 #%%
