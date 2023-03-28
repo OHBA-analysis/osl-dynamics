@@ -39,4 +39,4 @@ inputs = "training_data"
 # This creates the following directories in savedir:
 # - /trained_model, which contains the trained model.
 # - /inf_params, which contains the inferred parameters.
-run_pipeline(config, inputs, savedir="ae_results")
+run_pipeline(config, inputs, savedir="ae-hmm_results")

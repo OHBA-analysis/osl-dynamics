@@ -44,11 +44,16 @@ def load_config(config):
 def run_pipeline(config, inputs, savedir="./"):
     """Run a full pipeline.
 
+    See the `toolbox examples
+    <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
+    for scripts that use the config API this.
+
     Parameters
     ----------
     config : str or dict
         Path to yaml file, string to convert to dict, or dict
-        containing the config.
+        containing the config. Recommended defaults are given in the `toolbox examples
+        <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_.
     inputs : str or list
         Inputs to pass to osl_dynamics.data.Data.
     savedir : str
@@ -77,12 +82,15 @@ def run_pipeline(config, inputs, savedir="./"):
         _logger.error(e)
 
     # See if we pass parameters related to initialisation (n_init, n_init_epochs)
-    n_init = config["hmm"].pop("n_init", None)
-    n_init_epochs = config["hmm"].pop("n_init_epochs", None)
+    n_init = config[model_name].pop("n_init", None)
+    n_init_epochs = config[model_name].pop("n_init_epochs", None)
+    init_take = config[model_name].pop("init_take", None)
     if n_init is not None and n_init_epochs is None:
         n_init_epochs = 1
     if n_init_epochs is not None and n_init is None:
         n_init = 1
+    if init_take is None:
+        init_take = 1
 
     if "multitaper_spectra" in config and "regression_spectra" in config:
         e = ValueError("Please only specify one spectra section.")
@@ -98,7 +106,12 @@ def run_pipeline(config, inputs, savedir="./"):
     _logger.info("Loading data")
     from osl_dynamics.data import Data  # moved inside the function for fast imports
 
-    training_data = Data(inputs)
+    # See if we're loading the data in parallel
+    if "data_prep" in config:
+        data_n_jobs = config["data_prep"].pop("n_jobs", 1)
+
+    # Create the Data object
+    training_data = Data(inputs, n_jobs=data_n_jobs)
 
     # Prepare data
     if "data_prep" in config:
@@ -123,7 +136,11 @@ def run_pipeline(config, inputs, savedir="./"):
     # Initialisation
     if n_init is not None and model_name == "hmm":
         model.random_state_time_course_initialization(
-            training_data, n_init_epochs, n_init
+            training_data, n_init_epochs, n_init, take=init_take
+        )
+    if n_init is not None and model_name == "dynemo":
+        model.random_subset_initialization(
+            training_data, n_init_epochs, n_init, take=init_take
         )
 
     # Train the model
@@ -135,9 +152,16 @@ def run_pipeline(config, inputs, savedir="./"):
     _logger.info(f"Saving model to: {trained_model_dir}")
     model.save(trained_model_dir)
 
+    # Save the free energy
+    #
+    # Note, for DyNeMo the 'loss' in the history object is the
+    # free energy, whereas for the HMM the 'loss' in the history
+    # object is the log-likelihood
+    if model_name == "hmm":
+        free_energy = model.free_energy(training_data)
+        history["free_energy"] = free_energy
+
     # Save the free energy and training history
-    free_energy = model.free_energy(training_data)
-    history["free_energy"] = free_energy
     pickle.dump(history, open(trained_model_dir + "/history.pkl", "wb"))
 
     # Get inferred parameters

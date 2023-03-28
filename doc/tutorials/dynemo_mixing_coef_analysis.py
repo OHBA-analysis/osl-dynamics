@@ -61,7 +61,7 @@ from osl_dynamics.utils import plotting
 plotting.plot_alpha(alpha[0], n_samples=2000)
 
 #%%
-# Plotting the raw values of the mixing coefficients as provided by DyNeMo it gives the impression that one mode dominates, in this case mode 4. However, the model DyNeMo uses is $C_t = \displaystyle\sum_j \alpha_{jt} D_j$, where $\alpha_{jt}$ are the mixing coefficients and $D_j$ are the mode covariances. This means a mode can have a small $\alpha_{jt}$ value but still be a large contributor to the time-varying covariance $C_t$.
+# Plotting the raw values of the mixing coefficients as provided by DyNeMo it gives the impression that one mode dominates, in this case mode 4. However, the model DyNeMo uses is :math:`C_t = \displaystyle\sum_j \alpha_{jt} D_j`, where :math:`\alpha_{jt}` are the mixing coefficients and :math:`D_j` are the mode covariances. This means a mode can have a small :math:`\alpha_{jt}` value but still be a large contributor to the time-varying covariance :math:`C_t`.
 # 
 # Normalizing the mixing coefficients
 # ***********************************
@@ -240,7 +240,7 @@ print(fo)
 #%%
 # We can see the GMM thresholds identify more mode activations, which are reflected in the higher fractional occupancies.
 # 
-# We a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for more details.
+# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for more details.
 # 
 # Wrap Up
 # ^^^^^^^
