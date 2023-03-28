@@ -74,7 +74,7 @@ Note, the job will inherit the environment and working directory from when you s
 
 Submit with: ``sbatch job.sh``.
 
-Monitor jobs: ``watch squeue <username>``.
+Monitor jobs: ``watch squeue -u <username>``.
 
 Cancel a particular job: ``scancel <job-id>``.
 
