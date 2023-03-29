@@ -222,8 +222,8 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
                         covariances[i][k].flatten(), covariances[0][j].flatten()
                     )[0, 1]
                 else:
-                    F[j, k] = -metrics.rv_coefficient(
-                        [covariances[i][k], covariances[0][j]]
+                    F[j, k] = -metrics.pairwise_rv_coefficient(
+                        np.array([covariances[i][k], covariances[0][j]])
                     )[0, 1]
         order = linear_sum_assignment(F)[1]
 
