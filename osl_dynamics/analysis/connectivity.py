@@ -622,12 +622,26 @@ def threshold(
     # Set diagonal to nan
     c[:, :, range(n_channels), range(n_channels)] = np.nan
 
+    # Are the connectivity matrices symmetric?
+    c_is_symmetric = array_ops.check_symmetry(c, precision=1e-6)
+    m, n = np.triu_indices(n_channels, k=1)
+
     # Which edges are greater than the threshold?
     edges = np.empty([n_components, n_modes, n_channels, n_channels], dtype=bool)
     for i in range(n_components):
         for j in range(n_modes):
-            edges[i, j] = c[i, j] > np.nanpercentile(c[i, j], percentile[i, j])
-
+            if c_is_symmetric[i, j]:
+                # We have a symmetric connectivity matrix
+                # Threshold the upper triangle and copy to the lower triangle
+                edges[i, j, m, n] = c[i, j, m, n] > np.nanpercentile(
+                    c[i, j, m, n], percentile[i, j]
+                )
+                edges[i, j, n, m] = edges[i, j, m, n]
+            else:
+                # We have a directed connectivity matrix
+                # Threshold each entry independently
+                edges[i, j] = c[i, j] > np.nanpercentile(c[i, j], percentile[i, j])
+            
     if return_edges:
         return np.squeeze(edges)
 
