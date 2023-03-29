@@ -146,7 +146,7 @@ class FisherKernel:
         initial_distribution = np.maximum(initial_distribution, 1e-6)
         initial_distribution /= np.sum(initial_distribution)
 
-        d_initial_distribution = -gamma[0] / initial_distribution
+        d_initial_distribution = gamma[0] / initial_distribution
         return d_initial_distribution
 
     def _get_tf_gradients(self, inputs):
