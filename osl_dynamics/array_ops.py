@@ -232,3 +232,36 @@ def validate(
         raise ValueError(error_message)
 
     return array
+
+
+def check_symmetry(mat, precision=1e-6):
+    """Checks if one or more matrices are symmetric.
+
+    Parameters
+    ----------
+    mat : np.ndarray or list of np.ndarray
+        Matrices to be checked. Shape of a matrix should be (..., N, N).
+    precision : float
+        Precision for comparing values. Corresponds to an absolute tolerance parameter.
+        Default is 1e-6.
+
+    Returns
+    -------
+    symmetry : np.ndarray
+        Array indicating whether matrices are symmetric.
+    """
+    mat = np.array(mat)
+    if mat.ndim < 2:
+        raise ValueError("Input matrix must be an array with shape (..., N, N).")
+    transpose_axes = np.concatenate((np.arange(mat.ndim - 2), [-1, -2]))
+    symmetry = np.all(
+        np.isclose(
+            mat,
+            np.transpose(mat, axes=transpose_axes),
+            rtol=0,
+            atol=precision,
+            equal_nan=True,
+        ),
+        axis=(-1, -2),
+    )
+    return symmetry
