@@ -16,13 +16,15 @@ class FisherKernel:
             )
         self.model = model
 
-    def get_kernel_matrix(self, dataset):
+    def get_kernel_matrix(self, dataset, batch_size=None):
         """Get the Fisher kernel matrix.
 
         Parameters
         ----------
         dataset : osl_dynamics.data.Data
             Data.
+        batch_size : int
+            Batch size. If None, use the model's batch size.
 
         Returns
         -------
@@ -31,6 +33,8 @@ class FisherKernel:
         """
         _logger.info("Getting Fisher kernel matrix")
         n_subjects = dataset.n_subjects
+        if batch_size is not None:
+            self.model.config.batch_size = batch_size
         dataset = self.model.make_dataset(dataset, concatenate=False, shuffle=False)
 
         # Initialise list to hold subject features
