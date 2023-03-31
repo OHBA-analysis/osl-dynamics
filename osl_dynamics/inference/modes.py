@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 from tqdm.auto import trange
 from scipy.optimize import linear_sum_assignment
 
-from osl_dynamics.utils import plotting
 from osl_dynamics import analysis, array_ops
 from osl_dynamics.inference import metrics
+from osl_dynamics.utils import plotting
 from osl_dynamics.utils.misc import override_dict_defaults
 
 
@@ -166,7 +166,6 @@ def gmm_time_courses(
                     ax=ax,
                     **plot_kwargs,
                 )
-            ax.set_ylim([0, 0.6])
             ax.set_title(f"Averaged Threshold = {avg_threshold[mode]:.3}")
             handles, labels = plt.gca().get_legend_handles_labels()
             label_class = dict(zip(labels, handles))

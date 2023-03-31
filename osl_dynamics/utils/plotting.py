@@ -722,6 +722,9 @@ def plot_gmm(
     ----------
     data : np.ndarray
         Raw data to plot as a histogram.
+    amplitudes : np.ndarray
+        Amplitudes of each Gaussian component.
+        Mixture weights scaled by mixture covariances.
     means : np.ndarray
         Mean of each Gaussian component.
     stddevs : np.ndarray
@@ -788,19 +791,21 @@ def plot_gmm(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot histogram
-    ax.hist(data, bins=bins, histtype="step", density=True)
+    ax.hist(data, bins=bins, histtype="step", density=True, color="tab:blue")
 
     # Plot Gaussian components
     x = np.arange(min(data), max(data), (max(data) - min(data)) / bins)
     y1 = amplitudes[0] * np.exp(-((x - means[0]) ** 2) / (2 * stddevs[0] ** 2))
     y2 = amplitudes[1] * np.exp(-((x - means[1]) ** 2) / (2 * stddevs[1] ** 2))
-    ax.plot(x, y1, label="Off")
-    ax.plot(x, y2, label="On")
-    ax.plot(x, y1 + y2)
+    ax.plot(x, y1, label="Off", color="tab:orange")
+    ax.plot(x, y2, label="On", color="tab:green")
+    ax.plot(x, y1 + y2, color="tab:red")
 
     # Set axis range
-    ax.set_xlim(x_range[0], x_range[1])
-    ax.set_ylim(y_range[0], y_range[1])
+    if not any(r is None for r in x_range):
+        ax.set_xlim(x_range[0], x_range[1])
+    if not any(r is None for r in y_range):
+        ax.set_ylim(y_range[0], y_range[1])
 
     # Set title and axis labels
     ax.set_title(title)
@@ -808,7 +813,8 @@ def plot_gmm(
     ax.set_ylabel(y_label)
 
     # Add legend
-    ax.legend(loc=legend_loc)
+    if legend_loc is not None:
+        ax.legend(loc=legend_loc)
 
     # Save the figure if a filename has been pass
     if filename is not None:
