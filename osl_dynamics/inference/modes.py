@@ -317,7 +317,9 @@ def switching_rates(state_time_course, sampling_frequency=None):
     return analysis.modes.switching_rates(state_time_course, sampling_frequency)
 
 
-def convert_to_mne_raw(alpha, raw, ch_names=None, n_embeddings=1, verbose=False):
+def convert_to_mne_raw(
+    alpha, raw, ch_names=None, n_embeddings=None, n_window=None, verbose=False
+):
     """Convert a time series to an MNE Raw object.
 
     Parameters
@@ -328,9 +330,12 @@ def convert_to_mne_raw(alpha, raw, ch_names=None, n_embeddings=1, verbose=False)
         MNE Raw object to extract info from. If a str is passed, it must be the
         path to a fif file containing the Raw object.
     ch_names : list
-        Name for each channel.
+        Name for each channel. Optional.
     n_embeddings : int
-        Number of embeddings that was used to prepare the training data.
+        Number of embeddings that was used to prepare time-delay embedded
+        training data. Optional.
+    n_window : int
+        Number of samples used to smooth amplitude envelope data. Optional.
     verbose : bool
         Should we print a verbose?
 
@@ -339,6 +344,11 @@ def convert_to_mne_raw(alpha, raw, ch_names=None, n_embeddings=1, verbose=False)
     alpha_raw : mne.io.Raw
         Raw object for alpha.
     """
+    # How many time points from the start of parcellated data should we remove?
+    if n_embeddings is not None and n_window is not None:
+        raise ValueError("Cannot pass both n_embeddings and n_window.")
+    n_trim = n_embeddings or n_window or 1
+    n_trim = n_trim // 2
 
     # Load the Raw object
     if isinstance(raw, str):
@@ -350,13 +360,13 @@ def convert_to_mne_raw(alpha, raw, ch_names=None, n_embeddings=1, verbose=False)
     )
     indices = raw.time_as_index(times)
 
+    # Remove time points lost due to time delay embedding
+    indices = indices[n_trim:]
+
     # Create an array for the full time series including bad segments
     n_samples = raw.times.shape[0]
     n_channels = alpha.shape[1]
     alpha_ = np.zeros([n_samples, n_channels], dtype=np.float32)
-
-    # Shift the indices to account for the impact of time embedding
-    indices += n_embeddings // 2
 
     # Trim the indices we lost when we separate the time series into sequences
     indices = indices[: alpha.shape[0]]
