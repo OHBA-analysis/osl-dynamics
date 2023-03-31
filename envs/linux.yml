@@ -3,6 +3,7 @@ dependencies:
   - python=3
   - pip
   - pip:
+    - glmtools
     - mat73
     - matplotlib
     - mne
@@ -11,7 +12,6 @@ dependencies:
     - numba
     - numpy
     - pandas
-    - pre-commit
     - pyyaml
     - pqdm
     - scipy
