@@ -17,6 +17,7 @@ dependencies:
     - scipy
     - scikit-learn
     - seaborn
+    - tabulate
     - tensorflow
     - tensorflow_probability
     - tqdm
