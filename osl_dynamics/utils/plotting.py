@@ -96,6 +96,7 @@ def save(fig, filename, tight_layout=True):
     if tight_layout:
         fig.tight_layout()
     fig.savefig(filename)
+    plt.close(fig)
 
 
 def close(fig=None):
