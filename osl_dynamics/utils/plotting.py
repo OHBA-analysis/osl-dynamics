@@ -81,7 +81,7 @@ def show(tight_layout=True):
 
 
 def save(fig, filename, tight_layout=True):
-    """Saves a figure.
+    """Save and close a figure.
 
     Parameters
     ----------
@@ -96,7 +96,7 @@ def save(fig, filename, tight_layout=True):
     if tight_layout:
         fig.tight_layout()
     fig.savefig(filename)
-    plt.close(fig)
+    close(fig)
 
 
 def close(fig=None):
@@ -217,9 +217,9 @@ def plot_line(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
 
     # Validation
@@ -303,8 +303,7 @@ def plot_line(
     # Save figure
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -366,9 +365,9 @@ def plot_scatter(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
 
     # Validation
@@ -467,8 +466,7 @@ def plot_scatter(
     # Save figure
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -521,9 +519,9 @@ def plot_hist(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
 
     # Validation
@@ -590,8 +588,7 @@ def plot_hist(
     # Save the figure if a filename has been pass
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -638,9 +635,9 @@ def plot_bar_chart(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
 
     # Validation
@@ -695,8 +692,7 @@ def plot_bar_chart(
     # Save the figure if a filename has been pass
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -753,9 +749,9 @@ def plot_gmm(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
 
     # Validation
@@ -814,8 +810,7 @@ def plot_gmm(
     # Save the figure if a filename has been pass
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -871,9 +866,9 @@ def plot_violin(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
 
     # Validation
@@ -943,8 +938,7 @@ def plot_violin(
     # Save the figure if a filename has been pass
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -979,9 +973,9 @@ def plot_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
     time_series = np.asarray(time_series)
     n_samples = min(n_samples or np.inf, time_series.shape[0])
@@ -1038,8 +1032,7 @@ def plot_time_series(
     # Save figure
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -1072,9 +1065,9 @@ def plot_separate_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if filename=None.
     """
     time_series = np.asarray(time_series)
     n_samples = n_samples or min([ts.shape[0] for ts in time_series])
@@ -1117,8 +1110,8 @@ def plot_separate_time_series(
     # Save figure
     if filename is not None:
         save(fig, filename)
-
-    return fig, axes
+    else:
+        return fig, axes
 
 
 def plot_epoched_time_series(
@@ -1170,9 +1163,9 @@ def plot_epoched_time_series(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None.
+        Matplotlib figure object. Only returned if ax=None and filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None.
+        Matplotlib axis object(s). Only returned if ax=None and filename=None.
     """
     from osl_dynamics.data.task import epoch_mean
 
@@ -1230,8 +1223,7 @@ def plot_epoched_time_series(
     # Save the figure if a filename has been passed
     if filename is not None:
         save(fig, filename)
-
-    if create_fig:
+    elif create_fig:
         return fig, ax
 
 
@@ -1273,9 +1265,9 @@ def plot_matrices(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if filename=None.
     """
     matrix = np.array(matrix)
     if matrix.ndim == 2:
@@ -1333,8 +1325,8 @@ def plot_matrices(
 
     if filename is not None:
         save(fig, filename, tight_layout=False)
-
-    return fig, axes
+    else:
+        return fig, axes
 
 
 def plot_connections(
@@ -1372,9 +1364,9 @@ def plot_connections(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if filename=None.
     """
     weights = np.abs(weights)
     x, y = np.diag_indices_from(weights)
@@ -1504,8 +1496,8 @@ def plot_connections(
 
     if filename is not None:
         save(fig, filename)
-
-    return fig, ax
+    else:
+        return fig, ax
 
 
 def topoplot(
@@ -1560,7 +1552,7 @@ def topoplot(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     """
     topology = Topology(layout)
 
@@ -1581,8 +1573,8 @@ def topoplot(
 
     if filename is not None:
         save(fig, filename)
-
-    return fig
+    else:
+        return fig
 
 
 def plot_brain_surface(
@@ -1685,9 +1677,9 @@ def plot_alpha(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if filename=None.
     """
     n_alphas = len(alpha)
     n_modes = max(a.shape[1] for a in alpha)
@@ -1758,8 +1750,8 @@ def plot_alpha(
     # Save to file if a filename as been passed
     if filename is not None:
         save(fig, filename, tight_layout=False)
-
-    return fig, axes
+    else:
+        return fig, axes
 
 
 def plot_mode_lifetimes(
@@ -1809,9 +1801,9 @@ def plot_mode_lifetimes(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if filename=None.
     """
     from osl_dynamics.analysis import modes
 
@@ -1893,8 +1885,8 @@ def plot_mode_lifetimes(
     # Save file is a filename has been passed
     if filename is not None:
         save(fig, filename)
-
-    return fig, axes
+    else:
+        return fig, axes
 
 
 def plot_psd_topo(
@@ -1921,9 +1913,9 @@ def plot_psd_topo(
     Returns
     -------
     fig : matplotlib.pyplot.figure
-        Matplotlib figure object.
+        Matplotlib figure object. Only returned if filename=None.
     ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s).
+        Matplotlib axis object(s). Only returned if filename=None.
     """
 
     if parcellation_file is not None:
@@ -1962,5 +1954,5 @@ def plot_psd_topo(
     # Save
     if filename is not None:
         save(fig, filename, tight_layout=False)
-
-    return fig, ax
+    else:
+        return fig, ax
