@@ -22,6 +22,7 @@ def fit_gaussian_mixture(
     n_sigma=0,
     label_order="mean",
     sklearn_kwargs={},
+    return_statistics=False,
     show_plot=False,
     plot_filename=None,
     plot_kwargs={},
@@ -53,6 +54,8 @@ def fit_gaussian_mixture(
         How do we order the inferred classes?
     sklearn_kwargs : dict
         Keyword arguments to pass to the sklearn class.
+    return_statistics: bool
+        Should we return statistics of the Gaussian mixture components?
     show_plot : bool
         Should we show the GMM fit to the distribution of X.
     plot_filename : str
@@ -180,5 +183,16 @@ def fit_gaussian_mixture(
         if plot_filename is not None:
             plotting.save(fig, plot_filename)
             plotting.close()
+
+    # Return Gaussian component metrics
+    if return_statistics:
+        metrics = dict(
+            threshold=threshold_,
+            data=X_[:, 0],
+            amplitudes=amplitudes,
+            means=means,
+            stddevs=stddevs,
+        )
+        return threshold, metrics
 
     return threshold

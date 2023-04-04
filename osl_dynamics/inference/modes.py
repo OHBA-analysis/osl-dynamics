@@ -6,11 +6,13 @@ from pathlib import Path
 
 import mne
 import numpy as np
+import matplotlib.pyplot as plt
 from tqdm.auto import trange
 from scipy.optimize import linear_sum_assignment
 
 from osl_dynamics import analysis, array_ops
 from osl_dynamics.inference import metrics
+from osl_dynamics.utils import plotting
 from osl_dynamics.utils.misc import override_dict_defaults
 
 
@@ -103,45 +105,74 @@ def gmm_time_courses(
     n_modes = alpha[0].shape[1]
 
     gmm_tcs = []
+    gmm_metrics = []
     for sub in trange(n_subjects, desc="Fitting GMMs"):
         # Initialise an array to hold the gmm thresholded time course
         gmm_tc = np.empty(alpha[sub].shape, dtype=int)
+        gmm_metric = []
 
         # Loop over modes
         for mode in range(n_modes):
             a = alpha[sub][:, mode]
-
-            # GMM plot filename
-            if filename is not None:
-                plot_filename = "{fn.parent}/{fn.stem}_{sub:0{w1}d}_{mode:0{w2}d}{fn.suffix}".format(
-                    fn=Path(filename),
-                    sub=sub,
-                    mode=mode,
-                    w1=len(str(n_subjects)),
-                    w2=len(str(n_modes)),
-                )
-            else:
-                plot_filename = None
 
             # Fit the GMM
             default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3}
             sklearn_kwargs = override_dict_defaults(
                 default_sklearn_kwargs, sklearn_kwargs
             )
-            threshold = analysis.gmm.fit_gaussian_mixture(
+            threshold, metrics = analysis.gmm.fit_gaussian_mixture(
                 a,
                 logit_transform=logit_transform,
                 standardize=standardize,
                 p_value=p_value,
                 sklearn_kwargs=sklearn_kwargs,
-                plot_filename=plot_filename,
-                plot_kwargs=plot_kwargs,
+                return_statistics=True,
                 log_message=False,
             )
             gmm_tc[:, mode] = a > threshold
+            gmm_metric.append(metrics)
 
-        # Add to list containing subject-specific time courses
+        # Add to list containing subject-specific time courses and component metrics
         gmm_tcs.append(gmm_tc)
+        gmm_metrics.append(gmm_metric)
+
+    # Visualise subject-specific time courses in one plot per mode
+    avg_threshold = [
+        np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_subjects)])
+        for m in range(n_modes)
+    ]
+    if filename:
+        for mode in range(n_modes):
+            # GMM plot filename
+            if filename is not None:
+                plot_filename = "{fn.parent}/{fn.stem}{mode:0{w}d}{fn.suffix}".format(
+                    fn=Path(filename),
+                    mode=mode,
+                    w=len(str(n_modes)),
+                )
+            else:
+                plot_filename = None
+
+            # Subject-specific GMM plots per mode
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 4))
+            for sub in range(n_subjects):
+                metric = gmm_metrics[sub][mode]
+                plotting.plot_gmm(
+                    metric["data"],
+                    metric["amplitudes"],
+                    metric["means"],
+                    metric["stddevs"],
+                    legend_loc=None,
+                    ax=ax,
+                    **plot_kwargs,
+                )
+            ax.set_title(f"Averaged Threshold = {avg_threshold[mode]:.3}")
+            handles, labels = plt.gca().get_legend_handles_labels()
+            label_class = dict(zip(labels, handles))
+            ax.legend(label_class.values(), label_class.keys(), loc=1)
+            ax.axvline(avg_threshold[mode], color="black", linestyle="--")
+            plotting.save(fig, plot_filename)
+            plotting.close()
 
     return gmm_tcs
 
