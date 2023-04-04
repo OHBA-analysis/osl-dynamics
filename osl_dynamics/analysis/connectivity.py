@@ -90,7 +90,7 @@ def sliding_window_connectivity(
         sliding_window_conn.append(swc)
 
     if concatenate or len(sliding_window_conn) == 1:
-        sliding_window_conn = sliding_window_conn[0]
+        sliding_window_conn = np.concatenate(sliding_window_conn)
 
     return sliding_window_conn
 
@@ -641,7 +641,7 @@ def threshold(
                 # We have a directed connectivity matrix
                 # Threshold each entry independently
                 edges[i, j] = c[i, j] > np.nanpercentile(c[i, j], percentile[i, j])
-            
+
     if return_edges:
         return np.squeeze(edges)
 
