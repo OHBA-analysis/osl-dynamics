@@ -641,7 +641,7 @@ def threshold(
                 # We have a directed connectivity matrix
                 # Threshold each entry independently
                 edges[i, j] = c[i, j] > np.nanpercentile(c[i, j], percentile[i, j])
-            
+
     if return_edges:
         return np.squeeze(edges)
 
