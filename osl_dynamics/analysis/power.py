@@ -17,6 +17,70 @@ from osl_dynamics.analysis.spectral import get_frequency_args_range
 _logger = logging.getLogger("osl-dynamics")
 
 
+def sliding_window_power(
+    data, window_length, step_size=None, power_type="mean", concatenate=False
+):
+    """Calculate sliding window power.
+
+    Parameters
+    ----------
+    data : list or np.ndarray
+        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
+    window_length : int
+        Window length in samples.
+    step_size : int
+        Number of samples to slide the window along the time series.
+        If None is passed, then a 50% overlap is used.
+    power_type : str
+        Type of power to calculate. Can be "mean" or "var".
+    concatenate : bool
+        Should we concatenate the sliding window power from each subject
+        into one big time series?
+
+    Returns
+    -------
+    sliding_window_power : list or np.ndarray
+        Time series of power vectors. Shape is (n_subjects, n_windows, n_channels)
+        or (n_windows, n_channels).
+    """
+    # Validation
+    if power_type not in ["mean", "var"]:
+        raise ValueError(f"power_type must be 'mean' or 'var', not {power_type}")
+
+    if power_type == "var":
+        metric = np.var
+    else:
+        metric = np.mean
+
+    if step_size is None:
+        step_size = window_length // 2
+
+    if isinstance(data, np.ndarray):
+        if data.ndim != 3:
+            data = [data]
+
+    # Calculate sliding window power for each subject
+    sliding_window_power = []
+    for i in trange(len(data), desc="Calculating sliding window power"):
+        ts = data[i]
+        n_samples = ts.shape[0]
+        n_channels = ts.shape[1]
+        n_windows = (n_samples - window_length - 1) // step_size + 1
+
+        swp = np.empty([n_windows, n_channels], dtype=np.float32)
+        for j in range(n_windows):
+            window_ts = ts[j * step_size : j * step_size + window_length]
+            swp[j] = metric(window_ts, axis=0)
+
+        sliding_window_power.append(swp)
+
+    if concatenate or len(sliding_window_power) == 1:
+        sliding_window_power = np.concatenate(sliding_window_power)
+
+    return sliding_window_power
+
+
 def variance_from_spectra(
     frequencies,
     power_spectra,
