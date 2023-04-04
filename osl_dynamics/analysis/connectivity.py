@@ -67,30 +67,24 @@ def sliding_window_connectivity(
     # Calculate sliding window connectivity for each subject
     sliding_window_conn = []
     for i in trange(len(data), desc="Calculating connectivity"):
-        n_samples = data[i].shape[0]
-        n_channels = data[i].shape[1]
-
-        # Define indices of time points that start windows
-        time_idx = range(0, n_samples, step_size)
-        n_windows = n_samples // step_size
-
-        # Trim the data to only include complete window
-        data[i] = data[i][: n_windows * window_length]
+        ts = data[i]
+        n_samples = ts.shape[0]
+        n_channels = ts.shape[1]
+        n_windows = (n_samples - window_length - 1) // step_size + 1
 
         # Preallocate an array to hold moving average values
         swc = np.empty([n_windows, n_channels, n_channels], dtype=np.float32)
 
         # Compute connectivity matrix for each window
-        for k in range(n_windows):
-            j = time_idx[k]
-            window = data[i][j : j + window_length]
-            swc[k] = metric(window, rowvar=False)
+        for j in range(n_windows):
+            window_ts = ts[j * step_size : j * step_size + window_length]
+            swc[j] = metric(window_ts, rowvar=False)
 
         # Add to list to return
         sliding_window_conn.append(swc)
 
     if concatenate or len(sliding_window_conn) == 1:
-        sliding_window_conn = sliding_window_conn[0]
+        sliding_window_conn = np.concatenate(sliding_window_conn)
 
     return sliding_window_conn
 
@@ -641,7 +635,7 @@ def threshold(
                 # We have a directed connectivity matrix
                 # Threshold each entry independently
                 edges[i, j] = c[i, j] > np.nanpercentile(c[i, j], percentile[i, j])
-            
+
     if return_edges:
         return np.squeeze(edges)
 
