@@ -50,8 +50,8 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
 
     # Create design matrix
     DC = glm.design.DesignConfig()
-    for name, data in covariates.items():
-        DC.add_regressor(name=name, rtype="Parameteric", datainfo=name, preproc="z")
+    for name in covariates:
+        DC.add_regressor(name=name, rtype="Parametric", datainfo=name, preproc="z")
     DC.add_regressor(name="Mean", rtype="Constant")
     DC.add_contrast(name="Mean", values=[1] + [0] * len(covariates))
     design = DC.design_from_datainfo(data.info)
@@ -111,6 +111,8 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
 
     Returns
     -------
+    group_diff : np.ndarray
+        Group difference: Group1 - Group2. Shape is (features1, features2, ...).
     pvalues : np.ndarray
         P-values for the features. Shape is (features1, features2, ...).
     """
@@ -119,6 +121,11 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     ndim = data.ndim
     if ndim == 1:
         raise ValueError("data must be 2D or greater.")
+
+    # Calculate group difference
+    group1_mean = np.mean(data[assignments == 1], axis=0)
+    group2_mean = np.mean(data[assignments == 2], axis=0)
+    group_diff = group1_mean - group2_mean
 
     # Create GLM Dataset
     data = glm.data.TrialGLMData(
@@ -132,8 +139,8 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     DC = glm.design.DesignConfig()
     DC.add_regressor(name="Group1", rtype="Categorical", codes=1)
     DC.add_regressor(name="Group2", rtype="Categorical", codes=2)
-    for name, data in covariates.items():
-        DC.add_regressor(name=name, rtype="Parameteric", datainfo=name, preproc="z")
+    for name in covariates:
+        DC.add_regressor(name=name, rtype="Parametric", datainfo=name, preproc="z")
     DC.add_contrast(name="GroupDiff", values=[1, -1] + [0] * len(covariates))
     design = DC.design_from_datainfo(data.info)
 
@@ -164,4 +171,4 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     percentiles = stats.percentileofscore(null_dist, tstats)
     pvalues = 1 - percentiles / 100
 
-    return pvalues
+    return group_diff, pvalues
