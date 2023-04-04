@@ -318,6 +318,11 @@ class ModelBase:
         )
 
     def summary_string(self):
+        """Return a summary of the model as a string.
+
+        This is a modified version of the keras.Model.summary() method which
+        makes the output easier to parse.
+        """
         stringio = StringIO()
         self.model.summary(
             print_fn=lambda s: stringio.write(s + "\n"), line_length=1000
@@ -325,6 +330,19 @@ class ModelBase:
         return stringio.getvalue()
 
     def summary_table(self, renderer):
+        """Return a summary of the model as a table (HTML or LaTeX).
+
+        Parameters
+        ----------
+        renderer : str
+            Renderer to use. Either "html" or "latex".
+
+        Returns
+        -------
+        table : str
+            Summary of the model as a table.
+        """
+
         summary = self.summary_string()
 
         renderers = {"html": HTMLTable, "latex": LatexTable}
@@ -357,12 +375,19 @@ class ModelBase:
         return table.output()
 
     def html_summary(self):
+        """Return a summary of the model as an HTML table."""
         return self.summary_table(renderer="html")
 
     def latex_summary(self):
+        """Return a summary of the model as a LaTeX table."""
         return self.summary_table(renderer="latex")
 
     def _repr_html_(self):
+        """Display the model as an HTML table in Jupyter notebooks.
+
+        This is called when you type the variable name of the model in a
+        Jupyter notebook. It is unlikely that you will need to call this.
+        """
         return self.html_summary()
 
     def save_config(self, dirname):

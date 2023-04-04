@@ -6,10 +6,19 @@ import re
 
 
 def tex_escape(text):
+    """Escape characters which require control sequences in text for use in LaTeX.
+
+    Parameters
+    ----------
+    text : str
+        Text to be escaped.
+
+    Returns
+    -------
+    escaped_text : str
+        Escaped text.
     """
-    :param text: a plain text message
-    :return: the message escaped to appear correctly in LaTeX
-    """
+
     conv = {
         "&": r"\&",
         "%": r"\%",
@@ -34,11 +43,31 @@ def tex_escape(text):
 
 
 class Table:
-    def __init__(self, headers):
+    """A simple table class that stores data in rows and columns.
+
+    Parameters
+    ----------
+    headers : list
+        List of strings for the table headers.
+    """
+
+    def __init__(self, headers: list):
         self.headers = headers
         self.rows = []
 
-    def __iadd__(self, other):
+    def __iadd__(self, other: list):
+        """Add a row to the table.
+
+        Parameters
+        ----------
+        other : list
+            List of values for the row.
+
+        Returns
+        -------
+        self : Table
+            The table object.
+        """
         if not isinstance(other, list):
             raise TypeError("Must provide a list.")
         if not len(other) == len(self.headers):
@@ -48,32 +77,107 @@ class Table:
 
 
 class HTMLTable(Table):
+    """Class for creating HTML tables.
+
+    Attributes
+    ----------
+    headers : list of str
+        The table headers.
+    rows : list of list of str
+        The table rows.
+
+    """
+
     outer = "<table>\n{headers}\n{content}\n</table>"
     tr = "<tr>{}</tr>"
     th = "<th>{}</th>"
     td = '<td style="white-space:pre-wrap; word-wrap:break-word">{}</td>'
 
     def append_last(self, item):
+        """Append an item to the last cell in the last row.
+
+        Parameters
+        ----------
+        item : str
+            The string to append to the cell.
+
+        Returns
+        -------
+        None
+
+        """
         self.rows[-1][-1] = "\n".join([self.rows[-1][-1], item])
 
     def html_row(self, items):
+        """Format a list of strings as an HTML table row.
+        
+        Parameters
+        ----------
+        items : list
+            A list of strings to be added to the HTML table
+
+        Returns
+        -------
+        html : str
+            The HTML table row
+        """
         data = "".join([self.td.format(item) for item in items])
         return self.tr.format(data)
 
     def html_headers(self):
+        """Generate HTML table headers from self.headers
+
+        Returns
+        -------
+        headers : str
+            HTML table headers
+        """
         headers = "".join([self.th.format(header) for header in self.headers])
         return self.tr.format(headers)
 
     def output(self):
+        """Create the full HTML for the table.
+
+        Parameters
+        ----------
+        self : Table
+            The Table object.
+
+        Returns
+        -------
+        str
+            The HTML for the table.
+
+        """
         headers = self.html_headers()
         rows = "\n".join([self.html_row(row) for row in self.rows])
         return self.outer.format(headers=headers, content=rows)
 
     def _repr_html_(self):
+        """Return HTML representation of the current object.
+
+        This function is for use by the Jupyter backend.
+
+        Returns
+        -------
+        html : str
+            HTML representation of the current object
+        """
         return self.output()
 
 
 class LatexTable(Table):
+    """Class for creating LaTeX tables.
+
+    Attributes
+    ----------
+    headers : list of str
+        The table headers.
+    rows : list of list of str
+        The table rows.
+
+    """
+
     outer = "".join(
         "\\begin{{centering}}\n"
         "\\resizebox{{\\textwidth}}{{!}}{{%\n"
@@ -88,22 +192,70 @@ class LatexTable(Table):
     def __init__(
         self, headers, *, vertical_lines=True, horizontal_lines=True, header_lines=True
     ):
+        """
+        Parameters
+        ----------
+        headers : list
+            List of header strings.
+        vertical_lines : bool, optional
+            Whether to draw vertical lines, by default True
+        horizontal_lines : bool, optional
+            Whether to draw horizontal lines, by default True
+        header_lines : bool, optional
+            Whether to draw horizontal lines above the header, by default True
+        """
         super().__init__(headers)
         self.vertical_lines = vertical_lines
         self.horizontal_lines = horizontal_lines
 
     def escape(self):
+        """Escape special characters in headers and rows
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        """
         self.headers = [tex_escape(header) for header in self.headers]
         self.rows = [[tex_escape(item) for item in row] for row in self.rows]
 
     def append_last(self, item):
+        """Append an item on the last row of the table"""
         self.rows.append(["", "", "", item])
 
     @staticmethod
     def latex_row(items):
+        """Create a latex row from a list of strings.
+
+        Parameters
+        ----------
+        items : list of strings
+            The list of strings to be turned into a row.
+
+        Returns
+        -------
+        latex_row : string
+            The latex row.
+        """
         return " & ".join(items)
 
     def output(self):
+        """Format the table into LaTeX code.
+
+        Parameters
+        ----------
+        self : Table
+            A Table object.
+
+        Returns
+        -------
+        str
+            The LaTeX code that produces the table.
+        """
         self.escape()
 
         headers = self.latex_row(self.headers)
@@ -124,4 +276,12 @@ class LatexTable(Table):
         )
 
     def _repr_latex_(self):
+        r"""Returns the LaTeX representation of the object.
+
+        Returns
+        -------
+        latex : str
+            The LaTeX representation of the object.
+
+        """
         return self.output()
