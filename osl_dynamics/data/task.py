@@ -8,9 +8,9 @@ import numpy as np
 def epoch(
     data,
     time_index,
-    pre=125,
-    post=1000,
-    pad=True,
+    pre,
+    post,
+    pad=False,
 ):
     """Transform [time x channel] data to [time x channel x epoch] data.
 
@@ -36,19 +36,21 @@ def epoch(
     epoched : numpy.ndarray
         A [time x channels x epochs] dataset.
     """
-    # If there are not enough time points before the first trigger, discard it.
     if pad:
+        # Pad before and after the data with zeros
         data = np.pad(data, ((pre, post), (0, 0)), constant_values=np.nan)
         time_index = time_index + pre
-    elif time_index[0] - pre < 0:
-        time_index = time_index[1:]
+    else:
+        # Only keep epochs we have all time points for
+        keep = np.logical_and(time_index - pre > 0, time_index + post < data.shape[0])
+        time_index = time_index[keep]
 
     starts, stops = time_index - pre, time_index + post
     epoched = np.array([data[start:stop] for start, stop in zip(starts, stops)])
     return epoched
 
 
-def epoch_mean(data, time_index, pre=125, post=1000, pad=True):
+def epoch_mean(data, time_index, pre, post, pad=False):
     """Get the mean over epochs of a [time x channels] dataset.
 
     Calls `epoch_mean`, and takes a mean over epochs, returning data with dimensions
