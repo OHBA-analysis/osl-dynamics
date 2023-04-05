@@ -45,7 +45,7 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
     data = glm.data.TrialGLMData(
         data=data,
         **covariates,
-        dim_labels=["subjects", "samples", "modes"],
+        dim_labels=["subjects", "samples", "channels"],
     )
 
     # Create design matrix
@@ -76,6 +76,9 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
     # Get p-values
     percentiles = stats.percentileofscore(null_dist, tstats)
     pvalues = 1 - percentiles / 100
+
+    # Correct p-values for performing a 2 tail test
+    pvalues *= 2
 
     if np.all(pvalues < 0.05):
         _logger.warn(
@@ -170,5 +173,8 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     # Get p-values
     percentiles = stats.percentileofscore(null_dist, tstats)
     pvalues = 1 - percentiles / 100
+
+    # Correct p-values for performing a 2 tail test
+    pvalues *= 2
 
     return group_diff, pvalues
