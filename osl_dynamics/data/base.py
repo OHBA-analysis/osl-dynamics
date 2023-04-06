@@ -462,6 +462,9 @@ class Data:
                 + "Data(..., sampling_frequency=...) when creating the Data object."
             )
 
+        if n_window % 2 == 0:
+            raise ValueError("n_window must be an odd number.")
+
         # Save settings
         self.amplitude_envelope = True
         self.low_freq = low_freq
@@ -693,6 +696,7 @@ class Data:
         self,
         sequence_length=None,
         n_embeddings=1,
+        n_window=1,
         prepared=True,
         concatenate=False,
     ):
@@ -708,6 +712,9 @@ class Data:
             Length of the segement of data to feed into the model.
         n_embeddings : int
             Number of data points to embed the data.
+        n_window : int
+            Number of data points in a sliding window
+            to apply to the amplitude envelope data.
         prepared : bool
             Should we return the prepared data? If not we return the raw data.
         concatenate : bool
@@ -718,14 +725,19 @@ class Data:
         list of np.ndarray
             Trimed time series for each subject.
         """
-        if self.n_embeddings is None:
+        if self.n_embeddings is None and self.n_window is None:
             # Data has not been prepared so we can't trim the prepared data
             prepared = False
 
         if not prepared:
-            # We're trimming the raw data, how many time embedding data
-            # points do we need to remove?
-            n_embeddings = self.n_embeddings or n_embeddings
+            # We're trimming the raw data, how many data points do we
+            # need to remove due to time embedding or moving average?
+            if self.amplitude_envelope:
+                n_remove = self.n_window or n_window
+            else:
+                n_remove = self.n_embeddings or n_embeddings
+        else:
+            n_remove = 1
 
         # What data should we trim?
         if prepared:
@@ -736,8 +748,8 @@ class Data:
         trimmed_time_series = []
         for memmap in memmaps:
             # Remove data points lost to time embedding
-            if n_embeddings != 1:
-                memmap = memmap[n_embeddings // 2 : -(n_embeddings // 2)]
+            if n_remove != 1:
+                memmap = memmap[n_remove // 2 : -(n_remove // 2)]
 
             # Remove data points lost to separating into sequences
             if sequence_length is not None:
