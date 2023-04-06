@@ -3,6 +3,7 @@ dependencies:
   - python=3
   - pip
   - pip:
+    - glmtools
     - mat73
     - matplotlib
     - mne
@@ -11,12 +12,12 @@ dependencies:
     - numba
     - numpy
     - pandas
-    - pre-commit
     - pyyaml
     - pqdm
     - scipy
     - scikit-learn
     - seaborn
+    - tabulate
     - tensorflow
     - tensorflow_probability
     - tqdm
