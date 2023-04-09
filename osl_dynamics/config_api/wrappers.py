@@ -1,0 +1,1028 @@
+"""Wrapper functions for use in the config API.
+
+All of the functions in this module can be listed in the config passed to
+:code:`osl_dynamics.run_pipeline`.
+
+All wrapper functions have the structure::
+
+    func(data, output_dir, **kwargs)
+
+where:
+
+- :code:`data` is an `osl_dynamics.data.Data` object
+- :code:`output_dir` is the path to save output to.
+- :code:`kwargs` are keyword arguments for function specific options.
+"""
+
+import os
+import pickle
+import logging
+from pathlib import Path
+
+import numpy as np
+
+from osl_dynamics.utils.misc import override_dict_defaults
+
+_logger = logging.getLogger("osl-dynamics")
+
+
+def load_data(data_dir, data_kwargs={}, prepare_kwargs={}):
+    """Load and prepare data.
+
+    Parameters
+    ----------
+    data_dir : str
+        Path to directory containing npy files.
+    data_kwargs: dict
+        Keyword arguments to pass to the Data class.
+    prepare_kwargs : dict
+        Keyword arguments to pass to the prepare method.
+
+    Returns
+    -------
+    data : osl_dynamics.data.Data
+        Data object.
+    """
+    from osl_dynamics.data import Data
+
+    data = Data(data_dir, **data_kwargs)
+    data.prepare(**prepare_kwargs)
+    return data
+
+
+def train_hmm(
+    data,
+    output_dir,
+    config_kwargs,
+    init_kwargs={},
+    fit_kwargs={},
+    save_inf_params=True,
+):
+    """Train a Hidden Markov Model.
+
+    This function will:
+
+    1. Build an :code:`hmm.Model` object.
+    2. Initialize the parameters of the model using
+       :code:`Model.random_state_time_course_initialization`.
+    3. Perform full training.
+    4. Save the inferred parameters (state probabilities, means and covariances)
+       if :code:`save_inf_params=True`.
+
+    This function will create two directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Keyword arguments to pass to hmm.Config. Defaults to::
+
+            {'sequence_length': 2000, 'batch_size': 16, 'learning_rate': 0.01,
+             'n_epochs': 20}.
+    init_kwargs : dict
+        Keyword arguments to pass to :code:`Model.random_state_time_course_initialization`.
+        Optional, defaults to::
+
+            {'n_init': 3, 'n_epochs': 1}.
+    fit_kwargs : dict
+        Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
+    save_inf_params : bool
+        Should we save the inferred parameters? Optional, defaults to True.
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    from osl_dynamics.models import hmm
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+
+    # Create the model object
+    _logger.info("Building model")
+    default_config_kwargs = {
+        "n_channels": data.n_channels,
+        "sequence_length": 2000,
+        "batch_size": 16,
+        "learning_rate": 0.01,
+        "n_epochs": 20,
+    }
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+    config = hmm.Config(**config_kwargs)
+    model = hmm.Model(config)
+    model.summary()
+
+    # Initialisation
+    default_init_kwargs = {"n_init": 3, "n_epochs": 1}
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+    init_history = model.random_state_time_course_initialization(data, **init_kwargs)
+
+    # Training
+    history = model.fit(data, **fit_kwargs)
+
+    # Get the variational free energy
+    history["free_energy"] = model.free_energy(data)
+
+    # Save trained model
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
+    pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+    pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+
+    if save_inf_params:
+        os.makedirs(inf_params_dir, exist_ok=True)
+
+        # Get the inferred parameters
+        alpha = model.get_alpha(data)
+        means, covs = model.get_means_covariances()
+
+        # Save inferred parameters
+        pickle.dump(alpha, open(f"{inf_params_dir}/alp.pkl", "wb"))
+        np.save(f"{inf_params_dir}/means.npy", means)
+        np.save(f"{inf_params_dir}/covs.npy", covs)
+
+
+def train_dynemo(
+    data,
+    output_dir,
+    config_kwargs,
+    init_kwargs={},
+    fit_kwargs={},
+    save_inf_params=True,
+):
+    """Train DyNeMo.
+
+    This function will:
+
+    1. Build a :code:`dynemo.Model` object.
+    2. Initialize the parameters of the model using
+       :code:`Model.random_subset_initialization`.
+    3. Perform full training.
+    4. Save the inferred parameters (mode mixing coefficients, means and covariances)
+       if :code:`save_inf_params=True`.
+
+    This function will create two directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Keyword arguments to pass to dynemo.Config.
+        Defaults to::
+
+            {'n_channels': data.n_channels.
+             'sequence_length': 200,
+             'inference_n_units': 64,
+             'inference_normalization': 'layer',
+             'model_n_units': 64,
+             'model_normalization': 'layer',
+             'learn_alpha_temperature': True,
+             'initial_alpha_temperature': 1.0,
+             'do_kl_annealing': True,
+             'kl_annealing_curve': 'tanh',
+             'kl_annealing_sharpness': 10,
+             'n_kl_annealing_epochs': 20,
+             'batch_size': 128,
+             'learning_rate': 0.01,
+             'n_epochs': 40}
+    init_kwargs : dict
+        Keyword arguments to pass to :code:`Model.random_subset_initialization`.
+        Optional, defaults to::
+
+            {'n_init': 5, 'n_epochs': 1, 'take': 0.25}.
+    fit_kwargs : dict
+        Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
+    save_inf_params : bool
+        Should we save the inferred parameters? Optional, defaults to True.
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    from osl_dynamics.models import dynemo
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+
+    # Create the model object
+    _logger.info("Building model")
+    default_config_kwargs = {
+        "n_channels": data.n_channels,
+        "sequence_length": 200,
+        "inference_n_units": 64,
+        "inference_normalization": "layer",
+        "model_n_units": 64,
+        "model_normalization": "layer",
+        "learn_alpha_temperature": True,
+        "initial_alpha_temperature": 1.0,
+        "do_kl_annealing": True,
+        "kl_annealing_curve": "tanh",
+        "kl_annealing_sharpness": 10,
+        "n_kl_annealing_epochs": 20,
+        "batch_size": 128,
+        "learning_rate": 0.01,
+        "n_epochs": 40,
+    }
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+    config = dynemo.Config(**config_kwargs)
+    model = dynemo.Model(config)
+    model.summary()
+
+    # Initialisation
+    default_init_kwargs = {"n_init": 5, "n_epochs": 1, "take": 0.25}
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+    init_history = model.random_subset_initialization(data, **init_kwargs)
+
+    # Training
+    history = model.fit(data, **fit_kwargs)
+
+    # Save trained model
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
+    pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+    pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+
+    if save_inf_params:
+        os.makedirs(inf_params_dir, exist_ok=True)
+
+        # Get the inferred parameters
+        alpha = model.get_alpha(data)
+        means, covs = model.get_means_covariances()
+
+        # Save inferred parameters
+        pickle.dump(alpha, open(f"{inf_params_dir}/alp.pkl", "wb"))
+        np.save(f"{inf_params_dir}/means.npy", means)
+        np.save(f"{inf_params_dir}/covs.npy", covs)
+
+
+def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
+    """Calculate multitaper spectra.
+
+    This function expects a model has already been trained and the following
+    directories exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create the following directory:
+
+    - :code:`<output_dir>/spectra`, which contains the post-hoc spectra.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    kwargs : dict
+        Keyword arguments to pass to osl_dynamics.analysis.spectral.multitaper_spectra.
+        Defaults to::
+
+            {'sampling_frequency': data.sampling_frequency,
+             'time_half_bandwidth': 4,
+             'n_tapers': 7}.
+    nnmf_components : int
+        Number of non-negative matrix factorization (NNMF) components to fit to
+        the stacked subject-specific coherence spectra.
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    default_kwargs = {
+        "sampling_frequency": data.sampling_frequency,
+        "time_half_bandwidth": 4,
+        "n_tapers": 7,
+    }
+    kwargs = override_dict_defaults(default_kwargs, kwargs)
+    _logger.info(f"Using kwargs: {kwargs}")
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+    spectra_dir = output_dir + "/spectra"
+
+    # Load the inferred state probabilities
+    alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
+
+    # Get the config used to create the model
+    from osl_dynamics.models.mod_base import ModelBase
+
+    model_config, _ = ModelBase.load_config(model_dir)
+
+    # Get unprepared data (i.e. the data before calling Data.prepare)
+    # We also trim the data to account for the data points lost to
+    # time embedding or applying a sliding window
+    data = data.trim_time_series(
+        sequence_length=model_config["sequence_length"], prepared=False
+    )
+
+    # Sanity check
+    for d, a in zip(data, alpha):
+        if d.shape[0] != a.shape[0]:
+            raise ValueError(
+                "Mismatch in the number of samples in data and alpha. "
+                + "This is likely due to not trimming the data points "
+                + "lost to time embedding/sliding window and separating "
+                + "into sequences correctly."
+            )
+
+    # Calculate multitaper
+    from osl_dynamics.analysis import spectral
+
+    spectra = spectral.multitaper_spectra(data, alpha, **kwargs)
+
+    # Create output directory
+    os.makedirs(spectra_dir, exist_ok=True)
+
+    # Unpack spectra and save
+    def save(filename, array):
+        _logger.info(f"Saving {filename}")
+        np.save(filename, array)
+
+    return_weights = kwargs.pop("return_weights", False)
+    if return_weights:
+        f, psd, coh, w = spectra
+        save(f"{spectra_dir}/f.npy", f)
+        save(f"{spectra_dir}/psd.npy", psd)
+        save(f"{spectra_dir}/coh.npy", coh)
+        save(f"{spectra_dir}/w.npy")
+    else:
+        f, psd, coh = spectra
+        save(f"{spectra_dir}/f.npy", f)
+        save(f"{spectra_dir}/psd.npy", psd)
+        save(f"{spectra_dir}/coh.npy", coh)
+
+    if nnmf_components is not None:
+        # Calculate NNMF and save
+        nnmf = spectral.decompose_spectra(coh, n_components=nnmf_components)
+        save(f"{spectra_dir}/nnmf_{nnmf_components}.npy", nnmf)
+
+
+def nnmf(data, output_dir, n_components):
+    """Calculate non-negative matrix factorization (NNMF).
+
+    This function expects spectra have already been calculated and are in:
+
+    - :code:`<output_dir>/spectra`, which contains multitaper spectra.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    n_components : int
+        Number of components to fit.
+    """
+    # Load subject-specific coherences
+    coh_file = f"{spectra_dir}/coh.npy"
+    _logger.info(f"Loading {coh_file}")
+    coh = np.load(coh_file)
+
+    # Calculate NNMF
+    nnmf = spectral.decompose_spectra(coh, n_components=n_components)
+
+    # Save
+    filename = f"{spectra_dir}/nnmf_{n_components}.npy"
+    _logger.info(f"Saving {filename}")
+    np.save(filename, nnmf)
+
+
+def regression_spectra(data, output_dir, kwargs):
+    """Calculate regression spectra.
+
+    This function expects a model has already been trained and the following
+    directories exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create the following directory:
+
+    - :code:`<output_dir>/spectra`, which contains the post-hoc spectra.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    kwargs : dict
+        Keyword arguments to pass to osl_dynamics.analysis.spectral.multitaper_spectra.
+        Defaults to::
+
+            {'sampling_frequency': data.sampling_frequency,
+             'window_length': 4 * sampling_frequency,
+             'step_size': 20,
+             'n_sub_windows': 8,
+             'return_coef_int': True}
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    sampling_frequency = (
+        kwargs.pop("sampling_frequency", None) or data.sampling_frequency
+    )
+    default_kwargs = {
+        "sampling_frequency": sampling_frequency,
+        "window_length": int(4 * sampling_frequency),
+        "step_size": 20,
+        "n_sub_windows": 8,
+        "return_coef_int": True,
+    }
+    kwargs = override_dict_defaults(default_kwargs, kwargs)
+    _logger.info(f"Using kwargs: {kwargs}")
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+    spectra_dir = output_dir + "/spectra"
+
+    # Load the inferred mixing coefficients
+    alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
+
+    # Get the config used to create the model
+    from osl_dynamics.models.mod_base import ModelBase
+
+    model_config, _ = ModelBase.load_config(model_dir)
+
+    # Get unprepared data (i.e. the data before calling Data.prepare)
+    # We also trim the data to account for the data points lost to
+    # time embedding or applying a sliding window
+    data = data.trim_time_series(
+        sequence_length=model_config["sequence_length"], prepared=False
+    )
+
+    # Sanity check
+    for d, a in zip(data, alpha):
+        if d.shape[0] != a.shape[0]:
+            raise ValueError(
+                "Mismatch in the number of samples in data and alpha. "
+                + "This is likely due to not trimming the data points "
+                + "lost to time embedding/sliding window and separating "
+                + "into sequences correctly."
+            )
+
+    # Calculate regression spectra
+    from osl_dynamics.analysis import spectral
+
+    spectra = spectral.regression_spectra(data, alpha, **kwargs)
+
+    # Create output directory
+    os.makedirs(spectra_dir, exist_ok=True)
+
+    # Unpack spectra and save
+    def save(filename, array):
+        _logger.info(f"Saving {filename}")
+        np.save(filename, array)
+
+    return_weights = kwargs.pop("return_weights", False)
+    if return_weights:
+        f, psd, coh, w = spectra
+        save(f"{spectra_dir}/f.npy", f)
+        save(f"{spectra_dir}/psd.npy", psd)
+        save(f"{spectra_dir}/coh.npy", coh)
+        save(f"{spectra_dir}/w.npy")
+    else:
+        f, psd, coh = spectra
+        save(f"{spectra_dir}/f.npy", f)
+        save(f"{spectra_dir}/psd.npy", psd)
+        save(f"{spectra_dir}/coh.npy", coh)
+
+
+def plot_ae_networks(
+    data, output_dir, mask_file, parcellation_file, power_save_kwargs={}
+):
+    """Plot group-level amplitude envelope networks.
+
+    This function expects a model has been trained and the following directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/networks`, which contains plots of the networks.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcellate the training data.
+    power_save_kwargs : dict
+        Keyword arguments to pass to `analysis.power.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Defaults to::
+
+            {'filename': '<output_dir>/networks/means_.png',
+             'mask_file': mask_file,
+             'parcellation_file': parcellation_file}
+    """
+    # Directories
+    inf_params_dir = output_dir + "/inf_params"
+    networks_dir = output_dir + "/networks"
+    os.makedirs(networks_dir, exist_ok=True)
+
+    # Load inferred means
+    filename = f"{inf_params_dir}/means.npy"
+    _logger.info(f"Loading {filename}")
+    means = np.load(filename)
+
+    # Save mean activity maps
+    from osl_dynamics.analysis import power
+
+    default_power_save_kwargs = {
+        "filename": f"{networks_dir}/means_.png",
+        "mask_file": mask_file,
+        "parcellation_file": parcellation_file,
+    }
+    power_save_kwargs = override_dict_defaults(
+        default_power_save_kwargs, power_save_kwargs
+    )
+    _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
+    power.save(means, **power_save_kwargs)
+
+
+def plot_tde_hmm_networks(
+    data,
+    output_dir,
+    mask_file,
+    parcellation_file,
+    frequency_range=None,
+    percentile=97,
+    power_save_kwargs={},
+    conn_save_kwargs={},
+):
+    """Plot group-level TDE-HMM networks for a specified frequency band.
+
+    This function will:
+
+    1. Plot state PSDs.
+    2. Plot the power maps.
+    3. Plot coherence networks.
+
+    This function expects spectra have already been calculated and are in:
+
+    - :code:`<output_dir>/spectra`, which contains multitaper spectra.
+
+    This function will create:
+
+    - :code:`<output_dir>/networks`, which contains plots of the networks.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcellate the training data.
+    frequency_range : list
+        List of length 2 containing the minimum and maximum frequency to integrate
+        spectra over. Optional, defaults to the full frequency range.
+    percentile : float
+        Percentile for thresholding the coherence networks. Default is 97, which
+        corresponds to the top 3% of edges (relative to the mean across states).
+    plot_save_kwargs : dict
+        Keyword arguments to pass to `analysis.power.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Defaults to::
+
+            {'mask_file': mask_file,
+             'parcellation_file': parcellation_file,
+             'filename': '<output_dir>/networks/pow_.png',
+             'subtract_mean': True}
+    conn_save_kwargs : dict
+        Keyword arguments to pass to `analysis.connectivity.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        Defaults to::
+
+            {'parcellation_file': parcellation_file,
+             'filename': '<output_dir>/networks/coh_.png',
+             'plot_kwargs': {'edge_cmap': 'Reds'}}
+    """
+    # Directories
+    spectra_dir = output_dir + "/spectra"
+    networks_dir = output_dir + "/networks"
+    os.makedirs(networks_dir, exist_ok=True)
+
+    def load(filename):
+        _logger.info(f"Loading {filename}")
+        return np.load(filename)
+
+    # Load spectra
+    f = load(f"{spectra_dir}/f.npy")
+    psd = load(f"{spectra_dir}/psd.npy")
+    coh = load(f"{spectra_dir}/coh.npy")
+    if Path(f"{spectra_dir}/w.npy").exists():
+        w = load(f"{spectra_dir}/w.npy")
+    else:
+        w = None
+
+    # Calculate group average
+    gpsd = np.average(psd, axis=0, weights=w)
+    gcoh = np.average(coh, axis=0, weights=w)
+
+    # Calculate average PSD across channels and the standard error
+    p = np.mean(gpsd, axis=-2)
+    e = np.std(gpsd, axis=-2) / np.sqrt(gpsd.shape[-2])
+
+    # Plot PSDs
+    from osl_dynamics.utils import plotting
+
+    n_states = gpsd.shape[0]
+    for i in range(n_states):
+        fig, ax = plotting.plot_line(
+            [f],
+            [p[i]],
+            errors=[[p[i] - e[i]], [p[i] + e[i]]],
+            labels=[f"State {i + 1}"],
+            x_range=[f[0], f[-1]],
+            y_range=[p.min() - 0.1 * p.max(), 1.2 * p.max()],
+            x_label="Frequency (Hz)",
+            y_label="PSD (a.u.)",
+        )
+        if frequency_range is not None:
+            ax.axvspan(frequency_range[0], frequency_range[1], alpha=0.25, color="gray")
+        plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
+
+    # Calculate power maps from the group-level PSDs
+    from osl_dynamics.analysis import power
+
+    gp = power.variance_from_spectra(f, gpsd, frequency_range=frequency_range)
+
+    # Save power maps
+    default_power_save_kwargs = {
+        "mask_file": mask_file,
+        "parcellation_file": parcellation_file,
+        "filename": f"{networks_dir}/pow_.png",
+        "subtract_mean": True,
+    }
+    power_save_kwargs = override_dict_defaults(
+        default_power_save_kwargs, power_save_kwargs
+    )
+    _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
+    power.save(gp, **power_save_kwargs)
+
+    # Calculate coherence networks from group-level spectra
+    from osl_dynamics.analysis import connectivity
+
+    gc = connectivity.mean_coherence_from_spectra(
+        f, gcoh, frequency_range=frequency_range
+    )
+
+    # Threshold
+    gc = connectivity.threshold(gc, percentile=percentile, subtract_mean=True)
+
+    # Save coherence networks
+    default_conn_save_kwargs = {
+        "parcellation_file": parcellation_file,
+        "filename": f"{networks_dir}/coh_.png",
+        "plot_kwargs": {"edge_cmap": "Reds"},
+    }
+    conn_save_kwargs = override_dict_defaults(
+        default_conn_save_kwargs, conn_save_kwargs
+    )
+    _logger.info(f"Using conn_save_kwargs: {conn_save_kwargs}")
+    connectivity.save(gc, **conn_save_kwargs)
+
+
+def plot_nnmf_tde_hmm_networks(
+    data,
+    output_dir,
+    nnmf_file,
+    mask_file,
+    parcellation_file,
+    component=0,
+    percentile=97,
+    power_save_kwargs={},
+    conn_save_kwargs={},
+):
+    """Plot group-level TDE-HMM networks using a NNMF component to integrate
+    the spectra.
+
+    This function will:
+
+    1. Plot state PSDs.
+    2. Plot the power maps.
+    3. Plot coherence networks.
+
+    This function expects spectra have already been calculated and are in:
+
+    - :code:`<output_dir>/spectra`, which contains multitaper spectra.
+
+    This function will create:
+
+    - :code:`<output_dir>/networks`, which contains plots of the networks.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    nnmf_file : str
+        Path relative to :code:`output_dir` for a npy file (with the output of
+        `analysis.spectral.decompose_spectra
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_)
+        containing the NNMF components.
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcellate the training data.
+    component : int
+        NNMF component to plot. Defaults to the first component.
+    percentile : float
+        Percentile for thresholding the coherence networks. Default is 97, which
+        corresponds to the top 3% of edges (relative to the mean across states).
+    plot_save_kwargs : dict
+        Keyword arguments to pass to `analysis.power.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Defaults to::
+
+            {'mask_file': mask_file,
+             'parcellation_file': parcellation_file,
+             'component': component,
+             'filename': '<output_dir>/networks/pow_.png',
+             'subtract_mean': True}
+    conn_save_kwargs : dict
+        Keyword arguments to pass to `analysis.connectivity.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        Defaults to::
+
+            {'parcellation_file': parcellation_file,
+             'component': component,
+             'filename': '<output_dir>/networks/coh_.png',
+             'plot_kwargs': {'edge_cmap': 'Reds'}}
+    """
+    # Directories
+    spectra_dir = output_dir + "/spectra"
+    networks_dir = output_dir + "/networks"
+    os.makedirs(networks_dir, exist_ok=True)
+
+    def load(filename):
+        _logger.info(f"Loading {filename}")
+        return np.load(filename)
+
+    # Load the NNMF components
+    nnmf_file = output_dir + "/" + nnmf_file
+    if Path(nnmf_file).exists():
+        nnmf = load(nnmf_file)
+    else:
+        raise ValueError(f"{nnmf_file} not found.")
+
+    # Load spectra
+    f = load(f"{spectra_dir}/f.npy")
+    psd = load(f"{spectra_dir}/psd.npy")
+    coh = load(f"{spectra_dir}/coh.npy")
+    if Path(f"{spectra_dir}/w.npy").exists():
+        w = load(f"{spectra_dir}/w.npy")
+    else:
+        w = None
+
+    # Plot the NNMF components
+    from osl_dynamics.utils import plotting
+
+    n_components = nnmf.shape[0]
+    plotting.plot_line(
+        [f] * n_components,
+        nnmf,
+        labels=[f"Component {i}" for i in range(n_components)],
+        x_label="Frequency (Hz)",
+        y_label="Weighting",
+        filename=f"{networks_dir}/nnmf.png",
+    )
+
+    # Calculate group average
+    gpsd = np.average(psd, axis=0, weights=w)
+    gcoh = np.average(coh, axis=0, weights=w)
+
+    # Calculate average PSD across channels and the standard error
+    p = np.mean(gpsd, axis=-2)
+    e = np.std(gpsd, axis=-2) / np.sqrt(gpsd.shape[-2])
+
+    # Plot PSDs
+    n_states = gpsd.shape[0]
+    for i in range(n_states):
+        fig, ax = plotting.plot_line(
+            [f],
+            [p[i]],
+            errors=[[p[i] - e[i]], [p[i] + e[i]]],
+            labels=[f"State {i + 1}"],
+            x_range=[f[0], f[-1]],
+            y_range=[p.min() - 0.1 * p.max(), 1.2 * p.max()],
+            x_label="Frequency (Hz)",
+            y_label="PSD (a.u.)",
+        )
+        plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
+
+    # Calculate power maps from the group-level PSDs
+    from osl_dynamics.analysis import power
+
+    gp = power.variance_from_spectra(f, gpsd, nnmf)
+
+    # Save power maps
+    default_power_save_kwargs = {
+        "mask_file": mask_file,
+        "parcellation_file": parcellation_file,
+        "component": component,
+        "filename": f"{networks_dir}/pow_.png",
+        "subtract_mean": True,
+    }
+    power_save_kwargs = override_dict_defaults(
+        default_power_save_kwargs, power_save_kwargs
+    )
+    _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
+    power.save(gp, **power_save_kwargs)
+
+    # Calculate coherence networks from group-level spectra
+    from osl_dynamics.analysis import connectivity
+
+    gc = connectivity.mean_coherence_from_spectra(f, gcoh, nnmf)
+
+    # Threshold
+    gc = connectivity.threshold(gc, percentile=percentile, subtract_mean=True)
+
+    # Save coherence networks
+    default_conn_save_kwargs = {
+        "parcellation_file": parcellation_file,
+        "component": component,
+        "filename": f"{networks_dir}/coh_.png",
+        "plot_kwargs": {"edge_cmap": "Reds"},
+    }
+    conn_save_kwargs = override_dict_defaults(
+        default_conn_save_kwargs, conn_save_kwargs
+    )
+    _logger.info(f"Using conn_save_kwargs: {conn_save_kwargs}")
+    connectivity.save(gc, **conn_save_kwargs)
+
+
+def plot_tde_dynemo_networks(
+    data,
+    output_dir,
+    mask_file,
+    parcellation_file,
+    frequency_range=None,
+    percentile=97,
+    power_save_kwargs={},
+    conn_save_kwargs={},
+):
+    """Plot group-level TDE-DyNeMo networks for a specified frequency band.
+
+    This function will:
+
+    1. Plot mode PSDs.
+    2. Plot the power maps.
+    3. Plot coherence networks.
+
+    This function expects spectra have already been calculated and are in:
+
+    - :code:`<output_dir>/spectra`, which contains regression spectra.
+
+    This function will create:
+
+    - :code:`<output_dir>/networks`, which contains plots of the networks.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    mask_file : str
+        Mask file used to preprocess the training data.
+    parcellation_file : str
+        Parcellation file used to parcellate the training data.
+    frequency_range : list
+        List of length 2 containing the minimum and maximum frequency to integrate
+        spectra over. Optional, defaults to the full frequency range.
+    percentile : float
+        Percentile for thresholding the coherence networks. Default is 97, which
+        corresponds to the top 3% of edges (relative to the mean across states).
+    plot_save_kwargs : dict
+        Keyword arguments to pass to `analysis.power.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Defaults to::
+
+            {'mask_file': mask_file,
+             'parcellation_file': parcellation_file,
+             'filename': '<output_dir>/networks/pow_.png',
+             'subtract_mean': True}
+    conn_save_kwargs : dict
+        Keyword arguments to pass to `analysis.connectivity.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        Defaults to::
+
+            {'parcellation_file': parcellation_file,
+             'filename': '<output_dir>/networks/coh_.png',
+             'plot_kwargs': {'edge_cmap': 'Reds'}}
+    """
+    # Directories
+    spectra_dir = output_dir + "/spectra"
+    networks_dir = output_dir + "/networks"
+    os.makedirs(networks_dir, exist_ok=True)
+
+    def load(filename):
+        _logger.info(f"Loading {filename}")
+        return np.load(filename)
+
+    # Load spectra
+    f = load(f"{spectra_dir}/f.npy")
+    psd = load(f"{spectra_dir}/psd.npy")
+    coh = load(f"{spectra_dir}/coh.npy")
+    if Path(f"{spectra_dir}/w.npy").exists():
+        w = load(f"{spectra_dir}/w.npy")
+    else:
+        w = None
+
+    # Only keep the regression coefficients
+    psd = psd[:, 0]
+
+    # Calculate group average
+    gpsd = np.average(psd, axis=0, weights=w)
+    gcoh = np.average(coh, axis=0, weights=w)
+
+    # Calculate average PSD across channels and the standard error
+    p = np.mean(gpsd, axis=-2)
+    e = np.std(gpsd, axis=-2) / np.sqrt(gpsd.shape[-2])
+
+    # Plot PSDs
+    from osl_dynamics.utils import plotting
+
+    n_modes = gpsd.shape[0]
+    for i in range(n_modes):
+        fig, ax = plotting.plot_line(
+            [f],
+            [p[i]],
+            errors=[[p[i] - e[i]], [p[i] + e[i]]],
+            labels=[f"Mode {i + 1}"],
+            x_range=[f[0], f[-1]],
+            y_range=[p.min() - 0.1 * p.max(), 1.4 * p.max()],
+            x_label="Frequency (Hz)",
+            y_label="PSD (a.u.)",
+        )
+        if frequency_range is not None:
+            ax.axvspan(frequency_range[0], frequency_range[1], alpha=0.25, color="gray")
+        plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
+
+    # Calculate power maps from the group-level PSDs
+    from osl_dynamics.analysis import power
+
+    gp = power.variance_from_spectra(f, gpsd, frequency_range=frequency_range)
+
+    # Save power maps
+    default_power_save_kwargs = {
+        "mask_file": mask_file,
+        "parcellation_file": parcellation_file,
+        "filename": f"{networks_dir}/pow_.png",
+        "subtract_mean": True,
+    }
+    power_save_kwargs = override_dict_defaults(
+        default_power_save_kwargs, power_save_kwargs
+    )
+    _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
+    power.save(gp, **power_save_kwargs)
+
+    # Calculate coherence networks from group-level spectra
+    from osl_dynamics.analysis import connectivity
+
+    gc = connectivity.mean_coherence_from_spectra(
+        f, gcoh, frequency_range=frequency_range
+    )
+
+    # Threshold
+    gc = connectivity.threshold(gc, percentile=percentile, subtract_mean=True)
+
+    # Save coherence networks
+    default_conn_save_kwargs = {
+        "parcellation_file": parcellation_file,
+        "filename": f"{networks_dir}/coh_.png",
+        "plot_kwargs": {"edge_cmap": "Reds"},
+    }
+    conn_save_kwargs = override_dict_defaults(
+        default_conn_save_kwargs, conn_save_kwargs
+    )
+    _logger.info(f"Using conn_save_kwargs: {conn_save_kwargs}")
+    connectivity.save(gc, **conn_save_kwargs)

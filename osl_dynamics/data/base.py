@@ -711,10 +711,9 @@ class Data:
         sequence_length : int
             Length of the segement of data to feed into the model.
         n_embeddings : int
-            Number of data points to embed the data.
+            Number of data points used to embed the data.
         n_window : int
-            Number of data points in a sliding window
-            to apply to the amplitude envelope data.
+            Number of data points the sliding window applied to the data.
         prepared : bool
             Should we return the prepared data? If not we return the raw data.
         concatenate : bool
