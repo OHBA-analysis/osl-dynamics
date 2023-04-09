@@ -1,3 +1,9 @@
+"""Mask files.
+
+- MNI152_T1_8mm_brain.nii.gz
+- ft_8mm_brain_mask.nii.gz
+"""
+
 from pathlib import Path
 
 import nibabel as nib

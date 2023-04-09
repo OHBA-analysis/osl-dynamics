@@ -1,6 +1,10 @@
-"""Example script to help understand what brain regions each parcel in the Giles
-corresponds to.
+"""Plot the Giles parcellation.
 
+fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz is commonly
+referred to as the 'Giles parcellation'.
+
+This script can be helpful for understanding what brain regions each parcel
+in the Giles parcellation corresponds to.
 """
 
 import os
