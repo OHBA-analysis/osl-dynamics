@@ -5,9 +5,11 @@
 import logging
 from itertools import zip_longest
 
+import numpy as np
+import pandas as pd
+import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
@@ -20,21 +22,6 @@ from osl_dynamics.utils.parcellation import Parcellation
 
 
 _logger = logging.getLogger("osl-dynamics")
-
-QUAL_CMAPS = [
-    "Pastel1",
-    "Pastel2",
-    "Paired",
-    "Accent",
-    "Dark2",
-    "Set1",
-    "Set2",
-    "Set3",
-    "tab10",
-    "tab20",
-    "tab20b",
-    "tab20c",
-]
 
 
 def set_style(params):
@@ -822,16 +809,10 @@ def plot_gmm(
 
 def plot_violin(
     data,
-    show_mean=True,
-    show_median=True,
-    legend_loc=1,
     x=None,
-    x_range=None,
-    y_range=None,
     x_label=None,
     y_label=None,
     title=None,
-    plot_kwargs=None,
     fig_kwargs=None,
     ax=None,
     filename=None,
@@ -842,26 +823,14 @@ def plot_violin(
     ----------
     data : list of np.ndarray
         Data to plot.
-    show_mean : bool
-        Should we show the mean?
-    show_median : bool
-        Should we show the median?
-    legend_loc : int
-        Position for the legend.
     x : list or np.ndarray
         x-values for data.
-    x_range : list
-        Minimum and maximum for x-axis.
-    y_range : list
-        Minimum and maximum for y-axis.
     x_label : str
         Label for x-axis.
     y_label : str
         Label for y-axis.
     title : str
         Figure title.
-    plot_kwargs : dict
-        Arguments to pass to the ax.violinplot method.
     fig_kwargs : dict
         Arguments to pass to plt.subplots.
     ax : matplotlib.axes.axes
@@ -879,17 +848,11 @@ def plot_violin(
 
     # Validation
     if x is None:
-        x = range(len(data))
+        x = np.arange(len(data)) + 1
     elif len(x) != len(data):
         raise ValueError("Incorrect number of x-values or data passed.")
     else:
         x = [str(xi) for xi in x]
-
-    if x_range is None:
-        x_range = [None, None]
-
-    if y_range is None:
-        y_range = [None, None]
 
     if ax is not None:
         if filename is not None:
@@ -906,11 +869,13 @@ def plot_violin(
     else:
         fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
-    if plot_kwargs is None:
-        plot_kwargs = {}
-
-    # Replace emtpy lists in data with a pair of nans
-    data = [np.array([np.nan, np.nan]) if len(d) == 0 else d for d in data]
+    # Create a pandas DataFrame
+    data_dict = {}
+    for x, d in zip(x, data):
+        data_dict[x] = []
+        for y in d:
+            data_dict[x].append(y)
+    df = pd.DataFrame(data_dict)
 
     # Create figure
     create_fig = ax is None
@@ -918,28 +883,12 @@ def plot_violin(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot violins
-    ax.violinplot(data, positions=range(len(x)), showextrema=False)
-    if show_mean:
-        ax.scatter(
-            x, [np.mean(d) for d in data], label="Mean", marker="+", color="black"
-        )
-    if show_median:
-        ax.scatter(
-            x, [np.median(d) for d in data], label="Median", marker="x", color="black"
-        )
-
-    # Set axis range
-    ax.set_xlim(x_range[0], x_range[1])
-    ax.set_ylim(y_range[0], y_range[1])
+    sns.violinplot(df, ax=ax)
 
     # Set title and axis labels
     ax.set_title(title)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-
-    # Add a legend
-    if show_mean and show_median:
-        ax.legend(loc=legend_loc)
 
     # Save the figure if a filename has been pass
     if filename is not None:
@@ -1690,7 +1639,20 @@ def plot_alpha(
     n_alphas = len(alpha)
     n_modes = max(a.shape[1] for a in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
-    if cmap in QUAL_CMAPS:
+    if cmap in [
+        "Pastel1",
+        "Pastel2",
+        "Paired",
+        "Accent",
+        "Dark2",
+        "Set1",
+        "Set2",
+        "Set3",
+        "tab10",
+        "tab20",
+        "tab20b",
+        "tab20c",
+    ]:
         cmap = plt.cm.get_cmap(name=cmap)
     else:
         cmap = plt.cm.get_cmap(name=cmap, lut=n_modes)

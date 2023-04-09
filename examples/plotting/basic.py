@@ -3,8 +3,10 @@
 """
 
 import numpy as np
+
 from osl_dynamics import simulation
 from osl_dynamics.utils import plotting
+
 
 #%% Basic plots
 

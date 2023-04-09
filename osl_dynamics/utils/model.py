@@ -110,7 +110,7 @@ class HTMLTable(Table):
 
     def html_row(self, items):
         """Format a list of strings as an HTML table row.
-        
+
         Parameters
         ----------
         items : list

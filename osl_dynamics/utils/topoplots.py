@@ -2,12 +2,12 @@
 
 """
 
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import griddata
+
 from osl_dynamics.files.scanner import layouts
 
 
