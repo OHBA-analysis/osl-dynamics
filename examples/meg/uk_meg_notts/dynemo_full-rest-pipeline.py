@@ -20,8 +20,7 @@ from osl_dynamics import analysis, data, inference
 from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 
-# --------
-# Settings
+#%% Settings
 
 # GPU settings
 inference.tf_ops.gpu_growth()
@@ -61,8 +60,7 @@ makedirs(model_dir, exist_ok=True)
 makedirs(analysis_dir, exist_ok=True)
 makedirs(maps_dir, exist_ok=True)
 
-# ----------------
-# Training dataset
+#%% Training dataset
 
 # Directory containing source reconstructed data
 dataset_dir = "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec"
@@ -77,8 +75,7 @@ training_data = data.Data(
 # Prepare the data for training
 training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
 
-# --------------
-# Model training
+#%% Model training
 
 print("Building model")
 model = Model(config)
@@ -108,10 +105,10 @@ history = model.fit(
 with open(f"{model_dir}/history.pkl", "wb") as file:
     pickle.dump(history.history, file)
 
-"""
+'''
 # Load a pre-trained model
 model.load_weights(f"{model_dir}/weights")
-"""
+'''
 
 # Training loss
 ll_loss, kl_loss = model.losses(training_data)
@@ -121,8 +118,7 @@ print(f"training loss: {loss}")
 with open(f"{model_dir}/loss.dat", "w") as file:
     file.write(f"training loss = {loss}\n")
 
-# -------------
-# Mode Analysis
+#%% Mode analysis
 
 # Alpha time course for each subject
 a = model.get_alpha(training_data)
@@ -162,8 +158,7 @@ mean_a_NW = np.mean(np.concatenate(a_NW), axis=0)
 
 print("mean_a_NW:", mean_a_NW)
 
-# -----------------
-# Spectral analysis
+#%% Spectral analysis
 
 # Source reconstructed data
 src_rec_data = training_data.trim_time_series(
@@ -223,8 +218,7 @@ plotting.plot_line(
 # Average subject-specific coherences to get the group-level mode coherences
 gcoh = np.average(coh, axis=0, weights=w)
 
-# ---------------------------
-# Power and connectivity maps
+#%% Power and connectivity maps
 
 # Source reconstruction files
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
@@ -266,7 +260,6 @@ analysis.connectivity.save(
     parcellation_file=parcellation_file,
 )
 
-# --------
-# Clean up
+#%% Clean up
 
 training_data.delete_dir()

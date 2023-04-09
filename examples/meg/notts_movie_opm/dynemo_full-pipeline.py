@@ -1,22 +1,20 @@
-"""Full pipeline for a resting-state MEG study with DyNeMo.
+"""Train DyNeMo on Nottingham movie data.
 
 """
 
+print("Setting up")
+import pickle
+import numpy as np
 import os.path as op
 from os import makedirs
-
-import numpy as np
-import pickle
 from osl_dynamics import analysis, data, inference
 from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
-import matplotlib.pyplot as plt
 
-# -------- #
-# Settings #
-# -------- #
+#%% Settings
+
 # GPU settings
-#inference.tf_ops.gpu_growth()
+inference.tf_ops.gpu_growth()
 
 # Hyperparameters
 config = Config(
@@ -46,7 +44,6 @@ subjects_dir = '/Users/woolrich/homedir/vols_data/notts_movie_opm'
 #subjects_dir = '/well/woolrich/projects/notts_movie_opm'
 
 n_subject_init_runs = 5
-
 run = 1
 
 use_pre_trained_model = True
@@ -58,26 +55,22 @@ subj_sess_2exclude = np.zeros([10, 2]).astype(bool)
 subj_sess_2exclude = np.ones([10, 2]).astype(bool)
 subj_sess_2exclude[0:2,:] = False
 
-# -------------------------------------------------------------
-# %% Setup file names
+#%% Setup filenames
 
 subjects = []
 sf_files = []
-
 recon_dir = op.join(subjects_dir, 'recon')
-
 for sub in subjects_to_do:
     for ses in sessions_to_do:
         if not subj_sess_2exclude[sub, ses]:
-
             sub_dir = 'sub-' + ('{}'.format(subjects_to_do[sub]+1)).zfill(3)
             ses_dir = 'ses-' + ('{}'.format(sessions_to_do[ses]+1)).zfill(3)
             subject = sub_dir + '_' + ses_dir
             sf_file = op.join(recon_dir, subject + '/sflip_parc.npy')
-
             subjects.append(subject)
             sf_files.append(sf_file)
 
+# Directories
 output_id = f"dynemo_run{run}"
 
 model_dir = f"{recon_dir}/{output_id}/model"
@@ -89,45 +82,27 @@ makedirs(model_dir, exist_ok=True)
 makedirs(analysis_dir, exist_ok=True)
 makedirs(maps_dir, exist_ok=True)
 
-# ---------------- #
-# Training dataset #
-# ---------------- #
+#%% Training dataset
 
-training_data = data.Data(sf_files)
 # Prepare the data for training
+training_data = data.Data(sf_files)
 training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
 
-# --------------------------- #
-# Build the main DyNeMo model #
-# --------------------------- #
-print("Building model")
+#%% Build model
+
 model = Model(config)
 model.summary()
 
+#%% Model training
 
 if not use_pre_trained_model:
-
-    # ------------------------------------------------------ #
-    # Random subject initialisation for the mode covariances #
-    # ------------------------------------------------------ #
-    model.single_subject_initialization(
-        training_data,
-        n_kl_annealing_epochs=100,
-        n_epochs=200,
-        n_init=n_subject_init_runs,
-    )
-
-    # -------------------------- #
-    # Multi-start initialization #
-    # -------------------------- #
+    # Multi-start initialization
     init_history = model.multistart_initialization(training_data, n_epochs=20, n_init=10)
 
     with open(f"{model_dir}/init_history.pkl", "wb") as file:
         pickle.dump(init_history.history, file)
 
-    # --------------------------------- #
-    # Main training on the full dataset #
-    # --------------------------------- #
+    # Main training on the full dataset
     print("Training final model")
     history = model.fit(
         training_data,
@@ -153,16 +128,16 @@ print(f"training loss: {loss}")
 with open(f"{model_dir}/loss.dat", "w") as file:
     file.write(f"training loss = {loss}\n")
 
-# ------------- #
-# Training loss #
-# ------------- #
+plotting.plot_line(
+    [range(config.n_epochs)],
+    [history["loss"]],
+    x_label="Epoch",
+    y_label="Loss",
+    filename=f"{model_dir}/loss.png",
+)
 
-plt.figure()
-plt.plot(history['loss'])
+#%% Mode analysis
 
-# ------------- #
-# Mode Analysis #
-# ------------- #
 # Alpha time course for each subject
 a = model.get_alpha(training_data)
 
@@ -182,7 +157,7 @@ a_corr = np.corrcoef(np.concatenate(a), rowvar=False) - np.eye(config.n_modes)
 
 plotting.plot_matrices(a_corr, filename=f"{analysis_dir}/a_corr1.png")
 plotting.plot_matrices(a_corr[1:, 1:], filename=f"{analysis_dir}/a_corr2.png")
-``````
+
 # Mode covariances
 D = model.get_covariances()
 D = D[order]
@@ -201,9 +176,8 @@ mean_a_NW = np.mean(np.concatenate(a_NW), axis=0)
 
 print("mean_a_NW:", mean_a_NW)
 
-# ----------------- #
-# Spectral analysis #
-# ----------------- #
+#%% Spectral analysis
+
 # Source reconstructed data
 src_rec_data = training_data.trim_time_series(
     sequence_length=config.sequence_length,
@@ -217,7 +191,7 @@ f, psd, coh, w = analysis.spectral.regression_spectra(
     alpha=a,
     sampling_frequency=250,
     window_length=1000,
-    frequency_range=[0, 45],
+    frequency_range=[1, 45],
     step_size=20,
     n_sub_windows=8,
     return_weights=True,
@@ -262,49 +236,47 @@ plotting.plot_line(
 # Average subject-specific coherences to get the group-level mode coherences
 gcoh = np.average(coh, axis=0, weights=w)
 
-# --------------------------- #
-# Power and connectivity maps #
-# --------------------------- #
+#%% Power and connectivity maps
+
 # Source reconstruction files
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
-parcellation_file = op.join('/Users/woolrich/Dropbox/vols_scripts/hmm_misc_funcs/parcellations',
-                             'fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz')
+parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
 
 # Calculate relative (regression coefficients only) power maps using the
 # mode PSDs
 power_map = analysis.power.variance_from_spectra(f, gpsd[0])
 analysis.power.save(
-    power_map=power_map,
+    power_map,
     mask_file=mask_file,
     parcellation_file=parcellation_file,
-    filename=f"{maps_dir}/power_.png",
+    filename=f"{maps_dir}/pow_.png",
     subtract_mean=True,
 )
 
 # Calculate connectivity maps using mode coherences
-conn_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh)
+coh_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh)
 
 # Use a GMM to threshold the connectivity maps
-conn_map = analysis.connectivity.gmm_threshold(
-    conn_map,
+coh_map = analysis.connectivity.gmm_threshold(
+    coh_map,
     subtract_mean=True,
     standardize=True,
     one_component_percentile=95,
     n_sigma=2,
-    filename=f"{maps_dir}/gmm_conn_.png",
+    filename=f"{maps_dir}/gmm_coh_.png",
     plot_kwargs={
         "x_label": "Standardised Relative Coherence",
         "y_label": "Probability",
     },
 )
 
+# Save coherence networks
 analysis.connectivity.save(
-    connectivity_map=conn_map,
-    filename=f"{maps_dir}/conn_.png",
+    coh_map,
+    filename=f"{maps_dir}/coh_.png",
     parcellation_file=parcellation_file,
 )
 
-# -------- #
-# Clean up #
-# -------- #
+#%% Clean up
+
 training_data.delete_dir()
