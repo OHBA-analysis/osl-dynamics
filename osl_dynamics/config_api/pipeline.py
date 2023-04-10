@@ -1,4 +1,4 @@
-"""Config API user inferface.
+"""Functions for running full pipelines via the config API.
 
 See the `toolbox examples
 <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
@@ -100,7 +100,11 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     # Load config
     config = load_config(config)
     config_id = str(id(config))[3:7]
-    _logger.info("Using config:\n {}".format(pprint.pformat(config, sort_dicts=False)))
+    _logger.info(
+        "Using config:\n {}".format(
+            pprint.pformat(config, sort_dicts=False, compact=True)
+        )
+    )
 
     # Load data via the config
     load_data_kwargs = config.pop("load_data", None)
@@ -120,8 +124,11 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     for name, kwargs in config.items():
         func = find_function(name, extra_funcs)
         if func is not None:
-            _logger.info(f"{name}: {kwargs}")
-            func(data=data, output_dir=output_dir, **kwargs)
+            try:
+                _logger.info(f"{name}: {kwargs}")
+                func(data=data, output_dir=output_dir, **kwargs)
+            except Exception as e:
+                _logger.error(e)
 
     # Delete the temporary directory created by the Data class
     if data is not None:

@@ -1,5 +1,9 @@
 """Wrapper functions for use in the config API.
 
+See the `toolbox examples
+<https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
+for scripts that use the config API.
+
 All of the functions in this module can be listed in the config passed to
 :code:`osl_dynamics.run_pipeline`.
 
@@ -9,19 +13,22 @@ All wrapper functions have the structure::
 
 where:
 
-- :code:`data` is an `osl_dynamics.data.Data` object
+- :code:`data` is an :code:`osl_dynamics.data.Data` object
 - :code:`output_dir` is the path to save output to.
 - :code:`kwargs` are keyword arguments for function specific options.
 """
 
 import os
-import pickle
 import logging
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-from osl_dynamics.utils.misc import override_dict_defaults
+from osl_dynamics import array_ops
+from osl_dynamics.utils.misc import load, override_dict_defaults, save
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -35,6 +42,8 @@ def load_data(data_dir, data_kwargs={}, prepare_kwargs={}):
         Path to directory containing npy files.
     data_kwargs: dict
         Keyword arguments to pass to the Data class.
+        Useful keyword arguments to pass are the :code:`sampling_frequency`,
+        :code:`mask_file` and :code:`parcellation_file`.
     prepare_kwargs : dict
         Keyword arguments to pass to the prepare method.
 
@@ -83,7 +92,9 @@ def train_hmm(
     config_kwargs : dict
         Keyword arguments to pass to hmm.Config. Defaults to::
 
-            {'sequence_length': 2000, 'batch_size': 16, 'learning_rate': 0.01,
+            {'sequence_length': 2000,
+             'batch_size': 32,
+             'learning_rate': 0.001,
              'n_epochs': 20}.
     init_kwargs : dict
         Keyword arguments to pass to :code:`Model.random_state_time_course_initialization`.
@@ -93,7 +104,7 @@ def train_hmm(
     fit_kwargs : dict
         Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
     save_inf_params : bool
-        Should we save the inferred parameters? Optional, defaults to True.
+        Should we save the inferred parameters? Optional, defaults to :code:`True`.
     """
     if data is None:
         raise ValueError("data must be passed.")
@@ -103,14 +114,15 @@ def train_hmm(
     # Directories
     model_dir = output_dir + "/model"
     inf_params_dir = output_dir + "/inf_params"
+    os.makedirs(inf_params_dir, exist_ok=True)
 
     # Create the model object
     _logger.info("Building model")
     default_config_kwargs = {
         "n_channels": data.n_channels,
         "sequence_length": 2000,
-        "batch_size": 16,
-        "learning_rate": 0.01,
+        "batch_size": 32,
+        "learning_rate": 0.001,
         "n_epochs": 20,
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
@@ -134,20 +146,18 @@ def train_hmm(
     # Save trained model
     _logger.info(f"Saving model to: {model_dir}")
     model.save(model_dir)
-    pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
-    pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+    save(f"{model_dir}/init_history.pkl", init_history)
+    save(f"{model_dir}/history.pkl", history)
 
     if save_inf_params:
-        os.makedirs(inf_params_dir, exist_ok=True)
-
         # Get the inferred parameters
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
 
         # Save inferred parameters
-        pickle.dump(alpha, open(f"{inf_params_dir}/alp.pkl", "wb"))
-        np.save(f"{inf_params_dir}/means.npy", means)
-        np.save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
 
 
 def train_dynemo(
@@ -207,7 +217,7 @@ def train_dynemo(
     fit_kwargs : dict
         Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
     save_inf_params : bool
-        Should we save the inferred parameters? Optional, defaults to True.
+        Should we save the inferred parameters? Optional, defaults to :code:`True`.
     """
     if data is None:
         raise ValueError("data must be passed.")
@@ -255,8 +265,8 @@ def train_dynemo(
     # Save trained model
     _logger.info(f"Saving model to: {model_dir}")
     model.save(model_dir)
-    pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
-    pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+    save(f"{model_dir}/init_history.pkl", init_history)
+    save(f"{model_dir}/history.pkl", history)
 
     if save_inf_params:
         os.makedirs(inf_params_dir, exist_ok=True)
@@ -266,9 +276,53 @@ def train_dynemo(
         means, covs = model.get_means_covariances()
 
         # Save inferred parameters
-        pickle.dump(alpha, open(f"{inf_params_dir}/alp.pkl", "wb"))
-        np.save(f"{inf_params_dir}/means.npy", means)
-        np.save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+
+
+def calc_subject_ae_hmm_networks(data, output_dir):
+    """Calculate subject-specific AE-HMM networks.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create the following directory:
+
+    - :code:`<output_dir>/networks`, which contains the subject-specific networks.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    # Directories
+    inf_params_dir = output_dir + "/inf_params"
+    networks_dir = output_dir + "/networks"
+    os.makedirs(networks_dir, exist_ok=True)
+
+    # Load the inferred state probabilities
+    alpha = load(f"{inf_params_dir}/alp.pkl")
+
+    # Get the prepared data
+    # This should be the data after calculating the amplitude envelope
+    data = data.time_series()
+
+    # Calculate subject-specific means and AECs
+    from osl_dynamics.analysis import modes
+
+    means, aecs = modes.ae_hmm_networks(data, alpha)
+
+    # Save
+    save(f"{networks_dir}/subj_means.npy", means)
+    save(f"{networks_dir}/subj_aecs.npy", aecs)
 
 
 def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
@@ -316,9 +370,10 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     model_dir = output_dir + "/model"
     inf_params_dir = output_dir + "/inf_params"
     spectra_dir = output_dir + "/spectra"
+    os.makedirs(spectra_dir, exist_ok=True)
 
     # Load the inferred state probabilities
-    alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
+    alpha = load(f"{inf_params_dir}/alp.pkl")
 
     # Get the config used to create the model
     from osl_dynamics.models.mod_base import ModelBase
@@ -347,14 +402,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
 
     spectra = spectral.multitaper_spectra(data, alpha, **kwargs)
 
-    # Create output directory
-    os.makedirs(spectra_dir, exist_ok=True)
-
     # Unpack spectra and save
-    def save(filename, array):
-        _logger.info(f"Saving {filename}")
-        np.save(filename, array)
-
     return_weights = kwargs.pop("return_weights", False)
     if return_weights:
         f, psd, coh, w = spectra
@@ -390,18 +438,9 @@ def nnmf(data, output_dir, n_components):
     n_components : int
         Number of components to fit.
     """
-    # Load subject-specific coherences
-    coh_file = f"{spectra_dir}/coh.npy"
-    _logger.info(f"Loading {coh_file}")
-    coh = np.load(coh_file)
-
-    # Calculate NNMF
+    coh = load(f"{spectra_dir}/coh.npy")
     nnmf = spectral.decompose_spectra(coh, n_components=n_components)
-
-    # Save
-    filename = f"{spectra_dir}/nnmf_{n_components}.npy"
-    _logger.info(f"Saving {filename}")
-    np.save(filename, nnmf)
+    save(f"{spectra_dir}/nnmf_{n_components}.npy", nnmf)
 
 
 def regression_spectra(data, output_dir, kwargs):
@@ -453,9 +492,10 @@ def regression_spectra(data, output_dir, kwargs):
     model_dir = output_dir + "/model"
     inf_params_dir = output_dir + "/inf_params"
     spectra_dir = output_dir + "/spectra"
+    os.makedirs(spectra_dir, exist_ok=True)
 
     # Load the inferred mixing coefficients
-    alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
+    alpha = load(f"{inf_params_dir}/alp.pkl")
 
     # Get the config used to create the model
     from osl_dynamics.models.mod_base import ModelBase
@@ -484,14 +524,7 @@ def regression_spectra(data, output_dir, kwargs):
 
     spectra = spectral.regression_spectra(data, alpha, **kwargs)
 
-    # Create output directory
-    os.makedirs(spectra_dir, exist_ok=True)
-
     # Unpack spectra and save
-    def save(filename, array):
-        _logger.info(f"Saving {filename}")
-        np.save(filename, array)
-
     return_weights = kwargs.pop("return_weights", False)
     if return_weights:
         f, psd, coh, w = spectra
@@ -506,8 +539,14 @@ def regression_spectra(data, output_dir, kwargs):
         save(f"{spectra_dir}/coh.npy", coh)
 
 
-def plot_ae_networks(
-    data, output_dir, mask_file, parcellation_file, power_save_kwargs={}
+def plot_group_ae_networks(
+    data,
+    output_dir,
+    mask_file=None,
+    parcellation_file=None,
+    aec_abs=True,
+    power_save_kwargs={},
+    conn_save_kwargs={},
 ):
     """Plot group-level amplitude envelope networks.
 
@@ -526,33 +565,65 @@ def plot_ae_networks(
     output_dir : str
         Path to output directory.
     mask_file : str
-        Mask file used to preprocess the training data.
+        Mask file used to preprocess the training data. Optional. If :code:`None`,
+        we use :code:`data.mask_file`.
     parcellation_file : str
-        Parcellation file used to parcellate the training data.
+        Parcellation file used to parcellate the training data. Optional. If
+        :code:`None`, we use :code:`data.parcellation_file`.
+    aec_abs : bool
+        Should we take the absolute value of the amplitude envelope correlations?
+        Optional, defaults to :code:`True`.
     power_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
 
-            {'filename': '<output_dir>/networks/means_.png',
-             'mask_file': mask_file,
-             'parcellation_file': parcellation_file}
+            {'filename': '<output_dir>/networks/mean_.png',
+             'mask_file': data.mask_file,
+             'parcellation_file': data.parcellation_file}
+    conn_save_kwargs : dict
+        Keyword arguments to pass to `analysis.connectivity.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        Defaults to::
+
+            {'parcellation_file': parcellation_file,
+             'filename': '<output_dir>/networks/aec_.png',
+             'threshold': 0.97}
     """
+    # Validation
+    if mask_file is None:
+        if data is None or data.mask_file is None:
+            raise ValueError(
+                "mask_file must be passed or specified in the Data object."
+            )
+        else:
+            mask_file = data.mask_file
+
+    if parcellation_file is None:
+        if data is None or data.parcellation_file is None:
+            raise ValueError(
+                "parcellation_file must be passed or specified in the Data object."
+            )
+        else:
+            parcellation_file = data.parcellation_file
+
     # Directories
     inf_params_dir = output_dir + "/inf_params"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
 
-    # Load inferred means
-    filename = f"{inf_params_dir}/means.npy"
-    _logger.info(f"Loading {filename}")
-    means = np.load(filename)
+    # Load inferred means and covariances
+    means = load(f"{inf_params_dir}/means.npy")
+    covs = load(f"{inf_params_dir}/covs.npy")
+    aecs = array_ops.cov2corr(covs)
+    if aec_abs:
+        aecs = abs(aecs)
 
     # Save mean activity maps
     from osl_dynamics.analysis import power
 
     default_power_save_kwargs = {
-        "filename": f"{networks_dir}/means_.png",
+        "filename": f"{networks_dir}/mean_.png",
         "mask_file": mask_file,
         "parcellation_file": parcellation_file,
     }
@@ -562,12 +633,26 @@ def plot_ae_networks(
     _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
     power.save(means, **power_save_kwargs)
 
+    # Save AEC networks
+    from osl_dynamics.analysis import connectivity
 
-def plot_tde_hmm_networks(
+    default_conn_save_kwargs = {
+        "parcellation_file": parcellation_file,
+        "filename": f"{networks_dir}/aec_.png",
+        "threshold": 0.97,
+    }
+    conn_save_kwargs = override_dict_defaults(
+        default_conn_save_kwargs, conn_save_kwargs
+    )
+    _logger.info(f"Using conn_save_kwargs: {conn_save_kwargs}")
+    connectivity.save(aecs, **conn_save_kwargs)
+
+
+def plot_group_tde_hmm_networks(
     data,
     output_dir,
-    mask_file,
-    parcellation_file,
+    mask_file=None,
+    parcellation_file=None,
     frequency_range=None,
     percentile=97,
     power_save_kwargs={},
@@ -596,9 +681,11 @@ def plot_tde_hmm_networks(
     output_dir : str
         Path to output directory.
     mask_file : str
-        Mask file used to preprocess the training data.
+        Mask file used to preprocess the training data. Optional. If :code:`None`,
+        we use :code:`data.mask_file`.
     parcellation_file : str
-        Parcellation file used to parcellate the training data.
+        Parcellation file used to parcellate the training data. Optional. If
+        :code:`None`, we use :code:`data.parcellation_file`.
     frequency_range : list
         List of length 2 containing the minimum and maximum frequency to integrate
         spectra over. Optional, defaults to the full frequency range.
@@ -623,14 +710,27 @@ def plot_tde_hmm_networks(
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    # Validation
+    if mask_file is None:
+        if data is None or data.mask_file is None:
+            raise ValueError(
+                "mask_file must be passed or specified in the Data object."
+            )
+        else:
+            mask_file = data.mask_file
+
+    if parcellation_file is None:
+        if data is None or data.parcellation_file is None:
+            raise ValueError(
+                "parcellation_file must be passed or specified in the Data object."
+            )
+        else:
+            parcellation_file = data.parcellation_file
+
     # Directories
     spectra_dir = output_dir + "/spectra"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
-
-    def load(filename):
-        _logger.info(f"Loading {filename}")
-        return np.load(filename)
 
     # Load spectra
     f = load(f"{spectra_dir}/f.npy")
@@ -709,12 +809,12 @@ def plot_tde_hmm_networks(
     connectivity.save(gc, **conn_save_kwargs)
 
 
-def plot_nnmf_tde_hmm_networks(
+def plot_group_nnmf_tde_hmm_networks(
     data,
     output_dir,
     nnmf_file,
-    mask_file,
-    parcellation_file,
+    mask_file=None,
+    parcellation_file=None,
     component=0,
     percentile=97,
     power_save_kwargs={},
@@ -749,9 +849,11 @@ def plot_nnmf_tde_hmm_networks(
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_)
         containing the NNMF components.
     mask_file : str
-        Mask file used to preprocess the training data.
+        Mask file used to preprocess the training data. Optional. If :code:`None`,
+        we use :code:`data.mask_file`.
     parcellation_file : str
-        Parcellation file used to parcellate the training data.
+        Parcellation file used to parcellate the training data. Optional. If
+        :code:`None`, we use :code:`data.parcellation_file`.
     component : int
         NNMF component to plot. Defaults to the first component.
     percentile : float
@@ -777,14 +879,27 @@ def plot_nnmf_tde_hmm_networks(
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    # Validation
+    if mask_file is None:
+        if data is None or data.mask_file is None:
+            raise ValueError(
+                "mask_file must be passed or specified in the Data object."
+            )
+        else:
+            mask_file = data.mask_file
+
+    if parcellation_file is None:
+        if data is None or data.parcellation_file is None:
+            raise ValueError(
+                "parcellation_file must be passed or specified in the Data object."
+            )
+        else:
+            parcellation_file = data.parcellation_file
+
     # Directories
     spectra_dir = output_dir + "/spectra"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
-
-    def load(filename):
-        _logger.info(f"Loading {filename}")
-        return np.load(filename)
 
     # Load the NNMF components
     nnmf_file = output_dir + "/" + nnmf_file
@@ -879,11 +994,11 @@ def plot_nnmf_tde_hmm_networks(
     connectivity.save(gc, **conn_save_kwargs)
 
 
-def plot_tde_dynemo_networks(
+def plot_group_tde_dynemo_networks(
     data,
     output_dir,
-    mask_file,
-    parcellation_file,
+    mask_file=None,
+    parcellation_file=None,
     frequency_range=None,
     percentile=97,
     power_save_kwargs={},
@@ -912,9 +1027,11 @@ def plot_tde_dynemo_networks(
     output_dir : str
         Path to output directory.
     mask_file : str
-        Mask file used to preprocess the training data.
+        Mask file used to preprocess the training data. Optional. If :code:`None`,
+        we use :code:`data.mask_file`.
     parcellation_file : str
-        Parcellation file used to parcellate the training data.
+        Parcellation file used to parcellate the training data. Optional. If
+        :code:`None`, we use :code:`data.parcellation_file`.
     frequency_range : list
         List of length 2 containing the minimum and maximum frequency to integrate
         spectra over. Optional, defaults to the full frequency range.
@@ -939,14 +1056,27 @@ def plot_tde_dynemo_networks(
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    # Validation
+    if mask_file is None:
+        if data is None or data.mask_file is None:
+            raise ValueError(
+                "mask_file must be passed or specified in the Data object."
+            )
+        else:
+            mask_file = data.mask_file
+
+    if parcellation_file is None:
+        if data is None or data.parcellation_file is None:
+            raise ValueError(
+                "parcellation_file must be passed or specified in the Data object."
+            )
+        else:
+            parcellation_file = data.parcellation_file
+
     # Directories
     spectra_dir = output_dir + "/spectra"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
-
-    def load(filename):
-        _logger.info(f"Loading {filename}")
-        return np.load(filename)
 
     # Load spectra
     f = load(f"{spectra_dir}/f.npy")

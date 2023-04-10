@@ -60,6 +60,12 @@ class Data:
         reject_by_annotation="omit" to remove segments marked as bad.
     sampling_frequency : float
         Sampling frequency of the data in Hz. This argument is optional.
+    mask_file : str
+        Path to mask file used to source reconstruct the data. This argument is
+        optional.
+    parcellation_file : str
+        Path to parcellation file used to source reconstruct the data. This argument
+        is optional.
     store_dir : str
         We don't read all the data into memory. Instead we create store them on
         disk and create memmaps (unless load_memmaps=False is passed).
@@ -88,6 +94,8 @@ class Data:
         picks=None,
         reject_by_annotation=None,
         sampling_frequency=None,
+        mask_file=None,
+        parcellation_file=None,
         store_dir="tmp",
         n_embeddings=None,
         time_axis_first=True,
@@ -99,6 +107,8 @@ class Data:
         self.picks = picks
         self.reject_by_annotation = reject_by_annotation
         self.sampling_frequency = sampling_frequency
+        self.mask_file = mask_file
+        self.parcellation_file = parcellation_file
         self.n_embeddings = n_embeddings
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps

@@ -12,6 +12,49 @@ import glmtools as glm
 _logger = logging.getLogger("osl-dynamics")
 
 
+def _check_glm_data(data, covariates, assignments=None):
+    """Check shapes and remove subjects from GLM data which contain nans."""
+
+    # Make sure the number of subjects in data and covariates match
+    n_subjects = data.shape[0]
+    for k, v in covariates.items():
+        if v.shape[0] != n_subjects:
+            raise ValueError(
+                f"Got covariates['{k}'].shape[0]={v.shape[0]}, "
+                + f"but was expecting {n_subjects}."
+            )
+
+    # Remove subjects with a nan in either array
+    remove = []
+    glm_data = np.array(list(covariates.values()))
+    glm_data = np.concatenate([glm_data.T, data], axis=-1)
+    for i in range(n_subjects):
+        if np.isnan(glm_data[i]).any():
+            _logger.warn(f"Removing subject {i} from GLM.")
+            remove.append(i)
+        if assignments is not None:
+            if np.isnan(assignments[i]):
+                remove.append(i)
+
+    # Keep subjects without nans
+    keep = [i for i in range(n_subjects) if i not in remove]
+    data = np.copy(data)[keep]
+    covariates_ = {}
+    for key in covariates:
+        covariates_[key] = covariates[key][keep]
+    if assignments is not None:
+        assignments = np.copy(assignments)[keep]
+
+    # Check we have some subjects left
+    if len(data) == 0:
+        raise ValueError("No valid data to calculate the GLM.")
+
+    if assignments is not None:
+        return data, covariates_, assignments
+    else:
+        return data, covariates_
+
+
 def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
     """Statistical significant testing for evoked responses.
 
@@ -40,6 +83,8 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
         raise ValueError("data must be a numpy array.")
     if data.ndim != 3:
         raise ValueError("data must be (n_subjects, n_samples, n_modes).")
+
+    data, covariates = _check_glm_data(data, covariates)
 
     # Create GLM Dataset
     data = glm.data.TrialGLMData(
@@ -76,9 +121,6 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
     # Get p-values
     percentiles = stats.percentileofscore(null_dist, tstats)
     pvalues = 1 - percentiles / 100
-
-    # Correct p-values for performing a 2 tail test
-    pvalues *= 2
 
     if np.all(pvalues < 0.05):
         _logger.warn(
@@ -124,6 +166,8 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     ndim = data.ndim
     if ndim == 1:
         raise ValueError("data must be 2D or greater.")
+
+    data, covariates, assignments = _check_glm_data(data, covariates, assignments)
 
     # Calculate group difference
     group1_mean = np.mean(data[assignments == 1], axis=0)
@@ -173,8 +217,5 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     # Get p-values
     percentiles = stats.percentileofscore(null_dist, tstats)
     pvalues = 1 - percentiles / 100
-
-    # Correct p-values for performing a 2 tail test
-    pvalues *= 2
 
     return group_diff, pvalues
