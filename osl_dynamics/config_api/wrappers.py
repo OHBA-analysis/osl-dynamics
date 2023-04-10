@@ -1156,3 +1156,143 @@ def plot_group_tde_dynemo_networks(
     )
     _logger.info(f"Using conn_save_kwargs: {conn_save_kwargs}")
     connectivity.save(gc, **conn_save_kwargs)
+
+
+def compare_groups_hmm_summary_stats(
+    data,
+    output_dir,
+    group2_indices,
+    separate_tests=False,
+    covariates=None,
+    n_perm=1000,
+    n_jobs=1,
+    sampling_frequency=None,
+):
+    """Compare HMM summary statistics between two groups.
+
+    This function expects a model has been trained and the following directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/group_diff`, which contains the summary statistics and plots.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    group2_indices : np.ndarray or list
+        Indices indicating which subjects belong to the second group.
+    separate_tests : bool
+        Should we perform a maximum statistic permutation test for each summary
+        statistic separately?
+    covariates : str
+        Path to a pickle file containing a dict with covariances. Each item in the
+        dict must be the covariate name and value for each subject. The covariates
+        will be loaded with::
+
+            from osl_dynamics.utils.misc import load
+            covariates = load("/path/to/file.pkl")
+
+        Example covariates::
+
+            covariates = {"age": [...], "sex": [...]}
+    n_perm : int
+        Number of permutations.
+    n_jobs : int
+        Number of jobs for parallel processing.
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If :code:`None`, we use
+        :code:`data.sampling_frequency`.
+    """
+    if sampling_frequency is None:
+        if data is None or data.sampling_frequency is None:
+            raise ValueError(
+                "sampling_frequency must be passed or specified in the Data object."
+            )
+        else:
+            sampling_frequency = data.sampling_frequency
+
+    # Directories
+    inf_params_dir = output_dir + "/inf_params"
+    group_diff_dir = output_dir + "/group_diff"
+    os.makedirs(group_diff_dir, exist_ok=True)
+
+    # Get inferred state time courses
+    from osl_dynamics.inference import modes
+
+    alp = load(f"{inf_params_dir}/alp.pkl")
+    stc = modes.argmax_time_courses(alp)
+
+    # Calculate summary stats
+    names = ["fo", "lt", "intv", "sr"]
+    fo = modes.fractional_occupancies(stc)
+    lt = modes.mean_lifetimes(stc, sampling_frequency)
+    intv = modes.mean_intervals(stc, sampling_frequency)
+    sr = modes.switching_rates(stc, sampling_frequency)
+    sum_stats = np.swapaxes([fo, lt, intv, sr], 0, 1)
+
+    # Save
+    for i in range(4):
+        save(f"{group_diff_dir}/{names[i]}.npy", sum_stats[:, i])
+
+    # Create a vector for group assignments
+    n_subjects = fo.shape[0]
+    assignments = np.ones(n_subjects)
+    assignments[group2_indices] += 1
+
+    # Load covariates
+    if covariates is not None:
+        covariates = load(covariates)
+    else:
+        covariates = {}
+
+    # Perform statistical significance testing
+    from osl_dynamics.analysis import statistics
+
+    if separate_tests:
+        pvalues = []
+        for i in range(4):
+            # Calculate a statistical significance test for each summary stat separately
+            _, p = statistics.group_diff_max_stat_perm(
+                sum_stats[:, i],
+                assignments,
+                n_perm=n_perm,
+                covariates=covariates,
+                n_jobs=n_jobs,
+            )
+            pvalues.append(p)
+            _logger.info(f"{names[i]}: {np.sum(p <  0.05)} states have p-value<0.05")
+            save(f"{group_diff_dir}/{names[i]}_pvalues.npy", p)
+        pvalues = np.array(pvalues)
+    else:
+        # Calculate a statistical significance test for all summary stats concatenated
+        _, pvalues = statistics.group_diff_max_stat_perm(
+            sum_stats, assignments, n_perm=n_perm, covariates=covariates, n_jobs=n_jobs
+        )
+        for i in range(4):
+            _logger.info(
+                f"{names[i]}: {np.sum(pvalues[i] < 0.05)} states have p-value<0.05"
+            )
+            save(f"{group_diff_dir}/{names[i]}_pvalues.npy", pvalues[i])
+
+    # Plot
+    from osl_dynamics.utils import plotting
+
+    labels = [
+        "Fractional Occupancy",
+        "Mean Lifetime (s)",
+        "Mean Interval (s)",
+        "Switching Rate (Hz)",
+    ]
+    for i in range(4):
+        plotting.plot_summary_stats_group_diff(
+            name=labels[i],
+            summary_stats=sum_stats[:, i],
+            pvalues=pvalues[i],
+            assignments=assignments,
+            filename=f"{group_diff_dir}/{names[i]}.png",
+        )

@@ -1924,3 +1924,45 @@ def plot_psd_topo(
         save(fig, filename, tight_layout=False)
     else:
         return fig, ax
+
+
+def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, filename):
+    """Plot summary statistics for two groups as violin plots.
+
+    Parameters
+    ----------
+    name : str
+        Name of the summary statistic.
+    summary_stats : np.ndarray
+        Summary statistics. Shape is (n_subjects, n_states).
+    assignments : np.ndarray
+        Array of 1s and 2s indicating group assignment. Shape is (n_subjects,).
+    filename : str
+        Output filename.
+    """
+    # Create a pandas DataFrame to hold the summary stats
+    ss_dict = {name: [], "State": [], "Group": []}
+    n_subjects, n_states = summary_stats.shape
+    for subject in range(n_subjects):
+        for state in range(n_states):
+            ss_dict[name].append(summary_stats[subject, state])
+            ss_dict["State"].append(state + 1)
+            ss_dict["Group"].append(int(assignments[subject]))
+    ss_df = pd.DataFrame(ss_dict)
+
+    # Plot a half violin for each group
+    sns.violinplot(data=ss_df, x="State", y=name, hue="Group", split=True)
+
+    # Add a star above the violin to indicate significance
+    scatter_kwargs = {"c": "black", "s": 32, "marker": "*"}
+    for i in range(n_states):
+        if pvalues[i] < 0.01:
+            plt.scatter(i - 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+            plt.scatter(i + 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+        elif pvalues[i] < 0.05:
+            plt.scatter(i, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+
+    # Save
+    _logger.info(f"Saving {filename}")
+    plt.savefig(filename)
+    plt.close()
