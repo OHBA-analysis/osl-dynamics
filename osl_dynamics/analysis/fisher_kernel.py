@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import logging
-from tqdm import trange
+from tqdm.auto import trange
 
 _logger = logging.getLogger("osl-dynamics")
 
