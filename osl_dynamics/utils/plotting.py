@@ -1605,6 +1605,7 @@ def plot_alpha(
     plot_kwargs=None,
     fig_kwargs=None,
     filename=None,
+    axes=None,
 ):
     """Plot alpha.
 
@@ -1637,6 +1638,11 @@ def plot_alpha(
         Matplotlib axis object(s). Only returned if filename=None.
     """
     n_alphas = len(alpha)
+    if isinstance(axes, plt.Axes):
+        axes = [axes]
+    if axes is not None and len(axes) != n_alphas:
+        raise ValueError("Number of axes must match number of alphas.")
+    
     n_modes = max(a.shape[1] for a in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
     if cmap in [
@@ -1680,12 +1686,11 @@ def plot_alpha(
     elif len(y_labels) != n_alphas:
         raise ValueError("Incorrect number of y_labels passed.")
 
-    # Create figure
-    fig, axes = create_figure(n_alphas, **fig_kwargs)
-
-    # If n_alphas is one then axes won't be iterable
-    if not isinstance(axes, np.ndarray):
-        axes = [axes]
+    # Create figure if axes not passed
+    if axes is None:
+        fig, axes = create_figure(n_alphas, **fig_kwargs)
+    else:
+        fig = axes[0].get_figure()
 
     # Plot data
     for a, ax, y_label in zip(alpha, axes, y_labels):
