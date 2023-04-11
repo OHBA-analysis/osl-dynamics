@@ -72,8 +72,16 @@ class Data:
         This is the directory to save memmaps to. Default is ./tmp.
         This argument is optional.
     n_embeddings : int
-        Number of embeddings. Can be passed if data has already been prepared.
-        This argument is optional.
+        Number of time-delay embeddings that have already been appleid to the data.
+        This argument is optional. It is useful to pass this argument if the data has
+        already been prepared.
+    n_window : int
+        Length of sliding window that has already been applied to the data. This
+        argument is optional. It is useful to pass this argument if the data has
+        already been prepared.
+    amplitude_envelope : bool
+        Is the data we're loading amplitude envelope data? This argument is optional.
+        It is useful to pass this argument if the data has already been prepared.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)? Default is True.
         If your data is in format (n_channels, n_samples), use
@@ -98,6 +106,8 @@ class Data:
         parcellation_file=None,
         store_dir="tmp",
         n_embeddings=None,
+        n_window=None,
+        amplitude_envelope=None,
         time_axis_first=True,
         load_memmaps=True,
         n_jobs=1,
@@ -110,6 +120,8 @@ class Data:
         self.mask_file = mask_file
         self.parcellation_file = parcellation_file
         self.n_embeddings = n_embeddings
+        self.n_window = n_window
+        self.amplitude_envelope = amplitude_envelope
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
         self.n_jobs = n_jobs
