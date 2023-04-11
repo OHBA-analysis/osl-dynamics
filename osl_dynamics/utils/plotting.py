@@ -1629,6 +1629,8 @@ def plot_alpha(
         Arguments to pass to matplotlib.pyplot.subplots.
     filename : str
         Output filename.
+    axes: list of matplotlib.pyplot.Axes
+        A list of matplotlib axes to plot on. If None, a new figure is created.
 
     Returns
     -------
