@@ -1644,7 +1644,7 @@ def plot_alpha(
         axes = [axes]
     if axes is not None and len(axes) != n_alphas:
         raise ValueError("Number of axes must match number of alphas.")
-    
+
     n_modes = max(a.shape[1] for a in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
     if cmap in [
