@@ -1158,7 +1158,9 @@ def plot_group_tde_dynemo_networks(
     connectivity.save(gc, **conn_save_kwargs)
 
 
-def plot_alpha(data, output_dir, subject=0, sampling_frequency=None, kwargs={}):
+def plot_alpha(
+    data, output_dir, subject=0, normalize=False, sampling_frequency=None, kwargs={}
+):
     """Plot inferred alphas.
 
     This is a wrapper for `utils.plotting.plot_alpha
@@ -1181,6 +1183,10 @@ def plot_alpha(data, output_dir, subject=0, sampling_frequency=None, kwargs={}):
     subject : int
         Index for subject to plot. If 'all' is passed we create a separate plot
         for each subject.
+    normalize : bool
+        Should we also plot the alphas normalized using the trace of the inferred
+        covariance matrices? Optional. Useful if we are plotting the inferred alphas
+        from DyNeMo.
     sampling_frequency : float
         Sampling frequency in Hz. Optional. If :code:`None`, we see if it is
         present in :code:`data.sampling_frequency`.
@@ -1222,6 +1228,165 @@ def plot_alpha(data, output_dir, subject=0, sampling_frequency=None, kwargs={}):
     else:
         kwargs["filename"] = f"{alphas_dir}/alpha_{subject}.png"
         plotting.plot_alpha(alp[subject], **kwargs)
+
+    if normalize:
+        # Calculate normalised alphas
+        covs = load(f"{inf_params_dir}/covs.npy")
+        traces = np.trace(covs, axis1=1, axis2=2)
+        norm_alp = [a * traces[np.newaxis, :] for a in alp]
+        norm_alp = [na / np.sum(na, axis=1, keepdims=True) for na in norm_alp]
+
+        # Plot
+        if subject == "all":
+            for i in range(len(alp)):
+                kwargs["filename"] = f"{alphas_dir}/norm_alpha_{i}.png"
+                plotting.plot_alpha(norm_alp[i], **kwargs)
+        else:
+            kwargs["filename"] = f"{alphas_dir}/norm_alpha_{subject}.png"
+            plotting.plot_alpha(norm_alp[subject], **kwargs)
+
+
+def calc_gmm_alpha(data, output_dir, kwargs={}):
+    """Binarize inferred alphas using a two-component GMM.
+
+    This function expects a model has been trained and the following directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create the following file:
+
+    - :code:`<output_dir>/inf_params/gmm_alp.pkl`, which contains the binarized alphas.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    kwargs : dict
+        Keyword arguments to pass to `inference.modes.gmm_time_courses
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_.
+    """
+    inf_params_dir = output_dir + "/inf_params"
+
+    # Load inferred alphas
+    alp_file = f"{inf_params_dir}/alp.pkl"
+    if not Path(alp_file).exists():
+        raise ValueError(f"{alp_file} missing.")
+    alp = load(alp_file)
+
+    # Binarise using a two-component GMM
+    from osl_dynamics.inference import modes
+
+    _logger.info(f"Using kwargs: {kwargs}")
+    gmm_alp = modes.gmm_time_courses(alp, **kwargs)
+    save(f"{inf_params_dir}/gmm_alp.pkl", gmm_alp)
+
+
+def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency=None):
+    """Plot summary statistics as violin plots.
+
+    This function will plot the distribution over subjects for the following summary
+    statistics:
+
+    - Fractional occupancy.
+    - Mean lifetime (s).
+    - Mean interval (s).
+    - Switching rate (Hz).
+
+    This function expects a model has been trained and the following directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/summary_stats`, which contains plots of the summary statistics.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    use_gmm_alpha : bool
+        Should we use alphas binarised using a Gaussian mixture model?
+        This function assumes :code:`calc_gmm_alpha` has been called and the file
+        :code:`<output_dir>/inf_params/gmm_alp.pkl` exists.
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If :code:`None`, we use
+        :code:`data.sampling_frequency`.
+    """
+    if sampling_frequency is None:
+        if data is None or data.sampling_frequency is None:
+            raise ValueError(
+                "sampling_frequency must be passed or specified in the Data object."
+            )
+        else:
+            sampling_frequency = data.sampling_frequency
+
+    # Directories
+    inf_params_dir = output_dir + "/inf_params"
+    summary_stats_dir = output_dir + "/summary_stats"
+    os.makedirs(summary_stats_dir, exist_ok=True)
+
+    from osl_dynamics.inference import modes
+
+    if use_gmm_alpha:
+        # Use alphas that were binarised using a GMM
+        gmm_alp_file = f"{inf_params_dir}/gmm_alp.pkl"
+        if Path(gmm_alp_file).exists():
+            stc = load(gmm_alp_file)
+        else:
+            raise ValueError(f"{gmm_alp_file} missing.")
+
+    else:
+        # Load inferred alphas and hard classify
+        alp = load(f"{inf_params_dir}/alp.pkl")
+        if isinstance(alp, np.ndarray):
+            raise ValueError(
+                "We must train on multiple subjects to plot the distribution of summary statistics."
+            )
+        stc = modes.argmax_time_courses(alp)
+
+    # Calculate summary stats
+    fo = modes.fractional_occupancies(stc)
+    lt = modes.mean_lifetimes(stc, sampling_frequency)
+    intv = modes.mean_intervals(stc, sampling_frequency)
+    sr = modes.switching_rates(stc, sampling_frequency)
+
+    # Plot
+    from osl_dynamics.utils import plotting
+
+    n_states = fo.shape[1]
+    x = range(1, n_states + 1)
+    plotting.plot_violin(
+        fo.T,
+        x=x,
+        x_label="State",
+        y_label="Fractional Occupancy",
+        filename=f"{summary_stats_dir}/fo.png",
+    )
+    plotting.plot_violin(
+        lt.T,
+        x=x,
+        x_label="State",
+        y_label="Mean Lifetime (s)",
+        filename=f"{summary_stats_dir}/lt.png",
+    )
+    plotting.plot_violin(
+        intv.T,
+        x=x,
+        x_label="State",
+        y_label="Mean Interval (s)",
+        filename=f"{summary_stats_dir}/intv.png",
+    )
+    plotting.plot_violin(
+        sr.T,
+        x=x,
+        x_label="State",
+        y_label="Switching rate (Hz)",
+        filename=f"{summary_stats_dir}/sr.png",
+    )
 
 
 def compare_groups_hmm_summary_stats(

@@ -1935,6 +1935,8 @@ def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, fil
         Name of the summary statistic.
     summary_stats : np.ndarray
         Summary statistics. Shape is (n_subjects, n_states).
+    pvalues : np.ndarray
+        p-values for each summary statistic difference. Shape is (n_states,).
     assignments : np.ndarray
         Array of 1s and 2s indicating group assignment. Shape is (n_subjects,).
     filename : str

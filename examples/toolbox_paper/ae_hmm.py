@@ -27,5 +27,8 @@ config = """
             learn_covariances: True
     calc_subject_ae_hmm_networks: {}
     plot_group_ae_networks: {}
+    plot_alpha:
+        kwargs: {n_samples: 2000}
+    plot_summary_stats: {}
 """
 run_pipeline(config, output_dir="results/ae_hmm")

@@ -33,5 +33,8 @@ config = """
         nnmf_file: spectra/nnmf_2.npy
         power_save_kwargs:
             plot_kwargs: {views: [lateral]}
+    plot_alpha:
+        kwargs: {n_samples: 2000}
+    plot_summary_stats: {}
 """
 run_pipeline(config, output_dir="results/tde_hmm")

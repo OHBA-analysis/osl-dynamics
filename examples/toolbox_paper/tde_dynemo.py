@@ -27,5 +27,11 @@ config = """
             frequency_range: [1, 45]
             n_jobs: 16
     plot_group_tde_dynemo_networks: {}
+    plot_alpha:
+        normalize: True
+        kwargs: {n_samples: 2000}
+    calc_gmm_alpha: {}
+    plot_summary_stats:
+        use_gmm_alpha: True
 """
 run_pipeline(config, output_dir="results/tde_dynemo")
