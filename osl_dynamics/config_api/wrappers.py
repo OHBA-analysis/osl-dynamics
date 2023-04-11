@@ -1158,6 +1158,72 @@ def plot_group_tde_dynemo_networks(
     connectivity.save(gc, **conn_save_kwargs)
 
 
+def plot_alpha(data, output_dir, subject=0, sampling_frequency=None, kwargs={}):
+    """Plot inferred alphas.
+
+    This is a wrapper for `utils.plotting.plot_alpha
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+
+    This function expects a model has been trained and the following directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/alphas`, which contains plots of the inferred alphas.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    subject : int
+        Index for subject to plot. If 'all' is passed we create a separate plot
+        for each subject.
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If :code:`None`, we see if it is
+        present in :code:`data.sampling_frequency`.
+    kwargs : dict
+        Keyword arguments to pass to `utils.plotting.plot_alpha
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+        Optional. Defaults to::
+
+            {'sampling_frequency': data.sampling_frequency,
+             'filename': '<output_dir>/alphas/alpha_<subject>.png'}
+    """
+    if sampling_frequency is None and data is not None:
+        sampling_frequency = data.sampling_frequency
+
+    # Directories
+    inf_params_dir = output_dir + "/inf_params"
+    alphas_dir = output_dir + "/alphas"
+    os.makedirs(alphas_dir, exist_ok=True)
+
+    # Load inferred alphas
+    alp = load(f"{inf_params_dir}/alp.pkl")
+    if isinstance(alp, np.ndarray):
+        alp = [alp]
+
+    # Plot
+    from osl_dynamics.utils import plotting
+
+    default_kwargs = {
+        "sampling_frequency": sampling_frequency,
+        "filename": f"{alphas_dir}/alpha_*.png",
+    }
+    kwargs = override_dict_defaults(default_kwargs, kwargs)
+    _logger.info(f"Using kwargs: {kwargs}")
+
+    if subject == "all":
+        for i in range(len(alp)):
+            kwargs["filename"] = f"{alphas_dir}/alpha_{i}.png"
+            plotting.plot_alpha(alp[i], **kwargs)
+    else:
+        kwargs["filename"] = f"{alphas_dir}/alpha_{subject}.png"
+        plotting.plot_alpha(alp[subject], **kwargs)
+
+
 def compare_groups_hmm_summary_stats(
     data,
     output_dir,
