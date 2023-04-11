@@ -3,12 +3,12 @@
 """
 
 import numpy as np
+
 from osl_dynamics import simulation
 from osl_dynamics.utils import plotting
 
-#
-# Basic plots
-#
+
+#%% Basic plots
 
 # Line plot
 x = np.arange(100)
@@ -35,10 +35,7 @@ plotting.plot_hist([x1, x2], bins=[50, 50], labels=["x1", "x2"], filename="hist.
 # Violin plot
 plotting.plot_violin([x1, x2], filename="violins.png")
 
-
-#
-# Plot time series data
-#
+#%% Plot time series data
 
 # Plot continous raw time series data
 X = np.random.normal(size=[1000, 5])
@@ -53,9 +50,7 @@ plotting.plot_epoched_time_series(
     X, time_index=sti_ind, pre=25, post=75, filename="time_series3.png"
 )
 
-#
-# Plot matrices/connections
-#
+#%% Plot matrices/connections
 
 # Matrices
 C = np.random.normal(size=[4, 11, 11])
@@ -72,9 +67,7 @@ plotting.plot_connections(
     filename="connections.png",
 )
 
-#
-# Mode analysis plots
-#
+#%% Mode analysis plots
 
 # Simulate data
 hmm = simulation.HMM_MVN(
@@ -86,7 +79,7 @@ hmm = simulation.HMM_MVN(
     means="zero",
     covariances="random",
 )
-hmm_stc = hmm.mode_time_course
+hmm_stc = hmm.state_time_course
 
 sm = simulation.MixedSine_MVN(
     n_samples=25600,

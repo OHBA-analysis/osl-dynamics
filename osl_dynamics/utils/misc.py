@@ -4,6 +4,7 @@
 
 import inspect
 import logging
+import pickle
 import sys
 from copy import copy
 from pathlib import Path
@@ -450,3 +451,54 @@ class NumpyLoader(yaml.UnsafeLoader):
                 mark,
             )
         return getattr(module, object_name)
+
+
+def save(filename, array):
+    """Save a file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to file to save to. Must be '.npy' or '.pkl'.
+    array : np.ndarray or list
+        Array to save.
+    """
+    # Validation
+    ext = Path(filename).suffix
+    if ext not in [".npy", ".pkl"]:
+        raise ValueError(f"filename extension must be .npy or .pkl.")
+
+    # Save
+    _logger.info(f"Saving {filename}")
+    if ext == ".pkl":
+        pickle.dump(array, open(filename, "wb"))
+    else:
+        np.save(filename, array)
+
+
+def load(filename):
+    """Load a file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to file to load. Must be '.npy' or '.pkl'.
+
+    Returns
+    -------
+    array : np.ndarray or list
+        Array loaded from the file.
+    """
+    # Validation
+    ext = Path(filename).suffix
+    if ext not in [".npy", ".pkl"]:
+        raise ValueError(f"filename extension must be .npy or .pkl.")
+
+    # Load
+    _logger.info(f"Loading {filename}")
+    if ext == ".pkl":
+        array = pickle.load(open(filename, "rb"))
+    else:
+        array = np.load(filename)
+
+    return array

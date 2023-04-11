@@ -1,4 +1,4 @@
-"""Functions used to manage files kept in osl-dynamics' source code.
+"""Functions used to manage files kept within osl-dynamics.
 
 """
 

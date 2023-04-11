@@ -14,8 +14,7 @@ from osl_dynamics.inference import tf_ops, modes
 from osl_dynamics.models.hmm import Config, Model
 from osl_dynamics.utils import plotting
 
-# --------
-# Settings
+#%% Settings
 
 train_model = True
 calc_spectra = True
@@ -44,8 +43,7 @@ config = Config(
     n_epochs=20,
 )
 
-# ----------------
-# Training dataset
+#%% Training dataset
 
 # Directory containing source reconstructed data
 src_data_dir = "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec"
@@ -59,8 +57,7 @@ training_data = Data(
 # Prepare the data: time-delay embedding, PCA and standardization
 training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
 
-# --------------
-# Model training
+#%% Model training
 
 if train_model:
     # Build model
@@ -81,8 +78,7 @@ if train_model:
 else:
     model = Model.load(model_dir)
 
-# -------------------
-# Inferred parameters
+#%% Inferred parameters
 
 # Get subject-specific inferred state probabilities
 alpha = model.get_alpha(training_data)
@@ -101,8 +97,7 @@ covs = model.get_covariances()
 
 plotting.plot_matrices(covs, filename=plots_dir + "/covs.png")
 
-# ------------------
-# Summary statistics
+#%% Summary statistics
 
 # Calculate a state time course from the state probabilities
 stc = modes.argmax_time_courses(alpha, concatenate=True)
@@ -122,8 +117,7 @@ intv = modes.mean_intervals(stc, sampling_frequency=training_data.sampling_frequ
 
 print("Intervals:", intv)
 
-# -----------------
-# Spectral analysis
+#%% Spectral analysis
 
 if calc_spectra:
     # Get subject-specific source reconstructed data
@@ -165,8 +159,7 @@ plotting.plot_line([f, f], wideband_components, filename=plots_dir + "/wideband.
 psd = np.average(psd, axis=0, weights=w)
 coh = np.average(coh, axis=0, weights=w)
 
-# -----------------------
-# Power and coherence maps
+#%% Power and coherence maps
 
 # Source reconstruction files needed for plotting maps
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
@@ -202,8 +195,7 @@ connectivity.save(
     component=0,  # just plot the first component, second is noise
 )
 
-# --------
-# Clean up
+#%% Clean up
 
 # Delete temporary directory
 training_data.delete_dir()

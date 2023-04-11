@@ -1,6 +1,8 @@
 """Get training data.
 
-We will train on source reconstructed MEG data from Nottingham.
+This script will download source reconstructed resting-state MEG data.
+This data is part of the MRC MEGUK dataset. It is CTF data from the
+Nottingham site.
 """
 
 import os

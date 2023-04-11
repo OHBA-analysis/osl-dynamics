@@ -23,6 +23,8 @@ from osl_dynamics.utils import plotting
 from osl_dynamics.models.dynemo_obs import Config as DynemoConfig
 from osl_dynamics.models.dynemo_obs import Model as DynemoModel
 
+#%% Setup
+
 # GPU settings
 tf_ops.gpu_growth()
 
@@ -49,25 +51,22 @@ config = Config(
     n_epochs=50,
 )
 
-# ------------------------------- #
-#           UKB dataset           #
-# ------------------------------- #
+#%% UK-Biobank dataset
 
-# Training (Subset) data
-# For Training: Dataset containing a subset of resting-state fMRI data (location of training data in BMRC)
 print("Reading resting-fMRI data")
+
+# Subset of 2k subjects from biobank
 dataset_dir = "/gpfs3/well/win-biobank/projects/imaging/data/data3/subjectsAll/2*/fMRI/rfMRI_25.dr/dr_stage1.txt"
+files = random.sample(glob(dataset_dir), len(glob(dataset_dir)))[:2000]
 
-files = random.sample(glob(dataset_dir), len(glob(dataset_dir)))[
-    :2000
-]  # subset of 3k subjects for training
-
+# Load data
 training_data = data.Data(
     [path for path in glob(dataset_dir) if path in files],
     load_memmaps=False,
     keep_memmaps_on_close=True,
 )
 
+# Prepare data (standardisation)
 training_data.prepare(load_memmaps=False)
 
 # Create tensorflow datasets for training the model
@@ -78,38 +77,30 @@ training_dataset = training_data.dataset(
     concatenate=True,
 )
 
-# Prediction (full) data
-# For Prediction: Dataset containing full resting-state fMRI data
+# Prediction data (full resting-state dataset)
 prediction_files = [f"{path}" for path in glob(dataset_dir)]
 prediction_data = data.Data(
     prediction_files,
     load_memmaps=False,
     keep_memmaps_on_close=True,
 )
-
-# Standardise the data
 prediction_data.prepare(load_memmaps=False)
 prediction_dataset = prediction_data.dataset(
     config.sequence_length, config.batch_size, shuffle=False, concatenate=False
 )
 
-# ------------------------- #
-# Build the main SAGE model #
-# ------------------------- #
+#%% Build model
+
 model = Model(config)
 
-# ------------------------- -------------#
-# Train on the Training dataset (Subset) #
-# ------------------------- -------------#
-print("Training SAGE model")
+#%% Train model
+
 history = model.fit(training_dataset)
 
 
-# ----------------------------------------------------- #
-# State-level Analysis on the Prediction dataset (Full) #
-# ----------------------------------------------------- #
+#%% State-level analysis on the prediction dataset (full dataset)
 
-# Temporal Analysis: State-time courses
+# Temporal analysis: state-time courses
 
 # Alpha time course for each subject
 a = model.get_alpha(prediction_dataset, concatenate=False)
@@ -147,43 +138,16 @@ print("mean_a_NW:", mean_a_NW)
 # Create a state time course from the alpha
 argmax_a_NW = inference.modes.argmax_time_courses(a_NW)
 
-plotting.plot_alpha(
-    argmax_a_NW[0],
-    filename=f"{output_dir}/argmax_alpha_NW.png",
-)
+# Plot
+plotting.plot_alpha(argmax_a_NW[0], filename=f"{output_dir}/argmax_alpha_NW.png")
 
-# State statistics
+# State summary statistics
 
-# State FO
+# State fractional occupancies
 fo = np.array(inference.modes.fractional_occupancies(argmax_a_NW))
 mean_fo = np.mean(fo, axis=0)
 print("mean_fo:", mean_fo)
 
-# State lifetimes
-lt = inference.modes.lifetimes(argmax_a_NW)
-mean_lt = np.array([np.mean(lifetimes) for lifetimes in lt])
-print("mean_lt:", mean_lt)
-
-# State Intervals
-intv = inference.modes.intervals(argmax_a_NW)
-mean_intv = np.array([np.mean(interval) for interval in intv])
-print("mean_intv:", mean_intv)
-
-# Plotting FO, lifetimes and Intervals
-plotting.plot_violin(
-    [l for l in lt],
-    y_range=[0, 20],
-    x_label="Mode",
-    y_label="Lifetime",
-    filename=f"{output_dir}/lt.png",
-)
-plotting.plot_violin(
-    intv,
-    y_range=[0, 200],
-    x_label="Mode",
-    y_label="Interval (s)",
-    filename=f"{output_dir}/intv.png",
-)
 plotting.plot_violin(
     [f for f in fo.T],
     x_label="Mode",
@@ -191,15 +155,40 @@ plotting.plot_violin(
     filename=f"{output_dir}/fo.png",
 )
 
+# State lifetimes
+lt = inference.modes.lifetimes(argmax_a_NW)
+mean_lt = np.array([np.mean(lifetimes) for lifetimes in lt])
+print("mean_lt:", mean_lt)
 
-plotting.plot_matrices(covariances, filename=f"{output_dir}/cov.png")
-plotting.plot_matrices(means, filename=f"{output_dir}/mean.png")
+plotting.plot_violin(
+    [l for l in lt],
+    y_range=[0, 20],
+    x_label="Mode",
+    y_label="Lifetime",
+    filename=f"{output_dir}/lt.png",
+)
 
-# ------------------------------------------------------- #
-# Subject-level Analysis on the Prediction dataset (Full) #
-# ------------------------------------------------------- #
+# State Intervals
+intv = inference.modes.intervals(argmax_a_NW)
+mean_intv = np.array([np.mean(interval) for interval in intv])
+print("mean_intv:", mean_intv)
+
+plotting.plot_violin(
+    intv,
+    y_range=[0, 200],
+    x_label="Mode",
+    y_label="Interval (s)",
+    filename=f"{output_dir}/intv.png",
+)
+
+#%% Subject-level analysis on the prediction dataset (full dataset)
+
+# Get inferred group-level means and covariances
 means, covariances = model.get_means_covariances()
+plotting.plot_matrices(means, filename=f"{output_dir}/mean.png")
+plotting.plot_matrices(covariances, filename=f"{output_dir}/cov.png")
 
+# Create a DyNeMo observation model
 config = DynemoConfig(
     n_modes=12,
     n_channels=25,
@@ -211,9 +200,11 @@ config = DynemoConfig(
     n_epochs=60,
 )
 
+# Set observation model to group-level parameters
 obs_model = DynemoModel(config)
 obs_model.set_covariances(covariances)
 
+# Train on individual subjects
 covariances_subject = []
 subject_ids = []
 
@@ -246,33 +237,26 @@ for idx in range(len(prediction_files)):
 np.save(f"{output_dir}/covariances.npy", covariances_subject, allow_pickle=True)
 np.save(f"{output_dir}/ids.npy", subject_ids, allow_pickle=True)
 
-# --------------------------------------#
-# Subject-level Behavioural Variability #
-# --------------------------------------#
+#%% Subject-level Behavioural Variability
+
 # Loading the non-imaging variable age (i.e., age is just used an example here, any non-imaging variable can be loaded)
 age = io.loadmat("/gpfs3/well/win-fmrib-analysis/users/nhx531/ukb_46k/age.mat")["age"]
 
 # Loading the original IDs of the subject that are in accordance with the order in which non-imaging variable (i.e., age) is loaded
-ids_orig = io.loadmat("/gpfs3/well/win-fmrib-analysis/users/nhx531/ukb_46k/ids.mat")[
-    "ids"
-]
+ids_orig = io.loadmat("/gpfs3/well/win-fmrib-analysis/users/nhx531/ukb_46k/ids.mat")["ids"]
 
 # Loading the subject-level state fcs and subject IDs in accordance with which the fcs are loaded
-covariances_subject = np.load(
-    f"/well/win/users/nhx531/osl-dynamics/examples/fMRI/{output_dir}/covariances.npy"
-)
-subject_ids = np.load(
-    f"/well/win/users/nhx531/osl-dynamics/examples/fMRI/{output_dir}/ids.npy"
-)
+covariances_subject = np.load(f"/well/win/users/nhx531/osl-dynamics/examples/fMRI/{output_dir}/covariances.npy")
+subject_ids = np.load(f"/well/win/users/nhx531/osl-dynamics/examples/fMRI/{output_dir}/ids.npy")
 
 intersect, ind_a, ind_b = np.intersect1d(subject_ids, ids_orig, return_indices=True)
 y, X = age[ind_b], covariances_subject[ind_a]
 X = X.reshape(*X.shape[:-3], -1)
 
-# define model evaluation method
+# Define model evaluation method
 cv = RepeatedKFold(n_splits=10, n_repeats=5, random_state=1)
 
-# define model
+# Define model
 ratios = np.arange(0, 1, 0.1)
 alphas = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0]
 model = ElasticNetCV(l1_ratio=ratios, alphas=alphas, cv=cv, n_jobs=-1, precompute=False)
@@ -283,12 +267,10 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # Train the model using the training sets
 model.fit(X_train, y_train)
 
-# summarize chosen configuration
+# Summarize chosen configuration
 print("alpha: %f" % model.alpha_)
 print("l1_ratio_: %f" % model.l1_ratio_)
 
 # Make predictions using the testing set
 predict_y = model.predict(X_test)
-print(
-    pearsonr(np.squeeze(y_test), np.squeeze(predict_y))
-)  # prediction correlation on the testing set.
+print(pearsonr(np.squeeze(y_test), np.squeeze(predict_y)))

@@ -1,8 +1,10 @@
-from pkg_resources import DistributionNotFound, get_distribution
 import logging
+from pkg_resources import DistributionNotFound, get_distribution
 
-from .pipeline import run_pipeline
+from osl_dynamics.config_api.pipeline import run_pipeline
 
+
+# Setup the version
 try:
     __version__ = get_distribution("osl-dynamics").version
 except DistributionNotFound:
@@ -10,14 +12,12 @@ except DistributionNotFound:
 finally:
     del get_distribution, DistributionNotFound
 
-# Configure logging for package
+# Configure logging
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.INFO,
 )
-
 logger = logging.getLogger("osl-dynamics")
 logger.debug("Version %s", __version__)
-
 del logger, logging

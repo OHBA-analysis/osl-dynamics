@@ -2,11 +2,11 @@
 
 """
 
-
 import nibabel as nib
 import numpy as np
 from pathlib import Path
 from nilearn.plotting import plot_markers
+
 from osl_dynamics import files
 
 

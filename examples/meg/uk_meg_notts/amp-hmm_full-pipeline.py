@@ -13,8 +13,7 @@ from osl_dynamics.inference import tf_ops, modes
 from osl_dynamics.models.hmm import Config, Model
 from osl_dynamics.utils import plotting
 
-# --------
-# Settings
+#%% Settings
 
 train_model = False
 
@@ -40,8 +39,7 @@ config = Config(
     n_epochs=20,
 )
 
-# ----------------
-# Training dataset
+#%% Training dataset
 
 # Directory containing source reconstructed data
 src_data_dir = "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/src_rec"
@@ -55,8 +53,7 @@ training_data = Data(
 # Prepare the data: time-delay embedding, PCA and standardization
 training_data.prepare(amplitude_envelope=True, n_window=6)
 
-# --------------
-# Model training
+#%% Model training
 
 if train_model:
     # Build model
@@ -77,8 +74,7 @@ if train_model:
 else:
     model = Model.load(model_dir)
 
-# -------------------
-# Inferred parameters
+#%% Inferred parameters
 
 # Get subject-specific inferred state probabilities
 alpha = model.get_alpha(training_data)
@@ -97,8 +93,7 @@ means, covs = model.get_means_covariances()
 
 plotting.plot_matrices(covs, filename=plots_dir + "/covs.png")
 
-# ------------------
-# Summary statistics
+#%% Summary statistics
 
 # Calculate a state time course from the state probabilities
 stc = modes.argmax_time_courses(alpha, concatenate=True)
@@ -118,8 +113,7 @@ intv = modes.mean_intervals(stc, sampling_frequency=training_data.sampling_frequ
 
 print("Intervals:", intv)
 
-# -----------------------
-# Mean activity and connectivity maps
+#%% Mean activity and connectivity maps
 
 # Source reconstruction files needed for plotting maps
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
@@ -144,8 +138,7 @@ connectivity.save(
     parcellation_file=parcellation_file,
 )
 
-# --------
-# Clean up
+#%% Clean up
 
 # Delete temporary directory
 training_data.delete_dir()
