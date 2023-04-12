@@ -387,16 +387,6 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
         sequence_length=model_config["sequence_length"], prepared=False
     )
 
-    # Sanity check
-    for d, a in zip(data, alpha):
-        if d.shape[0] != a.shape[0]:
-            raise ValueError(
-                "Mismatch in the number of samples in data and alpha. "
-                + "This is likely due to not trimming the data points "
-                + "lost to time embedding/sliding window and separating "
-                + "into sequences correctly."
-            )
-
     # Calculate multitaper
     from osl_dynamics.analysis import spectral
 
@@ -508,16 +498,6 @@ def regression_spectra(data, output_dir, kwargs):
     data = data.trim_time_series(
         sequence_length=model_config["sequence_length"], prepared=False
     )
-
-    # Sanity check
-    for d, a in zip(data, alpha):
-        if d.shape[0] != a.shape[0]:
-            raise ValueError(
-                "Mismatch in the number of samples in data and alpha. "
-                + "This is likely due to not trimming the data points "
-                + "lost to time embedding/sliding window and separating "
-                + "into sequences correctly."
-            )
 
     # Calculate regression spectra
     from osl_dynamics.analysis import spectral
