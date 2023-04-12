@@ -650,6 +650,7 @@ def multitaper_spectra(
     return_weights=False,
     standardize=True,
     n_jobs=1,
+    keepdims=False,
 ):
     """Calculates spectra for inferred states using a multitaper.
 
@@ -681,18 +682,22 @@ def multitaper_spectra(
         Should we standardize the data before calculating the multitaper?
     n_jobs : int
         Number of parallel jobs.
+    keepdims : bool
+        Should we enforce a (n_subject, n_states, ...) array is returned for
+        psd and coh? If False, we remove any dimensions of length 1.
 
     Returns
     -------
     frequencies : np.ndarray
-        Frequencies of the power spectra and coherences.
-        Shape is (n_freq,).
+        Frequencies of the power spectra and coherences. Shape is (n_freq,).
     power_spectra : np.ndarray
-        Power spectra for each state.
-        Shape is (n_subjects, n_states, n_channels, n_freq).
+        Power spectra for each subject and state. Shape is (n_subjects,
+        n_states, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
     coherences : np.ndarray
-        Coherences for each state.
-        Shape is (n_subjects, n_states, n_channels, n_channels, n_freq).
+        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
     weights : np.ndarray
         Weight for each subject-specific PSD. Only returned if return_weights=True.
         Shape is (n_subjects,).
@@ -839,10 +844,15 @@ def multitaper_spectra(
     n_samples = [d.shape[0] for d in data]
     weights = np.array(n_samples) / np.sum(n_samples)
 
+    if not keepdims:
+        # Remove any axes that are of length 1
+        power_spectra = np.squeeze(power_spectra)
+        coherences = np.squeeze(coherences)
+
     if return_weights:
-        return frequencies, np.squeeze(power_spectra), np.squeeze(coherences), weights
+        return frequencies, power_spectra, coherences, weights
     else:
-        return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
+        return frequencies, power_spectra, coherences
 
 
 def single_regression_spectra(
@@ -931,6 +941,7 @@ def regression_spectra(
     return_coef_int=False,
     standardize=True,
     n_jobs=1,
+    keepdims=False,
 ):
     """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
 
@@ -968,19 +979,25 @@ def regression_spectra(
         Should we standardize the data before calculating the spectrogram?
     n_jobs : int
         Number of parallel jobs.
+    keepdims : bool
+        Should we enforce a (n_subject, n_states, ...) array is returned for
+        psd and coh? If False, we remove any dimensions of length 1.
 
     Returns
     -------
     f : np.ndarray
-        Frequency axis.
+        Frequency axis. Shape is (n_freq).
     psd : np.ndarray
         Mode PSDs. A numpy array with shape (n_subjects, 2, n_modes, n_channels, n_freq)
-        where the first axis is the coefficients/intercept if return_coef_int=True,
-        otherwise shape is (n_subjects, n_modes, n_channels, n_freq).
+        where axis=1 is the coefficients/intercept if return_coef_int=True, otherwise
+        shape is (n_subjects, n_modes, n_channels, n_freq). Any axis of length 1 is
+        removed if :code:`keepdims=False`.
     coh : np.ndarray
-        Mode coherences.
+        Mode coherences. Shape is (n_subjects, n_modes, n_channels, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
     w : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
+        Weight for each subject-specific PSD. Shape is (n_subjects).
+        Only returned if return_weights=True.
     """
 
     # Validation
@@ -1140,10 +1157,15 @@ def regression_spectra(
         # Sum coefficients and intercept
         psd = np.sum(psd, axis=1)
 
+    if not keepdims:
+        # Remove any axes that are of length 1
+        power_spectra = np.squeeze(power_spectra)
+        coherences = np.squeeze(coherences)
+
     if return_weights:
-        return f, np.squeeze(psd), np.squeeze(coh), weights
+        return frequencies, power_spectra, coherences, weights
     else:
-        return f, np.squeeze(psd), np.squeeze(coh)
+        return frequencies, power_spectra, coherences
 
 
 def spectrogram(

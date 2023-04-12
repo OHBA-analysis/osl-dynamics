@@ -28,6 +28,13 @@ config = """
         kwargs:
             frequency_range: [1, 45]
             n_jobs: 16
-    plot_group_tde_hmm_networks: {}
+        nnmf_components: 2
+    plot_group_nnmf_tde_hmm_networks: {}
+        nnmf_file: spectra/nnmf_2.npy
+        power_save_kwargs:
+            plot_kwargs: {views: [lateral]}
+    plot_alpha:
+        kwargs: {n_samples: 2000}
+    plot_summary_stats: {}
 """
 run_pipeline(config, output_dir="results/tde_hmm")
