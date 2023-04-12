@@ -350,7 +350,8 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
 
             {'sampling_frequency': data.sampling_frequency,
              'time_half_bandwidth': 4,
-             'n_tapers': 7}.
+             'n_tapers': 7,
+             'keepdims': True}
     nnmf_components : int
         Number of non-negative matrix factorization (NNMF) components to fit to
         the stacked subject-specific coherence spectra.
@@ -362,6 +363,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
         "sampling_frequency": data.sampling_frequency,
         "time_half_bandwidth": 4,
         "n_tapers": 7,
+        "keepdims": True,
     }
     kwargs = override_dict_defaults(default_kwargs, kwargs)
     _logger.info(f"Using kwargs: {kwargs}")
@@ -460,7 +462,8 @@ def regression_spectra(data, output_dir, kwargs):
              'window_length': 4 * sampling_frequency,
              'step_size': 20,
              'n_sub_windows': 8,
-             'return_coef_int': True}
+             'return_coef_int': True,
+             'keepdims': True}
     """
     if data is None:
         raise ValueError("data must be passed.")
@@ -474,6 +477,7 @@ def regression_spectra(data, output_dir, kwargs):
         "step_size": 20,
         "n_sub_windows": 8,
         "return_coef_int": True,
+        "keepdims": True,
     }
     kwargs = override_dict_defaults(default_kwargs, kwargs)
     _logger.info(f"Using kwargs: {kwargs}")
