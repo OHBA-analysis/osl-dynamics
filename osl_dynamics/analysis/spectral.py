@@ -1159,13 +1159,13 @@ def regression_spectra(
 
     if not keepdims:
         # Remove any axes that are of length 1
-        power_spectra = np.squeeze(power_spectra)
-        coherences = np.squeeze(coherences)
+        psd = np.squeeze(psd)
+        coh = np.squeeze(coh)
 
     if return_weights:
-        return frequencies, power_spectra, coherences, weights
+        return f, psd, coh, weights
     else:
-        return frequencies, power_spectra, coherences
+        return f, psd, coh
 
 
 def spectrogram(

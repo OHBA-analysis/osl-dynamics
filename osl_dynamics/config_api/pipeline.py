@@ -130,7 +130,6 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
             except Exception as e:
                 _logger.exception(e)
 
-
     # Delete the temporary directory created by the Data class
     if data is not None:
         data.delete_dir()
