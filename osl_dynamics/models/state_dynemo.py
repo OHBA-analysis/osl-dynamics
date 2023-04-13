@@ -243,7 +243,7 @@ class Model(DyNeMo):
             training_dataset.shuffle(100000)
             training_data_subset = training_dataset.take(n_batches)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
-            loss = history.history["loss"][-1]
+            loss = history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
                 best_loss = loss

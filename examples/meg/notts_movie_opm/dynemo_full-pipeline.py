@@ -100,7 +100,7 @@ if not use_pre_trained_model:
     init_history = model.multistart_initialization(training_data, n_epochs=20, n_init=10)
 
     with open(f"{model_dir}/init_history.pkl", "wb") as file:
-        pickle.dump(init_history.history, file)
+        pickle.dump(init_history, file)
 
     # Main training on the full dataset
     print("Training final model")
@@ -111,7 +111,7 @@ if not use_pre_trained_model:
     )
 
     with open(f"{model_dir}/history.pkl", "wb") as file:
-        pickle.dump(history.history, file)
+        pickle.dump(history, file)
 
 else:
     # Load a pre-trained model
