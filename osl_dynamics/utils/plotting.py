@@ -1694,6 +1694,9 @@ def plot_alpha(
     else:
         fig = axes[0].get_figure()
 
+    if isinstance(axes, plt.Axes):
+        axes = [axes]
+
     # Plot data
     for a, ax, y_label in zip(alpha, axes, y_labels):
         time_vector = (
