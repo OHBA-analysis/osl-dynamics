@@ -109,7 +109,6 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     # Load data via the config
     load_data_kwargs = config.pop("load_data", None)
     if load_data_kwargs is not None:
-
         # Make sure the Data class uses a unique temporary directory
         data_kwargs = load_data_kwargs.pop("data_kwargs", {})
         default_data_kwargs = {"store_dir": f"tmp_{config_id}"}
