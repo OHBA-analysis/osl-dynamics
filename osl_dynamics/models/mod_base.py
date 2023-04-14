@@ -352,7 +352,7 @@ class ModelBase:
         headers = [h for h in re.split(r"\s{2,}", summary.splitlines()[2]) if h != ""]
         columns = [summary.splitlines()[2].find(title) for title in headers] + [-1]
 
-        # Create HTML table.
+        # Create HTML table
         table = renderers.get(renderer, HTMLTable)(headers)
         for line in summary.splitlines()[4:]:
             if (
