@@ -231,7 +231,8 @@ class ModelBase:
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
 
-        return self.model.fit(*args, **kwargs)
+        history = self.model.fit(*args, **kwargs)
+        return history.history
 
     def load_weights(self, filepath):
         """Load weights of the model from a file.
