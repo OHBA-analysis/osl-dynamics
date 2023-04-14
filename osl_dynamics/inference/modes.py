@@ -349,24 +349,32 @@ def switching_rates(state_time_course, sampling_frequency=None):
 
 
 def convert_to_mne_raw(
-    alpha, raw, ch_names=None, n_embeddings=None, n_window=None, verbose=False
+    alpha,
+    raw,
+    ch_names=None,
+    n_embeddings=None,
+    n_window=None,
+    extra_chans=None,
+    verbose=False,
 ):
     """Convert a time series to an MNE Raw object.
 
     Parameters
     ----------
     alpha : np.ndarray
-        Time series containing raw data. Shape must be (n_samples, n_channels).
+        Time series containing raw data. Shape must be (n_samples, n_modes).
     raw : mne.io.Raw or str
         MNE Raw object to extract info from. If a str is passed, it must be the
         path to a fif file containing the Raw object.
     ch_names : list
-        Name for each channel. Optional.
+        Name for each channel. Optional. Defaults to alpha_0...alpha_{n_modes-1}.
     n_embeddings : int
         Number of embeddings that was used to prepare time-delay embedded
         training data. Optional.
     n_window : int
         Number of samples used to smooth amplitude envelope data. Optional.
+    extra_chans : str or list of str
+        Extra channel types to add to the Raw object. Defaults to an empty list.
     verbose : bool
         Should we print a verbose?
 
@@ -375,6 +383,12 @@ def convert_to_mne_raw(
     alpha_raw : mne.io.Raw
         Raw object for alpha.
     """
+    # Validation
+    if extra_chans is None:
+        extra_chans = []
+    if isinstance(extra_chans, str):
+        extra_chans = [extra_chans]
+
     # How many time points from the start of parcellated data should we remove?
     if n_embeddings is not None and n_window is not None:
         raise ValueError("Cannot pass both n_embeddings and n_window.")
@@ -407,7 +421,7 @@ def convert_to_mne_raw(
 
     # Create info object
     if ch_names is None:
-        ch_names = [str(ch) for ch in range(n_channels)]
+        ch_names = [f"alpha_{ch}" for ch in range(n_channels)]
     alpha_info = mne.create_info(
         ch_names=ch_names, ch_types="misc", sfreq=raw.info["sfreq"], verbose=verbose
     )
@@ -424,30 +438,17 @@ def convert_to_mne_raw(
     # Copy annotations from raw
     alpha_raw.set_annotations(raw._annotations)
 
-    # Add stim channel
-    if "stim" in raw:
-        stim_raw = raw.copy().pick_types(stim=True)
-        stim_data = stim_raw.get_data()
-        stim_info = mne.create_info(
-            stim_raw.ch_names,
-            raw.info["sfreq"],
-            ["stim"] * stim_data.shape[0],
-            verbose=verbose,
-        )
-        stim_raw = mne.io.RawArray(stim_data, stim_info, verbose=verbose)
-        alpha_raw.add_channels([stim_raw], force_update_info=True)
-
-    # Add EMG channel
-    if "emg" in raw:
-        emg_raw = raw.copy().pick_types(emg=True)
-        emg_data = emg_raw.get_data()
-        emg_info = mne.create_info(
-            emg_raw.ch_names,
-            raw.info["sfreq"],
-            ["emg"] * emg_data.shape[0],
-            verbose=verbose,
-        )
-        emg_raw = mne.io.RawArray(emg_data, emg_info, verbose=verbose)
-        alpha_raw.add_channels([emg_raw], force_update_info=True)
+    # Add extra channels
+    for extra_chan in extra_chans:
+        if extra_chan in raw:
+            chan_raw = raw.copy().pick(extra_chan)
+            chan_data = chan_raw.get_data()
+            chan_info = mne.create_info(
+                chan_raw.ch_names,
+                raw.info["sfreq"],
+                [extra_chan] * chan_data.shape[0],
+            )
+            chan_raw = mne.io.RawArray(chan_data, chan_info, verbose=verbose)
+            alpha_raw.add_channels([chan_raw], force_update_info=True)
 
     return alpha_raw
