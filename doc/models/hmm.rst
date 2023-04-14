@@ -104,6 +104,13 @@ We find high frequency activity (above ~25 Hz) sometimes leads to noisy estimate
 
 **When calculating power and coherence maps for HMM states the multitaper and NNMF approach is recommended.**
 
+Fisher kernel
+^^^^^^^^^^^^^
+
+The Fisher kernel can be used to characterize the similarity between subjects given the generative model. This can be used for downstream supervised learning tasks using for example kernel ridge regression and kernel SVM (support vector machine). This gives a more principled way to perform predicitons than using "handmade" features like the summary statistics and it has the advantage of tuning the importance of each parameter in the generative model automatically in a prediction task.
+
+For a derivation of the Fisher kernel see :download:`here <images/hmm-fisher-kernel.pdf>`.
+
 References
 ----------
 
