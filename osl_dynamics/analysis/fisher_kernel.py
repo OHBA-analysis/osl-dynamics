@@ -7,6 +7,14 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 class FisherKernel:
+    """Class for computing the Fisher kernel matrix given a generative model.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.Model
+        Model.
+    """
+
     def __init__(self, model):
         compatible_models = ["HMM", "DyNeMo", "M-DyNeMo"]
         if model.config.model_name not in compatible_models:
@@ -52,6 +60,7 @@ class FisherKernel:
             trainable_variable_names = [
                 var.name for var in self.model.trainable_weights
             ]
+            # Get only variable in the generative model
             for name in trainable_variable_names:
                 if (
                     "mod" in name
