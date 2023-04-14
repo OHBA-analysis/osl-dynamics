@@ -1904,14 +1904,14 @@ def plot_psd_topo(
         # Re-order to use colour to indicate anterior->posterior location
         order = np.argsort(roi_centers[:, 1])
         roi_centers = roi_centers[order]
-        psd = np.copy(psd)[order[::-1]]
+        psd = np.copy(psd)[order]
 
     n_parcels = psd.shape[0]
 
     # Plot PSDs
     fig, ax = create_figure()
-    cmap = plt.get_cmap()
-    for i in range(n_parcels):
+    cmap = plt.cm.viridis_r
+    for i in reversed(range(n_parcels)):
         ax.plot(f, psd[i], c=cmap(i / n_parcels))
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("PSD (a.u.)")
