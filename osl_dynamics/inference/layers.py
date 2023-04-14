@@ -1160,20 +1160,25 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
-        x, mu, sigma, probs = inputs
-
+        x, mu, sigma, probs, subj_id = inputs
         # Add a small error for numerical stability
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
+
+        if subj_id is not None:
+            subj_id = tf.cast(subj_id, tf.int32)
+            mu = tf.gather(mu, subj_id)
+            sigma = tf.gather(sigma, subj_id)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
         for i in range(self.n_states):
             mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=mu[i],
-                scale_tril=tf.linalg.cholesky(sigma[i]),
+                loc=tf.gather(mu, i, axis=-2),
+                scale_tril=tf.linalg.cholesky(tf.gather(sigma, i, axis=-3)),
                 allow_nan_stats=False,
             )
-            ll_loss += probs[:, :, i] * mvn.log_prob(x)
+            a = mvn.log_prob(x)
+            ll_loss += probs[:, :, i] * a
 
         # Sum over time dimension and average over the batch dimension
         ll_loss = tf.reduce_sum(ll_loss, axis=1)
