@@ -104,11 +104,11 @@ class FisherKernel:
 
         features = np.array(features)  # shape=(n_subjects, n_features)
 
-        # Normalise the features to l2-norm of 1.
+        # Normalise the features to l2-norm of 1
         features_l2_norm = np.sqrt(np.sum(np.square(features), axis=-1, keepdims=True))
         features /= features_l2_norm
 
-        # Computet the kernel matrix with inner product
+        # Compute the kernel matrix with inner product
         kernel_matrix = features @ features.T
         return kernel_matrix
 
