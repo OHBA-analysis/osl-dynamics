@@ -137,10 +137,10 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
 
 
 def run_pipeline_from_file(
-    config_file: str,
-    output_directory: str,
-    restrict: str = None,
-) -> None:
+    config_file,
+    output_directory,
+    restrict: str,
+):
     """Run a pipeline from a config file.
 
     Parameters

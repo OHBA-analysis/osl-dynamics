@@ -5,7 +5,7 @@ import argparse
 from osl_dynamics.config_api.pipeline import run_pipeline_from_file
 
 
-def pipeline() -> None:
+def pipeline():
     """Run a pipeline from a config file."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
