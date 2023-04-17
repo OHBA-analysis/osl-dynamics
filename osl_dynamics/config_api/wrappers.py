@@ -94,7 +94,7 @@ def train_hmm(
 
             {'sequence_length': 2000,
              'batch_size': 32,
-             'learning_rate': 0.001,
+             'learning_rate': 0.01,
              'n_epochs': 20}.
     init_kwargs : dict
         Keyword arguments to pass to :code:`Model.random_state_time_course_initialization`.
@@ -122,7 +122,7 @@ def train_hmm(
         "n_channels": data.n_channels,
         "sequence_length": 2000,
         "batch_size": 32,
-        "learning_rate": 0.001,
+        "learning_rate": 0.01,
         "n_epochs": 20,
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
@@ -261,6 +261,9 @@ def train_dynemo(
 
     # Training
     history = model.fit(data, **fit_kwargs)
+
+    # Add free energy to the history object
+    history["free_energy"] = history["loss"][-1]
 
     # Save trained model
     _logger.info(f"Saving model to: {model_dir}")
