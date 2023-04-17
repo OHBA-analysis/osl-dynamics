@@ -869,12 +869,15 @@ def plot_violin(
     else:
         fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
+    max_len = max([d.size for d in data])
     # Create a pandas DataFrame
-    data_dict = {}
-    for x, d in zip(x, data):
-        data_dict[x] = []
-        for y in d:
-            data_dict[x].append(y)
+    # Pad the data with NaNs to make sure all columns have the same length
+    data_dict = {
+        k: np.pad(
+            v, pad_width=(0, max_len - v.size), mode="constant", constant_values=np.nan
+        )
+        for k, v in zip(x, data)
+    }
     df = pd.DataFrame(data_dict)
 
     # Create figure
