@@ -354,7 +354,7 @@ def convert_to_mne_raw(
     ch_names=None,
     n_embeddings=None,
     n_window=None,
-    extra_chans=None,
+    extra_chans="stim",
     verbose=False,
 ):
     """Convert a time series to an MNE Raw object.
@@ -374,7 +374,7 @@ def convert_to_mne_raw(
     n_window : int
         Number of samples used to smooth amplitude envelope data. Optional.
     extra_chans : str or list of str
-        Extra channel types to add to the Raw object. Defaults to an empty list.
+        Extra channel types to add to the Raw object.
     verbose : bool
         Should we print a verbose?
 
