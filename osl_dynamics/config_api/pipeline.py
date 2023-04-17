@@ -136,7 +136,11 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
         data.delete_dir()
 
 
-def run_pipeline_from_file(config_file: str, output_directory: str):
+def run_pipeline_from_file(
+    config_file: str,
+    output_directory: str,
+    restrict: str = None,
+) -> None:
     """Run a pipeline from a config file.
 
     Parameters
@@ -145,7 +149,14 @@ def run_pipeline_from_file(config_file: str, output_directory: str):
         Path to the config file.
     output_directory : str
         Path to the output directory.
+    restrict : str
+        GPU to use. Optional.
     """
+    if restrict is not None:
+        from osl_dynamics.inference.tf_ops import gpu_growth, select_gpu
+
+        select_gpu(int(restrict))
+        gpu_growth()
     config_path = Path(config_file)
     config = config_path.read_text()
 
