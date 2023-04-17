@@ -193,7 +193,8 @@ def reinitialize_layer_weights(layer):
             var = getattr(init_container, key.replace("_initializer", ""))
 
         # Assign new random values to the variable
-        var.assign(new_initializer(var.shape, var.dtype))
+        if var is not None:
+            var.assign(new_initializer(var.shape, var.dtype))
 
 
 def reinitialize_model_weights(model, keep=None):
