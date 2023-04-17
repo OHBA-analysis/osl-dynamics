@@ -5,12 +5,14 @@ See the `toolbox examples
 for scripts that use the config API.
 """
 
-import os
 import logging
-import yaml
-import pprint
+import os
 import pickle
+import pprint
+from pathlib import Path
+
 import numpy as np
+import yaml
 
 from osl_dynamics.config_api import wrappers
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -132,3 +134,19 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     # Delete the temporary directory created by the Data class
     if data is not None:
         data.delete_dir()
+
+
+def run_pipeline_from_file(config_file: str, output_directory: str):
+    """Run a pipeline from a config file.
+
+    Parameters
+    ----------
+    config_file : str
+        Path to the config file.
+    output_directory : str
+        Path to the output directory.
+    """
+    config_path = Path(config_file)
+    config = config_path.read_text()
+
+    run_pipeline(config, output_directory)
