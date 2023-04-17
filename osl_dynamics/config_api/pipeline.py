@@ -67,7 +67,7 @@ def find_function(name, extra_funcs=None):
     # Check if the requested function is one of the custom functions
     if extra_funcs is not None:
         func_ind = [
-            idx if (f.__name__ == method) else -1 for idx, f in enumerate(extra_funcs)
+            idx if (f.__name__ == name) else -1 for idx, f in enumerate(extra_funcs)
         ]
         if np.max(func_ind) > -1:
             func = extra_funcs[np.argmax(func_ind)]
