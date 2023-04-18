@@ -24,10 +24,15 @@ def _check_glm_data(data, covariates, assignments=None):
                 + f"but was expecting {n_subjects}."
             )
 
+    # Combine target and covariate data
+    if len(covariates) > 0:
+        glm_data = np.array(list(covariates.values()))
+        glm_data = np.concatenate([glm_data.T, data], axis=-1)
+    else:
+        glm_data = data
+
     # Remove subjects with a nan in either array
     remove = []
-    glm_data = np.array(list(covariates.values()))
-    glm_data = np.concatenate([glm_data.T, data], axis=-1)
     for i in range(n_subjects):
         if np.isnan(glm_data[i]).any():
             _logger.warn(f"Removing subject {i} from GLM.")
