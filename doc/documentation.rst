@@ -3,7 +3,7 @@ Documentation
 
 Welcome to the osl-dynamics documentation!
 
-The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics.
+The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics. New users may find the :doc:`FAQ <faq>` useful.
 
 Models
 ------

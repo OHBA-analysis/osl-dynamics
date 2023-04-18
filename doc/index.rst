@@ -20,6 +20,7 @@ Contents
    Install <install>
    Development <development>
    Documentation <documentation>
+   FAQ <faq>
 
 
 Indices and tables
