@@ -7,6 +7,7 @@ import sys
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import numba
 import numpy as np
@@ -126,6 +127,16 @@ class Config(BaseModelConfig):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
+
+    do_kl_annealing : bool
+        Should we use KL annealing during training?
+    kl_annealing_curve : str
+        Type of KL annealing curve. Either 'linear' or 'tanh'.
+    kl_annealing_sharpness : float
+        Parameter to control the shape of the annealing curve if
+        kl_annealing_curve='tanh'.
+    n_kl_annealing_epochs : int
+        Number of epochs to perform KL annealing.
     """
 
     model_name: str = "SE-HMM"
@@ -159,11 +170,18 @@ class Config(BaseModelConfig):
     trans_prob_update_forget: float = 0.7  # beta
     observation_update_decay: float = 0.1
 
+    # KL annealing parameters
+    do_kl_annealing: bool = False
+    kl_annealing_curve: Literal["linear", "tanh"] = None
+    kl_annealing_sharpness: float = None
+    n_kl_annealing_epochs: int = None
+
     def __post_init__(self):
         self.validate_observation_model_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
         self.validate_subject_embedding_parameters()
+        self.validate_kl_annealing_parameters()
 
     def validate_observation_model_parameters(self):
         if self.learn_means is None or self.learn_covariances is None:
@@ -187,6 +205,38 @@ class Config(BaseModelConfig):
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
             raise ValueError("Please pass dev_inf_n_units.")
+
+    def validate_kl_annealing_parameters(self):
+        if self.do_kl_annealing:
+            if self.kl_annealing_curve is None:
+                raise ValueError(
+                    "If we are performing KL annealing, "
+                    "kl_annealing_curve must be passed."
+                )
+
+            if self.kl_annealing_curve not in ["linear", "tanh"]:
+                raise ValueError("KL annealing curve must be 'linear' or 'tanh'.")
+
+            if self.kl_annealing_curve == "tanh":
+                if self.kl_annealing_sharpness is None:
+                    raise ValueError(
+                        "kl_annealing_sharpness must be passed if "
+                        + "kl_annealing_curve='tanh'."
+                    )
+
+                if self.kl_annealing_sharpness < 0:
+                    raise ValueError("KL annealing sharpness must be positive.")
+
+            if self.n_kl_annealing_epochs is None:
+                raise ValueError(
+                    "If we are performing KL annealing, "
+                    + "n_kl_annealing_epochs must be passed."
+                )
+
+            if self.n_kl_annealing_epochs < 1:
+                raise ValueError(
+                    "Number of KL annealing epochs must be greater than zero."
+                )
 
 
 class Model(ModelBase):
@@ -283,7 +333,7 @@ class Model(ModelBase):
                 x_gamma_and_subj_id = np.concatenate(
                     [x, gamma, np.expand_dims(subj_id, -1)], axis=2
                 )
-                h = self.model.fit(x_gamma_and_subj_id, epochs=1, verbose=0, **kwargs)
+                h = self.model.fit(x_gamma_and_subj_id, epochs=3, verbose=0, **kwargs)
 
                 # Get the new loss
                 l = h.history["loss"][0]
@@ -302,10 +352,37 @@ class Model(ModelBase):
             history["rho"].append(self.rho)
             history["lr"].append(lr)
 
+            # Update KL annealing factor
+            if self.config.do_kl_annealing:
+                self._update_kl_annealing_factor(n)
+
         if use_tqdm:
             _range.close()
 
         return history
+
+    def _update_kl_annealing_factor(self, epoch, n_cycles=1):
+        """Update the KL annealing factor."""
+        n_epochs_one_cycle = self.config.n_kl_annealing_epochs // n_cycles
+        if epoch < self.config.n_kl_annealing_epochs:
+            epoch = epoch % n_epochs_one_cycle
+            if self.config.kl_annealing_curve == "tanh":
+                new_value = (
+                    0.5
+                    * np.tanh(
+                        self.config.kl_annealing_sharpness
+                        * (epoch - 0.5 * n_epochs_one_cycle)
+                        / n_epochs_one_cycle
+                    )
+                    + 0.5
+                )
+            elif self.config.kl_annealing_curve == "linear":
+                new_value = epoch / n_epochs_one_cycle
+        else:
+            new_value = 1.0
+
+        kl_loss_layer = self.model.get_layer("kl_loss")
+        kl_loss_layer.annealing_factor.assign(new_value)
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -1351,7 +1428,7 @@ def _model_structure(config):
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_means,
-            initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
+            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
             name="means_dev_mag_inf_alpha_input",
         )
         means_dev_mag_inf_alpha_layer = layers.Activation(
@@ -1360,7 +1437,7 @@ def _model_structure(config):
         means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_means,
-            initializer=initializers.TruncatedNormal(mean=50, stddev=0.02),
+            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
             name="means_dev_mag_inf_beta_input",
         )
         means_dev_mag_inf_beta_layer = layers.Activation(
@@ -1437,7 +1514,7 @@ def _model_structure(config):
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
+            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
             name="covs_dev_mag_inf_alpha_input",
         )
         covs_dev_mag_inf_alpha_layer = layers.Activation(
@@ -1446,7 +1523,7 @@ def _model_structure(config):
         covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=50, stddev=0.02),
+            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
             name="covs_dev_mag_inf_beta_input",
         )
         covs_dev_mag_inf_beta_layer = layers.Activation(
@@ -1603,7 +1680,7 @@ def _model_structure(config):
 
     # Total KL loss
     # Layer definitions
-    kl_loss_layer = KLLossLayer(do_annealing=False, name="kl_loss")
+    kl_loss_layer = KLLossLayer(do_annealing=True, name="kl_loss")
 
     # Data flow
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
