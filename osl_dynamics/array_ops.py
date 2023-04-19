@@ -283,8 +283,7 @@ def ezclump(binary_array):
             return [slice(0, binary_array.size)]
 
         r = [slice(0, idx[0])]
-        r.extend((slice(left, right)
-                  for left, right in zip(idx[1:-1:2], idx[2::2])))
+        r.extend((slice(left, right) for left, right in zip(idx[1:-1:2], idx[2::2])))
     else:
         if len(idx) == 0:
             return []
