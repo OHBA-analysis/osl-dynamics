@@ -10,6 +10,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, initializers
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics.utils.misc import get_argument
 from osl_dynamics.models import dynemo_obs, sedynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
@@ -254,6 +255,11 @@ class Model(VariationalInferenceModelBase):
     def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=True):
         """SE-DyNeMo requires subject id to be included in the dataset."""
         return super().make_dataset(inputs, shuffle, concatenate, subj_id)
+
+    def fit(self, training_data, *args, **kwargs):
+        # Set Bayesian KL scaling
+        self.set_bayesian_kl_scaling(training_data)
+        return super().fit(training_data, *args, **kwargs)
 
     def get_group_means_covariances(self):
         """Get the group means and covariances of each mode

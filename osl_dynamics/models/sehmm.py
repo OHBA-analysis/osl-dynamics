@@ -284,6 +284,9 @@ class Model(ModelBase):
         if epochs is None:
             epochs = self.config.n_epochs
 
+        # Set bayesian KL scaling
+        self.set_bayesian_kl_scaling(dataset)
+
         # Make a TensorFlow dataset
         dataset = self.make_dataset(
             dataset, shuffle=True, concatenate=True, subj_id=True
