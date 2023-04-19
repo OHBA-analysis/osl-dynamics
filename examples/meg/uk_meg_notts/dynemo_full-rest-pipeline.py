@@ -81,16 +81,8 @@ print("Building model")
 model = Model(config)
 model.summary()
 
-# Random subject initialisation for the mode covariances
-model.single_subject_initialization(
-    training_data,
-    n_kl_annealing_epochs=100,
-    n_epochs=200,
-    n_init=10,
-)
-
-# Multi-start initialization
-init_history = model.multistart_initialization(training_data, n_epochs=20, n_init=10)
+# Initialization for mode covariances
+init_history = model.random_subset_initialization(training_data, n_init=5, n_epochs=1, take=0.25)
 
 with open(f"{model_dir}/init_history.pkl", "wb") as file:
     pickle.dump(init_history, file)
