@@ -153,7 +153,7 @@ class Model(ModelBase):
 
     Parameters
     ----------
-    config : osl_dynamics.models.directional_sedynemo_obs.Config
+    config : osl_dynamics.models.sedynemo_obs.Config
     """
 
     config_type = Config
@@ -221,6 +221,8 @@ class Model(ModelBase):
         training_data : tensorflow.data.Dataset
             Training dataset.
         """
+        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+
         if self.config.learn_means:
             dynemo_obs.set_means_regularizer(
                 self.model, training_dataset, layer_name="group_means"
@@ -529,7 +531,6 @@ def _model_structure(config):
         means_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
-            use_bias=False,
             name="means_dev_mag_mod_beta",
         )
 
@@ -569,7 +570,6 @@ def _model_structure(config):
         covs_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
-            use_bias=False,
             name="covs_dev_mag_mod_beta",
         )
 
