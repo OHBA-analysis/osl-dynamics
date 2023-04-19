@@ -258,7 +258,7 @@ def _state_activations(state_time_course):
         each state. This cannot necessarily be converted into an array as an
         equal number of elements in each array is not guaranteed.
     """
-    return [np.ma.extras._ezclump(column) for column in state_time_course.T]
+    return [array_ops.ezclump(column) for column in state_time_course.T]
 
 
 def state_activation(state_time_course):
