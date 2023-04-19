@@ -288,7 +288,8 @@ def state_activation(state_time_course):
         np.array([slice_.start for slice_ in state_slices]) for state_slices in slices
     ]
     offs = [
-        np.array([slice_.stop for slice_ in state_slices]) for state_slices in slices
+        np.array([slice_.stop - 1 for slice_ in state_slices])
+        for state_slices in slices
     ]
 
     return ons, offs
