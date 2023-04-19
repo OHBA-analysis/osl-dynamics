@@ -1,7 +1,6 @@
-"""Functions to manipulate and analyse inferred mode/state data.
+"""Functions to manipulate and analyse inferred mode/state data."""
 
-"""
-
+import itertools
 import logging
 
 import numpy as np
@@ -32,7 +31,6 @@ def autocorrelation_functions(
     acfs : np.ndarray
         Auto/cross-correlation functions.
     """
-
     # Validation
     error_message = (
         "mode_covariances must be of shape (n_channels, n_channels) or "
@@ -58,12 +56,18 @@ def autocorrelation_functions(
     # Take mean of elements from the time embedded covariances that
     # correspond to the auto/cross-correlation function
     blocks = te_covs.reshape(
-        n_subjects, n_modes, n_parcels, n_embeddings, n_parcels, n_embeddings
+        n_subjects,
+        n_modes,
+        n_parcels,
+        n_embeddings,
+        n_parcels,
+        n_embeddings,
     )
     acfs = np.empty([n_subjects, n_modes, n_parcels, n_parcels, n_acf])
     for i in range(n_acf):
         acfs[:, :, :, :, i] = np.mean(
-            np.diagonal(blocks, offset=i - n_embeddings + 1, axis1=3, axis2=5), axis=-1
+            np.diagonal(blocks, offset=i - n_embeddings + 1, axis1=3, axis2=5),
+            axis=-1,
         )
 
     return np.squeeze(acfs)
@@ -97,7 +101,6 @@ def raw_covariances(
     raw_covs : np.ndarray
         Covariance matrix for raw channels.
     """
-
     # Validation
     error_message = (
         "mode_covariances must be of shape (n_channels, n_channels) or "
@@ -117,7 +120,10 @@ def raw_covariances(
     if zero_lag:
         # Return the zero-lag elements only
         raw_covs = te_covs[
-            :, :, n_embeddings // 2 :: n_embeddings, n_embeddings // 2 :: n_embeddings
+            :,
+            :,
+            n_embeddings // 2 :: n_embeddings,
+            n_embeddings // 2 :: n_embeddings,
         ]
 
     else:
@@ -128,7 +134,12 @@ def raw_covariances(
 
         n_parcels = te_covs.shape[-1] // n_embeddings
         blocks = te_covs.reshape(
-            n_subjects, n_modes, n_parcels, n_embeddings, n_parcels, n_embeddings
+            n_subjects,
+            n_modes,
+            n_parcels,
+            n_embeddings,
+            n_parcels,
+            n_embeddings,
         )
         block_diagonal = blocks.diagonal(0, 2, 4)
         diagonal_means = block_diagonal.diagonal(0, 2, 3).mean(3)
@@ -164,6 +175,92 @@ def reverse_pca(covariances, pca_components):
     return pca_components @ covariances @ pca_components.T
 
 
+def _slice_length(slice_):
+    """Return the length of a slice.
+
+    Parameters
+    ----------
+    slice_ : slice
+        Slice.
+
+    Returns
+    -------
+    length : int
+    """
+    return slice_.stop - slice_.start
+
+
+def _apply_to_lists(list_of_lists, func):
+    """Apply a function to each list in a list of lists.
+
+    Parameters
+    ----------
+    list_of_lists : list of list
+        List of lists.
+    func : callable
+        Function to apply to each list.
+
+    Returns
+    -------
+    result : np.ndarray
+        Numpy array with the function applied to each list.
+    """
+    return np.array([func(inner_list) for inner_list in list_of_lists])
+
+
+def _list_means(list_of_lists):
+    """Calculate the mean of each list in a list of lists.
+
+    Parameters
+    ----------
+    list_of_lists : list of list
+        List of lists.
+
+    Returns
+    -------
+    result : np.ndarray
+        Numpy array with the mean of each list.
+    """
+    return _apply_to_lists(list_of_lists, func=np.mean)
+
+
+def _list_stds(list_of_lists):
+    """Calculate the standard deviation of each list in a list of lists.
+
+    Parameters
+    ----------
+    list_of_lists : list of list
+        List of lists.
+
+    Returns
+    -------
+    result : np.ndarray
+        Numpy array with the standard deviation of each list.
+    """
+    return _apply_to_lists(list_of_lists, func=np.std)
+
+
+def _state_activations(state_time_course):
+    """Calculate state activations from a state time course.
+
+    Given a state time course (strictly binary), calculate the beginning and
+    end of each activation of each state.
+
+    Parameters
+    ----------
+    state_time_course : numpy.ndarray
+        State time course (strictly binary).
+
+    Returns
+    -------
+    slices: list of list of slice
+        List containing state activations (index) in the order they occur for
+        each state. This cannot necessarily be converted into an array as an
+        equal number of elements in each array is not guaranteed.
+    """
+    return [np.ma.extras._ezclump(column) for column in state_time_course.T]
+
+
 def state_activation(state_time_course):
     """Calculate state activations from a state time course.
 
@@ -186,31 +283,15 @@ def state_activation(state_time_course):
         This cannot necessarily be converted into an array as an equal number of
         elements in each array is not guaranteed.
     """
-    state_on = []
-    state_off = []
+    slices = _state_activations(state_time_course=state_time_course)
+    ons = [
+        np.array([slice_.start for slice_ in state_slices]) for state_slices in slices
+    ]
+    offs = [
+        np.array([slice_.stop for slice_ in state_slices]) for state_slices in slices
+    ]
 
-    diffs = np.diff(state_time_course, axis=0)
-    for i, diff in enumerate(diffs.T):
-        on = (diff == 1).nonzero()[0]
-        off = (diff == -1).nonzero()[0]
-        try:
-            if on[-1] > off[-1]:
-                off = np.append(off, len(diff))
-
-            if off[0] < on[0]:
-                on = np.insert(on, 0, -1)
-
-            state_on.append(on)
-            state_off.append(off)
-        except IndexError:
-            _logger.info(f"No activation in state {i}.")
-            state_on.append(np.array([]))
-            state_off.append(np.array([]))
-
-    state_on = np.array(state_on, dtype=object)
-    state_off = np.array(state_off, dtype=object)
-
-    return state_on, state_off
+    return ons, offs
 
 
 def lifetimes(state_time_course, sampling_frequency=None):
@@ -235,18 +316,13 @@ def lifetimes(state_time_course, sampling_frequency=None):
         number of elements in each array is not guaranteed. Shape is (n_subjects,
         n_states, n_activations) or (n_states, n_activations).
     """
-    if isinstance(state_time_course, np.ndarray):
-        state_time_course = [state_time_course]
-    lts = []
-    for stc in state_time_course:
-        ons, offs = state_activation(stc)
-        lt = offs - ons
-        if sampling_frequency is not None:
-            lt = [lt_ / sampling_frequency for lt_ in lt]
-        lts.append(lt)
-    if len(lts) == 1:
-        lts = lts[0]
-    return lts
+    sampling_frequency = sampling_frequency or 1
+    slices = _state_activations(state_time_course)
+    return [
+        np.array([_slice_length(slice_) for slice_ in state_slices])
+        / sampling_frequency
+        for state_slices in slices
+    ]
 
 
 def lifetime_statistics(state_time_course, sampling_frequency=None):
@@ -269,19 +345,10 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
         Standard deviation of each state. Shape is (n_subjects, n_states) or
         (n_states,).
     """
-    lts = lifetimes(state_time_course, sampling_frequency)
-    if np.array(lts, dtype=object).ndim == 2:
-        # lts.shape = (n_subjects, n_states, n_activations)
-        mean = []
-        std = []
-        for i in range(len(lts)):
-            mean.append([np.mean(lt) for lt in lts[i]])
-            std.append([np.std(lt) for lt in lts[i]])
-    else:
-        # lts.shape = (n_states, n_activations)
-        mean = [np.mean(lt) for lt in lts]
-        std = [np.std(lt) for lt in lts]
-    return np.array(mean), np.array(std)
+    lifetimes_ = lifetimes(state_time_course, sampling_frequency=sampling_frequency)
+    means = _list_means(lifetimes_)
+    stds = _list_stds(lifetimes_)
+    return means, stds
 
 
 def mean_lifetimes(state_time_course, sampling_frequency=None):
@@ -325,20 +392,18 @@ def intervals(state_time_course, sampling_frequency=None):
         number of elements in each array is not guaranteed. Shape is (n_subjects,
         n_states, n_activations) or (n_states, n_activations).
     """
-    if isinstance(state_time_course, np.ndarray):
-        state_time_course = [state_time_course]
-    intvs = []
-    for stc in state_time_course:
-        intv = []
-        ons, offs = state_activation(stc)
-        for on, off in zip(ons, offs):
-            intv.append(on[1:] - off[:-1])
-        if sampling_frequency is not None:
-            intv = [i / sampling_frequency for i in intv]
-        intvs.append(intv)
-    if len(intvs) == 1:
-        intvs = intvs[0]
-    return intvs
+    sampling_frequency = sampling_frequency or 1
+    slices = _state_activations(state_time_course)
+    return [
+        np.array(
+            [
+                slice_1.start - slice_0.stop
+                for slice_0, slice_1 in itertools.pairwise(state_slices)
+            ],
+        )
+        / sampling_frequency
+        for state_slices in slices
+    ]
 
 
 def interval_statistics(state_time_course, sampling_frequency=None):
@@ -361,19 +426,10 @@ def interval_statistics(state_time_course, sampling_frequency=None):
         Standard deviation of each state. Shape is (n_subjects, n_states) or
         (n_states,).
     """
-    intvs = intervals(state_time_course, sampling_frequency)
-    if np.array(intvs, dtype=object).ndim == 2:
-        # intvs.shape = (n_subjects, n_states, n_activations)
-        mean = []
-        std = []
-        for i in range(len(intvs)):
-            mean.append([np.mean(lt) for lt in intvs[i]])
-            std.append([np.std(lt) for lt in intvs[i]])
-    else:
-        # intvs.shape = (n_states, n_activations)
-        mean = [np.mean(lt) for lt in intvs]
-        std = [np.std(lt) for lt in intvs]
-    return np.array(mean), np.array(std)
+    intervals_ = intervals(state_time_course, sampling_frequency=sampling_frequency)
+    means = _list_means(intervals_)
+    stds = _list_stds(intervals_)
+    return means, stds
 
 
 def mean_intervals(state_time_course, sampling_frequency=None):
@@ -397,7 +453,7 @@ def mean_intervals(state_time_course, sampling_frequency=None):
 
 
 def fractional_occupancies(state_time_course):
-    """Calculates the fractional occupancy.
+    """Calculate the fractional occupancy.
 
     Parameters
     ----------
@@ -419,7 +475,7 @@ def fractional_occupancies(state_time_course):
 
 
 def switching_rates(state_time_course, sampling_frequency=None):
-    """Calculates the switching rate.
+    """Calculate the switching rate.
 
     This is defined as the number of state activations per second.
 
@@ -460,7 +516,7 @@ def fano_factor(
     window_lengths,
     sampling_frequency=1.0,
 ):
-    """Calculates the Fano factor.
+    """Calculate the Fano factor.
 
     Parameters
     ----------
@@ -533,14 +589,14 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
         state_time_course = [state_time_course]
     trans_prob = []
     for stc in state_time_course:
-        stc = stc.argmax(axis=1)
+        stc_argmax = stc.argmax(axis=1)
         vals, counts = np.unique(
-            stc[np.arange(2)[None, :] + np.arange(len(stc) - 1)[:, None]],
+            stc_argmax[np.arange(2)[None, :] + np.arange(len(stc_argmax) - 1)[:, None]],
             axis=0,
             return_counts=True,
         )
         if n_states is None:
-            n_states = stc.max() + 1
+            n_states = stc_argmax.max() + 1
         tp = np.zeros((n_states, n_states))
         tp[vals[:, 0], vals[:, 1]] = counts
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -550,7 +606,7 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
 
 
 def simple_moving_average(data, window_length, step_size):
-    """Simple moving average.
+    """Calculate imple moving average.
 
     Calculates moving averages by computing the unweighted mean of n
     observations over the current time window. Can be used to smooth
@@ -576,7 +632,8 @@ def simple_moving_average(data, window_length, step_size):
 
     # Pad the data
     data = np.pad(data, window_length // 2)[
-        :, window_length // 2 : window_length // 2 + n_modes
+        :,
+        window_length // 2 : window_length // 2 + n_modes,
     ]
 
     # Define indices of time points to calculate a moving average
@@ -643,10 +700,10 @@ def partial_covariances(data, alpha):
     pcovs = []
     for X, a in zip(data, alpha):
         # Variance normalise state/mode time courses
-        a /= np.std(a, axis=0, keepdims=True)
+        a_normed = a / np.std(a, axis=0, keepdims=True)
 
         # Do multiple regression of alpha onto data
-        pcovs.append(np.linalg.pinv(a) @ X)
+        pcovs.append(np.linalg.pinv(a_normed) @ X)
 
     return np.squeeze(pcovs)
 
@@ -671,7 +728,7 @@ def ae_hmm_networks(data, alpha):
         Shape is (n_subjects, n_states, n_channels, n_channels).
     """
     if type(data) != type(alpha):
-        raise ValueError(
+        raise TypeError(
             "data and alpha must be the same type: numpy arrays or lists of numpy arrays."
         )
     if isinstance(data, np.ndarray):
