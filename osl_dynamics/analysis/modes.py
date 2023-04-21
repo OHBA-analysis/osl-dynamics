@@ -552,7 +552,7 @@ def fractional_occupancies(state_time_course):
     if isinstance(state_time_course, list):
         fo = [np.sum(stc, axis=0) / stc.shape[0] for stc in state_time_course]
     else:
-        fo = np.sum(state_time_course, axis=0) / state_time_course.shape[0]
+        fo = np.sum(state_time_course, axis=1) / state_time_course.shape[1]
     return np.array(fo, dtype=np.float32)
 
 
@@ -576,7 +576,15 @@ def switching_rates(state_time_course, sampling_frequency=None):
         or (n_states,).
     """
     if isinstance(state_time_course, np.ndarray):
-        state_time_course = [state_time_course]
+        if state_time_course.ndim == 2:
+            state_time_course = [state_time_course]
+        if state_time_course.ndim == 3:
+            state_time_course = [
+                state_time_course[i] for i in range(len(state_time_course))
+            ]
+
+    # Set sampling frequency
+    sampling_frequency = sampling_frequency or 1
 
     # Loop through subjects
     sr = []
