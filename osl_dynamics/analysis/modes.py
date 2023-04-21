@@ -207,7 +207,12 @@ def _apply_to_lists(list_of_lists, func):
     result : np.ndarray
         Numpy array with the function applied to each list.
     """
-    return np.array([func(inner_list) for inner_list in list_of_lists])
+    return np.array(
+        [
+            [func(inner_list) for inner_list in subject_list]
+            for subject_list in list_of_lists
+        ],
+    )
 
 
 def _list_means(list_of_lists):
@@ -261,12 +266,17 @@ def _state_activations(state_time_course):
         equal number of elements in each array is not guaranteed.
     """
     shape_error_message = (
-        "State time course must be a 1D or 2D array. "
+        "State time course must be a 1D, 2D or 3D array. "
         f"Got {state_time_course.ndim}D array.",
     )
     if state_time_course.ndim == 1:
+        # Assume [n_time_points] and convert to [n_time_points x n_states=1]
         state_time_course = state_time_course[:, None]
-    if state_time_course.ndim != 2:
+    if state_time_course.ndim == 2:
+        # Assume [n_time_points x n_states] and convert
+        # to [n_subjects=1 x n_time_points x n_states]
+        state_time_course = state_time_course[None, ...]
+    if state_time_course.ndim != 3:
         raise ValueError(shape_error_message)
 
     type_error_message = (
@@ -281,7 +291,9 @@ def _state_activations(state_time_course):
     if not np.issubdtype(state_time_course.dtype, np.bool_):
         raise TypeError(type_error_message)
 
-    return [array_ops.ezclump(column) for column in state_time_course.T]
+    return [
+        [array_ops.ezclump(column) for column in stc.T] for stc in state_time_course
+    ]
 
 
 def state_activation(state_time_course):
@@ -311,18 +323,22 @@ def state_activation(state_time_course):
         elements in each array is not guaranteed.
     """
     slices = _state_activations(state_time_course=state_time_course)
-    ons = [
-        np.array([slice_.start for slice_ in state_slices]) for state_slices in slices
-    ]
-    offs = [
-        np.array([slice_.stop - 1 for slice_ in state_slices])
-        for state_slices in slices
-    ]
+    subject_level = []
+    for subject_slices in slices:
+        ons = [
+            np.array([slice_.start for slice_ in state_slices])
+            for state_slices in subject_slices
+        ]
+        offs = [
+            np.array([slice_.stop - 1 for slice_ in state_slices])
+            for state_slices in subject_slices
+        ]
+        subject_level.append((ons, offs))
 
-    return ons, offs
+    return subject_level
 
 
-def lifetimes(state_time_course, sampling_frequency=None):
+def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
     """Calculate state lifetimes from a state time course.
 
     Given a state time course (one-hot encoded), calculate the lifetime of each
@@ -335,6 +351,8 @@ def lifetimes(state_time_course, sampling_frequency=None):
         n_samples, n_states) or (n_samples, or n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
+    squeeze : bool
+        If True, squeeze the output to remove singleton dimensions.
 
     Returns
     -------
@@ -346,11 +364,25 @@ def lifetimes(state_time_course, sampling_frequency=None):
     """
     sampling_frequency = sampling_frequency or 1
     slices = _state_activations(state_time_course)
-    return [
-        np.array([_slice_length(slice_) for slice_ in state_slices])
-        / sampling_frequency
-        for state_slices in slices
+
+    result = [
+        [
+            np.array([_slice_length(slice_) for slice_ in state_slices])
+            / sampling_frequency
+            for state_slices in subject_slices
+        ]
+        for subject_slices in slices
     ]
+
+    if not squeeze:
+        return result
+
+    if len(result) == 1:
+        result = result[0]
+        if len(result) == 1:
+            result = result[0]
+
+    return result
 
 
 def lifetime_statistics(state_time_course, sampling_frequency=None):
@@ -373,9 +405,14 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
         Standard deviation of each state. Shape is (n_subjects, n_states) or
         (n_states,).
     """
-    lifetimes_ = lifetimes(state_time_course, sampling_frequency=sampling_frequency)
-    means = _list_means(lifetimes_)
-    stds = _list_stds(lifetimes_)
+    lifetimes_ = lifetimes(
+        state_time_course,
+        sampling_frequency=sampling_frequency,
+        squeeze=False,
+    )
+    means = np.squeeze(_list_means(lifetimes_))
+    stds = np.squeeze(_list_stds(lifetimes_))
+
     return means, stds
 
 
@@ -399,7 +436,7 @@ def mean_lifetimes(state_time_course, sampling_frequency=None):
     return lifetime_statistics(state_time_course, sampling_frequency)[0]
 
 
-def intervals(state_time_course, sampling_frequency=None):
+def intervals(state_time_course, sampling_frequency=None, squeeze=True):
     """Calculate state intervals from a state time course.
 
     An interval is the duration between successive visits for a particular state.
@@ -411,6 +448,8 @@ def intervals(state_time_course, sampling_frequency=None):
         n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the intervals in seconds.
+    squeeze : bool
+        If True, squeeze the output to remove singleton dimensions.
 
     Returns
     -------
@@ -422,16 +461,29 @@ def intervals(state_time_course, sampling_frequency=None):
     """
     sampling_frequency = sampling_frequency or 1
     slices = _state_activations(state_time_course)
-    return [
-        np.array(
-            [
-                slice_1.start - slice_0.stop
-                for slice_0, slice_1 in itertools.pairwise(state_slices)
-            ],
-        )
-        / sampling_frequency
-        for state_slices in slices
+    result = [
+        [
+            np.array(
+                [
+                    slice_1.start - slice_0.stop
+                    for slice_0, slice_1 in itertools.pairwise(state_slices)
+                ],
+            )
+            / sampling_frequency
+            for state_slices in subject_slice
+        ]
+        for subject_slice in slices
     ]
+
+    if not squeeze:
+        return result
+
+    if len(result) == 1:
+        result = result[0]
+        if len(result) == 1:
+            result = result[0]
+
+    return result
 
 
 def interval_statistics(state_time_course, sampling_frequency=None):
@@ -454,9 +506,11 @@ def interval_statistics(state_time_course, sampling_frequency=None):
         Standard deviation of each state. Shape is (n_subjects, n_states) or
         (n_states,).
     """
-    intervals_ = intervals(state_time_course, sampling_frequency=sampling_frequency)
-    means = _list_means(intervals_)
-    stds = _list_stds(intervals_)
+    intervals_ = intervals(
+        state_time_course, sampling_frequency=sampling_frequency, squeeze=False
+    )
+    means = np.squeeze(_list_means(intervals_))
+    stds = np.squeeze(_list_stds(intervals_))
     return means, stds
 
 
