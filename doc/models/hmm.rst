@@ -79,11 +79,12 @@ After we fit an HMM we're often interested in interpreting the hidden states. We
 Summary Statistics
 ^^^^^^^^^^^^^^^^^^
 
-We normally look at three summary statistics:
+It is common to look at four summary statistics:
 
 - The **fractional occupancy**, which is the fraction of total that is spent in a particular state.
 - The **mean lifetime**, which is the average duration of a state visit. This is called known as the 'dwell time'.
 - The **mean interval**, which is the average duration between successive state visits.
+- The **switching rate**, which is the average number of visits to a state per second.
 
 Summary statistics can be calculated for individual subjects or for a group. See the `HMM Summary Statistics tutorial <https://osf.io/ryb9q>`_ for example code of how to calculate these quantities.
 
