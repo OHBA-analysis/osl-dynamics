@@ -54,7 +54,7 @@ def get_one_hot(values, n_states=None):
     if n_states is None:
         n_states = values.max() + 1
     res = np.eye(n_states)[np.array(values).reshape(-1)]
-    return res.reshape(list(values.shape) + [n_states])
+    return res.reshape([*list(values.shape), n_states]).astype(int)
 
 
 def align_arrays(*sequences, alignment="left"):

@@ -255,7 +255,7 @@ def _state_activations(state_time_course):
 
     Parameters
     ----------
-    state_time_course : numpy.ndarray
+    state_time_course : numpy.ndarray or list or numpy.ndarray
         State time course (strictly binary).
 
     Returns
@@ -266,33 +266,47 @@ def _state_activations(state_time_course):
         equal number of elements in each array is not guaranteed.
     """
     shape_error_message = (
-        "State time course must be a 1D, 2D or 3D array. "
-        f"Got {state_time_course.ndim}D array.",
+        "State time course must be a 1D, 2D or 3D array or list of 2D arrays. "
     )
-    if state_time_course.ndim == 1:
-        # Assume [n_time_points] and convert to [n_time_points x n_states=1]
-        state_time_course = state_time_course[:, None]
-    if state_time_course.ndim == 2:
-        # Assume [n_time_points x n_states] and convert
-        # to [n_subjects=1 x n_time_points x n_states]
-        state_time_course = state_time_course[None, ...]
-    if state_time_course.ndim != 3:
-        raise ValueError(shape_error_message)
 
     type_error_message = (
         "State time course must be strictly binary. "
         "This can either be np.bools or np.ints with values 0 and 1."
     )
-    if np.issubdtype(state_time_course.dtype, np.integer):
-        if not np.all(np.isin(state_time_course, [0, 1])):
-            raise ValueError(type_error_message)
-        state_time_course = state_time_course.astype(bool)
 
-    if not np.issubdtype(state_time_course.dtype, np.bool_):
-        raise TypeError(type_error_message)
+    if isinstance(state_time_course, np.ndarray) and (
+        state_time_course.dtype == object
+    ):
+        state_time_course = list(state_time_course)
+
+    if isinstance(state_time_course, np.ndarray):
+        if state_time_course.ndim == 1:
+            state_time_course = state_time_course[:, None]
+        if state_time_course.ndim == 2:
+            state_time_course = [state_time_course]
+        elif state_time_course.ndim == 3:
+            state_time_course = list(state_time_course)
+        else:
+            raise ValueError(shape_error_message)
+    elif isinstance(state_time_course, list):
+        if not all(isinstance(stc, np.ndarray) for stc in state_time_course):
+            raise ValueError(shape_error_message)
+        if not all(stc.ndim == 2 for stc in state_time_course):
+            raise ValueError(shape_error_message)
+
+    bool_state_time_course = []
+    for stc in state_time_course:
+        if np.issubdtype(stc.dtype, np.integer):
+            if np.all(np.isin(stc, [0, 1])):
+                bool_state_time_course.append(stc.astype(bool))
+        elif np.issubdtype(stc.dtype, np.bool_):
+            bool_state_time_course.append(stc)
+        else:
+            raise ValueError(type_error_message)
 
     return [
-        [array_ops.ezclump(column) for column in stc.T] for stc in state_time_course
+        [array_ops.ezclump(column) for column in stc.T]
+        for stc in bool_state_time_course
     ]
 
 
