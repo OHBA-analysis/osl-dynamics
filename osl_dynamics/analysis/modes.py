@@ -260,6 +260,27 @@ def _state_activations(state_time_course):
         each state. This cannot necessarily be converted into an array as an
         equal number of elements in each array is not guaranteed.
     """
+    shape_error_message = (
+        "State time course must be a 1D or 2D array. "
+        f"Got {state_time_course.ndim}D array.",
+    )
+    if state_time_course.ndim == 1:
+        state_time_course = state_time_course[:, None]
+    if state_time_course.ndim != 2:
+        raise ValueError(shape_error_message)
+
+    type_error_message = (
+        "State time course must be strictly binary. "
+        "This can either be np.bools or np.ints with values 0 and 1."
+    )
+    if np.issubdtype(state_time_course.dtype, np.integer):
+        if not np.all(np.isin(state_time_course, [0, 1])):
+            raise ValueError(type_error_message)
+        state_time_course = state_time_course.astype(bool)
+
+    if not np.issubdtype(state_time_course.dtype, np.bool_):
+        raise TypeError(type_error_message)
+
     return [array_ops.ezclump(column) for column in state_time_course.T]
 
 
@@ -267,7 +288,11 @@ def state_activation(state_time_course):
     """Calculate state activations from a state time course.
 
     Given a state time course (strictly binary), calculate the beginning and
-    end of each activation of each state.
+    end of each activation of each state. Accepts a 1D or 2D array. If a 1D
+    array is passed, it is assumed to be a single state time course.
+
+    Either an array of ints or an array of bools is accepted, but if ints are passed
+    they should be explicitly zero or one.
 
     Parameters
     ----------
