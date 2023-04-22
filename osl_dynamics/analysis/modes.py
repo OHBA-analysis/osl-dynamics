@@ -177,154 +177,7 @@ def reverse_pca(covariances, pca_components):
     return pca_components @ covariances @ pca_components.T
 
 
-def _slice_length(slice_):
-    """Return the length of a slice.
-
-    Parameters
-    ----------
-    slice_ : slice
-        Slice.
-
-    Returns
-    -------
-    length : int
-    """
-    return slice_.stop - slice_.start
-
-
-def _apply_to_lists(list_of_lists, func, check_empty=True):
-    """Apply a function to each list in a list of lists.
-
-    Parameters
-    ----------
-    list_of_lists : list of list
-        List of lists.
-    func : callable
-        Function to apply to each list.
-    check_empty : bool
-        Return 0 for empty lists if set as True. If False, the function
-        will be applied to an empty list.
-
-    Returns
-    -------
-    result : np.ndarray
-        Numpy array with the function applied to each list.
-    """
-    if check_empty:
-        return np.array(
-            [
-                [
-                    func(inner_list) if np.any(inner_list) else 0
-                    for inner_list in subject_list
-                ]
-                for subject_list in list_of_lists
-            ],
-        )
-
-    return np.array(
-        [
-            [func(inner_list) for inner_list in subject_list]
-            for subject_list in list_of_lists
-        ],
-    )
-
-
-def _list_means(list_of_lists):
-    """Calculate the mean of each list in a list of lists.
-
-    Parameters
-    ----------
-    list_of_lists : list of list
-        List of lists.
-
-    Returns
-    -------
-    result : np.ndarray
-        Numpy array with the mean of each list.
-    """
-    return _apply_to_lists(list_of_lists, func=np.mean)
-
-
-def _list_stds(list_of_lists):
-    """Calculate the standard deviation of each list in a list of lists.
-
-    Parameters
-    ----------
-    list_of_lists : list of list
-        List of lists.
-
-    Returns
-    -------
-    result : np.ndarray
-        Numpy array with the standard deviation of each list.
-    """
-    return _apply_to_lists(list_of_lists, func=np.std)
-
-
-def _state_activations(state_time_course):
-    """Calculate state activations from a state time course.
-
-    Given a state time course (strictly binary), calculate the beginning and
-    end of each activation of each state.
-
-    Parameters
-    ----------
-    state_time_course : numpy.ndarray or list or numpy.ndarray
-        State time course (strictly binary).
-
-    Returns
-    -------
-    slices: list of list of slice
-        List containing state activations (index) in the order they occur for
-        each state. This cannot necessarily be converted into an array as an
-        equal number of elements in each array is not guaranteed.
-    """
-    shape_error_message = (
-        "State time course must be a 1D, 2D or 3D array or list of 2D arrays. "
-    )
-
-    type_error_message = (
-        "State time course must be strictly binary. "
-        "This can either be np.bools or np.ints with values 0 and 1."
-    )
-
-    if isinstance(state_time_course, np.ndarray) and (
-        state_time_course.dtype == object
-    ):
-        state_time_course = list(state_time_course)
-
-    if isinstance(state_time_course, np.ndarray):
-        if state_time_course.ndim == 1:
-            state_time_course = state_time_course[:, None]
-        if state_time_course.ndim == 2:
-            state_time_course = [state_time_course]
-        elif state_time_course.ndim == 3:
-            state_time_course = list(state_time_course)
-        else:
-            raise ValueError(shape_error_message)
-    elif isinstance(state_time_course, list):
-        if not all(isinstance(stc, np.ndarray) for stc in state_time_course):
-            raise ValueError(shape_error_message)
-        if not all(stc.ndim == 2 for stc in state_time_course):
-            raise ValueError(shape_error_message)
-
-    bool_state_time_course = []
-    for stc in state_time_course:
-        if np.issubdtype(stc.dtype, np.integer):
-            if np.all(np.isin(stc, [0, 1])):
-                bool_state_time_course.append(stc.astype(bool))
-        elif np.issubdtype(stc.dtype, np.bool_):
-            bool_state_time_course.append(stc)
-        else:
-            raise ValueError(type_error_message)
-
-    return [
-        [array_ops.ezclump(column) for column in stc.T]
-        for stc in bool_state_time_course
-    ]
-
-
-def state_activation(state_time_course):
+def state_activations(state_time_course):
     """Calculate state activations from a state time course.
 
     Given a state time course (strictly binary), calculate the beginning and
@@ -336,34 +189,56 @@ def state_activation(state_time_course):
 
     Parameters
     ----------
-    state_time_course : numpy.ndarray
+    state_time_course : numpy.ndarray or list of numpy.ndarray
         State time course (strictly binary).
 
     Returns
     -------
-    ons : list of numpy.ndarray
-        List containing state beginnings (index) in the order they occur for
+    slices: list of list of slice
+        List containing state activations (index) in the order they occur for
         each state. This cannot necessarily be converted into an array as an
         equal number of elements in each array is not guaranteed.
-    offs : list of numpy.ndarray
-        List containing state ends (index) in the order they occur for each state.
-        This cannot necessarily be converted into an array as an equal number of
-        elements in each array is not guaranteed.
     """
-    slices = _state_activations(state_time_course=state_time_course)
-    subject_level = []
-    for subject_slices in slices:
-        ons = [
-            np.array([slice_.start for slice_ in state_slices])
-            for state_slices in subject_slices
-        ]
-        offs = [
-            np.array([slice_.stop - 1 for slice_ in state_slices])
-            for state_slices in subject_slices
-        ]
-        subject_level.append((ons, offs))
+    # Make sure we have a list of numpy arrays
+    shape_error_message = (
+        "State time course must be a 1D, 2D or 3D array or list of 2D arrays."
+    )
+    if isinstance(state_time_course, np.ndarray):
+        if state_time_course.ndim == 3 or state_time_course.dtype == object:
+            state_time_course = list(state_time_course)
+        if state_time_course.ndim == 2:
+            state_time_course = [state_time_course]
+        elif state_time_course.ndim == 1:
+            state_time_course = [state_time_course[:, np.newaxis]]
+        else:
+            raise ValueError(shape_error_message)
+    elif isinstance(state_time_course, list):
+        if not all(isinstance(stc, np.ndarray) for stc in state_time_course):
+            raise ValueError(shape_error_message)
+        if not all(stc.ndim == 2 for stc in state_time_course):
+            raise ValueError(shape_error_message)
 
-    return subject_level
+    # Make sure the list of arrays is of type bool
+    type_error_message = (
+        "State time course must be strictly binary. "
+        "This can either be np.bools or np.ints with values 0 and 1."
+    )
+    bool_state_time_course = []
+    for stc in state_time_course:
+        if np.issubdtype(stc.dtype, np.integer):
+            if np.all(np.isin(stc, [0, 1])):
+                bool_state_time_course.append(stc.astype(bool))
+        elif np.issubdtype(stc.dtype, np.bool_):
+            bool_state_time_course.append(stc)
+        else:
+            raise ValueError(type_error_message)
+
+    # Get the slices where each state is True
+    slices = [
+        [array_ops.ezclump(column) for column in stc.T]
+        for stc in bool_state_time_course
+    ]
+    return slices
 
 
 def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
@@ -391,11 +266,11 @@ def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
         n_states, n_activations) or (n_states, n_activations).
     """
     sampling_frequency = sampling_frequency or 1
-    slices = _state_activations(state_time_course)
+    slices = state_activations(state_time_course)
 
     result = [
         [
-            np.array([_slice_length(slice_) for slice_ in state_slices])
+            np.array([array_ops.slice_length(slice_) for slice_ in state_slices])
             / sampling_frequency
             for state_slices in subject_slices
         ]
@@ -438,9 +313,8 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
         sampling_frequency=sampling_frequency,
         squeeze=False,
     )
-    means = np.squeeze(_list_means(lifetimes_))
-    stds = np.squeeze(_list_stds(lifetimes_))
-
+    means = np.squeeze(array_ops.list_means(lifetimes_))
+    stds = np.squeeze(array_ops.list_stds(lifetimes_))
     return means, stds
 
 
@@ -488,7 +362,7 @@ def intervals(state_time_course, sampling_frequency=None, squeeze=True):
         n_states, n_activations) or (n_states, n_activations).
     """
     sampling_frequency = sampling_frequency or 1
-    slices = _state_activations(state_time_course)
+    slices = state_activations(state_time_course)
     result = [
         [
             np.array(
@@ -537,8 +411,8 @@ def interval_statistics(state_time_course, sampling_frequency=None):
     intervals_ = intervals(
         state_time_course, sampling_frequency=sampling_frequency, squeeze=False
     )
-    means = np.squeeze(_list_means(intervals_))
-    stds = np.squeeze(_list_stds(intervals_))
+    means = np.squeeze(array_ops.list_means(intervals_))
+    stds = np.squeeze(array_ops.list_stds(intervals_))
     return means, stds
 
 
@@ -577,11 +451,16 @@ def fractional_occupancies(state_time_course):
         The fractional occupancy of each state. Shape is (n_subjects, n_states)
         or (n_states,).
     """
-    if isinstance(state_time_course, list):
-        fo = [np.sum(stc, axis=0) / stc.shape[0] for stc in state_time_course]
-    else:
-        fo = np.sum(state_time_course, axis=1) / state_time_course.shape[1]
-    return np.array(fo, dtype=np.float32)
+    if isinstance(state_time_course, np.ndarray):
+        if state_time_course.ndim == 2:
+            state_time_course = [state_time_course]
+        elif state_time_course.ndim != 3:
+            raise ValueError(
+                "A (n_subjects, n_samples, n_states) or "
+                "(n_samples, n_states) array must be passed."
+            )
+    fo = [np.sum(stc, axis=0) / stc.shape[0] for stc in state_time_course]
+    return np.squeeze(fo)
 
 
 def switching_rates(state_time_course, sampling_frequency=None):
@@ -606,10 +485,8 @@ def switching_rates(state_time_course, sampling_frequency=None):
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 2:
             state_time_course = [state_time_course]
-        if state_time_course.ndim == 3:
-            state_time_course = [
-                state_time_course[i] for i in range(len(state_time_course))
-            ]
+        elif state_time_course.ndim == 3:
+            state_time_course = list(state_time_course)
 
     # Set sampling frequency
     sampling_frequency = sampling_frequency or 1

@@ -293,3 +293,87 @@ def ezclump(binary_array):
     if binary_array[-1]:
         r.append(slice(idx[-1], binary_array.size))
     return r
+
+
+def slice_length(slice_):
+    """Return the length of a slice.
+
+    Parameters
+    ----------
+    slice_ : slice
+        Slice.
+
+    Returns
+    -------
+    length : int
+    """
+    return slice_.stop - slice_.start
+
+
+def apply_to_lists(list_of_lists, func, check_empty=True):
+    """Apply a function to each list in a list of lists.
+
+    Parameters
+    ----------
+    list_of_lists : list of list
+        List of lists.
+    func : callable
+        Function to apply to each list.
+    check_empty : bool
+        Return 0 for empty lists if set as True. If False, the function
+        will be applied to an empty list.
+
+    Returns
+    -------
+    result : np.ndarray
+        Numpy array with the function applied to each list.
+    """
+    if check_empty:
+        return np.array(
+            [
+                [
+                    func(inner_list) if np.any(inner_list) else 0
+                    for inner_list in subject_list
+                ]
+                for subject_list in list_of_lists
+            ],
+        )
+
+    return np.array(
+        [
+            [func(inner_list) for inner_list in subject_list]
+            for subject_list in list_of_lists
+        ],
+    )
+
+
+def list_means(list_of_lists):
+    """Calculate the mean of each list in a list of lists.
+
+    Parameters
+    ----------
+    list_of_lists : list of list
+        List of lists.
+
+    Returns
+    -------
+    result : np.ndarray
+        Numpy array with the mean of each list.
+    """
+    return apply_to_lists(list_of_lists, func=np.mean)
+
+
+def list_stds(list_of_lists):
+    """Calculate the standard deviation of each list in a list of lists.
+
+    Parameters
+    ----------
+    list_of_lists : list of list
+        List of lists.
+
+    Returns
+    -------
+    result : np.ndarray
+        Numpy array with the standard deviation of each list.
+    """
+    return apply_to_lists(list_of_lists, func=np.std)
