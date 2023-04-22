@@ -1,21 +1,23 @@
-"""TDE-HMM.
+"""Nottingham MRC MEGUK: TDE-HMM.
 
 In this script we train a Time-Delay Embedded Hidden Markov Model (TDE-HMM)
 on source reconstructed resting-state MEG data and plot the inferred networks.
 
-The examples/toolbox_paper/get_data.py script can be used to download the
-training data.
+The examples/toolbox_paper/nottingham_mrc_meguk/get_data.py script can be used
+to download the training data.
 """
 
 from osl_dynamics import run_pipeline
+from osl_dynamics.inference import tf_ops
 
 config = """
     load_data:
-        data_dir: training_data
+        data_dir: data/training_data
         data_kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
-            parcellation_file: fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz
+            parcellation_file: fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz
+            n_jobs: 16
         prepare_kwargs:
             n_embeddings: 15
             n_pca_components: 80
@@ -29,7 +31,7 @@ config = """
             frequency_range: [1, 45]
             n_jobs: 16
         nnmf_components: 2
-    plot_group_nnmf_tde_hmm_networks: {}
+    plot_group_nnmf_tde_hmm_networks:
         nnmf_file: spectra/nnmf_2.npy
         power_save_kwargs:
             plot_kwargs: {views: [lateral]}

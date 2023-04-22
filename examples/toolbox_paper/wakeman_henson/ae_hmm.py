@@ -1,22 +1,18 @@
-"""AE-HMM.
+"""Wakeman-Henson: AE-HMM.
 
-In this script we train an Amplitude Envelope Hidden Markov Model (AE-HMM)
-on source reconstructed resting-state MEG data and plot the inferred networks.
-
-The examples/toolbox_paper/get_data.py script can be used to download the
-training data.
 """
 
 from osl_dynamics import run_pipeline
+from osl_dynamics.inference import tf_ops
 
 config = """
     load_data:
-        data_dir: training_data
+        data_dir: data/training_data
         data_kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
-            parcellation_file: fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz
-            n_jobs: 8
+            parcellation_file: fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz
+            n_jobs: 16
         prepare_kwargs:
             amplitude_envelope: True
             n_window: 5
@@ -26,7 +22,9 @@ config = """
             learn_means: True
             learn_covariances: True
     calc_subject_ae_hmm_networks: {}
-    plot_group_ae_networks: {}
+    plot_group_ae_networks:
+        power_save_kwargs:
+            plot_kwargs: {views: [lateral]}
     plot_alpha:
         kwargs: {n_samples: 2000}
     plot_summary_stats: {}
