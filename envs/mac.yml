@@ -18,6 +18,6 @@ dependencies:
     - scikit-learn
     - seaborn
     - tabulate
-    - tensorflow
+    - tensorflow-macos
     - tensorflow_probability
     - tqdm

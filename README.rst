@@ -17,7 +17,7 @@ Here, we describe how to install osl-dynamics from source. We recommend using th
     conda activate osld
     pip install -e .
 
-Note, the conda environments use ``pip`` to install TensorFlow, you may need to load/install additional libraries (such as CUDA/cuDNN) if you have GPU support.
+If you're using a Mac then use the ``envs/mac.yml`` file to create the conda environment instead of ``envs/linux.yml``. Note, the conda environments use ``pip`` to install TensorFlow, you may need to load/install additional libraries (such as CUDA/cuDNN) if you have GPU support.
 
 Developers might want to clone the repo using SSH instead of HTTPS:
 
