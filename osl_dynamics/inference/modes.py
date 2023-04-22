@@ -452,3 +452,36 @@ def convert_to_mne_raw(
             alpha_raw.add_channels([chan_raw], force_update_info=True)
 
     return alpha_raw
+
+
+def reweight_alphas(alpha, covs):
+    """Re-weight DyNeMo mixing coefficients to account for the magnitude of
+    the mode covariances.
+
+    Parameters
+    ----------
+    alpha : list of np.ndarray or np.ndarray
+        Raw alphas from DyNeMo. Shape must be (n_subjects, n_samples, n_modes)
+        or (n_samples, n_modes).
+    covs : np.ndarray
+        Mode covariances. Shape must be (n_modes, n_channels, n_channels).
+
+    Returns
+    -------
+    reweighted_alpha : list of np.ndarray or np.ndarray
+        Re-weighted alphas. Shape is the same as alpha.
+    """
+    if isinstance(alpha, np.ndarray):
+        alpha = [alpha]
+
+    # Calculate normalised alphas
+    traces = np.trace(covs, axis1=1, axis2=2)
+    reweighted_alpha = [a * traces[np.newaxis, :] for a in alpha]
+    reweighted_alpha = [
+        na / np.sum(na, axis=1, keepdims=True) for na in reweighted_alpha
+    ]
+
+    if len(reweighted_alpha) == 1:
+        reweighted_alpha = reweighted_alpha[0]
+
+    return reweighted_alpha

@@ -1217,11 +1217,11 @@ def plot_alpha(
         plotting.plot_alpha(alp[subject], **kwargs)
 
     if normalize:
+        from osl_dynamics.inference import modes
+
         # Calculate normalised alphas
         covs = load(f"{inf_params_dir}/covs.npy")
-        traces = np.trace(covs, axis1=1, axis2=2)
-        norm_alp = [a * traces[np.newaxis, :] for a in alp]
-        norm_alp = [na / np.sum(na, axis=1, keepdims=True) for na in norm_alp]
+        norm_alp = modes.reweight_alphas(alp)
 
         # Plot
         if subject == "all":
