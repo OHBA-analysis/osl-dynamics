@@ -12,7 +12,7 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        conda create --name osld python=3
+        conda create --name osld python=3.10
         conda activate osld
 
     Note, this environment must be activated every time you want to use osl-dynamics.
