@@ -261,6 +261,26 @@ class Model(VariationalInferenceModelBase):
         self.set_bayesian_kl_scaling(training_data)
         return super().fit(training_data, *args, **kwargs)
 
+    def get_group_means(self):
+        """Get the group means.
+
+        Returns
+        -------
+        means : np.ndarray
+            Group means. Shape is (n_modes, n_channels).
+        """
+        return dynemo_obs.get_means(self.model, "group_means")
+
+    def get_group_covariances(self):
+        """Get the group covariances.
+
+        Returns
+        -------
+        covariances : np.ndarray
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
+        """
+        return dynemo_obs.get_covariances(self.model, "group_covs")
+
     def get_group_means_covariances(self):
         """Get the group means and covariances of each mode
 
@@ -271,7 +291,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances for the group. Shape is (n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covs(self.model)
+        return sedynemo_obs.get_group_means_covariances(self.model)
 
     def get_observation_model_parameters(self):
         """Wrapper for get_group_means_covariances."""
@@ -306,7 +326,7 @@ class Model(VariationalInferenceModelBase):
             Mode covariances for each subject.
             Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covs(
+        return sedynemo_obs.get_subject_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
@@ -511,7 +531,7 @@ def _model_structure(config):
         means_dev_map_layer = layers.Dense(config.n_channels, name="means_dev_map")
 
         norm_means_dev_map_layer = layers.LayerNormalization(
-            axis=-1, scale=False, name="norm_means_dev_map"
+            axis=-1, name="norm_means_dev_map"
         )
 
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
@@ -597,7 +617,7 @@ def _model_structure(config):
             config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_map"
         )
         norm_covs_dev_map_layer = layers.LayerNormalization(
-            axis=-1, scale=False, name="norm_covs_dev_map"
+            axis=-1, name="norm_covs_dev_map"
         )
 
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
