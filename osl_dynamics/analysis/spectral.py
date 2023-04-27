@@ -1373,6 +1373,9 @@ def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windo
         if alpha[i].shape[1] != psd[i].shape[1]:
             raise ValueError("psd and alpha must have same number of modes.")
 
+    # Prevent in-place operation
+    psd = psd.copy()
+
     # Number of subjects
     n_subjects = len(alpha)
 
