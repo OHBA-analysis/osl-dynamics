@@ -10,13 +10,7 @@ second part of the interval between visits to state i
 
 import numpy as np
 from osl_dynamics.inference.modes import argmax_time_courses
-
-
-
-
-
-
-import numpy as np
+import pickle
 
 # def validate_data(stc):
 #     if isinstance(stc, list):
@@ -37,10 +31,11 @@ def find_intervals(tc_hot):
     return intervals, durations
 
 
-def divide_intervals(intervals, nbin=2):
+def split_intervals(intervals, nbin=2):
     divided_intervals = []
     bin_sizes = []
-    for start, end in intervals:
+    drop_mask = np.zeros(len(intervals))
+    for i, (start, end) in enumerate(intervals):
         n_samples = end - start
         bin_size = n_samples // nbin
         if bin_size > 0:
@@ -58,51 +53,84 @@ def divide_intervals(intervals, nbin=2):
                 bin_start = bin_end
             divided_intervals.append(bins)
             bin_sizes.append(bin_size)
-    return divided_intervals, bin_sizes
+        else:
+            drop_mask[i] = 1
+    return divided_intervals, bin_sizes, drop_mask
 
 
-def compute_weighted_averages(tc_sec, divided_intervals):
-    interval_wavgs = []
-    interval_sums = []
-    for row in tc_sec.T:
-        fo_row = np.mean(row)
-        weighted_avg = np.zeros((len(divided_intervals), len(divided_intervals[0])))
-        interval_sum = np.zeros((len(divided_intervals), len(divided_intervals[0])))
-        for i, interval in enumerate(divided_intervals):
-            for j, (start, end) in enumerate(interval):
-                bin_sum = np.sum(row[start:end])
-                bin_avg = bin_sum / (end - start)
-                weighted_avg[i,j] = bin_avg * fo_row
-                interval_sum[i,j] = bin_sum
-        interval_wavgs.append(weighted_avg)
-        interval_sums.append(interval_sum)
-    return interval_wavgs, interval_sums
+def split_interval_duration(durations, interval_range=None, mode="sample", sfreq=None):
+    if mode == "sec" and sfreq is None:
+        raise ValueError("Sampling frequency (sfreq) must be specified when mode is 'sec'")
+    if interval_range is None:
+        return [np.ones_like(durations)]
+    else:
+        if mode == "sec":
+            interval_range = [r * sfreq for r in interval_range]
+        elif mode == "perc":
+            interval_range = np.percentile(durations, interval_range)
+        mask = []
+        for i in range(len(list(interval_range))-1):
+            hot_vector = np.logical_and(durations >= interval_range[i], durations < interval_range[i+1])
+            mask.append(hot_vector.astype(int))
+        return mask, interval_range
 
+
+
+def compute_weighted_averages(tc_sec, divided_intervals, interval_mask=None, avg_intervals=True):
+    if interval_mask is None:
+        interval_mask  = [np.ones(len(divided_intervals))]
+    tc_mean = np.expand_dims(tc_sec.mean(axis=0), axis=1)
+    interval_sum = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
+    interval_weighted_avg = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
+    for i, interval in enumerate(divided_intervals):
+        for j, (start, end) in enumerate(interval):
+            interval_sum[:,j,i] = np.sum(tc_sec[start:end,:], axis=0)
+        interval_weighted_avg[:,:,i] = tc_mean*(interval_sum[:,:,i] / (end - start))
+    interval_weighted_avg = [interval_weighted_avg[:,:,interval_selection==1].mean(axis=2) if avg_intervals else interval_weighted_avg[:,:,interval_selection==1] for interval_selection in interval_mask]
+    interval_sum = [interval_sum[:,:,interval_selection==1].sum(axis=2) if avg_intervals else interval_sum[:,:,interval_selection==1] for interval_selection in interval_mask]
+    return interval_weighted_avg, interval_sum
 
 
 alpha = pickle.load(open('/ohba/pi/mwoolrich/mvanes/Projects/Replay/dynamics/nott/hmm/alpha.pkl', 'rb'))
 stc = argmax_time_courses(alpha)
 
-def compute_fo_density(tc, nbin=2, interval_range=None, interval_mode=None):
+def tinda(tc, nbin=2, interval_range=None, interval_mode=None, sfreq=None, avg_intervals=True):
     if isinstance(tc, list): # list of time courses (e.g., subjects' HMM state time courses)
-        fo_density = [zip(compute_fo_density(itc, nbin, interval_range, interval_mode)) for itc in tc]
+        fo_density, fo_sum, stats = zip(*[tinda(itc, nbin, interval_range, interval_mode, sfreq, avg_intervals) for itc in tc])
     else:
-        fo_density = []
+        stats=[]
         dim = tc.shape
+        ignore_elements = []
         for i in range(dim[1]):
             itc_prim = tc[:, i]
-            if not np.array_equal(itc_prim, itc_prim.astype(int)):
-                fo_density.append(None)
+            if not np.array_equal(itc_prim, itc_prim.astype(int)): # if not binary (i.e., intervals are not well difined)
+                stats.append(None)
+                ignore_elements.append(i)
             else:
                 itc_sec = tc[:, np.setdiff1d(range(dim[1]), i)]
                 intervals, durations = find_intervals(itc_prim)
-                nbins = 4
-                divided_intervals, bin_sizes = divide_intervals(intervals, nbins)
-                interval_wavgs, interval_sums = compute_weighted_averages(itc_sec, divided_intervals)
-            fo_density.append({"interval_wavgs":interval_wavgs, "interval_sums": interval_sums,
-                              "divided_intervals": divided_intervals, "bin_sizes": bin_sizes,
-                                "intervals": intervals, "durations": durations})
-    return fo_density # TODO: might have to choose to average either over intervals or over subjects
+                divided_intervals, bin_sizes, dropped_intervals = split_intervals(intervals, nbin)
+                durations = durations[dropped_intervals==0]
+                interval_mask, interval_range_samples = split_interval_duration(durations, interval_range=interval_range, mode=interval_mode, sfreq=sfreq)
+                interval_wavgs, interval_sums = compute_weighted_averages(itc_sec, divided_intervals, interval_mask, avg_intervals=avg_intervals)
+                stats.append({"durations":durations,"intervals": intervals, "interval_wavgs":interval_wavgs, "interval_sums": interval_sums, 
+                          "divided_intervals": divided_intervals, "bin_sizes": bin_sizes, "interval_range": interval_range_samples})
+        fo_density = collate_stats(stats, 'interval_wavgs', ignore_elements)
+        fo_sum = collate_stats(stats, 'interval_sums', ignore_elements)
+    return fo_density, fo_sum, stats 
+
+
+def collate_stats(stats, field, ignore_elements=None):
+    num_states = len(stats)
+    nbins = stats[0][field][0].shape[-1]
+    n_ranges = len(stats[0][field])
+    collated_stat = [np.full((num_states, num_states, nbins), np.nan) for _ in range(n_ranges)]
+    for i in range(num_states):
+        if i in ignore_elements:
+            continue
+        for k in range(n_ranges):
+            collated_stat[k][i, np.setdiff1d(range(num_states),i)] = stats[i][field][k]
+    return collated_stat
 
 # Example usage
 stc_prim = [1, 0, 0, 1, 0, 1, 0, 0, 1]
@@ -114,7 +142,7 @@ stc_sec = [
 nbin = 4
 
 intervals = find_intervals(stc_prim)
-divided_intervals = divide_intervals(intervals, nbin)
+divided_intervals = split_intervals(intervals, nbin)
 weighted_avgs, interval_sums = compute_weighted_averages(stc_sec, divided_intervals)
 
 print("Intervals:", intervals)
