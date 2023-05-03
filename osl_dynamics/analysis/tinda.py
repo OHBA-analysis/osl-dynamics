@@ -112,7 +112,6 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
     """
     if mode == "sec" and sfreq is None:
         raise ValueError("Sampling frequency (sfreq) must be specified when mode is 'sec'")
-    if interval_range is None:
         return [np.ones_like(durations)], None
     else:
         if mode == "sec":
@@ -127,7 +126,7 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
 
 
 
-def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, avg_intervals=True):
+def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, return_all_intervals=False):
     """Compute weighted averages (weighted by interval duration and mean occurrence), 
         and sums, of time courses in each interval
 
@@ -140,8 +139,8 @@ def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, avg_interval
         a list of tuples of start and end indices of interval bins
     interval_mask: array_like
         array of zeros and ones indicating whether the interval was in the bin
-    avg_intervals: bool
-        whether to average the intervals within each bin (True) or sum/average them (False)
+    return_all_intervals: bool
+        whether to return the density/sum of all intervals in addition to the interval averages/sums
 
     Returns
     -------
@@ -161,12 +160,18 @@ def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, avg_interval
         for j, (start, end) in enumerate(interval):
             interval_sum[:,j,i] = np.sum(tc_sec[start:end,:], axis=0)
         interval_weighted_avg[:,:,i] = tc_mean*(interval_sum[:,:,i] / (end - start))
-    interval_weighted_avg = [interval_weighted_avg[:,:,interval_selection==1].mean(axis=2) if avg_intervals else interval_weighted_avg[:,:,interval_selection==1] for interval_selection in interval_mask]
-    interval_sum = [interval_sum[:,:,interval_selection==1].sum(axis=2) if avg_intervals else interval_sum[:,:,interval_selection==1] for interval_selection in interval_mask]
-    return interval_weighted_avg, interval_sum
+
+    interval_weighted_avg_all = [interval_weighted_avg[:,:,interval_selection==1] for interval_selection in interval_mask]
+    interval_sum_all = [interval_sum[:,:,interval_selection==1] for interval_selection in interval_mask]
+    interval_weighted_avg = np.stack([weighted_avg.mean(axis=-1) for weighted_avg in interval_weighted_avg_all], axis=-1)
+    interval_sum = np.stack([int_sum.mean(axis=-1) for int_sum in interval_sum_all], axis=-1)
+    if return_all_intervals:
+        return interval_weighted_avg, interval_sum, interval_weighted_avg_all, interval_sum_all
+    else:
+        return interval_weighted_avg, interval_sum, None, None
 
 
-def collate_stats(stats, field, ignore_elements=None):
+def collate_stats(stats, field, all_to_all=False, ignore_elements=None):
     """Collate stats across states
 
     Parameters
@@ -177,33 +182,41 @@ def collate_stats(stats, field, ignore_elements=None):
         of compute_fo_stats
     field: str
         field of stats to collate, e.g., "interval_wavgs", "interval_sums"
+    all_to_all: bool
+        whether the density_of was used to compute the stats (in which case the first 
+        2 dimensions are not n_states x n_states)
     ignore_elements: list
         list of states to ignore (i.e. because they don't contain binary events)
 
     Returns
     -------
-    collated_stat: list
-        list of collated stats for each interval range
+    collated_stat: array_like
+        the collated stat (n_interval_states, n_density_states, n_bins, n_interval_ranges)
+        If all_to_all is False (i.e., when the density is computed for all states
+        using all states' intervals), then the first two dimensions are n_states 
+        and the diagonal is np.nan
     """
     num_states = len(stats)
+    shp = stats[0][field].shape # (n_states, n_bins, n_interval_ranges)
     if num_states > 1:
-        nbins = stats[0][field][0].shape[-1]
-        n_ranges = len(stats[0][field])
-        collated_stat = [np.full((num_states, num_states, nbins), np.nan) for _ in range(n_ranges)]
+        if all_to_all:
+            collated_stat = np.full((2*[num_states]+list(shp[1:])), np.nan)
+        else:
+            collated_stat = np.full(([num_states]+list(shp)), np.nan)
         for i in range(num_states):
             if i in ignore_elements:
                 continue
-            for k in range(n_ranges):
-                stat = stats[i][field][k]
-                if len(stat.shape)>2:
-                    stat = stat.mean(axis=2)
-                collated_stat[k][i, np.setdiff1d(range(num_states),i)] = stat
+            for k in range(num_states):
+                if all_to_all:
+                    collated_stat[k, np.setdiff1d(range(num_states),i)] = stats[k][field]
+                else:
+                    collated_stat[k] =  stats[k][field]
     else:
         collated_stat = stats[0][field]
     return collated_stat
 
 
-def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, sfreq=None, avg_intervals=True):
+def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, sfreq=None, return_all_intervals=False):
     """Compute time-in-state density and sum for each interval
     
     Parameters
@@ -226,16 +239,20 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
         e.g. np.arange(0, 1, 0.1) for 100ms bins
     sfreq: float
         sampling frequency of tc (in Hz), only used if interval_mode is "sec"
-    avg_intervals: bool
-        whether to average/sum the intervals within each bin (True) keep the full dimensionality (False)
+    return_all_intervals: bool
+        whether to return the density/sum of all intervals in addition to the interval averages/sums
+        If True, will return a list of arrays in stats[i]['all_interval_wavgs'/'all_interval_sums'], 
+        each corresponding to an interval range
 
     Returns
     -------
-    fo_density: list
-        list with elements corresponding to interval ranges, each itself being an
-        array of time-in-state densities of shape (n_states, n_states, n_bins, n_subjects)
-        if avg_intervals is False, otherwise of shape (n_states, n_intervals)
-        will return a list of arrays if 
+    fo_density: array_like
+        time-in-state densities array of shape (n_interval_states, n_density_states, n_bins, n_interval_ranges)
+        n_interval_states is the number of states in the interval time courses (i.e., tc)
+        n_density_states is the number of states in the density time courses (i.e., density_of)
+        if density_of is None, n_density_states is the same as n_interval_states
+        if tc is a list of time courses (e.g., state time courses for multiple subjects), 
+        then an extra dimension is appended for the subjects
     fo_sum: array_like
         same as fo_density, but with time-in-state sums instead of densities
     stats: dict
@@ -247,15 +264,16 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
         - the bin edges (divided_intervals) for each interval
         - the bin sizes (bin_sizes) for each interval
         - the interval range (in samples)
+        - unaveraged interval densities (all_interval_wavgs) - only if return_all_intervals is True
+        - unaveraged interval sums (all_interval_sums) - only if return_all_intervals is True
     """
     if isinstance(tc, list): # list of time courses (e.g., subjects' HMM state time courses)
-        fo_density_tmp, fo_sum_tmp, stats = zip(*[tinda(itc, density_of[ix], nbin, interval_mode, interval_range, sfreq, avg_intervals) for ix, itc in enumerate(tc)])
-        # TODO: FIX!
-        s = fo_density_tmp[0][0].shape
-        n_ranges = len(fo_density_tmp[0])
-        n_sub = len(fo_density_tmp)
-        fo_density = [np.stack([fo_density_tmp[j][i] for j in range(n_sub)], axis=3) for i in range(n_ranges)]
-        fo_sum = [np.stack([fo_density_tmp[j][i] for j in range(n_sub)], axis=3) for i in range(n_ranges)]
+        if density_of is None:
+            fo_density_tmp, fo_sum_tmp, stats = zip(*[tinda(itc, None, nbin, interval_mode, interval_range, sfreq, return_all_intervals) for itc in tc])
+        elif len(density_of)==len(tc):
+            fo_density_tmp, fo_sum_tmp, stats = zip(*[tinda(itc, density_of[ix], nbin, interval_mode, interval_range, sfreq, return_all_intervals) for ix, itc in enumerate(tc)])
+        fo_density = np.stack(fo_density_tmp, axis=-1)
+        fo_sum = np.stack(fo_sum_tmp, axis=-1)
     else:
         stats=[]
         dim = tc.shape
@@ -274,11 +292,12 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
                 divided_intervals, bin_sizes, dropped_intervals = split_intervals(intervals, nbin)
                 durations = durations[dropped_intervals==0]
                 interval_mask, interval_range_samples = split_interval_duration(durations, interval_range=interval_range, mode=interval_mode, sfreq=sfreq)
-                interval_wavgs, interval_sums = compute_fo_stats(itc_sec, divided_intervals, interval_mask, avg_intervals=avg_intervals)
+                interval_wavgs, interval_sums, all_interval_wavgs, all_interval_sums = compute_fo_stats(itc_sec, divided_intervals, interval_mask, return_all_intervals=return_all_intervals)
                 stats.append({"durations":durations,"intervals": intervals, "interval_wavgs":interval_wavgs, "interval_sums": interval_sums, 
-                          "divided_intervals": divided_intervals, "bin_sizes": bin_sizes, "interval_range": interval_range_samples})
-        fo_density = collate_stats(stats, 'interval_wavgs', ignore_elements)
-        fo_sum = collate_stats(stats, 'interval_sums', ignore_elements)
+                          "divided_intervals": divided_intervals, "bin_sizes": bin_sizes, "interval_range": interval_range_samples,
+                          "all_interval_wavgs": all_interval_wavgs, "all_interval_sums": all_interval_sums})
+        fo_density = collate_stats(stats, 'interval_wavgs', all_to_all=density_of is None, ignore_elements=ignore_elements)
+        fo_sum = collate_stats(stats, 'interval_sums', all_to_all=density_of is None, ignore_elements=ignore_elements)
     return fo_density, fo_sum, stats 
 
 
