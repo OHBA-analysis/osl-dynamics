@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import trange
 from scipy.optimize import linear_sum_assignment
+from sklearn.cluster import AgglomerativeClustering
 
 from osl_dynamics import analysis, array_ops
 from osl_dynamics.inference import metrics
@@ -485,3 +486,74 @@ def reweight_alphas(alpha, covs):
         reweighted_alpha = reweighted_alpha[0]
 
     return reweighted_alpha
+
+
+def average_runs(alpha, return_cluster_ids=False):
+    """Average the state probabilities from different runs using hierarchical
+    clustering.
+
+    The hierarchical clustering used in this function is described `here
+    <https://www.biorxiv.org/content/10.1101/2023.01.18.524539v2>`_.
+
+    Parameters
+    ----------
+    alpha : list of list of np.ndarray or list of np.ndarray
+        State probabilities. Shape must be (n_runs, n_subjects, n_samples, n_states)
+        or (n_runs, n_samples, n_states).
+    return_cluster_ids : bool
+        Should we return the cluster ID? This tells you what cluster each
+        state time course (from each run) is assigned to. Each cluster
+        corresponds to a set of state time courses (from different runs)
+        which we average. Shape is (n_runs*n_states,).
+
+    Returns
+    -------
+    average_alpha : list of np.ndarray or np.ndarray
+        State probabilities averaged over runs. Shape is (n_subjects, n_states).
+    cluster_ids : np.ndarray
+        Cluster IDs. Only returned if return_cluster_ids=True.
+        Shape is (n_runs*n_states).
+    """
+    if not isinstance(alpha, list):
+        raise ValueError(
+            "alpha must be a list of lists (of numpy arrays) or list of numpy arrays."
+        )
+    if isinstance(alpha[0], np.ndarray):
+        alpha = [[a] for a in alpha]
+
+    # Number of runs and states
+    n_runs = len(alpha)
+    n_states = alpha[0][0].shape[-1]
+
+    # Save the length of each subject's data so we can split the group concatenated
+    # data later
+    n_subject_samples = [a.shape[0] for a in alpha[0]]
+
+    # Concatenate over subjects and turn into a (n_samples, n_runs * n_states) array
+    alpha = np.array(
+        [np.concatenate(a, axis=0) for a in alpha]
+    )  # (n_runs, n_samples, n_states)
+    alpha = np.swapaxes(alpha, 0, 1).reshape(-1, n_runs * n_states)
+
+    # Calculate correlation between all pairwise state probability time courses
+    corr = np.corrcoef(alpha, rowvar=False)
+
+    # Convert correlation to a dis-similarity measure
+    dissimilarity = 1 - corr
+
+    # Hierarchical clustering
+    clustering = AgglomerativeClustering(n_clusters=n_states, linkage="ward")
+    cluster_ids = clustering.fit_predict(dissimilarity)
+
+    # Average alphas in each cluster
+    average_alpha = []
+    for i in range(n_states):
+        a = np.mean(alpha[:, cluster_ids == i], axis=-1)
+        average_alpha.append(a)
+    average_alpha = np.array(average_alpha).T
+    average_alpha = np.split(average_alpha, np.cumsum(n_subject_samples[:-1]))
+
+    if return_cluster_ids:
+        return average_alpha, cluster_ids
+    else:
+        return average_alpha
