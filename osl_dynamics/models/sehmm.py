@@ -296,7 +296,7 @@ class Model(HMMModel):
                 x_gamma_and_subj_id = np.concatenate(
                     [x, gamma, np.expand_dims(subj_id, -1)], axis=2
                 )
-                h = self.model.fit(x_gamma_and_subj_id, epochs=3, verbose=0, **kwargs)
+                h = self.model.fit(x_gamma_and_subj_id, epochs=1, verbose=0, **kwargs)
 
                 # Get the new loss
                 l = h.history["loss"][0]
@@ -423,7 +423,7 @@ class Model(HMMModel):
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covs(self.model)[1]
+        return sedynemo_obs.get_group_means_covariances(self.model)[1]
 
     def get_group_means_covariances(self):
         """Get the means and covariances of each state.
@@ -435,9 +435,9 @@ class Model(HMMModel):
         covariances : np.ndarray
             Group level state covariances.
         """
-        return sedynemo_obs.get_group_means_covs(self.model)
+        return sedynemo_obs.get_group_means_covariances(self.model)
 
-    def get_subject_means_covs(self, subject_embeddings=None, n_neighbours=2):
+    def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
         """Get the subject means and covariances.
 
         Parameters
@@ -454,7 +454,7 @@ class Model(HMMModel):
         covs : np.ndarray
             Subject covariances. Shape is (n_subjects, n_states, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covs(
+        return sedynemo_obs.get_subject_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
