@@ -488,7 +488,7 @@ def reweight_alphas(alpha, covs):
     return reweighted_alpha
 
 
-def average_runs(alpha, return_cluster_ids=False):
+def average_runs(alpha, n_clusters=None, return_cluster_ids=False):
     """Average the state probabilities from different runs using hierarchical
     clustering.
 
@@ -500,6 +500,9 @@ def average_runs(alpha, return_cluster_ids=False):
     alpha : list of list of np.ndarray or list of np.ndarray
         State probabilities. Shape must be (n_runs, n_subjects, n_samples, n_states)
         or (n_runs, n_samples, n_states).
+    n_clusters : int
+        Number of clusters to fit. Optional. Defaults to the largest number of
+        states in alpha.
     return_cluster_ids : bool
         Should we return the cluster ID? This tells you what cluster each
         state time course (from each run) is assigned to. Each cluster
@@ -521,19 +524,23 @@ def average_runs(alpha, return_cluster_ids=False):
     if isinstance(alpha[0], np.ndarray):
         alpha = [[a] for a in alpha]
 
-    # Number of runs and states
+    # Number of runs and length of each subject's data
     n_runs = len(alpha)
-    n_states = alpha[0][0].shape[-1]
-
-    # Save the length of each subject's data so we can split the group concatenated
-    # data later
     n_subject_samples = [a.shape[0] for a in alpha[0]]
 
-    # Concatenate over subjects and turn into a (n_samples, n_runs * n_states) array
-    alpha = np.array(
-        [np.concatenate(a, axis=0) for a in alpha]
-    )  # (n_runs, n_samples, n_states)
-    alpha = np.swapaxes(alpha, 0, 1).reshape(-1, n_runs * n_states)
+    # Use the largest number of states as the number of clusters to find
+    if n_clusters is None:
+        n_clusters = max([a.shape[-1] for a in alpha[0]])
+
+    # Concatenate over subjects, gives (n_runs, n_samples, n_states) array
+    alpha = [np.concatenate(a, axis=0) for a in alpha]
+
+    # Turn into a (n_runs * n_states, n_samples) array
+    alpha_ = []
+    for i in range(n_runs):
+        for j in range(alpha[i].shape[-1]):
+            alpha_.append(alpha[i][:, j])
+    alpha = np.array(alpha_, dtype=np.float32).T
 
     # Calculate correlation between all pairwise state probability time courses
     corr = np.corrcoef(alpha, rowvar=False)
@@ -542,15 +549,17 @@ def average_runs(alpha, return_cluster_ids=False):
     dissimilarity = 1 - corr
 
     # Hierarchical clustering
-    clustering = AgglomerativeClustering(n_clusters=n_states, linkage="ward")
+    clustering = AgglomerativeClustering(n_clusters, linkage="ward")
     cluster_ids = clustering.fit_predict(dissimilarity)
 
     # Average alphas in each cluster
     average_alpha = []
-    for i in range(n_states):
+    for i in range(n_clusters):
         a = np.mean(alpha[:, cluster_ids == i], axis=-1)
         average_alpha.append(a)
-    average_alpha = np.array(average_alpha).T
+    average_alpha = np.array(average_alpha, dtype=np.float32).T
+
+    # Split average alphas back into subject-specific time courses
     average_alpha = np.split(average_alpha, np.cumsum(n_subject_samples[:-1]))
 
     if return_cluster_ids:
