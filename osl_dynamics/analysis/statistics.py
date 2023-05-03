@@ -24,22 +24,23 @@ def _check_glm_data(data, covariates, assignments=None):
                 + f"but was expecting {n_subjects}."
             )
 
-    # Combine target and covariate data
+    # Convert covariates to a numpy array
     if len(covariates) > 0:
-        glm_data = np.array(list(covariates.values()))
-        glm_data = np.concatenate([glm_data.T, data], axis=-1)
-    else:
-        glm_data = data
+        covariates_data = np.array(list(covariates.values())).T
 
     # Remove subjects with a nan in either array
     remove = []
     for i in range(n_subjects):
-        if np.isnan(glm_data[i]).any():
-            _logger.warn(f"Removing subject {i} from GLM.")
+        if np.isnan(data[i]).any():
             remove.append(i)
+        if len(covariates) > 0:
+            if np.isnan(covariates_data[i]).any():
+                remove.append(i)
         if assignments is not None:
             if np.isnan(assignments[i]):
                 remove.append(i)
+    if len(remove) > 0:
+        _logger.warn(f"The following subjects were removed from the GLM: {remove}")
 
     # Keep subjects without nans
     keep = [i for i in range(n_subjects) if i not in remove]
@@ -60,7 +61,9 @@ def _check_glm_data(data, covariates, assignments=None):
         return data, covariates_
 
 
-def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
+def evoked_response_max_stat_perm(
+    data, n_perm, covariates={}, metric="copes", n_jobs=1
+):
     """Statistical significant testing for evoked responses.
 
     This function fits a General Linear Model (GLM) with ordinary least squares
@@ -76,6 +79,8 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
         Number of permutations.
     covariates : dict
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
+    metric : str
+        Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
     n_jobs : int
         Number of processes to run in parallel.
 
@@ -84,6 +89,9 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
     pvalues : np.ndarray
         P-values for the evoked response. Shape is (n_subjects, n_samples, n_modes).
     """
+    if metric not in ["tstats", "copes"]:
+        raise ValueError("metric must be 'tstats' or 'copes'.")
+
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
     if data.ndim != 3:
@@ -108,7 +116,6 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
 
     # Fit model and get t-statistics
     model = glm.fit.OLSModel(design, data)
-    tstats = abs(model.tstats[0])
 
     # Run permutations and get null distribution
     perm = glm.permutations.MaxStatPermutation(
@@ -116,7 +123,7 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
         data,
         contrast_idx=0,  # selects the Mean contrast
         nperms=n_perm,
-        metric="tstats",
+        metric=metric,
         tail=0,  # two-sided test
         pooled_dims=(1, 2),  # pool over samples and modes dimension
         nprocesses=n_jobs,
@@ -124,7 +131,12 @@ def evoked_response_max_stat_perm(data, n_perm, covariates={}, n_jobs=1):
     null_dist = perm.nulls
 
     # Get p-values
-    percentiles = stats.percentileofscore(null_dist, tstats)
+    if metric == "tstats":
+        tstats = abs(model.tstats[0])
+        percentiles = stats.percentileofscore(null_dist, tstats)
+    elif metric == "copes":
+        copes = abs(model.copes[0])
+        percentiles = stats.percentileofscore(null_dist, copes)
     pvalues = 1 - percentiles / 100
 
     if np.all(pvalues < 0.05):

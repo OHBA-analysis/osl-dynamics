@@ -1962,7 +1962,7 @@ def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, fil
         for state in range(n_states):
             ss_dict[name].append(summary_stats[subject, state])
             ss_dict["State"].append(state + 1)
-            ss_dict["Group"].append(int(assignments[subject]))
+            ss_dict["Group"].append(assignments[subject])
     ss_df = pd.DataFrame(ss_dict)
 
     # Plot a half violin for each group
