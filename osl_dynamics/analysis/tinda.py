@@ -12,6 +12,7 @@ from itertools import permutations
 
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm.auto import tqdm
 
 
 def find_intervals(tc_hot):
@@ -38,9 +39,6 @@ def find_intervals(tc_hot):
     end = np.where(np.diff(tc_tmp) == -1)[0]
     intervals = list(zip(end[:-1], start[1:]))
     durations = np.diff(intervals, axis=1).squeeze()
-    durations = (
-        durations - 1
-    )  # remove this line in the future. This is to account for the fact that the matlab code disregarded the first sample
     return intervals, durations
 
 
@@ -131,11 +129,12 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
             elif mode == "perc":
                 interval_range = np.percentile(durations, interval_range)
             mask = []
-            for i in range(len(list(interval_range)) - 1):
-                hot_vector = np.logical_and(
-                    durations >= interval_range[i], durations < interval_range[i + 1]
-                )
-                mask.append(hot_vector.astype(int))
+            for i, start in enumerate(interval_range):
+                if i<len(interval_range)-1:
+                    hot_vector = np.logical_and(
+                        durations >= start, durations < interval_range[i + 1]
+                    )
+                    mask.append(hot_vector.astype(int))
     return mask, interval_range
 
 
@@ -554,19 +553,17 @@ def optimise_sequence(fo_density, metric_to_use=0):
         np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2)
         / np.mean(fo_density, axis=(2, 3))
     )
-
+    n_metrics = len(metric)
     K = fo_density.shape[0]
 
     # get all possible permutations of states
     myperms = np.array(list(permutations(range(1, K - 1), K - 2)))
 
     sequencemetric = np.zeros((len(myperms), 9, 3))
-    for i2 in range(len(myperms)):
-        if i2 % 10000 == 0:
-            print(f"\n Now up to run {i2} of {len(myperms)}")
+    for i2, iperm in enumerate(tqdm(myperms, desc="Optimising sequence")):
         for i in range(5):
             # setup state points on unit circle:
-            manualorder = [1] + [2 + val for val in myperms[i2]]
+            manualorder = [1] + [2 + val for val in iperm]
             manualorder = manualorder[:i] + [2] + manualorder[i:]
             manualorder = [val - 1 for val in manualorder]
             disttoplot_manual = np.zeros(K, dtype=complex)
@@ -583,14 +580,14 @@ def optimise_sequence(fo_density, metric_to_use=0):
             )
 
             # compute the metric
-            for i3 in range(len(metric)):
+            for i3 in range(n_metrics):
                 sequencemetric[i2, i, i3] = np.imag(
                     np.nansum(np.nansum(angleplot * metric[i3]))
                 )
 
     # find the permutation that maximizes the metric
     bestseq = []
-    for i in range(len(metric)):
+    for i in range(n_metrics):
         m1 = np.argmax(np.max(np.abs(sequencemetric[:, :, i]), axis=0))
         m = np.argmax(np.abs(sequencemetric[:, m1, i]))
         trueseqmetric = sequencemetric[m, m1, i]
