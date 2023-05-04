@@ -160,44 +160,42 @@ def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, return_all_i
     """
     if interval_mask is None:
         interval_mask  = [np.ones(len(divided_intervals))]
-    # interval_sum = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
-    # interval_weighted_avg = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
-    # TO DO: I think this is more principled than the matlab code, but I need to check
-    #  for i, interval in enumerate(divided_intervals):
-        # for j, (start, end) in enumerate(interval):
-        #     interval_sum[:,j,i] = np.sum(tc_sec[start:end,:], axis=0)
-        # interval_weighted_avg[:,:,i] = interval_sum[:,:,i] / (end - start)
-    # interval_weighted_avg_all = [interval_weighted_avg[:,:,interval_selection==1] for interval_selection in interval_mask]
-    # interval_sum_all = [interval_sum[:,:,interval_selection==1] for interval_selection in interval_mask]
-    # interval_weighted_avg = np.stack([weighted_avg.mean(axis=-1) for weighted_avg in interval_weighted_avg_all], axis=-1)
-    # interval_sum = np.stack([int_sum.mean(axis=-1) for int_sum in interval_sum_all], axis=-1)
-    # if return_all_intervals:
-    #     return interval_weighted_avg, interval_sum, interval_weighted_avg_all, interval_sum_all
-    # else:
-    #     return interval_weighted_avg, interval_sum, None, None
-    # go back to the original intervals (not divided)
-    intervals=[]
-    for interval in divided_intervals:
-        intervals.append([interval[0][0], interval[-1][-1]])
-    interval_weighted_avg = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))  
-    interval_sum = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))  
-    tempto=[]
-    tempaway=[]
-    for i in intervals:
-        d = int(np.floor((np.diff(i)-1)/2))
-        tempaway.append(tc_sec[i[0]:i[0]+d+1,:])
-        tempto.append(tc_sec[i[1]-d-1:i[1],:])
-    interval_weighted_avg_all=[]
-    interval_sum_all=[]
-    for j, mask in enumerate(interval_mask):
-        tempto_flat=np.concatenate([tempto[k] for k in np.where(mask==1)[0]])
-        tempaway_flat=np.concatenate([tempaway[k] for k in np.where(mask==1)[0]])
-        interval_weighted_avg[:,0,j] = np.mean(tempaway_flat,axis=0)
-        interval_weighted_avg[:,1,j] = np.mean(tempto_flat,axis=0)
-        interval_sum[:,0,j] = np.sum(tempaway_flat,axis=0)
-        interval_sum[:,1,j] = np.sum(tempto_flat,axis=0)
-        interval_weighted_avg_all.append(np.transpose(np.stack([np.stack([tempaway[k].mean(axis=0) for k in np.where(mask==1)[0]],axis=-1), np.stack([tempto[k].mean(axis=0) for k in np.where(mask==1)[0]],axis=-1)]), axes=[1,0,2]))
-        interval_sum_all.append(np.transpose(np.stack([np.stack([tempaway[k].sum(axis=0) for k in np.where(mask==1)[0]],axis=-1), np.stack([tempto[k].sum(axis=0) for k in np.where(mask==1)[0]],axis=-1)]), axes=[1,0,2]))
+    if len(divided_intervals[0])==2: # this corresponds to the matlab code but only works for two bins
+        # and I think it's less principled than the code below
+        intervals=[]
+        for interval in divided_intervals:
+            intervals.append([interval[0][0], interval[-1][-1]])
+        interval_weighted_avg = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))  
+        interval_sum = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))  
+        tempto=[]
+        tempaway=[]
+        for i in intervals:
+            d = int(np.floor((np.diff(i)-1)/2))
+            tempaway.append(tc_sec[i[0]:i[0]+d+1,:])
+            tempto.append(tc_sec[i[1]-d-1:i[1],:])
+        interval_weighted_avg_all=[]
+        interval_sum_all=[]
+        for j, mask in enumerate(interval_mask):
+            tempto_flat=np.concatenate([tempto[k] for k in np.where(mask==1)[0]])
+            tempaway_flat=np.concatenate([tempaway[k] for k in np.where(mask==1)[0]])
+            interval_weighted_avg[:,0,j] = np.mean(tempaway_flat,axis=0)
+            interval_weighted_avg[:,1,j] = np.mean(tempto_flat,axis=0)
+            interval_sum[:,0,j] = np.sum(tempaway_flat,axis=0)
+            interval_sum[:,1,j] = np.sum(tempto_flat,axis=0)
+            interval_weighted_avg_all.append(np.transpose(np.stack([np.stack([tempaway[k].mean(axis=0) for k in np.where(mask==1)[0]],axis=-1), np.stack([tempto[k].mean(axis=0) for k in np.where(mask==1)[0]],axis=-1)]), axes=[1,0,2]))
+            interval_sum_all.append(np.transpose(np.stack([np.stack([tempaway[k].sum(axis=0) for k in np.where(mask==1)[0]],axis=-1), np.stack([tempto[k].sum(axis=0) for k in np.where(mask==1)[0]],axis=-1)]), axes=[1,0,2]))
+    else:
+        #TO DO: I think this is more principled than the matlab code, but I need to check
+        interval_sum = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
+        interval_weighted_avg = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
+        for i, interval in enumerate(divided_intervals):
+            for j, (start, end) in enumerate(interval):
+                interval_sum[:,j,i] = np.sum(tc_sec[start:end,:], axis=0)
+            interval_weighted_avg[:,:,i] = interval_sum[:,:,i] / (end - start)
+        interval_weighted_avg_all = [interval_weighted_avg[:,:,interval_selection==1] for interval_selection in interval_mask]
+        interval_sum_all = [interval_sum[:,:,interval_selection==1] for interval_selection in interval_mask]
+        interval_weighted_avg = np.stack([weighted_avg.mean(axis=-1) for weighted_avg in interval_weighted_avg_all], axis=-1)
+        interval_sum = np.stack([int_sum.mean(axis=-1) for int_sum in interval_sum_all], axis=-1)
     if return_all_intervals:
         return interval_weighted_avg, interval_sum, interval_weighted_avg_all, interval_sum_all
     else:
@@ -319,7 +317,6 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
                 intervals, durations = find_intervals(itc_prim)
                 divided_intervals, bin_sizes, dropped_intervals = split_intervals(intervals, nbin) # split intervals into nbin
                 durations = durations[dropped_intervals==0] # drop intervals that are too short to be split into nbin
-                print(interval_range)
                 interval_mask, interval_range_samples = split_interval_duration(durations, interval_range=interval_range, mode=interval_mode, sfreq=sfreq) # split intervals into interval_range (i.e.,
                 # to compute statistics of intervals with durations in a certain range)
                 interval_wavgs, interval_sums, all_interval_wavgs, all_interval_sums = compute_fo_stats(itc_sec, divided_intervals, interval_mask, return_all_intervals=return_all_intervals)
@@ -334,7 +331,7 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
 
 #%% The following functions are used on the stats returned by tinda
 
-def optimiseSequentialPattern(fo_density, metric=0):
+def optimise_sequence(fo_density, metric_to_use=0):
     """
     This function reads in the mean pattern of differential fractional
     occupancy and computes the optimal display for a sequential circular
@@ -396,11 +393,11 @@ def optimiseSequentialPattern(fo_density, metric=0):
         if trueseqmetric > 0:
             seq = [1] + list(reversed(seq[1:]))   
         bestseq.append(seq)
-    return [i-1 for i in bestseq[metric]]
+    return [i-1 for i in bestseq[metric_to_use]]
 
 
 
-def cyclicalstateplot(ordering, fo_density, sigpoints, newfigure=False, color_scheme=None):
+def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=None):
     """Plot state network as circular diagram with arrows
 
     Parameters
@@ -460,5 +457,3 @@ def cyclicalstateplot(ordering, fo_density, sigpoints, newfigure=False, color_sc
     plt.axis('equal')
 
 
-cyclicalstateplot(bestseq, fo_density, sigpoints, newfigure=True)
-plt.savefig('/ohba/pi/mwoolrich/mvanes/tmp/cyclicalstateplot.png')
