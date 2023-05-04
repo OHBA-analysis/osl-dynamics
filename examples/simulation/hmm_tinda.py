@@ -1,4 +1,7 @@
 """Example script for simulating an HMM state time series and running TINDA on it."""
+# Author: Mats van Es <mats.vanes@psych.ox.ac.uk>
+
+
 import os
 import numpy as np
 from matplotlib import pyplot as plt

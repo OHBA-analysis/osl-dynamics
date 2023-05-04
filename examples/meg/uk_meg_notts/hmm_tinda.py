@@ -1,4 +1,5 @@
 """Example for running TINDA on MEG data from the Nottingham MEGUK dataset."""
+# Author: Mats van Es <mats.vanes@psych.ox.ac.uk>
 
 import os
 import numpy as np
