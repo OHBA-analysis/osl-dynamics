@@ -30,6 +30,7 @@ bestseq = optimise_sequence(fo_density)
 
 # Stats
 print("Finding statistically significant assymetries in interval densities")
+fo_density = np.squeeze(fo_density)
 tstat = np.nan * np.ones((fo_density.shape[:2]))
 pval = np.nan * np.ones((fo_density.shape[:2]))
 for i in range(fo_density.shape[0]):
@@ -42,7 +43,7 @@ if do_bonferroni_correction:
 else:
     significant_edges = pval<0.05
 
-mean_direction = np.squeeze(np.nanmean((fo_density[:,:,0]-fo_density[:,:,1]), axis=-1))
+mean_direction = np.squeeze(np.mean((fo_density[:,:,0]-fo_density[:,:,1]), axis=-1))
 
 
 # Plot
