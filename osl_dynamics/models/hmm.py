@@ -496,7 +496,7 @@ class Model(ModelBase):
             means, covs = self.get_means_covariances()
             n_states = means.shape[0]
         else:
-            means, covs = self.get_subject_means_covs()
+            means, covs = self.get_subject_means_covariances()
             n_states = means.shape[1]
             subj_id = tf.cast(subj_id, tf.int32)
             means = tf.gather(means, subj_id)
@@ -717,7 +717,7 @@ class Model(ModelBase):
         if subj_id is None:
             means, covs = self.get_means_covariances()
         else:
-            means, covs = self.get_subject_means_covs()
+            means, covs = self.get_subject_means_covariances()
             subj_id = tf.cast(subj_id, tf.int32)
             means = tf.gather(means, subj_id)
             covs = tf.gather(covs, subj_id)
