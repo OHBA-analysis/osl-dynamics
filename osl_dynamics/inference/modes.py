@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import trange
 from scipy.optimize import linear_sum_assignment
+from scipy.cluster import hierarchy
 from sklearn.cluster import AgglomerativeClustering
 
 from osl_dynamics import analysis, array_ops
@@ -488,7 +489,7 @@ def reweight_alphas(alpha, covs):
     return reweighted_alpha
 
 
-def average_runs(alpha, n_clusters=None, return_cluster_ids=False):
+def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     """Average the state probabilities from different runs using hierarchical
     clustering.
 
@@ -503,19 +504,17 @@ def average_runs(alpha, n_clusters=None, return_cluster_ids=False):
     n_clusters : int
         Number of clusters to fit. Optional. Defaults to the largest number of
         states in alpha.
-    return_cluster_ids : bool
-        Should we return the cluster ID? This tells you what cluster each
-        state time course (from each run) is assigned to. Each cluster
-        corresponds to a set of state time courses (from different runs)
-        which we average. Shape is (n_runs*n_states,).
+    return_cluster_info : bool
+        Should we return information describing the clustering?
 
     Returns
     -------
     average_alpha : list of np.ndarray or np.ndarray
         State probabilities averaged over runs. Shape is (n_subjects, n_states).
-    cluster_ids : np.ndarray
-        Cluster IDs. Only returned if return_cluster_ids=True.
-        Shape is (n_runs*n_states).
+    cluster_info : dict
+        Clustering info. Only returned if return_cluster_info=True.
+        This is a dictionary with keys 'correlation', 'dissimiarity', 'ids' and
+        'linkage'.
     """
     if not isinstance(alpha, list):
         raise ValueError(
@@ -562,7 +561,16 @@ def average_runs(alpha, n_clusters=None, return_cluster_ids=False):
     # Split average alphas back into subject-specific time courses
     average_alpha = np.split(average_alpha, np.cumsum(n_subject_samples[:-1]))
 
-    if return_cluster_ids:
-        return average_alpha, cluster_ids
+    if return_cluster_info:
+        # Create a dictionary containing the clustering info
+        linkage = hierarchy.linkage(dissimilarity, method="ward")
+        cluster_info = {
+            "correlation": corr,
+            "dissimilarity": dissimilarity,
+            "ids": cluster_ids,
+            "linkage": linkage,
+        }
+        return average_alpha, cluster_info
+
     else:
         return average_alpha
