@@ -34,11 +34,13 @@ def find_intervals(tc_hot):
     intervals = []
     durations = []
     tc_tmp = np.insert(np.insert(tc_hot, 0, 0, axis=0), -1, 0, axis=0)
-    start = np.where(np.diff(tc_tmp)==1)[0]
-    end = np.where(np.diff(tc_tmp)==-1)[0]
+    start = np.where(np.diff(tc_tmp) == 1)[0]
+    end = np.where(np.diff(tc_tmp) == -1)[0]
     intervals = list(zip(end[:-1], start[1:]))
     durations = np.diff(intervals, axis=1).squeeze()
-    durations=durations-1 # remove this line in the future. This is to account for the fact that the matlab code disregarded the first sample
+    durations = (
+        durations - 1
+    )  # remove this line in the future. This is to account for the fact that the matlab code disregarded the first sample
     return intervals, durations
 
 
@@ -55,13 +57,13 @@ def split_intervals(intervals, nbin=2):
     Returns
     -------
     divided_intervals: list
-        list the same length as intervals (minus dropped intervals, see below), 
+        list the same length as intervals (minus dropped intervals, see below),
         with each element being a list of tuples of start and end indices of bins
     bin_sizes: list
         list of bin sizes (in samples), one per interval
     drop_mask: array_like
         array of zeros and ones indicating whether the interval was dropped because it was smaller than nbin
-    
+
     """
     divided_intervals = []
     bin_sizes = []
@@ -82,7 +84,7 @@ def split_intervals(intervals, nbin=2):
             if remainder > 0:
                 if remainder == nbin - 1:
                     bin_end += 1
-                elif i == (nbin //2 - 1):
+                elif i == (nbin // 2 - 1):
                     bin_end += remainder
             bin_start = bin_end
         divided_intervals.append(bins)
@@ -102,7 +104,7 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
         array of bin edges (in samples, seconds, or percentiles) to split durations into
         bins are defined as [>=interval_range[i], <interval_range[i+1])
     mode: str
-        mode of interval_range, either "sample" (e.g., [4, 20, 100]), "perc" (e.g., range(20,100,20)), 
+        mode of interval_range, either "sample" (e.g., [4, 20, 100]), "perc" (e.g., range(20,100,20)),
         or "sec" (e.g., [0, 0.01, 0.1, 1, np.inf])
     sfreq: float
         sampling frequency (in Hz) of the data, only used if mode is "sec"
@@ -119,7 +121,9 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
         interval_range = [np.min(durations), np.max(durations)]
     else:
         if mode == "sec" and sfreq is None:
-            raise ValueError("Sampling frequency (sfreq) must be specified when mode is 'sec'")
+            raise ValueError(
+                "Sampling frequency (sfreq) must be specified when mode is 'sec'"
+            )
             return [np.ones_like(durations)], None
         else:
             if mode == "sec":
@@ -127,16 +131,19 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
             elif mode == "perc":
                 interval_range = np.percentile(durations, interval_range)
             mask = []
-            for i in range(len(list(interval_range))-1):
-                hot_vector = np.logical_and(durations >= interval_range[i], durations < interval_range[i+1])
+            for i in range(len(list(interval_range)) - 1):
+                hot_vector = np.logical_and(
+                    durations >= interval_range[i], durations < interval_range[i + 1]
+                )
                 mask.append(hot_vector.astype(int))
     return mask, interval_range
 
 
-
-def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, return_all_intervals=False):
+def compute_fo_stats(
+    tc_sec, divided_intervals, interval_mask=None, return_all_intervals=False
+):
     """Compute weighted averages of time courses in each interval.
-    
+
     Parameters
     ----------
     tc_sec: array_like
@@ -148,66 +155,131 @@ def compute_fo_stats(tc_sec, divided_intervals, interval_mask=None, return_all_i
         array of zeros and ones indicating whether the interval was in the bin
     return_all_intervals: bool
         whether to return the density/sum of all intervals in addition to the interval averages/sums
-    
+
     Returns
     -------
     interval_weighted_avg: array_like
         array of weighted averages of time courses in each interval of shape (n_states, n_bins, n_interval_ranges)
-    interval_sum: array_like    
-        array of sums of time courses in each interval of shape (n_states, n_bins, n_interval_ranges) 
+    interval_sum: array_like
+        array of sums of time courses in each interval of shape (n_states, n_bins, n_interval_ranges)
     interval_weighted_avg_all: list (optional)
-        list of length n_interval_ranges with each element an array of weighted averages of time courses 
+        list of length n_interval_ranges with each element an array of weighted averages of time courses
         in each interval of shape (n_states, n_bins, n_intervals)  None if return_all_intervals is False (default)
     interval_sum_all: list (optional)
         list of length n_interval_ranges with each element an array of sums of time courses
         in each interval of shape (n_states, n_bins, n_intervals). None if return_all_intervals is False (default)
     """
     if interval_mask is None:
-        interval_mask  = [np.ones(len(divided_intervals))]
+        interval_mask = [np.ones(len(divided_intervals))]
 
-    if len(divided_intervals[0])==2: # this corresponds to the matlab code but only works for two bins
+    if (
+        len(divided_intervals[0]) == 2
+    ):  # this corresponds to the matlab code but only works for two bins
         # and I think it's less principled than the code below
-        intervals=[]
+        intervals = []
         for interval in divided_intervals:
             intervals.append([interval[0][0], interval[-1][-1]])
-        
-        interval_weighted_avg = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))  
-        interval_sum = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))  
-        tempto=[]
-        tempaway=[]
+
+        interval_weighted_avg = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))
+        interval_sum = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))
+        tempto = []
+        tempaway = []
         for i in intervals:
-            d = int(np.floor((np.diff(i)-1)/2))
-            tempaway.append(tc_sec[i[0]:i[0]+d+1,:])
-            tempto.append(tc_sec[i[1]-d-1:i[1],:])
+            d = int(np.floor((np.diff(i) - 1) / 2))
+            tempaway.append(tc_sec[i[0] : i[0] + d + 1, :])
+            tempto.append(tc_sec[i[1] - d - 1 : i[1], :])
 
-        interval_weighted_avg_all=[]
-        interval_sum_all=[]
+        interval_weighted_avg_all = []
+        interval_sum_all = []
         for j, mask in enumerate(interval_mask):
-            tempto_flat=np.concatenate([tempto[k] for k in np.where(mask==1)[0]])
-            tempaway_flat=np.concatenate([tempaway[k] for k in np.where(mask==1)[0]])
+            tempto_flat = np.concatenate([tempto[k] for k in np.where(mask == 1)[0]])
+            tempaway_flat = np.concatenate(
+                [tempaway[k] for k in np.where(mask == 1)[0]]
+            )
 
-            interval_weighted_avg[:,0,j] = np.mean(tempaway_flat,axis=0)
-            interval_weighted_avg[:,1,j] = np.mean(tempto_flat,axis=0)
-            interval_sum[:,0,j] = np.sum(tempaway_flat,axis=0)
-            interval_sum[:,1,j] = np.sum(tempto_flat,axis=0)
-            interval_weighted_avg_all.append(np.transpose(np.stack([np.stack([tempaway[k].mean(axis=0) for k in np.where(mask==1)[0]],axis=-1), np.stack([tempto[k].mean(axis=0) for k in np.where(mask==1)[0]],axis=-1)]), axes=[1,0,2]))
-            interval_sum_all.append(np.transpose(np.stack([np.stack([tempaway[k].sum(axis=0) for k in np.where(mask==1)[0]],axis=-1), np.stack([tempto[k].sum(axis=0) for k in np.where(mask==1)[0]],axis=-1)]), axes=[1,0,2]))
+            interval_weighted_avg[:, 0, j] = np.mean(tempaway_flat, axis=0)
+            interval_weighted_avg[:, 1, j] = np.mean(tempto_flat, axis=0)
+            interval_sum[:, 0, j] = np.sum(tempaway_flat, axis=0)
+            interval_sum[:, 1, j] = np.sum(tempto_flat, axis=0)
+            interval_weighted_avg_all.append(
+                np.transpose(
+                    np.stack(
+                        [
+                            np.stack(
+                                [
+                                    tempaway[k].mean(axis=0)
+                                    for k in np.where(mask == 1)[0]
+                                ],
+                                axis=-1,
+                            ),
+                            np.stack(
+                                [
+                                    tempto[k].mean(axis=0)
+                                    for k in np.where(mask == 1)[0]
+                                ],
+                                axis=-1,
+                            ),
+                        ]
+                    ),
+                    axes=[1, 0, 2],
+                )
+            )
+            interval_sum_all.append(
+                np.transpose(
+                    np.stack(
+                        [
+                            np.stack(
+                                [
+                                    tempaway[k].sum(axis=0)
+                                    for k in np.where(mask == 1)[0]
+                                ],
+                                axis=-1,
+                            ),
+                            np.stack(
+                                [tempto[k].sum(axis=0) for k in np.where(mask == 1)[0]],
+                                axis=-1,
+                            ),
+                        ]
+                    ),
+                    axes=[1, 0, 2],
+                )
+            )
     else:
-        #TO DO: I think this is more principled than the matlab code, but I need to check
-        interval_sum = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
-        interval_weighted_avg = np.zeros((tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals)))
+        # TO DO: I think this is more principled than the matlab code, but I need to check
+        interval_sum = np.zeros(
+            (tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals))
+        )
+        interval_weighted_avg = np.zeros(
+            (tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals))
+        )
         for i, interval in enumerate(divided_intervals):
             for j, (start, end) in enumerate(interval):
-                interval_sum[:,j,i] = np.sum(tc_sec[start:end,:], axis=0)
-            interval_weighted_avg[:,:,i] = interval_sum[:,:,i] / (end - start)
+                interval_sum[:, j, i] = np.sum(tc_sec[start:end, :], axis=0)
+            interval_weighted_avg[:, :, i] = interval_sum[:, :, i] / (end - start)
 
-        interval_weighted_avg_all = [interval_weighted_avg[:,:,interval_selection==1] for interval_selection in interval_mask]
-        interval_sum_all = [interval_sum[:,:,interval_selection==1] for interval_selection in interval_mask]
-        interval_weighted_avg = np.stack([weighted_avg.mean(axis=-1) for weighted_avg in interval_weighted_avg_all], axis=-1)
-        interval_sum = np.stack([int_sum.mean(axis=-1) for int_sum in interval_sum_all], axis=-1)
+        interval_weighted_avg_all = [
+            interval_weighted_avg[:, :, interval_selection == 1]
+            for interval_selection in interval_mask
+        ]
+        interval_sum_all = [
+            interval_sum[:, :, interval_selection == 1]
+            for interval_selection in interval_mask
+        ]
+        interval_weighted_avg = np.stack(
+            [weighted_avg.mean(axis=-1) for weighted_avg in interval_weighted_avg_all],
+            axis=-1,
+        )
+        interval_sum = np.stack(
+            [int_sum.mean(axis=-1) for int_sum in interval_sum_all], axis=-1
+        )
 
     if return_all_intervals:
-        return interval_weighted_avg, interval_sum, interval_weighted_avg_all, interval_sum_all
+        return (
+            interval_weighted_avg,
+            interval_sum,
+            interval_weighted_avg_all,
+            interval_sum_all,
+        )
     else:
         return interval_weighted_avg, interval_sum, None, None
 
@@ -224,34 +296,34 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
     field: str
         field of stats to collate, e.g., "interval_wavgs", "interval_sums"
     all_to_all: bool
-        whether the density_of was used to compute the stats (in which case the first 
+        whether the density_of was used to compute the stats (in which case the first
         2 dimensions are not n_states x n_states)
     ignore_elements: list
         list of states to ignore (i.e. because they don't contain binary events)
-    
+
     Returns
     -------
     collated_stat: array_like
         the collated stat (n_interval_states, n_density_states, n_bins, n_interval_ranges)
         If all_to_all is False (i.e., when the density is computed for all states
-        using all states' intervals), then the first two dimensions are n_states 
+        using all states' intervals), then the first two dimensions are n_states
         and the diagonal is np.nan
     """
     num_states = len(stats)
-    shp = stats[0][field].shape # (n_states, n_bins, n_interval_ranges)
+    shp = stats[0][field].shape  # (n_states, n_bins, n_interval_ranges)
     if num_states > 1:
         if all_to_all:
-            collated_stat = np.full((2*[num_states]+list(shp[1:])), np.nan)
+            collated_stat = np.full((2 * [num_states] + list(shp[1:])), np.nan)
         else:
-            collated_stat = np.full(([num_states]+list(shp)), np.nan)
+            collated_stat = np.full(([num_states] + list(shp)), np.nan)
 
         for i in range(num_states):
-            if i in ignore_elements: # if intervals are not binary, keep a row of nans
+            if i in ignore_elements:  # if intervals are not binary, keep a row of nans
                 continue
             if all_to_all:
                 collated_stat[i, np.arange(num_states) != i, ...] = stats[i][field]
             else:
-                collated_stat[i] =  stats[i][field]
+                collated_stat[i] = stats[i][field]
 
     else:
         collated_stat = stats[0][field]
@@ -259,11 +331,19 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
     return collated_stat
 
 
-def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, sfreq=None, return_all_intervals=False):
+def tinda(
+    tc,
+    density_of=None,
+    nbin=2,
+    interval_mode=None,
+    interval_range=None,
+    sfreq=None,
+    return_all_intervals=False,
+):
     """Compute time-in-state density and sum for each interval.
 
     Parameters
-    ---------- 
+    ----------
     tc: array_like
         time courses of shape (n_samples, n_states) define intervals from
         will use the same time courses to compute density of when density_of is None
@@ -277,14 +357,14 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
         mode of interval_range, either "sample" (default), "sec" (seconds) or "perc" (percentile)
         To interpret the interval range as seconds, sfreq must be provided
     interval_range: array_like
-        array of bin edges (in samples, seconds, or percentiles) 
+        array of bin edges (in samples, seconds, or percentiles)
         used to split durations into bins (default None)
         e.g. np.arange(0, 1, 0.1) for 100ms bins
     sfreq: float
         sampling frequency of tc (in Hz), only used if interval_mode is "sec"
     return_all_intervals: bool
         whether to return the density/sum of all intervals in addition to the interval averages/sums
-        If True, will return a list of arrays in stats[i]['all_interval_wavgs'/'all_interval_sums'], 
+        If True, will return a list of arrays in stats[i]['all_interval_wavgs'/'all_interval_sums'],
         each corresponding to an interval range
 
     Returns
@@ -294,14 +374,14 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
         n_interval_states is the number of states in the interval time courses (i.e., tc)
         n_density_states is the number of states in the density time courses (i.e., density_of)
         if density_of is None, n_density_states is the same as n_interval_states
-        if tc is a list of time courses (e.g., state time courses for multiple subjects), 
+        if tc is a list of time courses (e.g., state time courses for multiple subjects),
         then an extra dimension is appended for the subjects
     fo_sum: array_like
         same as fo_density, but with time-in-state sums instead of densities
     stats: dict
-        dictionary of stats, including 
-        - interval durations in samples (durations) 
-        - start/end samples for each interval (intervals) 
+        dictionary of stats, including
+        - interval durations in samples (durations)
+        - start/end samples for each interval (intervals)
         - the weighted average (i.e, time-in-state density) over all intervals (interval_wavg)
         - the sum (i.e., time-in-state) over all intervals (interval_sum)
         - the bin edges (divided_intervals) for each interval
@@ -310,54 +390,126 @@ def tinda(tc, density_of=None, nbin=2, interval_mode=None, interval_range=None, 
         - unaveraged interval densities (all_interval_wavgs) - only if return_all_intervals is True
         - unaveraged interval sums (all_interval_sums) - only if return_all_intervals is True
     """
-    if isinstance(tc, list): # list of time courses (e.g., subjects' HMM state time courses)
+    if isinstance(
+        tc, list
+    ):  # list of time courses (e.g., subjects' HMM state time courses)
         if density_of is None:
-            fo_density_tmp, fo_sum_tmp, stats = zip(*[tinda(itc, None, nbin, interval_mode, interval_range, sfreq, return_all_intervals) for itc in tc])
-        elif len(density_of)==len(tc):
-            fo_density_tmp, fo_sum_tmp, stats = zip(*[tinda(itc, density_of[ix], nbin, interval_mode, interval_range, sfreq, return_all_intervals) for ix, itc in enumerate(tc)])
+            fo_density_tmp, fo_sum_tmp, stats = zip(
+                *[
+                    tinda(
+                        itc,
+                        None,
+                        nbin,
+                        interval_mode,
+                        interval_range,
+                        sfreq,
+                        return_all_intervals,
+                    )
+                    for itc in tc
+                ]
+            )
+        elif len(density_of) == len(tc):
+            fo_density_tmp, fo_sum_tmp, stats = zip(
+                *[
+                    tinda(
+                        itc,
+                        density_of[ix],
+                        nbin,
+                        interval_mode,
+                        interval_range,
+                        sfreq,
+                        return_all_intervals,
+                    )
+                    for ix, itc in enumerate(tc)
+                ]
+            )
         fo_density = np.stack(fo_density_tmp, axis=-1)
         fo_sum = np.stack(fo_sum_tmp, axis=-1)
 
     else:
-        stats=[]
+        stats = []
         dim = tc.shape
         ignore_elements = []
 
         for i in range(dim[1]):
             itc_prim = tc[:, i]
-            if not np.array_equal(itc_prim, itc_prim.astype(int)): # if not binary (i.e., intervals are not well difined)
+            if not np.array_equal(
+                itc_prim, itc_prim.astype(int)
+            ):  # if not binary (i.e., intervals are not well difined)
                 stats.append(None)
                 ignore_elements.append(i)
 
             else:
                 if density_of is None:
-                    itc_sec = tc[:, np.setdiff1d(range(dim[1]), i)] # we're doing density of all states in all states' intervals
+                    itc_sec = tc[
+                        :, np.setdiff1d(range(dim[1]), i)
+                    ]  # we're doing density of all states in all states' intervals
                 else:
                     itc_sec = density_of
-                
+
                 # get interval info
                 intervals, durations = find_intervals(itc_prim)
-                divided_intervals, bin_sizes, dropped_intervals = split_intervals(intervals, nbin) # split intervals into nbin
-                durations = durations[dropped_intervals==0] # drop intervals that are too short to be split into nbin
-                interval_mask, interval_range_samples = split_interval_duration(durations, interval_range=interval_range, mode=interval_mode, sfreq=sfreq) # split intervals into interval_range (i.e.,
+                divided_intervals, bin_sizes, dropped_intervals = split_intervals(
+                    intervals, nbin
+                )  # split intervals into nbin
+                durations = durations[
+                    dropped_intervals == 0
+                ]  # drop intervals that are too short to be split into nbin
+                interval_mask, interval_range_samples = split_interval_duration(
+                    durations,
+                    interval_range=interval_range,
+                    mode=interval_mode,
+                    sfreq=sfreq,
+                )  # split intervals into interval_range (i.e.,
                 # to compute statistics of intervals with durations in a certain range)
-                
+
                 # compute time-in-state densities and sums in all intervals
-                interval_wavgs, interval_sums, all_interval_wavgs, all_interval_sums = compute_fo_stats(itc_sec, divided_intervals, interval_mask, return_all_intervals=return_all_intervals)
-                
+                (
+                    interval_wavgs,
+                    interval_sums,
+                    all_interval_wavgs,
+                    all_interval_sums,
+                ) = compute_fo_stats(
+                    itc_sec,
+                    divided_intervals,
+                    interval_mask,
+                    return_all_intervals=return_all_intervals,
+                )
+
                 # append stats
-                stats.append({"durations":durations,"intervals": intervals, "interval_wavgs":interval_wavgs, "interval_sums": interval_sums, 
-                          "divided_intervals": divided_intervals, "bin_sizes": bin_sizes, "interval_range": interval_range_samples,
-                          "all_interval_wavgs": all_interval_wavgs, "all_interval_sums": all_interval_sums})
-                
-        # get a full matrix of FO densities and sums        
-        fo_density = collate_stats(stats, 'interval_wavgs', all_to_all=density_of is None, ignore_elements=ignore_elements)
-        fo_sum = collate_stats(stats, 'interval_sums', all_to_all=density_of is None, ignore_elements=ignore_elements)
+                stats.append(
+                    {
+                        "durations": durations,
+                        "intervals": intervals,
+                        "interval_wavgs": interval_wavgs,
+                        "interval_sums": interval_sums,
+                        "divided_intervals": divided_intervals,
+                        "bin_sizes": bin_sizes,
+                        "interval_range": interval_range_samples,
+                        "all_interval_wavgs": all_interval_wavgs,
+                        "all_interval_sums": all_interval_sums,
+                    }
+                )
 
-    return fo_density, fo_sum, stats 
+        # get a full matrix of FO densities and sums
+        fo_density = collate_stats(
+            stats,
+            "interval_wavgs",
+            all_to_all=density_of is None,
+            ignore_elements=ignore_elements,
+        )
+        fo_sum = collate_stats(
+            stats,
+            "interval_sums",
+            all_to_all=density_of is None,
+            ignore_elements=ignore_elements,
+        )
+
+    return fo_density, fo_sum, stats
 
 
-#%% The following functions are used on the stats returned by tinda
+# %% The following functions are used on the stats returned by tinda
+
 
 def optimise_sequence(fo_density, metric_to_use=0):
     """Optimise the sequence to maximal circularity.
@@ -390,13 +542,18 @@ def optimise_sequence(fo_density, metric_to_use=0):
     if len(fo_density.shape) == 5:
         fo_density = np.squeeze(fo_density)
 
-    # compute different metrics to optimise    
+    # compute different metrics to optimise
     metric = []
     metric.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
-    temp = (fo_density[:, :, 0, :] - fo_density[:, :, 1, :]) / np.mean(fo_density, axis=2)
+    temp = (fo_density[:, :, 0, :] - fo_density[:, :, 1, :]) / np.mean(
+        fo_density, axis=2
+    )
     temp[np.isnan(temp)] = 0
     metric.append(np.mean(temp, axis=2))
-    metric.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2) / np.mean(fo_density, axis=(2,3)))
+    metric.append(
+        np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2)
+        / np.mean(fo_density, axis=(2, 3))
+    )
 
     K = fo_density.shape[0]
 
@@ -406,21 +563,31 @@ def optimise_sequence(fo_density, metric_to_use=0):
     sequencemetric = np.zeros((len(myperms), 9, 3))
     for i2 in range(len(myperms)):
         if i2 % 10000 == 0:
-            print(f'\n Now up to run {i2} of {len(myperms)}')
+            print(f"\n Now up to run {i2} of {len(myperms)}")
         for i in range(5):
             # setup state points on unit circle:
             manualorder = [1] + [2 + val for val in myperms[i2]]
-            manualorder = manualorder[:i] + [2] + manualorder[i:] 
-            manualorder = [val-1 for val in manualorder]
+            manualorder = manualorder[:i] + [2] + manualorder[i:]
+            manualorder = [val - 1 for val in manualorder]
             disttoplot_manual = np.zeros(K, dtype=complex)
             for i3 in range(K):
-                disttoplot_manual[manualorder[i3]] = np.exp(1j * (i3+1) / K * 2 * np.pi)
-            angleplot = np.exp(1j * (np.angle(disttoplot_manual[:, np.newaxis]).T - np.angle(disttoplot_manual[:, np.newaxis])))
-            
+                disttoplot_manual[manualorder[i3]] = np.exp(
+                    1j * (i3 + 1) / K * 2 * np.pi
+                )
+            angleplot = np.exp(
+                1j
+                * (
+                    np.angle(disttoplot_manual[:, np.newaxis]).T
+                    - np.angle(disttoplot_manual[:, np.newaxis])
+                )
+            )
+
             # compute the metric
             for i3 in range(len(metric)):
-                sequencemetric[i2, i, i3] = np.imag(np.nansum(np.nansum(angleplot * metric[i3])))         
-    
+                sequencemetric[i2, i, i3] = np.imag(
+                    np.nansum(np.nansum(angleplot * metric[i3]))
+                )
+
     # find the permutation that maximizes the metric
     bestseq = []
     for i in range(len(metric)):
@@ -431,13 +598,12 @@ def optimise_sequence(fo_density, metric_to_use=0):
         seq = seq[:m1] + [2] + seq[m1:]
         # want rotation to be clockwise, so flip if necessary:
         if trueseqmetric > 0:
-            seq = [1] + list(reversed(seq[1:]))   
+            seq = [1] + list(reversed(seq[1:]))
         bestseq.append(seq)
 
-    # return the best sequence for the chosen metric (in order of counterclockwise rotation)    
-    bestseq = [i-1 for i in bestseq[metric_to_use]]
+    # return the best sequence for the chosen metric (in order of counterclockwise rotation)
+    bestseq = [i - 1 for i in bestseq[metric_to_use]]
     return bestseq
-
 
 
 def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=None):
@@ -460,54 +626,151 @@ def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=No
 
     # Plot state network as circular diagram with arrows
     if color_scheme is None:
-        color_scheme =  np.array([[0, 0, 1.0000], [1.0000,    0.3333,         0],    [1.0000,    0.6667,         0,],    [0.6667,    1.0000,    0.3333,],    [0.3333,    1.0000,    0.6667,],    [     0,    1.0000,    1.0000,],    [0.5529,    0.8275,    0.7804,],    [1.0000,    0.5000,    0.5000,],    [     0,    0.6667,    1.0000,],    [1.0000,    1.0000,         0,],    [0.7451,    0.7294,    0.8549,],    [0.6667,         0,         0,]])
+        color_scheme = np.array(
+            [
+                [0, 0, 1.0000],
+                [1.0000, 0.3333, 0],
+                [
+                    1.0000,
+                    0.6667,
+                    0,
+                ],
+                [
+                    0.6667,
+                    1.0000,
+                    0.3333,
+                ],
+                [
+                    0.3333,
+                    1.0000,
+                    0.6667,
+                ],
+                [
+                    0,
+                    1.0000,
+                    1.0000,
+                ],
+                [
+                    0.5529,
+                    0.8275,
+                    0.7804,
+                ],
+                [
+                    1.0000,
+                    0.5000,
+                    0.5000,
+                ],
+                [
+                    0,
+                    0.6667,
+                    1.0000,
+                ],
+                [
+                    1.0000,
+                    1.0000,
+                    0,
+                ],
+                [
+                    0.7451,
+                    0.7294,
+                    0.8549,
+                ],
+                [
+                    0.6667,
+                    0,
+                    0,
+                ],
+            ]
+        )
     if newfigure:
         plt.figure(figsize=(6.02, 4.52), dpi=100)
     else:
         plt.gca()
 
     K = len(ordering)
-    if len(fo_density.shape) == 5:    
-        fo_density = np.squeeze(fo_density) # squeeze in case there is still a interval_ranges dimension
+    if len(fo_density.shape) == 5:
+        fo_density = np.squeeze(
+            fo_density
+        )  # squeeze in case there is still a interval_ranges dimension
 
     # compute mean direction of arrows
-    mean_direction = np.squeeze((fo_density[:,:,0,:] - fo_density[:,:,1,:]).mean(axis=2))
+    mean_direction = np.squeeze(
+        (fo_density[:, :, 0, :] - fo_density[:, :, 1, :]).mean(axis=2)
+    )
 
     # reorder the states to match the ordering:
-    ordering = np.roll(ordering[::-1],1) # rotate ordering from clockwise to counter clockwise
-    sigpoints = sigpoints[ordering][:,ordering]
-    mean_direction = mean_direction[ordering][:,ordering]
+    ordering = np.roll(
+        ordering[::-1], 1
+    )  # rotate ordering from clockwise to counter clockwise
+    sigpoints = sigpoints[ordering][:, ordering]
+    mean_direction = mean_direction[ordering][:, ordering]
 
     # get the locations on the unit circle
-    theta = np.arange(0, 2*np.pi, 2*np.pi/K)
-    x = np.roll(np.cos(theta),int(K/4)) # start from 12 o'clock
-    y = np.roll(np.sin(theta),int(K-(K/4)))
-    disttoplot_manual = np.stack([x,y]).T
+    theta = np.arange(0, 2 * np.pi, 2 * np.pi / K)
+    x = np.roll(np.cos(theta), int(K / 4))  # start from 12 o'clock
+    y = np.roll(np.sin(theta), int(K - (K / 4)))
+    disttoplot_manual = np.stack([x, y]).T
 
     # plot the scatter points with state identities
     for i in range(K):
-        plt.scatter(disttoplot_manual[i, 0], disttoplot_manual[i, 1], s=400, color=color_scheme[ordering[i],:])
-        plt.text(disttoplot_manual[i, 0], disttoplot_manual[i, 1], str(ordering[i]+1), horizontalalignment='center', verticalalignment='center', fontsize=16)
+        plt.scatter(
+            disttoplot_manual[i, 0],
+            disttoplot_manual[i, 1],
+            s=400,
+            color=color_scheme[ordering[i], :],
+        )
+        plt.text(
+            disttoplot_manual[i, 0],
+            disttoplot_manual[i, 1],
+            str(ordering[i] + 1),
+            horizontalalignment="center",
+            verticalalignment="center",
+            fontsize=16,
+        )
 
     # plot the arrows
     for ik1 in range(K):
         for k2 in range(K):
             if sigpoints[ik1, k2]:
                 # arrow lengths have to be proportional to the distance between the states. Use Pythagoras:
-                linescale = np.sqrt(np.sum((disttoplot_manual[k2, :] - disttoplot_manual[ik1, :])**2))
+                linescale = np.sqrt(
+                    np.sum((disttoplot_manual[k2, :] - disttoplot_manual[ik1, :]) ** 2)
+                )
                 quivlength = 0.3 * linescale
-                arrow_start = disttoplot_manual[ik1,:] + 0.1*(disttoplot_manual[k2,:] - disttoplot_manual[ik1,:])/linescale
-                arrow_end = disttoplot_manual[k2,:] - 0.1*(disttoplot_manual[k2,:] - disttoplot_manual[ik1,:])/linescale
-                if mean_direction[ik1, k2] > 0: # arrow from k1 to k2:
-                    plt.arrow(arrow_start[0], arrow_start[1],
-                              arrow_end[0]-arrow_start[0], arrow_end[1]-arrow_start[1],
-                              head_width=.05, head_length=.1, length_includes_head=True, color='k')
-                elif mean_direction[ik1, k2] < 0: # arrow from k2 to k1:
-                    plt.arrow(arrow_end[0], arrow_end[1],
-                              arrow_start[0]-arrow_end[0], arrow_start[1]-arrow_end[1],
-                              head_width=.05, head_length=.1, length_includes_head=True, color='k')
-                    
-    plt.axis('off')
-    plt.axis('equal')
+                arrow_start = (
+                    disttoplot_manual[ik1, :]
+                    + 0.1
+                    * (disttoplot_manual[k2, :] - disttoplot_manual[ik1, :])
+                    / linescale
+                )
+                arrow_end = (
+                    disttoplot_manual[k2, :]
+                    - 0.1
+                    * (disttoplot_manual[k2, :] - disttoplot_manual[ik1, :])
+                    / linescale
+                )
+                if mean_direction[ik1, k2] > 0:  # arrow from k1 to k2:
+                    plt.arrow(
+                        arrow_start[0],
+                        arrow_start[1],
+                        arrow_end[0] - arrow_start[0],
+                        arrow_end[1] - arrow_start[1],
+                        head_width=0.05,
+                        head_length=0.1,
+                        length_includes_head=True,
+                        color="k",
+                    )
+                elif mean_direction[ik1, k2] < 0:  # arrow from k2 to k1:
+                    plt.arrow(
+                        arrow_end[0],
+                        arrow_end[1],
+                        arrow_start[0] - arrow_end[0],
+                        arrow_start[1] - arrow_end[1],
+                        head_width=0.05,
+                        head_length=0.1,
+                        length_includes_head=True,
+                        color="k",
+                    )
 
-
+    plt.axis("off")
+    plt.axis("equal")

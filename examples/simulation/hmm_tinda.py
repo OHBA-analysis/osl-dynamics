@@ -16,15 +16,15 @@ os.makedirs("figures", exist_ok=True)
 # Simulate data
 print("Simulating data")
 sim = simulation.HMM_MVN(
-            n_samples=25600,
-            n_states=12,
-            n_channels=38,
-            trans_prob="sequence",
-            stay_prob=0.9,
-            means="zero",
-            covariances="random",
-            random_seed=42,
-        )
+    n_samples=25600,
+    n_states=12,
+    n_channels=38,
+    trans_prob="sequence",
+    stay_prob=0.9,
+    means="zero",
+    covariances="random",
+    random_seed=42,
+)
 sim_stc = sim.state_time_course
 
 
@@ -36,12 +36,14 @@ print("Finding best circular sequence")
 bestseq = optimise_sequence(fo_density)
 
 print("Finding strongest interval asymmetries")
-mean_direction = np.squeeze(np.nanmean((fo_density[:,:,0]-fo_density[:,:,1]), axis=-1))
+mean_direction = np.squeeze(
+    np.nanmean((fo_density[:, :, 0] - fo_density[:, :, 1]), axis=-1)
+)
 mean_direction[np.isnan(mean_direction)] = 0
 
 # find indices of largest 25% values
-perc=0.25
-n_largest = int((np.prod(mean_direction.shape)-mean_direction.shape[0]) * perc)
+perc = 0.25
+n_largest = int((np.prod(mean_direction.shape) - mean_direction.shape[0]) * perc)
 largest_indices = np.abs(mean_direction).argsort(axis=None)[-n_largest:]
 
 largest_nodes = np.zeros(mean_direction.shape)
@@ -54,8 +56,8 @@ print("Plotting results")
 plt.figure()
 plt.imshow(mean_direction)
 plt.colorbar()
-plt.title('Mean direction')
-plt.savefig('figures/tinda_sim_mean_direction.png')
+plt.title("Mean direction")
+plt.savefig("figures/tinda_sim_mean_direction.png")
 
 plot_cycle(bestseq, fo_density, largest_nodes, newfigure=True)
-plt.savefig('figures/tinda_sim_cycle.png')
+plt.savefig("figures/tinda_sim_cycle.png")

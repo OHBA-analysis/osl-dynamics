@@ -11,12 +11,14 @@ from osl_dynamics.data import HMM_MAR
 
 
 # Some settings
-os.makedirs("figures", exist_ok=True) # Directory for plots
+os.makedirs("figures", exist_ok=True)  # Directory for plots
 do_bonferroni_correction = True
 
 # Load precomputed HMM
 print("Loading HMM")
-hmm = HMM_MAR("/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat")
+hmm = HMM_MAR(
+    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
+)
 # get state time courses
 gamma = hmm.gamma()
 stc = argmax_time_courses(gamma)
@@ -34,16 +36,20 @@ fo_density = np.squeeze(fo_density)
 tstat = np.nan * np.ones((fo_density.shape[:2]))
 pval = np.nan * np.ones((fo_density.shape[:2]))
 for i in range(fo_density.shape[0]):
-    for j in range(fo_density.shape[1]):   
-        tstat[i,j], pval[i,j] = ttest_rel(fo_density[i,j,0,:], fo_density[i,j,1,:])
+    for j in range(fo_density.shape[1]):
+        tstat[i, j], pval[i, j] = ttest_rel(
+            fo_density[i, j, 0, :], fo_density[i, j, 1, :]
+        )
 
-n_tests_bonferroni = np.prod(pval.shape)-pval.shape[0]
+n_tests_bonferroni = np.prod(pval.shape) - pval.shape[0]
 if do_bonferroni_correction:
-    significant_edges = pval<(0.05/n_tests_bonferroni)
+    significant_edges = pval < (0.05 / n_tests_bonferroni)
 else:
-    significant_edges = pval<0.05
+    significant_edges = pval < 0.05
 
-mean_direction = np.squeeze(np.mean((fo_density[:,:,0]-fo_density[:,:,1]), axis=-1))
+mean_direction = np.squeeze(
+    np.mean((fo_density[:, :, 0] - fo_density[:, :, 1]), axis=-1)
+)
 
 
 # Plot
@@ -51,8 +57,8 @@ print("Plotting results")
 plt.figure()
 plt.imshow(mean_direction)
 plt.colorbar()
-plt.title('Mean direction')
-plt.savefig('figures/tinda_meg_notts_mean_direction.png')
+plt.title("Mean direction")
+plt.savefig("figures/tinda_meg_notts_mean_direction.png")
 
 plot_cycle(bestseq, fo_density, significant_edges, newfigure=True)
-plt.savefig('figures/tinda_meg_notts_cycle.png')
+plt.savefig("figures/tinda_meg_notts_cycle.png")
