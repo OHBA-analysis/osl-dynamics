@@ -1,10 +1,12 @@
 """Get training data.
 
-This script will download source reconstructed resting-state (eyes open)
-MEG data.
+This script will download source reconstructed task MEG data collected using
+an Elekta scanner.
 
-This data is part of the MRC MEGUK dataset. It is CTF data from the
-Nottingham site. 65 subjects are part of this dataset.
+The data is from the Wakeman-Henson dataset: https://www.nature.com/articles/sdata20151
+
+It consists of 19 subjects performing a visual perception task.
+Each subject performed 6 runs.
 """
 
 import os
@@ -25,8 +27,8 @@ def get_data(name, output_dir):
     print(f"Data downloaded to: {output_dir}")
 
 
-# Download the dataset (approximately 700 MB)
+# Download the dataset (approximately 2 GB)
 #
-# This will unzip the notts_mrc_meguk.zip file into a
+# This will unzip the wakeman_henson.zip file into a
 # directory called "training_data"
-get_data("notts_mrc_meguk", output_dir="training_data")
+get_data("wakeman_henson", output_dir="training_data")

@@ -1,13 +1,20 @@
-"""Wakeman-Henson: TDE-HMM.
+"""Wakeman-Henson: TDE-HMM Pipeline.
 
+This script was used to create Figure 3.
 """
 
+from sys import argv
+
+if len(argv) != 2:
+    print("Please pass the run id, e.g. python tde_hmm.py 1")
+    exit()
+id = argv[1]
+
 from osl_dynamics import run_pipeline
-from osl_dynamics.inference import tf_ops
 
 config = """
     load_data:
-        data_dir: data/training_data
+        data_dir: training_data
         data_kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
@@ -34,4 +41,4 @@ config = """
         kwargs: {n_samples: 2000}
     plot_summary_stats: {}
 """
-run_pipeline(config, output_dir="results/tde_hmm")
+run_pipeline(config, output_dir=f"results/run{id}")
