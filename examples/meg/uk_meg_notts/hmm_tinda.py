@@ -1,10 +1,12 @@
-"""Example for running TINDA on MEG data from the Nottingham MEGUK dataset."""
-# Author: Mats van Es <mats.vanes@psych.ox.ac.uk>
+"""Example for running TINDA on MEG data from the Nottingham MEGUK dataset.
+
+"""
 
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_rel
+
 from osl_dynamics.inference.modes import argmax_time_courses
 from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimise_sequence
 from osl_dynamics.data import HMM_MAR
@@ -19,7 +21,8 @@ print("Loading HMM")
 hmm = HMM_MAR(
     "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
 )
-# get state time courses
+
+# Get state time courses
 gamma = hmm.gamma()
 stc = argmax_time_courses(gamma)
 
@@ -50,7 +53,6 @@ else:
 mean_direction = np.squeeze(
     np.mean((fo_density[:, :, 0] - fo_density[:, :, 1]), axis=-1)
 )
-
 
 # Plot
 print("Plotting results")

@@ -6,7 +6,6 @@ it is originally intended to use it on an HMM state time course to
 ask questions like what is the density of state j in the first and 
 second part of the interval between visits to state i
 """
-# Author: Mats van Es <mats.vanes@psych.ox.ac.uk>
 
 from itertools import permutations
 
@@ -130,7 +129,7 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
                 interval_range = np.percentile(durations, interval_range)
             mask = []
             for i, start in enumerate(interval_range):
-                if i<len(interval_range)-1:
+                if i < len(interval_range) - 1:
                     hot_vector = np.logical_and(
                         durations >= start, durations < interval_range[i + 1]
                     )

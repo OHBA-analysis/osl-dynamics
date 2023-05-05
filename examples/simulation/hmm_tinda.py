@@ -1,13 +1,13 @@
-"""Example script for simulating an HMM state time series and running TINDA on it."""
-# Author: Mats van Es <mats.vanes@psych.ox.ac.uk>
+"""Example script for simulating an HMM state time series and running TINDA on it.
 
+"""
 
 import os
 import numpy as np
 from matplotlib import pyplot as plt
+
 from osl_dynamics import simulation
 from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimise_sequence
-from osl_dynamics.inference.modes import argmax_time_courses
 
 
 # Directory for plots
@@ -27,7 +27,6 @@ sim = simulation.HMM_MVN(
 )
 sim_stc = sim.state_time_course
 
-
 # Run TINDA
 print("Running TINDA")
 fo_density, fo_sum, stats = tinda(sim_stc)
@@ -41,18 +40,17 @@ mean_direction = np.squeeze(
 )
 mean_direction[np.isnan(mean_direction)] = 0
 
-# find indices of largest 25% values
+# Find indices of largest 25% values
 perc = 0.25
 n_largest = int((np.prod(mean_direction.shape) - mean_direction.shape[0]) * perc)
 largest_indices = np.abs(mean_direction).argsort(axis=None)[-n_largest:]
 
 largest_nodes = np.zeros(mean_direction.shape)
-# set largest indices to 1
+# Set largest indices to 1
 largest_nodes[np.unravel_index(largest_indices, mean_direction.shape)] = 1
 
 # Plot
 print("Plotting results")
-
 plt.figure()
 plt.imshow(mean_direction)
 plt.colorbar()
