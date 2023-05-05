@@ -27,12 +27,7 @@ assignments = np.ones(n_subjects)
 assignments[-n_subjects_group2:] += 1
 
 # Get the p-value for the difference between the features for each group
-#
-# Note:
-# - We should use n_perm~=1000 for real analysis.
-# - We use a threshold of 0.05 / 2 = 0.025 for the pvalue because we
-#   perform a two-tail test.
 pvalues = statistics.group_diff_max_stat_perm(group_data, assignments, n_perm=100)
-significant = pvalues < 0.025
+significant = pvalues < 0.05
 
 print("significant features are:", np.squeeze(np.argwhere(significant)))

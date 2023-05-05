@@ -1981,3 +1981,127 @@ def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, fil
     _logger.info(f"Saving {filename}")
     plt.savefig(filename)
     plt.close()
+
+
+def plot_evoked_response(
+    t,
+    epochs,
+    pvalues,
+    significance_level=0.05,
+    offset_between_bars=0.01,
+    labels=None,
+    legend_loc=1,
+    x_label=None,
+    y_label=None,
+    title=None,
+    fig_kwargs=None,
+    ax=None,
+    filename=None,
+):
+    """Plot an evoked responses with significant time points highlighted.
+
+    Parameters
+    ----------
+    t : np.ndarray
+        Time axis. Shape must be (n_samples,).
+    epochs : np.ndarray
+        Evoked responses. Shape must be (n_samples, n_channels).
+    pvalues : np.ndarray
+        p-value for each evoked response. This can be calculated with
+        `osl_dynamics.analysis.statistics.evoked_response_max_stat_perm
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/statistics/index.html#osl_dynamics.analysis.statistics.evoked_response_max_stat_perm>`_.
+    significance_level : float
+        Value to threshold the p-values with to consider significant. By
+        default pvalues < 0.05 are significant.
+    offset_between_bars : float
+        Vertical offset between bars that highlight significance.
+    labels : list
+        Label for each evoked response time series.
+    legend_loc : int
+        Position of the legend.
+    x_label : str
+        Label for x-axis.
+    y_label : str
+        Label for y-axis.
+    title : str
+        Figure title.
+    fig_kwargs : dict
+        Arguments to pass to plt.subplots.
+    ax : matplotlib.axes.axes
+        Axis object to plot on.
+    filename : str
+        Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object. Only returned if filename=None.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s). Only returned if filename=None.
+    """
+
+    # Validation
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = [labels]
+        else:
+            if len(labels) != epochs.shape[1]:
+                raise ValueError("Incorrect number of lines or labels passed.")
+        add_legend = True
+    else:
+        labels = [None] * epochs.shape[1]
+        add_legend = False
+
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    default_fig_kwargs = {"figsize": (7, 4)}
+    if fig_kwargs is None:
+        fig_kwargs = default_fig_kwargs
+    else:
+        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    # Get significant time points for each channel
+    significant = pvalues < significance_level
+
+    # Create figure
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
+    for i, e, l, s in zip(range(epochs.shape[1]), epochs.T, labels, significant.T):
+        # Plot evoked response
+        p = ax.plot(t, e, label=l)
+
+        # Highlight significant time points
+        sig_times = t[s]
+        if len(sig_times) > 0:
+            y = 1.1 * np.max(epochs) + i * offset_between_bars
+            dt = (t[1] - t[0]) / 2
+            for st in sig_times:
+                ax.plot((st - dt, st + dt), (y, y), color=p[0].get_color(), linewidth=3)
+
+    # Add a dashed line at time = 0
+    ax.axvline(0, linestyle="--", color="black")
+
+    # Set title, axis labels and range
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_xlim(t[0], t[-1])
+
+    # Add a legend
+    if add_legend:
+        ax.legend(loc=legend_loc)
+
+    # Save figure
+    if filename is not None:
+        save(fig, filename)
+    elif create_fig:
+        return fig, ax
