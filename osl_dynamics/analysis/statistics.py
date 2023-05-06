@@ -39,6 +39,7 @@ def _check_glm_data(data, covariates, assignments=None):
         if assignments is not None:
             if np.isnan(assignments[i]):
                 remove.append(i)
+    remove = np.unique(remove)
     if len(remove) > 0:
         _logger.warn(f"The following subjects were removed from the GLM: {remove}")
 
@@ -132,9 +133,11 @@ def evoked_response_max_stat_perm(
 
     # Get p-values
     if metric == "tstats":
+        print("Using tstats as metric")
         tstats = abs(model.tstats[0])
         percentiles = stats.percentileofscore(null_dist, tstats)
     elif metric == "copes":
+        print("Using copes as metric")
         copes = abs(model.copes[0])
         percentiles = stats.percentileofscore(null_dist, copes)
     pvalues = 1 - percentiles / 100
@@ -148,7 +151,9 @@ def evoked_response_max_stat_perm(
     return pvalues
 
 
-def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1):
+def group_diff_max_stat_perm(
+    data, assignments, n_perm, covariates={}, metric="tstats", n_jobs=1
+):
     """Statistical significant testing for the difference between two groups.
 
     This function fits a General Linear Model (GLM) with ordinary least squares
@@ -168,6 +173,8 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
         Number of permutations.
     covariates : dict
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
+    metric : str
+        Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
     n_jobs : int
         Number of processes to run in parallel.
 
@@ -183,6 +190,9 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     ndim = data.ndim
     if ndim == 1:
         raise ValueError("data must be 2D or greater.")
+
+    if metric not in ["tstats", "copes"]:
+        raise ValueError("metric must be 'tstats' or 'copes'.")
 
     data, covariates, assignments = _check_glm_data(data, covariates, assignments)
 
@@ -210,7 +220,6 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
 
     # Fit model and get t-statistics
     model = glm.fit.OLSModel(design, data)
-    tstats = abs(model.tstats[0])
 
     # Which dimensions are we pooling over?
     if ndim == 2:
@@ -224,7 +233,7 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
         data,
         contrast_idx=0,  # selects GroupDiff
         nperms=n_perm,
-        metric="tstats",
+        metric=metric,
         tail=0,  # two-sided test
         pooled_dims=pooled_dims,
         nprocesses=n_jobs,
@@ -232,7 +241,14 @@ def group_diff_max_stat_perm(data, assignments, n_perm, covariates={}, n_jobs=1)
     null_dist = perm.nulls
 
     # Get p-values
-    percentiles = stats.percentileofscore(null_dist, tstats)
+    if metric == "tstats":
+        print("Using tstats as metric")
+        tstats = abs(model.tstats[0])
+        percentiles = stats.percentileofscore(null_dist, tstats)
+    elif metric == "copes":
+        print("Using copes as metric")
+        copes = abs(model.copes[0])
+        percentiles = stats.percentileofscore(null_dist, copes)
     pvalues = 1 - percentiles / 100
 
     return group_diff, pvalues
