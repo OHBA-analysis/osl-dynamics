@@ -557,7 +557,7 @@ def plot_hist(
 
     # Plot histograms
     for d, b, l in zip(data, bins, labels):
-        ax.hist(d, bins=b, label=l, histtype="step")
+        ax.hist(d, bins=b, label=l, histtype="step", **plot_kwargs)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])

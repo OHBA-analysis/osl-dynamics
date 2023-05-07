@@ -7,8 +7,6 @@ In this script we use an HMM fit, but this can be easily substituted for
 a DyNeMo fit.
 """
 
-import numpy as np
-
 from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.analysis import connectivity
 from osl_dynamics.data import OSL_HMM

@@ -5,7 +5,6 @@
 """
 
 print("Setting up")
-import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.sage import Config, Model

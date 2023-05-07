@@ -31,7 +31,7 @@ avg_epochs = np.mean(epochs, axis=0)
 
 # Plot epoched time courses with significant time points highlighed
 plotting.plot_evoked_response(
-    t, 
+    t,
     avg_epochs,
     pvalues,
     significance_level=0.05,

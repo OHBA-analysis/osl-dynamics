@@ -45,7 +45,7 @@ def epoch_state_time_course(stc, tmin=-0.1, tmax=1.5):
             s,
             p,
             n_window=5,  # this should be what was used to prepare the training data
-        )  
+        )
         events = mne.find_events(raw, min_duration=0.005, verbose=False)
         e = mne.Epochs(
             raw,

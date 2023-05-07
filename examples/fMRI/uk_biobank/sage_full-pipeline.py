@@ -8,18 +8,21 @@ This should give a prediction correlation around 0.4.
 """
 
 print("Setting up")
-import os, random, scipy
-import numpy as np
+import os
+import random
 from glob import glob
+
+import numpy as np
 from scipy import io
 from scipy.stats.stats import pearsonr
 from sklearn.model_selection import train_test_split, RepeatedKFold
 from sklearn.linear_model import ElasticNetCV
 
-from osl_dynamics import analysis, data, inference
-from osl_dynamics.models.sage import Config, Model
-from osl_dynamics.inference import metrics, modes, tf_ops
+from osl_dynamics import data, inference
+from osl_dynamics.inference import tf_ops
 from osl_dynamics.utils import plotting
+
+from osl_dynamics.models.sage import Config, Model
 from osl_dynamics.models.dynemo_obs import Config as DynemoConfig
 from osl_dynamics.models.dynemo_obs import Model as DynemoModel
 

@@ -3,11 +3,14 @@
 """
 
 print("Setting up")
+import os
+import os.path as op
+
 import pickle
 import numpy as np
-import os.path as op
-from os import makedirs
+
 from osl_dynamics import analysis, data
+from osl_dynamics.inference import tf_ops
 from osl_dynamics.models.hmm import Config, Model
 from osl_dynamics.utils import plotting
 
@@ -50,9 +53,9 @@ analysis_dir = f"{recon_dir}/{output_id}/analysis"
 maps_dir = f"{recon_dir}/{output_id}/maps"
 tmp_dir = f"{recon_dir}/{output_id}/tmp"
 
-makedirs(model_dir, exist_ok=True)
-makedirs(analysis_dir, exist_ok=True)
-makedirs(maps_dir, exist_ok=True)
+os.makedirs(model_dir, exist_ok=True)
+os.makedirs(analysis_dir, exist_ok=True)
+os.makedirs(maps_dir, exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()

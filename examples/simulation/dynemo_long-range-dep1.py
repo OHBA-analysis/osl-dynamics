@@ -6,7 +6,6 @@
 
 print("Setting up")
 import os
-import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import tf_ops, modes, metrics, callbacks
 from osl_dynamics.models.dynemo import Config, Model

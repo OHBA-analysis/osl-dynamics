@@ -4,7 +4,7 @@
 
 print("Setting up")
 import numpy as np
-from osl_dynamics import data, files, simulation
+from osl_dynamics import data, simulation
 from osl_dynamics.inference import tf_ops
 from osl_dynamics.models.mdynemo_obs import Config, Model
 from osl_dynamics.utils import plotting

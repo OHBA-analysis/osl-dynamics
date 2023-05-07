@@ -6,8 +6,8 @@ print("Setting up")
 import os
 import pickle
 import numpy as np
-from osl_dynamics import array_ops
-from osl_dynamics.analysis import spectral, power, connectivity
+
+from osl_dynamics.analysis import power, connectivity
 from osl_dynamics.data import Data
 from osl_dynamics.inference import tf_ops, modes
 from osl_dynamics.models.hmm import Config, Model

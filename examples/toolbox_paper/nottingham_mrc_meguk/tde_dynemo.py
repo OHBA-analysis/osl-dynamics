@@ -1,18 +1,25 @@
 """Nottingham MRC MEGUK: TDE-DyNeMo.
 
-In this script we train a DyNeMo model on time-delay embedded data.
+In this script we train a Time-Delay Embedded (TDE)-DyNeMo model on source reconstructed
+resting-state MEG data.
 
-We will use source reconstructed resting-state MEG data. See the
-examples/toolbox_paper/nottingham_mrc_meguk/get_data.py script for
-how to download the training data.
+The examples/toolbox_paper/nottingham_mrc_meguk/get_data.py script can be used
+to download the training data.
 """
+
+from sys import argv
+
+if len(argv) != 2:
+    print("Please pass the run id, e.g. python run.py 1")
+    exit()
+id = argv[1]
 
 from osl_dynamics import run_pipeline
 from osl_dynamics.inference import tf_ops
 
 config = """
     load_data:
-        data_dir: data/training_data
+        data_dir: training_data
         data_kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
@@ -40,4 +47,4 @@ config = """
     plot_summary_stats:
         use_gmm_alpha: True
 """
-run_pipeline(config, output_dir="results/tde_dynemo")
+run_pipeline(config, output_dir=f"results/run{id}")

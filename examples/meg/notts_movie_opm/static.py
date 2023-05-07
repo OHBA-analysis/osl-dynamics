@@ -51,8 +51,8 @@ for temporal_filter in [[4, 7], [8, 12], [13, 30]]:
     # Prepare data
     data = Data(sf_files, sampling_frequency=sampling_frequency)
     data.prepare(
-        low_freq=temporal_filters[0],
-        high_freq=temporal_filters[1],
+        low_freq=temporal_filter[0],
+        high_freq=temporal_filter[1],
         amplitude_envelope=True,
     )
     ts = data.time_series()
@@ -121,7 +121,7 @@ power.save(
 
 # Plot group level power map for different freq bands
 psd = np.load(f"{static_dir}/psd.npy")
-for frequency_range in [[7, 13], [13, 30]]
+for frequency_range in [[7, 13], [13, 30]]:
     varmap = power.variance_from_spectra(f, psd, frequency_range=frequency_range)
     group_varmap = np.mean(varmap, axis=0)
     power.save(

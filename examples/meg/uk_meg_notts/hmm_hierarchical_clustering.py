@@ -1,4 +1,4 @@
-"""Example script for applying hierarchical clustering to match state time course
+"""Example script for applying hierarchical clustering to match state time courses
 from different runs.
 
 The method is described here: https://www.biorxiv.org/content/10.1101/2023.01.18.524539v2
@@ -18,8 +18,8 @@ for i in range(1, 6):
 
 # Labels (run and state) for each time course
 labels = []
-for r in range(len(alpha)):
-    for s in range(alpha[r][0].shape[1]):
+for r in range(len(alpha)):  # run
+    for s in range(alpha[r][0].shape[1]):  # state
         labels.append(f"{r + 1}-{s + 1}")
 
 # Use hierarchical clustering to match states from different runs and average:
@@ -58,7 +58,7 @@ ax[1].set_title("After")
 fig.subplots_adjust(right=0.8)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 fig.colorbar(im, cax=cbar_ax)
-filename="corr.png"
+filename = "corr.png"
 print("Saving", filename)
 plt.savefig(filename)
 plt.close()

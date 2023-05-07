@@ -2,7 +2,6 @@
 
 """
 
-import os.path as op
 from glob import glob
 from pathlib import Path
 

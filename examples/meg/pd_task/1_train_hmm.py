@@ -18,7 +18,7 @@ os.makedirs(inf_params_dir, exist_ok=True)
 #%% Prepare data
 
 # Load data
-training_data = Data([f"data/subject{i}.npy" for subject in range(30)], n_jobs=4)
+training_data = Data([f"data/subject{i}.npy" for i in range(30)], n_jobs=4)
 
 # Perform time-delay embedding and PCA
 training_data.prepare(n_embeddings=15, n_pca_components=80)
