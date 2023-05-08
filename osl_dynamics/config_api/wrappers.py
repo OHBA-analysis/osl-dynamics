@@ -1289,6 +1289,9 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
 
     - :code:`<output_dir>/summary_stats`, which contains plots of the summary statistics.
 
+    The :code:`<output_dir>/summary_stats` directory will also contain numpy files
+    with the summary statistics.
+
     Parameters
     ----------
     data : osl_dynamics.data.Data
@@ -1340,6 +1343,12 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
     lt = modes.mean_lifetimes(stc, sampling_frequency)
     intv = modes.mean_intervals(stc, sampling_frequency)
     sr = modes.switching_rates(stc, sampling_frequency)
+
+    # Save summary stats
+    save(f"{summary_stats_dir}/fo.npy", fo)
+    save(f"{summary_stats_dir}/lt.npy", lt)
+    save(f"{summary_stats_dir}/intv.npy", intv)
+    save(f"{summary_stats_dir}/sr.npy", sr)
 
     # Plot
     from osl_dynamics.utils import plotting
