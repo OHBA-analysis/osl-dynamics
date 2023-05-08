@@ -252,11 +252,10 @@ def plot_line(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -402,11 +401,10 @@ def plot_scatter(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -495,7 +493,7 @@ def plot_hist(
     title : str
         Figure title.
     plot_kwargs : dict
-        Arguments to pass to the ax.hist method.
+        Arguments to pass to the ax.hist method. Defaults to {"histtype": "step"}.
     fig_kwargs : dict
         Arguments to pass to plt.subplots.
     ax : matplotlib.axes.Axes
@@ -541,14 +539,15 @@ def plot_hist(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if plot_kwargs is None:
         plot_kwargs = {}
+    default_plot_kwargs = {"histtype": "step"}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     # Create figure
     create_fig = ax is None
@@ -557,7 +556,7 @@ def plot_hist(
 
     # Plot histograms
     for d, b, l in zip(data, bins, labels):
-        ax.hist(d, bins=b, label=l, histtype="step", **plot_kwargs)
+        ax.hist(d, bins=b, label=l, **plot_kwargs)
 
     # Set axis range
     ax.set_xlim(x_range[0], x_range[1])
@@ -650,11 +649,10 @@ def plot_bar_chart(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -695,7 +693,6 @@ def plot_gmm(
     x_label=None,
     y_label=None,
     title=None,
-    plot_kwargs=None,
     fig_kwargs=None,
     ax=None,
     filename=None,
@@ -727,8 +724,6 @@ def plot_gmm(
         Label for y-axis.
     title : str
         Figure title.
-    plot_kwargs : dict
-        Arguments to pass to the ax.hist method.
     fig_kwargs : dict
         Arguments to pass to plt.subplots.
     ax : matplotlib.axes.Axes
@@ -760,14 +755,10 @@ def plot_gmm(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
-
-    if plot_kwargs is None:
-        plot_kwargs = {}
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     # Create figure
     create_fig = ax is None
@@ -863,15 +854,14 @@ def plot_violin(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
-    max_len = max([d.size for d in data])
     # Create a pandas DataFrame
     # Pad the data with NaNs to make sure all columns have the same length
+    max_len = max([d.size for d in data])
     data_dict = {
         k: np.pad(
             v, pad_width=(0, max_len - v.size), mode="constant", constant_values=np.nan
@@ -923,6 +913,7 @@ def plot_time_series(
         Keyword arguments to be passed on to matplotlib.pyplot.subplots.
     plot_kwargs : dict
         Keyword arguments to be passed on to matplotlib.pyplot.plot.
+        Defaults to {"lw": 0.7, "color": "tab:blue"}.
     ax : matplotlib.axes.Axes
         The axis on which to plot the data. If not given, a new axis is created.
     filename : str
@@ -949,17 +940,15 @@ def plot_time_series(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (12, 8)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (12, 8)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
-    default_plot_kwargs = {"lw": 0.7, "color": "tab:blue"}
     if plot_kwargs is None:
-        plot_kwargs = default_plot_kwargs
-    else:
-        plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+        plot_kwargs = {}
+    default_plot_kwargs = {"lw": 0.7, "color": "tab:blue"}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     # Calculate separation
     separation = (
@@ -1017,6 +1006,7 @@ def plot_separate_time_series(
         Keyword arguments to be passed on to matplotlib.pyplot.subplots.
     plot_kwargs : dict
         Keyword arguments to be passed on to matplotlib.pyplot.plot.
+        Defaults to {"lw": 0.7}.
     filename : str
         Output filename.
 
@@ -1031,17 +1021,15 @@ def plot_separate_time_series(
     n_samples = n_samples or min([ts.shape[0] for ts in time_series])
     n_lines = time_series[0].shape[1]
 
-    default_fig_kwargs = {"figsize": (20, 10), "sharex": "all"}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (20, 10), "sharex": "all"}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
-    default_plot_kwargs = {"lw": 0.7}
     if plot_kwargs is None:
-        plot_kwargs = default_plot_kwargs
-    else:
-        plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+        plot_kwargs = {}
+    default_plot_kwargs = {"lw": 0.7}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     if sampling_frequency is not None:
         time_vector = np.linspace(0, n_samples / sampling_frequency, n_samples)
@@ -1145,11 +1133,10 @@ def plot_epoched_time_series(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (16, 3)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (16, 3)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -1670,19 +1657,17 @@ def plot_alpha(
     colors = cmap.colors
 
     # Validation
+    if fig_kwargs is None:
+        fig_kwargs = {}
     default_fig_kwargs = dict(
         figsize=(12, 2.5 * n_alphas), sharex="all", facecolor="white"
     )
-    if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
-    default_plot_kwargs = dict(colors=colors)
     if plot_kwargs is None:
-        plot_kwargs = default_plot_kwargs
-    else:
-        plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+        plot_kwargs = {}
+    default_plot_kwargs = dict(colors=colors)
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     if y_labels is None:
         y_labels = [None] * n_alphas
@@ -1798,11 +1783,10 @@ def plot_mode_lifetimes(
     if mode_time_course.ndim != 2:
         raise ValueError("mode_timecourse must be a 2D array")
 
-    default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (long * 2.5, short * 2.5)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -2061,11 +2045,10 @@ def plot_evoked_response(
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
 
-    default_fig_kwargs = {"figsize": (7, 4)}
     if fig_kwargs is None:
-        fig_kwargs = default_fig_kwargs
-    else:
-        fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (7, 4)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     # Get significant time points for each channel
     significant = pvalues < significance_level
