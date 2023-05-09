@@ -1,10 +1,9 @@
 """Temporal Interval Network Density Analysis (TINDA).
 
-This module contains functions for calculating the density profile 
-(i.e., fractional occupancy over) in any interval between events
-it is originally intended to use it on an HMM state time course to 
-ask questions like what is the density of state j in the first and 
-second part of the interval between visits to state i.
+This module contains functions for calculating the density profile (i.e., fractional
+occupancy over) in any interval between events it is originally intended to use it on
+an HMM state time course to ask questions like what is the density of state j in the
+first and second part of the interval between visits to state i.
 """
 
 from itertools import permutations
@@ -19,15 +18,15 @@ def find_intervals(tc_hot):
 
     Parameters
     ----------
-    tc_hot: array_like
+    tc_hot : array_like
         Hot vector (i.e., binary vector) of shape (n_samples,) or (n_samples, 1).
         For example, a hot vector of a state time course of shape (n_samples, n_states).
 
     Returns
     -------
-    intervals: list
+    intervals : list
         List of tuples of start and end indices of intervals.
-    durations: array_like
+    durations : array_like
         Array of durations of intervals (in samples).
 
     """
@@ -46,19 +45,19 @@ def split_intervals(intervals, n_bins=2):
 
     Parameters
     ----------
-    intervals: list
+    intervals : list
         List of tuples of start and end indices of intervals.
-    n_bins: int
+    n_bins : int
         Number of bins to split each interval into.
 
     Returns
     -------
-    divided_intervals: list
+    divided_intervals : list
         List the same length as intervals (minus dropped intervals, see below),
         with each element being a list of tuples of start and end indices of bins.
-    bin_sizes: list
+    bin_sizes : list
         List of bin sizes (in samples), one per interval.
-    drop_mask: array_like
+    drop_mask : array_like
         Array of zeros and ones indicating whether the interval was dropped
         because it was smaller than nbin.s
 
@@ -98,24 +97,24 @@ def split_interval_duration(
 
     Parameters
     ----------
-    durations: array_like
+    durations : array_like
         Array of durations of intervals (in samples).
-    interval_range: array_like
+    interval_range : array_like
         Array of bin edges (in samples, seconds, or percentiles) to split durations
         into bins are defined as [>=interval_range[i], <interval_range[i+1]). If
         None, all durations are in the same bin.
-    mode: str
+    mode : str
         Mode of interval_range, either "sample" (e.g., [4, 20, 100]), "perc" (e.g.,
         range(20,100,20)), or "sec" (e.g., [0, 0.01, 0.1, 1, np.inf]). If "sec",
         sfreq must be provided.
-    sampling_frequency: float
+    sampling_frequency : float
         Sampling frequency (in Hz) of the data, only used if mode is "sec".
 
     Returns
     -------
-    mask: list
+    mask : list
         List of arrays of zeros and ones indicating whether the interval was in the bin.
-    interval_range: array_like
+    interval_range : array_like
         Array of bin edges (in samples) used to split durations into bins.
     """
     if interval_range is None:
@@ -149,29 +148,33 @@ def compute_fo_stats(
 
     Parameters
     ----------
-    tc_sec: array_like
+    tc_sec : array_like
         Time course of shape (n_samples, n_states).
-    divided_intervals: list
-        List with each element corresponding to an interval, each itself being a list of tuples of
-        start and end indices of interval bins.
-    interval_mask: array_like
+    divided_intervals : list
+        List with each element corresponding to an interval, each itself being a
+        list of tuples of start and end indices of interval bins.
+    interval_mask : array_like
         Array of zeros and ones indicating whether the interval was in the bin.
-    return_all_intervals: bool
-        Whether to return the density/sum of all intervals in addition to the interval averages/sums.
+    return_all_intervals : bool
+        Whether to return the density/sum of all intervals in addition to the interval
+        averages/sums.
 
     Returns
     -------
-    interval_weighted_avg: array_like
-        Array of weighted averages of time courses in each interval of shape (n_states, n_bins,
+    interval_weighted_avg : array_like
+        Array of weighted averages of time courses in each interval of shape (n_states,
+        n_bins, n_interval_ranges).
+    interval_sum : array_like
+        Array of sums of time courses in each interval of shape (n_states, n_bins,
         n_interval_ranges).
-    interval_sum: array_like
-        Array of sums of time courses in each interval of shape (n_states, n_bins, n_interval_ranges).
-    interval_weighted_avg_all: list (optional)
-        List of length n_interval_ranges with each element an array of weighted averages of time courses in
-        each interval of shape (n_states, n_bins, n_intervals)  None if return_all_intervals is False (default).
-    interval_sum_all: list (optional)
-        List of length n_interval_ranges with each element an array of sums of time courses in each interval of
-        shape (n_states, n_bins, n_intervals). None if return_all_intervals is False.
+    interval_weighted_avg_all : list (optional)
+        List of length n_interval_ranges with each element an array of weighted averages
+        of time courses in each interval of shape (n_states, n_bins, n_intervals).
+        None if return_all_intervals is False (default).
+    interval_sum_all : list (optional)
+        List of length n_interval_ranges with each element an array of sums of time
+        courses in each interval of shape (n_states, n_bins, n_intervals).
+        None if return_all_intervals is False.
     """
     if interval_mask is None:
         interval_mask = [np.ones(len(divided_intervals))]
@@ -252,7 +255,7 @@ def compute_fo_stats(
                 )
             )
     else:
-        # TO DO: I think this is more principled than the matlab code, but I need to check
+        # TODO: I think this is more principled than the matlab code, but I need to check
         interval_sum = np.zeros(
             (tc_sec.shape[1], len(divided_intervals[0]), len(divided_intervals))
         )
@@ -296,25 +299,26 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
 
     Parameters
     ----------
-    stats: list
+    stats : list
         List of stats (dict) for each state. Each element is a dictionary with keys that
         at least should include "field" (e.g., interval_wavgs), that is the output of
         compute_fo_stats.
-    field: str
+    field : str
         Field of stats to collate, e.g., "interval_wavgs", "interval_sums".
-    all_to_all: bool
+    all_to_all : bool
         Whether the density_of was used to compute the stats (in which case the first
         2 dimensions are not n_states x n_states). Default is False.
-    ignore_elements: list
-        List of indices in stats to ignore (i.e. because they don't contain binary events).
+    ignore_elements : list
+        List of indices in stats to ignore (i.e. because they don't contain binary
+        events).
 
     Returns
     -------
-    collated_stat: array_like
-        The collated stat (n_interval_states, n_density_states, n_bins, n_interval_ranges)
-        If all_to_all is False (default) (i.e., when the density is computed for all states
-        using all states' intervals), then the first two dimensions are n_states
-        and the diagonal is np.nan.
+    collated_stat : array_like
+        The collated stat (n_interval_states, n_density_states, n_bins,
+        n_interval_ranges). If all_to_all is False (default) (i.e., when the density
+        is computed for all states using all states' intervals), then the first two
+        dimensions are n_states and the diagonal is np.nan.
     """
     num_states = len(stats)
     shp = stats[0][field].shape  # (n_states, n_bins, n_interval_ranges)
@@ -351,49 +355,56 @@ def tinda(
 
     Parameters
     ----------
-    tc: array_like
-        Time courses of shape (n_samples, n_states) define intervals from will use the same time courses to
-        compute density of when density_of is None. Can be a list of time courses (e.g. state time courses for
-        each subject).
-    density_of: array_like
-        Time course of shape (n_samples, n_states) to compute density of if None (default), density is computed
-        for all columns of tc.
-    n_bins: int
+    tc : array_like
+        Time courses of shape (n_samples, n_states) define intervals from will use the
+        same time courses to compute density of when density_of is None. Can be a list
+        of time courses (e.g. state time courses for each subject).
+    density_of : array_like
+        Time course of shape (n_samples, n_states) to compute density of if None
+        (default), density is computed for all columns of tc.
+    n_bins : int
         Number of bins to divide each interval into (default 2).
-    interval_mode: str
-        Mode of interval_range, either "sample" (default), "sec" (seconds) or "perc" (percentile). To interpret
-        the interval range as seconds, sfreq must be provided.
-    interval_range: array_like
-        Array of bin edges (in samples, seconds, or percentiles) used to split durations into bins (default None),
-          e.g. np.arange(0, 1, 0.1) for 100ms bins.
-    sampling_frequency: float
+    interval_mode : str
+        Mode of interval_range, either "sample" (default), "sec" (seconds) or "perc"
+        (percentile). To interpret the interval range as seconds, sfreq must be provided.
+    interval_range : array_like
+        Array of bin edges (in samples, seconds, or percentiles) used to split durations
+        into bins (default None), e.g. np.arange(0, 1, 0.1) for 100ms bins.
+    sampling_frequency : float
         Sampling frequency of tc (in Hz), only used if interval_mode is "sec".
-    return_all_intervals: bool
-        Whether to return the density/sum of all intervals in addition to the interval averages/sums. If True,
-        will return a list of arrays in stats[i]['all_interval_wavgs'/'all_interval_sums'], each corresponding
-        to an interval range.
+    return_all_intervals : bool
+        Whether to return the density/sum of all intervals in addition to the interval
+        averages/sums. If True, will return a list of arrays in
+        stats[i]['all_interval_wavgs'/'all_interval_sums'], each corresponding to an
+        interval range.
 
     Returns
     -------
-    fo_density: array_like
-        Time-in-state densities array of shape (n_interval_states, n_density_states, n_bins, n_interval_ranges).
-        n_interval_states is the number of states in the interval time courses (i.e., tc); n_density_states is
-        the number of states in the density time courses (i.e., density_of). If density_of is None,
-        n_density_states is the same as n_interval_states. If tc is a list of time courses (e.g., state time
-        courses for multiple subjects), then an extra dimension is appended for the subjects.
-    fo_sum: array_like
+    fo_density : array_like
+        Time-in-state densities array of shape (n_interval_states, n_density_states,
+        n_bins, n_interval_ranges). n_interval_states is the number of states in the
+        interval time courses (i.e., tc); n_density_states is the number of states in
+        the density time courses (i.e., density_of). If density_of is None,
+        n_density_states is the same as n_interval_states. If tc is a list of time
+        courses (e.g., state time courses for multiple subjects), then an extra
+        dimension is appended for the subjects.
+    fo_sum : array_like
         Same as fo_density, but with time-in-state sums instead of densities.
-    stats: dict
+    stats : dict
         Dictionary of stats, including
-        - durations: interval durations in samples,
-        - intervals: start/end samples for each interval (intervals),
-        - interval_wavg: the weighted average (i.e, time-in-state density) over all intervals,
-        - interval_sum: the sum (i.e., time-in-state) over all intervals,
-        - divided_intervals: the bin edges for each interval,
-        - bin_sizes: the bin sizes for each interval,
-        - interval_range: the interval range (in samples),
-        - all_interval_wavg: unaveraged interval densities (only if return_all_intervals is True),
-        - all_interval_sum: unaveraged interval sums (only if return_all_intervals is True).
+
+        - durations: interval durations in samples.
+        - intervals: start/end samples for each interval (intervals).
+        - interval_wavg: the weighted average (i.e, time-in-state density) over all
+          interval.
+        - interval_sum: the sum (i.e., time-in-state) over all intervals.
+        - divided_intervals: the bin edges for each interval.
+        - bin_sizes: the bin sizes for each interval.
+        - interval_range: the interval range (in samples).
+        - all_interval_wavg: unaveraged interval densities (only if
+          return_all_intervals is True).
+        - all_interval_sum: unaveraged interval sums (only if return_all_intervals
+          is True).
     """
     if isinstance(
         tc, list
@@ -468,7 +479,7 @@ def tinda(
                 )  # split intervals into interval_range (i.e.,
                 # to compute statistics of intervals with durations in a certain range)
 
-                # compute time-in-state densities and sums in all intervals
+                # Compute time-in-state densities and sums in all intervals
                 (
                     interval_wavg,
                     interval_sum,
@@ -481,7 +492,7 @@ def tinda(
                     return_all_intervals=return_all_intervals,
                 )
 
-                # append stats
+                # Append stats
                 stats.append(
                     {
                         "durations": durations,
@@ -496,7 +507,7 @@ def tinda(
                     }
                 )
 
-        # get a full matrix of FO densities and sums
+        # Get a full matrix of FO densities and sums
         fo_density = collate_stats(
             stats,
             "interval_wavgs",
@@ -513,31 +524,25 @@ def tinda(
     return fo_density, fo_sum, stats
 
 
-# %% The following functions are used on the stats returned by tinda
-
-
 def optimise_sequence(fo_density, metric_to_use=0):
     """Optimise the sequence to maximal circularity.
 
-    This function reads in the mean pattern of differential fractional
-    occupancy and computes the optimal display for a sequential circular
-    plot visualization.
-    We test different possible metrics:
-    Sequence metric 1 is the mean FO asymmetry
-    Sequence metric 2 is the proportional FO asymmetry (i.e., asymmetry as a
-    proportion of a baseline - which is time spent in the state)
-    Sequence metric 3 is the proportional FO asymmetry using the global,
-    rather than subject-specific, baseline FO
+    This function reads in the mean pattern of differential fractional occupancy and
+    computes the optimal display for a sequential circular plot visualization.
 
     Parameters
     ----------
     fo_density : array_like
-        Time-in-state densities array of shape (n_interval_states, n_density_states, 2, n_subjects).
-    metric : int, optional
-        Metric to use for optimisation (default is 0)
-        0: mean FO asymmetry,
-        1: proportional FO asymmetry,
-        2: proportional FO asymmetry using global baseline FO.
+        Time-in-state densities array of shape (n_interval_states,
+        n_density_states, 2, n_subjects).
+    metric : int
+        Metric to use for optimisation:
+
+        - 0: mean FO asymmetry.
+        - 1: proportional FO asymmetry (i.e. asymmetry as a proportion of a
+          baseline - which time spend in the state).
+        - 2: proportional FO asymmetry using global baseline FO, rather than
+          a subject-specific baseline.
 
     Returns
     -------
@@ -547,7 +552,7 @@ def optimise_sequence(fo_density, metric_to_use=0):
     if len(fo_density.shape) == 5:
         fo_density = np.squeeze(fo_density)
 
-    # compute different metrics to optimise
+    # Compute different metrics to optimise
     metric = []
     metric.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
     temp = (fo_density[:, :, 0, :] - fo_density[:, :, 1, :]) / np.mean(
@@ -562,13 +567,13 @@ def optimise_sequence(fo_density, metric_to_use=0):
     n_metrics = len(metric)
     K = fo_density.shape[0]
 
-    # get all possible permutations of states
+    # Get all possible permutations of states
     my_perms = np.array(list(permutations(range(1, K - 1), K - 2)))
 
     sequence_metric = np.zeros((len(my_perms), 9, 3))
     for i2, iperm in enumerate(tqdm(my_perms, desc="Optimising sequence")):
         for i in range(5):
-            # setup state points on unit circle:
+            # Setup state points on unit circle:
             manual_order = [1] + [2 + val for val in iperm]
             manual_order = manual_order[:i] + [2] + manual_order[i:]
             manual_order = [val - 1 for val in manual_order]
@@ -585,13 +590,13 @@ def optimise_sequence(fo_density, metric_to_use=0):
                 )
             )
 
-            # compute the metric
+            # Compute the metric
             for i3 in range(n_metrics):
                 sequence_metric[i2, i, i3] = np.imag(
                     np.nansum(np.nansum(angle_plot * metric[i3]))
                 )
 
-    # find the permutation that maximizes the metric
+    # Find the permutation that maximizes the metric
     best_sequence = []
     for i in range(n_metrics):
         m1 = np.argmax(np.max(np.abs(sequence_metric[:, :, i]), axis=0))
@@ -599,12 +604,13 @@ def optimise_sequence(fo_density, metric_to_use=0):
         true_sequence_metric = sequence_metric[m, m1, i]
         seq = [1] + [2 + val for val in my_perms[m]]
         seq = seq[:m1] + [2] + seq[m1:]
-        # want rotation to be clockwise, so flip if necessary:
+        # Want rotation to be clockwise, so flip if necessary:
         if true_sequence_metric > 0:
             seq = [1] + list(reversed(seq[1:]))
         best_sequence.append(seq)
 
-    # return the best sequence for the chosen metric (in order of counterclockwise rotation)
+    # Return the best sequence for the chosen metric (in order of counterclockwise
+    # rotation)
     best_sequence = [i - 1 for i in best_sequence[metric_to_use]]
     return best_sequence
 
