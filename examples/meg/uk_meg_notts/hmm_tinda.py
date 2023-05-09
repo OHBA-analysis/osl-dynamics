@@ -31,7 +31,7 @@ print("Running TINDA")
 fo_density, fo_sum, stats = tinda(stc)
 
 print("Finding best circular sequence. This might take a while.")
-bestseq = optimise_sequence(fo_density)
+best_sequence = optimise_sequence(fo_density)
 
 # Stats
 print("Finding statistically significant assymetries in interval densities")
@@ -62,5 +62,5 @@ plt.colorbar()
 plt.title("Mean direction")
 plt.savefig("figures/tinda_meg_notts_mean_direction.png")
 
-plot_cycle(bestseq, fo_density, significant_edges, newfigure=True)
+plot_cycle(best_sequence, fo_density, significant_edges, new_figure=True)
 plt.savefig("figures/tinda_meg_notts_cycle.png")

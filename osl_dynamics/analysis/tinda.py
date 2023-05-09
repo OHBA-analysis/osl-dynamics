@@ -4,7 +4,7 @@ This module contains functions for calculating the density profile
 (i.e., fractional occupancy over) in any interval between events
 it is originally intended to use it on an HMM state time course to 
 ask questions like what is the density of state j in the first and 
-second part of the interval between visits to state i
+second part of the interval between visits to state i.
 """
 
 from itertools import permutations
@@ -20,15 +20,15 @@ def find_intervals(tc_hot):
     Parameters
     ----------
     tc_hot: array_like
-        hot vector (i.e., binary vector) of shape (n_samples,) or (n_samples, 1)
-        For example, a hot vector of a state time course of shape (n_samples, n_states)
+        Hot vector (i.e., binary vector) of shape (n_samples,) or (n_samples, 1).
+        For example, a hot vector of a state time course of shape (n_samples, n_states).
 
     Returns
     -------
     intervals: list
-        list of tuples of start and end indices of intervals
+        List of tuples of start and end indices of intervals.
     durations: array_like
-        array of durations of intervals (in samples)
+        Array of durations of intervals (in samples).
 
     """
     intervals = []
@@ -41,25 +41,26 @@ def find_intervals(tc_hot):
     return intervals, durations
 
 
-def split_intervals(intervals, nbin=2):
-    """Split each interval into nbin equal sized bins
+def split_intervals(intervals, n_bins=2):
+    """Splits each interval into nbin equally sized bins.
 
     Parameters
     ----------
     intervals: list
-        list of tuples of start and end indices of intervals
-    nbin: int
-        number of bins to split each interval into
+        List of tuples of start and end indices of intervals.
+    n_bins: int
+        Number of bins to split each interval into.
 
     Returns
     -------
     divided_intervals: list
-        list the same length as intervals (minus dropped intervals, see below),
-        with each element being a list of tuples of start and end indices of bins
+        List the same length as intervals (minus dropped intervals, see below),
+        with each element being a list of tuples of start and end indices of bins.
     bin_sizes: list
-        list of bin sizes (in samples), one per interval
+        List of bin sizes (in samples), one per interval.
     drop_mask: array_like
-        array of zeros and ones indicating whether the interval was dropped because it was smaller than nbin
+        Array of zeros and ones indicating whether the interval was dropped
+        because it was smaller than nbin.s
 
     """
     divided_intervals = []
@@ -67,21 +68,21 @@ def split_intervals(intervals, nbin=2):
     drop_mask = np.zeros(len(intervals))
     for i, (interval_start, interval_end) in enumerate(intervals):
         n_samples = interval_end - interval_start
-        if n_samples < nbin:
+        if n_samples < n_bins:
             drop_mask[i] = 1
             continue
 
-        bin_size = n_samples // nbin
-        remainder = n_samples % nbin
+        bin_size = n_samples // n_bins
+        remainder = n_samples % n_bins
         bins = []
         bin_start = interval_start
-        for i in range(nbin):
+        for i in range(n_bins):
             bin_end = bin_start + bin_size
             bins.append((bin_start, bin_end))
             if remainder > 0:
-                if remainder == nbin - 1:
+                if remainder == n_bins - 1:
                     bin_end += 1
-                elif i == (nbin // 2 - 1):
+                elif i == (n_bins // 2 - 1):
                     bin_end += remainder
             bin_start = bin_end
         divided_intervals.append(bins)
@@ -90,41 +91,45 @@ def split_intervals(intervals, nbin=2):
     return divided_intervals, bin_sizes, drop_mask
 
 
-def split_interval_duration(durations, interval_range=None, mode="sample", sfreq=None):
+def split_interval_duration(
+    durations, interval_range=None, mode="sample", sampling_frequency=None
+):
     """Split interval durations into bins based on their duration.
 
     Parameters
     ----------
     durations: array_like
-        array of durations of intervals (in samples)
+        Array of durations of intervals (in samples).
     interval_range: array_like
-        array of bin edges (in samples, seconds, or percentiles) to split durations into
-        bins are defined as [>=interval_range[i], <interval_range[i+1])
+        Array of bin edges (in samples, seconds, or percentiles) to split durations
+        into bins are defined as [>=interval_range[i], <interval_range[i+1]). If
+        None, all durations are in the same bin.
     mode: str
-        mode of interval_range, either "sample" (e.g., [4, 20, 100]), "perc" (e.g., range(20,100,20)),
-        or "sec" (e.g., [0, 0.01, 0.1, 1, np.inf])
-    sfreq: float
-        sampling frequency (in Hz) of the data, only used if mode is "sec"
+        Mode of interval_range, either "sample" (e.g., [4, 20, 100]), "perc" (e.g.,
+        range(20,100,20)), or "sec" (e.g., [0, 0.01, 0.1, 1, np.inf]). If "sec",
+        sfreq must be provided.
+    sampling_frequency: float
+        Sampling frequency (in Hz) of the data, only used if mode is "sec".
 
     Returns
     -------
     mask: list
-        list of arrays of zeros and ones indicating whether the interval was in the bin
+        List of arrays of zeros and ones indicating whether the interval was in the bin.
     interval_range: array_like
-        array of bin edges (in samples) used to split durations into bins
+        Array of bin edges (in samples) used to split durations into bins.
     """
     if interval_range is None:
         mask = [np.ones_like(durations)]
         interval_range = [np.min(durations), np.max(durations)]
     else:
-        if mode == "sec" and sfreq is None:
+        if mode == "sec" and sampling_frequency is None:
             raise ValueError(
                 "Sampling frequency (sfreq) must be specified when mode is 'sec'"
             )
             return [np.ones_like(durations)], None
         else:
             if mode == "sec":
-                interval_range = [r * sfreq for r in interval_range]
+                interval_range = [r * sampling_frequency for r in interval_range]
             elif mode == "perc":
                 interval_range = np.percentile(durations, interval_range)
             mask = []
@@ -140,32 +145,33 @@ def split_interval_duration(durations, interval_range=None, mode="sample", sfreq
 def compute_fo_stats(
     tc_sec, divided_intervals, interval_mask=None, return_all_intervals=False
 ):
-    """Compute weighted averages of time courses in each interval.
+    """Compute sums and weighted averages of time courses in each interval.
 
     Parameters
     ----------
     tc_sec: array_like
-        time course of shape (n_samples, n_states)
+        Time course of shape (n_samples, n_states).
     divided_intervals: list
-        list with each element corresponding to an interval, each itself being
-        a list of tuples of start and end indices of interval bins
+        List with each element corresponding to an interval, each itself being a list of tuples of
+        start and end indices of interval bins.
     interval_mask: array_like
-        array of zeros and ones indicating whether the interval was in the bin
+        Array of zeros and ones indicating whether the interval was in the bin.
     return_all_intervals: bool
-        whether to return the density/sum of all intervals in addition to the interval averages/sums
+        Whether to return the density/sum of all intervals in addition to the interval averages/sums.
 
     Returns
     -------
     interval_weighted_avg: array_like
-        array of weighted averages of time courses in each interval of shape (n_states, n_bins, n_interval_ranges)
+        Array of weighted averages of time courses in each interval of shape (n_states, n_bins,
+        n_interval_ranges).
     interval_sum: array_like
-        array of sums of time courses in each interval of shape (n_states, n_bins, n_interval_ranges)
+        Array of sums of time courses in each interval of shape (n_states, n_bins, n_interval_ranges).
     interval_weighted_avg_all: list (optional)
-        list of length n_interval_ranges with each element an array of weighted averages of time courses
-        in each interval of shape (n_states, n_bins, n_intervals)  None if return_all_intervals is False (default)
+        List of length n_interval_ranges with each element an array of weighted averages of time courses in
+        each interval of shape (n_states, n_bins, n_intervals)  None if return_all_intervals is False (default).
     interval_sum_all: list (optional)
-        list of length n_interval_ranges with each element an array of sums of time courses
-        in each interval of shape (n_states, n_bins, n_intervals). None if return_all_intervals is False (default)
+        List of length n_interval_ranges with each element an array of sums of time courses in each interval of
+        shape (n_states, n_bins, n_intervals). None if return_all_intervals is False.
     """
     if interval_mask is None:
         interval_mask = [np.ones(len(divided_intervals))]
@@ -180,39 +186,39 @@ def compute_fo_stats(
 
         interval_weighted_avg = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))
         interval_sum = np.zeros((tc_sec.shape[1], 2, len(interval_mask)))
-        tempto = []
-        tempaway = []
+        temp_to = []
+        temp_away = []
         for i in intervals:
             d = int(np.floor((np.diff(i) - 1) / 2))
-            tempaway.append(tc_sec[i[0] : i[0] + d + 1, :])
-            tempto.append(tc_sec[i[1] - d - 1 : i[1], :])
+            temp_away.append(tc_sec[i[0] : i[0] + d + 1, :])
+            temp_to.append(tc_sec[i[1] - d - 1 : i[1], :])
 
         interval_weighted_avg_all = []
         interval_sum_all = []
         for j, mask in enumerate(interval_mask):
-            tempto_flat = np.concatenate([tempto[k] for k in np.where(mask == 1)[0]])
-            tempaway_flat = np.concatenate(
-                [tempaway[k] for k in np.where(mask == 1)[0]]
+            temp_to_flat = np.concatenate([temp_to[k] for k in np.where(mask == 1)[0]])
+            temp_away_flat = np.concatenate(
+                [temp_away[k] for k in np.where(mask == 1)[0]]
             )
 
-            interval_weighted_avg[:, 0, j] = np.mean(tempaway_flat, axis=0)
-            interval_weighted_avg[:, 1, j] = np.mean(tempto_flat, axis=0)
-            interval_sum[:, 0, j] = np.sum(tempaway_flat, axis=0)
-            interval_sum[:, 1, j] = np.sum(tempto_flat, axis=0)
+            interval_weighted_avg[:, 0, j] = np.mean(temp_away_flat, axis=0)
+            interval_weighted_avg[:, 1, j] = np.mean(temp_to_flat, axis=0)
+            interval_sum[:, 0, j] = np.sum(temp_away_flat, axis=0)
+            interval_sum[:, 1, j] = np.sum(temp_to_flat, axis=0)
             interval_weighted_avg_all.append(
                 np.transpose(
                     np.stack(
                         [
                             np.stack(
                                 [
-                                    tempaway[k].mean(axis=0)
+                                    temp_away[k].mean(axis=0)
                                     for k in np.where(mask == 1)[0]
                                 ],
                                 axis=-1,
                             ),
                             np.stack(
                                 [
-                                    tempto[k].mean(axis=0)
+                                    temp_to[k].mean(axis=0)
                                     for k in np.where(mask == 1)[0]
                                 ],
                                 axis=-1,
@@ -228,13 +234,16 @@ def compute_fo_stats(
                         [
                             np.stack(
                                 [
-                                    tempaway[k].sum(axis=0)
+                                    temp_away[k].sum(axis=0)
                                     for k in np.where(mask == 1)[0]
                                 ],
                                 axis=-1,
                             ),
                             np.stack(
-                                [tempto[k].sum(axis=0) for k in np.where(mask == 1)[0]],
+                                [
+                                    temp_to[k].sum(axis=0)
+                                    for k in np.where(mask == 1)[0]
+                                ],
                                 axis=-1,
                             ),
                         ]
@@ -283,29 +292,29 @@ def compute_fo_stats(
 
 
 def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
-    """Collate stats across states
+    """Collate list of stats (e.g., of different states) into a single array.
 
     Parameters
     ----------
     stats: list
-        list of stats (dict) for each state. Each element is a dictionary with keys
-        that at least should include "field" (e.g., interval_wavgs), that is the output
-        of compute_fo_stats
+        List of stats (dict) for each state. Each element is a dictionary with keys that
+        at least should include "field" (e.g., interval_wavgs), that is the output of
+        compute_fo_stats.
     field: str
-        field of stats to collate, e.g., "interval_wavgs", "interval_sums"
+        Field of stats to collate, e.g., "interval_wavgs", "interval_sums".
     all_to_all: bool
-        whether the density_of was used to compute the stats (in which case the first
-        2 dimensions are not n_states x n_states)
+        Whether the density_of was used to compute the stats (in which case the first
+        2 dimensions are not n_states x n_states). Default is False.
     ignore_elements: list
-        list of states to ignore (i.e. because they don't contain binary events)
+        List of indices in stats to ignore (i.e. because they don't contain binary events).
 
     Returns
     -------
     collated_stat: array_like
-        the collated stat (n_interval_states, n_density_states, n_bins, n_interval_ranges)
-        If all_to_all is False (i.e., when the density is computed for all states
+        The collated stat (n_interval_states, n_density_states, n_bins, n_interval_ranges)
+        If all_to_all is False (default) (i.e., when the density is computed for all states
         using all states' intervals), then the first two dimensions are n_states
-        and the diagonal is np.nan
+        and the diagonal is np.nan.
     """
     num_states = len(stats)
     shp = stats[0][field].shape  # (n_states, n_bins, n_interval_ranges)
@@ -332,10 +341,10 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
 def tinda(
     tc,
     density_of=None,
-    nbin=2,
+    n_bins=2,
     interval_mode=None,
     interval_range=None,
-    sfreq=None,
+    sampling_frequency=None,
     return_all_intervals=False,
 ):
     """Compute time-in-state density and sum for each interval.
@@ -343,50 +352,48 @@ def tinda(
     Parameters
     ----------
     tc: array_like
-        time courses of shape (n_samples, n_states) define intervals from
-        will use the same time courses to compute density of when density_of is None
-        Can be a list of time courses (e.g. state time courses for each subject)
+        Time courses of shape (n_samples, n_states) define intervals from will use the same time courses to
+        compute density of when density_of is None. Can be a list of time courses (e.g. state time courses for
+        each subject).
     density_of: array_like
-        time course of shape (n_samples, n_states) to compute density of
-        if None (default), density is computed for all columns of tc
-    nbin: int
-        number of bins to divide each interval into (default 2)
+        Time course of shape (n_samples, n_states) to compute density of if None (default), density is computed
+        for all columns of tc.
+    n_bins: int
+        Number of bins to divide each interval into (default 2).
     interval_mode: str
-        mode of interval_range, either "sample" (default), "sec" (seconds) or "perc" (percentile)
-        To interpret the interval range as seconds, sfreq must be provided
+        Mode of interval_range, either "sample" (default), "sec" (seconds) or "perc" (percentile). To interpret
+        the interval range as seconds, sfreq must be provided.
     interval_range: array_like
-        array of bin edges (in samples, seconds, or percentiles)
-        used to split durations into bins (default None)
-        e.g. np.arange(0, 1, 0.1) for 100ms bins
-    sfreq: float
-        sampling frequency of tc (in Hz), only used if interval_mode is "sec"
+        Array of bin edges (in samples, seconds, or percentiles) used to split durations into bins (default None),
+          e.g. np.arange(0, 1, 0.1) for 100ms bins.
+    sampling_frequency: float
+        Sampling frequency of tc (in Hz), only used if interval_mode is "sec".
     return_all_intervals: bool
-        whether to return the density/sum of all intervals in addition to the interval averages/sums
-        If True, will return a list of arrays in stats[i]['all_interval_wavgs'/'all_interval_sums'],
-        each corresponding to an interval range
+        Whether to return the density/sum of all intervals in addition to the interval averages/sums. If True,
+        will return a list of arrays in stats[i]['all_interval_wavgs'/'all_interval_sums'], each corresponding
+        to an interval range.
 
     Returns
     -------
     fo_density: array_like
-        time-in-state densities array of shape (n_interval_states, n_density_states, n_bins, n_interval_ranges)
-        n_interval_states is the number of states in the interval time courses (i.e., tc)
-        n_density_states is the number of states in the density time courses (i.e., density_of)
-        if density_of is None, n_density_states is the same as n_interval_states
-        if tc is a list of time courses (e.g., state time courses for multiple subjects),
-        then an extra dimension is appended for the subjects
+        Time-in-state densities array of shape (n_interval_states, n_density_states, n_bins, n_interval_ranges).
+        n_interval_states is the number of states in the interval time courses (i.e., tc); n_density_states is
+        the number of states in the density time courses (i.e., density_of). If density_of is None,
+        n_density_states is the same as n_interval_states. If tc is a list of time courses (e.g., state time
+        courses for multiple subjects), then an extra dimension is appended for the subjects.
     fo_sum: array_like
-        same as fo_density, but with time-in-state sums instead of densities
+        Same as fo_density, but with time-in-state sums instead of densities.
     stats: dict
-        dictionary of stats, including
-        - interval durations in samples (durations)
-        - start/end samples for each interval (intervals)
-        - the weighted average (i.e, time-in-state density) over all intervals (interval_wavg)
-        - the sum (i.e., time-in-state) over all intervals (interval_sum)
-        - the bin edges (divided_intervals) for each interval
-        - the bin sizes (bin_sizes) for each interval
-        - the interval range (in samples)
-        - unaveraged interval densities (all_interval_wavgs) - only if return_all_intervals is True
-        - unaveraged interval sums (all_interval_sums) - only if return_all_intervals is True
+        Dictionary of stats, including
+        - durations: interval durations in samples,
+        - intervals: start/end samples for each interval (intervals),
+        - interval_wavg: the weighted average (i.e, time-in-state density) over all intervals,
+        - interval_sum: the sum (i.e., time-in-state) over all intervals,
+        - divided_intervals: the bin edges for each interval,
+        - bin_sizes: the bin sizes for each interval,
+        - interval_range: the interval range (in samples),
+        - all_interval_wavg: unaveraged interval densities (only if return_all_intervals is True),
+        - all_interval_sum: unaveraged interval sums (only if return_all_intervals is True).
     """
     if isinstance(
         tc, list
@@ -397,10 +404,10 @@ def tinda(
                     tinda(
                         itc,
                         None,
-                        nbin,
+                        n_bins,
                         interval_mode,
                         interval_range,
-                        sfreq,
+                        sampling_frequency,
                         return_all_intervals,
                     )
                     for itc in tc
@@ -412,10 +419,10 @@ def tinda(
                     tinda(
                         itc,
                         density_of[ix],
-                        nbin,
+                        n_bins,
                         interval_mode,
                         interval_range,
-                        sfreq,
+                        sampling_frequency,
                         return_all_intervals,
                     )
                     for ix, itc in enumerate(tc)
@@ -448,7 +455,7 @@ def tinda(
                 # get interval info
                 intervals, durations = find_intervals(itc_prim)
                 divided_intervals, bin_sizes, dropped_intervals = split_intervals(
-                    intervals, nbin
+                    intervals, n_bins
                 )  # split intervals into nbin
                 durations = durations[
                     dropped_intervals == 0
@@ -457,16 +464,16 @@ def tinda(
                     durations,
                     interval_range=interval_range,
                     mode=interval_mode,
-                    sfreq=sfreq,
+                    sampling_frequency=sampling_frequency,
                 )  # split intervals into interval_range (i.e.,
                 # to compute statistics of intervals with durations in a certain range)
 
                 # compute time-in-state densities and sums in all intervals
                 (
-                    interval_wavgs,
-                    interval_sums,
-                    all_interval_wavgs,
-                    all_interval_sums,
+                    interval_wavg,
+                    interval_sum,
+                    all_interval_wavg,
+                    all_interval_sum,
                 ) = compute_fo_stats(
                     itc_sec,
                     divided_intervals,
@@ -479,13 +486,13 @@ def tinda(
                     {
                         "durations": durations,
                         "intervals": intervals,
-                        "interval_wavgs": interval_wavgs,
-                        "interval_sums": interval_sums,
+                        "interval_wavg": interval_wavg,
+                        "interval_sum": interval_sum,
                         "divided_intervals": divided_intervals,
                         "bin_sizes": bin_sizes,
                         "interval_range": interval_range_samples,
-                        "all_interval_wavgs": all_interval_wavgs,
-                        "all_interval_sums": all_interval_sums,
+                        "all_interval_wavg": all_interval_wavg,
+                        "all_interval_sum": all_interval_sum,
                     }
                 )
 
@@ -525,17 +532,17 @@ def optimise_sequence(fo_density, metric_to_use=0):
     Parameters
     ----------
     fo_density : array_like
-        time-in-state densities array of shape (n_interval_states, n_density_states, 2, n_subjects)
+        Time-in-state densities array of shape (n_interval_states, n_density_states, 2, n_subjects).
     metric : int, optional
-        metric to use for optimisation (default is 0)
-        0: mean FO asymmetry
-        1: proportional FO asymmetry
-        2: proportional FO asymmetry using global baseline FO
+        Metric to use for optimisation (default is 0)
+        0: mean FO asymmetry,
+        1: proportional FO asymmetry,
+        2: proportional FO asymmetry using global baseline FO.
 
     Returns
     -------
-    bestseq : list
-        list of best sequence of states to plot (in order of counterclockwise rotation)
+    best_sequence : list
+        List of best sequence of states to plot (in order of counterclockwise rotation).
     """
     if len(fo_density.shape) == 5:
         fo_density = np.squeeze(fo_density)
@@ -556,68 +563,69 @@ def optimise_sequence(fo_density, metric_to_use=0):
     K = fo_density.shape[0]
 
     # get all possible permutations of states
-    myperms = np.array(list(permutations(range(1, K - 1), K - 2)))
+    my_perms = np.array(list(permutations(range(1, K - 1), K - 2)))
 
-    sequencemetric = np.zeros((len(myperms), 9, 3))
-    for i2, iperm in enumerate(tqdm(myperms, desc="Optimising sequence")):
+    sequence_metric = np.zeros((len(my_perms), 9, 3))
+    for i2, iperm in enumerate(tqdm(my_perms, desc="Optimising sequence")):
         for i in range(5):
             # setup state points on unit circle:
-            manualorder = [1] + [2 + val for val in iperm]
-            manualorder = manualorder[:i] + [2] + manualorder[i:]
-            manualorder = [val - 1 for val in manualorder]
-            disttoplot_manual = np.zeros(K, dtype=complex)
+            manual_order = [1] + [2 + val for val in iperm]
+            manual_order = manual_order[:i] + [2] + manual_order[i:]
+            manual_order = [val - 1 for val in manual_order]
+            distance_to_plot_manual = np.zeros(K, dtype=complex)
             for i3 in range(K):
-                disttoplot_manual[manualorder[i3]] = np.exp(
+                distance_to_plot_manual[manual_order[i3]] = np.exp(
                     1j * (i3 + 1) / K * 2 * np.pi
                 )
-            angleplot = np.exp(
+            angle_plot = np.exp(
                 1j
                 * (
-                    np.angle(disttoplot_manual[:, np.newaxis]).T
-                    - np.angle(disttoplot_manual[:, np.newaxis])
+                    np.angle(distance_to_plot_manual[:, np.newaxis]).T
+                    - np.angle(distance_to_plot_manual[:, np.newaxis])
                 )
             )
 
             # compute the metric
             for i3 in range(n_metrics):
-                sequencemetric[i2, i, i3] = np.imag(
-                    np.nansum(np.nansum(angleplot * metric[i3]))
+                sequence_metric[i2, i, i3] = np.imag(
+                    np.nansum(np.nansum(angle_plot * metric[i3]))
                 )
 
     # find the permutation that maximizes the metric
-    bestseq = []
+    best_sequence = []
     for i in range(n_metrics):
-        m1 = np.argmax(np.max(np.abs(sequencemetric[:, :, i]), axis=0))
-        m = np.argmax(np.abs(sequencemetric[:, m1, i]))
-        trueseqmetric = sequencemetric[m, m1, i]
-        seq = [1] + [2 + val for val in myperms[m]]
+        m1 = np.argmax(np.max(np.abs(sequence_metric[:, :, i]), axis=0))
+        m = np.argmax(np.abs(sequence_metric[:, m1, i]))
+        true_sequence_metric = sequence_metric[m, m1, i]
+        seq = [1] + [2 + val for val in my_perms[m]]
         seq = seq[:m1] + [2] + seq[m1:]
         # want rotation to be clockwise, so flip if necessary:
-        if trueseqmetric > 0:
+        if true_sequence_metric > 0:
             seq = [1] + list(reversed(seq[1:]))
-        bestseq.append(seq)
+        best_sequence.append(seq)
 
     # return the best sequence for the chosen metric (in order of counterclockwise rotation)
-    bestseq = [i - 1 for i in bestseq[metric_to_use]]
-    return bestseq
+    best_sequence = [i - 1 for i in best_sequence[metric_to_use]]
+    return best_sequence
 
 
-def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=None):
-    """Plot state network as circular diagram with arrows
+def plot_cycle(ordering, fo_density, edges, new_figure=False, color_scheme=None):
+    """Plot state network as circular diagram with arrows.
 
     Parameters
     ----------
     ordering : list
-        list of best sequence of states to plot (in order of counterclockwise rotation)
+        List of best sequence of states to plot (in order of counterclockwise rotation).
     fo_density : array_like
-        time-in-state densities array of shape (n_interval_states, n_density_states, 2, (n_interval_ranges,) n_subjects)
-    sigpoints : array_like
-        array of zeros and ones indicating whether the connection should be plotted
-    newfigure : bool, optional
-        whether to create a new figure (default is False)
+        Time-in-state densities array of shape (n_interval_states, n_density_states, 2,
+        (n_interval_ranges,) n_subjects).
+    edges : array_like
+        Array of zeros and ones indicating whether the connection should be plotted.
+    new_figure : bool, optional
+        Whether to create a new figure (default is False).
     color_scheme : array_like, optional
-        array of size (K,3) color scheme to use for plotting (default is None)
-        if None, will use the default color scheme from the matlab code
+        Array of size (K,3) color scheme to use for plotting (default is None). If None,
+        will use the default color scheme from the matlab code.
     """
 
     # Plot state network as circular diagram with arrows
@@ -678,7 +686,7 @@ def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=No
                 ],
             ]
         )
-    if newfigure:
+    if new_figure:
         plt.figure(figsize=(6.02, 4.52), dpi=100)
     else:
         plt.gca()
@@ -698,26 +706,26 @@ def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=No
     ordering = np.roll(
         ordering[::-1], 1
     )  # rotate ordering from clockwise to counter clockwise
-    sigpoints = sigpoints[ordering][:, ordering]
+    edges = edges[ordering][:, ordering]
     mean_direction = mean_direction[ordering][:, ordering]
 
     # get the locations on the unit circle
     theta = np.arange(0, 2 * np.pi, 2 * np.pi / K)
     x = np.roll(np.cos(theta), int(K / 4))  # start from 12 o'clock
     y = np.roll(np.sin(theta), int(K - (K / 4)))
-    disttoplot_manual = np.stack([x, y]).T
+    distance_to_plot_manual = np.stack([x, y]).T
 
     # plot the scatter points with state identities
     for i in range(K):
         plt.scatter(
-            disttoplot_manual[i, 0],
-            disttoplot_manual[i, 1],
+            distance_to_plot_manual[i, 0],
+            distance_to_plot_manual[i, 1],
             s=400,
             color=color_scheme[ordering[i], :],
         )
         plt.text(
-            disttoplot_manual[i, 0],
-            disttoplot_manual[i, 1],
+            distance_to_plot_manual[i, 0],
+            distance_to_plot_manual[i, 1],
             str(ordering[i] + 1),
             horizontalalignment="center",
             verticalalignment="center",
@@ -727,23 +735,29 @@ def plot_cycle(ordering, fo_density, sigpoints, newfigure=False, color_scheme=No
     # plot the arrows
     for ik1 in range(K):
         for k2 in range(K):
-            if sigpoints[ik1, k2]:
+            if edges[ik1, k2]:
                 # arrow lengths have to be proportional to the distance between the states. Use Pythagoras:
-                linescale = np.sqrt(
-                    np.sum((disttoplot_manual[k2, :] - disttoplot_manual[ik1, :]) ** 2)
+                line_scale = np.sqrt(
+                    np.sum(
+                        (
+                            distance_to_plot_manual[k2, :]
+                            - distance_to_plot_manual[ik1, :]
+                        )
+                        ** 2
+                    )
                 )
-                quivlength = 0.3 * linescale
+                quivlength = 0.3 * line_scale
                 arrow_start = (
-                    disttoplot_manual[ik1, :]
+                    distance_to_plot_manual[ik1, :]
                     + 0.1
-                    * (disttoplot_manual[k2, :] - disttoplot_manual[ik1, :])
-                    / linescale
+                    * (distance_to_plot_manual[k2, :] - distance_to_plot_manual[ik1, :])
+                    / line_scale
                 )
                 arrow_end = (
-                    disttoplot_manual[k2, :]
+                    distance_to_plot_manual[k2, :]
                     - 0.1
-                    * (disttoplot_manual[k2, :] - disttoplot_manual[ik1, :])
-                    / linescale
+                    * (distance_to_plot_manual[k2, :] - distance_to_plot_manual[ik1, :])
+                    / line_scale
                 )
                 if mean_direction[ik1, k2] > 0:  # arrow from k1 to k2:
                     plt.arrow(

@@ -32,7 +32,7 @@ print("Running TINDA")
 fo_density, fo_sum, stats = tinda(sim_stc)
 
 print("Finding best circular sequence")
-bestseq = optimise_sequence(fo_density)
+best_sequence = optimise_sequence(fo_density)
 
 print("Finding strongest interval asymmetries")
 mean_direction = np.squeeze(
@@ -45,9 +45,9 @@ perc = 0.25
 n_largest = int((np.prod(mean_direction.shape) - mean_direction.shape[0]) * perc)
 largest_indices = np.abs(mean_direction).argsort(axis=None)[-n_largest:]
 
-largest_nodes = np.zeros(mean_direction.shape)
+strongest_edges = np.zeros(mean_direction.shape)
 # Set largest indices to 1
-largest_nodes[np.unravel_index(largest_indices, mean_direction.shape)] = 1
+strongest_edges[np.unravel_index(largest_indices, mean_direction.shape)] = 1
 
 # Plot
 print("Plotting results")
@@ -57,5 +57,5 @@ plt.colorbar()
 plt.title("Mean direction")
 plt.savefig("figures/tinda_sim_mean_direction.png")
 
-plot_cycle(bestseq, fo_density, largest_nodes, newfigure=True)
+plot_cycle(best_sequence, fo_density, strongest_edges, new_figure=True)
 plt.savefig("figures/tinda_sim_cycle.png")
