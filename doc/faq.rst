@@ -64,7 +64,11 @@ The 2023 OSL workshop had a session on dynamic network modelling. The OSF projec
 Can I use a structural parcellation (e.g. AAL or Desikan-Killiany atlas)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes, you can. There’s nothing stopping you from using the parcellation you want during source reconstruction. Note, source reconstruction is performed using the `OSL package <https://github.com/OHBA-analysis/osl>`_ rather than within osl-dynamics. However, you want the number of parcels to be a good amount less than the rank of the sensor space data in order to well estimate your parcel time courses. The rank is at most equal to the number of sensors you have. However, with Maxfiltered data (e.g. Elekta/MEGIN data), the default rank of the sensor data is ~64, and so it is sensible to require the number of parcels to be less than 64. Even with non-maxfiltered data with hundreds of sensors (e.g. CTF, OPMs) the effective amount of information in the sensor data typically corresponds to a rank of about 100. You can look at the eigenspectrum of your sensor space data to check this. Also note, the requirement to have the number of parcels less than the rank is an absolute requirement, if you are using the recommended **symmetric orthogonalisation** approach on the parcel time courses to correct for spatial leakage. This is not a deficiency of the symmetric orthogonalisation approach, but reflects the rank needed to use this more complete spatial leakage correction (it removes so-called inherited or ghost interactions as well) while still being able to estimate parcel time courses unambiguously.
+Yes, you can. There’s nothing stopping you from using the parcellation you want during source reconstruction. Note, source reconstruction is performed using the `OSL package <https://github.com/OHBA-analysis/osl>`_ rather than within osl-dynamics.
+
+However, you want the number of parcels to be a good amount less than the rank of the sensor space data in order to well estimate your parcel time courses. The rank is at most equal to the number of sensors you have. With Maxfiltered data (e.g. Elekta/MEGIN data), the default rank of the sensor data is ~64, and so it is sensible to require the number of parcels to be less than 64. Even with non-maxfiltered data with hundreds of sensors (e.g. CTF, OPMs) the effective amount of information in the sensor data typically corresponds to a rank of about 100. You can look at the eigenspectrum of your sensor space data to check this.
+
+Also note, the requirement to have the number of parcels less than the rank is an absolute requirement, if you are using the recommended **symmetric orthogonalisation** approach on the parcel time courses to correct for spatial leakage. This is not a deficiency of the symmetric orthogonalisation approach, but reflects the rank needed to use this more complete spatial leakage correction (it removes so-called inherited or ghost interactions as well) while still being able to estimate parcel time courses unambiguously.
 
 Why do I need to sign flip my data before training a model?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -245,6 +249,16 @@ I've encountered a NaN when I tried to train a model? Why did this happen and ho
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Models in osl-dynamics are trained using 'stochastic gradient decent'. We believe the NaN values in the loss function arise from a bad update to the model parameters. We recommend using a lower learning rate and/or larger batch size to help avoid this problem. Alternatively, more aggressive bad segment removal when proprocessing the data seems to help with this problem.
+
+Why is my loss function increasing when I train a DyNeMo model?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The cost function we use for DyNeMo is the variational free energy:
+
+.. math::
+    \mathcal{F} = -LL + \eta KL
+
+where :math:`\eta` is the 'KL annealing factor'. This is a scalar that starts off at zero and increases to one as training progresses. At the start of training we suppress the KL term of the loss function (by setting :math:`\eta` to zero), which allows us to find the model that maximises the likliehood (via minimising the negative log-likelihood term, :math:`-LL`). Then we slowly turn on the KL term by increasing :math:`\eta`, this adds more of the KL term to the cost funciton which gives the apparent rise in the loss function. This process is known as **KL annealing**. We typically use KL annealing for the first half of training (set using the :code:`n_kl_annealing_epochs` hyperparameter). After :code:`n_kl_annealing_epochs` of training have occurred then the model is using the full cost function (with :math:`\eta=1`). If we are using early stopping we should make sure we're only considering epochs after :code:`n_kl_annealing_epochs`.
 
 Post-Hoc Analysis
 -----------------
