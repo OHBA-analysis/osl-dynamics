@@ -3,8 +3,30 @@
 See the `toolbox examples
 <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
 for scripts that use the config API.
+
+Note, the config API can be used via the command line with::
+
+    % osld-pipeline <config-file> <output-directory> <restrict>
+
+where
+
+- :code:`<config-file>` is a yaml file containing the config.
+- :code:`<output-directory>` is the output directory.
+
+Optionally, you can specify a particular GPU to use with::
+
+    % osld-pipeline <config-file> <output-directory> --restrict <restrict>
+
+where :code:`<restrict>` is an integer specifying the GPU number. E.g. if you would
+just like to use the first GPU, you can pass::
+
+    % osld-pipeline <config-file> <output-directory> --restrict 0
+
+Remember you need to activate the :code:`osld` conda environment to use the
+command line interface.
 """
 
+import argparse
 import logging
 import os
 import pickle
@@ -139,7 +161,7 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
 def run_pipeline_from_file(
     config_file,
     output_directory,
-    restrict: str,
+    restrict=None,
 ):
     """Run a pipeline from a config file.
 
@@ -149,15 +171,45 @@ def run_pipeline_from_file(
         Path to the config file.
     output_directory : str
         Path to the output directory.
-    restrict : str
-        GPU to use. Optional.
+    restrict : int or str
+        GPU to use. If a str is passed it will be cast to an int. Optional.
     """
     if restrict is not None:
-        from osl_dynamics.inference.tf_ops import gpu_growth, select_gpu
+        from osl_dynamics.inference import tf_ops
 
-        select_gpu(int(restrict))
-        gpu_growth()
+        tp_ops.select_gpu(int(restrict))
+        tp_ops.gpu_growth()
     config_path = Path(config_file)
     config = config_path.read_text()
 
     run_pipeline(config, output_directory)
+
+
+def osld_pipeline_cli():
+    """Command line interface function for running a pipeline from a config file."""
+
+    # Arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "config_file",
+        type=str,
+        help="Path to the config file.",
+    )
+    parser.add_argument(
+        "output_directory",
+        type=str,
+        help="Path to the output directory.",
+    )
+    parser.add_argument(
+        "--restrict",
+        type=str,
+        help="GPU to use. Optional.",
+    )
+    args = parser.parse_args()
+
+    # Run pipeline
+    run_pipeline_from_file(
+        args.config_file,
+        args.output_directory,
+        restrict=args.restrict,
+    )

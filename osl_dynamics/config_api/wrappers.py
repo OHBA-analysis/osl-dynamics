@@ -1,9 +1,5 @@
 """Wrapper functions for use in the config API.
 
-See the `toolbox examples
-<https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
-for scripts that use the config API.
-
 All of the functions in this module can be listed in the config passed to
 :code:`osl_dynamics.run_pipeline`.
 
@@ -13,7 +9,7 @@ All wrapper functions have the structure::
 
 where:
 
-- :code:`data` is an :code:`osl_dynamics.data.Data` object
+- :code:`data` is an :code:`osl_dynamics.data.Data` object.
 - :code:`output_dir` is the path to save output to.
 - :code:`kwargs` are keyword arguments for function specific options.
 """
