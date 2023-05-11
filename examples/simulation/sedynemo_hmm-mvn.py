@@ -78,9 +78,6 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-# Set scaling factor for devation kl loss
-model.set_bayesian_kl_scaling(training_data)
-
 model.random_subset_initialization(training_data, n_init=5, n_epochs=10, take=0.25)
 print("Training model")
 history = model.fit(training_data, epochs=config.n_epochs)

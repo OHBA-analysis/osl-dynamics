@@ -10,7 +10,6 @@ import tensorflow as tf
 from tensorflow.keras import layers, initializers
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.utils.misc import get_argument
 from osl_dynamics.models import dynemo_obs, sedynemo_obs
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
@@ -29,7 +28,6 @@ from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     SampleGammaDistributionLayer,
     SoftmaxLayer,
-    ConcatenateLayer,
     ConcatEmbeddingsLayer,
     SubjectMapLayer,
     MixSubjectSpecificParametersLayer,
@@ -727,7 +725,6 @@ def _model_structure(config):
         config.model_regularizer,
         name="mod_rnn",
     )
-    concatenate_layer = ConcatenateLayer(axis=2, name="model_concat")
     mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
     mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mod_sigma"
@@ -737,10 +734,8 @@ def _model_structure(config):
     # Data flow
     model_input_dropout = model_input_dropout_layer(theta_norm)
     model_output = model_output_layer(model_input_dropout)
-    dynamic_subject_embeddings = subject_embeddings_layer(subj_id)
-    model_output_concat = concatenate_layer([model_output, dynamic_subject_embeddings])
-    mod_mu = mod_mu_layer(model_output_concat)
-    mod_sigma = mod_sigma_layer(model_output_concat)
+    mod_mu = mod_mu_layer(model_output)
+    mod_sigma = mod_sigma_layer(model_output)
     kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
 
     # For the observation model (static KL loss)
