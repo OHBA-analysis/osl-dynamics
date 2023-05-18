@@ -5,7 +5,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, layers, initializers
+from tensorflow.keras import activations, layers, initializers, regularizers
 
 import osl_dynamics.inference.initializers as osld_initializers
 
@@ -100,7 +100,7 @@ class AddRegularizationLossLayer(layers.Layer):
 
     def __init__(self, reg, strength, **kwargs):
         super().__init__(**kwargs)
-        self.reg = tf.keras.regularizers.get(reg)
+        self.reg = regularizers.get(reg)
         self.strength = strength
 
     def call(self, inputs, **kwargs):
@@ -420,8 +420,8 @@ class VectorsLayer(layers.Layer):
         Should we learn the vectors?
     initial_value : np.ndarray
         Initial value for the vectors.
-    regularizer : tf.keras.regularizers.Regularizer
-        Regularizer for vectors.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
@@ -488,8 +488,8 @@ class CovarianceMatricesLayer(layers.Layer):
         Initial values for the matrices.
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
-    regularizer : tf.keras.regularizers.Regularizer
-        Regularizer for matrices.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
@@ -573,8 +573,8 @@ class CorrelationMatricesLayer(layers.Layer):
         Initial values for the matrices.
     epsilon : float
         Error added to the diagonal of correlation matrices for numerical stability.
-    regularizer : tf.keras.regularizers.Regularizer
-        Regularizer for matrices.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
@@ -659,8 +659,8 @@ class DiagonalMatricesLayer(layers.Layer):
         Initial values for the matrices.
     epsilon : float
         Error added to the diagonal matrices for numerical stability.
-    regularizer : tf.keras.regularizers.Regularizer
-        Regularizer for the diagonal entries.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
@@ -744,8 +744,8 @@ class MatrixLayer(layers.Layer):
         Initial value for the matrix.
     epsilon : float
         Error added to the matrices for numerical stability.
-    regularizer : tf.keras.regularizers.Regularizer
-        Regularizer for the diagonal entries.
+    regularizer : osl-dynamics regularizer
+        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
     """
 
     def __init__(
@@ -1352,6 +1352,10 @@ class MultiLayerPerceptronLayer(layers.Layer):
         Activation type.
     drop_rate : float
         Dropout rate.
+    regularizer : str
+        Regularizer type.
+    regularizer_factor : float
+        Regularizer factor.
     """
 
     def __init__(
@@ -1361,17 +1365,35 @@ class MultiLayerPerceptronLayer(layers.Layer):
         norm_type,
         act_type,
         drop_rate,
+        regularizer=None,
+        regularizer_factor=0.0,
+        n_batches=1,
         **kwargs,
     ):
         super().__init__(**kwargs)
+        self.regularizer = regularizers.get(regularizer)
+        self.regularizer_factor = regularizer_factor
+        self.n_batches = n_batches
         self.layers = []
-        for n in range(n_layers):
+        for _ in range(n_layers):
             self.layers.append(layers.Dense(n_units))
             self.layers.append(NormalizationLayer(norm_type))
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
     def call(self, inputs, **kwargs):
+        reg = 0.0
+        data, inputs = inputs
+
+        batch_size = tf.cast(tf.shape(data)[0], tf.float32)
+        scaling_factor = batch_size * self.n_batches
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
+            if self.regularizer is not None and isinstance(layer, layers.Dense):
+                reg += self.regularizer(layer.kernel)
+                reg += self.regularizer(layer.bias)
+        reg *= self.regularizer_factor
+        reg /= scaling_factor
+        self.add_loss(reg)
+        self.add_metric(reg, name=self.name)
         return inputs
