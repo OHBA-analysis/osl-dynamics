@@ -427,7 +427,7 @@ class Model(VariationalInferenceModelBase):
         sedynemo_obs.set_bayesian_kl_scaling(
             self.model, n_batches, learn_means, learn_covariances
         )
-    
+
     def set_dev_mlp_reg_scaling(self, training_dataset):
         """Set the correct scaling for the deviation MLP regularization.
 
@@ -440,7 +440,9 @@ class Model(VariationalInferenceModelBase):
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_dev_mlp_reg_scaling(self.model, n_batches, learn_means, learn_covariances)
+        sedynemo_obs.set_dev_mlp_reg_scaling(
+            self.model, n_batches, learn_means, learn_covariances
+        )
 
     def random_subject_initialization(self, **kwargs):
         """random subject initialisation not compatible with SE-DyNeMo."""

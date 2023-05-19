@@ -5,12 +5,14 @@
 
 print("Setting up")
 import os
+
 import numpy as np
-from sklearn.decomposition import PCA
+from matplotlib import pyplot as plt
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
-from osl_dynamics.utils import plotting
 from osl_dynamics.models.sedynemo import Config, Model
+from osl_dynamics.utils import plotting
+from sklearn.decomposition import PCA
 
 # Create directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -44,7 +46,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=100,
-    batch_size=128,
+    batch_size=32,
     learning_rate=0.005,
     n_epochs=200,
     multi_gpu=False,
@@ -100,9 +102,12 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
 
-# Plot the simulated subject embeddings with group labels
+# Plot the simulated and inferred subject embeddings with group labels
 sim_subject_embeddings = sim.subject_embeddings
+inf_subject_embeddings = model.get_subject_embeddings()
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 plotting.plot_scatter(
     [sim_subject_embeddings[group_mask, 0] for group_mask in group_masks],
     [sim_subject_embeddings[group_mask, 1] for group_mask in group_masks],
@@ -112,24 +117,24 @@ plotting.plot_scatter(
         np.array([str(i) for i in range(config.n_subjects)])[group_mask]
         for group_mask in group_masks
     ],
-    filename="figures/sim_subject_embeddings.png",
+    ax=axes[0],
 )
 
-# Get the inferred subject embeddings
-inf_subject_embeddings = model.get_subject_embeddings()
-
 # Perform PCA on the subject embeddings to visualise the embeddings
-pca = PCA(n_components=2)
-pca_inf_subject_embeddings = pca.fit_transform(inf_subject_embeddings)
-print("explained variances ratio:", pca.explained_variance_ratio_)
 plotting.plot_scatter(
-    [pca_inf_subject_embeddings[group_mask, 0] for group_mask in group_masks],
-    [pca_inf_subject_embeddings[group_mask, 1] for group_mask in group_masks],
-    x_label="PC1",
-    y_label="PC2",
+    [inf_subject_embeddings[group_mask, 0] for group_mask in group_masks],
+    [inf_subject_embeddings[group_mask, 1] for group_mask in group_masks],
+    x_label="dim1",
+    y_label="dim2",
     annotate=[
         np.array([str(i) for i in range(config.n_subjects)])[group_mask]
         for group_mask in group_masks
     ],
-    filename="figures/inf_subject_embeddings.png",
+    ax=axes[1],
 )
+axes[0].set_title("Simulation")
+axes[1].set_title("Inferred")
+fig.savefig("figures/subject_embeddings.png")
+plt.close()
+
+training_data.delete_dir()
