@@ -78,6 +78,11 @@ class Config(BaseModelConfig):
         E.g. 'relu', 'sigmoid', 'tanh', etc.
     dev_dropout : float
         Dropout rate for the MLP for deviations.
+    dev_regularizer : str
+        Regularizer for the MLP for deviations.
+    dev_regularizer_factor : float
+        Regularizer factor for the MLP for deviations.
+        This will be scaled by the amount of data.
 
     batch_size : int
         Mini-batch size.
@@ -117,6 +122,8 @@ class Config(BaseModelConfig):
     dev_normalization: str = None
     dev_activation: str = None
     dev_dropout: float = 0.0
+    dev_regularizer: str = None
+    dev_regularizer_factor: float = 0.0
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
@@ -161,6 +168,12 @@ class Model(ModelBase):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def fit(self, training_data, *arg, **kwargs):
+        # Set the scalings
+        self.set_dev_mlp_reg_scaling(training_data)
+        self.set_bayesian_kl_scaling(training_data)
+        return super().fit(training_data, *args, **kwargs)
 
     def get_group_means(self):
         """Get the group means.
@@ -263,6 +276,13 @@ class Model(ModelBase):
         learn_covariances = self.config.learn_covariances
         set_bayesian_kl_scaling(self.model, n_batches, learn_means, learn_covariances)
 
+    def set_dev_mlp_reg_scaling(self, training_dataset):
+        """Set the correct scaling for the dev mlp regularization."""
+        n_batches = dtf.get_n_batches(training_dataset)
+        learn_means = self.config.learn_means
+        learn_covariances = self.config.learn_covariances
+        set_dev_mlp_reg_scaling(self.model, n_batches, learn_means, learn_covariances)
+
     def set_group_means(self, group_means, update_initializer=True):
         """Set the group means of each mode.
 
@@ -352,6 +372,8 @@ def _model_structure(config):
             config.dev_normalization,
             config.dev_activation,
             config.dev_dropout,
+            config.dev_regularizer,
+            config.dev_regularizer_factor,
             name="means_dev_map_input",
         )
         means_dev_map_layer = layers.Dense(config.n_channels, name="means_dev_map")
@@ -436,6 +458,8 @@ def _model_structure(config):
             config.dev_normalization,
             config.dev_activation,
             config.dev_dropout,
+            config.dev_regularizer,
+            config.dev_regularizer_factor,
             name="covs_dev_map_input",
         )
         covs_dev_map_layer = layers.Dense(
@@ -546,6 +570,8 @@ def _model_structure(config):
             config.dev_normalization,
             config.dev_activation,
             config.dev_dropout,
+            config.dev_regularizer,
+            config.dev_regularizer_factor,
             name="means_dev_mag_mod_beta_input",
         )
         means_dev_mag_mod_beta_layer = layers.Dense(
@@ -585,6 +611,8 @@ def _model_structure(config):
             config.dev_normalization,
             config.dev_activation,
             config.dev_dropout,
+            config.dev_regularizer,
+            config.dev_regularizer_factor,
             name="covs_dev_mag_mod_beta_input",
         )
         covs_dev_mag_mod_beta_layer = layers.Dense(
@@ -705,7 +733,7 @@ def get_dev_map(model, map, subject_embeddings=None):
         norm_dev_map_layer = model.get_layer("norm_covs_dev_map")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    dev_map_input = dev_map_input_layer(concat_embeddings)
+    dev_map_input = dev_map_input_layer([np.zeros(1), concat_embeddings])
     dev_map = dev_map_layer(dev_map_input)
     norm_dev_map = norm_dev_map_layer(dev_map)
     return norm_dev_map.numpy()
@@ -837,3 +865,12 @@ def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
     sorted_distances = np.argsort(distances, axis=1)
     nearest_neighbours = sorted_distances[:, :n_neighbours]
     return nearest_neighbours
+
+
+def set_dev_mlp_reg_scaling(model, n_batches, learn_means, learn_covariances):
+    if learn_means:
+        model.get_layer("means_dev_map_input").n_batches = n_batches
+        model.get_layer("means_dev_mag_mod_beta_input").n_batches = n_batches
+    if learn_covariances:
+        model.get_layer("covs_dev_map_input").n_batches = n_batches
+        model.get_layer("covs_dev_mag_mod_beta_input").n_batches = n_batches

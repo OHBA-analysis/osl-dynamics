@@ -1,78 +1,71 @@
-"""Example script for running inference on simulated multi-subject HMM-MVN data.
+"""Example script for running HMM inference on simulated HMM-MVN data.
 
--Should achieve a dice score of 0.99.
 """
 
-print("Setting up")
 import os
 
 import numpy as np
 from matplotlib import pyplot as plt
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
-from osl_dynamics.models.sedynemo import Config, Model
+from osl_dynamics.models.sehmm import Config, Model
 from osl_dynamics.utils import plotting
-from sklearn.decomposition import PCA
 
-# Create directory to hold plots
+# Directory for plots
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
+tf_ops.select_gpu(0)
 tf_ops.gpu_growth()
 
 # Settings
 config = Config(
-    n_modes=5,
+    n_states=5,
     n_channels=20,
+    sequence_length=200,
     n_subjects=100,
     subject_embeddings_dim=2,
     mode_embeddings_dim=2,
-    sequence_length=200,
-    inference_n_units=128,
-    inference_normalization="layer",
-    model_n_units=128,
-    model_normalization="layer",
-    learn_alpha_temperature=True,
-    initial_alpha_temperature=1.0,
-    learn_means=False,
-    learn_covariances=True,
     dev_n_layers=5,
     dev_n_units=32,
     dev_activation="tanh",
     dev_normalization="layer",
     dev_regularizer="l1",
     dev_regularizer_factor=10,
+    learn_means=False,
+    learn_covariances=True,
+    batch_size=16,
+    learning_rate=1e-3,
+    n_epochs=30,
+    learn_trans_prob=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
-    batch_size=32,
-    learning_rate=0.005,
-    n_epochs=200,
-    multi_gpu=False,
+    n_kl_annealing_epochs=15,
 )
 
 # Simulate data
-print("Simulating data")
-
 sim = simulation.MSubj_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
     subject_means="zero",
     subject_covariances="random",
-    n_states=config.n_modes,
+    n_states=config.n_states,
     n_channels=config.n_channels,
     n_covariances_act=2,
     n_subjects=config.n_subjects,
     n_subject_embedding_dim=config.subject_embeddings_dim,
     n_mode_embedding_dim=config.mode_embeddings_dim,
-    subject_embedding_scale=0.001,
+    subject_embedding_scale=0.002,
     n_groups=3,
     between_group_scale=0.2,
     stay_prob=0.9,
     random_seed=1234,
 )
 sim.standardize()
+sim_stc = np.concatenate(sim.mode_time_course)
+
+# Create training dataset
 training_data = data.Data([mtc for mtc in sim.time_series])
 
 # Build model
@@ -81,30 +74,47 @@ model.summary()
 
 # Set regularizers
 model.set_regularizers(training_data)
+# Train model
+history = model.fit(training_data)
 
-model.random_subset_initialization(training_data, n_init=5, n_epochs=10, take=0.25)
-print("Training model")
-history = model.fit(training_data, epochs=config.n_epochs)
+# Loss
+plotting.plot_line(
+    [range(1, len(history["loss"]) + 1)],
+    [history["loss"]],
+    x_label="Epoch",
+    y_label="Loss",
+    filename="figures/loss.png",
+)
 
-# Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(training_data)
-print(f"Free energy: {free_energy}")
+# Get inferred parameters
+inf_stc = model.get_alpha(training_data, concatenate=True)
+inf_tp = model.get_trans_prob()
 
-# Inferred mode mixing factors and mode time course
-inf_alp = model.get_alpha(training_data, concatenate=True)
-inf_stc = modes.argmax_time_courses(inf_alp)
-sim_stc = np.concatenate(sim.mode_time_course)
+# Re-order with respect to the simulation
+_, order = modes.match_modes(sim_stc, inf_stc, return_order=True)
+inf_stc = inf_stc[:, order]
+inf_tp = inf_tp[np.ix_(order, order)]
 
-sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
+
+plotting.plot_alpha(
+    sim_stc,
+    inf_stc,
+    n_samples=2000,
+    y_labels=["Ground Truth", "Inferred"],
+    filename="figures/stc.png",
+)
+
+plotting.plot_matrices(inf_tp[np.newaxis, ...], filename="figures/trans_prob.png")
+
+# Compare the inferred mode time course to the ground truth
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
-# Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc))
 
-# Plot the simulated and inferred subject embeddings with group labels
+
 sim_subject_embeddings = sim.subject_embeddings
-inf_subject_embeddings = model.get_subject_embeddings()
+subject_embeddings = model.get_subject_embeddings()
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
@@ -120,12 +130,11 @@ plotting.plot_scatter(
     ax=axes[0],
 )
 
-# Perform PCA on the subject embeddings to visualise the embeddings
 plotting.plot_scatter(
-    [inf_subject_embeddings[group_mask, 0] for group_mask in group_masks],
-    [inf_subject_embeddings[group_mask, 1] for group_mask in group_masks],
-    x_label="dim1",
-    y_label="dim2",
+    [subject_embeddings[group_mask, 0] for group_mask in group_masks],
+    [subject_embeddings[group_mask, 1] for group_mask in group_masks],
+    x_label="dim_1",
+    y_label="dim_2",
     annotate=[
         np.array([str(i) for i in range(config.n_subjects)])[group_mask]
         for group_mask in group_masks
