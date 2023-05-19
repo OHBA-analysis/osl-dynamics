@@ -252,7 +252,7 @@ class Model(HMMModel):
             epochs = self.config.n_epochs
 
         # Set the scalings
-        self.set_dev_mlp_reg_scaling(training_data)
+        self.set_dev_mlp_reg_scaling(dataset)
         self.set_bayesian_kl_scaling(dataset)
 
         # Make a TensorFlow dataset
@@ -828,7 +828,7 @@ def _model_structure(config):
         )
 
         # Get the mean deviation maps (no global magnitude information)
-        means_dev_map_input = means_dev_map_input_layer(means_concat_embeddings)
+        means_dev_map_input = means_dev_map_input_layer([data, means_concat_embeddings])
         means_dev_map = means_dev_map_layer(means_dev_map_input)
         norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
 
@@ -917,7 +917,7 @@ def _model_structure(config):
         )
 
         # Get the covariance deviation maps (no global magnitude information)
-        covs_dev_map_input = covs_dev_map_input_layer(covs_concat_embeddings)
+        covs_dev_map_input = covs_dev_map_input_layer([data, covs_concat_embeddings])
         covs_dev_map = covs_dev_map_layer(covs_dev_map_input)
         norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
 
@@ -998,7 +998,7 @@ def _model_structure(config):
 
         # Data flow
         means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
-            means_concat_embeddings
+            [data, means_concat_embeddings]
         )
         means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(
             means_dev_mag_mod_beta_input
@@ -1039,7 +1039,7 @@ def _model_structure(config):
 
         # Data flow
         covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
-            covs_concat_embeddings
+            [data, covs_concat_embeddings]
         )
         covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(

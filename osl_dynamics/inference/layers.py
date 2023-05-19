@@ -1381,7 +1381,7 @@ class MultiLayerPerceptronLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         reg = 0.0
         data, inputs = inputs
 
@@ -1392,8 +1392,10 @@ class MultiLayerPerceptronLayer(layers.Layer):
             if self.regularizer is not None and isinstance(layer, layers.Dense):
                 reg += self.regularizer(layer.kernel)
                 reg += self.regularizer(layer.bias)
-        reg *= self.regularizer_factor
-        reg /= scaling_factor
-        self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
+
+        if self.regularizer is not None and training:
+            reg *= self.regularizer_factor
+            reg /= scaling_factor
+            self.add_loss(reg)
+            self.add_metric(reg, name=self.name)
         return inputs

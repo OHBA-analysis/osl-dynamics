@@ -733,7 +733,7 @@ def get_dev_map(model, map, subject_embeddings=None):
         norm_dev_map_layer = model.get_layer("norm_covs_dev_map")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    dev_map_input = dev_map_input_layer(concat_embeddings)
+    dev_map_input = dev_map_input_layer([np.zeros(1), concat_embeddings])
     dev_map = dev_map_layer(dev_map_input)
     norm_dev_map = norm_dev_map_layer(dev_map)
     return norm_dev_map.numpy()
