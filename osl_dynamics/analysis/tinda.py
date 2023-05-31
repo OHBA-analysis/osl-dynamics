@@ -301,10 +301,10 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
     ----------
     stats : list
         List of stats (dict) for each state. Each element is a dictionary with keys that
-        at least should include "field" (e.g., interval_wavgs), that is the output of
+        at least should include "field" (e.g., interval_wavg), that is the output of
         compute_fo_stats.
     field : str
-        Field of stats to collate, e.g., "interval_wavgs", "interval_sums".
+        Field of stats to collate, e.g., "interval_wavg", "interval_sum".
     all_to_all : bool
         Whether the density_of was used to compute the stats (in which case the first
         2 dimensions are not n_states x n_states). Default is False.
@@ -375,7 +375,7 @@ def tinda(
     return_all_intervals : bool
         Whether to return the density/sum of all intervals in addition to the interval
         averages/sums. If True, will return a list of arrays in
-        stats[i]['all_interval_wavgs'/'all_interval_sums'], each corresponding to an
+        stats[i]['all_interval_wavg'/'all_interval_sum'], each corresponding to an
         interval range.
 
     Returns
@@ -510,13 +510,13 @@ def tinda(
         # Get a full matrix of FO densities and sums
         fo_density = collate_stats(
             stats,
-            "interval_wavgs",
+            "interval_wavg",
             all_to_all=density_of is None,
             ignore_elements=ignore_elements,
         )
         fo_sum = collate_stats(
             stats,
-            "interval_sums",
+            "interval_sum",
             all_to_all=density_of is None,
             ignore_elements=ignore_elements,
         )
