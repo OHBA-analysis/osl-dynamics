@@ -169,7 +169,7 @@ class Model(ModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-    def fit(self, training_data, *arg, **kwargs):
+    def fit(self, training_data, *args, **kwargs):
         # Set the scalings
         self.set_dev_mlp_reg_scaling(training_data)
         self.set_bayesian_kl_scaling(training_data)
@@ -414,7 +414,7 @@ def _model_structure(config):
         )
 
         # Get the mean deviation maps (no global magnitude information)
-        means_dev_map_input = means_dev_map_input_layer(means_concat_embeddings)
+        means_dev_map_input = means_dev_map_input_layer([data, means_concat_embeddings])
         means_dev_map = means_dev_map_layer(means_dev_map_input)
         norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
 
@@ -503,7 +503,7 @@ def _model_structure(config):
         )
 
         # Get the covariance deviation maps (no global magnitude information)
-        covs_dev_map_input = covs_dev_map_input_layer(covs_concat_embeddings)
+        covs_dev_map_input = covs_dev_map_input_layer([data, covs_concat_embeddings])
         covs_dev_map = covs_dev_map_layer(covs_dev_map_input)
         norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
 
@@ -586,7 +586,7 @@ def _model_structure(config):
 
         # Data flow
         means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
-            means_concat_embeddings
+            [data, means_concat_embeddings]
         )
         means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(
             means_dev_mag_mod_beta_input
@@ -627,7 +627,7 @@ def _model_structure(config):
 
         # Data flow
         covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
-            covs_concat_embeddings
+            [data, covs_concat_embeddings]
         )
         covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
@@ -644,7 +644,7 @@ def _model_structure(config):
 
     # Total KL loss
     # Layer definitions
-    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+    kl_loss_layer = KLLossLayer(False, name="kl_loss")
 
     # Data flow
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
