@@ -353,15 +353,85 @@ class VariationalInferenceModelBase(ModelBase):
             Dictionary with labels for each prediction.
         """
         predictions = self.model.predict(*args, *kwargs)
-        return_names = ["ll_loss", "kl_loss", "alpha"]
-        if self.config.multiple_dynamics:
-            return_names.append("gamma")
+        if not self.config.multiple_dynamics:
+            return_names = ["ll_loss", "kl_loss", "theta"]
+        else:
+            return_names = ["ll_loss", "kl_loss", "mean_theta", "fc_theta"]
         predictions_dict = dict(zip(return_names, predictions))
 
         return predictions_dict
 
+    def get_theta(self, dataset, concatenate=False):
+        """Mode mixing logits, theta.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for each subject.
+        concatenate : bool
+            Should we concatenate alpha for each subject?
+
+        Returns
+        -------
+        theta : list or np.ndarray
+            Mode mixing logits with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        fc_theta : list or np.ndarray
+            Mode mixing logits for FC.
+            Only returned if self.config.multiple_dynamics=True.
+        """
+        if self.config.multiple_dynamics:
+            return self._get_multiple_dynamics_theta(dataset, concatenate)
+
+        dataset = self.make_dataset(dataset)
+
+        _logger.info("Getting theta")
+        theta = []
+        for ds in dataset:
+            predictions = self.predict(ds)
+            theta.append(np.concatenate(predictions["theta"]))
+
+        if concatenate or len(theta) == 1:
+            theta = np.concatenate(theta)
+
+        return theta
+
+    def _get_multiple_dynamics_theta(self, dataset, concatenate=False):
+        """Get theta for the multi-time-scale model.
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for each subject.
+
+        Returns
+        -------
+        mean_theta : list or np.ndarray
+            Mode mixing logits for mean with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        fc_theta : list or np.ndarray
+            Mode mixing logits for FC with shape (n_subjects, n_samples, n_modes) or
+            (n_samples, n_modes).
+        """
+        dataset = self.make_dataset(dataset)
+
+        _logger.info("Getting theta")
+        mean_theta = []
+        fc_theta = []
+        for ds in dataset:
+            predictions = self.predict(ds)
+            mean_theta.append(np.concatenate(predictions["mean_theta"]))
+            fc_theta.append(np.concatenate(predictions["fc_theta"]))
+
+        if concatenate or len(mean_theta) == 1:
+            mean_theta = np.concatenate(mean_theta)
+            fc_theta = np.concatenate(fc_theta)
+
+        return mean_theta, fc_theta
+
     def get_alpha(self, dataset, concatenate=False):
-        """Mode mixing factors, alpha.
+        """Get mode mixing coefficients alpha.
+        Wrapper for get_theta.
 
         Parameters
         ----------
@@ -373,20 +443,20 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
+            Mode mixing coefficients with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_time_courses(dataset)
+            return self.get_mode_time_courses(dataset, concatenate)
 
-        dataset = self.make_dataset(dataset)
+        # Get the learned softmax layer
+        alpha_layer = self.model.get_layer("alpha")
 
         _logger.info("Getting alpha")
         alpha = []
-        for ds in dataset:
-            a = self.predict(ds)["alpha"]
-            a = np.concatenate(a)
-            alpha.append(a)
+        for ds in self.make_dataset(dataset):
+            predictions = self.predict(ds)
+            alpha.append(np.concatenate(alpha_layer(predictions["theta"])))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
@@ -417,19 +487,16 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
-        dataset = self.make_dataset(dataset)
+        alpha_layer = self.model.get_layer("alpha")
+        gamma_layer = self.model.get_layer("gamma")
 
         _logger.info("Getting mode time courses")
         alpha = []
         gamma = []
-        for ds in dataset:
+        for ds in self.make_dataset(dataset):
             predictions = self.predict(ds)
-            a = predictions["alpha"]
-            g = predictions["gamma"]
-            a = np.concatenate(a)
-            g = np.concatenate(g)
-            alpha.append(a)
-            gamma.append(g)
+            alpha.append(np.concatenate(alpha_layer(predictions["mean_theta"])))
+            gamma.append(np.concatenate(gamma_layer(predictions["fc_theta"])))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)

@@ -856,6 +856,6 @@ def _model_structure(config):
 
     return tf.keras.Model(
         inputs=[data, subj_id],
-        outputs=[ll_loss, kl_loss, alpha],
+        outputs=[ll_loss, kl_loss, theta_norm],
         name="Se-DyNeMo",
     )

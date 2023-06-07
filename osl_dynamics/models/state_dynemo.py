@@ -232,7 +232,7 @@ class Model(DyNeMo):
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_dataset)
         n_batches = max(round(n_total_batches * take), 1)
-        _logging.info(f"Using {n_batches} out of {n_total_batches} batches")
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
@@ -372,7 +372,7 @@ def _model_structure(config):
 
     mu = means_layer(data)  # data not used
     D = covs_layer(data)  # data not used
-    ll_loss = ll_loss_layer([data, mu, D, alpha])
+    ll_loss = ll_loss_layer([data, mu, D, alpha, None])
 
     # Model RNN:
     # - p(theta_t | state_<t), predicts logits for the next state based
@@ -397,5 +397,5 @@ def _model_structure(config):
     kl_loss = kl_loss_layer(kl_div)
 
     return tf.keras.Model(
-        inputs=data, outputs=[ll_loss, kl_loss, alpha], name="State-DyNeMo"
+        inputs=data, outputs=[ll_loss, kl_loss, inf_theta], name="State-DyNeMo"
     )

@@ -596,5 +596,7 @@ def _model_structure(config):
     kl_loss = kl_loss_layer([mean_kl_div, fc_kl_div])
 
     return tf.keras.Model(
-        inputs=inputs, outputs=[ll_loss, kl_loss, alpha, gamma], name="M-DyNeMo"
+        inputs=inputs,
+        outputs=[ll_loss, kl_loss, mean_theta_norm, fc_theta_norm],
+        name="M-DyNeMo",
     )

@@ -70,6 +70,7 @@ print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors and state time course
 inf_alp = model.get_alpha(training_data)
+model.get_theta(training_data)
 inf_stc = modes.argmax_time_courses(inf_alp)
 sim_stc = sim.mode_time_course
 
