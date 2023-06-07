@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
+import tensorflow as tf
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import callbacks, initializers
@@ -185,13 +186,25 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info(f"Initialization {n}")
             self.reset()
             training_data_subset = training_data.shuffle(100000).take(n_batches)
-            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            try:
+                history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(
+                    "InvalidArgumentError encountered during training. "
+                    + "Skipping initialization. Could be due to instability of the KL term."
+                )
+                _logger.warning(e)
+                continue
+
             loss = history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
                 best_loss = loss
                 best_history = history
                 best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
         self.set_weights(best_weights)
