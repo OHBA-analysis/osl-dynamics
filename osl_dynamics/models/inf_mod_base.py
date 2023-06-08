@@ -189,11 +189,11 @@ class VariationalInferenceModelBase(ModelBase):
             try:
                 history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             except tf.errors.InvalidArgumentError as e:
-                _logger.warning(
-                    "InvalidArgumentError encountered during training. "
-                    + "Skipping initialization. Could be due to instability of the KL term."
-                )
                 _logger.warning(e)
+                _logger.warning(
+                    "Training failed! Could be due to instability of the KL term. "
+                    + "Skipping initialization."
+                )
                 continue
 
             loss = history["loss"][-1]
@@ -396,8 +396,8 @@ class VariationalInferenceModelBase(ModelBase):
 
         return theta
 
-    def _get_multiple_dynamics_theta(self, dataset, concatenate=False):
-        """Get theta for the multi-time-scale model.
+    def get_mode_logits(self, dataset, concatenate=False):
+        """Get logits (theta) for a multi-time-scale model.
 
         Parameters
         ----------
@@ -413,9 +413,12 @@ class VariationalInferenceModelBase(ModelBase):
             Mode mixing logits for FC with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
+        if not self.config.multiple_dynamics:
+            raise ValueError("Please use get_theta for a single time scale model.")
+
         dataset = self.make_dataset(dataset)
 
-        _logger.info("Getting theta")
+        _logger.info("Getting mode logits")
         mean_theta = []
         fc_theta = []
         for ds in dataset:
@@ -430,8 +433,7 @@ class VariationalInferenceModelBase(ModelBase):
         return mean_theta, fc_theta
 
     def get_alpha(self, dataset, concatenate=False):
-        """Get mode mixing coefficients alpha.
-        Wrapper for get_theta.
+        """Get mode mixing coefficients, alpha.
 
         Parameters
         ----------
@@ -449,12 +451,12 @@ class VariationalInferenceModelBase(ModelBase):
         if self.config.multiple_dynamics:
             return self.get_mode_time_courses(dataset, concatenate)
 
-        # Get the learned softmax layer
+        dataset = self.make_dataset(dataset)
         alpha_layer = self.model.get_layer("alpha")
 
         _logger.info("Getting alpha")
         alpha = []
-        for ds in self.make_dataset(dataset):
+        for ds in dataset:
             predictions = self.predict(ds)
             alpha.append(np.concatenate(alpha_layer(predictions["theta"])))
 
@@ -464,9 +466,7 @@ class VariationalInferenceModelBase(ModelBase):
         return alpha
 
     def get_mode_time_courses(self, dataset, concatenate=False):
-        """Get mode time courses.
-
-        This method is used to get mode time courses for the multi-time-scale model.
+        """Get mode time courses (alpha) for a multi-time-scale model.
 
         Parameters
         ----------
@@ -487,13 +487,14 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
+        dataset = self.make_dataset(dataset)
         alpha_layer = self.model.get_layer("alpha")
         gamma_layer = self.model.get_layer("gamma")
 
         _logger.info("Getting mode time courses")
         alpha = []
         gamma = []
-        for ds in self.make_dataset(dataset):
+        for ds in dataset:
             predictions = self.predict(ds)
             alpha.append(np.concatenate(alpha_layer(predictions["mean_theta"])))
             gamma.append(np.concatenate(gamma_layer(predictions["fc_theta"])))
