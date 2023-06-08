@@ -310,7 +310,7 @@ class SoftmaxLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         temperature = self.layers[0](inputs)
-        return activations.softmax(inputs / temperature, axis=2)
+        return activations.softmax(inputs / temperature, axis=-1)
 
 
 class LearnableTensorLayer(layers.Layer):
@@ -1161,10 +1161,12 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs, subj_id = inputs
+
         # Add a small error for numerical stability
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         if subj_id is not None:
+            # Get the mean and covariance for the requested subject
             subj_id = tf.cast(subj_id, tf.int32)
             mu = tf.gather(mu, subj_id)
             sigma = tf.gather(sigma, subj_id)

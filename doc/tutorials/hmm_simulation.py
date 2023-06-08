@@ -189,7 +189,7 @@ plotting.plot_line(
 # 
 # The implementation of the HMM in osl-dynamics uses Bayesian inference for the state time course, i.e. it learns the probability of a state being active at each time point for the given dataset. Note, it learns point-estimates (i.e. is not Bayesian) when it learns an estimate for the state means/covariances.
 # 
-# Let's get the state probabilies inferred for the training data. We use the `Model.get_alpha` method of the model to get the inferred state probabilities. Note, the `get_alpha` method is defined in this `base class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/inf_mod_base/index.html#osl_dynamics.models.inf_mod_base.VariationalInferenceModelBase>`_, which is inherited by the `hmm.Model` class.
+# Let's get the state probabilies inferred for the training data. We use the `Model.get_alpha` method of the model to get the inferred state probabilities.
 
 # Get the inferred state probabilities for the training data
 alpha = model.get_alpha(training_data)
