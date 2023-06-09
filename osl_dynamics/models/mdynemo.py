@@ -398,7 +398,16 @@ class Model(VariationalInferenceModelBase):
         return alpha, gamma
 
     def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model."""
+        """Get the number of trainable parameters in the generative model.
+
+        This includes the model RNN weights and biases, mixing coefficients, mode
+        means and covariances.
+
+        Returns
+        -------
+        n_params : int
+            Number of parameters in the generative model.
+        """
         n_params = 0
 
         for var in self.trainable_weights:

@@ -1106,7 +1106,16 @@ class Model(ModelBase):
         return alpha
 
     def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model."""
+        """Get the number of trainable parameters in the generative model.
+
+        This includes the transition probabiltity matrix, state means and
+        covariances.
+
+        Returns
+        -------
+        n_params : int
+            Number of parameters in the generative model.
+        """
         n_params = 0
         if self.config.learn_trans_prob:
             n_params += self.config.n_states * (self.config.n_states - 1)
@@ -1127,6 +1136,11 @@ class Model(ModelBase):
             Dataset to calculate the BIC for.
         loss_type : str
             Which loss to use for the BIC. Can be "free_energy" or "evidence".
+
+        Returns
+        -------
+        bic : float
+            Bayesian Information Criterion for the model (for each sequence).
         """
         if loss_type == "free_energy":
             loss = self.free_energy(dataset)

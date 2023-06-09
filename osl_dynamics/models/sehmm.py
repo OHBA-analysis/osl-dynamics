@@ -725,7 +725,16 @@ class Model(HMMModel):
         return alpha
 
     def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model."""
+        """Get the number of trainable parameters in the generative model.
+
+        This includes the transition probability matrix, state means and
+        covariances (group and subject deviation) and subject embeddings.
+
+        Returns
+        -------
+        n_params : int
+            Number of parameters in the generative model.
+        """
         n_params = 0
         if self.config.learn_trans_prob:
             n_params += self.config.n_states * (self.config.n_states - 1)
