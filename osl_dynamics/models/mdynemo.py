@@ -397,6 +397,24 @@ class Model(VariationalInferenceModelBase):
 
         return alpha, gamma
 
+    def get_n_params_generative_model(self):
+        """Get the number of trainable parameters in the generative model."""
+        n_params = 0
+
+        for var in self.trainable_weights:
+            var_name = var.name
+            if (
+                "mod_" in var_name
+                or "alpha" in var_name
+                or "gamma" in var_name
+                or "means" in var_name
+                or "stds" in var_name
+                or "fcs" in var_name
+            ):
+                n_params += np.prod(var.shape)
+
+            return int(n_params)
+
 
 def _model_structure(config):
     # Layer for input

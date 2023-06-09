@@ -550,3 +550,32 @@ class VariationalInferenceModelBase(ModelBase):
         ll_loss, kl_loss = self.losses(dataset)
         free_energy = ll_loss + kl_loss
         return free_energy
+
+    def bic(self, dataset):
+        """Calculate the Bayesian Information Criterion (BIC) of the model
+        for a given dataset.
+
+        Note this method uses free energy as an approximate to the negative
+        log-likelihood.
+
+        Parameters
+        ----------
+        dataset : osl_dynamics.data.Data
+            Dataset to calculate the BIC for.
+
+        Returns
+        -------
+        bic : float
+            Bayesian Information Criterion for the model (for each sequence).
+        """
+        loss = self.free_energy(dataset)
+        n_params = self.get_n_params_generative_model()
+        n_sequences = dtf.n_batches(
+            dataset.time_series(concatenate=True), self.config.sequence_length
+        )
+
+        bic = (
+            2 * loss
+            + np.log(self.config.sequence_length * n_sequences) * n_params / n_sequences
+        )
+        return bic

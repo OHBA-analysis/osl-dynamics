@@ -1105,6 +1105,47 @@ class Model(ModelBase):
 
         return alpha
 
+    def get_n_params_generative_model(self):
+        """Get the number of trainable parameters in the generative model."""
+        n_params = 0
+        if self.config.learn_trans_prob:
+            n_params += self.config.n_states * (self.config.n_states - 1)
+
+        for var in self.trainable_weights:
+            var_name = var.name
+            if "means" in var_name or "covs" in var_name:
+                n_params += np.prod(var.shape)
+
+        return int(n_params)
+
+    def bic(self, dataset, loss_type="free_energy"):
+        """Calculate the Bayesian Information Criterion (BIC) for the model.
+
+        Parameters
+        ----------
+        dataset : osl_dynamics.data.Data
+            Dataset to calculate the BIC for.
+        loss_type : str
+            Which loss to use for the BIC. Can be "free_energy" or "evidence".
+        """
+        if loss_type == "free_energy":
+            loss = self.free_energy(dataset)
+        elif loss_type == "evidence":
+            loss = -self.evidence(dataset)
+        else:
+            raise ValueError("loss_type must be 'free_energy' or 'evidence'")
+
+        n_params = self.get_n_params_generative_model()
+        n_sequences = dtf.n_batches(
+            dataset.time_series(concatenate=True), self.config.sequence_length
+        )
+
+        bic = (
+            2 * loss
+            + np.log(self.config.sequence_length * n_sequences) * n_params / n_sequences
+        )
+        return bic
+
     def get_training_time_series(self, training_data, prepared=True, concatenate=False):
         """Get the time series used for training from a Data object.
 
