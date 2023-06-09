@@ -724,6 +724,35 @@ class Model(HMMModel):
 
         return alpha
 
+    def get_n_params_generative_model(self):
+        """Get the number of trainable parameters in the generative model.
+
+        This includes the transition probability matrix, state means and
+        covariances (group and subject deviation) and subject embeddings.
+
+        Returns
+        -------
+        n_params : int
+            Number of parameters in the generative model.
+        """
+        n_params = 0
+        if self.config.learn_trans_prob:
+            n_params += self.config.n_states * (self.config.n_states - 1)
+
+        for var in self.trainable_variables:
+            var_name = var.name
+            if (
+                "mod_" in var_name
+                or "alpha" in var_name
+                or "group_means" in var_name
+                or "group_covs" in var_name
+                or "_embeddings" in var_name
+                or "dev_map" in var_name
+            ):
+                n_params += np.prod(var.shape)
+
+        return int(n_params)
+
 
 def _model_structure(config):
     # Inputs

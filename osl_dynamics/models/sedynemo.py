@@ -450,6 +450,33 @@ class Model(VariationalInferenceModelBase):
             " 'Model' object has no attribute 'random_subject_initialization'."
         )
 
+    def get_n_params_generative_model(self):
+        """Get the number of trainable parameters in the generative model.
+
+        This includes the model RNN weights and biases, mixing coefficients, mode
+        means and covariances (group and subject deviation) and subject embeddings.
+
+        Returns
+        -------
+        n_params : int
+            Number of parameters in the generative model.
+        """
+        n_params = 0
+
+        for var in self.trainable_weights:
+            var_name = var.name
+            if (
+                "mod_" in var_name
+                or "alpha" in var_name
+                or "group_means" in var_name
+                or "group_covs" in var_name
+                or "_embeddings" in var_name
+                or "dev_map" in var_name
+            ):
+                n_params += np.prod(var.shape)
+
+        return int(n_params)
+
 
 def _model_structure(config):
     # Layers for inputs
