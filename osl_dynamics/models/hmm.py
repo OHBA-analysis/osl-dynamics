@@ -1118,7 +1118,7 @@ class Model(ModelBase):
 
         return int(n_params)
 
-    def bic(self, dataset, loss_type="free_energy"):
+    def bayesian_information_criterion(self, dataset, loss_type="free_energy"):
         """Calculate the Bayesian Information Criterion (BIC) for the model.
 
         Parameters
@@ -1142,7 +1142,9 @@ class Model(ModelBase):
 
         bic = (
             2 * loss
-            + np.log(self.config.sequence_length * n_sequences) * n_params / n_sequences
+            + (np.log(self.config.sequence_length) + np.log(n_sequences))
+            * n_params
+            / n_sequences
         )
         return bic
 

@@ -551,7 +551,7 @@ class VariationalInferenceModelBase(ModelBase):
         free_energy = ll_loss + kl_loss
         return free_energy
 
-    def bic(self, dataset):
+    def bayesian_information_criterion(self, dataset):
         """Calculate the Bayesian Information Criterion (BIC) of the model
         for a given dataset.
 
@@ -576,6 +576,8 @@ class VariationalInferenceModelBase(ModelBase):
 
         bic = (
             2 * loss
-            + np.log(self.config.sequence_length * n_sequences) * n_params / n_sequences
+            + (np.log(self.config.sequence_length) + np.log(n_sequences))
+            * n_params
+            / n_sequences
         )
         return bic
