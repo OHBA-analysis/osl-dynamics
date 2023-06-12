@@ -53,7 +53,7 @@ def create_figure(*args, **kwargs):
     return fig, ax
 
 
-def show(tight_layout=True):
+def show(tight_layout=False):
     """Displays all figures in memory.
 
     Wrapper for plt.show().
@@ -68,7 +68,7 @@ def show(tight_layout=True):
     plt.show()
 
 
-def save(fig, filename, tight_layout=True):
+def save(fig, filename, tight_layout=False):
     """Save and close a figure.
 
     Parameters
@@ -289,7 +289,7 @@ def plot_line(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -451,7 +451,7 @@ def plot_scatter(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -574,7 +574,7 @@ def plot_hist(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -677,7 +677,7 @@ def plot_bar_chart(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -794,7 +794,7 @@ def plot_gmm(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -886,7 +886,7 @@ def plot_violin(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -979,7 +979,7 @@ def plot_time_series(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -1056,7 +1056,7 @@ def plot_separate_time_series(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig, axes
 
@@ -1168,7 +1168,7 @@ def plot_epoched_time_series(
 
     # Save the figure if a filename has been passed
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -1270,7 +1270,7 @@ def plot_matrices(
     fig.suptitle(main_title)
 
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     else:
         return fig, axes
 
@@ -1441,7 +1441,7 @@ def plot_connections(
         plt.setp(ax.spines.values(), visible=False)
 
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig, ax
 
@@ -1518,7 +1518,7 @@ def topoplot(
     )
 
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig
 
@@ -1716,7 +1716,7 @@ def plot_alpha(
 
     # Save to file if a filename as been passed
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     else:
         return fig, axes
 
@@ -1850,7 +1850,7 @@ def plot_mode_lifetimes(
 
     # Save file is a filename has been passed
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig, axes
 
@@ -1919,7 +1919,7 @@ def plot_psd_topo(
 
     # Save
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     else:
         return fig, ax
 
@@ -2086,7 +2086,7 @@ def plot_evoked_response(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -2195,6 +2195,6 @@ def plot_wavelet(
 
     # Save figure
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     elif create_fig:
         return fig, ax
