@@ -14,6 +14,7 @@ from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from nilearn.plotting import plot_markers
+from scipy import signal
 
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -52,7 +53,7 @@ def create_figure(*args, **kwargs):
     return fig, ax
 
 
-def show(tight_layout=True):
+def show(tight_layout=False):
     """Displays all figures in memory.
 
     Wrapper for plt.show().
@@ -67,7 +68,7 @@ def show(tight_layout=True):
     plt.show()
 
 
-def save(fig, filename, tight_layout=True):
+def save(fig, filename, tight_layout=False):
     """Save and close a figure.
 
     Parameters
@@ -288,7 +289,7 @@ def plot_line(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -450,7 +451,7 @@ def plot_scatter(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -573,7 +574,7 @@ def plot_hist(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -676,7 +677,7 @@ def plot_bar_chart(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -793,7 +794,7 @@ def plot_gmm(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -885,7 +886,7 @@ def plot_violin(
 
     # Save the figure if a filename has been pass
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -978,7 +979,7 @@ def plot_time_series(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -1055,7 +1056,7 @@ def plot_separate_time_series(
 
     # Save figure
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig, axes
 
@@ -1167,7 +1168,7 @@ def plot_epoched_time_series(
 
     # Save the figure if a filename has been passed
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax
 
@@ -1269,7 +1270,7 @@ def plot_matrices(
     fig.suptitle(main_title)
 
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     else:
         return fig, axes
 
@@ -1440,7 +1441,7 @@ def plot_connections(
         plt.setp(ax.spines.values(), visible=False)
 
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig, ax
 
@@ -1517,7 +1518,7 @@ def topoplot(
     )
 
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig
 
@@ -1715,7 +1716,7 @@ def plot_alpha(
 
     # Save to file if a filename as been passed
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     else:
         return fig, axes
 
@@ -1849,7 +1850,7 @@ def plot_mode_lifetimes(
 
     # Save file is a filename has been passed
     if filename is not None:
-        save(fig, filename)
+        save(fig, filename, tight_layout=True)
     else:
         return fig, axes
 
@@ -1918,7 +1919,7 @@ def plot_psd_topo(
 
     # Save
     if filename is not None:
-        save(fig, filename, tight_layout=False)
+        save(fig, filename)
     else:
         return fig, ax
 
@@ -2082,6 +2083,115 @@ def plot_evoked_response(
     # Add a legend
     if add_legend:
         ax.legend(loc=legend_loc)
+
+    # Save figure
+    if filename is not None:
+        save(fig, filename, tight_layout=True)
+    elif create_fig:
+        return fig, ax
+
+
+def plot_wavelet(
+    data,
+    sampling_frequency,
+    w=5,
+    standardize=True,
+    start_time=None,
+    end_time=None,
+    title=None,
+    fig_kwargs=None,
+    plot_kwargs=None,
+    ax=None,
+    filename=None,
+):
+    """Plot a wavelet transform.
+
+    This function uses a scipy.signal.morlet2 window to calculate
+    the wavelet transform.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        1D time series data.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    w : float
+        w parameter to pass to scipy.signal.morlet2.
+    standardize : bool
+        Should we standardize the data before calculating the wavelet?
+    start_time : float
+        Start time to plot in seconds.
+    end_time : float
+        End time to plot in seconds.
+    title : str
+        Figure title.
+    fig_kwargs : dict
+        Keyword arguments to pass to plt.subplots. Default to {"figsize": (12, 3)}.
+    plot_kwargs : dict
+        Keyword arguments to pass to pcolormesh. Defaults to {"cmap": "rainbow"}.
+    ax : matplotlib.axes.axes
+        Axis object to plot on.
+    filename : str
+        Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object. Only returned if filename=None.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s). Only returned if filename=None.
+    """
+    if start_time is not None:
+        start_time = int(start_time * sampling_frequency)
+    if end_time is not None:
+        end_time = int(end_time * sampling_frequency)
+
+    # Standardize the data
+    if standardize:
+        data = (data - np.mean(data)) / np.std(data)
+
+    # Use 100 equally space frequencies (on a linear scale) for the
+    # frequency axis
+    freqs = np.linspace(1, sampling_frequency / 2, 100)
+
+    # Calculate the width for each Morlet window based on the frequency
+    widths = w * sampling_frequency / (2 * freqs * np.pi)
+
+    # Calculate wavelet transform
+    wt = signal.cwt(data=data, wavelet=signal.morlet2, widths=widths, w=w)
+
+    # Create figure
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (12, 3)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
+    # Select time points to plot
+    times = np.arange(len(wt.T)) / sampling_frequency
+    time_mask = np.zeros_like(times, dtype=bool)
+    time_mask[start_time:end_time] = True
+
+    # Plot
+    if plot_kwargs is None:
+        plot_kwargs = {}
+    default_plot_kwargs = {"cmap": "rainbow"}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+    mappable = ax.pcolormesh(
+        times[time_mask], freqs, np.abs(wt[:, time_mask]), **plot_kwargs
+    )
+
+    # Add a colour bar
+    plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9)
+    cax = plt.axes([0.825, 0.1, 0.025, 0.8])
+    plt.colorbar(mappable=mappable, cax=cax)
+
+    # Set title and axis labels
+    ax.set_title(title)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Frequency (Hz)")
 
     # Save figure
     if filename is not None:
