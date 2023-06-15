@@ -197,11 +197,14 @@ class Data:
         """
         self.sampling_frequency = sampling_frequency
 
-    def time_series(self, concatenate=False):
+    def time_series(self, prepared=True, concatenate=False):
         """Time series data for all subjects.
 
         Parameters
         ----------
+        prepared : bool
+            Should we return the latest data after we have prepared it or
+            the original data we loaded into the Data object?
         concatenate : bool
             Should we return the time series for each subject concatenated?
 
@@ -210,10 +213,17 @@ class Data:
         ts : list or np.ndarray
             Time series data for each subject.
         """
-        if concatenate or self.n_subjects == 1:
-            return np.concatenate(self.subjects)
+        # What data should we return?
+        if prepared:
+            memmaps = self.subjects
         else:
-            return self.subjects
+            memmaps = self.raw_data_memmaps
+
+        # Should we return one long time series?
+        if concatenate or self.n_subjects == 1:
+            return np.concatenate(memmaps)
+        else:
+            return memmaps
 
     def delete_dir(self):
         """Deletes store_dir."""
