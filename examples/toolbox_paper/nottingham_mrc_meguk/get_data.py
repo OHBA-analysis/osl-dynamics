@@ -25,8 +25,13 @@ def get_data(name, output_dir):
     print(f"Data downloaded to: {output_dir}")
 
 
-# Download the dataset (approximately 700 MB)
+# Download datasets for burst detection and dynamic network analysis
+# (approximately 708 MB)
 #
 # This will unzip the notts_mrc_meguk.zip file into a
-# directory called "training_data"
+# directory called "training_data". There are two subdirectories:
+# - "bursts", which contains single channel data for the burst
+#   detection pipeline.
+# - "networks", which contains multi-channel data for the dynamic
+#   network analysis pipelines.
 get_data("notts_mrc_meguk", output_dir="training_data")
