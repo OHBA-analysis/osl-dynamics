@@ -1,4 +1,4 @@
-"""Nottingham MRC MEGUK: TDE-DyNeMo.
+"""Nottingham MRC MEGUK: TDE-DyNeMo for Dynamic Network Analysis.
 
 In this script we train a Time-Delay Embedded (TDE)-DyNeMo model on source reconstructed
 resting-state MEG data.
@@ -10,7 +10,7 @@ to download the training data.
 from sys import argv
 
 if len(argv) != 2:
-    print("Please pass the run id, e.g. python run.py 1")
+    print("Please pass the run id, e.g. python tde_dynemo_networks.py 1")
     exit()
 id = argv[1]
 
@@ -19,7 +19,7 @@ from osl_dynamics.inference import tf_ops
 
 config = """
     load_data:
-        data_dir: training_data
+        data_dir: training_data/networks
         data_kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
