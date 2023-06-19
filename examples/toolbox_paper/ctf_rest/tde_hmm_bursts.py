@@ -3,7 +3,7 @@
 In this script we train a Time-Delay Embedded Hidden Markov Model (TDE-HMM)
 on a single channel (region) of source reconstructed resting-state MEG data.
 
-The examples/toolbox_paper/nottingham_mrc_meguk/get_data.py script can be used
+The examples/toolbox_paper/ctf_rest/get_data.py script can be used
 to download the training data.
 """
 
@@ -216,7 +216,7 @@ def plot_burst_summary_stats(data, output_dir):
 
 config = """
     load_data:
-        data_dir: /well/woolrich/projects/toolbox_paper/mrc_meguk_notts/training_data/bursts
+        data_dir: training_data/bursts
         data_kwargs:
             sampling_frequency: 100
         prepare_kwargs:

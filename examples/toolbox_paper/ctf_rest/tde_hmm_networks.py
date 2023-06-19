@@ -3,7 +3,7 @@
 In this script we train a Time-Delay Embedded Hidden Markov Model (TDE-HMM)
 on source reconstructed resting-state MEG data.
 
-The examples/toolbox_paper/nottingham_mrc_meguk/get_data.py script can be used
+The examples/toolbox_paper/ctf_rest/get_data.py script can be used
 to download the training data.
 """
 
