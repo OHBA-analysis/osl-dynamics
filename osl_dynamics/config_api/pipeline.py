@@ -6,7 +6,7 @@ for scripts that use the config API.
 
 Note, the config API can be used via the command line with::
 
-    % osld-pipeline <config-file> <output-directory> <restrict>
+    % osl-dynamics <config-file> <output-directory>
 
 where
 
@@ -15,12 +15,12 @@ where
 
 Optionally, you can specify a particular GPU to use with::
 
-    % osld-pipeline <config-file> <output-directory> --restrict <restrict>
+    % osl-dynamics <config-file> <output-directory> --restrict <restrict>
 
 where :code:`<restrict>` is an integer specifying the GPU number. E.g. if you would
 just like to use the first GPU, you can pass::
 
-    % osld-pipeline <config-file> <output-directory> --restrict 0
+    % osl-dynamics <config-file> <output-directory> --restrict 0
 
 Remember you need to activate the :code:`osld` conda environment to use the
 command line interface.
@@ -185,7 +185,7 @@ def run_pipeline_from_file(
     run_pipeline(config, output_directory)
 
 
-def osld_pipeline_cli():
+def osl_dynamics_cli():
     """Command line interface function for running a pipeline from a config file."""
 
     # Arguments
