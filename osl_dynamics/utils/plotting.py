@@ -14,7 +14,6 @@ from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from nilearn.plotting import plot_markers
-from scipy import signal
 
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -2096,8 +2095,8 @@ def plot_wavelet(
     sampling_frequency,
     w=5,
     standardize=True,
-    start_time=None,
-    end_time=None,
+    time_range=None,
+    frequency_range=None,
     title=None,
     fig_kwargs=None,
     plot_kwargs=None,
@@ -2105,9 +2104,6 @@ def plot_wavelet(
     filename=None,
 ):
     """Plot a wavelet transform.
-
-    This function uses a scipy.signal.morlet2 window to calculate
-    the wavelet transform.
 
     Parameters
     ----------
@@ -2119,10 +2115,12 @@ def plot_wavelet(
         w parameter to pass to scipy.signal.morlet2.
     standardize : bool
         Should we standardize the data before calculating the wavelet?
-    start_time : float
-        Start time to plot in seconds.
-    end_time : float
-        End time to plot in seconds.
+    time_range : list
+        Start time and end time to plot in seconds.
+        Default is the full time axis of the data.
+    frequency_range : list of length 2
+        Start and end frequency to plot in Hertz.
+        Default is [1, sampling_frequency / 2].
     title : str
         Figure title.
     fig_kwargs : dict
@@ -2141,24 +2139,17 @@ def plot_wavelet(
     ax : matplotlib.pyplot.axis.
         Matplotlib axis object(s). Only returned if filename=None.
     """
-    if start_time is not None:
-        start_time = int(start_time * sampling_frequency)
-    if end_time is not None:
-        end_time = int(end_time * sampling_frequency)
-
-    # Standardize the data
-    if standardize:
-        data = (data - np.mean(data)) / np.std(data)
-
-    # Use 100 equally space frequencies (on a linear scale) for the
-    # frequency axis
-    freqs = np.linspace(1, sampling_frequency / 2, 100)
-
-    # Calculate the width for each Morlet window based on the frequency
-    widths = w * sampling_frequency / (2 * freqs * np.pi)
+    from osl_dynamics.analysis import spectral
 
     # Calculate wavelet transform
-    wt = signal.cwt(data=data, wavelet=signal.morlet2, widths=widths, w=w)
+    t, f, wt = spectral.wavelet(
+        data=data,
+        sampling_frequency=sampling_frequency,
+        w=w,
+        standardize=standardize,
+        time_range=time_range,
+        frequency_range=frequency_range,
+    )
 
     # Create figure
     if fig_kwargs is None:
@@ -2169,19 +2160,12 @@ def plot_wavelet(
     if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
-    # Select time points to plot
-    times = np.arange(len(wt.T)) / sampling_frequency
-    time_mask = np.zeros_like(times, dtype=bool)
-    time_mask[start_time:end_time] = True
-
     # Plot
     if plot_kwargs is None:
         plot_kwargs = {}
     default_plot_kwargs = {"cmap": "rainbow"}
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
-    mappable = ax.pcolormesh(
-        times[time_mask], freqs, np.abs(wt[:, time_mask]), **plot_kwargs
-    )
+    mappable = ax.pcolormesh(t, f, wt, **plot_kwargs)
 
     # Add a colour bar
     plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9)

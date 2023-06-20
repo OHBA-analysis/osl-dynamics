@@ -7,6 +7,7 @@ import warnings
 
 import numpy as np
 from pqdm.processes import pqdm
+from scipy import signal
 from scipy.signal.windows import dpss, hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm.auto import trange
@@ -1396,3 +1397,86 @@ def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windo
         psd[n, 0] *= np.expand_dims(max_alpha[n], axis=(1, 2))
 
     return psd
+
+
+def wavelet(
+    data,
+    sampling_frequency,
+    w=5,
+    standardize=True,
+    time_range=None,
+    frequency_range=None,
+):
+    """Calculate a wavelet transform.
+
+    This function uses a scipy.signal.morlet2 window to calculate
+    the wavelet transform.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        1D time series data.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    w : float
+        w parameter to pass to scipy.signal.morlet2.
+    standardize : bool
+        Should we standardize the data before calculating the wavelet?
+    time_range : list
+        Start time and end time to plot in seconds.
+        Default is the full time axis of the data.
+    frequency_range : list of length 2
+        Start and end frequency to plot in Hertz.
+        Default is [1, sampling_frequency / 2].
+
+    Returns
+    -------
+    t : np.ndarray
+        1D numpy array for the time axis.
+    f : np.ndarray
+        1D numpy array for the frequency axis.
+    wt : np.ndarray
+        2D numpy array (frequency, time) containing the wavelet transform.
+    """
+    # Validation
+    if np.array(data).ndim != 1:
+        raise ValueError("data must be a 1D numpy array.")
+
+    if time_range is None:
+        time_range = [0, data.shape[0] / sampling_frequency]
+    if time_range[0] is None:
+        time_range[0] = 0
+    if time_range[1] is None:
+        time_range[1] = data.shape[0] / sampling_frequency
+
+    if frequency_range is None:
+        frequency_range = [1, sampling_frequency / 2]
+    if frequency_range[0] is None:
+        frequency_range[0] = 1
+    if frequency_range[1] is None:
+        frequency_range[1] = sampling_frequency / 2
+
+    # Standardize the data
+    if standardize:
+        data = (data - np.mean(data)) / np.std(data)
+
+    # Keep selected time points
+    start_index = int(time_range[0] * sampling_frequency)
+    end_index = int(time_range[1] * sampling_frequency)
+    data = data[start_index:end_index]
+
+    # Time axis (s)
+    t = np.arange(time_range[0], time_range[1], 1 / sampling_frequency)
+
+    # Frequency axis (Hz)
+    # Use 100 equally spaced points (on a linear scale)
+    f = np.linspace(frequency_range[0], frequency_range[1], 100)
+
+    # Calculate the width for each Morlet window based on the frequency
+    widths = w * sampling_frequency / (2 * f * np.pi)
+
+    # Calculate wavelet transform
+    wt = signal.cwt(data=data, wavelet=signal.morlet2, widths=widths, w=w)
+    wt = abs(wt)
+
+    return t, f, wt
