@@ -1855,7 +1855,12 @@ def plot_mode_lifetimes(
 
 
 def plot_psd_topo(
-    f, psd, parcellation_file=None, topomap_pos=[0.45, 0.55, 0.5, 0.55], filename=None
+    f,
+    psd,
+    only_show=None,
+    parcellation_file=None,
+    topomap_pos=[0.45, 0.55, 0.5, 0.55],
+    filename=None,
 ):
     """PLot PSDs for parcels and a topomap.
 
@@ -1865,6 +1870,8 @@ def plot_psd_topo(
         Frequency axis. Shape must be (n_freq,).
     psd : np.ndarray
         PSD for each parcel. Shape must be (n_parcels, n_freq).
+    only_show : list
+        Indices for parcels to include in the plot. Defaults to all parcels.
     parcellation_file : str
         Path to parcellation file.
     topomap_pos : list
@@ -1895,11 +1902,16 @@ def plot_psd_topo(
 
     n_parcels = psd.shape[0]
 
+    # Which parcels should we plot the PSD for?
+    if only_show is None:
+        only_show = np.arange(n_parcels)
+
     # Plot PSDs
     fig, ax = create_figure()
     cmap = plt.cm.viridis_r
     for i in reversed(range(n_parcels)):
-        ax.plot(f, psd[i], c=cmap(i / n_parcels))
+        if i in only_show:
+            ax.plot(f, psd[i], c=cmap(i / n_parcels))
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("PSD (a.u.)")
     ax.set_xlim(f[0], f[-1])
