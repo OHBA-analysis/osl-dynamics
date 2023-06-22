@@ -360,15 +360,15 @@ def save(
     # Select the component to plot
     power_map = power_map[component]
 
-    original_max = power_map.max()
-    original_min = power_map.min()
-
     if asymmetric_data:
         # Scale power map to be between -1 and 1
-        power_map -= power_map.min()
-        power_map /= power_map.max()
-        power_map *= 2
-        power_map -= 1
+        original_mins = power_map.min(axis=-1)
+        original_maxs = power_map.max(axis=-1)
+        for p, min_, max_ in zip(power_map, original_mins, original_maxs):
+            p -= min_
+            p /= max_ - min_
+            p *= 2
+            p -= 1
 
     # Calculate power map grid
     power_map = power_map_grid(mask_file, parcellation_file, power_map)
@@ -386,7 +386,6 @@ def save(
         "colorbar": True,
     }
     plot_kwargs = utils.misc.override_dict_defaults(default_plot_kwargs, plot_kwargs)
-    cmap = plot_kwargs.get("cmap", "cold_hot")
 
     # Just display the power map
     if filename is None:
@@ -399,8 +398,10 @@ def save(
             if asymmetric_data:
                 plt.colorbar(
                     plt.cm.ScalarMappable(
-                        plt.matplotlib.colors.Normalize(original_min, original_max),
-                        cmap=cmap,
+                        plt.matplotlib.colors.Normalize(
+                            original_mins[i], original_maxs[i]
+                        ),
+                        cmap=plot_kwargs.get("cmap", "cold_hot"),
                     ),
                     cax=ax[-1],
                     orientation="horizontal",
@@ -418,10 +419,24 @@ def save(
             # Save each map as an image
             for i in trange(n_modes, desc="Saving images"):
                 nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
+                fig, ax = plotting.plot_img_on_surf(
+                    nii, output_file=None, **plot_kwargs
+                )
+                if asymmetric_data:
+                    plt.colorbar(
+                        plt.cm.ScalarMappable(
+                            plt.matplotlib.colors.Normalize(
+                                original_mins[i], original_maxs[i]
+                            ),
+                            cmap=plot_kwargs.get("cmap", "cold_hot"),
+                        ),
+                        cax=ax[-1],
+                        orientation="horizontal",
+                    )
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
                 )
-                plotting.plot_img_on_surf(nii, output_file=output_file, **plot_kwargs)
+                fig.savefig(output_file)
 
 
 def multi_save(
