@@ -1935,7 +1935,14 @@ def plot_psd_topo(
         return fig, ax
 
 
-def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, filename):
+def plot_summary_stats_group_diff(
+    name,
+    summary_stats,
+    pvalues,
+    assignments,
+    ax=None,
+    filename=None,
+):
     """Plot summary statistics for two groups as violin plots.
 
     Parameters
@@ -1948,9 +1955,28 @@ def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, fil
         p-values for each summary statistic difference. Shape is (n_states,).
     assignments : np.ndarray
         Array of 1s and 2s indicating group assignment. Shape is (n_subjects,).
+    ax : matplotlib.axes.axes
+        Axis object to plot on.
     filename : str
         Output filename.
+
+    Returns
+    -------
+    fig : matplotlib.pyplot.figure
+        Matplotlib figure object. Only returned if filename=None.
+    ax : matplotlib.pyplot.axis.
+        Matplotlib axis object(s). Only returned if filename=None.
     """
+    # Validation
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
     # Create a pandas DataFrame to hold the summary stats
     ss_dict = {name: [], "State": [], "Group": []}
     n_subjects, n_states = summary_stats.shape
@@ -1961,22 +1987,30 @@ def plot_summary_stats_group_diff(name, summary_stats, pvalues, assignments, fil
             ss_dict["Group"].append(assignments[subject])
     ss_df = pd.DataFrame(ss_dict)
 
+    # Create figure
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
     # Plot a half violin for each group
-    sns.violinplot(data=ss_df, x="State", y=name, hue="Group", split=True)
+    sns.violinplot(data=ss_df, x="State", y=name, hue="Group", split=True, ax=ax)
 
     # Add a star above the violin to indicate significance
     scatter_kwargs = {"c": "black", "s": 32, "marker": "*"}
     for i in range(n_states):
         if pvalues[i] < 0.01:
-            plt.scatter(i - 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
-            plt.scatter(i + 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+            ax.scatter(i - 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+            ax.scatter(i + 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
         elif pvalues[i] < 0.05:
-            plt.scatter(i, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+            ax.scatter(i, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
 
-    # Save
-    _logger.info(f"Saving {filename}")
-    plt.savefig(filename)
-    plt.close()
+    # Save figure
+    if filename is not None:
+        _logger.info(f"Saving {filename}")
+        plt.savefig(filename)
+        plt.close()
+    elif create_fig:
+        return fig, ax
 
 
 def plot_evoked_response(
