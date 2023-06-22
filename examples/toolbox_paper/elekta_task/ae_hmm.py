@@ -1,6 +1,12 @@
-"""Wakeman-Henson: AE-HMM Pipeline.
+"""Elekta Task Dataset: AE-HMM Pipeline.
 
-This script contains the code used to create Figure 2.
+In this script we train an Amplitude Envelope Hidden Markov Model (AE-HMM)
+on source reconstructed task MEG data.
+
+The examples/toolbox_paper/elekta_task/get_data.py script can be used
+to download the training data.
+
+Functions listed in the config are defined in osl_dynamics.config_api.wrappers.
 """
 
 from sys import argv
@@ -131,7 +137,7 @@ config = """
             plot_kwargs: {views: [lateral]}
     plot_alpha:
         kwargs: {n_samples: 2000}
-    plot_summary_stats: {}
+    plot_hmm_network_summary_stats: {}
     plot_evoked_response:
         n_perm: 1000
         metric: copes

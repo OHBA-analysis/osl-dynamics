@@ -6,6 +6,7 @@ import itertools
 import logging
 
 import numpy as np
+from scipy import signal
 
 from osl_dynamics import array_ops, inference
 
@@ -402,11 +403,11 @@ def interval_statistics(state_time_course, sampling_frequency=None):
     Returns
     -------
     means : np.ndarray
-        Mean interval of each state. Shape is (n_subjects, n_states) or
-        (n_states,).
+        Mean interval of each state.
+        Shape is (n_subjects, n_states) or (n_states,).
     std : np.ndarray
-        Standard deviation of each state. Shape is (n_subjects, n_states) or
-        (n_states,).
+        Standard deviation of each state.
+        Shape is (n_subjects, n_states) or (n_states,).
     """
     intervals_ = intervals(
         state_time_course, sampling_frequency=sampling_frequency, squeeze=False
@@ -430,8 +431,8 @@ def mean_intervals(state_time_course, sampling_frequency=None):
     Returns
     -------
     mlt : np.ndarray
-        Mean interval of each state. Shape is (n_subjects, n_states) or
-        (n_states,).
+        Mean interval of each state.
+        Shape is (n_subjects, n_states) or (n_states,).
     """
     return interval_statistics(state_time_course, sampling_frequency)[0]
 
@@ -448,8 +449,8 @@ def fractional_occupancies(state_time_course):
     Returns
     -------
     fo : np.ndarray
-        The fractional occupancy of each state. Shape is (n_subjects, n_states)
-        or (n_states,).
+        The fractional occupancy of each state.
+        Shape is (n_subjects, n_states) or (n_states,).
     """
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 2:
@@ -479,8 +480,8 @@ def switching_rates(state_time_course, sampling_frequency=None):
     Returns
     -------
     sr : np.ndarray
-        The switching rate of each state. Shape is (n_subjects, n_states)
-        or (n_states,).
+        The switching rate of each state.
+        Shape is (n_subjects, n_states) or (n_states,).
     """
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 2:
@@ -504,6 +505,52 @@ def switching_rates(state_time_course, sampling_frequency=None):
         sr.append(counts * sampling_frequency / n_samples)
 
     return np.squeeze(sr)
+
+
+def mean_amplitudes(state_time_course, data):
+    """Calculate mean amplitude for bursts.
+
+    Parameters
+    ----------
+    state_time_course : list or np.ndarray
+        State time course (strictly binary). Shape must be (n_subjects,
+        n_samples, n_states) or (n_samples, n_states).
+    data : list or np.ndarray
+        Single channel time series data (before calculating the amplitude envelope).
+        Shape must be (n_subjects, n_samples, 1) or
+        (n_samples, 1).
+
+    Returns
+    -------
+    amp : np.ndarray
+        Mean amplitude of the data for each state.
+        Shape is (n_subjects, n_states) or (n_states,).
+    """
+    if isinstance(state_time_course, np.ndarray):
+        if state_time_course.ndim == 2:
+            state_time_course = [state_time_course]
+        elif state_time_course.ndim == 3:
+            state_time_course = list(state_time_course)
+
+    if isinstance(data, np.ndarray):
+        if data.ndim == 2:
+            data = [data]
+        elif data.ndim == 3:
+            data = list(data)
+
+    n_subjects = len(state_time_course)
+    n_states = state_time_course[0].shape[1]
+
+    # Calculate amplitude envelope of data
+    data = [abs(signal.hilbert(d, axis=0)) for d in data]
+
+    # Calculate mean amplitude envelope when each state is on
+    amp = np.empty([n_subjects, n_states])
+    for i in range(n_subjects):
+        for j in range(n_states):
+            amp[i, j] = np.mean(data[i][state_time_course[i][:, j] == 1])
+
+    return np.squeeze(amp)
 
 
 def fano_factor(

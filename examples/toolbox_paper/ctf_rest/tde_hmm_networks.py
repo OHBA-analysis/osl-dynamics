@@ -1,10 +1,12 @@
-"""Nottingham MRC MEGUK: TDE-HMM for Dynamic Network Analysis.
+"""CTF Rest Dataset: TDE-HMM for Dynamic Network Analysis.
 
 In this script we train a Time-Delay Embedded Hidden Markov Model (TDE-HMM)
 on source reconstructed resting-state MEG data.
 
 The examples/toolbox_paper/ctf_rest/get_data.py script can be used
 to download the training data.
+
+Functions listed in the config are defined in osl_dynamics.config_api.wrappers.
 """
 
 from sys import argv
@@ -203,7 +205,7 @@ config = """
             plot_kwargs: {views: [lateral]}
     plot_alpha:
         kwargs: {n_samples: 2000}
-    plot_summary_stats: {}
+    plot_hmm_network_summary_stats: {}
     compare_groups:
         n_perm: 1000
         significance_level: 0.05
