@@ -1,10 +1,12 @@
-"""Nottingham MRC MEGUK: TDE-HMM Burst Detection Pipeline.
+"""CTF Rest Dataset: TDE-HMM Burst Detection Pipeline.
 
 In this script we train a Time-Delay Embedded Hidden Markov Model (TDE-HMM)
 on a single channel (region) of source reconstructed resting-state MEG data.
 
 The examples/toolbox_paper/ctf_rest/get_data.py script can be used
 to download the training data.
+
+Functions listed in the config are defined in osl_dynamics.config_api.wrappers.
 """
 
 from sys import argv

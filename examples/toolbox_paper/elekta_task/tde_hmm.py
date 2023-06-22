@@ -1,6 +1,12 @@
-"""Wakeman-Henson: TDE-HMM Pipeline.
+"""Elekta Task Dataset: TDE-HMM Pipeline.
 
-This script was used to create Figure 3.
+In this script we train an Time-Delay Embedded Hidden Markov Model (TDE-HMM)
+on source reconstructed task MEG data.
+
+The examples/toolbox_paper/elekta_task/get_data.py script can be used
+to download the training data.
+
+Functions listed in the config are defined in osl_dynamics.config_api.wrappers.
 """
 
 from sys import argv
