@@ -39,6 +39,6 @@ config = """
             plot_kwargs: {views: [lateral]}
     plot_alpha:
         kwargs: {n_samples: 2000}
-    plot_summary_stats: {}
+    plot_hmm_network_summary_stats: {}
 """
 run_pipeline(config, output_dir=f"results/run{id}")

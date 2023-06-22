@@ -280,6 +280,77 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
+def plot_tde_covariances(data, output_dir):
+    """Plot inferred covariance of the time-delay embedded data.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will output a :code:`tde_covs.png` file containing a plot of
+    the covariances in the :code:`<output_dir>/inf_params` directory.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    inf_params_dir = f"{output_dir}/inf_params"
+
+    covs = load(f"{inf_params_dir}/covs.npy")
+
+    if hasattr(data, "pca_components"):
+        if data.pca_components is not None:
+            from osl_dynamics.analysis import modes
+
+            covs = modes.reverse_pca(covs, pca_components)
+
+    from osl_dynamics.utils import plotting
+
+    plotting.plot_matrices(covs, filename=f"{inf_params_dir}/tde_covs.png")
+
+
+def plot_state_psds(data, output_dir):
+    """Plot state PSDs.
+
+    This function expects multitaper spectra to have already been calculated
+    and are in:
+
+    - :code:`<output_dir>/spectra`.
+
+    This function will output a file called :code:`psds.png` which contains
+    a plot of each state PSD.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    spectra_dir = f"{output_dir}/spectra"
+
+    f = load(f"{spectra_dir}/f.npy")
+    psd = load(f"{spectra_dir}/psd.npy")
+    psd = np.mean(psd, axis=(0, 2))  # average over subjects and channels
+    n_states = psd.shape[0]
+
+    from osl_dynamics.utils import plotting
+
+    plotting.plot_line(
+        [f] * n_states,
+        psd,
+        labels=[f"State {i + 1}" for i in range(n_states)],
+        x_label="Frequency (Hz)",
+        y_label="PSD (a.u.)",
+        x_range=[f[0], f[-1]],
+        filename=f"{spectra_dir}/psds.png",
+    )
+
+
 def calc_subject_ae_hmm_networks(data, output_dir):
     """Calculate subject-specific AE-HMM networks.
 
@@ -1266,8 +1337,10 @@ def calc_gmm_alpha(data, output_dir, kwargs={}):
     save(f"{inf_params_dir}/gmm_alp.pkl", gmm_alp)
 
 
-def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency=None):
-    """Plot summary statistics as violin plots.
+def plot_hmm_network_summary_stats(
+    data, output_dir, use_gmm_alpha=False, sampling_frequency=None
+):
+    """Plot HMM summary statistics for networks as violin plots.
 
     This function will plot the distribution over subjects for the following summary
     statistics:
@@ -1519,3 +1592,114 @@ def compare_groups_hmm_summary_stats(
             assignments=assignments,
             filename=f"{group_diff_dir}/{names[i]}.png",
         )
+
+
+def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
+    """Plot burst summary statistics as violin plots.
+
+    This function will plot the distribution over subjects for the following summary
+    statistics:
+
+    - Mean lifetime (s).
+    - Mean interval (s).
+    - Burst count (Hz).
+    - Mean amplitude (a.u.).
+
+    This function expects a model has been trained and the following directories to exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/summary_stats`, which contains plots of the summary statistics.
+
+    The :code:`<output_dir>/summary_stats` directory will also contain numpy files
+    with the summary statistics.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    sampling_frequency : float
+        Sampling frequency in Hz. Optional. If :code:`None`, we use
+        :code:`data.sampling_frequency`.
+    """
+    if sampling_frequency is None:
+        if data is None or data.sampling_frequency is None:
+            raise ValueError(
+                "sampling_frequency must be passed or specified in the Data object."
+            )
+        else:
+            sampling_frequency = data.sampling_frequency
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+    summary_stats_dir = output_dir + "/summary_stats"
+    os.makedirs(summary_stats_dir, exist_ok=True)
+
+    from osl_dynamics.inference import modes
+
+    # Load state time course
+    alp = load(f"{inf_params_dir}/alp.pkl")
+    stc = modes.argmax_time_courses(alp)
+
+    # Get the config used to create the model
+    from osl_dynamics.models.mod_base import ModelBase
+
+    model_config, _ = ModelBase.load_config(model_dir)
+
+    # Get unprepared data (i.e. the data before calling Data.prepare)
+    # We also trim the data to account for the data points lost to
+    # time embedding or applying a sliding window
+    data = data.trim_time_series(
+        sequence_length=model_config["sequence_length"], prepared=False
+    )
+
+    # Calculate summary stats
+    lt = modes.mean_lifetimes(stc, sampling_frequency)
+    intv = modes.mean_intervals(stc, sampling_frequency)
+    bc = modes.switching_rates(stc, sampling_frequency)
+    amp = modes.mean_amplitudes(stc, data)
+
+    # Save summary stats
+    save(f"{summary_stats_dir}/lt.npy", lt)
+    save(f"{summary_stats_dir}/intv.npy", intv)
+    save(f"{summary_stats_dir}/bc.npy", bc)
+    save(f"{summary_stats_dir}/amp.npy", amp)
+
+    from osl_dynamics.utils import plotting
+
+    # Plot
+    n_states = lt.shape[1]
+    plotting.plot_violin(
+        lt.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Mean Lifetime (s)",
+        filename=f"{summary_stats_dir}/fo.png",
+    )
+    plotting.plot_violin(
+        intv.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Mean Interval (s)",
+        filename=f"{summary_stats_dir}/intv.png",
+    )
+    plotting.plot_violin(
+        bc.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Burst Count (Hz)",
+        filename=f"{summary_stats_dir}/bc.png",
+    )
+    plotting.plot_violin(
+        amp.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Mean Amplitude (a.u.)",
+        filename=f"{summary_stats_dir}/amp.png",
+    )

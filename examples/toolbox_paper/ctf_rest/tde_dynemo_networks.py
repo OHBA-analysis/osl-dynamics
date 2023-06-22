@@ -44,7 +44,7 @@ config = """
         normalize: True
         kwargs: {n_samples: 2000}
     calc_gmm_alpha: {}
-    plot_summary_stats:
+    plot_hmm_network_summary_stats:
         use_gmm_alpha: True
 """
 run_pipeline(config, output_dir=f"results/run{id}")

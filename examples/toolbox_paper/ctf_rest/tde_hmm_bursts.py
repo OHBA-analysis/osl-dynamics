@@ -35,8 +35,7 @@ def plot_wavelet(data, output_dir):
     plotting.plot_wavelet(
         x,
         sampling_frequency=data.sampling_frequency,
-        start_time=0,
-        end_time=20,
+        time_range=[0, 20],
         filename=f"{plots_dir}/wavelet.png",
     )
 
@@ -108,112 +107,6 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
         filename=f"{plots_dir}/amp_env_delta_theta.png",
     )
 
-
-def plot_psds(data, output_dir):
-    """Plot state PSDs."""
-
-    spectra_dir = f"{output_dir}/spectra"
-    plots_dir = f"{output_dir}/plots"
-    os.makedirs(plots_dir, exist_ok=True)
-
-    f = np.load(f"{spectra_dir}/f.npy")
-    psd = np.load(f"{spectra_dir}/psd.npy")
-    psd = np.squeeze(psd)  # remove the channel dimension
-    psd = np.mean(psd, axis=0)  # average over subjects
-
-    n_states = psd.shape[0]
-    plotting.plot_line(
-        [f] * n_states,
-        psd,
-        labels=[f"State {i + 1}" for i in range(n_states)],
-        x_label="Frequency (Hz)",
-        y_label="PSD (a.u.)",
-        filename=f"{plots_dir}/psd.png",
-    )
-
-
-def plot_autocovariances(data, output_dir):
-    """Plot inferred covariance matrices."""
-
-    inf_params_dir = f"{output_dir}/inf_params"
-    plots_dir = f"{output_dir}/plots"
-    os.makedirs(plots_dir, exist_ok=True)
-
-    covs = np.load(f"{inf_params_dir}/covs.npy")
-    plotting.plot_matrices(covs, filename=f"{plots_dir}/covs.png")
-
-
-def plot_burst_summary_stats(data, output_dir):
-    """Plot summary statistics for bursts."""
-
-    inf_params_dir = f"{output_dir}/inf_params"
-    sum_stats_dir = f"{output_dir}/summary_stats"
-    plots_dir = f"{output_dir}/plots"
-    os.makedirs(sum_stats_dir, exist_ok=True)
-    os.makedirs(plots_dir, exist_ok=True)
-
-    # Load state time course
-    alp = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
-    stc = modes.argmax_time_courses(alp)
-
-    n_subjects = len(stc)
-    n_states = stc[0].shape[1]
-
-    # Mean lifetime
-    lt = modes.mean_lifetimes(stc, sampling_frequency=data.sampling_frequency)
-    np.save(f"{sum_stats_dir}/lt.npy", lt)
-    fig, ax = plotting.plot_violin(
-        lt.T,
-        x=range(1, n_states + 1),
-        x_label="State",
-        y_label="Mean Lifetime (s)",
-        fig_kwargs={"figsize": None},
-    )
-    plotting.save(fig, filename=f"{plots_dir}/sum_stats_1.png")
-
-    # Mean interval
-    intv = modes.mean_intervals(stc, sampling_frequency=data.sampling_frequency)
-    np.save(f"{sum_stats_dir}/intv.npy", intv)
-    fig, ax = plotting.plot_violin(
-        intv.T,
-        x=range(1, n_states + 1),
-        x_label="State",
-        y_label="Mean Interval (s)",
-        fig_kwargs={"figsize": None},
-    )
-    plotting.save(fig, filename=f"{plots_dir}/sum_stats_2.png")
-
-    # Burst count
-    sr = modes.switching_rates(stc, sampling_frequency=data.sampling_frequency)
-    np.save(f"{sum_stats_dir}/sr.npy", sr)
-    fig, ax = plotting.plot_violin(
-        sr.T,
-        x=range(1, n_states + 1),
-        x_label="State",
-        y_label="Burst Count (Hz)",
-        fig_kwargs={"figsize": None},
-    )
-    plotting.save(fig, filename=f"{plots_dir}/sum_stats_3.png")
-
-    # Average amplitude
-    amp = np.zeros([n_subjects, n_states])
-    x = data.trim_time_series(n_embeddings=21, sequence_length=2000)
-    for i in range(n_subjects):
-        d = np.abs(signal.hilbert(x[i], axis=0))
-        s = stc[i]
-        for j in range(n_states):
-            amp[i, j] = np.mean(d[s[:, j] == 1])
-    np.save(f"{sum_stats_dir}/amp.npy", amp)
-    fig, ax = plotting.plot_violin(
-        amp.T,
-        x=range(1, n_states + 1),
-        x_label="State",
-        y_label="Mean Amplitude (a.u.)",
-        fig_kwargs={"figsize": None},
-    )
-    plotting.save(fig, filename=f"{plots_dir}/sum_stats_4.png")
-
-
 config = """
     load_data:
         data_dir: training_data/bursts
@@ -232,19 +125,13 @@ config = """
             frequency_range: [1, 45]
     plot_amplitude_envelopes_and_alpha:
         n_samples: 2000
-    plot_psds: {}
-    plot_autocovariances: {}
+    plot_state_psds: {}
+    plot_tde_covariances: {}
     plot_burst_summary_stats: {}
 """
 
 run_pipeline(
     config,
     output_dir=f"results/run{id}",
-    extra_funcs=[
-        plot_wavelet,
-        plot_amplitude_envelopes_and_alpha,
-        plot_psds,
-        plot_autocovariances,
-        plot_burst_summary_stats,
-    ],
+    extra_funcs=[plot_wavelet, plot_amplitude_envelopes_and_alpha],
 )

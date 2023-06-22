@@ -350,6 +350,11 @@ def switching_rates(state_time_course, sampling_frequency=None):
     return analysis.modes.switching_rates(state_time_course, sampling_frequency)
 
 
+def mean_amplitudes(state_time_course, data):
+    """Wrapper for osl.dynamics.analysis.modes.mean_amplitudes."""
+    return analysis.modes.mean_amplitudes(state_time_course, data)
+
+
 def convert_to_mne_raw(
     alpha,
     raw,

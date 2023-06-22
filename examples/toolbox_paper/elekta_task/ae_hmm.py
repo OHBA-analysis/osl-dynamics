@@ -131,7 +131,7 @@ config = """
             plot_kwargs: {views: [lateral]}
     plot_alpha:
         kwargs: {n_samples: 2000}
-    plot_summary_stats: {}
+    plot_hmm_network_summary_stats: {}
     plot_evoked_response:
         n_perm: 1000
         metric: copes
