@@ -241,6 +241,7 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
     # Calculate the similarity between matrices
     F = np.empty([n_matrices, n_matrices])
     matched_covariances = [covariances[0]]
+    orders = [np.arange(covariances[0].shape[0])]
     for i in range(1, n_args):
         for j in range(n_matrices):
             # Find the matrix that is most similar to matrix j
@@ -262,9 +263,10 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
 
         # Add the ordered matrix to the list
         matched_covariances.append(covariances[i][order])
+        orders.append(order)
 
     if return_order:
-        return order
+        return orders
     else:
         return tuple(matched_covariances)
 
