@@ -2144,6 +2144,7 @@ def plot_wavelet(
     time_range=None,
     frequency_range=None,
     title=None,
+    add_colorbar=True,
     fig_kwargs=None,
     plot_kwargs=None,
     ax=None,
@@ -2169,6 +2170,8 @@ def plot_wavelet(
         Default is [1, sampling_frequency / 2].
     title : str
         Figure title.
+    add_colorbar : bool
+        If True (default), space will be stolen from the figure to create a colorbar.
     fig_kwargs : dict
         Keyword arguments to pass to plt.subplots. Default to {"figsize": (12, 3)}.
     plot_kwargs : dict
@@ -2213,10 +2216,10 @@ def plot_wavelet(
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
     mappable = ax.pcolormesh(t, f, wt, **plot_kwargs)
 
-    # Add a colour bar
-    plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9)
-    cax = plt.axes([0.825, 0.1, 0.025, 0.8])
-    plt.colorbar(mappable=mappable, cax=cax)
+    if add_colorbar:
+        plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9)
+        cax = plt.axes([0.825, 0.1, 0.025, 0.8])
+        plt.colorbar(mappable=mappable, cax=cax)
 
     # Set title and axis labels
     ax.set_title(title)
