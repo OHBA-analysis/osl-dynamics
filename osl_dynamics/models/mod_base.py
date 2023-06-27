@@ -254,7 +254,9 @@ class ModelBase:
         self.reset_weights()
         self.compile()
 
-    def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=False):
+    def make_dataset(
+        self, inputs, shuffle=False, concatenate=False, subj_id=False, step_size=None
+    ):
         """Converts a Data object into a TensorFlow Dataset.
 
         Parameters
@@ -268,6 +270,9 @@ class ModelBase:
             Should we return a single TensorFlow Dataset or a list of Datasets.
         subj_id : bool
             Should we include the subject id in the dataset?
+        step_size : int
+            Number of samples to slide the sequence across the dataset.
+            Default is no overlap.
 
         Returns
         -------
@@ -288,6 +293,7 @@ class ModelBase:
                 shuffle=shuffle,
                 concatenate=concatenate,
                 subj_id=subj_id,
+                step_size=step_size,
             )
         elif isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False

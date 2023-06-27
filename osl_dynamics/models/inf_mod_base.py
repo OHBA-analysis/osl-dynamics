@@ -361,7 +361,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         return predictions_dict
 
-    def get_theta(self, dataset, concatenate=False):
+    def get_theta(self, dataset, concatenate=False, remove_edge_effects=False):
         """Mode mixing logits, theta.
 
         Parameters
@@ -369,7 +369,12 @@ class VariationalInferenceModelBase(ModelBase):
         dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
         concatenate : bool
-            Should we concatenate alpha for each subject?
+            Should we concatenate theta for each subject?
+        remove_edge_effects : bool
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping thetas and disregarding
+            the alphas near the ends. Passing True does this by using sequences with
+            50% overlap and throwing away the first at last 25% of predictions.
 
         Returns
         -------
@@ -381,28 +386,48 @@ class VariationalInferenceModelBase(ModelBase):
             Only returned if self.config.multiple_dynamics=True.
         """
         if self.config.multiple_dynamics:
-            return self._get_multiple_dynamics_theta(dataset, concatenate)
+            return self.get_mode_logits(dataset, concatenate, remove_edge_effects)
 
-        dataset = self.make_dataset(dataset)
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
 
         _logger.info("Getting theta")
         theta = []
         for ds in dataset:
             predictions = self.predict(ds)
-            theta.append(np.concatenate(predictions["theta"]))
+            theta_ = predictions["theta"]
+            if remove_edge_effects:
+                trim = step_size // 2  # throw away 25%
+                theta_ = (
+                    [theta_[0, :-trim]]
+                    + list(theta_[1:-1, trim:-trim])
+                    + [theta_[-1, trim:]]
+                )
+            theta.append(np.concatenate(theta_))
 
         if concatenate or len(theta) == 1:
             theta = np.concatenate(theta)
 
         return theta
 
-    def get_mode_logits(self, dataset, concatenate=False):
+    def get_mode_logits(self, dataset, concatenate=False, remove_edge_effects=False):
         """Get logits (theta) for a multi-time-scale model.
 
         Parameters
         ----------
         dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
+        concatenate : bool
+            Should we concatenate theta for each subject?
+        remove_edge_effects : bool
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping thetas and disregarding
+            the alphas near the ends. Passing True does this by using sequences with
+            50% overlap and throwing away the first at last 25% of predictions.
 
         Returns
         -------
@@ -416,15 +441,34 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_theta for a single time scale model.")
 
-        dataset = self.make_dataset(dataset)
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
 
         _logger.info("Getting mode logits")
         mean_theta = []
         fc_theta = []
         for ds in dataset:
             predictions = self.predict(ds)
-            mean_theta.append(np.concatenate(predictions["mean_theta"]))
-            fc_theta.append(np.concatenate(predictions["fc_theta"]))
+            mean_theta_ = predictions["mean_theta"]
+            fc_theta_ = predictions["fc_theta"]
+            if remove_edge_effects:
+                trim = step_size // 2  # throw away 25%
+                mean_theta_ = (
+                    [mean_theta_[0, :-trim]]
+                    + list(mean_theta_[1:-1, trim:-trim])
+                    + [mean_theta_[-1, trim:]]
+                )
+                fc_theta_ = (
+                    [fc_theta_[0, :-trim]]
+                    + list(fc_theta_[1:-1, trim:-trim])
+                    + [fc_theta_[-1, trim:]]
+                )
+            mean_theta.append(np.concatenate(mean_theta_))
+            fc_theta.append(np.concatenate(fc_theta_))
 
         if concatenate or len(mean_theta) == 1:
             mean_theta = np.concatenate(mean_theta)
@@ -432,7 +476,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         return mean_theta, fc_theta
 
-    def get_alpha(self, dataset, concatenate=False):
+    def get_alpha(self, dataset, concatenate=False, remove_edge_effects=False):
         """Get mode mixing coefficients, alpha.
 
         Parameters
@@ -441,6 +485,11 @@ class VariationalInferenceModelBase(ModelBase):
             Prediction dataset. This can be a list of datasets, one for each subject.
         concatenate : bool
             Should we concatenate alpha for each subject?
+        remove_edge_effects : bool
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping alphas and disregarding
+            the alphas near the ends. Passing True does this by using sequences with
+            50% overlap and throwing away the first at last 25% of predictions.
 
         Returns
         -------
@@ -449,23 +498,39 @@ class VariationalInferenceModelBase(ModelBase):
             (n_samples, n_modes).
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_time_courses(dataset, concatenate)
+            return self.get_mode_time_courses(dataset, concatenate, step_size)
 
-        dataset = self.make_dataset(dataset)
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
         alpha_layer = self.model.get_layer("alpha")
 
         _logger.info("Getting alpha")
         alpha = []
         for ds in dataset:
             predictions = self.predict(ds)
-            alpha.append(np.concatenate(alpha_layer(predictions["theta"])))
+            theta = predictions["theta"]
+            alpha_ = alpha_layer(theta)
+            if remove_edge_effects:
+                trim = step_size // 2  # throw away 25%
+                alpha_ = (
+                    [alpha_[0, :-trim]]
+                    + list(alpha_[1:-1, trim:-trim])
+                    + [alpha_[-1, trim:]]
+                )
+            alpha.append(np.concatenate(alpha_))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
 
         return alpha
 
-    def get_mode_time_courses(self, dataset, concatenate=False):
+    def get_mode_time_courses(
+        self, dataset, concatenate=False, remove_edge_effects=False
+    ):
         """Get mode time courses (alpha) for a multi-time-scale model.
 
         Parameters
@@ -474,6 +539,12 @@ class VariationalInferenceModelBase(ModelBase):
             Prediction data. This can be a list of datasets, one for each subject.
         concatenate : bool
             Should we concatenate alpha/gamma for each subject?
+        remove_edge_effects : bool
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping alphas/gammas and
+            disregarding the alphas near the ends. Passing True does this by
+            using sequences with 50% overlap and throwing away the first at
+            last 25% of predictions.
 
         Returns
         -------
@@ -487,7 +558,12 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
-        dataset = self.make_dataset(dataset)
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
         alpha_layer = self.model.get_layer("alpha")
         gamma_layer = self.model.get_layer("gamma")
 
@@ -496,8 +572,24 @@ class VariationalInferenceModelBase(ModelBase):
         gamma = []
         for ds in dataset:
             predictions = self.predict(ds)
-            alpha.append(np.concatenate(alpha_layer(predictions["mean_theta"])))
-            gamma.append(np.concatenate(gamma_layer(predictions["fc_theta"])))
+            mean_theta = predictions["mean_theta"]
+            fc_theta = predictions["fc_theta"]
+            alpha_ = alpha_layer(mean_theta)
+            gamma_ = gamma_layer(fc_theta)
+            if remove_edge_effects:
+                trim = step_size // 2  # throw away 25%
+                alpha_ = (
+                    [alpha_[0, :-trim]]
+                    + list(alpha_[1:-1, trim:-trim])
+                    + [alpha_[-1, trim:]]
+                )
+                gamma_ = (
+                    [gamma_[0, :-trim]]
+                    + list(gamma_[1:-1, trim:-trim])
+                    + [gamma_[-1, trim:]]
+                )
+            alpha.append(np.concatenate(alpha_))
+            gamma.append(np.concatenate(gamma_))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
