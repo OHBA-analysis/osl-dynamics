@@ -305,8 +305,7 @@ class Model(ModelBase):
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                best_weights = self.get_weights()
-                best_trans_prob = self.trans_prob
+                best_weights, best_trans_prob = self.get_weights()
 
         if best_loss == np.Inf:
             _logger.error("Initialization failed")
@@ -375,8 +374,7 @@ class Model(ModelBase):
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                best_weights = self.get_weights()
-                best_trans_prob = self.trans_prob
+                best_weights, best_trans_prob = self.get_weights()
 
         if best_loss == np.Inf:
             _logger.error("Initialization failed")
@@ -1204,6 +1202,18 @@ class Model(ModelBase):
         """
         self.trans_prob = np.load(op.join(str(Path(filepath).parent), "trans_prob.npy"))
         return self.model.load_weights(filepath)
+
+    def get_weights(self):
+        """Get model parameter weights.
+
+        Returns
+        -------
+        weights : tensorflow weights
+            TensorFlow weights for the observation model.
+        trans_prob : np.ndarray
+            Transition probability matrix.
+        """
+        return self.model.get_weights(), self.trans_prob
 
     def set_weights(self, weights, trans_prob):
         """Set model parameter weights.

@@ -2,11 +2,14 @@
 
 """
 
+from copy import deepcopy
+
 import numpy as np
-import tensorflow_probability as tfp
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers, initializers
 from tensorflow.keras.initializers import Initializer
+
 from osl_dynamics import inference
 
 tfb = tfp.bijectors
@@ -183,8 +186,7 @@ def reinitialize_layer_weights(layer):
             #
             # We need to create a new initializer to get new
             # random values
-            new_initializer = initializer_type()
-            init_container.__dict__[key] = new_initializer
+            new_initializer = deepcopy(initializer)
 
         # Get the variable (i.e. weights) we want to re-initialize
         if key == "recurrent_initializer":
