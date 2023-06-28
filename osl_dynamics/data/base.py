@@ -9,6 +9,7 @@ import warnings
 from functools import partial
 from os import path
 from shutil import rmtree
+from contextlib import contextmanager
 
 import numpy as np
 from pqdm.threads import pqdm
@@ -151,6 +152,9 @@ class Data:
         # Use raw data for the subject data
         self.subjects = self.raw_data_memmaps
 
+        # Subjects that are kept for making tensorflow datasets
+        self.kept_subjects = list(range(len(self.subjects)))
+
     def __iter__(self):
         return iter(self.subjects)
 
@@ -186,6 +190,32 @@ class Data:
     def n_subjects(self):
         """Number of subjects."""
         return len(self.subjects)
+
+    @contextmanager
+    def set_kept_subjects(self, kept_subjects):
+        """Context manager to temporarily set the kept subjects.
+
+        Parameters
+        ----------
+        kept_subjects : int or list of int
+            List of subject indices to keep.
+        """
+        # Store the current kept subjects
+        current_kept_subjects = self.kept_subjects
+        try:
+            # validation
+            if isinstance(kept_subjects, int):
+                kept_subjects = [kept_subjects]
+            if not isinstance(kept_subjects, list):
+                raise ValueError(
+                    "kept_subjects must be a list of subject indices or a single subject index."
+                )
+
+            # Set the new kept subjects
+            self.kept_subjects = kept_subjects
+            yield
+        finally:
+            self.kept_subjects = current_kept_subjects
 
     def set_sampling_frequency(self, sampling_frequency):
         """Sets the sampling_frequency attribute.
@@ -874,6 +904,10 @@ class Data:
         if alpha is None:
             subject_datasets = []
             for i in range(self.n_subjects):
+                if i not in self.kept_subjects:
+                    # We don't want to include this subject in the dataset
+                    continue
+
                 subject = self.subjects[i]
                 if subj_id:
                     subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
@@ -895,6 +929,10 @@ class Data:
 
             subject_datasets = []
             for i in range(self.n_subjects):
+                if i not in self.kept_subjects:
+                    # We don't want to include this subject in the dataset
+                    continue
+
                 if n_embeddings > n_alpha_embeddings:
                     # We remove data points in alpha that are not in the new time
                     # embedded data

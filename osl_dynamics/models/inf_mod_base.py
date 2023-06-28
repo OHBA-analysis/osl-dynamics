@@ -352,7 +352,7 @@ class VariationalInferenceModelBase(ModelBase):
         predictions : dict
             Dictionary with labels for each prediction.
         """
-        predictions = self.model.predict(*args, *kwargs)
+        predictions = self.model.predict(*args, **kwargs)
         if not self.config.multiple_dynamics:
             return_names = ["ll_loss", "kl_loss", "theta"]
         else:
@@ -361,7 +361,9 @@ class VariationalInferenceModelBase(ModelBase):
 
         return predictions_dict
 
-    def get_theta(self, dataset, concatenate=False, remove_edge_effects=False):
+    def get_theta(
+        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
+    ):
         """Mode mixing logits, theta.
 
         Parameters
@@ -398,7 +400,7 @@ class VariationalInferenceModelBase(ModelBase):
         _logger.info("Getting theta")
         theta = []
         for ds in dataset:
-            predictions = self.predict(ds)
+            predictions = self.predict(ds, **kwargs)
             theta_ = predictions["theta"]
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
@@ -414,7 +416,9 @@ class VariationalInferenceModelBase(ModelBase):
 
         return theta
 
-    def get_mode_logits(self, dataset, concatenate=False, remove_edge_effects=False):
+    def get_mode_logits(
+        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
+    ):
         """Get logits (theta) for a multi-time-scale model.
 
         Parameters
@@ -452,7 +456,7 @@ class VariationalInferenceModelBase(ModelBase):
         mean_theta = []
         fc_theta = []
         for ds in dataset:
-            predictions = self.predict(ds)
+            predictions = self.predict(ds, **kwargs)
             mean_theta_ = predictions["mean_theta"]
             fc_theta_ = predictions["fc_theta"]
             if remove_edge_effects:
@@ -476,7 +480,9 @@ class VariationalInferenceModelBase(ModelBase):
 
         return mean_theta, fc_theta
 
-    def get_alpha(self, dataset, concatenate=False, remove_edge_effects=False):
+    def get_alpha(
+        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
+    ):
         """Get mode mixing coefficients, alpha.
 
         Parameters
@@ -511,7 +517,7 @@ class VariationalInferenceModelBase(ModelBase):
         _logger.info("Getting alpha")
         alpha = []
         for ds in dataset:
-            predictions = self.predict(ds)
+            predictions = self.predict(ds, **kwargs)
             theta = predictions["theta"]
             alpha_ = alpha_layer(theta)
             if remove_edge_effects:
@@ -529,7 +535,7 @@ class VariationalInferenceModelBase(ModelBase):
         return alpha
 
     def get_mode_time_courses(
-        self, dataset, concatenate=False, remove_edge_effects=False
+        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
     ):
         """Get mode time courses (alpha) for a multi-time-scale model.
 
@@ -571,7 +577,7 @@ class VariationalInferenceModelBase(ModelBase):
         alpha = []
         gamma = []
         for ds in dataset:
-            predictions = self.predict(ds)
+            predictions = self.predict(ds, **kwargs)
             mean_theta = predictions["mean_theta"]
             fc_theta = predictions["fc_theta"]
             alpha_ = alpha_layer(mean_theta)
@@ -597,7 +603,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         return alpha, gamma
 
-    def losses(self, dataset):
+    def losses(self, dataset, **kwargs):
         """Calculates the log-likelihood and KL loss for a dataset.
 
         Parameters
@@ -614,12 +620,12 @@ class VariationalInferenceModelBase(ModelBase):
         """
         dataset = self.make_dataset(dataset, concatenate=True)
         _logger.info("Getting losses")
-        predictions = self.predict(dataset)
+        predictions = self.predict(dataset, **kwargs)
         ll_loss = np.mean(predictions["ll_loss"])
         kl_loss = np.mean(predictions["kl_loss"])
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset):
+    def free_energy(self, dataset, **kwargs):
         """Calculates the variational free energy of a dataset.
 
         Note, this method returns a free energy which may have a significantly
@@ -639,7 +645,7 @@ class VariationalInferenceModelBase(ModelBase):
             Variational free energy for the dataset.
         """
         dataset = self.make_dataset(dataset, concatenate=True)
-        ll_loss, kl_loss = self.losses(dataset)
+        ll_loss, kl_loss = self.losses(dataset, **kwargs)
         free_energy = ll_loss + kl_loss
         return free_energy
 

@@ -8,6 +8,7 @@ import pickle
 import sys
 from copy import copy
 from pathlib import Path
+from contextlib import contextmanager
 
 import numpy as np
 import yaml
@@ -502,3 +503,13 @@ def load(filename):
         array = np.load(filename)
 
     return array
+
+
+@contextmanager
+def set_logging_level(logger, level):
+    current_level = logger.getEffectiveLevel()
+    try:
+        logger.setLevel(level)
+        yield
+    finally:
+        logger.setLevel(current_level)

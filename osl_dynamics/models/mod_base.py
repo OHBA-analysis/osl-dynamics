@@ -8,6 +8,7 @@ import re
 from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
+from contextlib import contextmanager
 
 import numpy as np
 import tensorflow
@@ -434,6 +435,48 @@ class ModelBase:
         self.save_weights(
             f"{dirname}/weights"
         )  # will use the keras method: self.model.save_weights()
+
+    @contextmanager
+    def set_trainable(self, layers, values):
+        """Context manager to temporarily set the trainable attribute of layers.
+
+        Parameters
+        ----------
+        layers : str or list of str
+            List of layers to set the trainable attribute of.
+        values : bool or list of bool
+            Value to set the trainable attribute of the layers to.
+        """
+        # Validation
+        if isinstance(layers, str):
+            layers = [layers]
+        if isinstance(values, bool):
+            values = [values] * len(layers)
+        if len(layers) != len(values):
+            raise ValueError(
+                f"layers and trainable must be the same length, "
+                + f"but got {len(layers)} and {len(values)}."
+            )
+
+        available_layers = [layer.name for layer in self.layers]
+        for layer in layers:
+            if layer not in available_layers:
+                raise ValueError(
+                    f"No such layer: {layer}. "
+                    + f"Available layers are: {available_layers}."
+                )
+
+        original_values = [self.get_layer(layer).trainable for layer in layers]
+
+        try:
+            for layer, trainable in zip(layers, values):
+                self.get_layer(layer).trainable = trainable
+            self.compile()
+            yield
+        finally:
+            for layer, trainable in zip(layers, original_values):
+                self.get_layer(layer).trainable = trainable
+            self.compile()
 
     @staticmethod
     def load_config(dirname):
