@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from typing import Literal
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -389,6 +390,76 @@ class Model(VariationalInferenceModelBase):
                 n_params += np.prod(var.shape)
 
         return int(n_params)
+
+    def dual_estimation(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
+        """Dual estimation for estimating subject specific means and covariances
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        n_epochs : int
+            Number of epochs to train for.
+        learning_rate : float
+            Learning rate.
+        store_dir : str
+            Directory to temporarily store the model in.
+
+        Returns
+        -------
+        subject_means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        subject_covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        """
+        # Save the group level model
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Placeholders for the subject specific means and covariances
+        subject_means = np.empty(
+            [
+                training_data.n_subjects,
+                self.config.n_modes,
+                self.config.n_channels,
+            ]
+        )
+        subject_covariances = np.empty(
+            [
+                training_data.n_subjects,
+                self.config.n_modes,
+                self.config.n_channels,
+                self.config.n_channels,
+            ]
+        )
+
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+        original_do_kl_annealing = self.config.do_kl_annealing
+
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+        self.config.do_kl_annealing = False
+
+        with self.set_trainable(["mod_rnn", "mod_mu", "mod_sigma"], False):
+            for subject in trange(training_data.n_subjects, desc="Dual estimation"):
+                self.load_weights(f"{store_dir}/weights.h5")
+                with training_data.set_kept_subjects(subject):
+                    self.fit(training_data, verbose=0)
+
+                means, covariances = self.get_means_covariances()
+
+                subject_means[subject] = means
+                subject_covariances[subject] = covariances
+
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+        self.config.do_kl_annealing = original_do_kl_annealing
+
+        return subject_means, subject_covariances
 
 
 def _model_structure(config):

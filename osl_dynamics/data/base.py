@@ -197,7 +197,7 @@ class Data:
 
         Parameters
         ----------
-        kept_subjects : list or int
+        kept_subjects : int or list of int
             List of subject indices to keep.
         """
         # Store the current kept subjects
