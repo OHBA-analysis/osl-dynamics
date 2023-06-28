@@ -5,6 +5,7 @@
 from dataclasses import dataclass
 from typing import Literal
 import os
+import logging
 
 import numpy as np
 import tensorflow as tf
@@ -32,6 +33,9 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.utils.misc import set_logging_level
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -391,10 +395,10 @@ class Model(VariationalInferenceModelBase):
 
         return int(n_params)
 
-    def dual_estimation(
+    def subject_fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Dual estimation for estimating subject specific means and covariances
+        """Fine tuning the model for each subject.
 
         Parameters
         ----------
@@ -409,17 +413,22 @@ class Model(VariationalInferenceModelBase):
 
         Returns
         -------
+        subject_alpha : list of np.ndarray
+            Subject specific mixing coefficients.
+            Each element has shape (n_samples, n_modes).
         subject_means : np.ndarray
             Subject specific means. Shape is (n_subjects, n_modes, n_channels).
         subject_covariances : np.ndarray
             Subject specific covariances.
             Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
+
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
         self.save_weights(f"{store_dir}/weights.h5")
 
-        # Placeholders for the subject specific means and covariances
+        # Placeholders for the subject alpha, specific means and covariances
+        subject_alpha = []
         subject_means = np.empty(
             [
                 training_data.n_subjects,
@@ -444,14 +453,18 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = learning_rate or self.config.learning_rate
         self.config.do_kl_annealing = False
 
-        with self.set_trainable(["mod_rnn", "mod_mu", "mod_sigma"], False):
-            for subject in trange(training_data.n_subjects, desc="Dual estimation"):
+        with self.set_trainable(
+            ["mod_rnn", "mod_mu", "mod_sigma"], False
+        ), set_logging_level(_logger, logging.WARNING):
+            for subject in trange(training_data.n_subjects, desc="Subject fine tuning"):
                 self.load_weights(f"{store_dir}/weights.h5")
                 with training_data.set_kept_subjects(subject):
                     self.fit(training_data, verbose=0)
 
+                alpha = self.get_alpha(training_data, concatenate=True, verbose=0)
                 means, covariances = self.get_means_covariances()
 
+                subject_alpha.append(alpha)
                 subject_means[subject] = means
                 subject_covariances[subject] = covariances
 
@@ -459,7 +472,7 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = original_learning_rate
         self.config.do_kl_annealing = original_do_kl_annealing
 
-        return subject_means, subject_covariances
+        return subject_alpha, subject_means, subject_covariances
 
 
 def _model_structure(config):
