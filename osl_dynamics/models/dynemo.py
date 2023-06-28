@@ -468,7 +468,7 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = original_learning_rate
         self.config.do_kl_annealing = original_do_kl_annealing
 
-        return alpha, means, covariances
+        return alpha, np.array(means), np.array(covariances)
 
 
 def _model_structure(config):
