@@ -26,7 +26,7 @@ from osl_dynamics.inference.layers import (
     DiagonalMatricesLayer,
     VectorsLayer,
 )
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.simulation import HMM
 
@@ -812,7 +812,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         """
-        return dynemo_obs.get_covariances(self.model)
+        return obs_mod.get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each state.
@@ -824,7 +824,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             State covariances.
         """
-        return dynemo_obs.get_means_covariances(self.model)
+        return obs_mod.get_means_covariances(self.model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each state.
@@ -837,7 +837,7 @@ class Model(ModelBase):
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        dynemo_obs.set_means(self.model, means, update_initializer)
+        obs_mod.set_means(self.model, means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each state.
@@ -850,7 +850,7 @@ class Model(ModelBase):
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_covariances(
             self.model,
             covariances,
             self.config.diagonal_covariances,
@@ -959,10 +959,10 @@ class Model(ModelBase):
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
@@ -1280,4 +1280,4 @@ def _model_structure(config):
     D = covs_layer(data)  # data not used
     ll_loss = ll_loss_layer([data, mu, D, gamma, None])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM-Obs")
+    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")

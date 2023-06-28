@@ -21,7 +21,7 @@ from osl_dynamics.inference.layers import (
     ModelRNNLayer,
     VectorsLayer,
 )
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 
 _logger = logging.getLogger("osl-dynamics")
@@ -363,7 +363,7 @@ class Model(ModelBase):
         covariances : np.ndarary
             Mode covariances.
         """
-        return dynemo_obs.get_covariances(self.inference_model)
+        return obs_mod.get_covariances(self.inference_model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -375,7 +375,7 @@ class Model(ModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return dynemo_obs.get_means_covariances(self.inference_model)
+        return obs_mod.get_means_covariances(self.inference_model)
 
     def set_means(self, means, update_initializer=True):
         """Set the means of each mode.
@@ -388,7 +388,7 @@ class Model(ModelBase):
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        dynemo_obs.set_means(self.inference_model, means, update_initializer)
+        obs_mod.set_means(self.inference_model, means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each mode.
@@ -401,9 +401,7 @@ class Model(ModelBase):
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
-            self.inference_model, covariances, update_initializer
-        )
+        obs_mod.set_covariances(self.inference_model, covariances, update_initializer)
 
     def sample_alpha(self, alpha=None):
         """Uses the generator to predict the prior alphas.

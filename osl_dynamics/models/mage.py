@@ -23,7 +23,7 @@ from osl_dynamics.inference.layers import (
     ModelRNNLayer,
     VectorsLayer,
 )
-from osl_dynamics.models import mdynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 
 _logger = logging.getLogger("osl-dynamics")
@@ -514,7 +514,7 @@ class Model(ModelBase):
         fcs : np.ndarray
             Mode functional connectivities.
         """
-        return mdynemo_obs.get_means_stds_fcs(self.inference_model)
+        return obs_mod.get_means_stds_fcs(self.inference_model)
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
         """Set the means, standard deviations, functional connectivities of each mode.
@@ -532,7 +532,7 @@ class Model(ModelBase):
             Do we want to use the passed parameters when we re_initialize
             the model?
         """
-        mdynemo_obs.set_means_stds_fcs(
+        obs_mod.set_means_stds_fcs(
             self.inference_model, means, stds, fcs, update_initializer
         )
 

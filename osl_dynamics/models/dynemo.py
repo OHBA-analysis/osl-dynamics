@@ -27,7 +27,7 @@ from osl_dynamics.inference.layers import (
     SoftmaxLayer,
     VectorsLayer,
 )
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelBase,
     VariationalInferenceModelConfig,
@@ -216,7 +216,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarary
             Mode covariances.
         """
-        return dynemo_obs.get_covariances(self.model)
+        return obs_mod.get_covariances(self.model)
 
     def get_means_covariances(self):
         """Get the means and covariances of each mode.
@@ -228,7 +228,7 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return dynemo_obs.get_means_covariances(self.model)
+        return obs_mod.get_means_covariances(self.model)
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_covariances."""
@@ -245,7 +245,7 @@ class Model(VariationalInferenceModelBase):
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        dynemo_obs.set_means(self.model, means, update_initializer)
+        obs_mod.set_means(self.model, means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
         """Set the covariances of each mode.
@@ -258,7 +258,7 @@ class Model(VariationalInferenceModelBase):
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_covariances(
             self.model,
             covariances,
             self.config.diagonal_covariances,
@@ -295,10 +295,10 @@ class Model(VariationalInferenceModelBase):
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,

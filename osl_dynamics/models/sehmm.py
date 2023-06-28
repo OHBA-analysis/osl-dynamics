@@ -29,7 +29,7 @@ from osl_dynamics.inference.layers import (
     MultiLayerPerceptronLayer,
 )
 from osl_dynamics.models.hmm import Config as HMMConfig, Model as HMMModel
-from osl_dynamics.models import dynemo_obs, sedynemo_obs
+from osl_dynamics.models import obs_mod
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -431,7 +431,7 @@ class Model(HMMModel):
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)[1]
+        return obs_mod.get_group_means_covariances(self.model)[1]
 
     def get_group_means_covariances(self):
         """Get the means and covariances of each state.
@@ -443,7 +443,7 @@ class Model(HMMModel):
         covariances : np.ndarray
             Group level state covariances.
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)
+        return obs_mod.get_group_means_covariances(self.model)
 
     def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
         """Get the subject means and covariances.
@@ -462,7 +462,7 @@ class Model(HMMModel):
         covs : np.ndarray
             Subject covariances. Shape is (n_subjects, n_states, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covariances(
+        return obs_mod.get_subject_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
@@ -479,7 +479,7 @@ class Model(HMMModel):
             Embedding vectors for subjects.
             Shape is (n_subjects, subject_embedding_dim).
         """
-        return sedynemo_obs.get_subject_embeddings(self.model)
+        return obs_mod.get_subject_embeddings(self.model)
 
     def set_group_means(self, group_means, update_initializer=True):
         """Set the group means of each state.
@@ -492,7 +492,7 @@ class Model(HMMModel):
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        dynemo_obs.set_means(
+        obs_mod.set_means(
             self.model, group_means, update_initializer, layer_name="group_means"
         )
 
@@ -507,7 +507,7 @@ class Model(HMMModel):
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_covariances(
             self.model,
             group_covariances,
             update_initializer=update_initializer,
@@ -539,12 +539,12 @@ class Model(HMMModel):
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(
+            obs_mod.set_means_regularizer(
                 self.model, training_dataset, layer_name="group_means"
             )
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
@@ -563,7 +563,7 @@ class Model(HMMModel):
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_bayesian_kl_scaling(
+        obs_mod.set_bayesian_kl_scaling(
             self.model, n_batches, learn_means, learn_covariances
         )
 
@@ -579,7 +579,7 @@ class Model(HMMModel):
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_dev_mlp_reg_scaling(
+        obs_mod.set_dev_mlp_reg_scaling(
             self.model, n_batches, learn_means, learn_covariances
         )
 
@@ -1090,4 +1090,4 @@ def _model_structure(config):
     # Data flow
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss, kl_loss], name="SE-HMM-Obs")
+    return tf.keras.Model(inputs=inputs, outputs=[ll_loss, kl_loss], name="SE-HMM")

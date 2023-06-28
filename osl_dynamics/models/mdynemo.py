@@ -28,7 +28,7 @@ from osl_dynamics.inference.layers import (
     SoftmaxLayer,
     VectorsLayer,
 )
-from osl_dynamics.models import dynemo_obs, mdynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelBase,
     VariationalInferenceModelConfig,
@@ -251,7 +251,7 @@ class Model(VariationalInferenceModelBase):
         fcs : np.ndarray
             Mode functional connectivities.
         """
-        return mdynemo_obs.get_means_stds_fcs(self.model)
+        return obs_mod.get_means_stds_fcs(self.model)
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_stds_fcs."""
@@ -273,7 +273,7 @@ class Model(VariationalInferenceModelBase):
             Do we want to use the passed parameters when we re_initialize
             the model?
         """
-        mdynemo_obs.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+        obs_mod.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
@@ -302,15 +302,15 @@ class Model(VariationalInferenceModelBase):
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_stds:
-            mdynemo_obs.set_stds_regularizer(
+            obs_mod.set_stds_regularizer(
                 self.model, training_dataset, self.config.stds_epsilon
             )
 
         if self.config.learn_fcs:
-            mdynemo_obs.set_fcs_regularizer(
+            obs_mod.set_fcs_regularizer(
                 self.model, training_dataset, self.config.fcs_epsilon
             )
 
