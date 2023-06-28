@@ -904,8 +904,8 @@ class Data:
         if alpha is None:
             subject_datasets = []
             for i in range(self.n_subjects):
-                # Only keep subjects that are in the self.kept_subjects list
                 if i not in self.kept_subjects:
+                    # We don't want to include this subject in the dataset
                     continue
 
                 subject = self.subjects[i]
@@ -929,8 +929,8 @@ class Data:
 
             subject_datasets = []
             for i in range(self.n_subjects):
-                # Only keep subjects that are in the self.kept_subjects list
                 if i not in self.kept_subjects:
+                    # We don't want to include this subject in the dataset
                     continue
 
                 if n_embeddings > n_alpha_embeddings:

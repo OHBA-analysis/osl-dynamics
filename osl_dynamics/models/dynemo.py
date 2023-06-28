@@ -2,10 +2,10 @@
 
 """
 
-from dataclasses import dataclass
-from typing import Literal
 import os
 import logging
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -405,46 +405,30 @@ class Model(VariationalInferenceModelBase):
         training_data : osl_dynamics.data.Data
             Training dataset.
         n_epochs : int
-            Number of epochs to train for.
+            Number of epochs to train for. Defaults to the value in the config
+            used to create the model.
         learning_rate : float
-            Learning rate.
+            Learning rate. Defaults to the value in the config used to create
+            the model.
         store_dir : str
             Directory to temporarily store the model in.
 
         Returns
         -------
-        subject_alpha : list of np.ndarray
+        alpha : list of np.ndarray
             Subject specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
-        subject_means : np.ndarray
+        means : np.ndarray
             Subject specific means. Shape is (n_subjects, n_modes, n_channels).
-        subject_covariances : np.ndarray
+        covariances : np.ndarray
             Subject specific covariances.
             Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
-
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
         self.save_weights(f"{store_dir}/weights.h5")
 
-        # Placeholders for the subject alpha, specific means and covariances
-        subject_alpha = []
-        subject_means = np.empty(
-            [
-                training_data.n_subjects,
-                self.config.n_modes,
-                self.config.n_channels,
-            ]
-        )
-        subject_covariances = np.empty(
-            [
-                training_data.n_subjects,
-                self.config.n_modes,
-                self.config.n_channels,
-                self.config.n_channels,
-            ]
-        )
-
+        # Save original training hyperparameters
         original_n_epochs = self.config.n_epochs
         original_learning_rate = self.config.learning_rate
         original_do_kl_annealing = self.config.do_kl_annealing
@@ -453,26 +437,38 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = learning_rate or self.config.learning_rate
         self.config.do_kl_annealing = False
 
-        with self.set_trainable(
-            ["mod_rnn", "mod_mu", "mod_sigma"], False
-        ), set_logging_level(_logger, logging.WARNING):
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
+
+        # Fine tune on individual subjects
+        alpha = []
+        means = []
+        covariances = []
+        with self.set_trainable(fixed_layers, False), set_logging_level(
+            _logger, logging.WARNING
+        ):
             for subject in trange(training_data.n_subjects, desc="Subject fine tuning"):
+                # Load group-level model
                 self.load_weights(f"{store_dir}/weights.h5")
+
+                # Train on this subject
                 with training_data.set_kept_subjects(subject):
                     self.fit(training_data, verbose=0)
 
-                alpha = self.get_alpha(training_data, concatenate=True, verbose=0)
-                means, covariances = self.get_means_covariances()
+                # Get inferred parameters
+                a = self.get_alpha(training_data, concatenate=True, verbose=0)
+                m, c = self.get_means_covariances()
 
-                subject_alpha.append(alpha)
-                subject_means[subject] = means
-                subject_covariances[subject] = covariances
+                alpha.append(a)
+                means.append(m)
+                covariances.append(c)
 
+        # Reset hyperparameters
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
         self.config.do_kl_annealing = original_do_kl_annealing
 
-        return subject_alpha, subject_means, subject_covariances
+        return alpha, means, covariances
 
 
 def _model_structure(config):

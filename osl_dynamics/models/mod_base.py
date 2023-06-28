@@ -437,25 +437,25 @@ class ModelBase:
         )  # will use the keras method: self.model.save_weights()
 
     @contextmanager
-    def set_trainable(self, layers, trainables):
+    def set_trainable(self, layers, values):
         """Context manager to temporarily set the trainable attribute of layers.
 
         Parameters
         ----------
         layers : str or list of str
             List of layers to set the trainable attribute of.
-        trainables : bool or list of bool
+        values : bool or list of bool
             Value to set the trainable attribute of the layers to.
         """
         # Validation
         if isinstance(layers, str):
             layers = [layers]
-        if isinstance(trainables, bool):
-            trainables = [trainables] * len(layers)
-        if len(layers) != len(trainables):
+        if isinstance(values, bool):
+            values = [values] * len(layers)
+        if len(layers) != len(values):
             raise ValueError(
                 f"layers and trainable must be the same length, "
-                + f"but got {len(layers)} and {len(trainables)}."
+                + f"but got {len(layers)} and {len(values)}."
             )
 
         available_layers = [layer.name for layer in self.layers]
@@ -466,18 +466,16 @@ class ModelBase:
                     + f"Available layers are: {available_layers}."
                 )
 
-        original_trainables = [self.get_layer(layer).trainable for layer in layers]
+        original_values = [self.get_layer(layer).trainable for layer in layers]
 
         try:
-            for layer, trainable in zip(layers, trainables):
+            for layer, trainable in zip(layers, values):
                 self.get_layer(layer).trainable = trainable
-
             self.compile()
             yield
         finally:
-            for layer, trainable in zip(layers, original_trainables):
+            for layer, trainable in zip(layers, original_values):
                 self.get_layer(layer).trainable = trainable
-
             self.compile()
 
     @staticmethod
