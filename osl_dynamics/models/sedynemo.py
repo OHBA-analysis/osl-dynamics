@@ -257,9 +257,9 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-    def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=True):
+    def make_dataset(self, inputs, **kwargs):
         """SE-DyNeMo requires subject id to be included in the dataset."""
-        return super().make_dataset(inputs, shuffle, concatenate, subj_id)
+        return super().make_dataset(inputs, subj_id=True, **kwargs)
 
     def fit(self, training_data, *args, **kwargs):
         # Set the scalings
