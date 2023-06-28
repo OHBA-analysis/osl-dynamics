@@ -4,8 +4,8 @@ from state/mode spectra.
 The spectra can be calculate with a multitaper (in the case of a state time
 course) or regression (in the case of a mode time course).
 
-See examples/analysis/multitaper_spectra.py for how to calculate a multitaper
-and examples/analysis/regression_spectra.py for how to calculate a regression.
+See examples/minimal/multitaper_spectra.py for how to calculate a multitaper
+and examples/minimal/regression_spectra.py for how to calculate regression spectra.
 
 In this script we assume this has been done and we have the group-average spectra
 files: f.npy and coh.npy. (The other file: psd.npy is not needed for this script.)
@@ -14,11 +14,6 @@ files: f.npy and coh.npy. (The other file: psd.npy is not needed for this script
 import numpy as np
 
 from osl_dynamics.analysis import connectivity
-
-# Source reconstruction files used to create the training data
-parcellation_file = (
-    "fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz"
-)
 
 # Load subject-specific state/mode spectra
 f = np.load("f.npy")
@@ -44,7 +39,7 @@ conn_map = connectivity.threshold(conn_map, percentile=95, subtract_mean=True)
 
 # Plot connectivity maps
 connectivity.save(
-    connectivity_map=conn_map,
+    conn_map,
+    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
     filename="coh_.png",
-    parcellation_file=parcellation_file,
 )

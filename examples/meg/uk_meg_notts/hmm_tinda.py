@@ -3,28 +3,38 @@
 """
 
 import os
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_rel
 
-from osl_dynamics.inference.modes import argmax_time_courses
+from osl_dynamics.inference import modes
 from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimise_sequence
-from osl_dynamics.data import HMM_MAR
 
 
-# Some settings
+# Settings
 os.makedirs("figures", exist_ok=True)  # Directory for plots
 do_bonferroni_correction = True
 
-# Load precomputed HMM
-print("Loading HMM")
-hmm = HMM_MAR(
-    "/well/woolrich/projects/uk_meg_notts/eo/natcomms18/results/Subj1-55_K-12/hmm.mat"
-)
+# We will download example data hosted on osf.io/by2tc.
+# Note, osfclient must be installed. This can be installed with pip:
+#
+#     pip install osfclient
 
-# Get state time courses
-gamma = hmm.gamma()
-stc = argmax_time_courses(gamma)
+def get_data(name, output_dir):
+    if os.path.exists(output_dir):
+        print(f"{output_dir} already downloaded. Skipping..")
+        return
+    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
+    os.system(f"unzip -o {name}.zip -d {output_dir}")
+    os.remove(f"{name}.zip")
+    print(f"Data downloaded to: {output_dir}")
+
+get_data("tde-hmm_notts_rest_55_subj", output_dir="notts_tde_hmm")
+
+# Get the state time course
+alpha = pickle.load(open("notts_tde_hmm/alpha.pkl", "rb"))
+stc = modes.argmax_time_courses(alpha)
 
 # Run TINDA on every subject
 print("Running TINDA")
