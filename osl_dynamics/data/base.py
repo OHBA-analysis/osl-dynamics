@@ -75,10 +75,14 @@ class Data:
         Is the input data of shape (n_samples, n_channels)? Default is True.
         If your data is in format (n_channels, n_samples), use
         time_axis_first=False. This argument is optional.
-    load_memmaps: bool
+    load_memmaps : bool
         Should we load the data as memory maps (memmaps)? If False, we will load data
         into memory rather than storing it on disk. By default we will keep the data
         on disk and use memmaps. This argument is optional.
+    buffer_size : int
+        Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
+        to less random shuffling but will be quicker. This argument is optional.
+        Default is 100000.
     n_jobs : int
         Number of processes to load the data in parallel. This argument is optional.
         Default is 1, which loads data in serial.
@@ -96,6 +100,7 @@ class Data:
         store_dir="tmp",
         time_axis_first=True,
         load_memmaps=True,
+        buffer_size=100000,
         n_jobs=1,
     ):
         self._identifier = id(self)
@@ -107,6 +112,7 @@ class Data:
         self.parcellation_file = parcellation_file
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
+        self.buffer_size = buffer_size
         self.n_jobs = n_jobs
         self.prepared_data_filenames = []
 
@@ -353,6 +359,7 @@ class Data:
             "parcellation_file",
             "time_axis_first",
             "load_memmaps",
+            "buffer_size",
             "n_jobs",
             "prepared_data_filenames",
             "inputs",
@@ -798,13 +805,13 @@ class Data:
 
             if shuffle:
                 # Shuffle sequences
-                full_dataset = full_dataset.shuffle(100000)
+                full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into mini-batches
                 full_dataset = full_dataset.batch(batch_size)
 
                 # Shuffle mini-batches
-                full_dataset = full_dataset.shuffle(100000)
+                full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
                 # Group into mini-batches
@@ -835,14 +842,14 @@ class Data:
             for ds in datasets:
                 if shuffle:
                     # Shuffle sequences
-                    ds = ds.shuffle(100000)
+                    ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
                 ds = ds.batch(batch_size)
 
                 if shuffle:
                     # Shuffle batches
-                    ds = ds.shuffle(100000)
+                    ds = ds.shuffle(self.buffer_size)
 
                 full_datasets.append(ds.prefetch(-1))
 
