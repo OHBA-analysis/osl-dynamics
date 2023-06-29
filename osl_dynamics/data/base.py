@@ -4,10 +4,7 @@
 
 import logging
 import pathlib
-import pickle
-import warnings
 from functools import partial
-from os import path
 from shutil import rmtree
 from contextlib import contextmanager
 
@@ -72,17 +69,6 @@ class Data:
         disk and create memmaps (unless load_memmaps=False is passed).
         This is the directory to save memmaps to. Default is ./tmp.
         This argument is optional.
-    n_embeddings : int
-        Number of time-delay embeddings that have already been appleid to the data.
-        This argument is optional. It is useful to pass this argument if the data has
-        already been prepared.
-    n_window : int
-        Length of sliding window that has already been applied to the data. This
-        argument is optional. It is useful to pass this argument if the data has
-        already been prepared.
-    amplitude_envelope : bool
-        Is the data we're loading amplitude envelope data? This argument is optional.
-        It is useful to pass this argument if the data has already been prepared.
     time_axis_first : bool
         Is the input data of shape (n_samples, n_channels)? Default is True.
         If your data is in format (n_channels, n_samples), use
@@ -106,9 +92,6 @@ class Data:
         mask_file=None,
         parcellation_file=None,
         store_dir="tmp",
-        n_embeddings=None,
-        n_window=None,
-        amplitude_envelope=None,
         time_axis_first=True,
         load_memmaps=True,
         n_jobs=1,
@@ -120,13 +103,9 @@ class Data:
         self.sampling_frequency = sampling_frequency
         self.mask_file = mask_file
         self.parcellation_file = parcellation_file
-        self.n_embeddings = n_embeddings
-        self.n_window = n_window
-        self.amplitude_envelope = amplitude_envelope
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
         self.n_jobs = n_jobs
-        self.prepared = False
         self.prepared_data_filenames = []
 
         # Validate inputs
@@ -142,10 +121,6 @@ class Data:
         # Load and validate the raw data
         self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data()
         self.validate_data()
-
-        # Get data prepration attributes if the raw data has been prepared
-        if not isinstance(inputs, list):
-            self.load_preparation(inputs)
 
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
 
@@ -258,29 +233,6 @@ class Data:
         if self.store_dir.exists():
             rmtree(self.store_dir)
 
-    def load_preparation(self, inputs):
-        """Loads a pickle file containing preparation settings.
-
-        Parameters
-        ----------
-        inputs : str
-            Path to directory containing the pickle file with preparation settings.
-        """
-        if path.isdir(inputs):
-            for file in rw.list_dir(inputs):
-                if "preparation.pkl" in file:
-                    preparation = pickle.load(open(inputs + "/preparation.pkl", "rb"))
-                    self.amplitude_envelope = preparation["amplitude_envelope"]
-                    self.low_freq = preparation["low_freq"]
-                    self.high_freq = preparation["high_freq"]
-                    self.n_window = preparation["n_window"]
-                    self.n_embeddings = preparation["n_embeddings"]
-                    self.n_te_channels = preparation["n_te_channels"]
-                    self.n_pca_components = preparation["n_pca_components"]
-                    self.pca_components = preparation["pca_components"]
-                    self.whiten = preparation["whiten"]
-                    self.prepared = True
-
     def load_raw_data(self):
         """Import data into a list of memory maps.
 
@@ -354,26 +306,9 @@ class Data:
         """
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Save time series data
         for i, array_data in enumerate(tqdm(self.arrays, desc="Saving data")):
             padded_number = misc.leading_zeros(i, self.n_arrays)
             np.save(f"{output_dir}/array{padded_number}.npy", array_data)
-
-        # Save preparation info if .prepared has been called
-        if self.prepared:
-            preparation = {
-                "amplitude_envelope": self.amplitude_envelope,
-                "low_freq": self.low_freq,
-                "high_freq": self.high_freq,
-                "n_window": self.n_window,
-                "n_embeddings": self.n_embeddings,
-                "n_te_channels": self.n_te_channels,
-                "n_pca_components": self.n_pca_components,
-                "pca_components": self.pca_components,
-                "whiten": self.whiten,
-            }
-            pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
 
     def validate_data(self):
         """Validate data files."""
@@ -382,7 +317,9 @@ class Data:
             raise ValueError("All inputs should have the same number of channels.")
 
     def filter(self, low_freq=None, high_freq=None):
-        """Filter the raw data.
+        """Filter the data.
+
+        This is an in-place operation.
 
         Parameters
         ----------
@@ -400,225 +337,51 @@ class Data:
                 + "Data(..., sampling_frequency=...) when creating the Data object."
             )
 
-        # Save settings
-        self.amplitude_envelope = False
         self.low_freq = low_freq
         self.high_freq = high_freq
-        self.n_window = 1
-        self.n_embeddings = 1
-        self.n_te_channels = self.n_raw_data_channels
-        self.n_pca_components = None
-        self.pca_components = None
-        self.whiten = None
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
 
-        # Prepare the data
-        for raw_data_memmap, prepared_data_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Filtering data"),
-            self.prepared_data_filenames,
-        ):
-            # Filtering
+        # Function to apply filtering to a single array
+        def _apply(memmap, prepared_data_file):
             prepared_data = processing.temporal_filter(
-                raw_data_memmap, low_freq, high_freq, self.sampling_frequency
+                memmap, self.low_freq, self.high_freq, self.sampling_frequency
             )
-
             if self.load_memmaps:
-                # Save the prepared data as a memmap
                 prepared_data_memmap = misc.array_to_memmap(
                     prepared_data_file, prepared_data
                 )
             else:
                 prepared_data_memmap = prepared_data
-            self.prepared_data_memmaps.append(prepared_data_memmap)
+            return prepared_data_memmap
 
-        # Update arrays to return the prepared data
-        self.arrays = self.prepared_data_memmaps
-
-        self.prepared = True
-
-    def prepare(
-        self,
-        amplitude_envelope=False,
-        low_freq=None,
-        high_freq=None,
-        n_window=1,
-        n_embeddings=1,
-        n_pca_components=None,
-        pca_components=None,
-        whiten=False,
-    ):
-        """Prepares data to train the model with.
-
-        If amplitude_envelope=True, first we filter the data then
-        calculate a Hilbert transform and take the absolute value.
-        We then apply a sliding window moving average. Finally, we
-        standardize the data.
-
-        Otherwise, we standardize the data, perform time-delay embedding,
-        then PCA, then whiten. Finally, the data is standardized again.
-
-        If no arguments are passed, the data is just standardized.
-
-        Parameters
-        ----------
-        amplitude_envelope : bool
-            Should we prepare amplitude envelope data?
-        low_freq : float
-            Frequency in Hz for a high pass filter.
-            Only used if amplitude_envelope=True.
-        high_freq : float
-            Frequency in Hz for a low pass filter.
-            Only used if amplitude_envelope=True.
-        n_window : int
-            Number of data points in a sliding window to apply to the amplitude
-            envelope data. Only used if amplitude_envelope=True.
-        n_embeddings : int
-            Number of data points to embed the data.
-            Only used if amplitude_envelope=False.
-        n_pca_components : int
-            Number of PCA components to keep. Default is no PCA.
-            Only used if amplitude_envelope=False.
-        pca_components : np.ndarray
-            PCA components to apply if they have already been calculated.
-            Only used if amplitude_envelope=False.
-        whiten : bool
-            Should we whiten the PCA'ed data?
-            Only used if amplitude_envelope=False.
-        """
-        if self.prepared:
-            warnings.warn(
-                "Previously prepared data will be overwritten.", RuntimeWarning
-            )
-
-        # Prepare data (either amplitude envelope or time-delay embedded)
-        if amplitude_envelope:
-            self.prepare_amp_env(low_freq, high_freq, n_window)
-        else:
-            self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
-
-    def prepare_amp_env(self, low_freq=None, high_freq=None, n_window=1):
-        """Prepare amplitude envelope data.
-
-        Parameters
-        ----------
-        low_freq : float
-            Frequency in Hz for a high pass filter.
-        high_freq : float
-            Frequency in Hz for a low pass filter.
-        n_window : int
-            Number of data points in a sliding window to apply to the amplitude
-            envelope data.
-        """
-
-        # Validation
-        if (
-            low_freq is not None or high_freq is not None
-        ) and self.sampling_frequency is None:
-            raise ValueError(
-                "Data.sampling_frequency must be set if we are filtering the data. "
-                + "Use Data.set_sampling_frequency() or pass "
-                + "Data(..., sampling_frequency=...) when creating the Data object."
-            )
-
-        if n_window % 2 == 0:
-            raise ValueError("n_window must be an odd number.")
-
-        # Save settings
-        self.amplitude_envelope = True
-        self.low_freq = low_freq
-        self.high_freq = high_freq
-        self.n_window = n_window
-        self.n_embeddings = 1
-        self.n_te_channels = self.n_raw_data_channels
-        self.n_pca_components = None
-        self.pca_components = None
-        self.whiten = None
-
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
-
-        # Prepare the data
-        prepare_args = zip(
-            self.raw_data_memmaps,
-            self.prepared_data_filenames,
-        )
-
+        # Prepare the data in parallel
+        args = zip(self.arrays, self.prepared_data_filenames)
         prepared_data_memmaps = pqdm(
-            prepare_args,
-            self.apply_amp_env,
-            desc="Preparing data",
+            args,
+            _apply,
+            desc="Filtering",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=len(self.raw_data_memmaps),
+            total=self.n_arrays,
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
         # Update arrays to return the prepared data
         self.arrays = self.prepared_data_memmaps
 
-        self.prepared = True
-
-    def apply_amp_env(self, raw_data_memmap, prepared_data_file):
-        """Applies filtering, a Hilbert transform and standardization to raw data.
-
-        Parameters
-        ----------
-        raw_data_memmap : np.memmap or np.ndarray
-            Raw data.
-        prepared_data_file : str
-            Name of memory map file to save prepared data to.
-            Can be None if we are not using memory maps.
-
-        Returns
-        -------
-        prepared_data_memmap : np.memmap or np.ndarray
-            Prepared data.
-        """
-        # Filtering
-        prepared_data = processing.temporal_filter(
-            raw_data_memmap, self.low_freq, self.high_freq, self.sampling_frequency
-        )
-
-        # Hilbert transform
-        prepared_data = np.abs(signal.hilbert(prepared_data, axis=0))
-
-        # Moving average filter
-        prepared_data = np.array(
-            [
-                np.convolve(
-                    prepared_data[:, i],
-                    np.ones(self.n_window) / self.n_window,
-                    mode="valid",
-                )
-                for i in range(prepared_data.shape[1])
-            ],
-        ).T
-
-        # Finally, we standardise
-        prepared_data = processing.standardize(prepared_data, create_copy=False)
-
-        # Make sure data is float32
-        prepared_data = prepared_data.astype(np.float32)
-
-        if self.load_memmaps:
-            # Save the prepared data as a memmap
-            prepared_data_memmap = misc.array_to_memmap(
-                prepared_data_file, prepared_data
-            )
-        else:
-            prepared_data_memmap = prepared_data
-        return prepared_data_memmap
-
-    def prepare_tde(
+    def tde_pca(
         self,
-        n_embeddings=1,
+        n_embeddings,
         n_pca_components=None,
         pca_components=None,
         whiten=False,
     ):
-        """Prepares time-delay embedded data to train the model with.
+        """Time-delay embedding (TDE) and principal component analysis (PCA).
+
+        This function will first standardize the data, then perform TDE then PCA.
+        This is an in-place operation.
 
         Parameters
         ----------
@@ -631,18 +394,12 @@ class Data:
         whiten : bool
             Should we whiten the PCA'ed data?
         """
-
         if n_pca_components is not None and pca_components is not None:
             raise ValueError("Please only pass n_pca_components or pca_components.")
 
         if pca_components is not None and not isinstance(pca_components, np.ndarray):
             raise ValueError("pca_components must be a numpy array.")
 
-        # Save settings
-        self.amplitude_envelope = False
-        self.low_freq = None
-        self.high_freq = None
-        self.n_window = 1
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
@@ -652,23 +409,17 @@ class Data:
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
 
-        # Principle component analysis (PCA)
+        # Calculate PCA on TDE data
         # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
-            # Calculate the PCA components by performing SVD on the covariance
-            # of the data
+            # Calculate covariance of the data
             covariance = np.zeros([self.n_te_channels, self.n_te_channels])
-            for raw_data_memmap in tqdm(
-                self.raw_data_memmaps, desc="Calculating PCA components"
-            ):
-                # Standardise and time embed the data
-                std_data = processing.standardize(raw_data_memmap)
+            for memmap in tqdm(self.arrays, desc="Calculating PCA components"):
+                std_data = processing.standardize(memmap)
                 te_std_data = processing.time_embed(std_data, n_embeddings)
-
-                # Calculate the covariance of the entire dataset
                 covariance += np.transpose(te_std_data) @ te_std_data
 
-            # Use SVD to calculate PCA components
+            # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
             explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
@@ -678,68 +429,143 @@ class Data:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
 
-        prepare_args = zip(
-            self.raw_data_memmaps,
-            self.prepared_data_filenames,
-        )
+        # Function to apply TDE-PCA to a single array
+        def _apply(memmap, prepared_data_file):
+            std_data = processing.standardize(memmap)
+            te_std_data = processing.time_embed(std_data, self.n_embeddings)
+            if self.pca_components is not None:
+                prepared_data = te_std_data @ self.pca_components
+            else:
+                prepared_data = te_std_data
+            if self.load_memmaps:
+                prepared_data_memmap = misc.array_to_memmap(
+                    prepared_data_file, prepared_data
+                )
+            else:
+                prepared_data_memmap = prepared_data
+            return prepared_data_memmap
 
+        # Apply TDE and PCA in parallel
+        args = zip(self.arrays, self.prepared_data_filenames)
         prepared_data_memmaps = pqdm(
-            prepare_args,
-            self.apply_tde_pca,
-            desc="Preparing data",
+            args,
+            _apply,
+            desc="TDE-PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=len(self.raw_data_memmaps),
+            total=self.n_arrays,
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
         # Update arrays to return the prepared data
         self.arrays = self.prepared_data_memmaps
 
-        self.prepared = True
+    def amp_env(self):
+        """Calculate the amplitude envelope.
 
-    def apply_tde_pca(self, raw_data_memmap, prepared_data_file):
-        """Applies time-delay embeddings, principal component analysis and
-        standardization to raw data.
+        This is an in-place operation.
+        """
+
+        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
+        self.prepare_memmap_filenames()
+
+        # Function to calculate amplitude envelope for a single array
+        def _apply_amp_env(memmap, prepared_data_file):
+            prepared_data = np.abs(signal.hilbert(memmap, axis=0))
+            prepared_data = prepared_data.astype(np.float32)
+            if self.load_memmaps:
+                prepared_data_memmap = misc.array_to_memmap(
+                    prepared_data_file, prepared_data
+                )
+            else:
+                prepared_data_memmap = prepared_data
+            return prepared_data_memmap
+
+        # Prepare the data in parallel
+        args = zip(self.arrays, self.prepared_data_filenames)
+        prepared_data_memmaps = pqdm(
+            args,
+            _apply_amp_env,
+            desc="Amplitude envelope",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        self.prepared_data_memmaps.extend(prepared_data_memmaps)
+
+        # Update arrays to return the prepared data
+        self.arrays = self.prepared_data_memmaps
+
+    def sliding_window(self, n_window):
+        """Apply a sliding window.
+
+        This is an in-place operation.
 
         Parameters
         ----------
-        raw_data_memmap : np.memmap or np.ndarray
-            Raw data.
-        prepared_data_file : str
-            Name of memory map file to save prepared data to.
-            Can be None if we are not using memory maps.
+        n_window : int
+            Number of data points in the sliding window. Must be odd.
+        """
+        if n_window % 2 == 0:
+            raise ValueError("n_window must be odd.")
 
-        Returns
-        -------
-        prepared_data_memmap : np.memmap or np.ndarray
-            Prepared data.
+        self.n_window = n_window
+
+        # Function to apply sliding window to a single array
+        def _apply(memmap, prepared_data_file):
+            prepared_data = np.array(
+                [
+                    np.convolve(
+                        memmap[:, i],
+                        np.ones(self.n_window) / self.n_window,
+                        mode="valid",
+                    )
+                    for i in range(memmap.shape[1])
+                ],
+            ).T
+            prepared_data = prepared_data.astype(np.float32)
+            if self.load_memmaps:
+                prepared_data_memmap = misc.array_to_memmap(
+                    prepared_data_file, prepared_data
+                )
+            else:
+                prepared_data_memmap = prepared_data
+            return prepared_data_memmap
+
+        # Prepare the data in parallel
+        args = zip(self.arrays, self.prepared_data_filenames)
+        prepared_data_memmaps = pqdm(
+            args,
+            _apply,
+            desc="Sliding window",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        self.prepared_data_memmaps.extend(prepared_data_memmaps)
+
+        # Update arrays to return the prepared data
+        self.arrays = self.prepared_data_memmaps
+
+    def standardize(self):
+        """Standardize (z-transform) the data.
+
+        This is an in-place operation.
         """
 
-        # Standardise and time embed the data
-        std_data = processing.standardize(raw_data_memmap)
-        te_std_data = processing.time_embed(std_data, self.n_embeddings)
+        # Function to apply standardisation to a single array
+        def _apply(memmap):
+            processing.standardize(memmap, create_copy=False)
 
-        # Apply PCA to get the prepared data
-        if self.pca_components is not None:
-            prepared_data = te_std_data @ self.pca_components
-
-        # Otherwise, the time embedded data is the prepared data
-        else:
-            prepared_data = te_std_data
-
-        # Finally, we standardise
-        prepared_data = processing.standardize(prepared_data, create_copy=False)
-
-        if self.load_memmaps:
-            # Save the prepared data as a memmap
-            prepared_data_memmap = misc.array_to_memmap(
-                prepared_data_file, prepared_data
-            )
-        else:
-            prepared_data_memmap = prepared_data
-
-        return prepared_data_memmap
+        # Apply standardisation to each array in parallel
+        pqdm(
+            zip(self.arrays),
+            _apply,
+            desc="Standardization",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
@@ -788,15 +614,16 @@ class Data:
             # Data has not been prepared so we can't trim the prepared data
             prepared = False
 
+        n_remove = 0
         if not prepared:
             # We're trimming the raw data, how many data points do we
             # need to remove due to time embedding or moving average?
-            if self.amplitude_envelope:
-                n_remove = self.n_window or n_window
-            else:
-                n_remove = self.n_embeddings or n_embeddings
-        else:
-            n_remove = 1
+            n_embeddings = n_embeddings or self.n_embeddings
+            n_window = n_window or self.n_window
+            if n_embeddings is not None:
+                n_remove += n_embeddings
+            if n_window is not None:
+                n_remove += n_window
 
         # What data should we trim?
         if prepared:
@@ -807,7 +634,7 @@ class Data:
         trimmed_time_series = []
         for memmap in memmaps:
             # Remove data points lost to time embedding
-            if n_remove != 1:
+            if n_remove != 0:
                 memmap = memmap[n_remove // 2 : -(n_remove // 2)]
 
             # Remove data points lost to separating into sequences
