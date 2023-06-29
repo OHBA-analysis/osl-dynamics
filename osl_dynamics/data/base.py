@@ -4,9 +4,11 @@
 
 import logging
 import pathlib
+import pickle
+from contextlib import contextmanager
 from functools import partial
 from shutil import rmtree
-from contextlib import contextmanager
+from os import path
 
 import numpy as np
 from pqdm.threads import pqdm
@@ -119,13 +121,18 @@ class Data:
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load and validate the raw data
-        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data()
+        self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
         self.validate_data()
 
-        self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
+        self.n_raw_data_channels = self.raw_data_arrays[0].shape[-1]
+
+        # Get data preparation attributes if there's a pickle file in the
+        # input directory
+        if not isinstance(inputs, list):
+            self.load_preparation(inputs)
 
         # Store raw data in the arrays attribute
-        self.arrays = self.raw_data_memmaps
+        self.arrays = self.raw_data_arrays
 
         # Subjects that are kept for making tensorflow datasets
         self.keep = list(range(len(self.arrays)))
@@ -149,7 +156,7 @@ class Data:
     @property
     def raw_data(self):
         """Return raw data as a list of arrays."""
-        return self.raw_data_memmaps
+        return self.raw_data_arrays
 
     @property
     def n_channels(self):
@@ -220,18 +227,13 @@ class Data:
         if prepared:
             memmaps = self.arrays
         else:
-            memmaps = self.raw_data_memmaps
+            memmaps = self.raw_data_arrays
 
         # Should we return one long time series?
         if concatenate or self.n_arrays == 1:
             return np.concatenate(memmaps)
         else:
             return memmaps
-
-    def delete_dir(self):
-        """Deletes store_dir."""
-        if self.store_dir.exists():
-            rmtree(self.store_dir)
 
     def load_raw_data(self):
         """Import data into a list of memory maps.
@@ -296,25 +298,91 @@ class Data:
             raw_data_mmap = raw_data_mmap.T
         return raw_data_mmap
 
+    def validate_data(self):
+        """Validate data files."""
+        n_channels = [memmap.shape[-1] for memmap in self.raw_data_arrays]
+        if not np.equal(n_channels, n_channels[0]).all():
+            raise ValueError("All inputs should have the same number of channels.")
+
     def save(self, output_dir="."):
-        """Saves data to numpy files.
+        """Saves (prepared) data to numpy files.
 
         Parameters
         ----------
         output_dir : str
             Path to save data files to. Default is the current working directory.
         """
+        # Create output directory
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        for i, array_data in enumerate(tqdm(self.arrays, desc="Saving data")):
-            padded_number = misc.leading_zeros(i, self.n_arrays)
-            np.save(f"{output_dir}/array{padded_number}.npy", array_data)
 
-    def validate_data(self):
-        """Validate data files."""
-        n_channels = [memmap.shape[-1] for memmap in self.raw_data_memmaps]
-        if not np.equal(n_channels, n_channels[0]).all():
-            raise ValueError("All inputs should have the same number of channels.")
+        # Function to save a single array
+        def _save(i, arr):
+            padded_number = misc.leading_zeros(i, self.n_arrays)
+            np.save(f"{output_dir}/array{padded_number}.npy", arr)
+
+        # Save arrays in parallel
+        pqdm(
+            enumerate(self.arrays),
+            _save,
+            desc="Saving data",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+
+        # Save preparation settings
+        self.save_preparation(output_dir)
+
+    def save_preparation(self, output_dir="."):
+        """Save a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Default is the current working directory.
+        """
+        attributes = list(self.__dict__.keys())
+        dont_keep = [
+            "_identifier",
+            "data_field",
+            "picks",
+            "reject_by_annotation",
+            "sampling_frequency",
+            "mask_file",
+            "parcellation_file",
+            "time_axis_first",
+            "load_memmaps",
+            "n_jobs",
+            "prepared_data_filenames",
+            "inputs",
+            "store_dir",
+            "raw_data_arrays",
+            "raw_data_filenames",
+            "n_raw_data_channels",
+            "arrays",
+            "keep",
+        ]
+        for item in dont_keep:
+            attributes.remove(item)
+        preparation = {a: getattr(self, a) for a in attributes}
+        pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
+
+    def load_preparation(self, inputs):
+        """Loads a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        inputs : str
+            Path to directory containing the pickle file with preparation settings.
+        """
+        if path.isdir(inputs):
+            for file in rw.list_dir(inputs):
+                if "preparation.pkl" in file:
+                    preparation = pickle.load(open(f"{inputs}/preparation.pkl", "rb"))
+                    for attr, value in preparation.items():
+                        setattr(self, attr, value)
+                    break
 
     def filter(self, low_freq=None, high_freq=None):
         """Filter the data.
@@ -328,6 +396,10 @@ class Data:
         high_freq : float
             Frequency in Hz for a low pass filter.
         """
+        if low_freq is None and high_freq is None:
+            _logger.warning("No filtering applied.")
+            return
+
         if (
             low_freq is not None or high_freq is not None
         ) and self.sampling_frequency is None:
@@ -358,7 +430,7 @@ class Data:
 
         # Prepare the data in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
-        prepared_data_memmaps = pqdm(
+        self.arrays = pqdm(
             args,
             _apply,
             desc="Filtering",
@@ -366,10 +438,6 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        self.prepared_data_memmaps.extend(prepared_data_memmaps)
-
-        # Update arrays to return the prepared data
-        self.arrays = self.prepared_data_memmaps
 
     def tde_pca(
         self,
@@ -394,6 +462,9 @@ class Data:
         whiten : bool
             Should we whiten the PCA'ed data?
         """
+        if n_pca_components is None and pca_components is None:
+            _logger.warning("Not applying PCA.")
+
         if n_pca_components is not None and pca_components is not None:
             raise ValueError("Please only pass n_pca_components or pca_components.")
 
@@ -447,7 +518,7 @@ class Data:
 
         # Apply TDE and PCA in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
-        prepared_data_memmaps = pqdm(
+        self.arrays = pqdm(
             args,
             _apply,
             desc="TDE-PCA",
@@ -455,17 +526,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        self.prepared_data_memmaps.extend(prepared_data_memmaps)
-
-        # Update arrays to return the prepared data
-        self.arrays = self.prepared_data_memmaps
 
     def amp_env(self):
         """Calculate the amplitude envelope.
 
         This is an in-place operation.
         """
-
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
         self.prepare_memmap_filenames()
 
@@ -483,7 +549,7 @@ class Data:
 
         # Prepare the data in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
-        prepared_data_memmaps = pqdm(
+        self.arrays = pqdm(
             args,
             _apply_amp_env,
             desc="Amplitude envelope",
@@ -491,10 +557,6 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        self.prepared_data_memmaps.extend(prepared_data_memmaps)
-
-        # Update arrays to return the prepared data
-        self.arrays = self.prepared_data_memmaps
 
     def sliding_window(self, n_window):
         """Apply a sliding window.
@@ -506,6 +568,7 @@ class Data:
         n_window : int
             Number of data points in the sliding window. Must be odd.
         """
+        # Validation
         if n_window % 2 == 0:
             raise ValueError("n_window must be odd.")
 
@@ -534,7 +597,7 @@ class Data:
 
         # Prepare the data in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
-        prepared_data_memmaps = pqdm(
+        self.arrays = pqdm(
             args,
             _apply,
             desc="Sliding window",
@@ -542,10 +605,6 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        self.prepared_data_memmaps.extend(prepared_data_memmaps)
-
-        # Update arrays to return the prepared data
-        self.arrays = self.prepared_data_memmaps
 
     def standardize(self):
         """Standardize (z-transform) the data.
@@ -575,8 +634,6 @@ class Data:
             str(self.store_dir / prepared_data_pattern.format(i=i))
             for i in range(self.n_arrays)
         ]
-
-        self.prepared_data_memmaps = []
 
     def trim_time_series(
         self,
@@ -629,7 +686,7 @@ class Data:
         if prepared:
             memmaps = self.arrays
         else:
-            memmaps = self.raw_data_memmaps
+            memmaps = self.raw_data_arrays
 
         trimmed_time_series = []
         for memmap in memmaps:
@@ -817,3 +874,8 @@ class Data:
                         + f"{len(validation_datasets[i])} batches in the validation dataset."
                     )
                 return training_datasets, validation_datasets
+
+    def delete_dir(self):
+        """Deletes store_dir."""
+        if self.store_dir.exists():
+            rmtree(self.store_dir)
