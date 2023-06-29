@@ -627,11 +627,34 @@ class Data:
         pqdm(
             zip(self.arrays),
             _apply,
-            desc="Standardization",
+            desc="Standardize",
             n_jobs=self.n_jobs,
             argument_type="args",
             total=self.n_arrays,
         )
+
+    def prepare(
+        self, n_embeddings=1, n_pca_components=None, pca_components=None, whiten=False
+    ):
+        """Prepare TDE-PCA data.
+
+        This method will standardize, perform time-delay embedding (TDE),
+        principal component analysis (PCA), and standardize again. This is
+        an in-place operation.
+
+        Parameters
+        ----------
+        n_embeddings : int
+            Number of data points to embed the data.
+        n_pca_components : int
+            Number of PCA components to keep. Default is no PCA.
+        pca_components : np.ndarray
+            PCA components to apply if they have already been calculated.
+        whiten : bool
+            Should we whiten the PCA'ed data?
+        """
+        self.tde_pca(n_embeddings, n_pca_components, pca_components, whiten)
+        self.standardize()
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
