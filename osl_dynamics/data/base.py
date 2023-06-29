@@ -650,8 +650,8 @@ class Data:
     def trim_time_series(
         self,
         sequence_length=None,
-        n_embeddings=1,
-        n_window=1,
+        n_embeddings=None,
+        n_window=None,
         prepared=True,
         concatenate=False,
     ):
@@ -679,39 +679,42 @@ class Data:
         list of np.ndarray
             Trimed time series for each array.
         """
-        if self.n_embeddings is None and self.n_window is None:
-            # Data has not been prepared so we can't trim the prepared data
-            prepared = False
-
+        # How many time points from the start/end of the time series should
+        # we remove?
         n_remove = 0
-        if not prepared:
-            # We're trimming the raw data, how many data points do we
-            # need to remove due to time embedding or moving average?
-            n_embeddings = n_embeddings or self.n_embeddings
-            n_window = n_window or self.n_window
-            if n_embeddings is not None:
-                n_remove += n_embeddings
-            if n_window is not None:
-                n_remove += n_window
+        if n_embeddings is None:
+            if hasattr(self, "n_embeddings"):
+                n_remove += self.n_embeddings // 2
+        else:
+            n_remove += n_embeddings // 2
+        if n_window is None:
+            if hasattr(self, "n_window"):
+                n_remove += self.n_window // 2
+        else:
+            n_remove += n_window // 2
+        _logger.info(
+            f"Removing {n_remove} data points from the start and end"
+            + " of each array due to time embedding/sliding window."
+        )
 
         # What data should we trim?
         if prepared:
-            memmaps = self.arrays
+            arrays = self.arrays
         else:
-            memmaps = self.raw_data_arrays
+            arrays = self.raw_data_arrays
 
         trimmed_time_series = []
-        for memmap in memmaps:
-            # Remove data points lost to time embedding
+        for array in arrays:
+            # Remove data points lost to time embedding or sliding window
             if n_remove != 0:
-                memmap = memmap[n_remove // 2 : -(n_remove // 2)]
+                array = array[n_remove:-n_remove]
 
             # Remove data points lost to separating into sequences
             if sequence_length is not None:
-                n_sequences = memmap.shape[0] // sequence_length
-                memmap = memmap[: n_sequences * sequence_length]
+                n_sequences = array.shape[0] // sequence_length
+                array = array[: n_sequences * sequence_length]
 
-            trimmed_time_series.append(memmap)
+            trimmed_time_series.append(array)
 
         if concatenate or len(trimmed_time_series) == 1:
             trimmed_time_series = np.concatenate(trimmed_time_series)
