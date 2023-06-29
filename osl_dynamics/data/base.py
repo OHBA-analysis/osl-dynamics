@@ -153,7 +153,7 @@ class Data:
         self.subjects = self.raw_data_memmaps
 
         # Subjects that are kept for making tensorflow datasets
-        self.kept_subjects = list(range(len(self.subjects)))
+        self.keep = list(range(len(self.subjects)))
 
     def __iter__(self):
         return iter(self.subjects)
@@ -192,30 +192,30 @@ class Data:
         return len(self.subjects)
 
     @contextmanager
-    def set_kept_subjects(self, kept_subjects):
+    def set_keep(self, keep):
         """Context manager to temporarily set the kept subjects.
 
         Parameters
         ----------
-        kept_subjects : int or list of int
+        keep : int or list of int
             List of subject indices to keep.
         """
         # Store the current kept subjects
-        current_kept_subjects = self.kept_subjects
+        current_keep = self.keep
         try:
             # validation
-            if isinstance(kept_subjects, int):
-                kept_subjects = [kept_subjects]
-            if not isinstance(kept_subjects, list):
+            if isinstance(keep, int):
+                keep = [keep]
+            if not isinstance(keep, list):
                 raise ValueError(
-                    "kept_subjects must be a list of subject indices or a single subject index."
+                    "keep must be a list of subject indices or a single subject index."
                 )
 
             # Set the new kept subjects
-            self.kept_subjects = kept_subjects
+            self.keep = keep
             yield
         finally:
-            self.kept_subjects = current_kept_subjects
+            self.keep = current_keep
 
     def set_sampling_frequency(self, sampling_frequency):
         """Sets the sampling_frequency attribute.
@@ -887,7 +887,7 @@ class Data:
 
         subject_datasets = []
         for i in range(self.n_subjects):
-            if i not in self.kept_subjects:
+            if i not in self.keep:
                 # We don't want to include this subject in the dataset
                 continue
 
