@@ -847,9 +847,6 @@ class Data:
         batch_size,
         shuffle=True,
         validation_split=None,
-        alpha=None,
-        gamma=None,
-        n_alpha_embeddings=1,
         concatenate=True,
         subj_id=False,
         step_size=None,
@@ -866,17 +863,6 @@ class Data:
             Should we shuffle sequences (within a batch) and batches.
         validation_split : float
             Ratio to split the dataset into a training and validation set.
-        alpha : list of np.ndarray
-            List of mode mixing factors for each subject.
-            If passed, we create a dataset that includes alpha at each time point.
-            Optional. Such a dataset is used to train an observation model.
-        gamma : list of np.ndarray
-            List of mode mixing factors for the functional connectivity.
-            Optional. Used with a multi-dynamic model when training the observation
-            model only.
-        n_alpha_embeddings : int
-            Number of embeddings used when inferring alpha. Optional. Only should be
-            used if passing alpha (or gamma).
         concatenate : bool
             Should we concatenate the datasets for each subject? Optional, default
             is True.
@@ -898,70 +884,31 @@ class Data:
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
-        n_embeddings = self.n_embeddings or 1
 
-        # Dataset for learning alpha and the observation model
-        if alpha is None:
-            subject_datasets = []
-            for i in range(self.n_subjects):
-                if i not in self.kept_subjects:
-                    # We don't want to include this subject in the dataset
-                    continue
+        subject_datasets = []
+        for i in range(self.n_subjects):
+            if i not in self.kept_subjects:
+                # We don't want to include this subject in the dataset
+                continue
 
-                subject = self.subjects[i]
-                if subj_id:
-                    subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
-                    dataset = tf.create_dataset(
-                        {"data": subject, "subj_id": subject_tracker},
-                        self.sequence_length,
-                        self.step_size,
-                    )
-                else:
-                    dataset = tf.create_dataset(
-                        {"data": subject}, self.sequence_length, self.step_size
-                    )
-                subject_datasets.append(dataset)
+            # Get time series data for this subject
+            subject = self.subjects[i]
 
-        # Dataset for learning the observation model
-        else:
-            if not isinstance(alpha, list):
-                raise ValueError("alpha must be a list of numpy arrays.")
-
-            subject_datasets = []
-            for i in range(self.n_subjects):
-                if i not in self.kept_subjects:
-                    # We don't want to include this subject in the dataset
-                    continue
-
-                if n_embeddings > n_alpha_embeddings:
-                    # We remove data points in alpha that are not in the new time
-                    # embedded data
-                    alp = alpha[i][(n_embeddings - n_alpha_embeddings) // 2 :]
-                    if gamma is not None:
-                        gam = gamma[i][(n_embeddings - n_alpha_embeddings) // 2 :]
-                    subject = self.subjects[i][: alp.shape[0]]
-
-                else:
-                    # We remove the data points that are not in alpha
-                    alp = alpha[i]
-                    if gamma is not None:
-                        gam = gamma[i]
-                    subject = self.subjects[i][
-                        (n_alpha_embeddings - n_embeddings) // 2 : alp.shape[0]
-                    ]
-
-                # Create dataset
-                input_data = {"data": subject, "alpha": alp}
-                if gamma is not None:
-                    input_data["gamma"] = gam
-                if subj_id:
-                    input_data["subj_id"] = (
-                        np.zeros(subject.shape[0], dtype=np.float32) + i
-                    )
+            if subj_id:
+                # Create a dataset with the time series data and subject ID
+                subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
                 dataset = tf.create_dataset(
-                    input_data, self.sequence_length, self.step_size
+                    {"data": subject, "subj_id": subject_tracker},
+                    self.sequence_length,
+                    self.step_size,
                 )
-                subject_datasets.append(dataset)
+            else:
+                # Createa a dataset with just the time series data
+                dataset = tf.create_dataset(
+                    {"data": subject}, self.sequence_length, self.step_size
+                )
+
+            subject_datasets.append(dataset)
 
         # Create a dataset from all the subjects concatenated
         if concatenate:

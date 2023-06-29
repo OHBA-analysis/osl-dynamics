@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, initializers
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.models import dynemo_obs, sedynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
@@ -268,38 +268,39 @@ class Model(VariationalInferenceModelBase):
         return super().fit(training_data, *args, **kwargs)
 
     def get_group_means(self):
-        """Get the group means.
+        """Get the group level mode means.
 
         Returns
         -------
         means : np.ndarray
             Group means. Shape is (n_modes, n_channels).
         """
-        return dynemo_obs.get_means(self.model, "group_means")
+        return obs_mod.get_observation_model_parameter(self.model, "group_means")
 
     def get_group_covariances(self):
-        """Get the group covariances.
+        """Get the group level mode covariances.
 
         Returns
         -------
         covariances : np.ndarray
             Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return dynemo_obs.get_covariances(self.model, "group_covs")
+        return obs_mod.get_observation_model_parameter(self.model, "group_covs")
 
     def get_group_means_covariances(self):
-        """Get the group means and covariances of each mode
+        """Get the group level mode means and covariances.
+        This is a wrapper for get_group_means and get_group_covariances.
 
         Returns
         -------
         means : np.ndarray
-            Mode means for the group. Shape is (n_modes, n_channels).
+            Group means. Shape is (n_modes, n_channels).
         covariances : np.ndarray
-            Mode covariances for the group. Shape is (n_modes, n_channels, n_channels).
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)
+        return self.get_group_means(), self.get_group_covariances()
 
-    def get_observation_model_parameters(self):
+    def get_group_observation_model_parameters(self):
         """Wrapper for get_group_means_covariances."""
         return self.get_group_means_covariances()
 
@@ -312,7 +313,7 @@ class Model(VariationalInferenceModelBase):
             Embedding vectors for subjects.
             Shape is (n_subjects, subject_embedding_dim).
         """
-        return sedynemo_obs.get_subject_embeddings(self.model)
+        return obs_mod.get_subject_embeddings(self.model)
 
     def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
         """Get the means and covariances for each subject.
@@ -332,7 +333,7 @@ class Model(VariationalInferenceModelBase):
             Mode covariances for each subject.
             Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covariances(
+        return obs_mod.get_subject_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
@@ -355,12 +356,12 @@ class Model(VariationalInferenceModelBase):
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(
+            obs_mod.set_means_regularizer(
                 self.model, training_dataset, layer_name="group_means"
             )
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
@@ -373,12 +374,15 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         group_means : np.ndarray
-            Mode means.
+            Group level mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
             Do we want to use the passed group means when we re-initialize the model?
         """
-        dynemo_obs.set_means(
-            self.model, group_means, update_initializer, layer_name="group_means"
+        obs_mod.set_observation_model_parameter(
+            self.model,
+            group_means,
+            layer_name="group_means",
+            update_initializer=update_initializer,
         )
 
     def set_group_covariances(self, group_covariances, update_initializer=True):
@@ -387,28 +391,38 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         group_covariances : np.ndarray
-            Mode covariances.
+            Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
             Do we want to use the passed group covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             group_covariances,
-            update_initializer=update_initializer,
             layer_name="group_covs",
+            update_initializer=update_initializer,
         )
 
-    def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
+    def set_group_means_covariances(
+        self, group_means, group_covariances, update_initializer=True
     ):
-        """Wrapper for set_group_means and set_group_covariances."""
+        """This is a wrapper for set_group_means and set_group_covariances."""
         self.set_group_means(
-            observation_model_parameters[0],
+            group_means,
             update_initializer=update_initializer,
         )
         self.set_group_covariances(
-            observation_model_parameters[1],
+            group_covariances,
+            update_initializer=update_initializer,
+        )
+
+    def set_group_observation_model_parameters(
+        self, group_observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_group_means_covariances."""
+        self.set_group_means_covariances(
+            group_observation_model_parameters[0],
+            group_observation_model_parameters[1],
             update_initializer=update_initializer,
         )
 
@@ -424,7 +438,7 @@ class Model(VariationalInferenceModelBase):
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_bayesian_kl_scaling(
+        obs_mod.set_bayesian_kl_scaling(
             self.model, n_batches, learn_means, learn_covariances
         )
 
@@ -440,7 +454,7 @@ class Model(VariationalInferenceModelBase):
         n_batches = dtf.get_n_batches(training_dataset)
         learn_means = self.config.learn_means
         learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_dev_mlp_reg_scaling(
+        obs_mod.set_dev_mlp_reg_scaling(
             self.model, n_batches, learn_means, learn_covariances
         )
 
