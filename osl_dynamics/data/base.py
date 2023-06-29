@@ -149,23 +149,23 @@ class Data:
 
         self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
 
-        # Use raw data for the subject data
-        self.subjects = self.raw_data_memmaps
+        # Store raw data in the arrays attribute
+        self.arrays = self.raw_data_memmaps
 
         # Subjects that are kept for making tensorflow datasets
-        self.keep = list(range(len(self.subjects)))
+        self.keep = list(range(len(self.arrays)))
 
     def __iter__(self):
-        return iter(self.subjects)
+        return iter(self.arrays)
 
     def __getitem__(self, item):
-        return self.subjects[item]
+        return self.arrays[item]
 
     def __str__(self):
         info = [
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
-            f"n_subjects: {self.n_subjects}",
+            f"n_arrays: {self.n_arrays}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
         ]
@@ -179,39 +179,37 @@ class Data:
     @property
     def n_channels(self):
         """Number of channels in the data files."""
-        return self.subjects[0].shape[-1]
+        return self.arrays[0].shape[-1]
 
     @property
     def n_samples(self):
-        """Number of samples for each subject."""
-        return sum([subject.shape[-2] for subject in self.subjects])
+        """Number of samples for each array."""
+        return sum([array.shape[-2] for array in self.arrays])
 
     @property
-    def n_subjects(self):
-        """Number of subjects."""
-        return len(self.subjects)
+    def n_arrays(self):
+        """Number of arrays."""
+        return len(self.arrays)
 
     @contextmanager
     def set_keep(self, keep):
-        """Context manager to temporarily set the kept subjects.
+        """Context manager to temporarily set the kept arrays.
 
         Parameters
         ----------
         keep : int or list of int
-            List of subject indices to keep.
+            Indices to keep in the Data.arrays list.
         """
-        # Store the current kept subjects
+        # Store the current kept arrays
         current_keep = self.keep
         try:
             # validation
             if isinstance(keep, int):
                 keep = [keep]
             if not isinstance(keep, list):
-                raise ValueError(
-                    "keep must be a list of subject indices or a single subject index."
-                )
+                raise ValueError("keep must be a list of indices or a single index.")
 
-            # Set the new kept subjects
+            # Set the new kept arrays
             self.keep = keep
             yield
         finally:
@@ -228,7 +226,7 @@ class Data:
         self.sampling_frequency = sampling_frequency
 
     def time_series(self, prepared=True, concatenate=False):
-        """Time series data for all subjects.
+        """Time series data for all arrays.
 
         Parameters
         ----------
@@ -236,21 +234,21 @@ class Data:
             Should we return the latest data after we have prepared it or
             the original data we loaded into the Data object?
         concatenate : bool
-            Should we return the time series for each subject concatenated?
+            Should we return the time series for each array concatenated?
 
         Returns
         -------
         ts : list or np.ndarray
-            Time series data for each subject.
+            Time series data for each array.
         """
         # What data should we return?
         if prepared:
-            memmaps = self.subjects
+            memmaps = self.arrays
         else:
             memmaps = self.raw_data_memmaps
 
         # Should we return one long time series?
-        if concatenate or self.n_subjects == 1:
+        if concatenate or self.n_arrays == 1:
             return np.concatenate(memmaps)
         else:
             return memmaps
@@ -358,9 +356,9 @@ class Data:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Save time series data
-        for i, subject_data in enumerate(tqdm(self.subjects, desc="Saving data")):
-            padded_number = misc.leading_zeros(i, self.n_subjects)
-            np.save(f"{output_dir}/subject{padded_number}.npy", subject_data)
+        for i, array_data in enumerate(tqdm(self.arrays, desc="Saving data")):
+            padded_number = misc.leading_zeros(i, self.n_arrays)
+            np.save(f"{output_dir}/array{padded_number}.npy", array_data)
 
         # Save preparation info if .prepared has been called
         if self.prepared:
@@ -435,8 +433,8 @@ class Data:
                 prepared_data_memmap = prepared_data
             self.prepared_data_memmaps.append(prepared_data_memmap)
 
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
+        # Update arrays to return the prepared data
+        self.arrays = self.prepared_data_memmaps
 
         self.prepared = True
 
@@ -557,8 +555,8 @@ class Data:
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
+        # Update arrays to return the prepared data
+        self.arrays = self.prepared_data_memmaps
 
         self.prepared = True
 
@@ -695,8 +693,8 @@ class Data:
         )
         self.prepared_data_memmaps.extend(prepared_data_memmaps)
 
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
+        # Update arrays to return the prepared data
+        self.arrays = self.prepared_data_memmaps
 
         self.prepared = True
 
@@ -745,11 +743,11 @@ class Data:
 
     def prepare_memmap_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(self.n_subjects)), identifier=self._identifier
+            width=len(str(self.n_arrays)), identifier=self._identifier
         )
         self.prepared_data_filenames = [
             str(self.store_dir / prepared_data_pattern.format(i=i))
-            for i in range(self.n_subjects)
+            for i in range(self.n_arrays)
         ]
 
         self.prepared_data_memmaps = []
@@ -779,12 +777,12 @@ class Data:
         prepared : bool
             Should we return the prepared data? If not we return the raw data.
         concatenate : bool
-            Should we concatenate the data for each subject?
+            Should we concatenate the data for each array?
 
         Returns
         -------
         list of np.ndarray
-            Trimed time series for each subject.
+            Trimed time series for each array.
         """
         if self.n_embeddings is None and self.n_window is None:
             # Data has not been prepared so we can't trim the prepared data
@@ -802,7 +800,7 @@ class Data:
 
         # What data should we trim?
         if prepared:
-            memmaps = self.subjects
+            memmaps = self.arrays
         else:
             memmaps = self.raw_data_memmaps
 
@@ -835,10 +833,10 @@ class Data:
         Returns
         -------
         n : np.ndarray
-            Number of batches for each subject's data.
+            Number of batches for each array's data.
         """
         return np.array(
-            [tf.n_batches(memmap, sequence_length) for memmap in self.subjects]
+            [tf.n_batches(memmap, sequence_length) for memmap in self.arrays]
         )
 
     def dataset(
@@ -864,7 +862,7 @@ class Data:
         validation_split : float
             Ratio to split the dataset into a training and validation set.
         concatenate : bool
-            Should we concatenate the datasets for each subject? Optional, default
+            Should we concatenate the datasets for each array? Optional, default
             is True.
         subj_id : bool
             Should we include the subject id in the dataset? Optional, default is
@@ -885,34 +883,34 @@ class Data:
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
-        subject_datasets = []
-        for i in range(self.n_subjects):
+        datasets = []
+        for i in range(self.n_arrays):
             if i not in self.keep:
-                # We don't want to include this subject in the dataset
+                # We don't want to include this file in the dataset
                 continue
 
-            # Get time series data for this subject
-            subject = self.subjects[i]
+            # Get time series data
+            array = self.arrays[i]
 
             if subj_id:
-                # Create a dataset with the time series data and subject ID
-                subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
+                # Create a dataset with the time series data and ID
+                array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
                 dataset = tf.create_dataset(
-                    {"data": subject, "subj_id": subject_tracker},
+                    {"data": array, "subj_id": array_tracker},
                     self.sequence_length,
                     self.step_size,
                 )
             else:
                 # Createa a dataset with just the time series data
                 dataset = tf.create_dataset(
-                    {"data": subject}, self.sequence_length, self.step_size
+                    {"data": array}, self.sequence_length, self.step_size
                 )
 
-            subject_datasets.append(dataset)
+            datasets.append(dataset)
 
-        # Create a dataset from all the subjects concatenated
+        # Create a dataset from all the arrays concatenated
         if concatenate:
-            full_dataset = tf.concatenate_datasets(subject_datasets, shuffle=False)
+            full_dataset = tf.concatenate_datasets(datasets, shuffle=False)
 
             if shuffle:
                 # Shuffle sequences
@@ -947,10 +945,10 @@ class Data:
 
                 return training_dataset.prefetch(-1), validation_dataset.prefetch(-1)
 
-        # Otherwise create a dataset for each subject separately
+        # Otherwise create a dataset for each array separately
         else:
             full_datasets = []
-            for ds in subject_datasets:
+            for ds in datasets:
                 if shuffle:
                     # Shuffle sequences
                     ds = ds.shuffle(100000)
@@ -965,11 +963,11 @@ class Data:
                 full_datasets.append(ds.prefetch(-1))
 
             if validation_split is None:
-                # Return the full dataset for each subject
+                # Return the full dataset for each array
                 return full_datasets
 
             else:
-                # Split the dataset for each subject separately
+                # Split the dataset for each array separately
                 training_datasets = []
                 validation_datasets = []
                 for i in range(len(full_datasets)):
@@ -979,7 +977,7 @@ class Data:
                         (1.0 - validation_split) * dataset_size
                     )
 
-                    # Split this subject's dataset
+                    # Split this array's dataset
                     training_datasets.append(
                         full_datasets[i].take(training_dataset_size)
                     )
