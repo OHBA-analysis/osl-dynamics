@@ -423,27 +423,58 @@ class Model(HMMModel):
             training_dataset, n_epochs, n_init, take, **kwargs
         )
 
+    def get_group_means(self):
+        """Get the group level mode means.
+
+        Returns
+        -------
+        means : np.ndarray
+            Group means. Shape is (n_modes, n_channels).
+        """
+        return obs_mod.get_observation_model_parameter(self.model, "group_means")
+
+    def get_means(self):
+        """Overwrite get_means method of the HMM."""
+        return self.get_group_means()
+
     def get_group_covariances(self):
-        """Get the covariances of each state.
+        """Get the group level mode covariances.
 
         Returns
         -------
         covariances : np.ndarray
-            State covariances. Shape is (n_states, n_channels, n_channels).
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_group_means_covariances(self.model)[1]
+        return obs_mod.get_observation_model_parameter(self.model, "group_covs")
+
+    def get_covariances(self):
+        """Overwrite get_covariances method of the HMM."""
+        return self.get_group_covariances()
 
     def get_group_means_covariances(self):
-        """Get the means and covariances of each state.
+        """Get the group level mode means and covariances.
+        This is a wrapper for get_group_means and get_group_covariances.
 
         Returns
         -------
-        means : np.ndarary
-            Group level state means.
+        means : np.ndarray
+            Group means. Shape is (n_modes, n_channels).
         covariances : np.ndarray
-            Group level state covariances.
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_group_means_covariances(self.model)
+        return self.get_group_means(), self.get_group_covariances()
+
+    def get_means_covariances(self):
+        """Overwrite get_means_covariances method of the HMM."""
+        return self.get_group_means_covariances()
+
+    def get_group_observation_model_parameters(self):
+        """Wrapper for get_group_means_covariances."""
+        return self.get_group_means_covariances()
+
+    def get_observation_model_parameters(self):
+        """Overwrite get_observation_model_parameters method of the HMM."""
+        return self.get_group_observation_model_parameters()
 
     def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
         """Get the subject means and covariances.
@@ -482,45 +513,82 @@ class Model(HMMModel):
         return obs_mod.get_subject_embeddings(self.model)
 
     def set_group_means(self, group_means, update_initializer=True):
-        """Set the group means of each state.
+        """Set the group means of each mode.
 
         Parameters
         ----------
         group_means : np.ndarray
-            State covariances.
+            Group level mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
-            Do we want to use the passed means when we re-initialize
-            the model?
+            Do we want to use the passed group means when we re-initialize the model?
         """
-        obs_mod.set_means(
-            self.model, group_means, update_initializer, layer_name="group_means"
+        obs_mod.set_observation_model_parameter(
+            self.model,
+            group_means,
+            layer_name="group_means",
+            update_initializer=update_initializer,
         )
 
     def set_group_covariances(self, group_covariances, update_initializer=True):
-        """Set the group covariances of each state.
+        """Set the group covariances of each mode.
 
         Parameters
         ----------
         group_covariances : np.ndarray
-            State covariances.
+            Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
-            Do we want to use the passed covariances when we re-initialize
+            Do we want to use the passed group covariances when we re-initialize
             the model?
         """
-        obs_mod.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             group_covariances,
-            update_initializer=update_initializer,
             layer_name="group_covs",
+            update_initializer=update_initializer,
+        )
+
+    def set_group_means_covariances(
+        self, group_means, group_covariances, update_initializer=True
+    ):
+        """This is a wrapper for set_group_means and set_group_covariances."""
+        self.set_group_means(
+            group_means,
+            update_initializer=update_initializer,
+        )
+        self.set_group_covariances(
+            group_covariances,
+            update_initializer=update_initializer,
+        )
+
+    def set_group_observation_model_parameters(
+        self, group_observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_group_means_covariances."""
+        self.set_group_means_covariances(
+            group_observation_model_parameters[0],
+            group_observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def set_means(self, means, update_initializer=True):
-        """Wrapper of set_group_means."""
+        """Overwrite set_means method of the HMM."""
         self.set_group_means(means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Wrapper of set_group_covariances."""
+        """Overwrite set_covariances method of the HMM."""
         self.set_group_covariances(covariances, update_initializer)
+
+    def set_means_covariances(self, means, covariances, update_initializer=True):
+        """Overwrite set_means_covariances method of the HMM."""
+        self.set_group_means_covariances(means, covariances, update_initializer)
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Overwrite set_observation_model_parameters method of the HMM."""
+        self.set_group_observation_model_parameters(
+            observation_model_parameters, update_initializer
+        )
 
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.

@@ -268,38 +268,39 @@ class Model(VariationalInferenceModelBase):
         return super().fit(training_data, *args, **kwargs)
 
     def get_group_means(self):
-        """Get the group means.
+        """Get the group level mode means.
 
         Returns
         -------
         means : np.ndarray
             Group means. Shape is (n_modes, n_channels).
         """
-        return obs_mod.get_means(self.model, "group_means")
+        return obs_mod.get_observation_model_parameter(self.model, "group_means")
 
     def get_group_covariances(self):
-        """Get the group covariances.
+        """Get the group level mode covariances.
 
         Returns
         -------
         covariances : np.ndarray
             Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_covariances(self.model, "group_covs")
+        return obs_mod.get_observation_model_parameter(self.model, "group_covs")
 
     def get_group_means_covariances(self):
-        """Get the group means and covariances of each mode
+        """Get the group level mode means and covariances.
+        This is a wrapper for get_group_means and get_group_covariances.
 
         Returns
         -------
         means : np.ndarray
-            Mode means for the group. Shape is (n_modes, n_channels).
+            Group means. Shape is (n_modes, n_channels).
         covariances : np.ndarray
-            Mode covariances for the group. Shape is (n_modes, n_channels, n_channels).
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_group_means_covariances(self.model)
+        return self.get_group_means(), self.get_group_covariances()
 
-    def get_observation_model_parameters(self):
+    def get_group_observation_model_parameters(self):
         """Wrapper for get_group_means_covariances."""
         return self.get_group_means_covariances()
 
@@ -373,12 +374,15 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         group_means : np.ndarray
-            Mode means.
+            Group level mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
             Do we want to use the passed group means when we re-initialize the model?
         """
-        obs_mod.set_means(
-            self.model, group_means, update_initializer, layer_name="group_means"
+        obs_mod.set_observation_model_parameter(
+            self.model,
+            group_means,
+            layer_name="group_means",
+            update_initializer=update_initializer,
         )
 
     def set_group_covariances(self, group_covariances, update_initializer=True):
@@ -387,28 +391,38 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         group_covariances : np.ndarray
-            Mode covariances.
+            Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
             Do we want to use the passed group covariances when we re-initialize
             the model?
         """
-        obs_mod.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             group_covariances,
-            update_initializer=update_initializer,
             layer_name="group_covs",
+            update_initializer=update_initializer,
         )
 
-    def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
+    def set_group_means_covariances(
+        self, group_means, group_covariances, update_initializer=True
     ):
-        """Wrapper for set_group_means and set_group_covariances."""
+        """This is a wrapper for set_group_means and set_group_covariances."""
         self.set_group_means(
-            observation_model_parameters[0],
+            group_means,
             update_initializer=update_initializer,
         )
         self.set_group_covariances(
-            observation_model_parameters[1],
+            group_covariances,
+            update_initializer=update_initializer,
+        )
+
+    def set_group_observation_model_parameters(
+        self, group_observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for set_group_means_covariances."""
+        self.set_group_means_covariances(
+            group_observation_model_parameters[0],
+            group_observation_model_parameters[1],
             update_initializer=update_initializer,
         )
 

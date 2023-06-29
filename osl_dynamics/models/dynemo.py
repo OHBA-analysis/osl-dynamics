@@ -208,18 +208,29 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def get_means(self):
+        """Get the mode means.
+
+        Returns
+        -------
+        means : np.ndarary
+            Mode means.
+        """
+        return obs_mod.get_observation_model_parameter(self.model, "means")
+
     def get_covariances(self):
-        """Get the covariances of each mode.
+        """Get the mode covariances.
 
         Returns
         -------
         covariances : np.ndarary
             Mode covariances.
         """
-        return obs_mod.get_covariances(self.model)
+        return obs_mod.get_observation_model_parameter(self.model, "covs")
 
     def get_means_covariances(self):
-        """Get the means and covariances of each mode.
+        """Get the mode means and covariances.
+        This is a wrapper for get_means and get_covariances.
 
         Returns
         -------
@@ -228,52 +239,63 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return obs_mod.get_means_covariances(self.model)
+        return self.get_means(), self.get_covariances()
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_covariances."""
         return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
-        """Set the means of each mode.
+        """Set the mode means.
 
         Parameters
         ----------
         means : np.ndarray
-            Mode covariances.
+            Mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        obs_mod.set_means(self.model, means, update_initializer)
+        obs_mod.set_observation_model_parameter(
+            self.model, means, layer_name="means", update_initializer=update_initializer
+        )
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each mode.
+        """Set the mode covariances.
 
         Parameters
         ----------
         covariances : np.ndarray
-            Mode covariances.
+            Mode covariances. Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        obs_mod.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             covariances,
-            self.config.diagonal_covariances,
-            update_initializer,
+            layer_name="covs",
+            update_initializer=update_initializer,
+            diagonal_covariances=self.config.diagonal_covariances,
+        )
+
+    def set_means_covariances(self, means, covariances, update_initializer=True):
+        """This is a wrapper for set_means and set_covariances."""
+        self.set_means(
+            means,
+            update_initializer=update_initializer,
+        )
+        self.set_covariances(
+            covariances,
+            update_initializer=update_initializer,
         )
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_means and set_covariances."""
-        self.set_means(
+        """Wrapper for set_means_covariances."""
+        self.set_means_covariances(
             observation_model_parameters[0],
-            update_initializer=update_initializer,
-        )
-        self.set_covariances(
             observation_model_parameters[1],
             update_initializer=update_initializer,
         )

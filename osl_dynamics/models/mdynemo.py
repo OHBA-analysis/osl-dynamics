@@ -239,41 +239,106 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-    def get_means_stds_fcs(self):
-        """Get the mean, standard devation and functional connectivity of each mode.
+    def get_means(self):
+        """Get the mode means.
 
         Returns
         -------
         means : np.ndarray
-            Mode means.
-        stds : np.ndarray
-            Mode standard deviations.
-        fcs : np.ndarray
-            Mode functional connectivities.
+            Mode means. Shape (n_modes, n_channels).
         """
-        return obs_mod.get_means_stds_fcs(self.model)
+        return obs_mod.get_observation_model_parameter(self.model, "means")
+
+    def get_stds(self):
+        """Get the mode standard deviations.
+
+        Returns
+        -------
+        stds : np.ndarray
+            Mode standard deviations. Shape (n_modes, n_channels, n_channels).
+        """
+        return obs_mod.get_observation_model_parameter(self.model, "stds")
+
+    def get_fcs(self):
+        """Get the mode functional connectivities.
+
+        Returns
+        -------
+        fcs : np.ndarray
+            Mode functional connectivities. Shape (n_modes, n_channels, n_channels).
+        """
+        return obs_mod.get_observation_model_parameter(self.model, "fcs")
+
+    def get_means_stds_fcs(self):
+        """Get the mode means, standard deviations, functional connectivities.
+        This is a wrapper for get_means, get_stds, get_fcs.
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means. Shape is (n_modes, n_channels).
+        stds : np.ndarray
+            Mode standard deviations. Shape is (n_modes, n_channels, n_channels).
+        fcs : np.ndarray
+            Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
+        """
+        return self.get_means(), self.get_stds(), self.get_fcs()
 
     def get_observation_model_parameters(self):
         """Wrapper for get_means_stds_fcs."""
         return self.get_means_stds_fcs()
 
-    def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
-        """Set the means, standard deviations, functional connectivities of each mode.
+    def set_means(self, means, update_initializer=True):
+        """Set the mode means.
 
         Parameters
         ----------
-        means: np.ndarray
-            Mode means with shape (n_modes, n_channels).
-        stds: np.ndarray
-            Mode standard deviations with shape (n_modes, n_channels) or
-            (n_modes, n_channels, n_channels).
-        fcs: np.ndarray
-            Mode functional connectivities with shape (n_fc_modes, n_channels, n_channels).
-        update_initializer: bool
+        means : np.ndarray
+            Mode means. Shape is (n_modes, n_channels).
+        update_initializer : bool
             Do we want to use the passed parameters when we re_initialize
             the model?
         """
-        obs_mod.set_means_stds_fcs(self.model, means, stds, fcs, update_initializer)
+        obs_mod.set_observation_model_parameter(
+            self.model, means, layer_name="means", update_initializer=update_initializer
+        )
+
+    def set_stds(self, stds, update_initializer=True):
+        """Set the mode standard deviations.
+
+        Parameters
+        ----------
+        stds : np.ndarray
+            Mode standard deviations.
+            Shape is (n_modes, n_channels, n_channels) or (n_modes, n_channels).
+        update_initializer : bool
+            Do we want to use the passed parameters when we re_initialize
+            the model?
+        """
+        obs_mod.set_observation_model_parameter(
+            self.model, stds, layer_name="stds", update_initializer=update_initializer
+        )
+
+    def set_fcs(self, fcs, update_initializer=True):
+        """Set the mode functional connectivities.
+
+        Parameters
+        ----------
+        fcs : np.ndarray
+            Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
+        update_initializer : bool
+            Do we want to use the passed parameters when we re_initialize
+            the model?
+        """
+        obs_mod.set_observation_model_parameter(
+            self.model, fcs, layer_name="fcs", update_initializer=update_initializer
+        )
+
+    def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
+        """This is a wrapper for set_means, set_stds, set_fcs."""
+        self.set_means(means, update_initializer=update_initializer)
+        self.set_stds(stds, update_initializer=update_initializer)
+        self.set_fcs(fcs, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
