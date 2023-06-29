@@ -231,15 +231,15 @@ class Data:
         """
         # What data should we return?
         if prepared:
-            memmaps = self.arrays
+            arrays = self.arrays
         else:
-            memmaps = self.raw_data_arrays
+            arrays = self.raw_data_arrays
 
         # Should we return one long time series?
         if concatenate or self.n_arrays == 1:
-            return np.concatenate(memmaps)
+            return np.concatenate(arrays)
         else:
-            return memmaps
+            return arrays
 
     def load_raw_data(self):
         """Import data into a list of memory maps.
@@ -306,7 +306,7 @@ class Data:
 
     def validate_data(self):
         """Validate data files."""
-        n_channels = [memmap.shape[-1] for memmap in self.raw_data_arrays]
+        n_channels = [array.shape[-1] for array in self.raw_data_arrays]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
@@ -420,20 +420,16 @@ class Data:
         self.high_freq = high_freq
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
+        self.create_prepared_data_filenames()
 
         # Function to apply filtering to a single array
-        def _apply(memmap, prepared_data_file):
-            prepared_data = processing.temporal_filter(
-                memmap, self.low_freq, self.high_freq, self.sampling_frequency
+        def _apply(array, prepared_data_file):
+            array = processing.temporal_filter(
+                array, low_freq, high_freq, self.sampling_frequency
             )
             if self.load_memmaps:
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            return prepared_data_memmap
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
         # Prepare the data in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
@@ -485,15 +481,15 @@ class Data:
         self.whiten = whiten
 
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
+        self.create_prepared_data_filenames()
 
         # Calculate PCA on TDE data
         # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
             # Calculate covariance of the data
             covariance = np.zeros([self.n_te_channels, self.n_te_channels])
-            for memmap in tqdm(self.arrays, desc="Calculating PCA components"):
-                std_data = processing.standardize(memmap)
+            for array in tqdm(self.arrays, desc="Calculating PCA components"):
+                std_data = processing.standardize(array)
                 te_std_data = processing.time_embed(std_data, n_embeddings)
                 covariance += np.transpose(te_std_data) @ te_std_data
 
@@ -508,20 +504,14 @@ class Data:
             self.pca_components = u
 
         # Function to apply TDE-PCA to a single array
-        def _apply(memmap, prepared_data_file):
-            std_data = processing.standardize(memmap)
-            te_std_data = processing.time_embed(std_data, self.n_embeddings)
+        def _apply(array, prepared_data_file):
+            array = processing.standardize(array)
+            array = processing.time_embed(array, n_embeddings)
             if self.pca_components is not None:
-                prepared_data = te_std_data @ self.pca_components
-            else:
-                prepared_data = te_std_data
+                array = array @ self.pca_components
             if self.load_memmaps:
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            return prepared_data_memmap
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
         # Apply TDE and PCA in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
@@ -540,25 +530,21 @@ class Data:
         This is an in-place operation.
         """
         # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
+        self.create_prepared_data_filenames()
 
         # Function to calculate amplitude envelope for a single array
-        def _apply_amp_env(memmap, prepared_data_file):
-            prepared_data = np.abs(signal.hilbert(memmap, axis=0))
-            prepared_data = prepared_data.astype(np.float32)
+        def _apply(array, prepared_data_file):
+            array = np.abs(signal.hilbert(array, axis=0))
+            array = array.astype(np.float32)
             if self.load_memmaps:
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            return prepared_data_memmap
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
         # Prepare the data in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
             args,
-            _apply_amp_env,
+            _apply,
             desc="Amplitude envelope",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -582,25 +568,21 @@ class Data:
         self.n_window = n_window
 
         # Function to apply sliding window to a single array
-        def _apply(memmap, prepared_data_file):
-            prepared_data = np.array(
+        def _apply(array, prepared_data_file):
+            array = np.array(
                 [
                     np.convolve(
-                        memmap[:, i],
-                        np.ones(self.n_window) / self.n_window,
+                        array[:, i],
+                        np.ones(n_window) / n_window,
                         mode="valid",
                     )
-                    for i in range(memmap.shape[1])
+                    for i in range(array.shape[1])
                 ],
             ).T
-            prepared_data = prepared_data.astype(np.float32)
+            array = array.astype(np.float32)
             if self.load_memmaps:
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            return prepared_data_memmap
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
         # Prepare the data in parallel
         args = zip(self.arrays, self.prepared_data_filenames)
@@ -620,11 +602,11 @@ class Data:
         """
 
         # Function to apply standardisation to a single array
-        def _apply(memmap):
-            processing.standardize(memmap, create_copy=False)
+        def _apply(array):
+            return processing.standardize(array, create_copy=False)
 
         # Apply standardisation to each array in parallel
-        pqdm(
+        self.arrays = pqdm(
             zip(self.arrays),
             _apply,
             desc="Standardize",
@@ -656,7 +638,7 @@ class Data:
         self.tde_pca(n_embeddings, n_pca_components, pca_components, whiten)
         self.standardize()
 
-    def prepare_memmap_filenames(self):
+    def create_prepared_data_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(self.n_arrays)), identifier=self._identifier
         )
