@@ -3,15 +3,12 @@
 """
 
 import logging
-import warnings
 from os import listdir, path
 
 import mne
 import mat73
 import numpy as np
 import scipy.io
-
-from osl_dynamics.data import spm
 
 _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
@@ -244,7 +241,7 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
 
 
 def load_matlab(filename, field, ignored_keys=None):
-    """Loads a MATLAB or SPM file.
+    """Loads a MATLAB file.
 
     Parameters
     ----------
@@ -258,25 +255,12 @@ def load_matlab(filename, field, ignored_keys=None):
     Returns
     -------
     data : np.ndarray
-        Data in the MATLAB/SPM file.
+        Data in the MATLAB file.
     """
-    # Load file
     mat = loadmat(filename, return_dict=True)
-
-    # Get data
-    if "D" in mat:
-        warnings.warn(
-            "Assuming that key 'D' corresponds to an SPM MEEG object.", RuntimeWarning
-        )
-        D = spm.SPM(filename)
-        data = D.data
-    else:
-        try:
-            data = mat[field]
-        except KeyError:
-            raise KeyError(f"field '{field}' missing from MATLAB file.")
-
-    return data
+    if field not in mat:
+        raise KeyError(f"field '{field}' missing from MATLAB file.")
+    return mat[field]
 
 
 def loadmat(filename, return_dict=False):
