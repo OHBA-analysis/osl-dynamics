@@ -211,6 +211,17 @@ class Data:
         """
         self.sampling_frequency = sampling_frequency
 
+    def set_buffer_size(self, buffer_size):
+        """Set the buffer_size attribute.
+
+        Parameters
+        ----------
+        buffer_size : int
+            Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
+            to less random shuffling but will be quicker.
+        """
+        self.buffer_size = buffer_size
+
     def time_series(self, prepared=True, concatenate=False):
         """Time series data for all arrays.
 
