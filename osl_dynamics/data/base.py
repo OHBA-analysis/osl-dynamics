@@ -330,6 +330,11 @@ class Data:
             Frequency in Hz for a high pass filter.
         high_freq : float
             Frequency in Hz for a low pass filter.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         if low_freq is None and high_freq is None:
             _logger.warning("No filtering applied.")
@@ -368,6 +373,8 @@ class Data:
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
 
+        return self
+
     def downsample(self, freq):
         """Downsample the data.
 
@@ -377,6 +384,11 @@ class Data:
         ----------
         freq : float
             Frequency in Hz to downsample to.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         if self.sampling_frequency is None:
             raise ValueError(
@@ -409,6 +421,8 @@ class Data:
         # Update sampling_frequency attribute
         self.sampling_frequency = freq
 
+        return self
+
     def pca(self, n_pca_components=None, pca_components=None, whiten=False):
         """Principal component analysis (PCA).
 
@@ -423,6 +437,11 @@ class Data:
             PCA components to apply if they have already been calculated.
         whiten : bool
             Should we whiten the PCA'ed data?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         if (n_pca_components is None and pca_components is None) or (
             n_pca_components is not None and pca_components is not None
@@ -477,6 +496,8 @@ class Data:
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
 
+        return self
+
     def tde(self, n_embeddings):
         """Time-delay embedding (TDE).
 
@@ -486,6 +507,11 @@ class Data:
         ----------
         n_embeddings : int
             Number of data points to embed the data.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         self.n_embeddings = n_embeddings
         self.n_te_channels = self.n_raw_data_channels * n_embeddings
@@ -511,6 +537,8 @@ class Data:
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
 
+        return self
+
     def tde_pca(
         self,
         n_embeddings,
@@ -534,6 +562,11 @@ class Data:
             PCA components to apply if they have already been calculated.
         whiten : bool
             Should we whiten the PCA'ed data?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         if (n_pca_components is None and pca_components is None) or (
             n_pca_components is not None and pca_components is not None
@@ -592,10 +625,17 @@ class Data:
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
 
+        return self
+
     def amplitude_envelope(self):
         """Calculate the amplitude envelope.
 
         This is an in-place operation.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
 
         # Function to calculate amplitude envelope for a single array
@@ -619,6 +659,8 @@ class Data:
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
 
+        return self
+
     def sliding_window(self, n_window):
         """Apply a sliding window.
 
@@ -628,6 +670,11 @@ class Data:
         ----------
         n_window : int
             Number of data points in the sliding window. Must be odd.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         self.n_window = n_window
 
@@ -652,10 +699,17 @@ class Data:
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
 
+        return self
+
     def standardize(self):
         """Standardize (z-transform) the data.
 
         This is an in-place operation.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
 
         # Function to apply standardisation to a single array
@@ -673,6 +727,8 @@ class Data:
         )
         if isinstance(self.arrays[0], Exception):
             raise self.arrays[0]
+
+        return self
 
     def prepare(self, methods):
         """Prepare data.
@@ -702,10 +758,17 @@ class Data:
                     "standardize": {},
                 }
                 data.prepare(methods)
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
         for method_name, kwargs in methods.items():
             method = getattr(self, method_name)
             method(**kwargs)
+
+        return self
 
     def set_prepared_data_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
