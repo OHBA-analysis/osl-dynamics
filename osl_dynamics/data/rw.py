@@ -3,15 +3,12 @@
 """
 
 import logging
-import warnings
 from os import listdir, path
 
 import mne
 import mat73
 import numpy as np
 import scipy.io
-
-from osl_dynamics.data import spm
 
 _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
@@ -239,12 +236,12 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
         data = epochs.get_data(picks=picks)
         data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
     else:
-        raise ValueError(f"a fif file must end with 'raw.fif' or 'epo.fif'.")
+        raise ValueError("a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
 
 
-def load_matlab(filename, field, ignored_keys=None):
-    """Loads a MATLAB or SPM file.
+def load_matlab(filename, field):
+    """Loads a MATLAB file.
 
     Parameters
     ----------
@@ -252,31 +249,16 @@ def load_matlab(filename, field, ignored_keys=None):
         Filename of MATLAB file to read.
     field : str
         Field that corresponds to the data.
-    ignored_keys :  list of str
-        Keys in the MATLAB file to ignore.
 
     Returns
     -------
     data : np.ndarray
-        Data in the MATLAB/SPM file.
+        Data in the MATLAB file.
     """
-    # Load file
     mat = loadmat(filename, return_dict=True)
-
-    # Get data
-    if "D" in mat:
-        warnings.warn(
-            "Assuming that key 'D' corresponds to an SPM MEEG object.", RuntimeWarning
-        )
-        D = spm.SPM(filename)
-        data = D.data
-    else:
-        try:
-            data = mat[field]
-        except KeyError:
-            raise KeyError(f"field '{field}' missing from MATLAB file.")
-
-    return data
+    if field not in mat:
+        raise KeyError(f"field '{field}' missing from MATLAB file.")
+    return mat[field]
 
 
 def loadmat(filename, return_dict=False):

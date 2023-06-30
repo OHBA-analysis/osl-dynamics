@@ -474,7 +474,7 @@ class Model(VariationalInferenceModelBase):
                 self.load_weights(f"{store_dir}/weights.h5")
 
                 # Train on this subject
-                with training_data.set_kept_subjects(subject):
+                with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
 
                 # Get inferred parameters

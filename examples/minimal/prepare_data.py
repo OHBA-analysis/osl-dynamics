@@ -23,8 +23,12 @@ data = Data(files)
 # component analysis
 #
 # Alternatively, we could prepare amplitude envelope data. See the Data.prepare()
-# method for various the options.
-data.prepare(n_embeddings=15, n_pca_components=80)
+# method for the various options.
+methods = {
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "standardize": {},
+}
+data.prepare(methods)
 
 # Save the data (this will create a new directory containined the prepared data)
 data.save(data_dir)

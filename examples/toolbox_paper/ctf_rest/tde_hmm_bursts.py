@@ -61,7 +61,9 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
     )
 
     def get_amp_env(low_freq, high_freq, n_embeddings=21, sequence_length=2000):
-        data.prepare_amp_env(low_freq=low_freq, high_freq=high_freq)
+        data.filter(low_freq=low_freq, high_freq=high_freq)
+        data.amplitude_envelope()
+        data.standardize()
         x = []
         for X in data.time_series():
             X = X[n_embeddings // 2 :]
@@ -111,11 +113,12 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
 
 config = """
     load_data:
-        data_dir: training_data/bursts
-        data_kwargs:
+        inputs: training_data/bursts
+        kwargs:
             sampling_frequency: 100
-        prepare_kwargs:
-            n_embeddings: 21
+        prepare:
+            tde: {n_embeddings: 21}
+            standardize: {}
     plot_wavelet: {}
     train_hmm:
         config_kwargs:

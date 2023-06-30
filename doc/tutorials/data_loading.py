@@ -24,7 +24,7 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # There is one mandatory argument that needs to be passed to the Data class: `inputs`. This can be:
 # 
 # - A path to a directory containing .npy files. Each .npy file should be a subject or session.
-# - A list of paths to .npy or .mat files. Each file should be a subject or session.
+# - A list of paths to .npy, .mat or .fif files. Each file should be a subject or session.
 # - A numpy array. The array will be treated as continuous data from the same subject.
 # - A list of numpy arrays. Each numpy array should be the data for a subject or session.
 # 

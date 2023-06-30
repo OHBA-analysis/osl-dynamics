@@ -21,7 +21,11 @@ os.makedirs(inf_params_dir, exist_ok=True)
 training_data = Data([f"data/subject{i}.npy" for i in range(1, 68)])
 
 # Perform time-delay embedding and PCA
-training_data.prepare(n_embeddings=15, n_pca_components=80)
+methods = {
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "standardize": {},
+}
+training_data.prepare(methods)
 
 #%% Setup model
 

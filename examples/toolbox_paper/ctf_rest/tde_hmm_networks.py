@@ -180,15 +180,15 @@ def compare_groups(data, output_dir, n_perm, significance_level, n_jobs):
 # Full pipeline
 config = """
     load_data:
-        data_dir: training_data/networks
-        data_kwargs:
+        inputs: training_data/networks
+        kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
             parcellation_file: fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz
             n_jobs: 16
-        prepare_kwargs:
-            n_embeddings: 15
-            n_pca_components: 80
+        prepare:
+            tde_pca: {n_embeddings: 15, n_pca_components: 80}
+            standardize: {}
     train_hmm:
         config_kwargs:
             n_states: 8

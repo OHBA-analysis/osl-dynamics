@@ -70,15 +70,11 @@ print(data)
 # The prepare method
 # ******************
 # 
-# The `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ has a method for preparing the data called `prepare`. This is an 'in-place' operator, it does not return anything.
-# 
-# To time-delay embed the data, we just need to pass the `n_embeddings` argument. Additionally, we can pass the `n_pca_components` argument to the `prepare` method to perform PCA. Note, if you just want to perform TDE then you can omit the `n_pca_component` argument, similarly, the `n_embeddings` argument can be omitted if you'd just like to perform PCA. For MEG data, we typically use `n_embeddings=15`, which corresponds to adding channels with -7, -6, ..., 0, 6, 7 lags, and `n_pca_components=80`.
-# 
-# **Note, standardization (removing the mean and normalizing each channel to unit variance) is always performed as the last step in the `prepare` method.**
+# The `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ has a method for preparing the data called `prepare`. This is an 'in-place' operator, it does not return anything. The `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ also has many methods for processing the data, e.g. filtering, downsampling, time-delay embedding, PCA, etc. We can call these methods via the `prepare` method.
 # 
 # To understand TDE-PCA a bit better let's start by just performing TDE.
 
-data.prepare(n_embeddings=15)
+data.tde(n_embeddings=15)
 print(data)
 
 #%%
@@ -88,14 +84,24 @@ print(data)
 # 
 # **Note, if we call the `prepare` method again, it will start from the original raw data.**
 # 
-# Now, let's prepare TDE-PCA data.
+# Now, let's prepare TDE-PCA data and standardize.
 
-data.prepare(n_embeddings=15, n_pca_components=80)
+data.tde_pca(n_embeddings=15, n_pca_components=80)
+data.standardize()
 print(data)
 
 #%%
 # We can now see the number of channels is the number of PCA components as expected.
 # 
+# We can do the above via the `prepare` method with
+
+methods = {
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "standardize": {},
+}
+data.prepare(methods)
+
+#%%
 # When we perform PCA a `pca_components` attribute is added to the Data object. This is the `(n_raw_channels, n_pca_components)` shape array that is used to perform PCA.
 
 pca_components = data.pca_components
@@ -122,21 +128,22 @@ print(raw[0].shape)
 # Preparing Amplitude Envelope Data
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # 
-# Another common approach is to train a model on amplitude envelope data. The `prepare` method can also be used for this. Amplitude envelope data can be calculated using the `amplitude_envelope` argument.
+# Another common approach is to train a model on amplitude envelope data. Let's reload the data to start from scratch and compute the amplitude envelope.
 
-data.prepare(amplitude_envelope=True)
+data = Data("example_loading_data/numpy_format")
+data.amplitude_envelope()
 print(data)
 
 #%%
 # We can see when we prepare amplitude envelope data, the number of samples and channels does not change.
 # 
-# It is also common to apply a sliding window filter to smooth the data after calculating the amplitude envelope. We can do this using the `n_window` argument, which is the number of samples for the sliding window. The sliding window uses a boxcar windowing function. For MEG data, we typically use `n_window=6`. Let's prepare amplitude envelope data followed by a sliding window.
+# It is also common to apply a sliding window filter to smooth the data after calculating the amplitude envelope. We can do this using the `n_window` argument, which is the number of samples for the sliding window. The sliding window uses a boxcar windowing function. For MEG data, we typically use `n_window=5`. Let's now apply a sliding window to the amplitude envelope data.
 
-data.prepare(amplitude_envelope=True, n_window=6)
+data.sliding_window(n_window=5)
 print(data)
 
 #%%
-# Now we see we have lost 10 data points. In this case we have lost 5 data points from the end of the time series for each subject. We can verify this by printing the shape of each subject's time series.
+# Now we see we have lost 4 data points. In this case we have lost 2 data points from the end of the time series for each subject. We can verify this by printing the shape of each subject's time series.
 
 # Get the time series for each subject
 ts = data.time_series()

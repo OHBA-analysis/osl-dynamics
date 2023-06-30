@@ -55,7 +55,11 @@ training_data = Data(
 )
 
 # Prepare the data: time-delay embedding, PCA and standardization
-training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
+methods = {
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": config.n_channels},
+    "standardize": {},
+}
+training_data.prepare(methods)
 
 #%% Model training
 
