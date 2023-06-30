@@ -57,8 +57,8 @@ def train_hmm(
     data,
     output_dir,
     config_kwargs,
-    init_kwargs={},
-    fit_kwargs={},
+    init_kwargs=None,
+    fit_kwargs=None,
     save_inf_params=True,
 ):
     """Train a Hidden Markov Model.
@@ -104,6 +104,9 @@ def train_hmm(
         raise ValueError("data must be passed.")
 
     from osl_dynamics.models import hmm
+
+    config_kwargs = {} if config_kwargs is None else config_kwargs
+    init_kwargs = {} if init_kwargs is None else init_kwargs
 
     # Directories
     model_dir = output_dir + "/model"
@@ -158,8 +161,8 @@ def train_dynemo(
     data,
     output_dir,
     config_kwargs,
-    init_kwargs={},
-    fit_kwargs={},
+    init_kwargs=None,
+    fit_kwargs=None,
     save_inf_params=True,
 ):
     """Train DyNeMo.
@@ -213,6 +216,10 @@ def train_dynemo(
     save_inf_params : bool
         Should we save the inferred parameters? Optional, defaults to :code:`True`.
     """
+
+    init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
+
     if data is None:
         raise ValueError("data must be passed.")
 
@@ -304,7 +311,7 @@ def plot_tde_covariances(data, output_dir):
         if data.pca_components is not None:
             from osl_dynamics.analysis import modes
 
-            covs = modes.reverse_pca(covs, pca_components)
+            covs = modes.reverse_pca(covs, data.pca_components)
 
     from osl_dynamics.utils import plotting
 
@@ -498,6 +505,10 @@ def nnmf(data, output_dir, n_components):
     n_components : int
         Number of components to fit.
     """
+    from osl_dynamics.analysis import spectral
+    
+    spectra_dir = output_dir + "/spectra"
+    
     coh = load(f"{spectra_dir}/coh.npy")
     nnmf = spectral.decompose_spectra(coh, n_components=n_components)
     save(f"{spectra_dir}/nnmf_{n_components}.npy", nnmf)
@@ -597,8 +608,8 @@ def plot_group_ae_networks(
     mask_file=None,
     parcellation_file=None,
     aec_abs=True,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level amplitude envelope networks.
 
@@ -642,6 +653,9 @@ def plot_group_ae_networks(
              'filename': '<output_dir>/networks/aec_.png',
              'threshold': 0.97}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -707,8 +721,8 @@ def plot_group_tde_hmm_networks(
     parcellation_file=None,
     frequency_range=None,
     percentile=97,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level TDE-HMM networks for a specified frequency band.
 
@@ -744,7 +758,7 @@ def plot_group_tde_hmm_networks(
     percentile : float
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict
+    power_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
@@ -762,6 +776,9 @@ def plot_group_tde_hmm_networks(
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -869,8 +886,8 @@ def plot_group_nnmf_tde_hmm_networks(
     parcellation_file=None,
     component=0,
     percentile=97,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level TDE-HMM networks using a NNMF component to integrate
     the spectra.
@@ -911,7 +928,7 @@ def plot_group_nnmf_tde_hmm_networks(
     percentile : float
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict
+    power_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
@@ -931,6 +948,9 @@ def plot_group_nnmf_tde_hmm_networks(
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -1053,8 +1073,8 @@ def plot_group_tde_dynemo_networks(
     parcellation_file=None,
     frequency_range=None,
     percentile=97,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level TDE-DyNeMo networks for a specified frequency band.
 
@@ -1108,6 +1128,9 @@ def plot_group_tde_dynemo_networks(
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -1211,7 +1234,7 @@ def plot_group_tde_dynemo_networks(
 
 
 def plot_alpha(
-    data, output_dir, subject=0, normalize=False, sampling_frequency=None, kwargs={}
+    data, output_dir, subject=0, normalize=False, sampling_frequency=None, kwargs=None
 ):
     """Plot inferred alphas.
 
@@ -1286,7 +1309,7 @@ def plot_alpha(
 
         # Calculate normalised alphas
         covs = load(f"{inf_params_dir}/covs.npy")
-        norm_alp = modes.reweight_alphas(alp)
+        norm_alp = modes.reweight_alphas(alp, covs)
 
         # Plot
         if subject == "all":
@@ -1298,7 +1321,7 @@ def plot_alpha(
             plotting.plot_alpha(norm_alp[subject], **kwargs)
 
 
-def calc_gmm_alpha(data, output_dir, kwargs={}):
+def calc_gmm_alpha(data, output_dir, kwargs=None):
     """Binarize inferred alphas using a two-component GMM.
 
     This function expects a model has been trained and the following directory to exist:
@@ -1319,6 +1342,7 @@ def calc_gmm_alpha(data, output_dir, kwargs={}):
         Keyword arguments to pass to `inference.modes.gmm_time_courses
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_.
     """
+    kwargs = {} if kwargs is None else kwargs
     inf_params_dir = output_dir + "/inf_params"
 
     # Load inferred alphas

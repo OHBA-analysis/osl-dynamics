@@ -175,8 +175,8 @@ def run_pipeline_from_file(
     if restrict is not None:
         from osl_dynamics.inference import tf_ops
 
-        tp_ops.select_gpu(int(restrict))
-        tp_ops.gpu_growth()
+        tf_ops.select_gpu(int(restrict))
+        tf_ops.gpu_growth()
     config_path = Path(config_file)
     config = config_path.read_text()
 
