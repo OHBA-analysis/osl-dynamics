@@ -12,7 +12,6 @@ from os import path
 
 import numpy as np
 from pqdm.threads import pqdm
-from scipy import signal
 from tqdm.auto import tqdm
 
 from osl_dynamics.data import processing, rw, tf
@@ -394,6 +393,104 @@ class Data:
             total=self.n_arrays,
         )
 
+    def pca(self, n_pca_components=None, pca_components=None, whiten=False):
+        """Principal component analysis (PCA).
+
+        This function will first standardize the data then perform PCA.
+        This is an in-place operation.
+
+        Parameters
+        ----------
+        n_pca_components : int
+            Number of PCA components to keep.
+        pca_components : np.ndarray
+            PCA components to apply if they have already been calculated.
+        whiten : bool
+            Should we whiten the PCA'ed data?
+        """
+        if (n_pca_components is None and pca_components is None) or (
+            n_pca_components is not None and pca_components is not None
+        ):
+            raise ValueError("Please pass either n_pca_components or pca_components.")
+
+        if pca_components is not None and not isinstance(pca_components, np.ndarray):
+            raise ValueError("pca_components must be a numpy array.")
+
+        self.n_pca_components = n_pca_components
+        self.pca_components = pca_components
+        self.whiten = whiten
+
+        # Calculate PCA
+        # NOTE: the approach used here only works for zero mean data
+        if n_pca_components is not None:
+            # Calculate covariance of the data
+            covariance = np.zeros([self.n_channels, self.n_channels])
+            for array in tqdm(self.arrays, desc="Calculating PCA components"):
+                std_data = processing.standardize(array)
+                covariance += np.transpose(std_data) @ std_data
+
+            # Use SVD on the covariance to calculate PCA components
+            u, s, vh = np.linalg.svd(covariance)
+            u = u[:, :n_pca_components].astype(np.float32)
+            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            s = s[:n_pca_components].astype(np.float32)
+            if whiten:
+                u = u @ np.diag(1.0 / np.sqrt(s))
+            self.pca_components = u
+
+        # Function to apply PCA to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.standardize(array)
+            array = array @ self.pca_components
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Apply PCA in parallel
+        self.set_prepared_data_filenames()
+        args = zip(self.arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            _apply,
+            desc="PCA",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+
+    def tde(self, n_embeddings):
+        """Time-delay embedding (TDE).
+
+        This is an in-place operation.
+
+        Parameters
+        ----------
+        n_embeddings : int
+            Number of data points to embed the data.
+        """
+        self.n_embeddings = n_embeddings
+        self.n_te_channels = self.n_raw_data_channels * n_embeddings
+
+        # Function to apply TDE to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.time_embed(array, n_embeddings)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Apply TDE in parallel
+        self.set_prepared_data_filenames()
+        args = zip(self.arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            _apply,
+            desc="TDE",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+
     def tde_pca(
         self,
         n_embeddings,
@@ -404,24 +501,24 @@ class Data:
         """Time-delay embedding (TDE) and principal component analysis (PCA).
 
         This function will first standardize the data, then perform TDE then PCA.
-        This is an in-place operation.
+        It is useful to do both operations in a single methods because it avoids
+        having to save the time-embedded data. This is an in-place operation.
 
         Parameters
         ----------
         n_embeddings : int
             Number of data points to embed the data.
         n_pca_components : int
-            Number of PCA components to keep. Default is no PCA.
+            Number of PCA components to keep.
         pca_components : np.ndarray
             PCA components to apply if they have already been calculated.
         whiten : bool
             Should we whiten the PCA'ed data?
         """
-        if n_pca_components is None and pca_components is None:
-            _logger.warning("Not applying PCA.")
-
-        if n_pca_components is not None and pca_components is not None:
-            raise ValueError("Please only pass n_pca_components or pca_components.")
+        if (n_pca_components is None and pca_components is None) or (
+            n_pca_components is not None and pca_components is not None
+        ):
+            raise ValueError("Please pass either n_pca_components or pca_components.")
 
         if pca_components is not None and not isinstance(pca_components, np.ndarray):
             raise ValueError("pca_components must be a numpy array.")
@@ -456,8 +553,7 @@ class Data:
         def _apply(array, prepared_data_file):
             array = processing.standardize(array)
             array = processing.time_embed(array, n_embeddings)
-            if self.pca_components is not None:
-                array = array @ self.pca_components
+            array = array @ self.pca_components
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
             return array
