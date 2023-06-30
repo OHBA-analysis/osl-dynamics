@@ -74,8 +74,8 @@ training_data = data.Data(
 
 # Prepare the data for training
 methods = {
-    "tde_pca": {"n_embeddings": 15, "n_pca_components": config.n_channels}
-    "standardize": {}
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": config.n_channels},
+    "standardize": {},
 }
 training_data.prepare(methods)
 
