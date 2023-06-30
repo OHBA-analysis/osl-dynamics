@@ -54,7 +54,7 @@ training_data = Data(
 methods = {
     "amplitude_envelope": {},
     "sliding_window": {"n_window": 5},
-    "standardize": {}
+    "standardize": {},
 }
 training_data.prepare(methods)
 
