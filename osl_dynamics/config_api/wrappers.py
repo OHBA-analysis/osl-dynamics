@@ -26,7 +26,7 @@ from osl_dynamics.utils.misc import load, override_dict_defaults, save
 _logger = logging.getLogger("osl-dynamics")
 
 
-def load_data(inputs, kwargs={}, prepare={}):
+def load_data(inputs, kwargs=None, prepare=None):
     """Load and prepare data.
 
     Parameters
@@ -47,6 +47,9 @@ def load_data(inputs, kwargs={}, prepare={}):
         Data object.
     """
     from osl_dynamics.data import Data
+
+    kwargs = {} if kwargs is None else kwargs
+    prepare = {} if prepare is None else kwargs
 
     data = Data(inputs, **kwargs)
     data.prepare(prepare)
