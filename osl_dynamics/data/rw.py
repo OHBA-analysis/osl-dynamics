@@ -236,7 +236,7 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
         data = epochs.get_data(picks=picks)
         data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
     else:
-        raise ValueError(f"a fif file must end with 'raw.fif' or 'epo.fif'.")
+        raise ValueError("a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
 
 
