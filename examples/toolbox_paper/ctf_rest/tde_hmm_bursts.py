@@ -61,15 +61,13 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
     )
 
     def get_amp_env(low_freq, high_freq, n_embeddings=21, sequence_length=2000):
-        data.filter(low_freq=low_freq, high_freq=high_freq)
-        data.amplitude_envelope()
-        data.standardize()
-        x = []
-        for X in data.time_series():
-            X = X[n_embeddings // 2 :]
-            X = X[: (X.shape[0] // sequence_length) * sequence_length]
-            x.append(X)
-        return np.concatenate(x)[:, 0]
+        data.prepare({
+            "filter": {"low_freq": low_freq, "high_freq": high_freq, "use_raw" : True},
+            "amplitude_envelope": {},
+            "standardize": {},
+        })
+        x = data.trim_time_series(sequence_length, n_embeddings, concatenate=True)
+        return x[:, 0]
 
     # Get amplitude envelope data for different frequency bands
     x_beta = get_amp_env(13, 30)

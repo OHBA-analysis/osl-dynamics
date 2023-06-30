@@ -325,7 +325,7 @@ class Data:
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def filter(self, low_freq=None, high_freq=None):
+    def filter(self, low_freq=None, high_freq=None, use_raw=False):
         """Filter the data.
 
         This is an in-place operation.
@@ -336,6 +336,8 @@ class Data:
             Frequency in Hz for a high pass filter.
         high_freq : float
             Frequency in Hz for a low pass filter.
+        use_raw : bool
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
@@ -366,8 +368,10 @@ class Data:
             return array
 
         # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="Filtering",
             n_jobs=self.n_jobs,
@@ -383,7 +387,7 @@ class Data:
 
         return self
 
-    def downsample(self, freq):
+    def downsample(self, freq, use_raw=False):
         """Downsample the data.
 
         This is an in-place operation.
@@ -392,6 +396,8 @@ class Data:
         ----------
         freq : float
             Frequency in Hz to downsample to.
+        use_raw : bool
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
@@ -405,16 +411,23 @@ class Data:
                 + "Data(..., sampling_frequency=...) when creating the Data object."
             )
 
+        if use_raw and hasattr(self, "original_sampling_frequency"):
+            sampling_frequency = self.original_sampling_frequency
+        else:
+            sampling_frequency = self.sampling_frequency
+
         # Function to apply downsampling to a single array
         def _apply(array, prepared_data_file):
-            array = processing.downsample(array, freq, self.sampling_frequency)
+            array = processing.downsample(array, freq, sampling_frequency)
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
             return array
 
         # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="Downsampling",
             n_jobs=self.n_jobs,
@@ -428,12 +441,15 @@ class Data:
                     _logger.exception(e, exc_info=False)
             raise e
 
-        # Update sampling_frequency attribute
+        # Update sampling_frequency attributes
+        self.original_sampling_frequency = self.sampling_frequency
         self.sampling_frequency = freq
 
         return self
 
-    def pca(self, n_pca_components=None, pca_components=None, whiten=False):
+    def pca(
+        self, n_pca_components=None, pca_components=None, whiten=False, use_raw=False
+    ):
         """Principal component analysis (PCA).
 
         This function will first standardize the data then perform PCA.
@@ -447,6 +463,8 @@ class Data:
             PCA components to apply if they have already been calculated.
         whiten : bool
             Should we whiten the PCA'ed data?
+        use_raw : bool
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
@@ -465,12 +483,15 @@ class Data:
         self.pca_components = pca_components
         self.whiten = whiten
 
+        # What data should we apply PCA to?
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+
         # Calculate PCA
-        # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
             # Calculate covariance of the data
-            covariance = np.zeros([self.n_channels, self.n_channels])
-            for array in tqdm(self.arrays, desc="Calculating PCA components"):
+            n_channels = arrays[0].shape[-1]
+            covariance = np.zeros([n_channels, n_channels])
+            for array in tqdm(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 covariance += np.transpose(std_data) @ std_data
 
@@ -493,8 +514,9 @@ class Data:
             return array
 
         # Apply PCA in parallel
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="PCA",
             n_jobs=self.n_jobs,
@@ -510,7 +532,7 @@ class Data:
 
         return self
 
-    def tde(self, n_embeddings):
+    def tde(self, n_embeddings, use_raw=False):
         """Time-delay embedding (TDE).
 
         This is an in-place operation.
@@ -519,6 +541,8 @@ class Data:
         ----------
         n_embeddings : int
             Number of data points to embed the data.
+        use_raw : bool
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
@@ -536,8 +560,10 @@ class Data:
             return array
 
         # Apply TDE in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="TDE",
             n_jobs=self.n_jobs,
@@ -559,6 +585,7 @@ class Data:
         n_pca_components=None,
         pca_components=None,
         whiten=False,
+        use_raw=False,
     ):
         """Time-delay embedding (TDE) and principal component analysis (PCA).
 
@@ -576,6 +603,8 @@ class Data:
             PCA components to apply if they have already been calculated.
         whiten : bool
             Should we whiten the PCA'ed data?
+        use_raw : bool
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
@@ -591,17 +620,19 @@ class Data:
             raise ValueError("pca_components must be a numpy array.")
 
         self.n_embeddings = n_embeddings
-        self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
         self.whiten = whiten
 
+        # What data should we use?
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        self.n_te_channels = arrays[0].shape[-1] * n_embeddings
+
         # Calculate PCA on TDE data
-        # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
             # Calculate covariance of the data
             covariance = np.zeros([self.n_te_channels, self.n_te_channels])
-            for array in tqdm(self.arrays, desc="Calculating PCA components"):
+            for array in tqdm(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 te_std_data = processing.time_embed(std_data, n_embeddings)
                 covariance += np.transpose(te_std_data) @ te_std_data
@@ -626,8 +657,9 @@ class Data:
             return array
 
         # Apply TDE and PCA in parallel
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="TDE-PCA",
             n_jobs=self.n_jobs,
@@ -662,8 +694,9 @@ class Data:
             return array
 
         # Prepare the data in parallel
+        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="Amplitude envelope",
             n_jobs=self.n_jobs,
@@ -679,7 +712,7 @@ class Data:
 
         return self
 
-    def sliding_window(self, n_window):
+    def sliding_window(self, n_window, use_raw=False):
         """Apply a sliding window.
 
         This is an in-place operation.
@@ -688,6 +721,8 @@ class Data:
         ----------
         n_window : int
             Number of data points in the sliding window. Must be odd.
+        use_raw : bool
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
@@ -704,8 +739,10 @@ class Data:
             return array
 
         # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(self.arrays, self.prepared_data_filenames),
+            args,
             function=_apply,
             desc="Sliding window",
             n_jobs=self.n_jobs,
