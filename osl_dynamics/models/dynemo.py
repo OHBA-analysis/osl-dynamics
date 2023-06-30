@@ -492,6 +492,79 @@ class Model(VariationalInferenceModelBase):
 
         return alpha, np.array(means), np.array(covariances)
 
+    def dual_estimation(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
+        """Dual estimation to get the subject specific parameters.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        n_epochs : int
+            Number of epochs to train for. Defaults to the value in the config
+            used to create the model.
+        learning_rate : float
+            Learning rate. Defaults to the value in the config used to create
+            the model.
+        store_dir : str
+            Directory to temporarily store the model in.
+
+        Returns
+        -------
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        """
+        # Save the group level model
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Save original training hyperparameters
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = [
+            "mod_rnn",
+            "mod_mu",
+            "mod_sigma",
+            "inf_rnn",
+            "inf_mu",
+            "inf_sigma",
+            "theta_norm",
+            "alpha",
+        ]
+
+        # Dual estimation on individual subjects
+        means = []
+        covariances = []
+        with self.set_trainable(fixed_layers, False):
+            for subject in trange(training_data.n_subjects, desc="Dual estimation"):
+                # Load group-level model
+                self.load_weights(f"{store_dir}/weights.h5")
+
+                # Train on this subject
+                with training_data.set_kept_subjects(subject):
+                    self.fit(training_data, verbose=0)
+
+                # Get inferred parameters
+                m, c = self.get_means_covariances()
+
+                means.append(m)
+                covariances.append(c)
+
+        # Reset hyperparameters
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+
+        return np.array(means), np.array(covariances)
+
 
 def _model_structure(config):
     # Layer for input

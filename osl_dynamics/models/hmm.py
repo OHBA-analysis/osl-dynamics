@@ -19,7 +19,7 @@ from tensorflow.keras import backend, layers, utils
 from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.inference import initializers
+from osl_dynamics.inference import initializers, modes
 from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
@@ -29,6 +29,7 @@ from osl_dynamics.inference.layers import (
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.simulation import HMM
+from osl_dynamics.utils.misc import set_logging_level
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -1192,6 +1193,57 @@ class Model(ModelBase):
             / n_sequences
         )
         return bic
+
+    def dual_estimation(self, training_data):
+        """Dual estimation to get subject specific parameters.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training data.
+
+        Returns
+        -------
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_states, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
+        """
+        # Get the inferred alpha for each subject
+        with set_logging_level(_logger, logging.WARNING):
+            alpha = self.get_alpha(training_data)
+
+        # Get the state time courses
+        stc = modes.argmax_time_courses(alpha)
+        if not isinstance(stc, list):
+            stc = [stc]
+
+        # Get the data time series
+        data_time_series = self.get_training_time_series(training_data)
+        if not isinstance(data_time_series, list):
+            data_time_series = [data_time_series]
+
+        # Initialise the means with zeros and covariances with identity
+        means = np.zeros(
+            [training_data.n_subjects, self.config.n_states, self.config.n_channels]
+        )
+        covariances = np.stack(
+            [np.stack([np.eye(self.config.n_channels)] * self.config.n_states)]
+            * training_data.n_subjects
+        )
+
+        for subject in trange(training_data.n_subjects, desc="Dual estimation"):
+            s = stc[subject]
+            d = data_time_series[subject]
+
+            for i in range(self.config.n_states):
+                if self.config.learn_means:
+                    means[subject, i] = np.mean(d[s[:, i] == 1], axis=0)
+                if self.config.learn_covariances:
+                    covariances[subject, i] = np.cov(d[s[:, i] == 1], rowvar=False)
+
+        return means, covariances
 
     def get_training_time_series(self, training_data, prepared=True, concatenate=False):
         """Get the time series used for training from a Data object.
