@@ -114,7 +114,6 @@ class Data:
         self.load_memmaps = load_memmaps
         self.buffer_size = buffer_size
         self.n_jobs = n_jobs
-        self.prepared_data_filenames = []
 
         # Validate inputs
         self.inputs = rw.validate_inputs(inputs)
@@ -310,87 +309,6 @@ class Data:
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def save(self, output_dir="."):
-        """Saves (prepared) data to numpy files.
-
-        Parameters
-        ----------
-        output_dir : str
-            Path to save data files to. Default is the current working directory.
-        """
-        # Create output directory
-        output_dir = pathlib.Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Function to save a single array
-        def _save(i, arr):
-            padded_number = misc.leading_zeros(i, self.n_arrays)
-            np.save(f"{output_dir}/array{padded_number}.npy", arr)
-
-        # Save arrays in parallel
-        pqdm(
-            enumerate(self.arrays),
-            _save,
-            desc="Saving data",
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=self.n_arrays,
-        )
-
-        # Save preparation settings
-        self.save_preparation(output_dir)
-
-    def save_preparation(self, output_dir="."):
-        """Save a pickle file containing preparation settings.
-
-        Parameters
-        ----------
-        output_dir : str
-            Path to save data files to. Default is the current working directory.
-        """
-        attributes = list(self.__dict__.keys())
-        dont_keep = [
-            "_identifier",
-            "data_field",
-            "picks",
-            "reject_by_annotation",
-            "sampling_frequency",
-            "mask_file",
-            "parcellation_file",
-            "time_axis_first",
-            "load_memmaps",
-            "buffer_size",
-            "n_jobs",
-            "prepared_data_filenames",
-            "inputs",
-            "store_dir",
-            "raw_data_arrays",
-            "raw_data_filenames",
-            "n_raw_data_channels",
-            "arrays",
-            "keep",
-        ]
-        for item in dont_keep:
-            attributes.remove(item)
-        preparation = {a: getattr(self, a) for a in attributes}
-        pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
-
-    def load_preparation(self, inputs):
-        """Loads a pickle file containing preparation settings.
-
-        Parameters
-        ----------
-        inputs : str
-            Path to directory containing the pickle file with preparation settings.
-        """
-        if path.isdir(inputs):
-            for file in rw.list_dir(inputs):
-                if "preparation.pkl" in file:
-                    preparation = pickle.load(open(f"{inputs}/preparation.pkl", "rb"))
-                    for attr, value in preparation.items():
-                        setattr(self, attr, value)
-                    break
-
     def filter(self, low_freq=None, high_freq=None):
         """Filter the data.
 
@@ -407,9 +325,7 @@ class Data:
             _logger.warning("No filtering applied.")
             return
 
-        if (
-            low_freq is not None or high_freq is not None
-        ) and self.sampling_frequency is None:
+        if self.sampling_frequency is None:
             raise ValueError(
                 "Data.sampling_frequency must be set if we are filtering the data. "
                 + "Use Data.set_sampling_frequency() or pass "
@@ -418,9 +334,6 @@ class Data:
 
         self.low_freq = low_freq
         self.high_freq = high_freq
-
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.create_prepared_data_filenames()
 
         # Function to apply filtering to a single array
         def _apply(array, prepared_data_file):
@@ -432,11 +345,50 @@ class Data:
             return array
 
         # Prepare the data in parallel
+        self.set_prepared_data_filenames()
         args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
             args,
             _apply,
             desc="Filtering",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+
+    def downsample(self, freq):
+        """Downsample the data.
+
+        This is an in-place operation.
+
+        Parameters
+        ----------
+        freq : float
+            Frequency in Hz to downsample to.
+        """
+        if self.sampling_frequency is None:
+            raise ValueError(
+                "Data.sampling_frequency must be set if we are filtering the data. "
+                + "Use Data.set_sampling_frequency() or pass "
+                + "Data(..., sampling_frequency=...) when creating the Data object."
+            )
+
+        self.sampling_frequency = freq
+
+        # Function to apply downsampling to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.downsample(array, freq, self.sampling_frequency)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Prepare the data in parallel
+        self.set_prepared_data_filenames()
+        args = zip(self.arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            _apply,
+            desc="Downsampling",
             n_jobs=self.n_jobs,
             argument_type="args",
             total=self.n_arrays,
@@ -480,9 +432,6 @@ class Data:
         self.pca_components = pca_components
         self.whiten = whiten
 
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.create_prepared_data_filenames()
-
         # Calculate PCA on TDE data
         # NOTE: the approach used here only works for zero mean data
         if n_pca_components is not None:
@@ -514,6 +463,7 @@ class Data:
             return array
 
         # Apply TDE and PCA in parallel
+        self.set_prepared_data_filenames()
         args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
             args,
@@ -529,18 +479,16 @@ class Data:
 
         This is an in-place operation.
         """
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.create_prepared_data_filenames()
 
         # Function to calculate amplitude envelope for a single array
         def _apply(array, prepared_data_file):
-            array = np.abs(signal.hilbert(array, axis=0))
-            array = array.astype(np.float32)
+            array = processing.amplitude_envelope(array)
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
             return array
 
         # Prepare the data in parallel
+        self.set_prepared_data_filenames()
         args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
             args,
@@ -561,30 +509,17 @@ class Data:
         n_window : int
             Number of data points in the sliding window. Must be odd.
         """
-        # Validation
-        if n_window % 2 == 0:
-            raise ValueError("n_window must be odd.")
-
         self.n_window = n_window
 
         # Function to apply sliding window to a single array
         def _apply(array, prepared_data_file):
-            array = np.array(
-                [
-                    np.convolve(
-                        array[:, i],
-                        np.ones(n_window) / n_window,
-                        mode="valid",
-                    )
-                    for i in range(array.shape[1])
-                ],
-            ).T
-            array = array.astype(np.float32)
+            array = processing.sliding_window(array, n_window)
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
             return array
 
         # Prepare the data in parallel
+        self.set_prepared_data_filenames()
         args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
             args,
@@ -638,7 +573,7 @@ class Data:
         self.tde_pca(n_embeddings, n_pca_components, pca_components, whiten)
         self.standardize()
 
-    def create_prepared_data_filenames(self):
+    def set_prepared_data_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
             width=len(str(self.n_arrays)), identifier=self._identifier
         )
@@ -734,9 +669,7 @@ class Data:
         n : np.ndarray
             Number of batches for each array's data.
         """
-        return np.array(
-            [tf.n_batches(memmap, sequence_length) for memmap in self.arrays]
-        )
+        return np.array([tf.n_batches(array, sequence_length) for array in self.arrays])
 
     def dataset(
         self,
@@ -886,9 +819,92 @@ class Data:
                     _logger.info(
                         f"Subject {i}: "
                         + f"{len(training_datasets[i])} batches in training dataset, "
-                        + f"{len(validation_datasets[i])} batches in the validation dataset."
+                        + f"{len(validation_datasets[i])} batches in the validation "
+                        + "dataset."
                     )
                 return training_datasets, validation_datasets
+
+    def save_preparation(self, output_dir="."):
+        """Save a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Default is the current working directory.
+        """
+        attributes = list(self.__dict__.keys())
+        dont_keep = [
+            "_identifier",
+            "data_field",
+            "picks",
+            "reject_by_annotation",
+            "sampling_frequency",
+            "mask_file",
+            "parcellation_file",
+            "time_axis_first",
+            "load_memmaps",
+            "buffer_size",
+            "n_jobs",
+            "prepared_data_filenames",
+            "inputs",
+            "store_dir",
+            "raw_data_arrays",
+            "raw_data_filenames",
+            "n_raw_data_channels",
+            "arrays",
+            "keep",
+        ]
+        for item in dont_keep:
+            if item in attributes:
+                attributes.remove(item)
+        preparation = {a: getattr(self, a) for a in attributes}
+        pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
+
+    def load_preparation(self, inputs):
+        """Loads a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        inputs : str
+            Path to directory containing the pickle file with preparation settings.
+        """
+        if path.isdir(inputs):
+            for file in rw.list_dir(inputs):
+                if "preparation.pkl" in file:
+                    preparation = pickle.load(open(f"{inputs}/preparation.pkl", "rb"))
+                    for attr, value in preparation.items():
+                        setattr(self, attr, value)
+                    break
+
+    def save(self, output_dir="."):
+        """Saves (prepared) data to numpy files.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Default is the current working directory.
+        """
+        # Create output directory
+        output_dir = pathlib.Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Function to save a single array
+        def _save(i, arr):
+            padded_number = misc.leading_zeros(i, self.n_arrays)
+            np.save(f"{output_dir}/array{padded_number}.npy", arr)
+
+        # Save arrays in parallel
+        pqdm(
+            enumerate(self.arrays),
+            _save,
+            desc="Saving data",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+
+        # Save preparation settings
+        self.save_preparation(output_dir)
 
     def delete_dir(self):
         """Deletes store_dir."""

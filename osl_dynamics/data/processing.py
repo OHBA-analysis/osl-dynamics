@@ -2,26 +2,22 @@
 
 """
 
+import mne
 import numpy as np
 from scipy import signal
-from tqdm.auto import tqdm
 
 from osl_dynamics import array_ops
 
 
-def standardize(
-    time_series,
-    axis=0,
-    create_copy=True,
-):
+def standardize(x, axis=0, create_copy=True):
     """Standardizes a time series.
 
     Returns a time series with zero mean and unit variance.
 
     Parameters
     ----------
-    time_series : numpy.ndarray
-        Time series data.
+    x : np.ndarray
+        Time series data. Shape must be (n_samples, n_channels).
     axis : int
         Axis on which to perform the transformation.
     create_copy : bool
@@ -30,61 +26,61 @@ def standardize(
 
     Returns
     -------
-    std_time_series :  np.ndarray
+    X :  np.ndarray
         Standardized data.
     """
-    mean = np.expand_dims(np.mean(time_series, axis=axis), axis=axis)
-    std = np.expand_dims(np.std(time_series, axis=axis), axis=axis)
+    mean = np.expand_dims(np.mean(x, axis=axis), axis=axis)
+    std = np.expand_dims(np.std(x, axis=axis), axis=axis)
     if create_copy:
-        std_time_series = (np.copy(time_series) - mean) / std
+        X = (np.copy(x) - mean) / std
     else:
-        std_time_series = (time_series - mean) / std
-    return std_time_series
+        X = (x - mean) / std
+    return X
 
 
-def time_embed(time_series, n_embeddings):
+def time_embed(x, n_embeddings):
     """Performs time embedding.
 
     Parameters
     ----------
-    time_series : numpy.ndarray
-        Time series data.
+    x : np.ndarray
+        Time series data. Shape must be (n_samples, n_channels).
     n_embeddings : int
         Number of samples in which to shift the data.
 
     Returns
     -------
-    sliding_window_view
-        Time embedded data.
+    X : sliding_window_view
+        Time embedded data. Shape is (n_samples - n_embeddings + 1,
+        n_channels * n_embeddings).
     """
-
     if n_embeddings % 2 == 0:
         raise ValueError("n_embeddings must be an odd number.")
 
-    te_shape = (
-        time_series.shape[0] - (n_embeddings - 1),
-        time_series.shape[1] * n_embeddings,
-    )
-    return (
-        array_ops.sliding_window_view(x=time_series, window_shape=te_shape[0], axis=0)
+    # Shape of time embedded data
+    te_shape = (x.shape[0] - (n_embeddings - 1), x.shape[1] * n_embeddings)
+
+    # Perform time embedding
+    X = (
+        array_ops.sliding_window_view(x=x, window_shape=te_shape[0], axis=0)
         .T[..., ::-1]
         .reshape(te_shape)
     )
 
+    return X
 
-def temporal_filter(time_series, low_freq, high_freq, sampling_frequency, order=5):
+
+def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
     """Apply temporal filtering.
 
     Parameters
     ----------
-    time_series : numpy.ndarray
-        Time series data. Shape is (n_samples, n_channels).
+    x : np.ndarray
+        Time series data. Shape must be (n_samples, n_channels).
     low_freq : float
         Frequency in Hz for a high pass filter.
-        Only used if amplitude_envelope=True.
     high_freq : float
         Frequency in Hz for a low pass filter.
-        Only used if amplitude_envelope=True.
     sampling_frequency : float
         Sampling frequency in Hz.
     order : int
@@ -92,12 +88,12 @@ def temporal_filter(time_series, low_freq, high_freq, sampling_frequency, order=
 
     Returns
     -------
-    filtered_time_series : numpy.ndarray
+    X : np.ndarray
         Filtered time series. Shape is (n_samples, n_channels).
     """
     if low_freq is None and high_freq is None:
         # No filtering
-        return time_series
+        return x
 
     if low_freq is None and high_freq is not None:
         btype = "lowpass"
@@ -113,65 +109,82 @@ def temporal_filter(time_series, low_freq, high_freq, sampling_frequency, order=
     b, a = signal.butter(order, Wn=Wn, btype=btype, fs=sampling_frequency)
 
     # Apply the filter
-    filtered_time_series = signal.filtfilt(b, a, time_series, axis=0).astype(
-        time_series.dtype
-    )
+    X = signal.filtfilt(b, a, x, axis=0)
 
-    return filtered_time_series
+    return X.astype(x.dtype)
 
 
-def trim_time_series(
-    time_series,
-    sequence_length,
-    discontinuities=None,
-    concatenate=False,
-):
-    """Trims a time seris.
-
-    Removes data points lost to separating a time series into sequences.
+def amplitude_envelope(x):
+    """Calculate amplitude envelope.
 
     Parameters
     ----------
-    time_series : numpy.ndarray
-        Time series data for all subjects concatenated.
-    sequence_length : int
-        Length of sequence passed to the inference network and generative model.
-    discontinuities : list of int
-        Length of each subject's data. If nothing is passed we assume the entire
-        time series is continuous.
-    concatenate : bool
-        Should we concatenate the data for segment?
+    x : np.ndarray
+        Time series data. Shape must be (n_samples, n_channels).
 
     Returns
     -------
-    trimmed_time_series : list of np.ndarray
-        Trimmed time series.
+    X : np.ndarray
+        Amplitude envelope data. Shape is (n_samples, n_channels).
     """
-    if isinstance(time_series, np.ndarray):
-        if discontinuities is None:
-            # Assume entire time series corresponds to a single subject
-            ts = [time_series]
-        else:
-            # Separate the time series for each subject
-            ts = []
-            for i in range(len(discontinuities)):
-                start = sum(discontinuities[:i])
-                end = sum(discontinuities[: i + 1])
-                ts.append(time_series[start:end])
-    elif isinstance(time_series, list):
-        ts = time_series
-    else:
-        raise ValueError("time_series must be a list or numpy array.")
+    X = np.abs(signal.hilbert(x, axis=0))
+    return X.astype(x.dtype)
 
-    # Remove data points lost to separating into sequences
-    for i in range(len(ts)):
-        n_sequences = ts[i].shape[0] // sequence_length
-        ts[i] = ts[i][: n_sequences * sequence_length]
 
-    if len(ts) == 1:
-        ts = ts[0]
+def sliding_window(x, n_window):
+    """Apply a moving average.
 
-    elif concatenate:
-        ts = np.concatenate(ts)
+    Parameters
+    ----------
+    x : np.ndarray
+        Time series data. Shape must be (n_samples, n_channels).
+    n_window : int
+        Number of data points in the sliding window. Must be odd.
 
-    return ts
+    Returns
+    -------
+    X : np.ndarray
+        Time series with sliding window applied.
+        Shape is (n_samples - n_window // 2, n_channels).
+    """
+    if n_window % 2 == 0:
+        raise ValueError("n_window must be odd.")
+    X = np.array(
+        [
+            np.convolve(
+                x[:, i],
+                np.ones(n_window) / n_window,
+                mode="valid",
+            )
+            for i in range(x.shape[1])
+        ],
+    ).T
+    return X.astype(x.dtype)
+
+
+def downsample(x, new_freq, old_freq):
+    """Downsample.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Time series data. Shape must be (n_samples, n_channels).
+    old_freq : float
+        Old sampling frequency in Hz.
+    new_freq : float
+        New sampling frequency in Hz.
+
+    Returns
+    -------
+    X : np.ndarray
+        Downsampled time series.
+        Shape is (n_samples * new_freq / old_freq, n_channels).
+    """
+    if old_freq < new_freq:
+        raise ValueError(
+            f"new frequency ({new_freq} Hz) must be less than old "
+            + f"frequency ({old_freq} Hz)."
+        )
+    ratio = old_freq / new_freq
+    X = mne.filter.resample(x, down=ratio, axis=0, verbose=False)
+    return X.astype(x.dtype)
