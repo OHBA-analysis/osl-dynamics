@@ -354,6 +354,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def downsample(self, freq):
         """Downsample the data.
@@ -367,12 +369,10 @@ class Data:
         """
         if self.sampling_frequency is None:
             raise ValueError(
-                "Data.sampling_frequency must be set if we are filtering the data. "
+                "Data.sampling_frequency must be set if we are downsampling the data. "
                 + "Use Data.set_sampling_frequency() or pass "
                 + "Data(..., sampling_frequency=...) when creating the Data object."
             )
-
-        self.sampling_frequency = freq
 
         # Function to apply downsampling to a single array
         def _apply(array, prepared_data_file):
@@ -392,6 +392,11 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
+
+        # Update sampling_frequency attribute
+        self.sampling_frequency = freq
 
     def pca(self, n_pca_components=None, pca_components=None, whiten=False):
         """Principal component analysis (PCA).
@@ -458,6 +463,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def tde(self, n_embeddings):
         """Time-delay embedding (TDE).
@@ -490,6 +497,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def tde_pca(
         self,
@@ -569,6 +578,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def amplitude_envelope(self):
         """Calculate the amplitude envelope.
@@ -594,6 +605,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def sliding_window(self, n_window):
         """Apply a sliding window.
@@ -625,6 +638,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def standardize(self):
         """Standardize (z-transform) the data.
@@ -645,6 +660,8 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
+        if isinstance(self.arrays[0], Exception):
+            raise self.arrays[0]
 
     def prepare(self, methods):
         """Prepare data.

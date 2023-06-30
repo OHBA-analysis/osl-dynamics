@@ -134,10 +134,10 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     load_data_kwargs = config.pop("load_data", None)
     if load_data_kwargs is not None:
         # Make sure the Data class uses a unique temporary directory
-        data_kwargs = load_data_kwargs.pop("data_kwargs", {})
-        default_data_kwargs = {"store_dir": f"tmp_{config_id}"}
-        data_kwargs = override_dict_defaults(default_data_kwargs, data_kwargs)
-        load_data_kwargs["data_kwargs"] = data_kwargs
+        kwargs = load_data_kwargs.pop("kwargs", {})
+        default_kwargs = {"store_dir": f"tmp_{config_id}"}
+        kwargs = override_dict_defaults(default_kwargs, kwargs)
+        load_data_kwargs["kwargs"] = kwargs
 
         # Load data
         _logger.info(f"load_data: {load_data_kwargs}")

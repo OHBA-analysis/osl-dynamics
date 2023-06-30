@@ -145,7 +145,7 @@ def sliding_window(x, n_window):
     -------
     X : np.ndarray
         Time series with sliding window applied.
-        Shape is (n_samples - n_window // 2, n_channels).
+        Shape is (n_samples - n_window + 1, n_channels).
     """
     if n_window % 2 == 0:
         raise ValueError("n_window must be odd.")
@@ -186,5 +186,5 @@ def downsample(x, new_freq, old_freq):
             + f"frequency ({old_freq} Hz)."
         )
     ratio = old_freq / new_freq
-    X = mne.filter.resample(x, down=ratio, axis=0, verbose=False)
+    X = mne.filter.resample(x.astype(np.float64), down=ratio, axis=0, verbose=False)
     return X.astype(x.dtype)
