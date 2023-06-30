@@ -6,7 +6,6 @@ import logging
 import pathlib
 import pickle
 from contextlib import contextmanager
-from functools import partial
 from shutil import rmtree
 from os import path
 
@@ -138,8 +137,17 @@ class Data:
         # Store raw data in the arrays attribute
         self.arrays = self.raw_data_arrays
 
-        # Subjects that are kept for making TensorFlow Datasets
-        self.keep = list(range(len(self.arrays)))
+        # Create filenames for prepared data memmaps
+        prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(self.n_arrays)), identifier=self._identifier
+        )
+        self.prepared_data_filenames = [
+            str(self.store_dir / prepared_data_pattern.format(i=i))
+            for i in range(self.n_arrays)
+        ]
+
+        # Arrays to keep when making TensorFlow Datasets
+        self.keep = list(range(self.n_arrays))
 
     def __iter__(self):
         return iter(self.arrays)
@@ -271,11 +279,9 @@ class Data:
         # where the strings are paths to .npy files
 
         # Load data
-        partial_make_memmap = partial(self.make_memmap)
-        args = zip(self.inputs, raw_data_filenames)
         memmaps = pqdm(
-            args,
-            partial_make_memmap,
+            array=zip(self.inputs, raw_data_filenames),
+            function=self.make_memmap,
             n_jobs=self.n_jobs,
             desc="Loading files",
             argument_type="args",
@@ -360,11 +366,9 @@ class Data:
             return array
 
         # Prepare the data in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="Filtering",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -409,11 +413,9 @@ class Data:
             return array
 
         # Prepare the data in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="Downsampling",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -491,11 +493,9 @@ class Data:
             return array
 
         # Apply PCA in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -536,11 +536,9 @@ class Data:
             return array
 
         # Apply TDE in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="TDE",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -628,11 +626,9 @@ class Data:
             return array
 
         # Apply TDE and PCA in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="TDE-PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -666,11 +662,9 @@ class Data:
             return array
 
         # Prepare the data in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="Amplitude envelope",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -710,18 +704,20 @@ class Data:
             return array
 
         # Prepare the data in parallel
-        self.set_prepared_data_filenames()
-        args = zip(self.arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            args,
-            _apply,
+            array=zip(self.arrays, self.prepared_data_filenames),
+            function=_apply,
             desc="Sliding window",
             n_jobs=self.n_jobs,
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
@@ -742,8 +738,8 @@ class Data:
 
         # Apply standardisation to each array in parallel
         self.arrays = pqdm(
-            zip(self.arrays),
-            _apply,
+            array=zip(self.arrays),
+            function=_apply,
             desc="Standardize",
             n_jobs=self.n_jobs,
             argument_type="args",
@@ -797,15 +793,6 @@ class Data:
             method(**kwargs)
 
         return self
-
-    def set_prepared_data_filenames(self):
-        prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(self.n_arrays)), identifier=self._identifier
-        )
-        self.prepared_data_filenames = [
-            str(self.store_dir / prepared_data_pattern.format(i=i))
-            for i in range(self.n_arrays)
-        ]
 
     def trim_time_series(
         self,
