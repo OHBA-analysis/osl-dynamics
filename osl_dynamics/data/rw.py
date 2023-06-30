@@ -240,7 +240,7 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
     return data
 
 
-def load_matlab(filename, field, ignored_keys=None):
+def load_matlab(filename, field):
     """Loads a MATLAB file.
 
     Parameters
@@ -249,8 +249,6 @@ def load_matlab(filename, field, ignored_keys=None):
         Filename of MATLAB file to read.
     field : str
         Field that corresponds to the data.
-    ignored_keys :  list of str
-        Keys in the MATLAB file to ignore.
 
     Returns
     -------
