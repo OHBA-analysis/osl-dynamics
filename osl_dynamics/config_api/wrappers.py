@@ -509,9 +509,8 @@ def nnmf(data, output_dir, n_components):
         Number of components to fit.
     """
     from osl_dynamics.analysis import spectral
-    
+
     spectra_dir = output_dir + "/spectra"
-    
     coh = load(f"{spectra_dir}/coh.npy")
     nnmf = spectral.decompose_spectra(coh, n_components=n_components)
     save(f"{spectra_dir}/nnmf_{n_components}.npy", nnmf)

@@ -370,8 +370,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
@@ -415,8 +419,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         # Update sampling_frequency attribute
         self.sampling_frequency = freq
@@ -493,8 +501,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
@@ -534,8 +546,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
@@ -622,8 +638,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
@@ -656,8 +676,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
@@ -725,8 +749,12 @@ class Data:
             argument_type="args",
             total=self.n_arrays,
         )
-        if isinstance(self.arrays[0], Exception):
-            raise self.arrays[0]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: " + e.args[0],)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
         return self
 
