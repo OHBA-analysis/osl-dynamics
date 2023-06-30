@@ -50,8 +50,13 @@ training_data = Data(
     sampling_frequency=250,
 )
 
-# Prepare the data: time-delay embedding, PCA and standardization
-training_data.prepare(amplitude_envelope=True, n_window=6)
+# Prepare amplitude envelope data
+methods = {
+    "amplitude_envelope": {}
+    "sliding_window": {"n_window": 5},
+    "standardize": {}
+}
+training_data.prepare(methods)
 
 #%% Model training
 

@@ -138,7 +138,7 @@ class Data:
         # Store raw data in the arrays attribute
         self.arrays = self.raw_data_arrays
 
-        # Subjects that are kept for making tensorflow datasets
+        # Subjects that are kept for making TensorFlow Datasets
         self.keep = list(range(len(self.arrays)))
 
     def __iter__(self):
@@ -804,7 +804,7 @@ class Data:
         subj_id=False,
         step_size=None,
     ):
-        """Create a tensorflow dataset for training or evaluation.
+        """Create a Tensorflow Dataset for training or evaluation.
 
         Parameters
         ----------
@@ -829,7 +829,7 @@ class Data:
 
         Returns
         -------
-        tensorflow.data.Dataset or Tuple
+        dataset : tensorflow.data.Dataset or tuple
             Dataset for training or evaluating the model along with the validation
             set if validation_split was passed.
         """

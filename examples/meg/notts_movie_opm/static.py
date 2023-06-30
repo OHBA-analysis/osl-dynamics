@@ -50,11 +50,12 @@ for temporal_filter in [[4, 7], [8, 12], [13, 30]]:
 
     # Prepare data
     data = Data(sf_files, sampling_frequency=sampling_frequency)
-    data.prepare(
-        low_freq=temporal_filter[0],
-        high_freq=temporal_filter[1],
-        amplitude_envelope=True,
-    )
+    methods = {
+        "filter": {"low_freq": temporal_filter[0], "high_freq": temporal_filter[1]},
+        "amplitude_envelope": {},
+        "standardize": {},
+    }
+    data.prepare(methods)
     ts = data.time_series()
 
     # Calculate functional connectivity (Pearson correlation)

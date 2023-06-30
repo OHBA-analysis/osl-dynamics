@@ -73,7 +73,11 @@ training_data = data.Data(
 )
 
 # Prepare the data for training
-training_data.prepare(n_embeddings=15, n_pca_components=config.n_channels)
+methods = {
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": config.n_channels}
+    "standardize": {}
+}
+training_data.prepare(methods)
 
 #%% Model training
 

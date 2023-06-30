@@ -89,7 +89,9 @@ connectivity.save(
 # Calculate AEC networks for different frequency bands
 aec = []
 for l, h in [(1, 4), (4, 7), (7, 13), (13, 30)]:
-    data.prepare(low_freq=l, high_freq=h, amplitude_envelope=True)
+    data.filter(low_freq=l, high_freq=h)
+    data.amplitude_envelope()
+    data.standardize()
     aec.append(static.functional_connectivity(data.time_series()))
 aec = np.array(aec)
 aec = np.swapaxes(aec, 0, 1)  # (freq_bands, subjects, ...) -> (subjects, freq_bands, ...)
