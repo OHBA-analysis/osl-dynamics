@@ -56,11 +56,7 @@ def concatenate_datasets(datasets, shuffle=True):
     return full_dataset
 
 
-def create_dataset(
-    data,
-    sequence_length,
-    step_size,
-):
+def create_dataset(data, sequence_length, step_size):
     """Creates a TensorFlow dataset of batched time series data.
 
     Parameters

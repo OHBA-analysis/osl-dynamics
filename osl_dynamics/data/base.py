@@ -844,8 +844,9 @@ class Data:
                 # We don't want to include this file in the dataset
                 continue
 
-            # Get time series data
+            # Get time series data and ensure an integer multiple of sequence length
             array = self.arrays[i]
+            array = array[: (array.shape[0] // sequence_length) * sequence_length]
 
             if subj_id:
                 # Create a dataset with the time series data and ID
@@ -872,14 +873,14 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(batch_size)
+                full_dataset = full_dataset.batch(self.batch_size)
 
                 # Shuffle mini-batches
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(batch_size)
+                full_dataset = full_dataset.batch(self.batch_size)
 
             if validation_split is None:
                 # Return the full dataset
@@ -909,7 +910,7 @@ class Data:
                     ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
-                ds = ds.batch(batch_size)
+                ds = ds.batch(self.batch_size)
 
                 if shuffle:
                     # Shuffle batches
