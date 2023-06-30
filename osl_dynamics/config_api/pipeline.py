@@ -28,8 +28,6 @@ command line interface.
 
 import argparse
 import logging
-import os
-import pickle
 import pprint
 from pathlib import Path
 
