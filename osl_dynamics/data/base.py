@@ -570,7 +570,7 @@ class Data:
             total=self.n_arrays,
         )
 
-    def amp_env(self):
+    def amplitude_envelope(self):
         """Calculate the amplitude envelope.
 
         This is an in-place operation.
@@ -646,28 +646,38 @@ class Data:
             total=self.n_arrays,
         )
 
-    def prepare(
-        self, n_embeddings=1, n_pca_components=None, pca_components=None, whiten=False
-    ):
-        """Prepare TDE-PCA data.
+    def prepare(self, methods):
+        """Prepare data.
 
-        This method will standardize, perform time-delay embedding (TDE),
-        principal component analysis (PCA), and standardize again. This is
-        an in-place operation.
+        Wrapper for calling a series of data preparation methods. Any method in
+        Data can be called.
 
         Parameters
         ----------
-        n_embeddings : int
-            Number of data points to embed the data.
-        n_pca_components : int
-            Number of PCA components to keep. Default is no PCA.
-        pca_components : np.ndarray
-            PCA components to apply if they have already been calculated.
-        whiten : bool
-            Should we whiten the PCA'ed data?
+        methods : dict
+            Each key is the name of a method to call. Each value is a dict
+            containing keyword arguments to pass to the method. Example use
+            for TDE-PCA data preparation::
+
+                methods = {
+                    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+                    "standardize": {},
+                }
+                data.prepare(methods)
+
+            Or for amplitude envelope data preparation::
+
+                methods = {
+                    "filter": {"low_freq": 1, "high_freq": 45},
+                    "amplitude_envelope": {},
+                    "sliding_window": {"n_window": 5},
+                    "standardize": {},
+                }
+                data.prepare(methods)
         """
-        self.tde_pca(n_embeddings, n_pca_components, pca_components, whiten)
-        self.standardize()
+        for method_name, kwargs in methods.items():
+            method = getattr(self, method_name)
+            method(**kwargs)
 
     def set_prepared_data_filenames(self):
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(

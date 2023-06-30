@@ -29,19 +29,20 @@ from osl_dynamics.utils.misc import load, override_dict_defaults, save
 _logger = logging.getLogger("osl-dynamics")
 
 
-def load_data(data_dir, data_kwargs={}, prepare_kwargs={}):
+def load_data(inputs, kwargs={}, prepare={}):
     """Load and prepare data.
 
     Parameters
     ----------
-    data_dir : str
+    inputs : str
         Path to directory containing npy files.
-    data_kwargs: dict
+    kwargs: dict
         Keyword arguments to pass to the Data class.
         Useful keyword arguments to pass are the :code:`sampling_frequency`,
         :code:`mask_file` and :code:`parcellation_file`.
-    prepare_kwargs : dict
-        Keyword arguments to pass to the prepare method.
+    prepare : dict
+        Methods dict to pass to the prepare method. See docstring for
+        osl_dynamics.data.Data.prepare.
 
     Returns
     -------
@@ -50,8 +51,8 @@ def load_data(data_dir, data_kwargs={}, prepare_kwargs={}):
     """
     from osl_dynamics.data import Data
 
-    data = Data(data_dir, **data_kwargs)
-    data.prepare(**prepare_kwargs)
+    data = Data(inputs, **kwargs)
+    data.prepare(prepare)
     return data
 
 

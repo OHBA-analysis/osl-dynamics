@@ -111,11 +111,12 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
 
 config = """
     load_data:
-        data_dir: training_data/bursts
-        data_kwargs:
+        inputs: training_data/bursts
+        kwargs:
             sampling_frequency: 100
-        prepare_kwargs:
-            n_embeddings: 21
+        prepare:
+            tde: {n_embeddings: 21}
+            standardize: {}
     plot_wavelet: {}
     train_hmm:
         config_kwargs:

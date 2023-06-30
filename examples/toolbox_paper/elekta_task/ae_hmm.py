@@ -117,15 +117,16 @@ def plot_evoked_response(data, output_dir, n_perm, metric, significance_level):
 # Full pipeline
 config = """
     load_data:
-        data_dir: training_data
-        data_kwargs:
+        inputs: training_data
+        kwargs:
             sampling_frequency: 250
             mask_file: MNI152_T1_8mm_brain.nii.gz
             parcellation_file: fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz
             n_jobs: 16
-        prepare_kwargs:
-            amplitude_envelope: True
-            n_window: 5
+        prepare:
+            amplitude_envelope: {}
+            sliding_window: {n_window: 5}
+            standardize: {}
     train_hmm:
         config_kwargs:
             n_states: 8
