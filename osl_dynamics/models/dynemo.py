@@ -469,7 +469,7 @@ class Model(VariationalInferenceModelBase):
         with self.set_trainable(fixed_layers, False), set_logging_level(
             _logger, logging.WARNING
         ):
-            for subject in trange(training_data.n_subjects, desc="Subject fine tuning"):
+            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
                 # Load group-level model
                 self.load_weights(f"{store_dir}/weights.h5")
 
