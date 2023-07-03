@@ -26,6 +26,7 @@ from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
+    ScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
@@ -576,6 +577,10 @@ def _model_structure(config):
         shape=(config.sequence_length, config.n_channels), name="data"
     )
 
+    # Scaling factor
+    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
+    scaling_factor = scaling_factor_layer(inputs)
+
     # Inference RNN:
     # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
     #     - inf_mu    ~ affine(RNN(inputs_<=t))
@@ -654,8 +659,8 @@ def _model_structure(config):
     ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
 
     # Data flow
-    mu = means_layer(inputs)  # inputs not used
-    D = covs_layer(inputs)  # inputs not used
+    mu = means_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
+    D = covs_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
     m = mix_means_layer([alpha, mu])
     C = mix_covs_layer([alpha, D])
     ll_loss = ll_loss_layer([inputs, m, C])

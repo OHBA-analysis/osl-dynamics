@@ -26,6 +26,7 @@ from osl_dynamics.inference.layers import (
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
     VectorsLayer,
+    ScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
@@ -1437,6 +1438,10 @@ def _model_structure(config):
     )
     data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
+    # Scaling factor
+    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
+    scaling_factor = scaling_factor_layer(data)
+
     # Definition of layers
     means_layer = VectorsLayer(
         config.n_states,
@@ -1471,8 +1476,8 @@ def _model_structure(config):
     )
 
     # Data flow
-    mu = means_layer(data)  # data not used
-    D = covs_layer(data)  # data not used
+    mu = means_layer(data, scaling_factor=scaling_factor)  # data not used
+    D = covs_layer(data, scaling_factor=scaling_factor)  # data not used
     ll_loss = ll_loss_layer([data, mu, D, gamma, None])
 
     return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")

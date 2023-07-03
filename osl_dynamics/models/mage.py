@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm.auto import trange
 
@@ -22,6 +23,7 @@ from osl_dynamics.inference.layers import (
     MixVectorsLayer,
     ModelRNNLayer,
     VectorsLayer,
+    ScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
@@ -104,6 +106,12 @@ class Config(BaseModelConfig):
         Error added to mode stds for numerical stability.
     fcs_epsilon : float
         Error added to mode fcs for numerical stability.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the mean vectors.
+    stds_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the standard deviation vectors.
+    fcs_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for the correlation matrices.
 
     batch_size : int
         Mini-batch size.
@@ -157,6 +165,9 @@ class Config(BaseModelConfig):
     initial_fcs: np.ndarray = None
     stds_epsilon: float = None
     fcs_epsilon: float = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    stds_regularizer: tf.keras.regularizers.Regularizer = None
+    fcs_regularizer: tf.keras.regularizers.Regularizer = None
     multiple_dynamics: bool = True
 
     def __post_init__(self):
@@ -634,6 +645,11 @@ def _build_inference_model(config):
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
     )
+
+    # Scaling factor
+    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
+    scaling_factor = scaling_factor_layer(inputs)
+
     data_drop_layer = layers.TimeDistributed(
         layers.Dropout(config.inference_dropout, name="inf_data_drop")
     )
@@ -674,6 +690,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
 
@@ -683,6 +700,7 @@ def _build_inference_model(config):
         config.learn_stds,
         config.initial_stds,
         config.stds_epsilon,
+        config.stds_regularizer,
         name="stds",
     )
 
@@ -692,6 +710,7 @@ def _build_inference_model(config):
         config.learn_fcs,
         config.initial_fcs,
         config.fcs_epsilon,
+        config.fcs_regularizer,
         name="fcs",
     )
 
@@ -702,9 +721,9 @@ def _build_inference_model(config):
     concat_means_covs_layer = ConcatVectorsMatricesLayer(name="concat_means_covs")
 
     # Data flow
-    mu = means_layer(inputs)  # inputs not used
-    E = stds_layer(inputs)  # inputs not used
-    D = fcs_layer(inputs)  # inputs not used
+    mu = means_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
+    E = stds_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
+    D = fcs_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
 
     m = mix_means_layer([alpha, mu])
     G = mix_stds_layer([alpha, E])

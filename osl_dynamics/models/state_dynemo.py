@@ -22,6 +22,7 @@ from osl_dynamics.inference.layers import (
     SampleOneHotCategoricalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
+    ScalingFactorLayer,
 )
 from osl_dynamics.models.dynemo import Model as DyNeMo
 from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
@@ -312,6 +313,10 @@ def _model_structure(config):
     # Layer for input
     data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
 
+    # Scaling factor
+    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
+    scaling_factor = scaling_factor_layer(data)
+
     # Inference RNN:
     # - q(state_t) = softmax(theta_t), where theta_t is a set of logits
     inf_rnn_layer = InferenceRNNLayer(
@@ -370,8 +375,8 @@ def _model_structure(config):
         config.n_states, config.covariances_epsilon, name="ll_loss"
     )
 
-    mu = means_layer(data)  # data not used
-    D = covs_layer(data)  # data not used
+    mu = means_layer(data, scaling_factor=scaling_factor)  # data not used
+    D = covs_layer(data, scaling_factor=scaling_factor)  # data not used
     ll_loss = ll_loss_layer([data, mu, D, alpha, None])
 
     # Model RNN:

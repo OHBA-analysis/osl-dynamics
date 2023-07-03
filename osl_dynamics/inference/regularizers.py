@@ -23,16 +23,13 @@ class InverseWishart(regularizers.Regularizer):
         Shape must be (n_channels, n_channels).
     epsilon : float
         Error added to the diagonal of the covariances.
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, nu, psi, epsilon, n_batches, **kwargs):
+    def __init__(self, nu, psi, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.psi = psi
         self.epsilon = epsilon
-        self.n_batches = n_batches
         self.n_channels = psi.shape[-1]
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
@@ -77,15 +74,12 @@ class MultivariateNormal(regularizers.Regularizer):
     sigma : np.ndarray
         2D numpy array of covariance matrix of the prior.
         Shape must be (n_channels, n_channels).
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, n_batches, **kwargs):
+    def __init__(self, mu, sigma, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
-        self.n_batches = n_batches
 
         # Validation
         if self.mu.ndim != 1:
@@ -135,16 +129,13 @@ class MarginalInverseWishart(regularizers.Regularizer):
         Error added to the correlations.
     n_channels : int
         Number of channels of the correlation matrices.
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, nu, epsilon, n_channels, n_batches, **kwargs):
+    def __init__(self, nu, epsilon, n_channels, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.epsilon = epsilon
         self.n_channels = n_channels
-        self.n_batches = n_batches
         self.bijector = tfb.Chain(
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
@@ -178,16 +169,13 @@ class LogNormal(regularizers.Regularizer):
         Shape is (n_channels,). All entries must be positive.
     epsilon : float
         Error added to the standard deviations.
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, epsilon, n_batches, **kwargs):
+    def __init__(self, mu, sigma, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
         self.epsilon = epsilon
-        self.n_batches = n_batches
         self.bijector = tfb.Softplus()
 
         # Validation

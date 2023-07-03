@@ -27,6 +27,7 @@ from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
+    ScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
@@ -496,6 +497,10 @@ def _model_structure(config):
         shape=(config.sequence_length, config.n_channels), name="data"
     )
 
+    # Scaling factor
+    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
+    scaling_factor = scaling_factor_layer(inputs)
+
     #
     # Inference RNN
     #
@@ -613,9 +618,9 @@ def _model_structure(config):
     )
 
     # Data flow
-    mu = means_layer(inputs)  # inputs not used
-    E = stds_layer(inputs)  # inputs not used
-    D = fcs_layer(inputs)  # inputs not used
+    mu = means_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
+    E = stds_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
+    D = fcs_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
 
     m = mix_means_layer([alpha, mu])
     G = mix_stds_layer([alpha, E])
