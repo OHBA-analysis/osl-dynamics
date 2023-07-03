@@ -199,10 +199,9 @@ class Model(ModelBase):
             _range = range(epochs)
         for n in _range:
             # Setup a progress bar for this epoch
-            if verbose > 0:
-                if not use_tqdm:
-                    print("Epoch {}/{}".format(n + 1, epochs))
-                    pb_i = utils.Progbar(len(dataset))
+            if verbose > 0 and not use_tqdm:
+                print("Epoch {}/{}".format(n + 1, epochs))
+                pb_i = utils.Progbar(len(dataset))
 
             # Update rho
             self._update_rho(n)
