@@ -545,7 +545,7 @@ class Model(VariationalInferenceModelBase):
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False):
-            for subject in trange(training_data.n_subjects, desc="Dual estimation"):
+            for subject in trange(training_data.n_arrays, desc="Dual estimation"):
                 # Load group-level model
                 self.load_weights(f"{store_dir}/weights.h5")
 

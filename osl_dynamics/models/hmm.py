@@ -3,6 +3,7 @@
 """
 
 import logging
+import os
 import os.path as op
 import sys
 import warnings
@@ -19,7 +20,7 @@ from tensorflow.keras import backend, layers, utils
 from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.inference import initializers, modes
+from osl_dynamics.inference import initializers
 from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
@@ -154,7 +155,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, use_tqdm=False, **kwargs):
+    def fit(self, dataset, epochs=None, use_tqdm=False, verbose=1, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -169,6 +170,10 @@ class Model(ModelBase):
             Training dataset.
         epochs : int
             Number of epochs.
+        use_tqdm : bool
+            Should we use tqdm to display a progress bar?
+        verbose : int
+            Verbosity level. 0 = silent.
         kwargs : keyword arguments
             Keyword arguments for the TensorFlow observation model training.
             These keywords arguments will be passed to self.model.fit().
@@ -194,9 +199,10 @@ class Model(ModelBase):
             _range = range(epochs)
         for n in _range:
             # Setup a progress bar for this epoch
-            if not use_tqdm:
-                print("Epoch {}/{}".format(n + 1, epochs))
-                pb_i = utils.Progbar(len(dataset))
+            if verbose > 0:
+                if not use_tqdm:
+                    print("Epoch {}/{}".format(n + 1, epochs))
+                    pb_i = utils.Progbar(len(dataset))
 
             # Update rho
             self._update_rho(n)
@@ -234,11 +240,12 @@ class Model(ModelBase):
                     return
                 loss.append(l)
 
-                # Update progress bar
-                if use_tqdm:
-                    _range.set_postfix(rho=self.rho, lr=lr, loss=l)
-                else:
-                    pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
+                if verbose > 0:
+                    # Update progress bar
+                    if use_tqdm:
+                        _range.set_postfix(rho=self.rho, lr=lr, loss=l)
+                    else:
+                        pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
@@ -1194,13 +1201,95 @@ class Model(ModelBase):
         )
         return bic
 
-    def dual_estimation(self, training_data):
+    def subject_fine_tuning(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
+        """Fine tuning the model for each subject.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        n_epochs : int
+            Number of epochs to train for. Defaults to the value in the config
+            used to create the model.
+        learning_rate : float
+            Learning rate. Defaults to the value in the config used to create
+            the model.
+        store_dir : str
+            Directory to temporarily store the model in.
+
+        Returns
+        -------
+        alpha : list of np.ndarray
+            Subject specific mixing coefficients.
+            Each element has shape (n_samples, n_modes).
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        """
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Save original training hyperparameters
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+        original_learn_trans_prob = self.config.learn_trans_prob
+
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+        self.config.learn_trans_prob = False
+
+        self.compile()
+
+        # Fine tune the model for each subject
+        alpha = []
+        means = []
+        covariances = []
+        with set_logging_level(_logger, logging.WARNING):
+            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
+                # Load group-level model
+                self.load_weights(f"{store_dir}/weights.h5")
+
+                # Train on this subject
+                with training_data.set_keep(subject):
+                    self.fit(training_data, verbose=0)
+
+                # Get the inferred parameters
+                a = self.get_alpha(training_data, concatenate=True)
+                m, c = self.get_means_covariances()
+
+                alpha.append(a)
+                means.append(m)
+                covariances.append(c)
+
+        # Reset hyperparameters
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+        self.config.learn_trans_prob = original_learn_trans_prob
+        self.compile()
+
+        return alpha, np.array(means), np.array(covariances)
+
+    def dual_estimation(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
         """Dual estimation to get subject specific parameters.
 
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
             Training data.
+        n_epochs : int
+            Number of epochs to train for. Defaults to the value in the config
+            used to create the model.
+        learning_rate : float
+            Learning rate. Defaults to the value in the config used to create
+            the model.
+        store_dir : str
+            Directory to temporarily store the model in.
 
         Returns
         -------
@@ -1211,39 +1300,43 @@ class Model(ModelBase):
             Shape is (n_subjects, n_states, n_channels, n_channels).
         """
         # Get the inferred alpha for each subject
-        with set_logging_level(_logger, logging.WARNING):
-            alpha = self.get_alpha(training_data)
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
 
-        # Get the state time courses
-        stc = modes.argmax_time_courses(alpha)
-        if not isinstance(stc, list):
-            stc = [stc]
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
 
-        # Get the data time series
-        data_time_series = self.get_training_time_series(training_data)
-        if not isinstance(data_time_series, list):
-            data_time_series = [data_time_series]
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
 
-        # Initialise the means with zeros and covariances with identity
-        means = np.zeros(
-            [training_data.n_subjects, self.config.n_states, self.config.n_channels]
-        )
-        covariances = np.stack(
-            [np.stack([np.eye(self.config.n_channels)] * self.config.n_states)]
-            * training_data.n_subjects
-        )
+        self.compile()
 
-        for subject in trange(training_data.n_subjects, desc="Dual estimation"):
-            s = stc[subject]
-            d = data_time_series[subject]
+        means = []
+        covariances = []
 
-            for i in range(self.config.n_states):
-                if self.config.learn_means:
-                    means[subject, i] = np.mean(d[s[:, i] == 1], axis=0)
-                if self.config.learn_covariances:
-                    covariances[subject, i] = np.cov(d[s[:, i] == 1], rowvar=False)
+        dataset = self.make_dataset(training_data, shuffle=True, concatenate=False)
 
-        return means, covariances
+        for subject in trange(training_data.n_arrays, desc="Dual estimation"):
+            self.load_weights(f"{store_dir}/weights.h5")
+            ds = dataset[subject]
+
+            for _ in range(self.config.n_epochs):
+                # Loop over batches
+                for data in ds:
+                    x = data["data"]
+                    gamma, _ = self._get_state_probs(x)
+                    gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
+                    x_and_gamma = np.concatenate([x, gamma], axis=2)
+                    self.model.fit(x_and_gamma, epochs=1, verbose=0)
+
+            m, c = self.get_means_covariances()
+            means.append(m)
+            covariances.append(c)
+
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+
+        return np.array(means), np.array(covariances)
 
     def get_training_time_series(self, training_data, prepared=True, concatenate=False):
         """Get the time series used for training from a Data object.
