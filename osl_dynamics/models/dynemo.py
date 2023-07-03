@@ -422,6 +422,9 @@ class Model(VariationalInferenceModelBase):
     ):
         """Fine tuning the model for each subject.
 
+        Here, we train the inference RNN and observation model with the model
+        RNN fixed held fixed at the group-level.
+
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
@@ -454,7 +457,6 @@ class Model(VariationalInferenceModelBase):
         original_n_epochs = self.config.n_epochs
         original_learning_rate = self.config.learning_rate
         original_do_kl_annealing = self.config.do_kl_annealing
-
         self.config.n_epochs = n_epochs or self.config.n_epochs
         self.config.learning_rate = learning_rate or self.config.learning_rate
         self.config.do_kl_annealing = False
@@ -480,12 +482,12 @@ class Model(VariationalInferenceModelBase):
                 # Get inferred parameters
                 a = self.get_alpha(training_data, concatenate=True, verbose=0)
                 m, c = self.get_means_covariances()
-
                 alpha.append(a)
                 means.append(m)
                 covariances.append(c)
 
-        # Reset hyperparameters
+        # Reset group-level model and hyperparameters
+        self.load_weights(f"{store_dir}/weights.h5")
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
         self.config.do_kl_annealing = original_do_kl_annealing
@@ -495,7 +497,10 @@ class Model(VariationalInferenceModelBase):
     def dual_estimation(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Dual estimation to get the subject specific parameters.
+        """Dual estimation to get the subject-specific observation model parameters.
+
+        Here, we train the observation model parameters (mode means and covariances)
+        with the inference RNN and model RNN held fixed at the group-level.
 
         Parameters
         ----------
@@ -525,7 +530,6 @@ class Model(VariationalInferenceModelBase):
         # Save original training hyperparameters
         original_n_epochs = self.config.n_epochs
         original_learning_rate = self.config.learning_rate
-
         self.config.n_epochs = n_epochs or self.config.n_epochs
         self.config.learning_rate = learning_rate or self.config.learning_rate
 
@@ -555,11 +559,11 @@ class Model(VariationalInferenceModelBase):
 
                 # Get inferred parameters
                 m, c = self.get_means_covariances()
-
                 means.append(m)
                 covariances.append(c)
 
-        # Reset hyperparameters
+        # Reset group-level model and hyperparameters
+        self.load_weights(f"{store_dir}/weights.h5")
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
 
