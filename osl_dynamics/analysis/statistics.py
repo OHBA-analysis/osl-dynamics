@@ -75,11 +75,12 @@ def evoked_response_max_stat_perm(
     ----------
     data : np.ndarray
         Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape (n_subjects, n_samples, n_modes).
+        Must be shape (n_subjects, n_samples, ...).
     n_perm : int
         Number of permutations.
     covariates : dict
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
+        Must be of shape (n_subjects,).
     metric : str
         Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
     n_jobs : int
@@ -88,15 +89,17 @@ def evoked_response_max_stat_perm(
     Returns
     -------
     pvalues : np.ndarray
-        P-values for the evoked response. Shape is (n_subjects, n_samples, n_modes).
+        P-values for the evoked response. Shape is (n_subjects, n_samples, ...).
     """
-    if metric not in ["tstats", "copes"]:
-        raise ValueError("metric must be 'tstats' or 'copes'.")
-
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
-    if data.ndim != 3:
-        raise ValueError("data must be (n_subjects, n_samples, n_modes).")
+
+    ndim = data.ndim
+    if ndim < 3:
+        raise ValueError("data must be 3D or greater.")
+
+    if metric not in ["tstats", "copes"]:
+        raise ValueError("metric must be 'tstats' or 'copes'.")
 
     data, covariates = _check_glm_data(data, covariates)
 
@@ -104,7 +107,7 @@ def evoked_response_max_stat_perm(
     data = glm.data.TrialGLMData(
         data=data,
         **covariates,
-        dim_labels=["subjects", "samples", "channels"],
+        dim_labels=["subjects", "time"] + [f"features {i}" for i in range(1, ndim - 1)],
     )
 
     # Create design matrix
@@ -118,6 +121,9 @@ def evoked_response_max_stat_perm(
     # Fit model and get t-statistics
     model = glm.fit.OLSModel(design, data)
 
+    # Pool over all dimensions over than subjects
+    pooled_dims = tuple(range(1, ndim))
+
     # Run permutations and get null distribution
     perm = glm.permutations.MaxStatPermutation(
         design,
@@ -126,7 +132,7 @@ def evoked_response_max_stat_perm(
         nperms=n_perm,
         metric=metric,
         tail=0,  # two-sided test
-        pooled_dims=(1, 2),  # pool over samples and modes dimension
+        pooled_dims=pooled_dims,
         nprocesses=n_jobs,
     )
     null_dist = perm.nulls
@@ -173,6 +179,7 @@ def group_diff_max_stat_perm(
         Number of permutations.
     covariates : dict
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
+        Must be of shape (n_subjects,).
     metric : str
         Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
     n_jobs : int
@@ -187,6 +194,7 @@ def group_diff_max_stat_perm(
     """
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
+
     ndim = data.ndim
     if ndim == 1:
         raise ValueError("data must be 2D or greater.")
