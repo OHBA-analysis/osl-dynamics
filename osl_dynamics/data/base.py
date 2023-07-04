@@ -381,7 +381,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -437,7 +437,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -526,7 +526,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -573,7 +573,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -669,7 +669,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -706,7 +706,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -752,7 +752,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
@@ -785,7 +785,7 @@ class Data:
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
-                    e.args = (f"array {i}: " + e.args[0],)
+                    e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
 
