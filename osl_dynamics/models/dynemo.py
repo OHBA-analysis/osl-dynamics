@@ -475,9 +475,9 @@ class Model(VariationalInferenceModelBase):
                 # Train on this subject
                 with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
+                    a = self.get_alpha(training_data, concatenate=True, verbose=0)
 
                 # Get inferred parameters
-                a = self.get_alpha(training_data, concatenate=True, verbose=0)
                 m, c = self.get_means_covariances()
                 alpha.append(a)
                 means.append(m)

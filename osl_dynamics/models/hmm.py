@@ -1257,9 +1257,9 @@ class Model(ModelBase):
                 # Train on this subject
                 with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
+                    a = self.get_alpha(training_data, concatenate=True)
 
                 # Get the inferred parameters
-                a = self.get_alpha(training_data, concatenate=True)
                 m, c = self.get_means_covariances()
                 alpha.append(a)
                 means.append(m)
