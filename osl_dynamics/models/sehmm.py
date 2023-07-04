@@ -27,7 +27,7 @@ from osl_dynamics.inference.layers import (
     StaticKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
-    ScalingFactorLayer,
+    StaticLossScalingFactorLayer,
 )
 from osl_dynamics.models.hmm import Config as HMMConfig, Model as HMMModel
 from osl_dynamics.models import obs_mod
@@ -834,9 +834,11 @@ def _model_structure(config):
     )
     subj_id = tf.squeeze(subj_id, axis=2)
 
-    # Scaling factor
-    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
-    scaling_factor = scaling_factor_layer(data)
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Subject embedding layers
     subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
@@ -866,8 +868,12 @@ def _model_structure(config):
     subjects = subjects_layer(data)
     subject_embeddings = subject_embeddings_layer(subjects)
 
-    group_mu = group_means_layer(data, scaling_factor=scaling_factor)
-    group_D = group_covs_layer(data, scaling_factor=scaling_factor)
+    group_mu = group_means_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )
+    group_D = group_covs_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )
 
     # ---------------
     # Mean deviations
@@ -931,7 +937,8 @@ def _model_structure(config):
 
         # Get the mean deviation maps (no global magnitude information)
         means_dev_map_input = means_dev_map_input_layer(
-            means_concat_embeddings, scaling_factor=scaling_factor
+            means_concat_embeddings,
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
         means_dev_map = means_dev_map_layer(means_dev_map_input)
         norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
@@ -1022,7 +1029,8 @@ def _model_structure(config):
 
         # Get the covariance deviation maps (no global magnitude information)
         covs_dev_map_input = covs_dev_map_input_layer(
-            covs_concat_embeddings, scaling_factor=scaling_factor
+            covs_concat_embeddings,
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
         covs_dev_map = covs_dev_map_layer(covs_dev_map_input)
         norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
@@ -1104,7 +1112,8 @@ def _model_structure(config):
 
         # Data flow
         means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
-            means_concat_embeddings, scaling_factor=scaling_factor
+            means_concat_embeddings,
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
         means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(
             means_dev_mag_mod_beta_input
@@ -1116,7 +1125,7 @@ def _model_structure(config):
                 means_dev_mag_inf_beta,
                 means_dev_mag_mod_beta,
             ],
-            scaling_factor=scaling_factor,
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
         means_dev_mag_kl_loss_layer = ZeroLayer((), name="means_dev_mag_kl_loss")
@@ -1146,7 +1155,8 @@ def _model_structure(config):
 
         # Data flow
         covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
-            covs_concat_embeddings, scaling_factor=scaling_factor
+            covs_concat_embeddings,
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
         covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
@@ -1156,7 +1166,7 @@ def _model_structure(config):
                 covs_dev_mag_inf_beta,
                 covs_dev_mag_mod_beta,
             ],
-            scaling_factor=scaling_factor,
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
         covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")

@@ -21,7 +21,7 @@ from osl_dynamics.inference.layers import (
     MixVectorsLayer,
     ModelRNNLayer,
     VectorsLayer,
-    ScalingFactorLayer,
+    StaticLossScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
@@ -499,9 +499,11 @@ def _build_inference_model(config):
         shape=(config.sequence_length, config.n_channels), name="data"
     )
 
-    # Scaling factor
-    scaling_factor_layer = ScalingFactorLayer(name="scaling_factor")
-    scaling_factor = scaling_factor_layer(inputs)
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
 
     data_drop_layer = layers.TimeDistributed(
         layers.Dropout(config.inference_dropout, name="inf_data_drop")
@@ -555,8 +557,12 @@ def _build_inference_model(config):
     concat_means_covs_layer = ConcatVectorsMatricesLayer(name="concat_means_covs")
 
     # Data flow
-    mu = means_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
-    D = covs_layer(inputs, scaling_factor=scaling_factor)  # inputs not used
+    mu = means_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
+    D = covs_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
     m = mix_means_layer([alpha, mu])
     C = mix_covs_layer([alpha, D])
     C_m = concat_means_covs_layer([m, C])

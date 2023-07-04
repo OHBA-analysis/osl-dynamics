@@ -233,8 +233,8 @@ class ModelBase:
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
 
-        # Set the scaling factor for static quantity losses
-        self.set_scaling_factor(x)
+        # Set the scaling factor for losses that are associated with static quantities
+        self.set_static_loss_scaling_factor(x)
 
         history = self.model.fit(*args, **kwargs)
         return history.history
@@ -440,10 +440,9 @@ class ModelBase:
             f"{dirname}/weights"
         )  # will use the keras method: self.model.save_weights()
 
-    def set_scaling_factor(self, dataset):
-        """Set the scaling factor for static losses.
-
-        This assumes every model has a layer called "scaling_factor",
+    def set_static_loss_scaling_factor(self, dataset):
+        """Set the n_batches attribute of the "static_loss_scaling_factor" layer.
+        This assumes every model has a layer called "static_loss_scaling_factor",
         with an attribure called "n_batches".
 
         Parameters
@@ -452,7 +451,7 @@ class ModelBase:
             TensorFlow dataset.
         """
         n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("scaling_factor").n_batches = n_batches
+        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     @contextmanager
     def set_trainable(self, layers, values):

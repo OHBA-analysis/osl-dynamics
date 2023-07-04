@@ -375,10 +375,10 @@ class LearnableTensorLayer(layers.Layer):
         # This should be a function of the tensor that returns a float
         self.regularizer = regularizer
 
-    def add_regularization(self, tensor, scaling_factor):
+    def add_regularization(self, tensor, static_loss_scaling_factor):
         # Calculate the regularisation from the tensor
         reg = self.regularizer(tensor)
-        reg *= scaling_factor
+        reg *= static_loss_scaling_factor
 
         # Add regularization to the loss and display while training
         self.add_loss(reg)
@@ -395,9 +395,9 @@ class LearnableTensorLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, scaling_factor=1, training=None, **kwargs):
+    def call(self, inputs, static_loss_scaling_factor=1, training=None, **kwargs):
         if self.regularizer is not None and training:
-            self.add_regularization(self.tensor, scaling_factor)
+            self.add_regularization(self.tensor, static_loss_scaling_factor)
         return self.tensor
 
 
@@ -1302,7 +1302,7 @@ class StaticKLDivergenceLayer(layers.Layer):
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
-    def call(self, inputs, scaling_factor=1, **kwargs):
+    def call(self, inputs, static_loss_scaling_factor=1, **kwargs):
         data, inference_alpha, inference_beta, model_beta = inputs
 
         # Add a small error for numerical stability
@@ -1319,7 +1319,7 @@ class StaticKLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        kl_loss = tf.reduce_sum(kl_loss) * scaling_factor
+        kl_loss = tf.reduce_sum(kl_loss) * static_loss_scaling_factor
 
         return kl_loss
 
@@ -1366,7 +1366,7 @@ class MultiLayerPerceptronLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
-    def call(self, inputs, scaling_factor=1, training=None, **kwargs):
+    def call(self, inputs, static_loss_scaling_factor=1, training=None, **kwargs):
         reg = 0.0
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
@@ -1376,21 +1376,22 @@ class MultiLayerPerceptronLayer(layers.Layer):
 
         if self.regularizer is not None and training:
             reg *= self.regularizer_factor
-            reg *= scaling_factor
+            reg *= static_loss_scaling_factor
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
         return inputs
 
 
-class ScalingFactorLayer(layers.Layer):
-    """Layer to calculate the scaling factor for KL loss and
-    regularisation of static quantities.
+class StaticLossScalingFactorLayer(layers.Layer):
+    """Layer to calculate the scaling factor for losses that
+    are associated with static parameters (e.g. regularisation
+    for observation model parameters).
 
     When calculating loss, we sum over the sequence length and
     average over the sequences. The scaling factor is given by
 
     .. math::
-        \text{scaling_factor} = \frac{1}{\text{batch_size} \times \text{n_batches}}
+        \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times \text{n_batches}}
     """
 
     def __init__(self, **kwargs):
@@ -1400,5 +1401,5 @@ class ScalingFactorLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         # Note that inputs.shape[0] must be the batch size
         batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        scaling_factor = 1 / (batch_size * self.n_batches)
-        return scaling_factor
+        static_loss_scaling_factor = 1 / (batch_size * self.n_batches)
+        return static_loss_scaling_factor
