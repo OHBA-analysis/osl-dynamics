@@ -551,7 +551,7 @@ class Model(VariationalInferenceModelBase):
         with self.set_trainable(fixed_layers, False):
             for subject in trange(training_data.n_arrays, desc="Dual estimation"):
                 # Train on this subject
-                with training_data.set_kept_subjects(subject):
+                with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
 
                 # Get inferred parameters
