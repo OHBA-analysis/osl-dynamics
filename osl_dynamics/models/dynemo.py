@@ -472,9 +472,6 @@ class Model(VariationalInferenceModelBase):
             _logger, logging.WARNING
         ):
             for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
-                # Load group-level model
-                self.load_weights(f"{store_dir}/weights.h5")
-
                 # Train on this subject
                 with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
@@ -486,8 +483,11 @@ class Model(VariationalInferenceModelBase):
                 means.append(m)
                 covariances.append(c)
 
-        # Reset group-level model and hyperparameters
-        self.load_weights(f"{store_dir}/weights.h5")
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
         self.config.do_kl_annealing = original_do_kl_annealing
@@ -550,9 +550,6 @@ class Model(VariationalInferenceModelBase):
         covariances = []
         with self.set_trainable(fixed_layers, False):
             for subject in trange(training_data.n_arrays, desc="Dual estimation"):
-                # Load group-level model
-                self.load_weights(f"{store_dir}/weights.h5")
-
                 # Train on this subject
                 with training_data.set_kept_subjects(subject):
                     self.fit(training_data, verbose=0)
@@ -562,8 +559,11 @@ class Model(VariationalInferenceModelBase):
                 means.append(m)
                 covariances.append(c)
 
-        # Reset group-level model and hyperparameters
-        self.load_weights(f"{store_dir}/weights.h5")
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
 

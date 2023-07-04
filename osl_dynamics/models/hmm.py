@@ -1244,6 +1244,8 @@ class Model(ModelBase):
         self.config.n_epochs = n_epochs or self.config.n_epochs
         self.config.learning_rate = learning_rate or self.config.learning_rate
         self.config.learn_trans_prob = False
+
+        # Reset the optimiser
         self.compile()
 
         # Fine tune the model for each subject
@@ -1252,9 +1254,6 @@ class Model(ModelBase):
         covariances = []
         with set_logging_level(_logger, logging.WARNING):
             for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
-                # Load group-level model
-                self.load_weights(f"{store_dir}/weights.h5")
-
                 # Train on this subject
                 with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
@@ -1262,17 +1261,18 @@ class Model(ModelBase):
                 # Get the inferred parameters
                 a = self.get_alpha(training_data, concatenate=True)
                 m, c = self.get_means_covariances()
-
                 alpha.append(a)
                 means.append(m)
                 covariances.append(c)
 
-        # Reset group-level model and hyperparameters
-        self.load_weights(f"{store_dir}/weights.h5")
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
         self.config.learn_trans_prob = original_learn_trans_prob
-        self.compile()
 
         return alpha, np.array(means), np.array(covariances)
 
@@ -1315,6 +1315,8 @@ class Model(ModelBase):
         original_learning_rate = self.config.learning_rate
         self.config.n_epochs = n_epochs or self.config.n_epochs
         self.config.learning_rate = learning_rate or self.config.learning_rate
+
+        # Reset the optimiser
         self.compile()
 
         # Create a TensorFlow Dataset
@@ -1324,11 +1326,8 @@ class Model(ModelBase):
         means = []
         covariances = []
         for subject in trange(training_data.n_arrays, desc="Dual estimation"):
-            # Load group-level parameters
-            self.load_weights(f"{store_dir}/weights.h5")
-            ds = dataset[subject]
-
             # Train on this subject's data
+            ds = dataset[subject]
             for _ in range(self.config.n_epochs):
                 # Loop over batches
                 for data in ds:
@@ -1347,11 +1346,13 @@ class Model(ModelBase):
             means.append(m)
             covariances.append(c)
 
-        # Reset group-level model and hyperparameters
-        self.load_weights(f"{store_dir}/weights.h5")
+            # Reset back to group-level model parameters
+            self.load_weights(f"{store_dir}/weights.h5")
+            self.compile()
+
+        # Reset hyperparameters
         self.config.n_epochs = original_n_epochs
         self.config.learning_rate = original_learning_rate
-        self.compile()
 
         return np.array(means), np.array(covariances)
 
