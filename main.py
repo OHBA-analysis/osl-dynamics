@@ -50,7 +50,7 @@ def Dynemo_analysis(dataset):
 
     config = Config(
         n_modes=6,
-        n_channels=80,
+        n_channels=15,
         sequence_length=100,
         inference_n_units=64,
         inference_normalization="layer",
