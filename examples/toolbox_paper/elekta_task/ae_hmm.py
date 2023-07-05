@@ -125,7 +125,7 @@ config = """
             n_jobs: 16
         prepare:
             amplitude_envelope: {}
-            sliding_window: {n_window: 5}
+            moving_average: {n_window: 5}
             standardize: {}
     train_hmm:
         config_kwargs:

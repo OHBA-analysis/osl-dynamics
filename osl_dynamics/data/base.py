@@ -712,8 +712,8 @@ class Data:
 
         return self
 
-    def sliding_window(self, n_window, use_raw=False):
-        """Apply a sliding window.
+    def moving_average(self, n_window, use_raw=False):
+        """Calculate a moving average.
 
         This is an in-place operation.
 
@@ -733,7 +733,7 @@ class Data:
 
         # Function to apply sliding window to a single array
         def _apply(array, prepared_data_file):
-            array = processing.sliding_window(array, n_window)
+            array = processing.moving_average(array, n_window)
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
             return array
@@ -815,7 +815,7 @@ class Data:
                 methods = {
                     "filter": {"low_freq": 1, "high_freq": 45},
                     "amplitude_envelope": {},
-                    "sliding_window": {"n_window": 5},
+                    "moving_average": {"n_window": 5},
                     "standardize": {},
                 }
                 data.prepare(methods)

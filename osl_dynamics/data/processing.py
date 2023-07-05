@@ -131,8 +131,8 @@ def amplitude_envelope(x):
     return X.astype(x.dtype)
 
 
-def sliding_window(x, n_window):
-    """Apply a moving average.
+def moving_average(x, n_window):
+    """Calculate a moving average.
 
     Parameters
     ----------

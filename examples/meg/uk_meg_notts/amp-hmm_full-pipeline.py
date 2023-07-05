@@ -53,7 +53,7 @@ training_data = Data(
 # Prepare amplitude envelope data
 methods = {
     "amplitude_envelope": {},
-    "sliding_window": {"n_window": 5},
+    "moving_average": {"n_window": 5},
     "standardize": {},
 }
 training_data.prepare(methods)
