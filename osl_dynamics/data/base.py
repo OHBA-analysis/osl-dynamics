@@ -838,6 +838,7 @@ class Data:
         n_window=None,
         prepared=True,
         concatenate=False,
+        verbose=False,
     ):
         """Trims the data time series.
 
@@ -857,6 +858,8 @@ class Data:
             Should we return the prepared data? If not we return the raw data.
         concatenate : bool
             Should we concatenate the data for each array?
+        verbose : bool
+            Should we print the number of data points we're removing?
 
         Returns
         -------
@@ -876,10 +879,11 @@ class Data:
                 n_remove += self.n_window // 2
         else:
             n_remove += n_window // 2
-        _logger.info(
-            f"Removing {n_remove} data points from the start and end"
-            + " of each array due to time embedding/sliding window."
-        )
+        if verbose:
+            _logger.info(
+                f"Removing {n_remove} data points from the start and end"
+                + " of each array due to time embedding/sliding window."
+            )
 
         # What data should we trim?
         if prepared:
@@ -888,7 +892,7 @@ class Data:
             arrays = self.raw_data_arrays
 
         trimmed_time_series = []
-        for array in arrays:
+        for i, array in enumerate(arrays):
             # Remove data points lost to time embedding or sliding window
             if n_remove != 0:
                 array = array[n_remove:-n_remove]
@@ -896,7 +900,13 @@ class Data:
             # Remove data points lost to separating into sequences
             if sequence_length is not None:
                 n_sequences = array.shape[0] // sequence_length
-                array = array[: n_sequences * sequence_length]
+                n_keep = n_sequences * sequence_length
+                if verbose:
+                    _logger.info(
+                        f"Removing {array.shape[0] - n_keep} data points"
+                        + f" from the end of array {i} due to sequencing."
+                    )
+                array = array[:n_keep]
 
             trimmed_time_series.append(array)
 
@@ -905,20 +915,27 @@ class Data:
 
         return trimmed_time_series
 
-    def count_batches(self, sequence_length):
-        """Count batches.
+    def count_sequences(self, sequence_length, step_size):
+        """Count sequences.
 
         Parameters
         ----------
         sequence_length : int
             Length of the segement of data to feed into the model.
+        step_size : int
+            The number of samples by which to move the sliding window between sequences.
 
         Returns
         -------
         n : np.ndarray
-            Number of batches for each array's data.
+            Number of sequences for each array's data.
         """
-        return np.array([tf.n_batches(array, sequence_length) for array in self.arrays])
+        return np.array(
+            [
+                tf.get_n_sequences(array, sequence_length, step_size)
+                for array in self.arrays
+            ]
+        )
 
     def dataset(
         self,
@@ -959,10 +976,11 @@ class Data:
             Dataset for training or evaluating the model along with the validation
             set if validation_split was passed.
         """
-        self.n_batches = self.count_batches(sequence_length)
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
+
+        n_sequences = self.count_sequences(self.sequence_length, self.step_size)
 
         datasets = []
         for i in range(self.n_arrays):
@@ -971,8 +989,7 @@ class Data:
                 continue
 
             # Get time series data and ensure an integer multiple of sequence length
-            array = self.arrays[i]
-            array = array[: (array.shape[0] // sequence_length) * sequence_length]
+            array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             if subj_id:
                 # Create a dataset with the time series data and ID
@@ -992,7 +1009,7 @@ class Data:
 
         # Create a dataset from all the arrays concatenated
         if concatenate:
-            full_dataset = tf.concatenate_datasets(datasets, shuffle=False)
+            full_dataset = tf.concatenate_datasets(datasets)
 
             if shuffle:
                 # Shuffle sequences

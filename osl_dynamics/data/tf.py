@@ -5,8 +5,8 @@
 import numpy as np
 
 
-def n_batches(arr, sequence_length, step_size=None):
-    """Calculate the number of batches an array will be split into.
+def get_n_sequences(arr, sequence_length, step_size=None):
+    """Calculate the number of sequences an array will be split into.
 
     Parameters
     ----------
@@ -20,39 +20,29 @@ def n_batches(arr, sequence_length, step_size=None):
     Returns
     -------
     n : int
-        Number of batches.
+        Number of sequences.
     """
     step_size = step_size or sequence_length
-    final_slice_start = arr.shape[0] - sequence_length + 1
-    index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
-        sequence_length
-    )
-    return len(index)
+    n_samples = (arr.shape[0] // sequence_length) * sequence_length
+    return n_samples // step_size
 
 
-def concatenate_datasets(datasets, shuffle=True):
+def concatenate_datasets(datasets):
     """Concatenates a list of TensorFlow datasets.
 
     Parameters
     ----------
     datasets : list
         List of TensorFlow datasets.
-    Shuffle : bool
-        Should we shuffle the final concatenated dataset?
 
     Returns
     -------
     full_dataset : tensorflow.data.Dataset
         Concatenated dataset.
     """
-
     full_dataset = datasets[0]
     for ds in datasets[1:]:
         full_dataset = full_dataset.concatenate(ds)
-
-    if shuffle:
-        full_dataset = full_dataset.shuffle(100000)
-
     return full_dataset
 
 
