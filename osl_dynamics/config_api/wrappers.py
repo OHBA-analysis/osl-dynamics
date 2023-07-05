@@ -49,7 +49,7 @@ def load_data(inputs, kwargs=None, prepare=None):
     from osl_dynamics.data import Data
 
     kwargs = {} if kwargs is None else kwargs
-    prepare = {} if prepare is None else kwargs
+    prepare = {} if prepare is None else prepare
 
     data = Data(inputs, **kwargs)
     data.prepare(prepare)
@@ -108,8 +108,8 @@ def train_hmm(
 
     from osl_dynamics.models import hmm
 
-    config_kwargs = {} if config_kwargs is None else config_kwargs
     init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
 
     # Directories
     model_dir = output_dir + "/model"
