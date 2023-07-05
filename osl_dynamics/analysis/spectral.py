@@ -386,8 +386,8 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     return f, np.squeeze(P)
 
 
-def mode_covariance_spectra(
-    autocorrelation_function,
+def autocorr_to_spectra(
+    autocorr_func,
     sampling_frequency,
     nfft=64,
     frequency_range=None,
@@ -399,9 +399,9 @@ def mode_covariance_spectra(
 
     Parameters
     ----------
-    autocorrelation_function : np.ndarray
-        Mode autocorrelation functions.
-        Shape must be (n_modes, n_channels, n_channels, n_acf).
+    autocorr_func : np.ndarray
+        Autocorrelation functions. Shape must be (n_channels, n_channels, n_acf) or
+        (n_modes, n_channels, n_channels, n_acf).
     sampling_frequency : float
         Frequency at which the data was sampled (Hz).
     nfft : int
@@ -417,20 +417,30 @@ def mode_covariance_spectra(
     frequencies : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     power_spectra : np.ndarray
-        Power (or cross) spectra calculated for each mode. Shape is (n_modes,
-        n_channels, n_channels, n_freq).
+        Power (or cross) spectra calculated for each mode. Shape is
+        (n_channels, n_channels, n_freq) or (n_modes, n_channels, n_channels, n_freq).
     coherences : np.ndarray
-        Coherences calculated for each mode. Shape is (n_modes, n_channels,
-        n_channels, n_freq).
+        Coherences calculated for each mode. Shape is (n_channels, n_channels, n_freq)
+        or (n_modes, n_channels, n_channels, n_freq).
     """
-    _logger.info("Calculating power spectra")
-
     # Validation
+    error_message = (
+        "autocorrelation_functions must be of shape (n_channels, n_channels, n_acf) "
+        + "or (n_modes, n_channels, n_channels, n_acf)."
+    )
+    autocorr_func = array_ops.validate(
+        autocorr_func,
+        correct_dimensionality=4,
+        allow_dimensions=[3],
+        error_message=error_message,
+    )
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
+    _logger.info("Calculating power spectra")
+
     # Number of data points in the autocorrelation function and FFT
-    n_acf = autocorrelation_function.shape[-1]
+    n_acf = autocorr_func.shape[-1]
     nfft = max(nfft, 2 ** nextpow2(n_acf))
 
     # Calculate the argments to keep for the given frequency range
@@ -440,7 +450,7 @@ def mode_covariance_spectra(
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
-    power_spectra = abs(fourier_transform(autocorrelation_function, nfft, args_range))
+    power_spectra = abs(fourier_transform(autocorr_func, nfft, args_range))
 
     # Normalise the power spectra
     power_spectra /= nfft**2

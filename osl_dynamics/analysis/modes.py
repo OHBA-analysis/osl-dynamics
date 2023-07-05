@@ -13,42 +13,44 @@ from osl_dynamics import array_ops, inference
 _logger = logging.getLogger("osl-dynamics")
 
 
-def autocorrelation_functions(
-    mode_covariances,
-    n_embeddings,
-    pca_components,
-):
+def autocorr_from_tde_cov(covs, n_embeddings, pca_components=None):
     """Auto/cross-correlation function from the mode covariance matrices.
 
     Parameters
     ----------
-    mode_covariances : np.ndarray
-        Mode covariance matrices.
+    covs : np.ndarray
+        Covariance matrix of time-delay embedded data. Shape must be
+        (n_channels, n_channels) or (n_modes, n_channels, n_channels).
     n_embeddings : int
-        Number of embeddings applied to the training data.
+        Number of embeddings.
     pca_components : np.ndarray
-        PCA components used for dimensionality reduction.
+        PCA components used for dimensionality reduction. Only needs to be passed
+        if PCA was performed on the time embedded data.
 
     Returns
     -------
     acfs : np.ndarray
-        Auto/cross-correlation functions.
+        Auto/cross-correlation functions. Shape is (n_channels, n_channels, n_acf)
+        or (n_modes, n_channels, n_channels, n_acf).
     """
     # Validation
     error_message = (
-        "mode_covariances must be of shape (n_channels, n_channels) or "
+        "covs must be of shape (n_channels, n_channels) or "
         + "(n_modes, n_channels, n_channels) or "
         + "(n_subjects, n_modes, n_channels, n_channels)."
     )
-    mode_covariances = array_ops.validate(
-        mode_covariances,
+    covs = array_ops.validate(
+        covs,
         correct_dimensionality=4,
         allow_dimensions=[2, 3],
         error_message=error_message,
     )
 
     # Get covariance of time embedded data
-    te_covs = reverse_pca(mode_covariances, pca_components)
+    if pca_components is not None:
+        te_covs = reverse_pca(covs, pca_components)
+    else:
+        te_covs = covs
 
     # Dimensions
     n_subjects = te_covs.shape[0]
