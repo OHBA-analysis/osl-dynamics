@@ -14,10 +14,13 @@ def swc_analysis(dataset):
     swc_concat = np.abs(swc_concat)
 
     print(swc_concat.shape)
+    np.save('results/model_swc/dfc.npy')
+    '''
     connectivity.save(
         swc_concat[:5],
         threshold=0.95,  # only display the top 5% of connections
     )
+    '''
 
 def HMM_analysis(dataset):
     from osl_dynamics.models.hmm import Config, Model
@@ -105,10 +108,10 @@ if __name__ == '__main__':
     dataset = Data(np_datas)
 
     # Step 1: Sliding window analysis
-    #swc_analysis(dataset)
+    swc_analysis(dataset)
 
     # Step 2: HMM analysis
     #HMM_analysis(dataset)
 
     # Step 3: Dynemo analysis
-    Dynemo_analysis(dataset)
+    #Dynemo_analysis(dataset)
