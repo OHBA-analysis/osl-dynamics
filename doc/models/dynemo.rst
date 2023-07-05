@@ -60,7 +60,7 @@ Similar to the `HMM <hmm.html>`_, we perform variational Bayes on the latent var
 Amortized Variational Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In DyNeMo, we use a new approach for variational Bayes (from variational auto-encoders [3]) known as **amortized variational inference**. Here, we train an 'inference network' (**inference RNN**) to predict the posterior distribution for the model parameters. This network learns a mapping from the observed data to the parameters of the posterior distributions. This allows us to allows us to efficiently scale to large datasets [3].
+In DyNeMo, we use a new approach for variational Bayes (from variational auto-encoders [3]) known as **amortized variational inference**. Here, we train an 'inference network' (**inference RNN**) to predict the posterior distribution for the model parameters. This network learns a mapping from the observed data to the parameters of the posterior distributions. This allows us to efficiently scale to large datasets [3].
 
 Cost Function
 ^^^^^^^^^^^^^
