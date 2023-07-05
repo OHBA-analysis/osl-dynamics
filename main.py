@@ -23,7 +23,7 @@ def HMM_analysis(dataset):
     # Create a config object
     config = Config(
         n_states=8,
-        n_channels=80,
+        n_channels=15,
         sequence_length=1000,
         learn_means=False,
         learn_covariances=True,
