@@ -127,7 +127,7 @@ class HSMM:
             )
             current_position += state_lifetime
 
-        return alpha
+        return alpha.astype(int)
 
 
 class HSMM_MVN(Simulation):
