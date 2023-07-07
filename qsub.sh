@@ -28,6 +28,7 @@
 echo "------------------------------------------------"
 echo "SGE Job ID: $JOB_ID"
 echo "SGE Job ID: $SGE_JOB_ID"
+echo "SGE task ID: $SGE_TASK_ID"
 echo "Run on host: "`hostname`
 echo "Operating system: "`uname -s`
 echo "Username: "`whoami`
@@ -51,5 +52,5 @@ unset __conda_setup
 # Finally, we can run our real computing job
 
 conda activate osld # Environment name
-python post_analysis.py
+python main.py $SGE_TASK_ID
 # End of job script

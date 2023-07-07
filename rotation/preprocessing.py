@@ -9,7 +9,7 @@ class PrepareData():
         self.data_dir = data_dir
         self.n_session = n_session
         
-    def load(self,):
+    def load(self,split_session = True):
         '''
         Load data from specified directories
         Returns:
@@ -21,12 +21,18 @@ class PrepareData():
         data_list = []
         for file in sorted(self.data_dir.glob('*.txt')):
             subjs.append(file.stem)
-            data_list.append(z_score(np.loadtxt(file),self.n_session))
+            loaded_data = np.loadtxt(file)
+            if split_session:
+                splitted_data = np.split(loaded_data,self.n_session)
+                for i in range(len(splitted_data)):
+                    data_list.append(z_score(splitted_data[i]))
+            else:
+                data_list.append(z_score(loaded_data,self.n_session))
         
         print('Read from directory: ',self.data_dir)
         print('Number of subjects: ',len(subjs))
         
-        return subjs, Data(data_list)
+        return subjs, data_list#Data(data_list)
 
 
 def z_score(data:np.ndarray,n_session:int = 1):

@@ -1,8 +1,11 @@
 import glob
+import sys
 import pathlib
 
 import numpy as np
 import scipy.stats as stats
+from rotation.preprocessing import PrepareData
+from rotation.training import *
 from osl_dynamics.data import Data
 from osl_dynamics.analysis import connectivity
 
@@ -86,7 +89,38 @@ def Dynemo_analysis(dataset):
     model.save("results/model_Dynemo")
 
 if __name__ == '__main__':
-    data_dir = pathlib.Path('/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d15_ts2/')
+    models = ['HMM','Dynemo']
+    n_channels = [15, 25, 50, 100, 200, 300]
+    n_states = [4,8,12,16,20]
+    
+    index = int(sys.argv[1])
+    
+    if index >= 30:
+        model = models[1]
+        index -= 30
+    else:
+        model = models[0]
+    n_channel = n_channels[index // 5]
+    n_state = n_states[index % 5]
+    save_dir = f'./results/{model}_ICA_{n_channel}_state_{n_state}'
+    
+    print(f'Number of channels: {n_channel}')
+    print(f'Number of states: {n_state}')
+    print(f'The model: {model}')
+    
+    data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channel}_ts2/')
+    prepare_data = PrepareData(data_dir)
+    dataset = prepare_data.load()
+    
+    if model == 'HMM':
+        HMM_training(dataset,n_states,n_channels,save_dir)
+    elif model == 'Dynemo':
+        Dynemo_training(dataset, n_states, n_channels,save_dir)
+    else:
+        raise ValueError('The model name is incorrect!')
+        
+    '''
+    data_dir =pathlib.Path('/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d15_ts2/')
     subjs = []
     np_datas = []
     for file in data_dir.glob('*.txt'):
@@ -106,9 +140,9 @@ if __name__ == '__main__':
 
 
     dataset = Data(np_datas)
-
+    '''
     # Step 1: Sliding window analysis
-    swc_analysis(dataset)
+    #swc_analysis(dataset)
 
     # Step 2: HMM analysis
     #HMM_analysis(dataset)

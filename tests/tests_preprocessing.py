@@ -1,6 +1,32 @@
 import numpy as np
 import numpy.testing as npt
 
+def test_prepare_data():
+    import shutil, os, pathlib
+    from rotation.preprocessing import PrepareData
+    temp_dir = './test_temp/'
+    # Create the directory if not exists
+    if not os.path.exists(temp_dir):
+        print(f'Create the temporary directory {temp_dir}')
+        os.makedirs(temp_dir)
+    
+    # Create a subject
+    subj_name = '10001'
+    data = np.array([[-1,1,-1,1],[1,-1,1,-1]]).T
+    np.savetxt(f'{temp_dir}{subj_name}.txt', data)
+    
+    # Use the PrepareData class
+    prepare_data = PrepareData(pathlib.Path(temp_dir),2)
+    subj,result = prepare_data.load()
+    npt.assert_equal(subj[0],'10001')
+    npt.assert_equal(result[0],np.array([[-1,1],[1,-1]]))
+    npt.assert_equal(result[1],np.array([[-1,1],[1,-1]]))
+    
+    # Delete the directory
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+        print(f'Delete temporary directory {temp_dir}')
+
 def test_z_score():
     
     # Example 1: one session
