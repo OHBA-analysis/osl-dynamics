@@ -32,7 +32,7 @@ class PrepareData():
         print('Read from directory: ',self.data_dir)
         print('Number of subjects: ',len(subjs))
         
-        return subjs, data_list#Data(data_list)
+        return subjs, Data(data_list)
 
 
 def z_score(data:np.ndarray,n_session:int = 1):

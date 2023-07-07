@@ -5,7 +5,7 @@ import pathlib
 import numpy as np
 import scipy.stats as stats
 from rotation.preprocessing import PrepareData
-from rotation.training import *
+from rotation.training import HMM_training, Dynemo_training
 from osl_dynamics.data import Data
 from osl_dynamics.analysis import connectivity
 
@@ -90,27 +90,28 @@ def Dynemo_analysis(dataset):
 
 if __name__ == '__main__':
     models = ['HMM','Dynemo']
-    n_channels = [15, 25, 50, 100, 200, 300]
-    n_states = [4,8,12,16,20]
+    list_channels = [15, 25, 50, 100, 200, 300]
+    list_states = [4,8,12,16,20]
     
-    index = int(sys.argv[1])
+    index = int(sys.argv[1]) - 1
     
     if index >= 30:
         model = models[1]
         index -= 30
     else:
         model = models[0]
-    n_channel = n_channels[index // 5]
-    n_state = n_states[index % 5]
-    save_dir = f'./results/{model}_ICA_{n_channel}_state_{n_state}'
+    n_channels = list_channels[index // 5]
+    n_states = list_states[index % 5]
+    save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}'
     
-    print(f'Number of channels: {n_channel}')
-    print(f'Number of states: {n_state}')
+    print(f'Number of channels: {n_channels}')
+    print(f'Number of states: {n_states}')
     print(f'The model: {model}')
     
-    data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channel}_ts2/')
+    data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
     prepare_data = PrepareData(data_dir)
-    dataset = prepare_data.load()
+    subj,dataset = prepare_data.load()
+    print(f'Number of subjects: {len(subj)}')
     
     if model == 'HMM':
         HMM_training(dataset,n_states,n_channels,save_dir)
