@@ -21,5 +21,41 @@ def HMM_training(dataset,n_states,n_channels,save_dir):
     init_history = model.random_state_time_course_initialization(dataset, n_epochs=1, n_init=3)
     
     # Full training
-    history = model.fit(training_data)
+    history = model.fit(dataset)
+    model.save(save_dir)
+
+
+def Dynemo_training(dataset, n_modes, n_channels, save_dir):
+    from osl_dynamics.models.dynemo import Config, Model
+    # Create a config object
+    config = Config(
+        n_modes=n_modes,
+        n_channels=n_channels,
+        sequence_length=100,
+        inference_n_units=64,
+        inference_normalization="layer",
+        model_n_units=64,
+        model_normalization="layer",
+        learn_alpha_temperature=True,
+        initial_alpha_temperature=1.0,
+        learn_means=True,
+        learn_covariances=True,
+        do_kl_annealing=True,
+        kl_annealing_curve="tanh",
+        kl_annealing_sharpness=5,
+        n_kl_annealing_epochs=10,
+        batch_size=32,
+        learning_rate=0.01,
+        n_epochs=40,  # for the purposes of this tutorial we'll just train for a short period
+    )
+
+    # Initiate a Model class and print a summary
+    model = Model(config)
+    model.summary()
+
+    # Initialization
+    init_history = model.random_state_time_course_initialization(dataset, n_epochs=1, n_init=3)
+
+    # Full training
+    history = model.fit(dataset)
     model.save(save_dir)
