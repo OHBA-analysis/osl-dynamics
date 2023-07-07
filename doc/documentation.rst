@@ -46,8 +46,9 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/dynemo_mixing_coef_analysis`.
 - :doc:`tutorials_build/dynemo_plotting_networks`.
 
-**Other**:
-
-- :doc:`tutorials_build/statistical_significance_testing`.
-
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
+
+Workshops
+---------
+
+- `2023 OHBA Software Library (OSL) workshop <https://osf.io/zxb6c/>`_.
