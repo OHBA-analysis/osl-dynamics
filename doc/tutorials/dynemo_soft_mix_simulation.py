@@ -14,18 +14,16 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 #%%
 # Simulating Data
 # ^^^^^^^^^^^^^^^
-# 
 # Let's start by simulating some training data.
-# 
+#
 # Soft mixture simulation
 # ***********************
-# 
 # We can use the `simulation.MixedSine_MVN <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/simulation/sm/index.html#osl_dynamics.simulation.sm.MixedSine_MVN>`_ class to simulate a soft mixture of multivariate normals. This simulation (with zero mean) is very close to the DyNeMo model:
-# 
+#
 # .. math::
 #     m_t = 0, \\
 #     C_t = \displaystyle\sum_j \alpha_{jt} D_j,
-# 
+#
 # where :math:`\alpha_{jt}` are mixing coefficients and :math:`D_j` are mode covariances. The `simulation.MixedSine_MVN <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/simulation/sm/index.html#osl_dynamics.simulation.sm.MixedSine_MVN>`_ class generates the mixing coefficients with sinusoidal logits. I.e. :math:`\alpha_{jt} = \{ \mathrm{softmax}(\theta_t) \}_j`, where :math:`\theta_{jt} = A_j \sin (2 \pi f_j t + \phi_j)`. Let's first simulate some data then we'll look at these components in more detail.
 
 from osl_dynamics.simulation import MixedSine_MVN
@@ -74,10 +72,9 @@ plotting.plot_alpha(sim_alp, n_samples=2000)
 
 #%%
 # We can see there is a good amount of mixing and dynamics in the mixing coefficients.
-# 
+#
 # Loading into the Data class
 # ***************************
-# 
 # We can create a Data object by simply passing the simulated numpy array to the `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_.
 
 from osl_dynamics.data import Data
@@ -87,10 +84,9 @@ training_data = Data(sim_ts)
 #%%
 # Training DyNeMo
 # ^^^^^^^^^^^^^^^
-# 
+#
 # Create the model
 # ****************
-# 
 # Next, let's create a DyNeMo model. We do this by creating a Config object. See the `API reference guide <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics.models.dynemo.Config>`_ for a list of the arguments that can be passed to DyNeMo's Config class.
 
 from osl_dynamics.models.dynemo import Config
@@ -127,16 +123,14 @@ model.summary()
 #%%
 # Train the model
 # ***************
-# 
 # Now we have created the model we can train it on the simulated data. This can be done using the `fit` method by simply passing the Data object. In this tutorial, we will also pass `use_tqdm=True`, which will tell the `fit` method to use a tqdm progress bar instead of the default TensorFlow progress bar. This argument is only for visualisation the progress bar, it does not affect the training.
 
 print("Training model:")
-model.fit(training_data, use_tqdm=True)
+history = model.fit(training_data, use_tqdm=True)
 
 #%%
 # Getting the Inferred Parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# 
 # Now we have trained the model, let's look at the inferred parameters, in particular the inferred mixing coefficients. We can get these using the `get_alpha` method of the model.
 
 inf_alp = model.get_alpha(training_data)
@@ -167,10 +161,9 @@ plotting.plot_alpha(
 
 #%%
 # We can see these is a good correspondence between the inferred and simulated mixing coefficients, demonstrating DyNeMo's ability to learn a mixture of modes.
-# 
+#
 # Wrap up
 # ^^^^^^^
-# 
 # - We have some how to simulate a soft mixture of multivariate normals.
 # - We have trained DyNeMo on simulation data.
 # - We have shown DyNeMo can learn a soft mixture.

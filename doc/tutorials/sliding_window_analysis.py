@@ -1,11 +1,11 @@
 """
 Sliding Window Analysis
 =======================
- 
+
 In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyse source space MEG data.
- 
+
 This tutorial covers:
- 
+
 1. Getting the Data
 2. Estimating Networks using a Sliding Window
 3. Clustering the Networks
@@ -16,17 +16,15 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 #%%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^
-# 
 # We will use eyes open resting-state data that has already been source reconstructed. This dataset is:
 #
 # - From 10 subjects.
 # - Parcellated to 42 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
-# 
+#
 # Download the dataset
 # ********************
-# 
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
 #
 #     !pip install osfclient
@@ -50,7 +48,6 @@ os.listdir("notts_rest_10_subj")
 #%%
 # Load the data
 # *************
-# 
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
 from osl_dynamics.data import Data
@@ -68,7 +65,6 @@ ts = data.time_series()
 #%%
 # Estimating Networks using a Sliding Window
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# 
 # A sliding window network analysis involves:
 #
 # - Taking a segment of your time series, i.e. a window. We need to pre-specify the length of the window.
@@ -76,16 +72,15 @@ ts = data.time_series()
 # - Sliding the window along the time series.
 # - Estimating a network using the new window.
 # - Repeat.
-# 
+#
 # This results in a series of networks. Important aspects of this technique are:
 #
 # - A useful advantage of this technique is you can use any metric you like for the pairwise connectivity as long as you can calculate it from the data in a window.
 # - The main limitation of this approach is you have to pre-specify the window length. If you don't know the time scale of dynamics in the time series, specifying the window length is difficult.
 # - There is a trade-off between having long windows which will lead to an accurate estimate of a network but long temporal specificity, whereas a short window has good temporal specificity but can give noisy estimates of network connections.
-# 
+#
 # Sliding window connectivity using the Pearson correlation
 # *********************************************************
-# 
 # Now that we have loaded the data we want to study, let's estimate sliding window networks. The first thing we need to do is choose the the metric for connectivity we will use. In this tutorial we're use the absolute value of the Pearson correlation of the source space time series. osl-dynamics has a function for calculating sliding window networks: `analysis.connectivity.sliding_window_connectivity <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.sliding_window_connectivity>`_. Let's use this function to calculate dynamics networks.
 
 from osl_dynamics.analysis import connectivity
@@ -117,12 +112,11 @@ connectivity.save(
 #
 # Clustering the Networks
 # ^^^^^^^^^^^^^^^^^^^^^^^
-# 
+#
 # K-means clustering
 # ******************
-#
 # The most common approach used for clustering is the K-means algorithm. We will use sci-kit learn's K-means class to cluster the sliding window connectivities. The documentation for sci-kit learn's K-means class is `here <https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html>`_.
-# 
+#
 # First, let's initiate a K-means object. When we do this we need to specify the number of clusters. We will use 6.
 
 from sklearn.cluster import KMeans
@@ -148,7 +142,7 @@ print(swc_vectors.shape)
 
 #%%
 # We expect the vectors to have 42 * 41 // 2 = 861 elements (upper triangle of a square matrix), which matches the second dimension.
-# 
+#
 # Now we can train the Kmeans algorithm using the `fit` method.
 
 kmeans.fit(swc_vectors)  # should take a few seconds
@@ -161,7 +155,7 @@ print(centroids.shape)
 
 #%%
 # We see the first dimension is the number of clusters and the second dimension is the length of the input vectors, which is what we expect.
-# 
+#
 # Now, we just need to put the vectors back into ROIs by ROIs form and then we can visualise them as networks.
 
 n_clusters = centroids.shape[0]
@@ -186,6 +180,5 @@ connectivity.save(
 #
 # Wrap Up
 # ^^^^^^^
-# 
 # - We have applied a sliding window analysis to MEG data.
 # - We have shown clustering sliding window connectivity matrices gives reasonable functional networks.

@@ -3,7 +3,7 @@ DyNeMo: Plotting Networks
 =========================
 
 In this tutorial we will analyse the dynamic networks inferred by DyNeMo on resting-state source reconstructed MEG data. This tutorial covers:
- 
+
 1. Downloading a Trained Model
 2. Power Maps
 3. Coherence Networks
@@ -14,7 +14,6 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 #%%
 # Downloading a Trained Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# 
 # First, let's download a model that's already been trained on a resting-state dataset. See the `DyNeMo Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/dynemo_training_real_data.html>`_ for how to train DyNeMo.
 
 import os
@@ -39,13 +38,12 @@ for sub_dir in sub_dirs:
 
 #%%
 # We can see the directory contains two sub-directories:
-#  
+#
 # - `model`: contains the trained HMM.
 # - `data`: contains the inferred mixing coefficients (`alpha.pkl`) and mode spectra (`f.npy`, `psd.npy`, `coh.npy`).
-# 
+#
 # Power Maps
 # ^^^^^^^^^^
-# 
 # Let's start by plotting the inferred power maps. First we need to calculate the power maps from the mode spectra. Let's first load the mode spectra.
 
 import numpy as np
@@ -79,7 +77,7 @@ print(mean_p.shape)
 # Now we can plot the power map for each mode.
 
 # Display the power maps (takes a few seconds to appear)
-power.save(
+fig, ax = power.save(
     mean_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
@@ -88,10 +86,9 @@ power.save(
 
 #%%
 # We can see recognisable functional networks, which gives us confidence in the DyNeMo fit. We also see the networks are more localised than typical HMM states.
-# 
+#
 # Coherence Networks
 # ^^^^^^^^^^^^^^^^^^
-# 
 # Next, let's visualise the coherence networks. First, we need to load the coherence spectra.
 
 coh = np.load("dynemo_notts_rest_10_subj/data/coh.npy")
@@ -124,8 +121,7 @@ connectivity.save(
 
 #%%
 # We can see the coherence networks show high coherence in the same regions with high power. We expect these networks will improve with more subjects.
-# 
+#
 # Wrap Up
 # ^^^^^^^
-# 
 # - We have shown how to calculate power maps and coherence networks from mode spectra calculated using the regression approach.

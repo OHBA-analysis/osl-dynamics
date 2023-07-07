@@ -15,12 +15,10 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 #%%
 # Simulating Data
 # ^^^^^^^^^^^^^^^
-# 
 # Let's start by simulating some training data.
-# 
+#
 # Hidden Semi-Markov Model
 # ************************
-# 
 # We will simulate long-range temporal structure by using a HSMM. This differs from a vanilla HMM by specifying non-exponential a distribution for lifetimes. This enables us to simulate very long-lived states that would be improbable with an HMM. We can simulate an HSMM with a multivariate normal observation model using the `simulation.HSMM_MVN <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/simulation/hsmm/index.html#osl_dynamics.simulation.hsmm.HSMM_MVN>`_ class in osl-dynamics. This class uses a Gamma distribution for the state lifetimes, which is parameterised with a shape and scale parameter.
 
 from osl_dynamics.simulation import HSMM_MVN
@@ -60,10 +58,9 @@ plotting.plot_alpha(sim_stc, n_samples=2000)
 
 #%%
 # We can see there are long-lived states with lifetimes of approximately 50 samples, which wouldn't occur with a vanilla HMM.
-# 
+#
 # Loading into the Data class
 # ***************************
-# 
 # We can create a Data object by simply passing the simulated numpy array to the `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_.
 
 from osl_dynamics.data import Data
@@ -73,7 +70,6 @@ training_data = Data(sim_ts)
 #%%
 # Training DyNeMo
 # ^^^^^^^^^^^^^^^
-# 
 # Now we have simulated our training data. Let's create a DyNeMo model. We first need to specify a Config object. See the `API reference guide <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics.models.dynemo.Config>`_ for a list of arguments that can be passed to this class. We will use the following arguments in this tutorial.
 
 from osl_dynamics.models.dynemo import Config
@@ -111,12 +107,11 @@ model.summary()
 # Now we can train the model by calling the `fit` method. Note, we will also pass `use_tqdm=True`, which will tell the `fit` method to use a tqdm progress bar instead of the default TensorFlow progress bar. This argument is only for visualisation the progress bar, it does not affect the training.
 
 print("Training model:")
-model.fit(training_data, use_tqdm=True)
+history = model.fit(training_data, use_tqdm=True)
 
 #%%
 # Getting the Inferred Parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# 
 # Now we have trained the model, let's examine the inferred parameters. Let's start with the inferred mixing coefficients.
 
 # DyNeMo inferred alpha
@@ -160,7 +155,7 @@ plotting.plot_mode_lifetimes(inf_stc, x_label="Lifetime", y_label="Occurrence")
 
 #%%
 # We see the simulated and inferred lifetime distribution match very well.
-# 
+#
 # Finally, let's have a look at the simulated and inferred covariances.
 
 import numpy as np
@@ -174,10 +169,9 @@ plotting.plot_matrices(np.concatenate([sim_cov, inf_cov]))
 
 #%%
 # Again, we see a good correspondence between the simulated and inferred parameters.
-# 
+#
 # Sampling from the Generative Model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# 
 # In the previous section, we showed DyNeMo was able to infer hidden states with long-range temporal structure from the data. However, this does not neccessarily mean it is able to generate data with the same long-range temporal structure. To access this we need to sample new data from the trained model. We're interested in the temporal structure in the mixing coefficients. We can sample from the trained model using the `sample_alpha` method. Let's do this.
 
 # Sample from model RNN
@@ -201,9 +195,8 @@ plotting.plot_mode_lifetimes(
 
 #%%
 # We see this resembles the lifetime distribution used to simulate the data, demonstrates DyNeMo was able to learn long-range temporal dependencies in the training data. The distribution is a bit noisy due to the limited length of the sampled time course. Note, if we trained an HMM on the same data, it would not be able generate samples with this lifetime distribution.
-# 
+#
 # Wrap Up
 # ^^^^^^^
-# 
 # - We have shown how to simulate HSMM data.
 # - We trained DyNeMo on HSMM data and showed it was able to learn the temporal structure in the hidden states.
