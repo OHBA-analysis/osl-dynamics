@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm.auto import trange
 
@@ -20,6 +21,7 @@ from osl_dynamics.inference.layers import (
     MixVectorsLayer,
     ModelRNNLayer,
     VectorsLayer,
+    StaticLossScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
@@ -99,6 +101,10 @@ class Config(BaseModelConfig):
         Initialisation for mode covariances.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for covariance matrices.
 
     batch_size : int
         Mini-batch size.
@@ -149,6 +155,8 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
     covariances_epsilon: float = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     def __post_init__(self):
         self.validate_dimension_parameters()
@@ -490,6 +498,13 @@ def _build_inference_model(config):
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
     )
+
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
+
     data_drop_layer = layers.TimeDistributed(
         layers.Dropout(config.inference_dropout, name="inf_data_drop")
     )
@@ -525,6 +540,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     covs_layer = CovarianceMatricesLayer(
@@ -533,6 +549,7 @@ def _build_inference_model(config):
         config.learn_covariances,
         config.initial_covariances,
         config.covariances_epsilon,
+        config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
@@ -540,8 +557,12 @@ def _build_inference_model(config):
     concat_means_covs_layer = ConcatVectorsMatricesLayer(name="concat_means_covs")
 
     # Data flow
-    mu = means_layer(inputs)  # inputs not used
-    D = covs_layer(inputs)  # inputs not used
+    mu = means_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
+    D = covs_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
     m = mix_means_layer([alpha, mu])
     C = mix_covs_layer([alpha, D])
     C_m = concat_means_covs_layer([m, C])

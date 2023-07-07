@@ -22,6 +22,7 @@ from tqdm.keras import TqdmCallback
 
 import osl_dynamics
 from osl_dynamics import data
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import NumpyLoader, get_argument, replace_argument
 from osl_dynamics.utils.model import HTMLTable, LatexTable
@@ -232,6 +233,9 @@ class ModelBase:
         if use_tqdm:
             args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
 
+        # Set the scaling factor for losses that are associated with static quantities
+        self.set_static_loss_scaling_factor(x)
+
         history = self.model.fit(*args, **kwargs)
         return history.history
 
@@ -435,6 +439,19 @@ class ModelBase:
         self.save_weights(
             f"{dirname}/weights"
         )  # will use the keras method: self.model.save_weights()
+
+    def set_static_loss_scaling_factor(self, dataset):
+        """Set the n_batches attribute of the "static_loss_scaling_factor" layer.
+        This assumes every model has a layer called "static_loss_scaling_factor",
+        with an attribure called "n_batches".
+
+        Parameters
+        ----------
+        dataset : tensorflow.data.Dataset
+            TensorFlow dataset.
+        """
+        n_batches = dtf.get_n_batches(dataset)
+        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     @contextmanager
     def set_trainable(self, layers, values):

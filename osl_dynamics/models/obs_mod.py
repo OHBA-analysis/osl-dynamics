@@ -99,7 +99,6 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     layer_name : str
         Layer name of the means. Can be "means" or "group_means".
     """
-    n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
 
@@ -108,9 +107,7 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
 
     means_layer = model.get_layer(layer_name)
     learnable_tensor_layer = means_layer.layers[0]
-    learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(
-        mu, sigma, n_batches
-    )
+    learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(mu, sigma)
 
 
 def set_covariances_regularizer(
@@ -140,7 +137,6 @@ def set_covariances_regularizer(
     layer_name : str
         Layer name of the covariances. Can be "covs" or "group_covs".
     """
-    n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
 
@@ -149,16 +145,14 @@ def set_covariances_regularizer(
         mu = np.zeros([n_channels], dtype=np.float32)
         sigma = np.sqrt(np.log(2 * range_))
         learnable_tensor_layer = covs_layer.layers[0]
-        learnable_tensor_layer.regularizer = regularizers.LogNormal(
-            mu, sigma, epsilon, n_batches
-        )
+        learnable_tensor_layer.regularizer = regularizers.LogNormal(mu, sigma, epsilon)
 
     else:
         nu = n_channels - 1 + 0.1
         psi = np.diag(range_)
         learnable_tensor_layer = covs_layer.layers[0]
         learnable_tensor_layer.regularizer = regularizers.InverseWishart(
-            nu, psi, epsilon, n_batches
+            nu, psi, epsilon
         )
 
 
@@ -177,7 +171,6 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     epsilon : float
         Error added to the standard deviations.
     """
-    n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
 
@@ -186,9 +179,7 @@ def set_stds_regularizer(model, training_dataset, epsilon):
 
     stds_layer = model.get_layer("stds")
     learnable_tensor_layer = stds_layer.layers[0]
-    learnable_tensor_layer.regularizer = regularizers.LogNormal(
-        mu, sigma, epsilon, n_batches
-    )
+    learnable_tensor_layer.regularizer = regularizers.LogNormal(mu, sigma, epsilon)
 
 
 def set_fcs_regularizer(model, training_dataset, epsilon):
@@ -206,7 +197,6 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     epsilon : float
         Error added to the FCS.
     """
-    n_batches = dtf.get_n_batches(training_dataset)
     n_channels = dtf.get_n_channels(training_dataset)
 
     nu = n_channels - 1 + 0.1
@@ -217,7 +207,6 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
         nu,
         epsilon,
         n_channels,
-        n_batches,
     )
 
 
@@ -569,29 +558,6 @@ def get_subject_means_covariances(
     return mu.numpy(), D.numpy()
 
 
-def set_bayesian_kl_scaling(model, n_batches, learn_means, learn_covariances):
-    """Set the scaling of the KL loss of deviation magnitude.
-
-    Parameters
-    ----------
-    model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
-    n_batches : int
-        The number of batches in the dataset.
-    learn_means : bool
-        Whether the mean is learnt.
-    learn_covariances : bool
-        Whether the covariances are learnt.
-    """
-    if learn_means:
-        means_dev_mag_kl_loss_layer = model.get_layer("means_dev_mag_kl_loss")
-        means_dev_mag_kl_loss_layer.n_batches = n_batches
-
-    if learn_covariances:
-        covs_dev_mag_kl_loss_layer = model.get_layer("covs_dev_mag_kl_loss")
-        covs_dev_mag_kl_loss_layer.n_batches = n_batches
-
-
 def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
     """Get the indices of the nearest neighours in the subject embedding space.
 
@@ -620,25 +586,3 @@ def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
     sorted_distances = np.argsort(distances, axis=1)
     nearest_neighbours = sorted_distances[:, :n_neighbours]
     return nearest_neighbours
-
-
-def set_dev_mlp_reg_scaling(model, n_batches, learn_means, learn_covariances):
-    """Set the scaling of the MLP regularisation.
-
-    Parameters
-    ----------
-    model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
-    n_batches : int
-        The number of batches in the dataset.
-    learn_means : bool
-        Whether the mean is learnt.
-    learn_covariances : bool
-        Whether the covariances are learnt.
-    """
-    if learn_means:
-        model.get_layer("means_dev_map_input").n_batches = n_batches
-        model.get_layer("means_dev_mag_mod_beta_input").n_batches = n_batches
-    if learn_covariances:
-        model.get_layer("covs_dev_map_input").n_batches = n_batches
-        model.get_layer("covs_dev_mag_mod_beta_input").n_batches = n_batches

@@ -375,16 +375,10 @@ class LearnableTensorLayer(layers.Layer):
         # This should be a function of the tensor that returns a float
         self.regularizer = regularizer
 
-    def add_regularization(self, tensor, inputs):
+    def add_regularization(self, tensor, static_loss_scaling_factor):
         # Calculate the regularisation from the tensor
         reg = self.regularizer(tensor)
-
-        # Calculate the scaling factor for the regularization
-        # Note, inputs.shape[0] must be the batch size
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        n_batches = self.regularizer.n_batches
-        scaling_factor = batch_size * n_batches
-        reg /= scaling_factor
+        reg *= static_loss_scaling_factor
 
         # Add regularization to the loss and display while training
         self.add_loss(reg)
@@ -401,9 +395,9 @@ class LearnableTensorLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, static_loss_scaling_factor=1, training=None, **kwargs):
         if self.regularizer is not None and training:
-            self.add_regularization(self.tensor, inputs)
+            self.add_regularization(self.tensor, static_loss_scaling_factor)
         return self.tensor
 
 
@@ -1296,23 +1290,19 @@ class MixSubjectSpecificParametersLayer(layers.Layer):
 
 class StaticKLDivergenceLayer(layers.Layer):
     """Layer to calculate KL divergence between Gamma posterior
-    and exponential prior for static parameters.
+    and exponential prior for deviation magnitude.
 
     Parameters
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
-    n_batches : int
-        Number of batches in the data. This is for calculating
-        the scaling factor.
     """
 
-    def __init__(self, epsilon, n_batches=1, **kwargs):
+    def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
-        self.n_batches = n_batches
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, static_loss_scaling_factor=1, **kwargs):
         data, inference_alpha, inference_beta, model_beta = inputs
 
         # Add a small error for numerical stability
@@ -1329,12 +1319,7 @@ class StaticKLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        # Calculate the scaling for KL loss
-        batch_size = tf.cast(tf.shape(data)[0], tf.float32)
-        scaling_factor = batch_size * self.n_batches
-        kl_loss /= scaling_factor
-
-        kl_loss = tf.reduce_sum(kl_loss)
+        kl_loss = tf.reduce_sum(kl_loss) * static_loss_scaling_factor
 
         return kl_loss
 
@@ -1369,13 +1354,11 @@ class MultiLayerPerceptronLayer(layers.Layer):
         drop_rate,
         regularizer=None,
         regularizer_factor=0.0,
-        n_batches=1,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.regularizer = regularizers.get(regularizer)
         self.regularizer_factor = regularizer_factor
-        self.n_batches = n_batches
         self.layers = []
         for _ in range(n_layers):
             self.layers.append(layers.Dense(n_units))
@@ -1383,12 +1366,8 @@ class MultiLayerPerceptronLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, static_loss_scaling_factor=1, training=None, **kwargs):
         reg = 0.0
-        data, inputs = inputs
-
-        batch_size = tf.cast(tf.shape(data)[0], tf.float32)
-        scaling_factor = batch_size * self.n_batches
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
             if self.regularizer is not None and isinstance(layer, layers.Dense):
@@ -1397,7 +1376,30 @@ class MultiLayerPerceptronLayer(layers.Layer):
 
         if self.regularizer is not None and training:
             reg *= self.regularizer_factor
-            reg /= scaling_factor
+            reg *= static_loss_scaling_factor
             self.add_loss(reg)
             self.add_metric(reg, name=self.name)
         return inputs
+
+
+class StaticLossScalingFactorLayer(layers.Layer):
+    """Layer to calculate the scaling factor for losses that
+    are associated with static parameters (e.g. regularisation
+    for observation model parameters).
+
+    When calculating loss, we sum over the sequence length and
+    average over the sequences. The scaling factor is given by
+
+    .. math::
+        \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times \text{n_batches}}
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.n_batches = 1
+
+    def call(self, inputs, **kwargs):
+        # Note that inputs.shape[0] must be the batch size
+        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+        static_loss_scaling_factor = 1 / (batch_size * self.n_batches)
+        return static_loss_scaling_factor
