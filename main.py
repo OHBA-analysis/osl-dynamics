@@ -108,7 +108,8 @@ if __name__ == '__main__':
     print(f'Number of states: {n_states}')
     print(f'The model: {model}')
     
-    data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
+   # data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
+    data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
     prepare_data = PrepareData(data_dir)
     subj,dataset = prepare_data.load()
     print(f'Number of subjects: {len(subj)}')
