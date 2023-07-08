@@ -4,51 +4,48 @@
 
 import numpy as np
 from tensorflow import tanh
-from tensorflow.python.keras import callbacks
+from tensorflow.keras import callbacks
+
 from osl_dynamics import inference
 
 
 class DiceCoefficientCallback(callbacks.Callback):
-    """Callback to calculate a dice coefficient during training.
+    """Callback to calculate a Dice coefficient during training.
 
     Parameters
     ----------
-    prediction_dataset : tensorflow.data.Dataset
+    prediction_dataset : tf.data.Dataset
         Dataset to use to calculate outputs of the model.
-    ground_truth_mode_time_course : np.ndarray
-        2D or 3D numpy array containing the ground truth mode time
-        course of the training data.
-    mode_names : list of str
-        Names for the mode time courses.
+    ground_truth_time_course : np.ndarray
+        2D or 3D numpy array containing the ground truth state/mode time course of
+        the training data. Shape must be :code:`(n_time_courses, n_samples, n_modes)`
+        or :code:`(n_samples, n_modes)`.
+    names : list of str
+        Names for the time courses. Shape must be :code:`(n_time_courses,)`. Optional.
     """
 
-    def __init__(
-        self,
-        prediction_dataset,
-        ground_truth_mode_time_course,
-        mode_names=None,
-    ):
+    def __init__(self, prediction_dataset, ground_truth_time_course, names=None):
         super().__init__()
         self.prediction_dataset = prediction_dataset
-        if ground_truth_mode_time_course.ndim == 2:
+        if ground_truth_time_course.ndim == 2:
             # We're training a single time scale model
             self.n_time_courses = 1
-            self.gtmtc = ground_truth_mode_time_course[np.newaxis, ...]
-        elif ground_truth_mode_time_course.ndim == 3:
+            self.gttc = ground_truth_time_course[np.newaxis, ...]
+        elif ground_truth_time_course.ndim == 3:
             # We're training a multi-time-scale model
-            self.n_time_courses = ground_truth_mode_time_course.shape[0]
-            self.gtmtc = ground_truth_mode_time_course
+            self.n_time_courses = ground_truth_time_course.shape[0]
+            self.gttc = ground_truth_time_course
         else:
             raise ValueError(
-                "A 2D or 3D numpy array must be pass for ground_truth_mode_time_course."
+                "A 2D or 3D numpy array must be pass for ground_truth_time_course."
             )
-        if mode_names is not None:
-            if len(mode_names) != self.n_time_courses:
+        if names is not None:
+            if len(names) != self.n_time_courses:
                 raise ValueError(
-                    "Mismatch between the number of mode_names and time courses."
+                    "Mismatch between the number of names and time courses."
                 )
-        self.mode_names = mode_names
-        self.n_modes = ground_truth_mode_time_course.shape[-1]
+        self.names = names
+        self.n_modes = ground_truth_time_course.shape[-1]
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -76,8 +73,8 @@ class DiceCoefficientCallback(callbacks.Callback):
             pmtc = inference.modes.argmax_time_courses(
                 tc[i], concatenate=True, n_modes=self.n_modes
             )
-            pmtc, gtmtc = inference.modes.match_modes(pmtc, self.gtmtc[i])
-            dice = inference.metrics.dice_coefficient(pmtc, gtmtc)
+            pmtc, gttc = inference.modes.match_modes(pmtc, self.gttc[i])
+            dice = inference.metrics.dice_coefficient(pmtc, gttc)
             dices.append(dice)
 
         # Add dice to the training history and print to screen
@@ -85,8 +82,8 @@ class DiceCoefficientCallback(callbacks.Callback):
             logs["dice"] = dices[0]
         else:
             for i in range(self.n_time_courses):
-                if self.mode_names is not None:
-                    key = "dice_" + self.mode_names[i]
+                if self.names is not None:
+                    key = "dice_" + self.names[i]
                 else:
                     key = "dice" + str(i)
                 logs[key] = dices[i]
@@ -95,27 +92,21 @@ class DiceCoefficientCallback(callbacks.Callback):
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
-    This callback assumes there is a keras layer named 'kl_loss' in the model.
+    This callback assumes there is a keras layer named :code:`'kl_loss'` in the model.
 
     Parameters
     ----------
     curve : str
-        Shape of the annealing curve. Either 'linear' or 'tanh'.
+        Shape of the annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     annealing_sharpness : float
         Parameter to control the shape of the annealing curve.
     n_annealing_epochs : int
         Number of epochs to apply annealing.
     n_cycles : int
-        Number of times to perform KL annealing with n_annealing_epochs.
+        Number of times to perform KL annealing with :code:`n_annealing_epochs`.
     """
 
-    def __init__(
-        self,
-        curve,
-        annealing_sharpness,
-        n_annealing_epochs,
-        n_cycles=1,
-    ):
+    def __init__(self, curve, annealing_sharpness, n_annealing_epochs, n_cycles=1):
         if curve not in ["linear", "tanh"]:
             raise NotImplementedError(curve)
 

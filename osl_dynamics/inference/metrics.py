@@ -9,20 +9,22 @@ from tqdm.auto import trange
 
 
 def alpha_correlation(alpha_1, alpha_2):
-    """Calculates the correlation between modes of two alpha time series.
+    """Calculates the `correlation \
+    <https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html>`_
+    between modes of two mixing coefficient time series.
 
     Parameters
     ----------
     alpha_1 : np.ndarray
-        First alpha time series. Shape is (n_samples, n_modes).
+        First alpha time series. Shape must be :code:`(n_samples, n_modes)`.
     alpha_2 : np.ndarray
-        Second alpha time series. Shape is (n_samples, n_modes).
+        Second alpha time series. Shape must be :code:`(n_samples, n_modes)`.
 
     Returns
     -------
     corr : np.ndarray
         Correlation of each mode in the corresponding alphas.
-        Shape is (n_modes,).
+        Shape is :code:`(n_modes,)`.
     """
     if alpha_1.shape[1] != alpha_2.shape[1]:
         raise ValueError(
@@ -35,117 +37,90 @@ def alpha_correlation(alpha_1, alpha_2):
     return corr
 
 
-def confusion_matrix(mode_time_course_1, mode_time_course_2):
-    """Calculate the confusion matrix of two mode time courses.
+def confusion_matrix(state_time_course_1, state_time_course_2):
+    """Calculate the `confusion_matrix \
+    <https://scikit-learn.org/stable/modules/generated/\
+    sklearn.metrics.confusion_matrix.html>`_ of two state time courses.
 
-    For two mode-time-courses, calculate the confusion matrix (i.e. the
-    disagreement between the mode selection for each sample). If either sequence is
-    two dimensional, it will first have argmax(axis=1) applied to it. The produces the
-    expected result for a one-hot encoded sequence but other inputs are not guaranteed
-    to behave.
-
-    This function is a wrapper for sklearn.metrics.confusion_matrix.
+    For two state time courses, calculate the confusion matrix (i.e. the
+    disagreement between the state selection for each sample). If either sequence
+    is two dimensional, it will first have :code:`argmax(axis=1)` applied to it.
+    The produces the expected result for a one-hot encoded sequence but other
+    inputs are not guaranteed to behave.
 
     Parameters
     ----------
-    mode_time_course_1 : np.ndarray
-    mode_time_course_2 : np.ndarray
+    state_time_course_1 : np.ndarray
+        Mode time course. Shape must be :code:`(n_samples, n_states)` or
+        :code:`(n_samples,)`.
+    state_time_course_2 : np.ndarray
+        Mode time course. Shape must be :code:`(n_samples, n_states)` or
+        :code:`(n_samples,)`.
 
     Returns
     -------
-    cm : nd.ndarray
-        Confusion matrix
+    cm : np.ndarray
+        Confusion matrix. Shape is :code:`(n_states, n_states)`.
     """
-    if mode_time_course_1.ndim == 2:
-        mode_time_course_1 = mode_time_course_1.argmax(axis=1)
-    if mode_time_course_2.ndim == 2:
-        mode_time_course_2 = mode_time_course_2.argmax(axis=1)
-    if not ((mode_time_course_1.ndim == 1) and (mode_time_course_2.ndim == 1)):
-        raise ValueError("Both mode time courses must be either 1D or 2D.")
+    if state_time_course_1.ndim == 2:
+        state_time_course_1 = state_time_course_1.argmax(axis=1)
+    if state_time_course_2.ndim == 2:
+        state_time_course_2 = state_time_course_2.argmax(axis=1)
+    if not ((state_time_course_1.ndim == 1) and (state_time_course_2.ndim == 1)):
+        raise ValueError("Both state time courses must be either 1D or 2D.")
+    return sklearn_confusion_matrix(state_time_course_1, state_time_course_2)
 
-    return sklearn_confusion_matrix(mode_time_course_1, mode_time_course_2)
 
-
-def dice_coefficient_1d(sequence_1, sequence_2):
-    """Calculate the Dice coefficient of a discrete array
-
-    Given two sequences containing a number of discrete elements (i.e. a
-    categorical variable), calculate the Dice coefficient of those sequences.
+def dice_coefficient(sequence_1, sequence_2):
+    """Calculates the Dice coefficient.
 
     The Dice coefficient is 2 times the number of equal elements (equivalent to
     true-positives) divided by the sum of the total number of elements.
 
     Parameters
     ----------
-    sequence_1 : nd.ndarray
-        A sequence containing discrete elements.
-    sequence_2 : nd.ndarray
-        A sequence containing discrete elements.
+    sequence_1 : np.ndarray
+        A sequence containing either 1D discrete or 2D continuous data.
+        Shape must be :code:`(n_samples, n_states)` or :code:`(n_samples,)`.
+    sequence_2 : np.ndarray
+        A sequence containing either 1D discrete or 2D continuous data.
+        Shape must be :code:`(n_samples, n_states)` or :code:`(n_samples,)`.
 
     Returns
     -------
     dice : float
         The Dice coefficient of the two sequences.
     """
-    if (sequence_1.ndim, sequence_2.ndim) != (1, 1):
-        raise ValueError(
-            f"sequences must be 1D: {(sequence_1.ndim, sequence_2.ndim)} != (1, 1)."
-        )
-    if (sequence_1.dtype, sequence_2.dtype) != (int, int):
-        raise TypeError("Both sequences must be integer (categorical).")
-
+    if (sequence_1.ndim not in [1, 2]) or (sequence_2.ndim not in [1, 2]):
+        raise ValueError("Both sequences must be either 1D or 2D")
+    if sequence_1.ndim == 2:
+        sequence_1 = sequence_1.argmax(axis=1)
+    if sequence_2.ndim == 2:
+        sequence_2 = sequence_2.argmax(axis=1)
     return 2 * ((sequence_1 == sequence_2).sum()) / (len(sequence_1) + len(sequence_2))
 
 
-def dice_coefficient(sequence_1, sequence_2):
-    """Wrapper method for `dice_coefficient`.
-
-    If passed a one-dimensional array, it will be sent straight to `dice_coefficient`.
-    Given a two-dimensional array, it will perform an argmax calculation on each sample.
-    The default axis for this is zero, i.e. each row represents a sample.
-
-    Parameters
-    ----------
-    sequence_1 : nd.ndarray
-        A sequence containing either 1D discrete or 2D continuous data.
-    sequence_2 : nd.ndarray
-        A sequence containing either 1D discrete or 2D continuous data.
-
-    Returns
-    -------
-    dice : float
-        The Dice coefficient of the two sequences.
-    """
-    if (len(sequence_1.shape) not in [1, 2]) or (len(sequence_2.shape) not in [1, 2]):
-        raise ValueError("Both sequences must be either 1D or 2D")
-    if (len(sequence_1.shape) == 1) and (len(sequence_2.shape) == 1):
-        return dice_coefficient_1d(sequence_1, sequence_2)
-    if len(sequence_1.shape) == 2:
-        sequence_1 = sequence_1.argmax(axis=1)
-    if len(sequence_2.shape) == 2:
-        sequence_2 = sequence_2.argmax(axis=1)
-    return dice_coefficient_1d(sequence_1, sequence_2)
-
-
 def frobenius_norm(A, B):
-    """Calculates the frobenius norm of the difference of two matrices.
+    """Calculates the Frobenius norm of the difference of two matrices.
 
-    The Frobenius norm is calculated as sqrt( Sum_ij abs(a_ij - b_ij)^2 ).
+    The Frobenius norm is calculated as
+    :math:`\sqrt{\displaystyle\sum_{ij} \mathrm{abs}(a_{ij} - b_{ij})^2}`.
 
     Parameters
     ----------
     A : np.ndarray
-        First matrix. Shape must be (n_modes, n_channels, n_channels) or
-        (n_channels, n_channels).
+        First matrix. Shape must be :code:`(n_modes, n_channels, n_channels)` or
+        :code:`(n_channels, n_channels)`.
     B : np.ndarray
-        Second matrix. Shape must be (n_modes, n_channels, n_channels) or
-        (n_channels, n_channels).
+        Second matrix. Shape must be :code:`(n_modes, n_channels, n_channels)` or
+        :code:`(n_channels, n_channels)`.
 
     Returns
     -------
     norm : float
-        The Frobenius norm of the difference of A and B. If A and B are
-        stacked matrices, we sum the Frobenius norm of each sub-matrix.
+        The Frobenius norm of the difference of :code:`A` and :code:`B`.
+        If :code:`A` and :code:`B` are stacked matrices, we sum the Frobenius norm
+        of each sub-matrix.
     """
     if A.ndim == 2 and B.ndim == 2:
         norm = np.linalg.norm(A - B, ord="fro")
@@ -160,17 +135,21 @@ def frobenius_norm(A, B):
 
 
 def pairwise_frobenius_distance(matrices):
-    """Calculates the pairwise frobenius distance of a set of matrices.
+    """Calculates the pairwise Frobenius distance of a set of matrices.
 
     Parameters
     ----------
     matrices : np.ndarray
-        The set of matrices. Shape must be (n_matrices, n_channels, n_channels)
+        The set of matrices. Shape must be :code:`(n_matrices, n_channels, n_channels)`.
 
     Returns
     -------
     pairwise_distance : np.ndarray
-        Matrix of pairwise Frobenius distance. Shape is (n_matrices, n_matrices)
+        Matrix of pairwise Frobenius distance. Shape is :code:`(n_matrices, n_matrices)`.
+
+    See Also
+    --------
+    frobenius_norm
     """
     return np.sqrt(
         np.sum(
@@ -181,18 +160,22 @@ def pairwise_frobenius_distance(matrices):
 
 
 def pairwise_matrix_correlations(matrices, remove_diagonal=False):
-    """Calculate the correlation between elements of covariance matrices.
+    """Calculate the `correlation \
+    <https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html>`_
+    between (flattened) covariance matrices.
 
     Parameters
     ----------
     matrices : np.ndarray
-        Shape must be (n_matrices, N, N).
+        Matrices. Shape must be :code:`(M, N, N)`.
+    remove_diagonal : bool
+        Should we remove the diagonal before calculating the correction?
 
     Returns
     -------
     correlations : np.ndarray
-        Pairwise Pearson correlation between elements of each matrix.
-        Shape is (n_matrices, n_matrices).
+        Pairwise Pearson correlation between elements of each flattened matrix.
+        Shape is :code:`(M, M)`.
     """
     n_matrices = matrices.shape[0]
     matrices = matrices.reshape(n_matrices, -1)
@@ -205,18 +188,22 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=False):
 def riemannian_distance(M1, M2, threshold=1e-3):
     """Calculate the Riemannian distance between two matrices.
 
-    The Riemannian distance is defined as: d = (sum log(eig(M_1 * M_2))) ^ 0.5
+    The Riemannian distance is defined as
+    :math:`d = \sqrt{\displaystyle\sum \log(\mathrm{eig}(M_1 * M_2))}`.
 
     Parameters
     ----------
     M1 : np.ndarray
+        First matrix. Shape must be :code:`(N, N)`.
     M2 : np.ndarray
+        Second matrix. Shape must be :code:`(N, N)`.
     threshold : float
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
     Returns
     -------
-    d : np.ndarray
+    d : float
+        Riemannian distance.
     """
     eigvals = eigvalsh(M1, M2, driver="gv")
     if np.any(eigvals < 0):
@@ -232,7 +219,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     Parameters
     ----------
     matrices : np.ndarray
-        Shape must be (n_matrices, N, N).
+        Matrices. Shape must be :code:`(M, N, N)`.
     threshold : float
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
@@ -240,7 +227,11 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     -------
     riemannian_distances : np.ndarray
         Matrix containing the pairwise Riemannian distances between matrices.
-        Shape is (n_matrices, n_matrices).
+        Shape is :code:`(M, M)`.
+
+    See Also
+    --------
+    riemannian_distance
     """
     matrices.astype(np.float64)
     n_matrices = matrices.shape[0]
@@ -258,31 +249,32 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     return riemannian_distances
 
 
-def pairwise_rv_coefficient(M, remove_diagonal=False):
+def pairwise_rv_coefficient(matrices, remove_diagonal=False):
     """Calculate the RV coefficient for two matrices.
 
     Parameters
     ----------
-    M : np.ndarray
-        Set of matrices. Shape is (n_matrices, N, N)
+    matrices : np.ndarray
+        Set of matrices. Shape must be :code:`(M, N, N)`.
+    remove_diagonal : bool
+        Should we remove the diagonal before calculating the correction?
 
     Returns
     -------
-    C : np.ndarray
-        Matrix of pairwise RV coefficients. Shape is (n_matrices, n_matrices)
+    rv_coefficients : np.ndarray
+        Matrix of pairwise RV coefficients. Shape is :code:`(M, M)`.
     """
-    n_matrices = M.shape[0]
     # First compute the scalar product matrices for each data set X
     scal_arr_list = []
-
-    for arr in M:
+    for arr in matrices:
         scal_arr = np.dot(arr, np.transpose(arr))
         scal_arr_list.append(scal_arr)
 
-    # Now compute the 'between study cosine matrix' C
-    C = np.zeros([n_matrices, n_matrices])
+    # Now compute the 'between study cosine matrix'
+    n_matrices = matrices.shape[0]
+    rv_coefficients = np.zeros([n_matrices, n_matrices])
 
-    for index, element in np.ndenumerate(C):
+    for index, element in np.ndenumerate(rv_coefficients):
         nom = np.trace(
             np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[1]])
         )
@@ -293,57 +285,59 @@ def pairwise_rv_coefficient(M, remove_diagonal=False):
             np.dot(np.transpose(scal_arr_list[index[1]]), scal_arr_list[index[1]])
         )
         Rv = nom / np.sqrt(np.dot(denom1, denom2))
-        C[index[0], index[1]] = Rv
+        rv_coefficients[index[0], index[1]] = Rv
 
     if remove_diagonal:
-        C -= np.eye(n_matrices)
+        rv_coefficients -= np.eye(n_matrices)
 
-    return C
+    return rv_coefficients
 
 
-def pairwise_congruence_coefficient(M, remove_diagonal=False):
-    """Computes the congruence coefficient between covariance/correlation matrices
+def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
+    """Computes the congruence coefficient between covariance/correlation matrices.
+
     Parameters
     ----------
-    M : np.ndarray
-        Set of symmetric semi-positive definite matrices. Shape is (n_matrices, N, N).
+    matrices : np.ndarray
+        Set of symmetric semi-positive definite matrices. Shape is :code:`(M, N, N)`.
+    remove_diagonal : bool
+        Should we remove the diagonal before calculating the correction?
 
     Returns
     -------
-    C : np.ndarray
-        Matrix of pairwise congruence coefficients. Shape is (n_matrices, n_matrices).
+    congruence_coefficient : np.ndarray
+        Matrix of pairwise congruence coefficients. Shape is :code:`(M, M)`.
     """
 
-    n_matrices = M.shape[0]
-    C = np.zeros([n_matrices, n_matrices])
-    for index, element in np.ndenumerate(C):
-        nom = np.trace(np.dot(np.transpose(M[index[0]]), M[index[1]]))
-        denom1 = np.trace(np.dot(np.transpose(M[index[0]]), M[index[0]]))
-        denom2 = np.trace(np.dot(np.transpose(M[index[1]]), M[index[1]]))
+    n_matrices = matrices.shape[0]
+    congruence_coefficient = np.zeros([n_matrices, n_matrices])
+    for index, element in np.ndenumerate(congruence_coefficient):
+        nom = np.trace(np.dot(np.transpose(matrices[index[0]]), matrices[index[1]]))
+        denom1 = np.trace(np.dot(np.transpose(matrices[index[0]]), matrices[index[0]]))
+        denom2 = np.trace(np.dot(np.transpose(matrices[index[1]]), matrices[index[1]]))
         cc = nom / np.sqrt(np.dot(denom1, denom2))
-        C[index[0], index[1]] = cc
+        congruence_coefficient[index[0], index[1]] = cc
 
     if remove_diagonal:
-        C -= np.eye(n_matrices)
+        congruence_coefficient -= np.eye(n_matrices)
 
-    return C
+    return congruence_coefficient
 
 
 def pairwise_l2_distance(arrays, batch_dims=0):
-    """Calculate the pairwise L2 distance
-    along the first axis after the batch dims.
+    """Calculate the pairwise L2 distance along the first axis after :code:`batch_dims`.
 
     Parameters
     ----------
     arrays : np.ndarray
-        Set of arrays. Shape is (..., n_arrays, ...).
+        Set of arrays. Shape is :code:`(..., n_arrays, ...)`.
     batch_dims : int
         Number of batch dimensions.
 
     Returns
     -------
     pairwise_distance : np.ndarray
-        Matrix of pairwise L2 distance. Shape is (..., n_arrays, n_arrays)
+        Matrix of pairwise L2 distance. Shape is :code:`(..., n_arrays, n_arrays)`.
     """
     if batch_dims > arrays.ndim - 1:
         raise ValueError("batch_dims must be less than arrays.ndim - 1")

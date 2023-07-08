@@ -9,10 +9,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def gpu_growth():
-    """Only allocate the amount of memory required on the GPU.
-
-    If resources are shared between multiple users, it's polite not to hog the GPUs!
-    """
+    """Only allocate the amount of memory required on the GPU."""
     import tensorflow as tf  # moved here to avoid slow imports
 
     gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -45,9 +42,13 @@ def select_gpu(gpu_numbers):
 
 
 def suppress_messages(level=3):
-    """Suppress messages from tensorflow.
+    """Suppress messages from TensorFlow.
 
-    Must be called before gpu_growth() and select_gpu().
+    Must be called before `gpu_growth <https://osl-dynamics.readthedocs.io/en/latest/\
+    autoapi/osl_dynamics/inference/tf_ops/index.html#osl_dynamics.inference.tf_ops.\
+    gpu_growth>`_ and `select_gpu <https://osl-dynamics.readthedocs.io/en/latest/\
+    autoapi/osl_dynamics/inference/tf_ops/index.html#osl_dynamics.inference.tf_ops.\
+    gpu_growth>`_.
 
     Parameters
     ----------

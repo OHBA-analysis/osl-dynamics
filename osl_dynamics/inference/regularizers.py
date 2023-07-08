@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import regularizers
 import tensorflow_probability as tfp
+
 from osl_dynamics.inference.layers import add_epsilon
 
 tfb = tfp.bijectors
@@ -17,10 +18,10 @@ class InverseWishart(regularizers.Regularizer):
     Parameters
     ----------
     nu : int
-        Degrees of freedom. Must be greater than (n_channels - 1).
+        Degrees of freedom. Must be greater than :code:`(n_channels - 1)`.
     psi : np.ndarray
         Scale matrix. Must be a symmetric positive definite matrix.
-        Shape must be (n_channels, n_channels).
+        Shape must be :code:`(n_channels, n_channels)`.
     epsilon : float
         Error added to the diagonal of the covariances.
     """
@@ -69,11 +70,10 @@ class MultivariateNormal(regularizers.Regularizer):
     Parameters
     ----------
     mu : np.ndarray
-        1D numpy array of the mean of the prior.
-        Shape must be (n_channels,).
+        1D array of the mean of the prior. Shape must be :code:`(n_channels,)`.
     sigma : np.ndarray
-        2D numpy array of covariance matrix of the prior.
-        Shape must be (n_channels, n_channels).
+        2D array of covariance matrix of the prior.
+        Shape must be :code:`(n_channels, n_channels)`.
     """
 
     def __init__(self, mu, sigma, **kwargs):
@@ -95,7 +95,8 @@ class MultivariateNormal(regularizers.Regularizer):
             np.linalg.cholesky(self.sigma)
         except:
             raise ValueError(
-                "Cholesky decomposition of sigma failed. sigma must be positive definite."
+                "Cholesky decomposition of sigma failed. "
+                + "sigma must be positive definite."
             )
 
         self.inv_sigma = tf.linalg.inv(self.sigma)
@@ -117,18 +118,20 @@ class MultivariateNormal(regularizers.Regularizer):
 class MarginalInverseWishart(regularizers.Regularizer):
     """Inverse Wishart regularizer on correlaton matrices.
 
-    It is assumed that the scale matrix of the inverse Wishart distribution
-    is diagonal. Hence the marginal distribution on the correlation matrix is
-    independent of the scale matrix.
-
     Parameters
     ----------
     nu : int
-        Degrees of freedom. Must be greater than (n_channels - 1).
+        Degrees of freedom. Must be greater than :code:`(n_channels - 1)`.
     epsilon : float
         Error added to the correlations.
     n_channels : int
         Number of channels of the correlation matrices.
+
+    Note
+    ----
+    It is assumed that the scale matrix of the inverse Wishart distribution
+    is diagonal. Hence, the marginal distribution on the correlation matrix is
+    independent of the scale matrix.
     """
 
     def __init__(self, nu, epsilon, n_channels, **kwargs):
@@ -157,16 +160,16 @@ class MarginalInverseWishart(regularizers.Regularizer):
 
 
 class LogNormal(regularizers.Regularizer):
-    """Log normal regularizer on the standard deviations.
+    """Log-Normal regularizer on the standard deviations.
 
     Parameters
     ----------
     mu : np.ndarray
         Mu parameters of the log normal distribution.
-        Shape is (n_channels,).
+        Shape is :code:`(n_channels,)`.
     sigma : np.ndarray
         Sigma parameters of the log normal distribution.
-        Shape is (n_channels,). All entries must be positive.
+        Shape is :code:`(n_channels,)`. All entries must be positive.
     epsilon : float
         Error added to the standard deviations.
     """

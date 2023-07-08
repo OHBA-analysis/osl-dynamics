@@ -14,17 +14,17 @@ tfb = tfp.bijectors
 
 @tf.function
 def add_epsilon(A, epsilon, diag=False):
-    """Adds epsilon the the diagonal of batches of square matrices
-    or all elements of matrices.
+    """Adds epsilon the the diagonal of batches of square matrices or all elements
+    of matrices.
 
     Parameters
     ----------
     A : tf.Tensor
-        Batches of square matrices or vectors.
-        Shape is (..., N, N) or (..., N).
+        Batches of square matrices or vectors. Shape is :code:`(..., N, N)` or
+        :code:`(..., N)`.
     epsilon : float
-        Small error added to the diagonal of the matrices or every element
-        of the vectors.
+        Small error added to the diagonal of the matrices or every element of the
+        vectors.
     diag : bool
         Do we want to add epsilon to the diagonal only?
     """
@@ -45,7 +45,12 @@ def NormalizationLayer(norm_type, *args, **kwargs):
     Parameters
     ----------
     norm_type : str
-        Type of normalization layer. Either 'layer', 'batch' or None.
+        Type of normalization layer. Either :code:`'layer'`, :code:`'batch'` or
+        :code:`None`.
+    args : arguments
+        Arguments to pass to the normalization layer.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the normalization layer.
     """
     if norm_type == "layer":
         return layers.LayerNormalization(*args, **kwargs)
@@ -58,12 +63,16 @@ def NormalizationLayer(norm_type, *args, **kwargs):
 
 
 def RNNLayer(rnn_type, *args, **kwargs):
-    """Returns an RNN layer.
+    """Returns a Recurrent Neural Network (RNN) layer.
 
     Parameters
     ----------
     rnn_type : str
-        Type of RNN. Either 'lstm' or 'gru'.
+        Type of RNN. Either :code:`'lstm'` or :code:`'gru'`.
+    args : arguments
+        Arguments to pass to the normalization layer.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the normalization layer.
     """
     if rnn_type == "lstm":
         return layers.LSTM(*args, **kwargs)
@@ -74,10 +83,7 @@ def RNNLayer(rnn_type, *args, **kwargs):
 
 
 class DummyLayer(layers.Layer):
-    """Dummy layer.
-
-    Returns the inputs without modification.
-    """
+    """Returns the inputs without modification."""
 
     def call(self, inputs, **kwargs):
         return inputs
@@ -92,10 +98,13 @@ class AddRegularizationLossLayer(layers.Layer):
     Parameters
     ----------
     reg : str
-        Type of regularization.
+        Type of regularization. Passed to `tf.keras.regularizers.get \
+        <https://www.tensorflow.org/api_docs/python/tf/keras/regularizers/get>`_.
     strength : float
         Strength of regularization. The regularization is multiplied
-        by the strength before being added to the loss
+        by the strength before being added to the loss.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, reg, strength, **kwargs):
@@ -110,14 +119,14 @@ class AddRegularizationLossLayer(layers.Layer):
 
 
 class ConcatenateLayer(layers.Layer):
-    """Concatenates a set of tensors.
-
-    Wrapper for tf.concat().
+    """Wrapper for `tf.concat <https://www.tensorflow.org/api_docs/python/tf/concat>`_.
 
     Parameters
     ----------
     axis : int
         Axis to concatenate along.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, axis, **kwargs):
@@ -129,9 +138,8 @@ class ConcatenateLayer(layers.Layer):
 
 
 class MatMulLayer(layers.Layer):
-    """Multiplies a set of matrices.
-
-    Wrapper for tf.matmul().
+    """Wrapper for `tf.matmul \
+    <https://www.tensorflow.org/api_docs/python/tf/linalg/matmul>`_.
     """
 
     def call(self, inputs, **kwargs):
@@ -143,12 +151,14 @@ class MatMulLayer(layers.Layer):
 
 
 class TFRangeLayer(layers.Layer):
-    """Wrapper for tf.range.
+    """Wrapper for `tf.range <https://www.tensorflow.org/api_docs/python/tf/range>`_.
 
     Parameters
     ----------
     limit : int
         Upper limit for range.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, limit, **kwargs):
@@ -160,14 +170,14 @@ class TFRangeLayer(layers.Layer):
 
 
 class ZeroLayer(layers.Layer):
-    """Layer that outputs tensor of zeros.
-
-    Wrapper for tf.zeros(). Note, the inputs to this layer are not used.
+    """Wrapper for `tf.zeros <https://www.tensorflow.org/api_docs/python/tf/zeros>`_.
 
     Parameters
     ----------
     shape : tuple
-        Shape of the zero tensor.
+        Shape of the zeros tensor.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, shape, **kwargs):
@@ -175,6 +185,11 @@ class ZeroLayer(layers.Layer):
         self.shape = shape
 
     def call(self, inputs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
         return tf.zeros(self.shape)
 
 
@@ -185,6 +200,8 @@ class InverseCholeskyLayer(layers.Layer):
     ----------
     epsilon : float
         Small error added to the diagonal of the matrices.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, epsilon, **kwargs):
@@ -198,15 +215,17 @@ class InverseCholeskyLayer(layers.Layer):
 
 
 class SampleGammaDistributionLayer(layers.Layer):
-    """Layer for sampling from a gamma distribution.
+    """Layer for sampling from a Gamma distribution.
 
-    This layer accepts the shape and rate
-    and outputs samples from a gamma distribution.
+    This layer is a wrapper for `tfp.distributions.Gamma \
+    <https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma>`_.
 
     Parameters
     ----------
     epsilon : float
         Error to add to the shape and rate for numerical stability.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, epsilon, **kwargs):
@@ -214,6 +233,7 @@ class SampleGammaDistributionLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, training=None, **kwargs):
+        """This method accepts the shape and rate and outputs the samples."""
         alpha, beta = inputs
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
@@ -228,15 +248,17 @@ class SampleGammaDistributionLayer(layers.Layer):
 
 
 class SampleNormalDistributionLayer(layers.Layer):
-    """Layer for sampling from a normal distribution.
+    """Layer for sampling from a Normal distribution.
 
-    This layer accepts the mean and the standard deviation and
-    outputs samples from a normal distribution.
+    This layer is a wrapper for `tfp.distributions.Normal \
+    <https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Normal>`_.
 
     Parameters
     ----------
     epsilon : float
         Error to add to the standard deviations for numerical stability.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, epsilon, **kwargs):
@@ -244,6 +266,9 @@ class SampleNormalDistributionLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, training=None, **kwargs):
+        """
+        This method accepts the mean and the standard deviation and outputs the samples.
+        """
         mu, sigma = inputs
         sigma = add_epsilon(sigma, self.epsilon)
         if training:
@@ -256,10 +281,16 @@ class SampleNormalDistributionLayer(layers.Layer):
 class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
     """Layer for sampling from a Gumbel-Softmax distribution.
 
+    This layer is a wrapper for `tfp.distributions.RelaxedOneHotCategorical \
+    <https://www.tensorflow.org/probability/api_docs/python/tfp/distributions\
+    /RelaxedOneHotCategorical>`_.
+
     Parameters
     ----------
     temperature : float
         Temperature for the Gumbel-Softmax distribution.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, temperature, **kwargs):
@@ -267,6 +298,7 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
         self.temperature = temperature
 
     def call(self, inputs, **kwargs):
+        """This method accepts logits and outputs samples."""
         gs = tfp.distributions.RelaxedOneHotCategorical(
             temperature=self.temperature, logits=inputs
         )
@@ -274,9 +306,15 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
 
 
 class SampleOneHotCategoricalDistributionLayer(layers.Layer):
-    """Layer for sampling from a Categorical distribution."""
+    """Layer for sampling from a Categorical distribution.
+
+    This layer is a wrapper for `tfp.distributions.OneHotCategorical \
+    <https://www.tensorflow.org/probability/api_docs/python/tfp/distributions\
+    /OneHotCategorical>`_.
+    """
 
     def call(self, inputs, **kwargs):
+        """The method accepts logits and outputs samples."""
         cat = tfp.distributions.OneHotCategorical(logits=inputs, dtype=tf.float32)
         return cat.sample()
 
@@ -290,14 +328,11 @@ class SoftmaxLayer(layers.Layer):
         Temperature parameter.
     learn_temperature : bool
         Should we learn the alpha temperature?
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
-    def __init__(
-        self,
-        initial_temperature,
-        learn_temperature,
-        **kwargs,
-    ):
+    def __init__(self, initial_temperature, learn_temperature, **kwargs):
         super().__init__(**kwargs)
         self.layers = [
             LearnableTensorLayer(
@@ -327,7 +362,11 @@ class LearnableTensorLayer(layers.Layer):
     initial_value : float
         Initial value for the tensor if initializer is not passed.
     regularizer : osl-dynamics regularizer
-        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
+        Regularizer for the tensor. Must be from `inference.regularizers \
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/regularizers/index.html>`_.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -413,9 +452,13 @@ class VectorsLayer(layers.Layer):
     learn : bool
         Should we learn the vectors?
     initial_value : np.ndarray
-        Initial value for the vectors.
+        Initial value for the vectors. Shape must be :code:`(n, m)`.
     regularizer : osl-dynamics regularizer
-        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
+        Regularizer for the tensor. Must be from `inference.regularizers \
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/regularizers/index.html>`_.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -458,6 +501,11 @@ class VectorsLayer(layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
         learnable_tensors_layer = self.layers[0]
         vectors = learnable_tensors_layer(inputs, **kwargs)
         return vectors
@@ -467,8 +515,8 @@ class CovarianceMatricesLayer(layers.Layer):
     """Layer to learn a set of covariance matrices.
 
     A cholesky factor is learnt and used to calculate a covariance matrix as
-    C = LL^T, where L is the cholesky factor. The cholesky factor is learnt as
-    a vector of free parameters.
+    :math:`C = LL^T`, where :code:`L` is the cholesky factor. The cholesky factor
+    is learnt as a vector of free parameters.
 
     Parameters
     ----------
@@ -479,11 +527,15 @@ class CovarianceMatricesLayer(layers.Layer):
     learn : bool
         Should the matrices be learnable?
     initial_value : np.ndarray
-        Initial values for the matrices.
+        Initial values for the matrices. Shape must be :code:`(n, m, m)`.
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
     regularizer : osl-dynamics regularizer
-        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
+        Regularizer for the tensor. Must be from `inference.regularizers \
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/regularizers/index.html>`_.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -542,6 +594,11 @@ class CovarianceMatricesLayer(layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
         learnable_tensor_layer = self.layers[0]
         flattened_cholesky_factors = learnable_tensor_layer(inputs, **kwargs)
         covariances = self.bijector(flattened_cholesky_factors)
@@ -564,11 +621,15 @@ class CorrelationMatricesLayer(layers.Layer):
     learn : bool
         Should the matrices be learnable?
     initial_value : np.ndarray
-        Initial values for the matrices.
+        Initial values for the matrices. Shape must be :code:`(n, m, m)`.
     epsilon : float
         Error added to the diagonal of correlation matrices for numerical stability.
     regularizer : osl-dynamics regularizer
-        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
+        Regularizer for the tensor. Must be from `inference.regularizers \
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/regularizers/index.html>`_.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -629,6 +690,11 @@ class CorrelationMatricesLayer(layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
         learnable_tensor_layer = self.layers[0]
         flattened_cholesky_factors = learnable_tensor_layer(inputs, **kwargs)
         correlations = self.bijector(flattened_cholesky_factors)
@@ -650,23 +716,19 @@ class DiagonalMatricesLayer(layers.Layer):
     learn : bool
         Should the matrices be learnable?
     initial_value : np.ndarray
-        Initial values for the matrices.
+        Initial values for the matrices. Shape must be :code:`(n, m, m)` or
+        :code:`(n, m)`.
     epsilon : float
         Error added to the diagonal matrices for numerical stability.
     regularizer : osl-dynamics regularizer
-        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
+        Regularizer for the tensor. Must be from `inference.regularizers \
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/regularizers/index.html>`_.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
-    def __init__(
-        self,
-        n,
-        m,
-        learn,
-        initial_value,
-        epsilon,
-        regularizer=None,
-        **kwargs,
-    ):
+    def __init__(self, n, m, learn, initial_value, epsilon, regularizer=None, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
@@ -716,6 +778,11 @@ class DiagonalMatricesLayer(layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
         learnable_tensor_layer = self.layers[0]
         diagonals = learnable_tensor_layer(inputs, **kwargs)
         diagonals = self.bijector(diagonals)
@@ -739,7 +806,11 @@ class MatrixLayer(layers.Layer):
     epsilon : float
         Error added to the matrices for numerical stability.
     regularizer : osl-dynamics regularizer
-        Regularizer for the tensor. Must be from osl_dynamics.inference.regularizers.
+        Regularizer for the tensor. Must be from `inference.regularizers \
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/regularizers/index.html>`_.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -769,14 +840,19 @@ class MatrixLayer(layers.Layer):
         self.layers = [self.matrix_layer]
 
     def call(self, inputs, **kwargs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
         return self.matrix_layer(inputs, **kwargs)[0]
 
 
 class MixVectorsLayer(layers.Layer):
-    """Mix a set of vectors.
+    r"""Mix a set of vectors.
 
-    The mixture is calculated as m_t = Sum_j alpha_jt mu_j,
-    where mu_j are the vectors and alpha_jt are mixing coefficients.
+    The mixture is calculated as :math:`m_t = \displaystyle\sum_j \alpha_{jt} \mu_j`,
+    where :math:`\mu_j` are the vectors and :math:`\alpha_{jt}` are mixing coefficients.
     """
 
     def call(self, inputs, **kwargs):
@@ -793,10 +869,10 @@ class MixVectorsLayer(layers.Layer):
 
 
 class MixMatricesLayer(layers.Layer):
-    """Layer to mix matrices.
+    r"""Layer to mix matrices.
 
-    The mixture is calculated as C_t = Sum_j alpha_jt D_j,
-    where D_j are the matrices and alpha_jt are mixing coefficients.
+    The mixture is calculated as :math:`C_t = \displaystyle\sum_j \alpha_{jt} D_j`,
+    where :math:`D_j` are the matrices and :math:`\alpha_{jt}` are mixing coefficients.
     """
 
     def call(self, inputs, **kwargs):
@@ -816,6 +892,9 @@ class ConcatVectorsMatricesLayer(layers.Layer):
     """Layer to concatenate vectors and matrices."""
 
     def call(self, inputs, **kwargs):
+        """
+        This method takes a :code:`(..., m, n)` tensor and :code:`(..., m, n, n)` tensor.
+        """
         m, C = inputs
         m = tf.expand_dims(m, axis=-1)
         C_m = tf.concat([C, m], axis=3)
@@ -823,15 +902,17 @@ class ConcatVectorsMatricesLayer(layers.Layer):
 
 
 class LogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the negative log likelihood.
+    """Layer to calculate the negative log-likelihood.
 
-    The negative log-likelihood is calculated assuming a multivariate normal
-    probability density and its value is added to the loss function.
+    We assume a multivariate normal probability density. This layer will add
+    the negative log-likelihood to the loss.
 
     Parameters
     ----------
     epsilon : float
         Error added to the covariance matrices for numerical stability.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, epsilon, **kwargs):
@@ -839,6 +920,9 @@ class LogLikelihoodLossLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs):
+        """
+        The method takes the data, mean vector and covariance matrix.
+        """
         x, mu, sigma = inputs
 
         # Add a small error for numerical stability
@@ -867,21 +951,22 @@ class LogLikelihoodLossLayer(layers.Layer):
 
 
 class AdversarialLogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the negative log likelihood.
+    """Layer to calculate the negative log-likelihood for SAGE/MAGE.
 
-    The negative log-likelihood is calculated assuming a multivariate normal
-    probability density and its value is added to the loss function.
+    This layer will add the negative log-likelihood to the loss.
 
     Parameters
     ----------
     n_channels : int
         Number of channels.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, n_channels, **kwargs):
         super().__init__(**kwargs)
         self.n_channels = n_channels
-        self.__name__ = self._name  # needed to fix error
+        self.__name__ = self._name  # needed to avoid error
 
     def call(self, y_true, y_pred):
         sigma = y_pred[:, :, :, : self.n_channels]
@@ -912,7 +997,10 @@ class KLDivergenceLayer(layers.Layer):
     epsilon : float
         Error added to the standard deviations for numerical stability.
     clip_start : int
-        Index to clip the sequences inputted to this layer.
+        Index to clip the sequences inputted to this layer. Optional, default is
+        no clipping.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, epsilon, clip_start=0, **kwargs):
@@ -961,6 +1049,8 @@ class KLLossLayer(layers.Layer):
     ----------
     do_annealing : bool
         Should we perform KL annealing?
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, do_annealing, **kwargs):
@@ -991,11 +1081,11 @@ class InferenceRNNLayer(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'.
+        Either :code:`'lstm'` or :code:`'gru'`.
     norm_type : str
-        Either 'layer', 'batch' or None.
+        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     act_type : 'str'
-        Activation type, e.g. 'relu', 'elu', etc.
+        Activation type, e.g. :code:`'relu'`, :code:`'elu'`, etc.
     n_layers : int
         Number of layers.
     n_units : int
@@ -1004,6 +1094,8 @@ class InferenceRNNLayer(layers.Layer):
         Dropout rate for the output of each layer.
     reg : str
         Regularization for each layer.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -1050,11 +1142,11 @@ class ModelRNNLayer(layers.Layer):
     Parameters
     ----------
     rnn_type : str
-        Either 'lstm' or 'gru'.
+        Either :code:`'lstm'` or :code:`'gru'`.
     norm_type : str
-        Either 'layer', 'batch' or None.
+        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     act_type : 'str'
-        Activation type, e.g. 'relu', 'elu', etc.
+        Activation type, e.g. :code:`'relu'`, :code:`'elu'`, etc.
     n_layers : int
         Number of layers.
     n_units : int
@@ -1063,6 +1155,8 @@ class ModelRNNLayer(layers.Layer):
         Dropout rate for the output of each layer.
     reg : str
         Regularization for each layer.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -1107,7 +1201,10 @@ class CategoricalKLDivergenceLayer(layers.Layer):
     Parameters
     ----------
     clip_start : int
-        Index to clip the sequences inputted to this layer.
+        Index to clip the sequences inputted to this layer. Optional, default is
+        no clipping.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, clip_start=0, **kwargs):
@@ -1146,6 +1243,8 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         Number of states.
     epsilon : float
         Error added to the covariances for numerical stability.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, n_states, epsilon, **kwargs):
@@ -1224,9 +1323,11 @@ class SubjectMapLayer(layers.Layer):
     Parameters
     ----------
     which_map : str
-        Which spatial map are we using? Must be one of 'means' and 'covariances'.
+        Which spatial map are we using? Must be :code:`'means'` or :code:`'covariances'`.
     epsilon : float
         Error added to the diagonal of covariances for numerical stability.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, which_map, epsilon, **kwargs):
@@ -1256,13 +1357,14 @@ class SubjectMapLayer(layers.Layer):
 
 
 class MixSubjectSpecificParametersLayer(layers.Layer):
-    """Class for mixing means and covariances for the
-    subject embedding model.
+    r"""Class for mixing means and covariances for the subject embedding model.
 
     The mixture is calculated as
-    - m_t = Sum_j alpha_jt mu_j^(s_t)
-    - C_t = Sum_j alpha_jt D_j^(s_t)
-    where s_t is the subject at time t.
+
+    - :math:`m_t = \displaystyle\sum_j \alpha_jt \mu_j^{s_t}`
+    - :math:`C_t = \displaystyle\sum_j \alpha_jt D_j^{s_t}`
+
+    where :math:`s_t` is the subject at time :math:`t`.
     """
 
     def call(self, inputs):
@@ -1289,13 +1391,15 @@ class MixSubjectSpecificParametersLayer(layers.Layer):
 
 
 class StaticKLDivergenceLayer(layers.Layer):
-    """Layer to calculate KL divergence between Gamma posterior
-    and exponential prior for deviation magnitude.
+    """Layer to calculate KL divergence between Gamma posterior and exponential prior
+    for deviation magnitude.
 
     Parameters
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(self, epsilon, **kwargs):
@@ -1334,7 +1438,8 @@ class MultiLayerPerceptronLayer(layers.Layer):
     n_units : int
         Number of units/neurons.
     norm_type : str
-        Normalization layer type. Can be None, "layer" or "batch".
+        Normalization layer type. Can be :code:`'layer'`, :code:`'batch'` or
+        :code:`None`.
     act_type : str
         Activation type.
     drop_rate : float
@@ -1343,6 +1448,8 @@ class MultiLayerPerceptronLayer(layers.Layer):
         Regularizer type.
     regularizer_factor : float
         Regularizer factor.
+    kwargs : keyword arguments
+        Keyword arguments to pass to the base class.
     """
 
     def __init__(
@@ -1383,15 +1490,15 @@ class MultiLayerPerceptronLayer(layers.Layer):
 
 
 class StaticLossScalingFactorLayer(layers.Layer):
-    """Layer to calculate the scaling factor for losses that
-    are associated with static parameters (e.g. regularisation
-    for observation model parameters).
+    r"""Layer to calculate the scaling factor for losses that are associated with
+    static parameters (e.g. regularisation for observation model parameters).
 
-    When calculating loss, we sum over the sequence length and
-    average over the sequences. The scaling factor is given by
+    When calculating loss, we sum over the sequence length and average over the
+    sequences. The scaling factor is given by
 
     .. math::
-        \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times \text{n_batches}}
+        \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times
+        \text{n_batches}}
     """
 
     def __init__(self, **kwargs):
