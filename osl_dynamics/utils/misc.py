@@ -62,7 +62,7 @@ def override_dict_defaults(default_dict, override_dict=None):
 def listify(obj):
     """Create a list from any input.
 
-    If None is passed, return an empty list.
+    If :code:`None` is passed, return an empty list.
     If a list is passed, return the list.
     If a tuple is passed, return it as a list.
     If any other object is passed, return it as a single item list.
@@ -107,7 +107,9 @@ def replace_argument(func, name, item, args, kwargs, append=False):
     Returns
     -------
     args : list
+        Arguments.
     kwargs : dict
+        Keyword arguments.
     """
     args = copy(listify(args))
     kwargs = copy(kwargs)
@@ -146,6 +148,7 @@ def get_argument(func, name, args, kwargs):
     Returns
     -------
     args : argument
+        Argument.
     """
     args = copy(listify(args))
     kwargs = copy(kwargs)
@@ -179,7 +182,7 @@ def check_arguments(args, kwargs, index, name, value, comparison_op):
         Comparison operation for checking the original.
 
     Returns
-    _______
+    -------
     valid : bool
         If the given value is valid as determined by the comparison operation.
     """
@@ -198,47 +201,6 @@ def check_arguments(args, kwargs, index, name, value, comparison_op):
         return False
 
 
-def check_iterable_type(iterable, object_type):
-    """Check iterable is non-empty and contains only objects of specific type.
-
-    Parameters
-    ----------
-    iterable : iterable
-        Iterable to check the type of.
-    object_type : type
-        Type to check for.
-
-    Returns
-    _______
-    type_correct : bool
-        Whether the iterable only contains the specified type.
-    """
-    if not hasattr(iterable, "__iter__") and not isinstance(iterable, str):
-        return False
-    if isinstance(iterable, np.ndarray):
-        return iterable.dtype == object_type
-    return bool(iterable) and all(isinstance(elem, object_type) for elem in iterable)
-
-
-def time_axis_first(input_array):
-    """Make arrays have their longest dimension first.
-
-    Parameters
-    ----------
-    input_array : np.ndarray
-        The array to be transposed or returned.
-
-    Returns
-    -------
-    transposed_array : np.ndarray
-    """
-    if input_array.ndim != 2:
-        return input_array
-    if input_array.shape[1] > input_array.shape[0]:
-        input_array = np.transpose(input_array)
-    return input_array
-
-
 def array_to_memmap(filename, array):
     """Save an array and reopen it as a np.memmap.
 
@@ -252,6 +214,7 @@ def array_to_memmap(filename, array):
     Returns
     -------
     memmap : np.memmap
+        Memory map.
     """
     np.save(filename, array)
     return np.load(filename, mmap_mode="r+")
@@ -280,7 +243,7 @@ class MockArray:
     ----------
     shape : list of int
         Dimensions or the array being created.
-    dtype
+    dtype : type
         The data type of the array.
     c_contiguous : bool
         Is the array C contiguous or F contiguous?
@@ -330,86 +293,6 @@ class MockArray:
     def get_memmap(cls, filename, shape, dtype=np.float64, c_contiguous=True):
         cls.to_disk(filename, shape, dtype, c_contiguous)
         return np.load(filename, mmap_mode="r+")
-
-
-def _gen_dict_extract(key, dictionary, current_key="root"):
-    """Search for a key in a nested dict and get the value and full path of a key.
-
-    Parameters
-    ----------
-    key: str
-        The key to search for.
-    dictionary: dict
-        The nested dictionary to search.
-    current_key: str
-        The current path (nesting level) in the dictionary.
-    """
-    if hasattr(dictionary, "items"):
-        for k, v in dictionary.items():
-            this_key = "".join([current_key, f'["{k}"]'])
-            if k == key:
-                yield {this_key: v}
-            if isinstance(v, dict):
-                for result in _gen_dict_extract(key, v, this_key):
-                    yield result
-            elif isinstance(v, list):
-                for d in v:
-                    for result in _gen_dict_extract(key, d, this_key):
-                        yield result
-
-
-def dict_extract(key, dictionary):
-    """Wrapper for _gen_dict_extract
-
-    Parameters
-    ----------
-    key: str
-        The key to search for.
-    dictionary: dict
-        The nested dictionary to search.
-
-    Returns
-    -------
-    dictionary : dict
-        Extracted dictionary.
-    """
-
-    full_dictionary = {}
-    for item in _gen_dict_extract(key, dictionary):
-        full_dictionary.update(item)
-
-    return full_dictionary
-
-
-def class_from_yaml(cls, file, kwargs):
-    file = Path(file)
-    with file.open() as f:
-        args = yaml.load(f, Loader=yaml.Loader)
-
-    args.update(kwargs)
-
-    signature = inspect.signature(cls)
-    parameters = np.array(list(signature.parameters.items()))
-
-    extra = [arg for arg in args if arg not in parameters]
-    missing = np.array([parameter[0] not in args for parameter in parameters])
-    has_default = np.array(
-        [parameter[1].default is not parameter[1].empty for parameter in parameters]
-    )
-    allowed = ~missing | has_default
-    using_default = missing & has_default
-
-    actually_missing = parameters[~allowed]
-    using_default = parameters[missing & has_default]
-
-    if actually_missing.size > 0:
-        raise ValueError(f"Missing arguments: {', '.join(actually_missing[:, 0])}")
-    if extra:
-        _logger.warning(f"Extra arguments: {', '.join(extra)}")
-    if using_default.size > 0:
-        _logger.warning(f"Using defaults for: {', '.join(using_default[:, 0])}")
-
-    return cls(**{key: value for key, value in args.items() if key not in extra})
 
 
 class NumpyLoader(yaml.UnsafeLoader):
@@ -467,7 +350,7 @@ def save(filename, array):
     # Validation
     ext = Path(filename).suffix
     if ext not in [".npy", ".pkl"]:
-        raise ValueError(f"filename extension must be .npy or .pkl.")
+        raise ValueError("filename extension must be .npy or .pkl.")
 
     # Save
     _logger.info(f"Saving {filename}")
@@ -493,7 +376,7 @@ def load(filename):
     # Validation
     ext = Path(filename).suffix
     if ext not in [".npy", ".pkl"]:
-        raise ValueError(f"filename extension must be .npy or .pkl.")
+        raise ValueError("filename extension must be .npy or .pkl.")
 
     # Load
     _logger.info(f"Loading {filename}")
