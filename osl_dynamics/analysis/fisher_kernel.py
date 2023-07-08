@@ -2,8 +2,9 @@
 
 """
 
-import numpy as np
 import logging
+
+import numpy as np
 from tqdm.auto import trange
 
 _logger = logging.getLogger("osl-dynamics")
@@ -14,8 +15,9 @@ class FisherKernel:
 
     Parameters
     ----------
-    model : osl_dynamics.models.Model
-        Model.
+    model : osl-dynamics model
+        Model. Currently only the :code:`HMM`, :code:`DyNeMo` and :code:`M-DyNeMo`
+        are implemented.
     """
 
     def __init__(self, model):
@@ -27,6 +29,7 @@ class FisherKernel:
                 f"{model.config.model_name} was not found."
                 + f"Options are {compatible_models}."
             )
+
         self.model = model
 
     def get_kernel_matrix(self, dataset, batch_size=None):
@@ -37,17 +40,19 @@ class FisherKernel:
         dataset : osl_dynamics.data.Data
             Data.
         batch_size : int
-            Batch size. If None, use the model's batch size.
+            Batch size. If :code:`None`, we use the :code:`model.config.batch_size`.
 
         Returns
         -------
         kernel_matrix : np.ndarray
-            Fisher kernel matrix. Shape is (n_subjects, n_subjects).
+            Fisher kernel matrix. Shape is :code:`(n_subjects, n_subjects)`.
         """
         _logger.info("Getting Fisher kernel matrix")
+
         n_subjects = dataset.n_subjects
         if batch_size is not None:
             self.model.config.batch_size = batch_size
+
         dataset = self.model.make_dataset(dataset, concatenate=False, shuffle=False)
 
         # Initialise list to hold subject features
@@ -115,56 +120,60 @@ class FisherKernel:
 
         # Compute the kernel matrix with inner product
         kernel_matrix = features @ features.T
+
         return kernel_matrix
 
     def _d_trans_prob(self, xi):
-        """Get the derivative of free energy with respect to
-        the transition probability in HMM.
+        """Get the derivative of free energy with respect to the transition probability
+        in the HMM.
 
         Parameters
         ----------
         xi : np.ndarray
-            Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Shape is :code:`(batch_size*sequence_length-1, n_states*n_states)`.
 
         Returns
         -------
         d_trans_prob : np.ndarray
-            Derivative of free energy wrt the transition probability.
-            Shape is (n_states, n_states).
+            Derivative of free energy with respect to the transition probability.
+            Shape is :code:`(n_states, n_states)`.
         """
         trans_prob = self.model.trans_prob
         n_states = trans_prob.shape[0]
+
         # Reshape xi
         xi = np.reshape(xi, (xi.shape[0], n_states, n_states), order="F")
-        # truncate at 1e-6 for numerical stability
+
+        # Truncate at 1e-6 for numerical stability
         trans_prob = np.maximum(trans_prob, 1e-6)
         trans_prob /= np.sum(trans_prob, axis=-1, keepdims=True)
-
         d_trans_prob = np.sum(xi, axis=0) / trans_prob
+
         return d_trans_prob
 
     def _d_initial_distribution(self, gamma):
-        """Get the derivative of free energy with respect to
-        the initial distribution in HMM.
+        """Get the derivative of free energy with respect to the initial distribution
+        in HMM.
 
         Parameters
         ----------
         gamma : np.ndarray
             Marginal posterior distribution of hidden states given the data.
-            Shape is (batch_size*sequence_length, n_states).
+            Shape is :code:`(batch_size*sequence_length, n_states)`.
 
         Returns
         -------
         d_initial_distribution : np.ndarray
-            Derivative of free energy wrt the initial distribution.
-            Shape is (n_states,).
+            Derivative of free energy with respect to the initial distribution.
+            Shape is :code:`(n_states,)`.
         """
-        # truncate at 1e-6 for numerical stability
+        # Truncate at 1e-6 for numerical stability
         initial_distribution = self.model.state_probs_t0
         initial_distribution = np.maximum(initial_distribution, 1e-6)
         initial_distribution /= np.sum(initial_distribution)
 
         d_initial_distribution = gamma[0] / initial_distribution
+
         return d_initial_distribution
 
     def _get_tf_gradients(self, inputs):
@@ -172,13 +181,13 @@ class FisherKernel:
 
         Parameters
         ----------
-        inputs
-            Input to the tensorflow models.
+        inputs : tf.data.Dataset
+            Model inputs.
 
         Returns
         -------
         gradients : dict
-            Gradients with respect to trainable variables.
+            Gradients with respect to the trainable variables.
         """
         with tf.GradientTape() as tape:
             loss = self.model.model(inputs)

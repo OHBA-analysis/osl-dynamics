@@ -18,16 +18,17 @@ def functional_connectivity(data, conn_type="corr"):
     Parameters
     ----------
     data : np.ndarray
-        Time series data. Shape must be (n_subjects, n_samples, n_channels)
-        or (n_samples, n_channels).
+        Time series data. Shape must be :code:`(n_subjects, n_samples, n_channels)`
+        or :code:`(n_samples, n_channels)`.
     conn_type : str
-        What metric should we use? "corr" (Pearson correlation) or "cov" (covariance).
+        What metric should we use? :code:`"corr"` (Pearson correlation) or
+        :code:`"cov"` (covariance).
 
     Returns
     -------
     fc : np.ndarray
-        Functional connectivity. Shape is (n_subjects, n_channels, n_channels)
-        or (n_channels, n_channels).
+        Functional connectivity. Shape is :code:`(n_subjects, n_channels, n_channels)`
+        or :code:`(n_channels, n_channels)`.
     """
     if conn_type not in ["corr", "cov"]:
         raise ValueError(f"conn_type must be 'corr' or 'cov', got: {conn_type}")
@@ -62,14 +63,14 @@ def power_spectra(
     ----------
     data : np.ndarray
         Data to calculate the spectrogram for. Shape must be
-        (n_subjects,  n_samples, n_channels) or (n_samples, n_channels).
+        :code:`(n_subjects, n_samples, n_channels)` or :code:`(n_samples, n_channels)`.
     window_length : int
         Number of data points to use when calculating the periodogram.
     sampling_frequency : float
         Sampling frequency in Hz.
     step_size : int
-        Step size for shifting the window. By default we will use half
-        the window length.
+        Step size for shifting the window. By default we will use
+        :code:`step_size=window_length // 2`.
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
@@ -83,14 +84,15 @@ def power_spectra(
     Returns
     -------
     f : np.ndarray
-        Frequency axis. Shape is (n_freq,).
+        Frequency axis. Shape is :code:`(n_freq,)`.
     psd : np.ndarray
-        Power spectral density. Shape is (n_subjects, n_channels, n_freq).
+        Power spectral density. Shape is :code:`(n_subjects, n_channels, n_freq)`.
     coh : np.ndarray
-        Coherence spectra. Shape is (n_subjects, n_channels, n_channels, n_freq).
-        Only returned is calc_coh=True.
+        Coherence spectra. Shape is :code:`(n_subjects, n_channels, n_channels, n_freq)`.
+        Only returned is :code:`calc_coh=True`.
     weights : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
+        Weight for each subject-specific PSD. Only returned if
+        :code:`return_weights=True`.
     """
 
     # Validation
@@ -201,8 +203,8 @@ def multitaper_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Raw time series data. Must have shape (n_subjects, n_samples, n_channels)
-        or (n_samples, n_channels).
+        Raw time series data. Must have shape :code:`(n_subjects, n_samples, n_channels)`
+        or :code:`(n_samples, n_channels)`.
     sampling_frequency : float
         Sampling frequency in Hz.
     time_half_bandwidth : float
@@ -224,17 +226,15 @@ def multitaper_spectra(
     Returns
     -------
     frequencies : np.ndarray
-        Frequencies of the power spectra and coherences.
-        Shape is (n_freq,).
+        Frequencies of the power spectra and coherences. Shape is :code:`(n_freq,)`.
     power_spectra : np.ndarray
-        Power spectra for each state.
-        Shape is (n_subjects, n_channels, n_freq).
+        Power spectra for each state. Shape is :code:`(n_subjects, n_channels, n_freq)`.
     coherences : np.ndarray
         Coherences for each state.
-        Shape is (n_subjects, n_channels, n_channels, n_freq).
+        Shape is :code:`(n_subjects, n_channels, n_channels, n_freq)`.
     weights : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
-        Shape is (n_subjects,).
+        Weight for each subject-specific PSD. Only returned if
+        :code:`return_weights=True`. Shape is :code:`(n_subjects,)`.
     """
     if isinstance(data, np.ndarray):
         if data.ndim != 3:

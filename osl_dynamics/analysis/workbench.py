@@ -52,9 +52,9 @@ def render(
     save_dir : str
         Path to save rendered surface plots.
     interptype : str
-        Interpolation type. Default is 'trilinear'.
+        Interpolation type. Default is :code:`'trilinear'`.
     gui : bool
-        Should we display the rendered plots in workbench? Default is True.
+        Should we display the rendered plots in workbench? Default is :code:`True`.
     image_name : str
         Filename of image to save.
     """

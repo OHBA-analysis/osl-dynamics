@@ -45,14 +45,14 @@ def get_state_time_series(data, alpha):
     Parameters
     ----------
     data : np.ndarray
-        Raw data time series with shape (n_samples, n_channels).
+        Raw data time series with shape :code:`(n_samples, n_channels)`.
     alpha : np.ndarray
-        Mode mixing factors alpha_t with shape (n_samples, n_states).
+        State probabilities with shape :code:`(n_samples, n_states)`.
 
     Returns
     -------
     state_time_series : np.ndarray
-        Time series for each state. Shape is (n_states, n_samples, n_channels).
+        Time series for each state. Shape is :code:`(n_states, n_samples, n_channels)`.
 
     """
     # Make sure the data and state time courses have the same length
@@ -82,7 +82,7 @@ def window_mean(data, window_length, step_size=1, n_sub_windows=1):
     Parameters
     ----------
     data : np.ndarray
-        Time series data. Shape is (n_samples, n_modes).
+        Time series data. Shape is :code:`(n_samples, n_modes)`.
     window_length : int
         Number of data points in a window.
     step_size : int
@@ -147,7 +147,7 @@ def coherence_spectra(power_spectra, log_message=False):
     Parameters
     ----------
     power_spectra : np.ndarray
-        Power spectra. Shape is (n_modes, n_channels, n_channels, n_freq).
+        Power spectra. Shape is :code:`(n_modes, n_channels, n_channels, n_freq)`.
     log_message : bool
         Should we log a message to screen?
 
@@ -155,7 +155,7 @@ def coherence_spectra(power_spectra, log_message=False):
     -------
     coherences : np.ndarray
         Coherence spectra for each mode.
-        Shape is (n_modes, n_channels, n_channels, n_freq).
+        Shape is :code:`(n_modes, n_channels, n_channels, n_freq)`.
     """
     n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
@@ -184,25 +184,28 @@ def decompose_spectra(
     """Performs spectral decomposition using coherences.
 
     Uses non-negative matrix factorization to decompose spectra.
-    Follows the same procedure as the OSL function HMM-MAR/spectral/spectdecompose.m
+    Follows the same procedure as the MATLAB function `HMM-MAR/spectral/spectdecompose.m
+    <https://github.com/OHBA-analysis/HMM-MAR/blob/master/spectral/spectdecompose.m>`_.
 
     Parameters
     ----------
     coherences : np.ndarray
-        Coherences spectra.
+        Coherences spectra. Shape must be :code:`(..., n_channels, n_channels, n_freq,)`.
     n_components : int
         Number of spectral components to fit.
     max_iter : int
-        Maximum number of iterations in sklearn's non_negative_factorization.
+        Maximum number of iterations in `sklearn.decomposion.non_negative_factorization
+        <https://scikit-learn.org/stable/modules/generated/sklearn.decomposition\
+        .non_negative_factorization.html>`_.
     random_state : int
         Seed for the random number generator.
     verbose : int
-        Show verbose? (1) yes, (0) no.
+        Show verbose? (:code:`1`) yes, (:code:`0`) no.
 
     Returns
     -------
     components : np.ndarray
-        Spectral components. Shape is (n_components, n_freq).
+        Spectral components. Shape is :code:`(n_components, n_freq)`.
     """
     _logger.info("Performing spectral decomposition")
 
@@ -257,7 +260,7 @@ def fourier_transform(
     Parameters
     ----------
     data : np.ndarray
-        Data with shape (n_samples, n_channels) to FFT.
+        Data with shape :code:`(n_samples, n_channels)` to FFT.
     nfft : int
         Number of points in the FFT.
     args_range : list
@@ -268,7 +271,8 @@ def fourier_transform(
     Returns
     -------
     X : np.ndarray
-        FFT data.
+        FFT data. Shape is :code:`(n_channels, nfft // 2,)` if :code:`one_side=True`,
+        otherwise it is :code:`(n_channels, nfft)`.
     """
 
     # Calculate the FFT
@@ -314,23 +318,23 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     Parameters
     ----------
     coeffs : np.ndarray
-        MAR coefficients. Shape must be (n_modes, n_channels, n_channels) or
-        (n_channels, n_channels) or (n_channels,).
+        MAR coefficients. Shape must be :code:`(n_modes, n_channels, n_channels)` or
+        :code:`(n_channels, n_channels)` or :code:`(n_channels,)`.
     covs : np.ndarray
-        MAR covariances. Shape must be (n_modes, n_channels, n_channels) or
-        (n_channels, n_channels).
+        MAR covariances. Shape must be :code:`(n_modes, n_channels, n_channels)` or
+        :code:`(n_channels, n_channels)`.
     sampling_frequency : float
-        Sampling frequency in Hertz.
+        Sampling frequency in Hz.
     n_freq : int
         Number of frequency bins in the cross power spectral density to calculate.
 
     Returns
     -------
     f : np.ndarray
-        Frequency axis. Shape is (n_freq,).
+        Frequency axis. Shape is :code:`(n_freq,)`.
     P : np.ndarray
-        Cross power spectral densities. Shape is (n_freq, n_modes, n_channels,
-        n_channels) or (n_freq, n_channels, n_channels).
+        Cross power spectral densities. Shape is :code:`(n_freq, n_modes, n_channels,
+        n_channels)` or :code:`(n_freq, n_channels, n_channels)`.
     """
     # Validation
     if covs.shape[-1] != covs.shape[-2]:
@@ -400,33 +404,35 @@ def autocorr_to_spectra(
     Parameters
     ----------
     autocorr_func : np.ndarray
-        Autocorrelation functions. Shape must be (n_channels, n_channels, n_acf) or
-        (n_modes, n_channels, n_channels, n_acf).
+        Autocorrelation functions. Shape must be :code:`(n_channels, n_channels,
+        n_lags)` or :code:`(n_modes, n_channels, n_channels, n_lags)`.
     sampling_frequency : float
-        Frequency at which the data was sampled (Hz).
+        Sampling frequency in Hz.
     nfft : int
         Number of data points in the FFT. The auto-correlation function will only
-        have 2 * (n_embeddings + 2) - 1 data points. We pad the auto-correlation
-        function with zeros to have nfft data points if the number of data points
-        in the auto-correlation function is less than nfft. Default is 64.
+        have :code:`2 * (n_embeddings + 2) - 1` data points. We pad the auto-correlation
+        function with zeros to have :code:`nfft` data points if the number of data points
+        in the auto-correlation function is less than :code:`nfft`.
+        Default is :code:`64`.
     frequency_range : list
         Minimum and maximum frequency to keep (Hz).
 
     Returns
     -------
     frequencies : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
+        Frequencies of the power spectra and coherences. Shape is :code:`(n_freq,)`.
     power_spectra : np.ndarray
         Power (or cross) spectra calculated for each mode. Shape is
-        (n_channels, n_channels, n_freq) or (n_modes, n_channels, n_channels, n_freq).
+        :code:`(n_channels, n_channels, n_freq)` or :code:`(n_modes, n_channels,
+        n_channels, n_freq)`.
     coherences : np.ndarray
-        Coherences calculated for each mode. Shape is (n_channels, n_channels, n_freq)
-        or (n_modes, n_channels, n_channels, n_freq).
+        Coherences calculated for each mode. Shape is :code:`(n_channels, n_channels,
+        n_freq)` or :code:`(n_modes, n_channels, n_channels, n_freq)`.
     """
     # Validation
     error_message = (
-        "autocorrelation_functions must be of shape (n_channels, n_channels, n_acf) "
-        + "or (n_modes, n_channels, n_channels, n_acf)."
+        "autocorrelation_functions must be of shape (n_channels, n_channels, n_lags) "
+        + "or (n_modes, n_channels, n_channels, n_lags)."
     )
     autocorr_func = array_ops.validate(
         autocorr_func,
@@ -440,8 +446,8 @@ def autocorr_to_spectra(
     _logger.info("Calculating power spectra")
 
     # Number of data points in the autocorrelation function and FFT
-    n_acf = autocorr_func.shape[-1]
-    nfft = max(nfft, 2 ** nextpow2(n_acf))
+    n_lags = autocorr_func.shape[-1]
+    nfft = max(nfft, 2 ** nextpow2(n_lags))
 
     # Calculate the argments to keep for the given frequency range
     frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
@@ -475,9 +481,9 @@ def multitaper(
     Parameters
     ----------
     data : np.ndarray
-        Data with shape (n_samples, n_channels) to calculate a multitaper for.
+        Data with shape :code:`(n_samples, n_channels)` to calculate a multitaper for.
     sampling_frequency : float
-        Frequency used to sample the data (Hz).
+        Sampling frequency in Hz.
     nfft : int
         Number of points in the FFT.
     tapers : np.ndarray
@@ -492,7 +498,8 @@ def multitaper(
     Returns
     -------
     P : np.ndarray
-        Power (or cross) spectral density with shape (n_channels, n_channels, n_freq).
+        Power (or cross) spectral density with shape :code:`(n_channels, n_channels,
+        n_freq)`.
     """
 
     # Transpose the data so that it is [n_channels, n_samples]
@@ -556,12 +563,12 @@ def single_multitaper_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Raw time series data. Must have shape (n_samples, n_channels).
+        Raw time series data. Must have shape :code:`(n_samples, n_channels)`.
     alpha : np.ndarray or list
-        Inferred state mixing factors. Must have shape (n_samples, n_states).
+        Inferred state mixing factors. Must have shape :code:`(n_samples, n_states)`.
     tapers : np.ndarray
         Tapers for apply to each data segments.
-        Shape must be (n_tapers, segment_length).
+        Shape must be :code:`(n_tapers, segment_length)`.
     n_freq : int
         Number of frequency bins.
     sampling_frequency : float
@@ -577,9 +584,9 @@ def single_multitaper_spectra(
     Returns
     -------
     p : np.ndarray
-        Power spectra. Shape is (n_states, n_channels, n_freq).
+        Power spectra. Shape is :code:`(n_states, n_channels, n_freq)`.
     c : np.ndarray
-        Coherence spectra. Shape is (n_states, n_channels, n_channels, n_freq).
+        Coherence spectra. Shape is :code:`(n_states, n_channels, n_channels, n_freq)`.
     """
 
     # Use the state time course to get a time series for each state
@@ -666,16 +673,17 @@ def multitaper_spectra(
     """Calculates spectra for inferred states using a multitaper.
 
     This includes power and coherence spectra.
-    Follows the same procedure as the OSL function HMM-MAR/spectral/hmmspectamt.m
+    Follows the same procedure as the MATLAB function `HMM-MAR/spectral/hmmspectamt.m
+    <https://github.com/OHBA-analysis/HMM-MAR/blob/master/spectral/hmmspectramt.m>`_.
 
     Parameters
     ----------
     data : np.ndarray or list
-        Raw time series data. Must have shape (n_subjects, n_samples, n_channels)
-        or (n_samples, n_channels).
+        Raw time series data. Must have shape :code:`(n_subjects, n_samples,
+        n_channels)` or :code:`(n_samples, n_channels)`.
     alpha : np.ndarray or list
-        Inferred state time course. Must have shape (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
+        Inferred state time course. Must have shape :code:`(n_subjects, n_samples,
+        n_states)` or :code:`(n_samples, n_states)`.
     sampling_frequency : float
         Sampling frequency in Hz.
     time_half_bandwidth : float
@@ -694,24 +702,24 @@ def multitaper_spectra(
     n_jobs : int
         Number of parallel jobs.
     keepdims : bool
-        Should we enforce a (n_subject, n_states, ...) array is returned for
-        psd and coh? If False, we remove any dimensions of length 1.
+        Should we enforce a :code:`(n_subject, n_states, ...)` array is returned for
+        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions of
+        length 1.
 
     Returns
     -------
     frequencies : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
+        Frequencies of the power spectra and coherences. Shape is :code:`(n_freq,)`.
     power_spectra : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
+        Power spectra for each subject and state. Shape is :code:`(n_subjects,
+        n_states, n_channels, n_freq)`. Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coherences : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        Coherences for each state. Shape is :code:`(n_subjects, n_states, n_channels,
+        n_channels, n_freq)`. Any axis of length 1 is removed if :code:`keepdims=False`.
     weights : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
-        Shape is (n_subjects,).
+        Weight for each subject-specific PSD. Only returned if
+        :code:`return_weights=True`. Shape is :code:`(n_subjects,)`.
     """
 
     # Validation
@@ -882,9 +890,10 @@ def single_regression_spectra(
     Parameters
     ----------
     data : np.ndarray
-        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
+        Data to calculate the spectrogram for. Shape must be :code:`(n_samples,
+        n_channels)`.
     alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
+        Inferred mode mixing factors. Shape must be :code:`(n_samples, n_modes)`.
     window_length : int
         Number of data points to use when calculating the periodogram.
     sampling_frequency : float
@@ -959,11 +968,11 @@ def regression_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Data to calculate a time-varying PSD for. Shape must be (n_subjects,
-        n_samples, n_channels) or (n_samples, n_channels).
+        Data to calculate a time-varying PSD for. Shape must be :code:`(n_subjects,
+        n_samples, n_channels)` or :code:`(n_samples, n_channels)`.
     alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be (n_subjects, n_samples,
-        n_modes) or (n_samples, n_modes).
+        Inferred mode mixing factors. Shape must be :code:`(n_subjects, n_samples,
+        n_modes)` or :code:`(n_samples, n_modes)`.
     window_length : int
         Number samples to use in the window to calculate a PSD.
     sampling_frequency : float
@@ -979,7 +988,7 @@ def regression_spectra(
     n_sub_windows : int
         We split the window into a number of sub-windows and average the
         spectra for each sub-window. window_length must be divisible by
-        n_sub_windows.
+        :code:`n_sub_windows`.
     return_weights : bool
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
@@ -991,24 +1000,25 @@ def regression_spectra(
     n_jobs : int
         Number of parallel jobs.
     keepdims : bool
-        Should we enforce a (n_subject, n_states, ...) array is returned for
-        psd and coh? If False, we remove any dimensions of length 1.
+        Should we enforce a :code:`(n_subject, n_states, ...)` array is returned for
+        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions of
+        length 1.
 
     Returns
     -------
     f : np.ndarray
-        Frequency axis. Shape is (n_freq).
+        Frequency axis. Shape is :code:`(n_freq)`.
     psd : np.ndarray
-        Mode PSDs. A numpy array with shape (n_subjects, 2, n_modes, n_channels, n_freq)
-        where axis=1 is the coefficients/intercept if return_coef_int=True, otherwise
-        shape is (n_subjects, n_modes, n_channels, n_freq). Any axis of length 1 is
-        removed if :code:`keepdims=False`.
+        Mode PSDs. A numpy array with shape :code:`(n_subjects, 2, n_modes, n_channels,
+        n_freq)` where :code:`axis=1` is the coefficients/intercept if
+        :code:`return_coef_int=True`, otherwise shape is :code:`(n_subjects, n_modes,
+        n_channels, n_freq)`. Any axis of length 1 is removed if :code:`keepdims=False`.
     coh : np.ndarray
-        Mode coherences. Shape is (n_subjects, n_modes, n_channels, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Mode coherences. Shape is :code:`(n_subjects, n_modes, n_channels, n_channels,
+        n_freq)`. Any axis of length 1 is removed if :code:`keepdims=False`.
     w : np.ndarray
-        Weight for each subject-specific PSD. Shape is (n_subjects).
-        Only returned if return_weights=True.
+        Weight for each subject-specific PSD. Shape is :code:`(n_subjects,)`.
+        Only returned if :code:`return_weights=True`.
     """
 
     # Validation
@@ -1197,7 +1207,8 @@ def spectrogram(
     Parameters
     ----------
     data : np.ndarray
-        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
+        Data to calculate the spectrogram for.
+        Shape must be :code:`(n_samples, n_channels)`.
     window_length : int
         Number of data points to use when calculating the periodogram.
     sampling_frequency : float
@@ -1342,17 +1353,17 @@ def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windo
     Parameters
     ----------
     psd : np.ndarray
-        Mode PSDs. Shape must be (n_subjects, 2, n_modes, n_channels, n_freq)
+        Mode PSDs. Shape must be :code:`(n_subjects, 2, n_modes, n_channels, n_freq)`
     alpha : np.ndarray or list
-        Inferred mode mixing factors. Shape must be (n_subjects, n_samples,
-        n_modes) or (n_samples, n_modes).
+        Inferred mode mixing coefficients. Shape must be :code:`(n_subjects, n_samples,
+        n_modes)` or :code:`(n_samples, n_modes)`.
     window_length : int
         Number samples used as the window to calcualte a PSD.
     step_size : int
         Step size used for shifting the window.
     n_sub_windows : int
-        Number of sub-windows used to average the spectra. window_length
-        must be divisible by n_sub_windows.
+        Number of sub-windows used to average the spectra. :code:`window_length`
+        must be divisible by :code:`n_sub_windows`.
 
     Returns
     -------
@@ -1419,25 +1430,28 @@ def wavelet(
 ):
     """Calculate a wavelet transform.
 
-    This function uses a scipy.signal.morlet2 window to calculate
-    the wavelet transform.
+    This function uses a `scipy.signal.morlet2 <https://docs.scipy.org/doc/scipy\
+    /reference/generated/scipy.signal.morlet2.html>`_ window to calculate the
+    wavelet transform.
 
     Parameters
     ----------
     data : np.ndarray
-        1D time series data.
+        1D time series data. Shape must be :code:`(n_samples,)`.
     sampling_frequency : float
         Sampling frequency in Hz.
     w : float
-        w parameter to pass to scipy.signal.morlet2.
+        :code:`w` parameter to pass to `scipy.signal.morlet2 
+        <https://docs.scipy.org/doc/scipy/reference/generated\
+        /scipy.signal.morlet2.html>`_.
     standardize : bool
         Should we standardize the data before calculating the wavelet?
     time_range : list
         Start time and end time to plot in seconds.
         Default is the full time axis of the data.
     frequency_range : list of length 2
-        Start and end frequency to plot in Hertz.
-        Default is [1, sampling_frequency / 2].
+        Start and end frequency to plot in Hz.
+        Default is :code:`[1, sampling_frequency / 2]`.
 
     Returns
     -------
