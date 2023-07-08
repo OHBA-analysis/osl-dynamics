@@ -87,13 +87,13 @@ plotting.plot_alpha(
     filename="figures/compare.png",
 )
 
-plotting.plot_mode_lifetimes(
+plotting.plot_state_lifetimes(
     sim_stc,
     x_label="Lifetime",
     y_label="Occurrence",
     filename="figures/sim_lt.png",
 )
-plotting.plot_mode_lifetimes(
+plotting.plot_state_lifetimes(
     inf_stc,
     x_label="Lifetime",
     y_label="Occurrence",
@@ -112,7 +112,7 @@ plotting.plot_matrices(inf_cov, filename="figures/inf_cov.png")
 gen_alp = model.sample_alpha(inf_alp)
 gen_stc = modes.argmax_time_courses(gen_alp)
 
-plotting.plot_mode_lifetimes(
+plotting.plot_state_lifetimes(
     gen_stc,
     x_label="Lifetime",
     y_label="Occurrence",

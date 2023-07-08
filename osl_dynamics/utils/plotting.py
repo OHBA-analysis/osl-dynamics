@@ -1784,8 +1784,8 @@ def plot_alpha(
         return fig, axes
 
 
-def plot_mode_lifetimes(
-    mode_time_course,
+def plot_state_lifetimes(
+    state_time_course,
     bins="auto",
     density=False,
     match_scale_x=False,
@@ -1797,19 +1797,19 @@ def plot_mode_lifetimes(
     fig_kwargs=None,
     filename=None,
 ):
-    """Create a histogram of mode lifetimes.
+    """Create a histogram of state lifetimes.
 
-    For a mode time course, create a histogram for each mode with the distribution
+    For a state time course, create a histogram for each state with the distribution
     of the lengths of time for which it is active.
 
     Parameters
     ----------
-    mode_time_course : np.ndarray
+    state_time_course : np.ndarray
         Mode time course to analyse.
     bins : int
         Number of bins for the histograms.
     density : bool
-        If :code:`True`, plot the probability density of the mode activation lengths.
+        If :code:`True`, plot the probability density of the state activation lengths.
         If :code:`False`, raw number.
     match_scale_x : bool
         If True, all histograms will share the same x-axis scale.
@@ -1840,15 +1840,15 @@ def plot_mode_lifetimes(
     """
     from osl_dynamics.analysis import modes
 
-    n_plots = mode_time_course.shape[1]
+    n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
     colors = get_colors(n_plots)
 
     # Validation
-    if mode_time_course.ndim == 1:
-        mode_time_course = get_one_hot(mode_time_course)
-    if mode_time_course.ndim != 2:
-        raise ValueError("mode_timecourse must be a 2D array")
+    if state_time_course.ndim == 1:
+        state_time_course = get_one_hot(state_time_course)
+    if state_time_course.ndim != 2:
+        raise ValueError("state_time_course must be a 2D array.")
 
     if fig_kwargs is None:
         fig_kwargs = {}
@@ -1858,8 +1858,8 @@ def plot_mode_lifetimes(
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    # Calculate mode lifetimes
-    channel_lifetimes = modes.lifetimes(mode_time_course)
+    # Calculate state lifetimes
+    channel_lifetimes = modes.lifetimes(state_time_course)
 
     # Create figure
     fig, axes = create_figure(short, long, **fig_kwargs)
@@ -1892,7 +1892,7 @@ def plot_mode_lifetimes(
         t = axis.text(
             0.95,
             0.95,
-            f"{np.sum(channel) / len(mode_time_course) * 100:.2f}%",
+            f"{np.sum(channel) / len(state_time_course) * 100:.2f}%",
             fontsize=10,
             horizontalalignment="right",
             verticalalignment="top",
