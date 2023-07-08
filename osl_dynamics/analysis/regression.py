@@ -11,7 +11,8 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def linear(X, y, fit_intercept, normalize=False, log_message=False):
-    """Wrapper for sklearn's LinearRegression.
+    """Wrapper for `sklearn.linear_model.LinearRegression \
+    <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html>`_.
 
     Parameters
     ----------
@@ -33,7 +34,7 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
         2D or higher dimension array. Regression coefficients.
     intercept : np.ndarray
         1D or higher dimension array. Regression intercept.
-        Returned if fit_intercept=True.
+        Returned if :code:`fit_intercept=True`.
     """
     if log_message:
         _logger.info("Fitting linear regression")
@@ -83,30 +84,3 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
         return coefs, intercept
     else:
         return coefs
-
-
-def pinv(X, y):
-    """Find the parameters of a linear regression using a pseudo inverse.
-
-    If y = X @ b, where y, X and b are 2D matrices. This function calculates
-    b using y and X: b = pinv(X) @ y.
-
-    Parameters
-    ----------
-    X : np.ndarray
-        2D matrix. Regressors.
-    y : np.ndarray
-        2D matrix. Targets. If a higher dimension array is passed, the extra
-        dimensions are concatenated.
-
-    Returns
-    -------
-    b : np.ndarray
-        2D or higher dimension matrix. Regression coefficients.
-    """
-    original_shape = y.shape
-    new_shape = [X.shape[1]] + list(original_shape[1:])
-    y = y.reshape(original_shape[0], -1)
-    b = np.linalg.pinv(X) @ y
-    b = b.reshape(new_shape)
-    return b
