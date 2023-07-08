@@ -32,14 +32,16 @@ def load_data(inputs, kwargs=None, prepare=None):
     Parameters
     ----------
     inputs : str
-        Path to directory containing npy files.
-    kwargs: dict
-        Keyword arguments to pass to the Data class.
-        Useful keyword arguments to pass are the :code:`sampling_frequency`,
+        Path to directory containing :code:`npy` files.
+    kwargs : dict
+        Keyword arguments to pass to the `Data <https://osl-dynamics.readthedocs.io\
+        /en/latest/autoapi/osl_dynamics/data/index.html#osl_dynamics.data.Data>`_ class.
+        Useful keyword arguments to pass are :code:`sampling_frequency`,
         :code:`mask_file` and :code:`parcellation_file`.
     prepare : dict
         Methods dict to pass to the prepare method. See docstring for
-        osl_dynamics.data.Data.prepare.
+        `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /data/index.html#osl_dynamics.data.Data>`_.prepare.
 
     Returns
     -------
@@ -64,7 +66,8 @@ def train_hmm(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train a Hidden Markov Model.
+    """Train a `Hidden Markov Model <https://osl-dynamics.readthedocs.io/en/latest/\
+    autoapi/osl_dynamics/models/hmm/index.html>`_.
 
     This function will:
 
@@ -87,15 +90,17 @@ def train_hmm(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to hmm.Config. Defaults to::
+        Keyword arguments to pass to `hmm.Config <https://osl-dynamics.readthedocs.io\
+        /en/latest/autoapi/osl_dynamics/models/hmm/index.html#osl_dynamics.models.\
+        hmm.Config>`_. Defaults to::
 
             {'sequence_length': 2000,
              'batch_size': 32,
              'learning_rate': 0.01,
              'n_epochs': 20}.
     init_kwargs : dict
-        Keyword arguments to pass to :code:`Model.random_state_time_course_initialization`.
-        Optional, defaults to::
+        Keyword arguments to pass to
+        :code:`Model.random_state_time_course_initialization`. Optional, defaults to::
 
             {'n_init': 3, 'n_epochs': 1}.
     fit_kwargs : dict
@@ -168,7 +173,8 @@ def train_dynemo(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train DyNeMo.
+    """Train `DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+    /osl_dynamics/models/dynemo/index.html>`_.
 
     This function will:
 
@@ -191,8 +197,9 @@ def train_dynemo(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to dynemo.Config.
-        Defaults to::
+        Keyword arguments to pass to `dynemo.Config <https://osl-dynamics.readthedocs\
+        .io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics\
+        .models.dynemo.Config>`_. Defaults to::
 
             {'n_channels': data.n_channels.
              'sequence_length': 200,
@@ -423,7 +430,9 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     output_dir : str
         Path to output directory.
     kwargs : dict
-        Keyword arguments to pass to osl_dynamics.analysis.spectral.multitaper_spectra.
+        Keyword arguments to pass to `analysis.spectral.multitaper_spectra
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_.
         Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
@@ -536,7 +545,9 @@ def regression_spectra(data, output_dir, kwargs):
     output_dir : str
         Path to output directory.
     kwargs : dict
-        Keyword arguments to pass to osl_dynamics.analysis.spectral.multitaper_spectra.
+        Keyword arguments to pass to `analysis.spectral.regress_spectra
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /spectral/index.html#osl_dynamics.analysis.spectral.regression_spectra>`_.
         Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
@@ -640,15 +651,16 @@ def plot_group_ae_networks(
         Optional, defaults to :code:`True`.
     power_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
 
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
              'parcellation_file': data.parcellation_file}
     conn_save_kwargs : dict
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
         Defaults to::
 
             {'parcellation_file': parcellation_file,
@@ -762,8 +774,8 @@ def plot_group_tde_hmm_networks(
         corresponds to the top 3% of edges (relative to the mean across states).
     power_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
 
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
@@ -771,7 +783,8 @@ def plot_group_tde_hmm_networks(
              'subtract_mean': True}
     conn_save_kwargs : dict
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
         Defaults to::
 
             {'parcellation_file': parcellation_file,
@@ -917,7 +930,8 @@ def plot_group_nnmf_tde_hmm_networks(
     nnmf_file : str
         Path relative to :code:`output_dir` for a npy file (with the output of
         `analysis.spectral.decompose_spectra
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_)
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_)
         containing the NNMF components.
     mask_file : str
         Mask file used to preprocess the training data. Optional. If :code:`None`,
@@ -932,8 +946,8 @@ def plot_group_nnmf_tde_hmm_networks(
         corresponds to the top 3% of edges (relative to the mean across states).
     power_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
 
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
@@ -942,7 +956,8 @@ def plot_group_nnmf_tde_hmm_networks(
              'subtract_mean': True}
     conn_save_kwargs : dict
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
         Defaults to::
 
             {'parcellation_file': parcellation_file,
@@ -1114,8 +1129,8 @@ def plot_group_tde_dynemo_networks(
         corresponds to the top 3% of edges (relative to the mean across states).
     plot_save_kwargs : dict
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
 
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
@@ -1123,7 +1138,8 @@ def plot_group_tde_dynemo_networks(
              'subtract_mean': True}
     conn_save_kwargs : dict
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
         Defaults to::
 
             {'parcellation_file': parcellation_file,
@@ -1241,7 +1257,8 @@ def plot_alpha(
     """Plot inferred alphas.
 
     This is a wrapper for `utils.plotting.plot_alpha
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
+    /plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
 
     This function expects a model has been trained and the following directory to exist:
 
@@ -1269,7 +1286,8 @@ def plot_alpha(
         present in :code:`data.sampling_frequency`.
     kwargs : dict
         Keyword arguments to pass to `utils.plotting.plot_alpha
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
+        /plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
         Optional. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
@@ -1342,7 +1360,8 @@ def calc_gmm_alpha(data, output_dir, kwargs=None):
         Path to output directory.
     kwargs : dict
         Keyword arguments to pass to `inference.modes.gmm_time_courses
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference\
+        /modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_.
     """
     kwargs = {} if kwargs is None else kwargs
     inf_params_dir = output_dir + "/inf_params"
@@ -1427,7 +1446,8 @@ def plot_hmm_network_summary_stats(
         alp = load(f"{inf_params_dir}/alp.pkl")
         if isinstance(alp, np.ndarray):
             raise ValueError(
-                "We must train on multiple subjects to plot the distribution of summary statistics."
+                "We must train on multiple subjects to plot the distribution "
+                "of summary statistics."
             )
         stc = modes.argmax_time_courses(alp)
 
@@ -1629,7 +1649,8 @@ def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
     - Burst count (Hz).
     - Mean amplitude (a.u.).
 
-    This function expects a model has been trained and the following directories to exist:
+    This function expects a model has been trained and the following directories to
+    exist:
 
     - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.

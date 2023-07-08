@@ -46,8 +46,8 @@ def load_config(config):
     Parameters
     ----------
     config : str or dict
-        Path to yaml file, string to convert to dict, or dict
-        containing the config.
+        Path to yaml file, :code:`str` to convert to :code:`dict`,
+        or :code:`dict` containing the config.
 
     Returns
     -------
@@ -76,7 +76,7 @@ def find_function(name, extra_funcs=None):
     ----------
     name : str
         Function name.
-    extra_funcs : list of function
+    extra_funcs : list of functions
         Custom functions passed by the user.
 
     Returns
@@ -110,7 +110,8 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     Parameters
     ----------
     config : str or dict
-        Path to yaml file, string to convert to dict, or dict containing the config.
+        Path to yaml file, :code:`str` to convert to :code:`dict`,
+        or :code:`dict` containing the config.
     output_dir : str
         Path to output directory.
     data : osl_dynamics.data.Data
