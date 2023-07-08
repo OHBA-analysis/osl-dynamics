@@ -17,11 +17,11 @@ class MVN:
     n_modes : int
         Number of modes.
     means : np.ndarray or str
-        Mean vector for each mode, shape should be :code:`(n_modes, n_channels)`.
+        Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be :code:`(n_modes,
-        n_channels, n_channels)`. Either a numpy array or :code:`'random'`.
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
     n_covariances_act : int
         Number of iterations to add activations to covariance matrices.
     observation_error : float
@@ -139,13 +139,12 @@ class MVN:
         Parameters
         ----------
         state_time_course : np.ndarray
-            2D array containing state activations.
-            Shape must be :code:`(n_samples, n_states)`.
+            2D array containing state activations. Shape must be (n_samples, n_states).
 
         Returns
         -------
         data : np.ndarray
-            Time series data. Shape is :code:`(n_samples, n_channels)`.
+            Time series data. Shape is (n_samples, n_channels).
         """
         n_samples = state_time_course.shape[0]
 
@@ -187,11 +186,11 @@ class MDyn_MVN(MVN):
     Parameters
     ----------
     means : np.ndarray or str
-        Mean vector for each mode, shape should be :code:`(n_modes, n_channels)`.
+        Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be :code:`(n_modes,
-        n_channels, n_channels)`. Either a numpy array or :code:`'random'`.
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
     n_modes : int
         Number of modes.
     n_channels : int
@@ -235,13 +234,12 @@ class MDyn_MVN(MVN):
         ----------
         state_time_courses : np.ndarray
             Should contain two time courses: one for the mean and standard deviations
-            and another for functional connectiivty. Shape is
-            :code:`(2, n_samples, n_modes)`.
+            and another for functional connectiivty. Shape is (2, n_samples, n_modes).
 
         Returns
         -------
         np.ndarray
-            Simulated data. Shape is :code:`(n_samples, n_channels)`.
+            Simulated data. Shape is (n_samples, n_channels).
         """
         # Reshape state_time_courses so that the multi-time-scale dimension
         # is last
@@ -300,11 +298,11 @@ class MSubj_MVN(MVN):
     ----------
     subject_means : np.ndarray or str
         Subject mean vector for each mode for each subject, shape should be
-        :code:`(n_subjects, n_modes, n_channels)`. Either a numpy array or
+        (n_subjects, n_modes, n_channels). Either a numpy array or
         :code:`'zero'` or :code:`'random'`.
     subject_covariances : np.ndarray or str
         Subject covariance matrix for each mode for each subject, shape should be
-        :code:`(n_subjects, n_modes, n_channels, n_channels)`. Either a numpy array
+        (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
     n_modes : int
         Number of modes.
@@ -631,12 +629,12 @@ class MSubj_MVN(MVN):
         subject : int
             Subject number.
         mode_time_course : np.ndarray
-            Mode time course. Shape is :code:`(n_samples, n_modes)`.
+            Mode time course. Shape is (n_samples, n_modes).
 
         Returns
         -------
         data : np.ndarray
-            Simulated data. Shape is :code:`(n_samples, n_channels)`.
+            Simulated data. Shape is (n_samples, n_channels).
         """
         n_samples = mode_time_course.shape[0]
 
@@ -677,13 +675,12 @@ class MSubj_MVN(MVN):
         ----------
         mode_time_courses : np.ndarray
             It contains n_subjects time courses.
-            Shape is :code:`(n_subjects, n_samples, n_modes)`.
+            Shape is (n_subjects, n_samples, n_modes).
 
         Returns
         -------
         np.ndarray
-            Simulated data for subjects.
-            Shape is :code:`(n_subjects, n_samples, n_channels)`.
+            Simulated data for subjects. Shape is (n_subjects, n_samples, n_channels).
         """
         data = []
         self.instantaneous_covs = []

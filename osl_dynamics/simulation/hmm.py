@@ -145,13 +145,13 @@ class HMM_MAR(Simulation):
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition probability
         matrix.
     coeffs : np.ndarray
-        Array of MAR coefficients. Shape must be :code:`(n_states, n_lags, n_channels,
-        n_channels)`.
+        Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
+        n_channels).
     covs : np.ndarray
         Variance of :math:`\epsilon_t`. See `simulation.MAR \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/\
         simulation/mar/index.html#osl_dynamics.simulation.mar.MAR>`_ for further
-        details. Shape must be :code:`(n_states, n_channels)`.
+        details. Shape must be (n_states, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is :code:`trans_prob` is a
         :code:`str`. Must be between :code:`0` and :code:`1`.
@@ -219,11 +219,11 @@ class HMM_MVN(Simulation):
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition probability
         matrix.
     means : np.ndarray or str
-        Mean vector for each state, shape should be :code:`(n_states, n_channels)`.
+        Mean vector for each state, shape should be (n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each state, shape should be :code:`(n_states,
-        n_channels, n_channels)`. Either a numpy array or :code:`'random'`.
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
     n_states : int
         Number of states. Can pass this argument with keyword :code:`n_modes` instead.
     n_channels : int
@@ -331,11 +331,11 @@ class MDyn_HMM_MVN(Simulation):
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition probability
         matrix.
     means : np.ndarray or str
-        Mean vector for each state, shape should be :code:`(n_states, n_channels)`.
+        Mean vector for each state, shape should be (n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each state, shape should be :code:`(n_states,
-        n_channels, n_channels)`. Either a numpy array or :code:`'random'`.
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
     n_states : int
         Number of states. Can pass this argument with keyword :code:`n_modes` instead.
     n_channels : int
@@ -450,11 +450,11 @@ class MSubj_HMM_MVN(Simulation):
         matrix.
     subject_means : np.ndarray or str
         Subject mean vector for each state, shape should be
-        :code:`(n_subjects, n_states, n_channels)`.
+        (n_subjects, n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     subject_covariances : np.ndarray or str
         Subject covariance matrix for each state, shape should be
-        :code:`(n_subjects, n_states, n_channels, n_channels)`.
+        (n_subjects, n_states, n_channels, n_channels).
         Either a numpy array or :code:`'random'`.
     n_states : int
         Number of states. Can pass this argument with keyword :code:`n_modes` instead.
@@ -616,11 +616,11 @@ class HierarchicalHMM_MVN(Simulation):
         Transitions probability matrices for the bottom level HMMs,
         which generate the observed data.
     means : np.ndarray or str
-        Mean vector for each state, shape should be :code:`(n_states, n_channels)`.
+        Mean vector for each state, shape should be (n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each state, shape should be :code:`(n_states,
-        n_channels, n_channels)`. Either a numpy array or :code:`'random'`.
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
     n_states : int
         Number of states. Can pass this argument with keyword :code:`n_modes` instead.
     n_channels : int

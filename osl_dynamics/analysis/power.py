@@ -26,8 +26,8 @@ def sliding_window_power(
     Parameters
     ----------
     data : list or np.ndarray
-        Time series data. Shape must be :code:`(n_subjects, n_samples, n_channels)`
-        or :code:`(n_samples, n_channels)`.
+        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
     window_length : int
         Window length in samples.
     step_size : int
@@ -42,8 +42,8 @@ def sliding_window_power(
     Returns
     -------
     sliding_window_power : list or np.ndarray
-        Time series of power vectors. Shape is :code:`(n_subjects, n_windows,
-        n_channels)` or :code:`(n_windows, n_channels)`.
+        Time series of power vectors. Shape is (n_subjects, n_windows, n_channels)
+        or (n_windows, n_channels).
     """
     # Validation
     if power_type not in ["mean", "var"]:
@@ -94,12 +94,12 @@ def variance_from_spectra(
     ----------
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if :code:`frequency_range` is given.
-        Shape must be :code:`(n_freq,)`.
+        Shape must be (n_freq,).
     power_spectra : np.ndarray
-        Power/cross spectra for each channel.
-        Shape must be :code:`(n_channels, n_channels)` or :code:`(n_channels,)`.
+        Power/cross spectra for each channel. Shape must be (n_channels, n_channels)
+        or (n_channels,).
     components : np.ndarray
-        Spectral components. Shape must be :code:`(n_components, n_freq)`.
+        Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list
         Frequency range in Hz to integrate the PSD over. Default is full range.
 
@@ -107,8 +107,8 @@ def variance_from_spectra(
     -------
     var : np.ndarray
         Variance over a frequency band for each component of each mode.
-        Shape is :code:`(n_components, n_modes, n_channels)` or :code:`(n_modes,
-        n_channels)` or :code:`(n_channels,)`.
+        Shape is (n_components, n_modes, n_channels) or (n_modes, n_channels)
+        or (n_channels,).
     """
 
     # Validation
@@ -209,14 +209,14 @@ def power_map_grid(mask_file, parcellation_file, power_map):
     mask_file : str
         Mask file used to preprocess the training data.
     power_map : np.ndarray
-        Power at each parcel. Shape must be :code:`(n_modes, n_parcels)`.
+        Power at each parcel. Shape must be (n_modes, n_parcels).
     parcellation_file : str
         Parcellation file used to parcellate the training data.
 
     Returns
     -------
     power_map : np.ndarray
-        Power at each voxel. Shape is :code:`(x, y, z, n_modes)`, where
+        Power at each voxel. Shape is (x, y, z, n_modes), where
         :code:`x`, :code:`y` and :code:`z` correspond to 3D voxel locations.
     """
 
@@ -280,9 +280,9 @@ def save(
     Parameters
     ----------
     power_map : np.ndarray
-        Power map to save. Can be of shape: :code:`(n_components, n_modes, n_channels)`,
-        :code:`(n_modes, n_channels)` or :code:`(n_channels,)`. A :code:`(...,
-        n_channels, n_channels)` array can also be passed. Warning: this function
+        Power map to save. Can be of shape: (n_components, n_modes, n_channels),
+        (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
+        array can also be passed. Warning: this function
         cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
@@ -491,16 +491,14 @@ def multi_save(
     ----------
     group_power_map : np.ndarray
         Group level power map to save.
-        Can be of shape: :code:`(n_modes, n_channels)` or :code:`(n_channels,)`.
-        A :code:`(..., n_channels, n_channels)` can also be passed.
-        Warning: this function cannot be used if :code:`n_modes` is equal to
-        :code:`n_channels`.
+        Can be of shape: (n_modes, n_channels) or (n_channels,). A (..., n_channels,
+        n_channels) can also be passed. Warning: this function cannot be used if
+        :code:`n_modes` is equal to :code:`n_channels`.
     subject_power_map : np.ndarray
         Subject level power maps to save.
-        Can be of shape: :code:`(n_subjects, n_modes, n_channels)`, :code:`(n_modes,
-        n_channels)` or :code:`(n_channels,)`. A :code:`(..., n_channels, n_channels)`
-        array can also be passed. Warning: this function cannot be used if
-        :code:`n_modes=n_channels`.
+        Can be of shape: (n_subjects, n_modes, n_channels), (n_modes, n_channels)
+        or (n_channels,). A (..., n_channels, n_channels) array can also be passed.
+        Warning: this function cannot be used if :code:`n_modes=n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str

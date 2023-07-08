@@ -151,11 +151,11 @@ class HSMM_MVN(Simulation):
     full_trans_prob : np.ndarray
         A transition probability matrix, the diagonal of which will be ignored.
     means : np.ndarray or str
-        Mean vector for each state, shape should be :code:`(n_states, n_channels)`.
+        Mean vector for each state, shape should be (n_states, n_channels).
         Or :code:`'zero'` or :code:`'random'`.
     covariances : numpy.ndarray or str
-        Covariance matrix for each state, shape should be :code:`(n_states, n_channels,
-        n_channels)`. Or :code:`'random'`.
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Or :code:`'random'`.
     n_states : int
         Number of states. Can pass this argument with keyword :code:`n_modes` instead.
     n_channels : int
@@ -264,11 +264,11 @@ class MixedHSMM_MVN(Simulation):
     full_trans_prob : np.ndarray
         A transition probability matrix, the diagonal of which will be ignored.
     means : np.ndarray or str
-        Mean vector for each state, shape should be :code:`(n_states, n_channels)`.
+        Mean vector for each state, shape should be (n_states, n_channels).
         Or :code:`'zero'` or :code:`'random'`.
     covariances : numpy.ndarray or str
-        Covariance matrix for each state, shape should be :code:`(n_states, n_channels,
-        n_channels)`. Or :code:`'random'`.
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Or :code:`'random'`.
     n_channels : int
         Number of channels in the observation model.
     observation_error : float

@@ -25,7 +25,7 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     ----------
     alpha : list or np.ndarray
         Mode mixing factors or state probabilities. Shape must be
-        :code:`(n_subjects, n_samples, n_modes)` or :code:`(n_samples, n_modes)`.
+        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
     concatenate : bool
         If :code:`alpha` is a :code:`list`, should we concatenate the time courses?
     n_modes : int
@@ -35,8 +35,8 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     Returns
     -------
     argmax_tcs : list or np.ndarray
-        Argmax time courses. Shape is :code:`(n_subjects, n_samples, n_modes)`
-        or :code:`(n_samples, n_modes)`.
+        Argmax time courses. Shape is (n_subjects, n_samples, n_modes)
+        or (n_samples, n_modes).
     """
     if isinstance(alpha, list):
         if n_modes is None:
@@ -79,8 +79,8 @@ def gmm_time_courses(
     Parameters
     ----------
     alpha : list of np.ndarray or np.ndarray
-        Mode time courses. Shape must be :code:`(n_subjects, n_samples, n_modes)` or
-        :code:`(n_samples, n_modes)`.
+        Mode time courses. Shape must be (n_subjects, n_samples, n_modes) or
+        (n_samples, n_modes).
     logit_transform : bool
         Should we logit transform the mode time course?
     standardize : bool
@@ -105,7 +105,7 @@ def gmm_time_courses(
     -------
     gmm_tcs : list of np.ndarray or np.ndarray
         GMM time courses with binary entries. Shape is
-        :code:`(n_subjects, n_samples, n_modes)` or :code:`(n_samples, n_modes)`.
+        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
     """
 
     if not isinstance(alpha, list):
@@ -197,14 +197,14 @@ def correlate_modes(mode_time_course_1, mode_time_course_2):
     Parameters
     ----------
     mode_time_course_1 : np.ndarray
-        Mode time course. Shape must be :code:`(n_samples, n_modes)`.
+        Mode time course. Shape must be (n_samples, n_modes).
     mode_time_course_2 : np.ndarray
-        Mode time course. Shape must be :code:`(n_samples, n_modes)`.
+        Mode time course. Shape must be (n_samples, n_modes).
 
     Returns
     -------
     correlation_matrix : np.ndarray
-        Correlation matrix. Shape is :code:`(n_modes, n_modes)`.
+        Correlation matrix. Shape is (n_modes, n_modes).
     """
     correlation = np.zeros((mode_time_course_1.shape[1], mode_time_course_2.shape[1]))
     for i, mode1 in enumerate(mode_time_course_1.T):
@@ -219,8 +219,8 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
     Parameters
     ----------
     covariances : tuple of np.ndarray
-        Covariance matrices to match. Each covariance must be
-        :code:`(n_modes, n_channel, n_channels)`.
+        Covariance matrices to match. Each covariance must be (n_modes, n_channel,
+        n_channels).
     comparison : str
         Either :code:`'rv_coefficient'`, :code:`'correlation'` or :code:`'frobenius'`.
         Default is :code:`'rv_coefficient'`.
@@ -230,7 +230,7 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
     Returns
     -------
     matched_covariances : tuple or list of np.ndarray
-        Matched covariances of shape :code:`(n_channels, n_channels)` or order if
+        Matched covariances of shape (n_channels, n_channels) or order if
         :code:`return_order=True`.
 
     Examples
@@ -306,12 +306,12 @@ def match_modes(*mode_time_courses, return_order=False):
     Parameters
     ----------
     mode_time_courses : list of np.ndarray
-        Mode time courses. Each time course must be :code:`(n_samples, n_modes)`.
+        Mode time courses. Each time course must be (n_samples, n_modes).
 
     Returns
     -------
     matched_mode_time_courses : tuple or list of np.ndarray
-        Matched mode time courses of shape :code:`(n_samples, n_modes)` or order
+        Matched mode time courses of shape (n_samples, n_modes) or order
         if :code:`return_order=True`.
 
     Examples
@@ -355,12 +355,12 @@ def reduce_state_time_course(state_time_course):
     Parameters
     ----------
     state_time_course: np.ndarray
-        State time course. Shape must be :code:`(n_samples, n_states)`.
+        State time course. Shape must be (n_samples, n_states).
 
     Returns
     -------
     reduced_state_time_course: np.ndarray
-        Reduced state time course. Shape is :code:`(n_samples, n_reduced_states)`.
+        Reduced state time course. Shape is (n_samples, n_reduced_states).
     """
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
 
@@ -415,7 +415,7 @@ def convert_to_mne_raw(
     Parameters
     ----------
     alpha : np.ndarray
-        Time series containing raw data. Shape must be :code:`(n_samples, n_modes)`.
+        Time series containing raw data. Shape must be (n_samples, n_modes).
     raw : mne.io.Raw or str
         Raw object to extract info from. If a :code:`str` is passed, it must be the
         path to a fif file containing the Raw object.
@@ -516,10 +516,10 @@ def reweight_alphas(alpha, covs):
     Parameters
     ----------
     alpha : list of np.ndarray or np.ndarray
-        Raw mixing coefficients. Shape must be :code:`(n_subjects, n_samples, n_modes)`
-        or :code:`(n_samples, n_modes)`.
+        Raw mixing coefficients. Shape must be (n_subjects, n_samples, n_modes)
+        or (n_samples, n_modes).
     covs : np.ndarray
-        Mode covariances. Shape must be :code:`(n_modes, n_channels, n_channels)`.
+        Mode covariances. Shape must be (n_modes, n_channels, n_channels).
 
     Returns
     -------
@@ -548,8 +548,8 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     Parameters
     ----------
     alpha : list of list of np.ndarray or list of np.ndarray
-        State probabilities. Shape must be :code:`(n_runs, n_subjects, n_samples,
-        n_states)` or :code:`(n_runs, n_samples, n_states)`.
+        State probabilities. Shape must be (n_runs, n_subjects, n_samples, n_states)
+        or (n_runs, n_samples, n_states).
     n_clusters : int
         Number of clusters to fit. Optional, defaults to the largest number of
         states in alpha.
@@ -559,7 +559,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     Returns
     -------
     average_alpha : list of np.ndarray or np.ndarray
-        State probabilities averaged over runs. Shape is :code:`(n_subjects, n_states)`.
+        State probabilities averaged over runs. Shape is (n_subjects, n_states).
     cluster_info : dict
         Clustering info. Only returned if :code:`return_cluster_info=True`.
         This is a dictionary with keys :code:`'correlation'`, :code:`'dissimiarity'`,

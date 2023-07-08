@@ -35,17 +35,16 @@ def fit_gaussian_mixture(
     X : np.ndarray
         Data to fit GMM to. Must be 1D.
     logit_transform : bool
-        Should we logit transform the X?
+        Should we logit transform the :code:`X`?
     standardize : bool
-        Should we standardize X?
+        Should we standardize :code:`X`?
     p_value : float
         Used to determine a threshold. We ensure the data points assigned to the
         'on' component have a probability of less than :code:`p_value` of belonging
         to the 'off' component.
     one_component_percentile : float
-        Percentile threshold if only one component is found. Should be a between
-        :code:`0` and :code:`100`. E.g. for the 95th percentile,
-        :code:`one_component_percentile=95`.
+        Percentile threshold if only one component is found. Should be a between 0 and
+        100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
     n_sigma : float
         Number of standard deviations of the 'off' component the mean of the 'on'
         component must be for the fit to be considered to have two components.
@@ -58,7 +57,7 @@ def fit_gaussian_mixture(
     return_statistics: bool
         Should we return statistics of the Gaussian mixture components?
     show_plot : bool
-        Should we show the GMM fit to the distribution of X.
+        Should we show the GMM fit to the distribution of :code:`X`.
     plot_filename : str
         Filename to save a plot of the Gaussian mixture model.
     plot_kwargs : dict

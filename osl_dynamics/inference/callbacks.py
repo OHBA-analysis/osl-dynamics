@@ -18,10 +18,10 @@ class DiceCoefficientCallback(callbacks.Callback):
         Dataset to use to calculate outputs of the model.
     ground_truth_time_course : np.ndarray
         2D or 3D numpy array containing the ground truth state/mode time course of
-        the training data. Shape must be :code:`(n_time_courses, n_samples, n_modes)`
-        or :code:`(n_samples, n_modes)`.
+        the training data. Shape must be (n_time_courses, n_samples, n_modes)
+        or (n_samples, n_modes).
     names : list of str
-        Names for the time courses. Shape must be :code:`(n_time_courses,)`. Optional.
+        Names for the time courses. Shape must be (n_time_courses,). Optional.
     """
 
     def __init__(self, prediction_dataset, ground_truth_time_course, names=None):

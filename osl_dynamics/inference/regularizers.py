@@ -18,10 +18,10 @@ class InverseWishart(regularizers.Regularizer):
     Parameters
     ----------
     nu : int
-        Degrees of freedom. Must be greater than :code:`(n_channels - 1)`.
+        Degrees of freedom. Must be greater than (n_channels - 1).
     psi : np.ndarray
         Scale matrix. Must be a symmetric positive definite matrix.
-        Shape must be :code:`(n_channels, n_channels)`.
+        Shape must be (n_channels, n_channels).
     epsilon : float
         Error added to the diagonal of the covariances.
     """
@@ -70,10 +70,10 @@ class MultivariateNormal(regularizers.Regularizer):
     Parameters
     ----------
     mu : np.ndarray
-        1D array of the mean of the prior. Shape must be :code:`(n_channels,)`.
+        1D array of the mean of the prior. Shape must be (n_channels,).
     sigma : np.ndarray
         2D array of covariance matrix of the prior.
-        Shape must be :code:`(n_channels, n_channels)`.
+        Shape must be (n_channels, n_channels).
     """
 
     def __init__(self, mu, sigma, **kwargs):
@@ -121,7 +121,7 @@ class MarginalInverseWishart(regularizers.Regularizer):
     Parameters
     ----------
     nu : int
-        Degrees of freedom. Must be greater than :code:`(n_channels - 1)`.
+        Degrees of freedom. Must be greater than (n_channels - 1).
     epsilon : float
         Error added to the correlations.
     n_channels : int
@@ -165,11 +165,10 @@ class LogNormal(regularizers.Regularizer):
     Parameters
     ----------
     mu : np.ndarray
-        Mu parameters of the log normal distribution.
-        Shape is :code:`(n_channels,)`.
+        Mu parameters of the log normal distribution. Shape is (n_channels,).
     sigma : np.ndarray
         Sigma parameters of the log normal distribution.
-        Shape is :code:`(n_channels,)`. All entries must be positive.
+        Shape is (n_channels,). All entries must be positive.
     epsilon : float
         Error added to the standard deviations.
     """

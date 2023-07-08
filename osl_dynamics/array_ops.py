@@ -38,9 +38,9 @@ def get_one_hot(values, n_states=None):
     Parameters
     ----------
     values : np.ndarray
-        1D array of categorical values with shape :code:`(n_samples,)`.
-        The values should be integers (0, 1, 2, 3, ... , :code:`n_states` - 1).
-        Or 2D array of shape :code:`(n_samples, n_states)` to be binarized.
+        1D array of categorical values with shape (n_samples,). The values should
+        be integers (0, 1, 2, 3, ... , :code:`n_states` - 1). Or 2D array of shape
+        (n_samples, n_states) to be binarized.
     n_states : int
         Total number of states in :code:`values`. Must be at least the number of states
         present in :code:`values`. Default is the number of unique values in
@@ -50,7 +50,7 @@ def get_one_hot(values, n_states=None):
     -------
     one_hot : np.ndarray
         A 2D array containing the one-hot encoded form of :code:`values`.
-        Shape is :code:`(n_samples, n_states)`.
+        Shape is (n_samples, n_states).
     """
     if values.ndim == 2:
         values = values.argmax(axis=1)
@@ -66,12 +66,12 @@ def cov2corr(cov):
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrices. Shape must be :code:`(..., N, N)`.
+        Covariance matrices. Shape must be (..., N, N).
 
     Returns
     -------
     corr : np.ndarray
-        Correlation matrices. Shape is :code:`(..., N, N)`.
+        Correlation matrices. Shape is (..., N, N).
     """
     # Validation
     cov = np.array(cov)
@@ -90,12 +90,12 @@ def cov2std(cov):
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrix. Shape must be :code:`(..., N, N)`.
+        Covariance matrix. Shape must be (..., N, N).
 
     Returns
     -------
     std : np.ndarray
-        Standard deviations. Shape is :code:`(..., N)`.
+        Standard deviations. Shape is (..., N).
     """
     cov = np.array(cov)
     if cov.ndim < 2:
@@ -191,7 +191,7 @@ def check_symmetry(mat, precision=1e-6):
     Parameters
     ----------
     mat : np.ndarray or list of np.ndarray
-        Matrices to be checked. Shape of a matrix should be :code:`(..., N, N)`.
+        Matrices to be checked. Shape of a matrix should be (..., N, N).
     precision : float
         Precision for comparing values. Corresponds to an absolute tolerance parameter.
         Default is :code:`1e-6`.

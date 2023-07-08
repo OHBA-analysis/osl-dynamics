@@ -88,19 +88,19 @@ class MixedSine_MVN(Simulation):
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
         operation. This argument can use use to change the relative values
-        of each mode time course. Shape must be :code:`(n_modes,)`
+        of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
-        Amplitude of each sinusoid. Shape must be :code:`(n_modes,)`.
+        Amplitude of each sinusoid. Shape must be (n_modes,).
     frequencies : np.ndarray or list
-        Frequency of each sinusoid. Shape must be :code:`(n_modes,)`.
+        Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
     means : np.ndarray or str
-        Mean vector for each mode, shape should be :code:`(n_modes, n_channels)`.
+        Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be :code:`(n_modes,
-        n_channels, n_channels)`. Either a numpy array or :code:`'random'`.
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
     n_covariances_act : int
         Number of iterations to add activations to covariance matrices.
     n_modes : int
@@ -179,21 +179,21 @@ class MSubj_MixedSine_MVN(Simulation):
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
         operation. This argument can use use to change the relative values
-        of each mode time course. Shape must be :code:`(n_modes,)`.
+        of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
-        Amplitude of each sinusoid. Shape must be :code:`(n_modes,)`.
+        Amplitude of each sinusoid. Shape must be (n_modes,).
     frequencies : np.ndarray or list
-        Frequency of each sinusoid. Shape must be :code:`(n_modes,)`.
+        Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
     subject_means : np.ndarray or str
-        Subject mean vector for each mode, shape should be :code:`(n_subjects,
-        n_modes, n_channels)`. Either a numpy array or :code:`'zero'` or
+        Subject mean vector for each mode, shape should be (n_subjects, n_modes,
+        n_channels). Either a numpy array or :code:`'zero'` or
         :code:`'random'`.
     subject_covariances : np.ndarray or str
         Subject covariance matrix for each mode, shape should be
-        :code:`(n_subjects, n_modes, n_channels, n_channels)`.
-        Either a numpy array or :code:`'random'`.
+        (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
+        or :code:`'random'`.
     n_covariances_act : int
         Number of iterations to add activations to covariance matrices.
     n_modes : int

@@ -75,12 +75,12 @@ def evoked_response_max_stat_perm(
     ----------
     data : np.ndarray
         Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape :code:`(n_subjects, n_samples, ...)`.
+        Must be shape (n_subjects, n_samples, ...).
     n_perm : int
         Number of permutations.
     covariates : dict
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
-        Must be of shape :code:`(n_subjects,)`.
+        Must be of shape (n_subjects,).
     metric : str
         Metric to use to build the null distribution. Can be :code:`'tstats'` or
         :code:`'copes'`.
@@ -90,7 +90,7 @@ def evoked_response_max_stat_perm(
     Returns
     -------
     pvalues : np.ndarray
-        P-values for the evoked response. Shape is :code:`(n_subjects, n_samples, ...)`.
+        P-values for the evoked response. Shape is (n_subjects, n_samples, ...).
     """
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
@@ -171,7 +171,7 @@ def group_diff_max_stat_perm(
     ----------
     data : np.ndarray
         Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape :code:`(n_subjects, features1, features2, ...)`.
+        Must be shape (n_subjects, features1, features2, ...).
     assignments : np.ndarray
         1D numpy array containing group assignments. A value of 1 indicates
         Group1 and a value of 2 indicates Group2. Note, we test the contrast
@@ -180,7 +180,7 @@ def group_diff_max_stat_perm(
         Number of permutations.
     covariates : dict
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
-        Must be of shape :code:`(n_subjects,)`.
+        Must be of shape (n_subjects,).
     metric : str
         Metric to use to build the null distribution. Can be :code:`'tstats'` or
         :code:`'copes'`.
@@ -190,9 +190,9 @@ def group_diff_max_stat_perm(
     Returns
     -------
     group_diff : np.ndarray
-        Group difference: Group1 - Group2. Shape is :code:`(features1, features2, ...)`.
+        Group difference: Group1 - Group2. Shape is (features1, features2, ...).
     pvalues : np.ndarray
-        P-values for the features. Shape is :code:`(features1, features2, ...)`.
+        P-values for the features. Shape is (features1, features2, ...).
     """
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")

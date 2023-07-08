@@ -20,10 +20,10 @@ class MAR:
     ----------
     coeffs : np.ndarray
         Array of MAR coefficients, :math:`A`. Shape must be
-        :code:`(n_states, n_lags, n_channels, n_channels)`.
+        (n_states, n_lags, n_channels, n_channels).
     covs : np.ndarray
         Covariance of the error :math:`\epsilon_t`. Shape must be
-        :code:`(n_states, n_channels)` or :code:`(n_states, n_channels, n_channels)`.
+        (n_states, n_channels) or (n_states, n_channels, n_channels).
     random_seed: int
         Seed for the random number generator.
 
@@ -68,13 +68,13 @@ class MAR:
         Parameters
         ----------
         state_time_course : np.ndarray
-            State time course. Shape must be :code:`(n_samples, n_states)`.
+            State time course. Shape must be (n_samples, n_states).
             States must be mutually exclusive.
 
         Returns
         -------
         data : np.ndarray
-            Simulated data. Shape is :code:`(n_samples, n_channels)`.
+            Simulated data. Shape is (n_samples, n_channels).
         """
         n_samples = state_time_course.shape[0]
         data = np.empty([n_samples, self.n_channels])

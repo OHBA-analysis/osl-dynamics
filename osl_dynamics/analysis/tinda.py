@@ -19,9 +19,8 @@ def find_intervals(tc_hot):
     Parameters
     ----------
     tc_hot : array_like
-        Hot vector (i.e., binary vector) of shape :code:`(n_samples,)` or
-        :code:`(n_samples, 1)`. For example, a hot vector of a state time course
-        of shape :code:`(n_samples, n_states)`.
+        Hot vector (i.e., binary vector) of shape (n_samples,) or (n_samples, 1).
+        For example, a hot vector of a state time course of shape (n_samples, n_states).
 
     Returns
     -------
@@ -148,7 +147,7 @@ def compute_fo_stats(
     Parameters
     ----------
     tc_sec : array_like
-        Time course of shape :code:`(n_samples, n_states)`.
+        Time course of shape (n_samples, n_states).
     divided_intervals : list
         List with each element corresponding to an interval, each itself being a
         list of tuples of start and end indices of interval bins.
@@ -162,18 +161,18 @@ def compute_fo_stats(
     -------
     interval_weighted_avg : array_like
         Array of weighted averages of time courses in each interval of shape
-        :code:`(n_states, n_bins, n_interval_ranges)`.
+        (n_states, n_bins, n_interval_ranges).
     interval_sum : array_like
-        Array of sums of time courses in each interval of shape
-        :code:`(n_states, n_bins, n_interval_ranges)`.
+        Array of sums of time courses in each interval of shape (n_states, n_bins,
+        n_interval_ranges).
     interval_weighted_avg_all : list
         List of length n_interval_ranges with each element an array of weighted averages
-        of time courses in each interval of shape :code:`(n_states, n_bins,
-        n_intervals)`. :code:`None` if :code:`return_all_intervals=False` (default).
+        of time courses in each interval of shape (n_states, n_bins, n_intervals).
+        :code:`None` if :code:`return_all_intervals=False` (default).
     interval_sum_all : list
         List of length :code:`n_interval_ranges` with each element an array of sums
-        of time courses in each interval of shape :code:`(n_states, n_bins,
-        n_intervals)`. :code:`None` if :code:`return_all_intervals=False`.
+        of time courses in each interval of shape (n_states, n_bins, n_intervals).
+        :code:`None` if :code:`return_all_intervals=False`.
     """
     if interval_mask is None:
         interval_mask = [np.ones(len(divided_intervals))]
@@ -357,13 +356,12 @@ def tinda(
     Parameters
     ----------
     tc : array_like
-        Time courses of shape :code:`(n_samples, n_states)` define intervals from
-        will use the same time courses to compute density of when :code:`density_of`
-        is :code:`None`. Can be a list of time courses (e.g. state time courses for
-        each subject).
+        Time courses of shape (n_samples, n_states) define intervals from will use the
+        same time courses to compute density of when :code:`density_of` is :code:`None`.
+        Can be a list of time courses (e.g. state time courses for each subject).
     density_of : array_like
-        Time course of shape :code:`(n_samples, n_states)` to compute density of
-        if :code:`None` (default), density is computed for all columns of tc.
+        Time course of shape (n_samples, n_states) to compute density of if
+        :code:`None` (default), density is computed for all columns of tc.
     n_bins : int
         Number of bins to divide each interval into (default 2).
     interval_mode : str
@@ -385,14 +383,14 @@ def tinda(
     Returns
     -------
     fo_density : array_like
-        Time-in-state densities array of shape :code:`(n_interval_states,
-        n_density_states, n_bins, n_interval_ranges)`. :code:`n_interval_states` is
-        the number of states in the interval time courses (i.e., tc);
-        :code:`n_density_states` is the number of states in the density time courses
-        (i.e., :code:`density_of`). If :code:`density_of` is :code:`None`,
-        :code:`n_density_states` is the same as :code:`n_interval_states`. If tc
-        is a list of time courses (e.g., state time courses for multiple subjects),
-        then an extra dimension is appended for the subjects.
+        Time-in-state densities array of shape (n_interval_states, n_density_states,
+        n_bins, n_interval_ranges). :code:`n_interval_states` is the number of states
+        in the interval time courses (i.e., tc); :code:`n_density_states` is the
+        number of states in the density time courses (i.e., :code:`density_of`). If
+        :code:`density_of` is :code:`None`, :code:`n_density_states` is the same as
+        :code:`n_interval_states`. If tc is a list of time courses (e.g., state time
+        courses for multiple subjects), then an extra dimension is appended for the
+        subjects.
     fo_sum : array_like
         Same as :code:`fo_density`, but with time-in-state sums instead of densities.
     stats : dict
@@ -538,8 +536,8 @@ def optimise_sequence(fo_density, metric_to_use=0):
     Parameters
     ----------
     fo_density : array_like
-        Time-in-state densities array of shape :code:`(n_interval_states,
-        n_density_states, 2, n_subjects)`.
+        Time-in-state densities array of shape (n_interval_states, n_density_states,
+        2, n_subjects).
     metric : int
         Metric to use for optimisation:
 
@@ -628,16 +626,15 @@ def plot_cycle(ordering, fo_density, edges, new_figure=False, color_scheme=None)
     ordering : list
         List of best sequence of states to plot (in order of counterclockwise rotation).
     fo_density : array_like
-        Time-in-state densities array of shape :code:`(n_interval_states,
-        n_density_states, 2, (n_interval_ranges,) n_subjects)`.
+        Time-in-state densities array of shape (n_interval_states, n_density_states,
+        2, (n_interval_ranges,) n_subjects).
     edges : array_like
         Array of zeros and ones indicating whether the connection should be plotted.
     new_figure : bool
         Whether to create a new figure (default is :code:`False`).
     color_scheme : array_like
-        Array of size :code:`(K,3)` color scheme to use for plotting (default is
-        :code:`None`). If :code:`None`, will use the default color scheme from the
-        matlab code.
+        Array of size (K,3) color scheme to use for plotting (default is :code:`None`).
+        If :code:`None`, will use the default color scheme from the matlab code.
     """
 
     # Plot state network as circular diagram with arrows

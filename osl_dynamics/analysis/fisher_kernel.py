@@ -45,7 +45,7 @@ class FisherKernel:
         Returns
         -------
         kernel_matrix : np.ndarray
-            Fisher kernel matrix. Shape is :code:`(n_subjects, n_subjects)`.
+            Fisher kernel matrix. Shape is (n_subjects, n_subjects).
         """
         _logger.info("Getting Fisher kernel matrix")
 
@@ -130,13 +130,13 @@ class FisherKernel:
         Parameters
         ----------
         xi : np.ndarray
-            Shape is :code:`(batch_size*sequence_length-1, n_states*n_states)`.
+            Shape is (batch_size*sequence_length-1, n_states*n_states).
 
         Returns
         -------
         d_trans_prob : np.ndarray
             Derivative of free energy with respect to the transition probability.
-            Shape is :code:`(n_states, n_states)`.
+            Shape is (n_states, n_states).
         """
         trans_prob = self.model.trans_prob
         n_states = trans_prob.shape[0]
@@ -159,13 +159,13 @@ class FisherKernel:
         ----------
         gamma : np.ndarray
             Marginal posterior distribution of hidden states given the data.
-            Shape is :code:`(batch_size*sequence_length, n_states)`.
+            Shape is (batch_size*sequence_length, n_states).
 
         Returns
         -------
         d_initial_distribution : np.ndarray
             Derivative of free energy with respect to the initial distribution.
-            Shape is :code:`(n_states,)`.
+            Shape is (n_states,).
         """
         # Truncate at 1e-6 for numerical stability
         initial_distribution = self.model.state_probs_t0

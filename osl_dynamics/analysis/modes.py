@@ -22,7 +22,7 @@ def autocorr_from_tde_cov(
     ----------
     covs : np.ndarray
         Covariance matrix of time-delay embedded data. Shape must be
-        :code:`(n_channels, n_channels)` or :code:`(n_modes, n_channels, n_channels)`.
+        (n_channels, n_channels) or (n_modes, n_channels, n_channels).
     n_embeddings : int
         Number of embeddings.
     pca_components : np.ndarray
@@ -35,10 +35,10 @@ def autocorr_from_tde_cov(
     -------
     tau : np.ndarray
         Time lags in samples if `sampling_frequency=None`, otherwise in seconds.
-        Shape is :code:`(n_lags)`.
+        Shape is (n_lags).
     acfs : np.ndarray
-        Auto/cross-correlation functions. Shape is :code:`(n_channels, n_channels,
-        n_lags)` or :code:`(n_modes, n_channels, n_channels, n_lags)`.
+        Auto/cross-correlation functions. Shape is (n_channels, n_channels,
+        n_lags) or (n_modes, n_channels, n_channels, n_lags).
     """
     # Validation
     error_message = (
@@ -266,8 +266,8 @@ def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
     Parameters
     ----------
     state_time_course : numpy.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, or n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, or n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
     squeeze : bool
@@ -279,8 +279,7 @@ def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
         List containing an array of lifetimes in the order they occur for each
         state. This cannot necessarily be converted into an array as an equal
         number of elements in each array is not guaranteed. Shape is
-        :code:`(n_subjects, n_states, n_activations)` or
-        :code:`(n_states, n_activations)`.
+        (n_subjects, n_states, n_activations) or (n_states, n_activations).
     """
     sampling_frequency = sampling_frequency or 1
     slices = state_activations(state_time_course)
@@ -311,19 +310,17 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
     -------
     means : np.ndarray
-        Mean lifetime of each state. Shape is :code:`(n_subjects, n_states)` or
-        :code:`(n_states,)`.
+        Mean lifetime of each state. Shape is (n_subjects, n_states) or (n_states,).
     std : np.ndarray
-        Standard deviation of each state. Shape is :code:`(n_subjects, n_states)`
-        or :code:`(n_states,)`.
+        Standard deviation of each state. Shape is (n_subjects, n_states) or (n_states,).
     """
     lifetimes_ = lifetimes(
         state_time_course,
@@ -341,16 +338,15 @@ def mean_lifetimes(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be :code:`(n_subjects,
-        n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
     -------
     mlt : np.ndarray
-        Mean lifetime of each state. Shape is :code:`(n_subjects, n_states)` or
-        :code:`(n_states,)`.
+        Mean lifetime of each state. Shape is (n_subjects, n_states) or (n_states,).
     """
     return lifetime_statistics(state_time_course, sampling_frequency)[0]
 
@@ -363,8 +359,8 @@ def intervals(state_time_course, sampling_frequency=None, squeeze=True):
     Parameters
     ----------
     state_time_course : list or numpy.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the intervals in seconds.
     squeeze : bool
@@ -376,8 +372,7 @@ def intervals(state_time_course, sampling_frequency=None, squeeze=True):
         List containing an array of intervals in the order they occur for each
         state. This cannot necessarily be converted into an array as an equal
         number of elements in each array is not guaranteed. Shape is
-        :code:(n_subjects, n_states, n_activations)` or
-        :code:`(n_states, n_activations)`.
+        (n_subjects, n_states, n_activations) or (n_states, n_activations).
     """
     sampling_frequency = sampling_frequency or 1
     slices = state_activations(state_time_course)
@@ -412,19 +407,17 @@ def interval_statistics(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
     -------
     means : np.ndarray
-        Mean interval of each state.
-        Shape is :code:`(n_subjects, n_states)` or :code:`(n_states,)`.
+        Mean interval of each state. Shape is (n_subjects, n_states) or (n_states,).
     std : np.ndarray
-        Standard deviation of each state.
-        Shape is :code:`(n_subjects, n_states)` or :code:`(n_states,)`.
+        Standard deviation of each state. Shape is (n_subjects, n_states) or (n_states,).
     """
     intervals_ = intervals(
         state_time_course, sampling_frequency=sampling_frequency, squeeze=False
@@ -440,16 +433,15 @@ def mean_intervals(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If passed returns the intervals in seconds.
 
     Returns
     -------
     mlt : np.ndarray
-        Mean interval of each state.
-        Shape is :code:`(n_subjects, n_states)` or :code:`(n_states,)`.
+        Mean interval of each state. Shape is (n_subjects, n_states) or (n_states,).
     """
     return interval_statistics(state_time_course, sampling_frequency)[0]
 
@@ -460,14 +452,14 @@ def fractional_occupancies(state_time_course):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
 
     Returns
     -------
     fo : np.ndarray
-        The fractional occupancy of each state.
-        Shape is :code:`(n_subjects, n_states)` or :code:`(n_states,)`.
+        The fractional occupancy of each state. Shape is (n_subjects, n_states) or
+        (n_states,).
     """
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 2:
@@ -489,16 +481,15 @@ def switching_rates(state_time_course, sampling_frequency=None):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     sampling_frequency : float
         Sampling frequency in Hz. If :code:`None`, defaults to 1 Hz.
 
     Returns
     -------
     sr : np.ndarray
-        The switching rate of each state.
-        Shape is :code:`(n_subjects, n_states)` or :code:`(n_states,)`.
+        The switching rate of each state. Shape is (n_subjects, n_states) or (n_states,).
     """
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 2:
@@ -530,17 +521,17 @@ def mean_amplitudes(state_time_course, data):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     data : list or np.ndarray
         Single channel time series data (before calculating the amplitude envelope).
-        Shape must be :code:`(n_subjects, n_samples, 1)` or :code:`(n_samples, 1)`.
+        Shape must be (n_subjects, n_samples, 1) or (n_samples, 1).
 
     Returns
     -------
     amp : np.ndarray
-        Mean amplitude of the data for each state.
-        Shape is :code:`(n_subjects, n_states)` or :code:`(n_states,)`.
+        Mean amplitude of the data for each state. Shape is (n_subjects, n_states)
+        or (n_states,).
     """
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 2:
@@ -575,8 +566,8 @@ def fano_factor(state_time_course, window_lengths, sampling_frequency=1.0):
     Parameters
     ----------
     state_time_course : list or np.ndarray
-        State time course (strictly binary). Shape must be
-        :code:`(n_subjects, n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State time course (strictly binary). Shape must be (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
     window_lengths : list or np.ndarray
         Window lengths to use. Must be in samples.
     sampling_frequency : float
@@ -585,8 +576,8 @@ def fano_factor(state_time_course, window_lengths, sampling_frequency=1.0):
     Returns
     -------
     F : list of np.ndarray
-        Fano factor. Shape is :code:`(n_subjects, n_window_lengths, n_states)`
-        or :code:`(n_window_lengths, n_states)`.
+        Fano factor. Shape is (n_subjects, n_window_lengths, n_states) or
+        (n_window_lengths, n_states).
     """
     if isinstance(state_time_course, np.ndarray):
         state_time_course = [state_time_course]
@@ -628,16 +619,16 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
     Parameters
     ----------
     state_time_course : list of np.ndarray or np.ndarray
-        State time courses. Shape must be :code:`(n_subjects, n_samples, n_states)`
-        or :code:`(n_samples, n_states)`.
+        State time courses. Shape must be (n_subjects, n_samples, n_states)
+        or (n_samples, n_states).
     n_states : int
         Number of states.
 
     Returns
     -------
     trans_prob : np.ndarray
-        Subject-specific transition probability matrices.
-        Shape is :code:`(n_subjects, n_states, n_states)`.
+        Subject-specific transition probability matrices. Shape is (n_subjects,
+        n_states, n_states).
     """
     if isinstance(state_time_course, np.ndarray):
         state_time_course = [state_time_course]
@@ -669,7 +660,7 @@ def simple_moving_average(data, window_length, step_size):
     Parameters
     ----------
     data : np.ndarray
-        Time series data. Shape must be :code:`(n_samples, n_channels)`.
+        Time series data. Shape must be (n_samples, n_channels).
     window_length : int
         Number of data points in a window.
     step_size : int
@@ -720,28 +711,28 @@ def partial_covariances(data, alpha):
 
     where:
 
-    - :math:`Y_i` is :code:`(n_samples, 1)` the data amplitude/envelope/power/absolute
+    - :math:`Y_i` is (n_samples, 1) the data amplitude/envelope/power/absolute
       time course at channel :math:`i`.
-    - :math:`X` is :code:`(n_samples, n_states)` matrix of the variance normalised
+    - :math:`X` is (n_samples, n_states) matrix of the variance normalised
       state/mode time courses.
-    - :math:`\beta_i` is an :code:`(n_states, 1)` vector of multiple regression
+    - :math:`\beta_i` is an (n_states, 1) vector of multiple regression
       parameters for channel :math:`i`.
     - :math:`\epsilon` is the error.
 
     Parameters
     ----------
     data : np.ndarray or list of np.ndarray
-        Training data for each subject. Shape is :code:`(n_subjects, n_samples,
-        n_channels)` or :code:`(n_samples, n_channels)`.
+        Training data for each subject. Shape is (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
     alpha : np.ndarray or list of np.ndarray
-        State/mode time courses for each subject. Shape is :code:`(n_subjects,
-        n_samples, n_states)` or :code:`(n_samples, n_states)`.
+        State/mode time courses for each subject. Shape is (n_subjects, n_samples,
+        n_states) or (n_samples, n_states).
 
     Returns
     -------
     partial_covariances : np.ndarray
         Matrix of partial covariance (multiple regression parameter estimates,
-        :math:`\beta`). Shape is :code:`(n_states, n_channels)`.
+        :math:`\beta`). Shape is (n_states, n_channels).
 
     Note
     ----
@@ -780,18 +771,17 @@ def ae_hmm_networks(data, alpha):
     ----------
     data : list of np.ndarray
         Amplitude envelope data (i.e. after preparation).
-        Shape is :code:`(n_subjects, n_channels)`.
+        Shape is (n_subjects, n_channels).
     alpha : list of np.ndarray
-        Inferred state probabilities. Shape is :code:`(n_subjects, n_states)`.
+        Inferred state probabilities. Shape is (n_subjects, n_states).
 
     Returns
     -------
     means : np.ndarray
-        Subject-specific mean activity maps.
-        Shape is :code:`(n_subjects, n_states, n_channels)`.
+        Subject-specific mean activity maps. Shape is (n_subjects, n_states, n_channels).
     aecs : np.ndarray
         Subject-specific amplitude envelope correlation maps.
-        Shape is :code:`(n_subjects, n_states, n_channels, n_channels)`.
+        Shape is (n_subjects, n_states, n_channels, n_channels).
     """
     if type(data) != type(alpha):
         raise TypeError(

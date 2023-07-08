@@ -16,15 +16,15 @@ def alpha_correlation(alpha_1, alpha_2):
     Parameters
     ----------
     alpha_1 : np.ndarray
-        First alpha time series. Shape must be :code:`(n_samples, n_modes)`.
+        First alpha time series. Shape must be (n_samples, n_modes).
     alpha_2 : np.ndarray
-        Second alpha time series. Shape must be :code:`(n_samples, n_modes)`.
+        Second alpha time series. Shape must be (n_samples, n_modes).
 
     Returns
     -------
     corr : np.ndarray
         Correlation of each mode in the corresponding alphas.
-        Shape is :code:`(n_modes,)`.
+        Shape is (n_modes,).
     """
     if alpha_1.shape[1] != alpha_2.shape[1]:
         raise ValueError(
@@ -51,16 +51,14 @@ def confusion_matrix(state_time_course_1, state_time_course_2):
     Parameters
     ----------
     state_time_course_1 : np.ndarray
-        Mode time course. Shape must be :code:`(n_samples, n_states)` or
-        :code:`(n_samples,)`.
+        Mode time course. Shape must be (n_samples, n_states) or (n_samples,).
     state_time_course_2 : np.ndarray
-        Mode time course. Shape must be :code:`(n_samples, n_states)` or
-        :code:`(n_samples,)`.
+        Mode time course. Shape must be (n_samples, n_states) or (n_samples,).
 
     Returns
     -------
     cm : np.ndarray
-        Confusion matrix. Shape is :code:`(n_states, n_states)`.
+        Confusion matrix. Shape is (n_states, n_states).
     """
     if state_time_course_1.ndim == 2:
         state_time_course_1 = state_time_course_1.argmax(axis=1)
@@ -81,10 +79,10 @@ def dice_coefficient(sequence_1, sequence_2):
     ----------
     sequence_1 : np.ndarray
         A sequence containing either 1D discrete or 2D continuous data.
-        Shape must be :code:`(n_samples, n_states)` or :code:`(n_samples,)`.
+        Shape must be (n_samples, n_states) or (n_samples,).
     sequence_2 : np.ndarray
         A sequence containing either 1D discrete or 2D continuous data.
-        Shape must be :code:`(n_samples, n_states)` or :code:`(n_samples,)`.
+        Shape must be (n_samples, n_states) or (n_samples,).
 
     Returns
     -------
@@ -109,11 +107,11 @@ def frobenius_norm(A, B):
     Parameters
     ----------
     A : np.ndarray
-        First matrix. Shape must be :code:`(n_modes, n_channels, n_channels)` or
-        :code:`(n_channels, n_channels)`.
+        First matrix. Shape must be (n_modes, n_channels, n_channels) or
+        (n_channels, n_channels).
     B : np.ndarray
-        Second matrix. Shape must be :code:`(n_modes, n_channels, n_channels)` or
-        :code:`(n_channels, n_channels)`.
+        Second matrix. Shape must be (n_modes, n_channels, n_channels) or
+        (n_channels, n_channels)`.
 
     Returns
     -------
@@ -140,12 +138,12 @@ def pairwise_frobenius_distance(matrices):
     Parameters
     ----------
     matrices : np.ndarray
-        The set of matrices. Shape must be :code:`(n_matrices, n_channels, n_channels)`.
+        The set of matrices. Shape must be (n_matrices, n_channels, n_channels).
 
     Returns
     -------
     pairwise_distance : np.ndarray
-        Matrix of pairwise Frobenius distance. Shape is :code:`(n_matrices, n_matrices)`.
+        Matrix of pairwise Frobenius distance. Shape is (n_matrices, n_matrices).
 
     See Also
     --------
@@ -167,7 +165,7 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=False):
     Parameters
     ----------
     matrices : np.ndarray
-        Matrices. Shape must be :code:`(M, N, N)`.
+        Matrices. Shape must be (M, N, N).
     remove_diagonal : bool
         Should we remove the diagonal before calculating the correction?
 
@@ -175,7 +173,7 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=False):
     -------
     correlations : np.ndarray
         Pairwise Pearson correlation between elements of each flattened matrix.
-        Shape is :code:`(M, M)`.
+        Shape is (M, M).
     """
     n_matrices = matrices.shape[0]
     matrices = matrices.reshape(n_matrices, -1)
@@ -194,9 +192,9 @@ def riemannian_distance(M1, M2, threshold=1e-3):
     Parameters
     ----------
     M1 : np.ndarray
-        First matrix. Shape must be :code:`(N, N)`.
+        First matrix. Shape must be (N, N).
     M2 : np.ndarray
-        Second matrix. Shape must be :code:`(N, N)`.
+        Second matrix. Shape must be (N, N).
     threshold : float
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
@@ -219,7 +217,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     Parameters
     ----------
     matrices : np.ndarray
-        Matrices. Shape must be :code:`(M, N, N)`.
+        Matrices. Shape must be (M, N, N).
     threshold : float
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
@@ -227,7 +225,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     -------
     riemannian_distances : np.ndarray
         Matrix containing the pairwise Riemannian distances between matrices.
-        Shape is :code:`(M, M)`.
+        Shape is (M, M).
 
     See Also
     --------
@@ -255,14 +253,14 @@ def pairwise_rv_coefficient(matrices, remove_diagonal=False):
     Parameters
     ----------
     matrices : np.ndarray
-        Set of matrices. Shape must be :code:`(M, N, N)`.
+        Set of matrices. Shape must be (M, N, N).
     remove_diagonal : bool
         Should we remove the diagonal before calculating the correction?
 
     Returns
     -------
     rv_coefficients : np.ndarray
-        Matrix of pairwise RV coefficients. Shape is :code:`(M, M)`.
+        Matrix of pairwise RV coefficients. Shape is (M, M).
     """
     # First compute the scalar product matrices for each data set X
     scal_arr_list = []
@@ -299,14 +297,14 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
     Parameters
     ----------
     matrices : np.ndarray
-        Set of symmetric semi-positive definite matrices. Shape is :code:`(M, N, N)`.
+        Set of symmetric semi-positive definite matrices. Shape is (M, N, N).
     remove_diagonal : bool
         Should we remove the diagonal before calculating the correction?
 
     Returns
     -------
     congruence_coefficient : np.ndarray
-        Matrix of pairwise congruence coefficients. Shape is :code:`(M, M)`.
+        Matrix of pairwise congruence coefficients. Shape is (M, M).
     """
 
     n_matrices = matrices.shape[0]
@@ -330,14 +328,14 @@ def pairwise_l2_distance(arrays, batch_dims=0):
     Parameters
     ----------
     arrays : np.ndarray
-        Set of arrays. Shape is :code:`(..., n_arrays, ...)`.
+        Set of arrays. Shape is (..., n_arrays, ...).
     batch_dims : int
         Number of batch dimensions.
 
     Returns
     -------
     pairwise_distance : np.ndarray
-        Matrix of pairwise L2 distance. Shape is :code:`(..., n_arrays, n_arrays)`.
+        Matrix of pairwise L2 distance. Shape is (..., n_arrays, n_arrays).
     """
     if batch_dims > arrays.ndim - 1:
         raise ValueError("batch_dims must be less than arrays.ndim - 1")

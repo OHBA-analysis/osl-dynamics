@@ -20,8 +20,7 @@ def add_epsilon(A, epsilon, diag=False):
     Parameters
     ----------
     A : tf.Tensor
-        Batches of square matrices or vectors. Shape is :code:`(..., N, N)` or
-        :code:`(..., N)`.
+        Batches of square matrices or vectors. Shape is (..., N, N) or (..., N).
     epsilon : float
         Small error added to the diagonal of the matrices or every element of the
         vectors.
@@ -452,7 +451,7 @@ class VectorsLayer(layers.Layer):
     learn : bool
         Should we learn the vectors?
     initial_value : np.ndarray
-        Initial value for the vectors. Shape must be :code:`(n, m)`.
+        Initial value for the vectors. Shape must be (n, m).
     regularizer : osl-dynamics regularizer
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -527,7 +526,7 @@ class CovarianceMatricesLayer(layers.Layer):
     learn : bool
         Should the matrices be learnable?
     initial_value : np.ndarray
-        Initial values for the matrices. Shape must be :code:`(n, m, m)`.
+        Initial values for the matrices. Shape must be (n, m, m).
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
     regularizer : osl-dynamics regularizer
@@ -621,7 +620,7 @@ class CorrelationMatricesLayer(layers.Layer):
     learn : bool
         Should the matrices be learnable?
     initial_value : np.ndarray
-        Initial values for the matrices. Shape must be :code:`(n, m, m)`.
+        Initial values for the matrices. Shape must be (n, m, m).
     epsilon : float
         Error added to the diagonal of correlation matrices for numerical stability.
     regularizer : osl-dynamics regularizer
@@ -716,8 +715,7 @@ class DiagonalMatricesLayer(layers.Layer):
     learn : bool
         Should the matrices be learnable?
     initial_value : np.ndarray
-        Initial values for the matrices. Shape must be :code:`(n, m, m)` or
-        :code:`(n, m)`.
+        Initial values for the matrices. Shape must be (n, m, m) or (n, m).
     epsilon : float
         Error added to the diagonal matrices for numerical stability.
     regularizer : osl-dynamics regularizer
@@ -893,7 +891,7 @@ class ConcatVectorsMatricesLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         """
-        This method takes a :code:`(..., m, n)` tensor and :code:`(..., m, n, n)` tensor.
+        This method takes a (..., m, n) tensor and (..., m, n, n) tensor.
         """
         m, C = inputs
         m = tf.expand_dims(m, axis=-1)

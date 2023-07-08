@@ -28,8 +28,8 @@ def sliding_window_connectivity(
     Parameters
     ----------
     data : list or np.ndarray
-        Time series data. Shape must be :code:`(n_subjects, n_samples, n_channels)`
-        or :code:`(n_samples, n_channels)`.
+        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        or (n_samples, n_channels).
     window_length : int
         Window length in samples.
     step_size : int
@@ -46,8 +46,8 @@ def sliding_window_connectivity(
     Returns
     -------
     sliding_window_conn : list or np.ndarray
-        Time series of connectivity matrices. Shape is :code:`(n_subjects, n_windows,
-        n_channels, n_channels)` or :code:`(n_windows, n_channels, n_channels)`.
+        Time series of connectivity matrices. Shape is (n_subjects, n_windows,
+        n_channels, n_channels) or (n_windows, n_channels, n_channels).
     """
     # Validation
     if conn_type not in ["corr", "cov"]:
@@ -102,12 +102,12 @@ def covariance_from_spectra(
     ----------
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if :code:`frequency_range` is given.
-        Shape must be :code:`(n_freq,)`.
+        Shape must be (n_freq,).
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape must be :code:`(n_modes, n_channels,
-        n_channels, n_freq)`.
+        Power/cross spectra for each channel. Shape must be (n_modes, n_channels,
+        n_channels, n_freq).
     components : np.ndarray
-        Spectral components. Shape must be :code:`(n_components, n_freq)`.
+        Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list
         Frequency range to integrate the PSD over (Hz). Default is the full range.
 
@@ -115,7 +115,7 @@ def covariance_from_spectra(
     -------
     covar : np.ndarray
         Covariance over a frequency band for each component of each mode.
-        Shape is :code:`(n_components, n_modes, n_channels, n_channels)`.
+        Shape is (n_components, n_modes, n_channels, n_channels).
     """
 
     # Validation
@@ -188,12 +188,12 @@ def mean_coherence_from_spectra(
     ----------
     frequencies : np.ndarray
         Frequency axis of the PSDs. Only used if :code:`frequency_range` is given.
-        Shape must be :code:`(n_freq,)`.
+        Shape must be (n_freq,).
     coherence : np.ndarray
-        Coherence for each channel. Shape must be :code:`(n_modes, n_channels,
-        n_channels, n_freq)`.
+        Coherence for each channel. Shape must be (n_modes, n_channels,
+        n_channels, n_freq).
     components : np.ndarray
-        Spectral components. Shape must be :code:`(n_components, n_freq)`.
+        Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list
         Frequency range to integrate the PSD over (Hz).
 
@@ -201,8 +201,8 @@ def mean_coherence_from_spectra(
     -------
     coh : np.ndarray
         Mean coherence over a frequency band for each component of each mode.
-        Shape is :code:`(n_components, n_modes, n_channels, n_channels)` or
-        :code:`(n_modes, n_channels, n_channels)` or :code:`(n_channels, n_channels)`.
+        Shape is (n_components, n_modes, n_channels, n_channels) or
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     """
 
     # Validation
@@ -267,12 +267,12 @@ def mean_connections(conn_map):
     Parameters
     ----------
     conn_map : np.ndarray
-        A :code:`(..., n_channels, n_channels)` connectivity matrix.
+        A (..., n_channels, n_channels) connectivity matrix.
 
     Returns
     -------
     mean_connections : np.ndarray
-        A :code:`(..., n_channels)` matrix.
+        A (..., n_channels) matrix.
     """
     return np.mean(conn_map, axis=-1)
 
@@ -283,7 +283,7 @@ def eigenvectors(conn_map, n_eigenvectors=1, absolute_value=False, as_network=Fa
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity matrix. Shape must be :code:`(..., n_channels, n_channels)`.
+        Connectivity matrix. Shape must be (..., n_channels, n_channels).
     n_eigenvectors : int
         Number of eigenvectors to include.
     absolute_value : bool
@@ -295,9 +295,9 @@ def eigenvectors(conn_map, n_eigenvectors=1, absolute_value=False, as_network=Fa
     Returns
     -------
     eigenvectors : np.ndarray.
-        Eigenvectors. Shape is :code:`(n_eigenvectors, ..., n_channels, n_channels)`
+        Eigenvectors. Shape is (n_eigenvectors, ..., n_channels, n_channels)
         if :code:`as_network=True`, otherwise it is
-        :code:`(n_eigenvectors, ..., n_channels)`. If :code:`n_eigenvectors=1`,
+        (n_eigenvectors, ..., n_channels). If :code:`n_eigenvectors=1`,
         the first dimension is removed.
     """
     if absolute_value:
@@ -348,9 +348,8 @@ def gmm_threshold(
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity matrix. Shape must be :code:`(n_components, n_modes, n_channels,
-        n_channels)` or :code:`(n_modes, n_channels, n_channels)` or :code:`(n_channels,
-        n_channels)`.
+        Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     mean_weights: np.ndarray
@@ -366,8 +365,7 @@ def gmm_threshold(
         Should we only keep positive values to fit a GMM to?
     one_component_percentile : float
         Percentile threshold if only one component is found. Should be a between
-        :code:`0` and :code:`100`. E.g. for the 95th percentile,
-        :code:`one_component_percentile=95`.
+        0 and 100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
     n_sigma : float
         Number of standard deviations of the 'off' component the mean of the 'on'
         component must be for the fit to be considered to have two components.
@@ -428,9 +426,8 @@ def fit_gmm(
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity map. Shape must be :code:`(n_components, n_modes, n_channels,
-        n_channels)` or :code:`(n_modes, n_channels, n_channels)` or :code:`(n_channels,
-        n_channels)`.
+        Connectivity map. Shape must be (n_components, n_modes, n_channels, n_channels)
+        or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     subtract_mean : bool
         Should we subtract the mean over modes before fitting a GMM?
     mean_weights: np.ndarray
@@ -467,8 +464,7 @@ def fit_gmm(
     Returns
     -------
     percentile : np.ndarray
-        Percentile threshold. Shape is :code:`(n_components, n_modes)` or
-        :code:`(n_modes,)`.
+        Percentile threshold. Shape is (n_components, n_modes) or (n_modes,).
     """
     # Validation
     conn_map = array_ops.validate(
@@ -558,13 +554,12 @@ def threshold(
     Parameters
     ---------
     conn_map : np.ndarray
-        Connectivity matrix to threshold. Shape must be :code:`(n_components, n_modes,
-        n_channels, n_channels)`, :code:`(n_modes, n_channels, n_channels)` or
-        :code:`(n_channels, n_channels)`.
+        Connectivity matrix to threshold. Shape must be (n_components, n_modes,
+        n_channels, n_channels), (n_modes, n_channels, n_channels) or (n_channels,
+        n_channels).
     percentile : float or np.ndarray
         Percentile to threshold with. Should be between :code:`0` and :code:`100`.
-        Shape must be :code:`(n_components, n_modes)`, :code:`(n_modes,)` or a
-        :code:`float`.
+        Shape must be (n_components, n_modes), (n_modes,) or a float.
     subtract_mean : bool
         Should we subtract the mean over modes before thresholding? The thresholding
         is only done to identify edges, the values returned in :code:`conn_map` are
@@ -695,7 +690,7 @@ def save(
     ----------
     connectivity_map : np.ndarray
         Matrices containing connectivity strengths to plot. Shape must be
-        :code:`(n_modes, n_channels, n_channels)` or :code:`(n_channels, n_channels)`.
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     parcellation_file : str
         Name of parcellation file used.
     filename : str
@@ -706,7 +701,7 @@ def save(
     threshold : float or np.ndarray
         Threshold to determine which connectivity to show. Should be between :code:`0`
         and :code:`1`. If a :code:`float` is passed the same threshold is used for all
-        modes. Otherwise, threshold should be a numpy array of shape :code:`(n_modes,)`.
+        modes. Otherwise, threshold should be a numpy array of shape (n_modes,).
     glassbrain : bool
         Sholud we create a 3D glass brain plot (as an interactive HTML file)
         or a 2D image plot (as a :code:`png`, :code:`pdf`, :code:`svg`, etc. file).
@@ -823,14 +818,14 @@ def spectral_reordering(corr_mat):
     Parameters
     ----------
     corr_mat : np.ndarray
-        Correlation matrix. Shape must be :code:`(n_channels, n_channels)`.
+        Correlation matrix. Shape must be (n_channels, n_channels).
 
     Returns
     -------
     reorder_corr_mat : np.ndarray
-        Re-ordered correlation matrix. Shape is :code:`(n_channels, n_channels)`.
+        Re-ordered correlation matrix. Shape is (n_channels, n_channels).
     order : np.ndarray
-        New ordering. Shape is :code:`(n_channels,)`.
+        New ordering. Shape is (n_channels,).
     """
     # Add one to make all entries postive
     C = corr_mat + 1

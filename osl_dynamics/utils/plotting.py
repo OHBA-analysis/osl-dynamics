@@ -949,7 +949,7 @@ def plot_time_series(
     Parameters
     ----------
     time_series : np.ndarray
-        The time series to be plotted. Shape must be :code:`(n_samples, n_channels)`.
+        The time series to be plotted. Shape must be (n_samples, n_channels).
     n_samples : int
         The number of time points to be plotted.
     y_tick_values:
@@ -1044,8 +1044,8 @@ def plot_separate_time_series(
     Parameters
     ----------
     time_series : np.ndarray
-        Time series to be plotted. Should be :code:`(n_samples, n_lines)`. Each line
-        is its own subplot.
+        Time series to be plotted. Should be (n_samples, n_lines). Each line is
+        its own subplot.
     sampling_frequency: float
         Sampling frequency of the input data, enabling us to label the x-axis.
     n_samples : int
@@ -1131,7 +1131,7 @@ def plot_epoched_time_series(
     Parameters
     ----------
     data : np.ndarray
-        Data to be epoched. Shape must be :code:`(n_samples, n_channels)`.
+        Data to be epoched. Shape must be (n_samples, n_channels).
     time_index : np.ndarray
         The integer indices of the start of each epoch.
     sampling_frequency : float
@@ -1594,10 +1594,9 @@ def plot_brain_surface(
     Parameters
     ----------
     values : np.ndarray
-        Data to plot. Can be of shape: :code:`(n_maps, n_channels)` or
-        :code:`(n_channels,)`. A :code:`(..., n_channels, n_channels)` array can
-        also be passed. Warning: this function cannot be used if :code:`n_maps`
-        is equal to :code:`n_channels`.
+        Data to plot. Can be of shape: (n_maps, n_channels) or (n_channels,).
+        A (..., n_channels, n_channels) array can also be passed. Warning: this
+        function cannot be used if :code:`n_maps` is equal to :code:`n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
@@ -1934,9 +1933,9 @@ def plot_psd_topo(
     Parameters
     ----------
     f : np.ndarray
-        Frequency axis. Shape must be :code:`(n_freq,)`.
+        Frequency axis. Shape must be (n_freq,).
     psd : np.ndarray
-        PSD for each parcel. Shape must be :code:`(n_parcels, n_freq)`.
+        PSD for each parcel. Shape must be (n_parcels, n_freq).
     only_show : list
         Indices for parcels to include in the plot. Defaults to all parcels.
     parcellation_file : str
@@ -2021,11 +2020,11 @@ def plot_summary_stats_group_diff(
     name : str
         Name of the summary statistic.
     summary_stats : np.ndarray
-        Summary statistics. Shape is :code:`(n_subjects, n_states)`.
+        Summary statistics. Shape is (n_subjects, n_states).
     pvalues : np.ndarray
-        p-values for each summary statistic difference. Shape is :code:`(n_states,)`.
+        p-values for each summary statistic difference. Shape is (n_states,).
     assignments : np.ndarray
-        Array of 1s and 2s indicating group assignment. Shape is :code:`(n_subjects,)`.
+        Array of 1s and 2s indicating group assignment. Shape is (n_subjects,).
     fig_kwargs : dict
         Arguments to pass to :code:`plt.subplots()`.
     ax : plt.axes
@@ -2110,9 +2109,9 @@ def plot_evoked_response(
     Parameters
     ----------
     t : np.ndarray
-        Time axis. Shape must be :code:`(n_samples,)`.
+        Time axis. Shape must be (n_samples,).
     epochs : np.ndarray
-        Evoked responses. Shape must be :code:`(n_samples, n_channels)`.
+        Evoked responses. Shape must be (n_samples, n_channels).
     pvalues : np.ndarray
         p-value for each evoked response. This can be calculated with
         `osl_dynamics.analysis.statistics.evoked_response_max_stat_perm 
