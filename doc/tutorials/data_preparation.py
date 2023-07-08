@@ -79,7 +79,7 @@ plt.colorbar()
 from osl_dynamics.analysis import modes, spectral
 
 # Extract auto (and cross) correlation functions from the covariance
-acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=5)
+tau, acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=5)
 print(acf.shape)  # channels x channels x time lags
 
 #%%
@@ -105,7 +105,7 @@ print(data)
 
 # Calculate TDE covariance, ACF and PSD
 cov_tde = np.cov(data.time_series(), rowvar=False)
-acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
+tau, acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
 f, psd, _ = spectral.autocorr_to_spectra(acf, sampling_frequency=200)
 
 # Plot
@@ -130,7 +130,7 @@ data.tde(n_embeddings=11)
 
 # Calculate TDE covariance, ACF and PSD
 cov_tde = np.cov(data.time_series(), rowvar=False)
-acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
+tau, acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
 f, psd, _ = spectral.autocorr_to_spectra(acf, sampling_frequency=200)
 
 # Plot
