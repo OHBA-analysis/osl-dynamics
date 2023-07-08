@@ -8,7 +8,7 @@ def HMM_training(dataset,n_states,n_channels,save_dir):
         sequence_length=600,
         learn_means=True,
         learn_covariances=True,
-        batch_size=32,
+        batch_size=16,
         learning_rate=1e-3,
         n_epochs=40,
     )
@@ -44,7 +44,7 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir):
         kl_annealing_curve="tanh",
         kl_annealing_sharpness=5,
         n_kl_annealing_epochs=10,
-        batch_size=32,
+        batch_size=16,
         learning_rate=0.01,
         n_epochs=40,  # for the purposes of this tutorial we'll just train for a short period
     )
@@ -54,7 +54,7 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir):
     model.summary()
 
     # Initialization
-    init_history = model.random_state_time_course_initialization(dataset, n_epochs=1, n_init=3)
+    init_history = model.random_subset_initialization(dataset, n_epochs=1, n_init=3,take=0.2)
 
     # Full training
     history = model.fit(dataset)
