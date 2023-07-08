@@ -1,4 +1,5 @@
-"""Helper functions using NumPy.
+"""Helper functions for manipulating `NumPy \
+<https://numpy.org/doc/stable/user/index.html>`_ arrays.
 
 """
 
@@ -37,17 +38,19 @@ def get_one_hot(values, n_states=None):
     Parameters
     ----------
     values : np.ndarray
-        Categorical variable in a 1D array. Values should be integers (i.e. mode 0, 1,
-        2, 3, ... , `n_states`).
+        1D array of categorical values with shape :code:`(n_samples,)`.
+        The values should be integers (0, 1, 2, 3, ... , :code:`n_states` - 1).
+        Or 2D array of shape :code:`(n_samples, n_states)` to be binarized.
     n_states : int
-        Total number of modes in `values`. Must be at least the number of modes
-        present in `values`. Default is the number of unique values in `values`.
+        Total number of states in :code:`values`. Must be at least the number of states
+        present in :code:`values`. Default is the number of unique values in
+        :code:`values`.
 
     Returns
     -------
     one_hot : np.ndarray
-        A 2D array containing the one-hot encoded form of the input data.
-
+        A 2D array containing the one-hot encoded form of :code:`values`.
+        Shape is :code:`(n_samples, n_states)`.
     """
     if values.ndim == 2:
         values = values.argmax(axis=1)
@@ -57,66 +60,21 @@ def get_one_hot(values, n_states=None):
     return res.reshape([*list(values.shape), n_states]).astype(int)
 
 
-def align_arrays(*sequences, alignment="left"):
-    """Given a list of sequences, return the sequences trimmed to equal length.
-
-    Given a list of sequences of unequal length, remove either the start, end or a
-    portion of both the start and end of the arrays such that their lengths are equal
-    to the length of the shortest array.
-
-    If alignment is "left", values will be trimmed from the ends of the arrays
-    (i.e. the starts of the arrays will be aligned). If "right", values will be trimmed
-    from the starts of the arrays (i.e. the ends will be aligned). If "center", an
-    equal amount will be trimmed from the start and end of the array (i.e. the arrays
-    are aligned by their middle values.
-
-
-    Parameters
-    ----------
-    sequences : list of np.ndarray
-        Time courses with differing lengths.
-    alignment : str
-        One of "left", "center" and "right".
-    Returns
-    -------
-    aligned_arrays : list of np.ndarray
-    """
-    min_length = min(len(sequence) for sequence in sequences)
-
-    if alignment == "left":
-        return [sequence[:min_length] for sequence in sequences]
-
-    elif alignment == "right":
-        return [sequence[-min_length:] for sequence in sequences]
-    elif alignment == "center":
-        half_length = int(min_length / 2)
-        mids = [int(len(sequence) / 2) for sequence in sequences]
-
-        return [
-            sequence[mid - half_length : mid + half_length]
-            for sequence, mid in zip(sequences, mids)
-        ]
-
-    else:
-        raise ValueError("Alignment must be left, right or center.")
-
-
 def cov2corr(cov):
-    """Converts batches of covariance matrix into batches correlation matrix.
+    """Converts batches of covariance matrices into batches of correlation matrives.
 
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrices. Shape is (..., N, N).
+        Covariance matrices. Shape must be :code:`(..., N, N)`.
 
     Returns
     -------
     corr : np.ndarray
-        Correlation matrices. Shape is (..., N, N).
+        Correlation matrices. Shape is :code:`(..., N, N)`.
     """
-    cov = np.array(cov)
-
     # Validation
+    cov = np.array(cov)
     if cov.ndim < 2:
         raise ValueError("input covariances must have more than 1 dimension.")
 
@@ -127,31 +85,31 @@ def cov2corr(cov):
 
 
 def cov2std(cov):
-    """Gets the standard deviation from batches of covariance matrices.
+    """Get the standard deviation of batches of covariance matrices.
 
     Parameters
     ----------
     cov : np.ndarray
-        Covariance matrix. Shape is (..., N, N).
+        Covariance matrix. Shape must be :code:`(..., N, N)`.
 
     Returns
     -------
     std : np.ndarray
-        Standard deviations. Shape is (..., N).
+        Standard deviations. Shape is :code:`(..., N)`.
     """
     cov = np.array(cov)
-
-    # Validation
     if cov.ndim < 2:
         raise ValueError("input covariances must have more than 1 dimension.")
-
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
 def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=False):
     """Create a sliding window over an array in arbitrary dimensions.
 
-    Unceremoniously ripped from numpy 1.20, np.lib.stride_tricks.sliding_window_view.
+    Unceremoniously ripped from numpy 1.20,
+    `np.lib.stride_tricks.sliding_window_view \
+    <https://numpy.org/doc/1.20/reference/generated/\
+    numpy.lib.stride_tricks.sliding_window_view.html>`_.
     """
     window_shape = tuple(window_shape) if np.iterable(window_shape) else (window_shape,)
     # first convert input to array, possibly keeping subclass
@@ -193,15 +151,8 @@ def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=Fa
     )
 
 
-def validate(
-    array,
-    correct_dimensionality,
-    allow_dimensions,
-    error_message,
-):
-    """Checks if an array has been passed correctly.
-
-    This function checks the dimensionality of the array is correct.
+def validate(array, correct_dimensionality, allow_dimensions, error_message):
+    """Checks if the dimensionality of an array is correct.
 
     Parameters
     ----------
@@ -240,14 +191,14 @@ def check_symmetry(mat, precision=1e-6):
     Parameters
     ----------
     mat : np.ndarray or list of np.ndarray
-        Matrices to be checked. Shape of a matrix should be (..., N, N).
+        Matrices to be checked. Shape of a matrix should be :code:`(..., N, N)`.
     precision : float
         Precision for comparing values. Corresponds to an absolute tolerance parameter.
-        Default is 1e-6.
+        Default is :code:`1e-6`.
 
     Returns
     -------
-    symmetry : np.ndarray
+    symmetry : np.ndarray of bool
         Array indicating whether matrices are symmetric.
     """
     mat = np.array(mat)
@@ -270,8 +221,7 @@ def check_symmetry(mat, precision=1e-6):
 def ezclump(binary_array):
     """Find the clumps (groups of data with the same values) for a 1D bool array.
 
-    Returns a series of slices.
-    Taken wholesale from numpy.ma.extras.ezclump.
+    Taken wholesale from :code:`numpy.ma.extras.ezclump`.
     """
     if binary_array.ndim > 1:
         binary_array = binary_array.ravel()
@@ -292,6 +242,7 @@ def ezclump(binary_array):
 
     if binary_array[-1]:
         r.append(slice(idx[-1], binary_array.size))
+
     return r
 
 
@@ -306,6 +257,7 @@ def slice_length(slice_):
     Returns
     -------
     length : int
+        Length.
     """
     return slice_.stop - slice_.start
 
@@ -320,8 +272,8 @@ def apply_to_lists(list_of_lists, func, check_empty=True):
     func : callable
         Function to apply to each list.
     check_empty : bool
-        Return 0 for empty lists if set as True. If False, the function
-        will be applied to an empty list.
+        Return :code:`0` for empty lists if set as :code:`True`.
+        If :code:`False`, the function will be applied to an empty list.
 
     Returns
     -------
