@@ -25,7 +25,7 @@ class HMM:
         matrix.
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob` is a
-        :code:`str`. Must be between :code:`0` and :code:`1`.
+        :code:`str`. Must be between 0 and 1.
     n_states : int, optional
         Number of states. Needed when :code:`trans_prob` is a :code:`str` to construct
         the transition probability matrix.
@@ -154,7 +154,7 @@ class HMM_MAR(Simulation):
         details. Shape must be (n_states, n_channels).
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob` is a
-        :code:`str`. Must be between :code:`0` and :code:`1`.
+        :code:`str`. Must be between 0 and 1.
     random_seed : int, optional
         Seed for random number generator.
     """
@@ -232,7 +232,7 @@ class HMM_MVN(Simulation):
         Number of iterations to add activations to covariance matrices.
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob` is a
-        :code:`str`. Must be between :code:`0` and :code:`1`.
+        :code:`str`. Must be between 0 and 1.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
     random_seed : int, optional
@@ -344,7 +344,7 @@ class MDyn_HMM_MVN(Simulation):
         Number of iterations to add activations to covariance matrices.
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob` is a
-        :code:`str`. Must be between :code:`0` and :code:`1`.
+        :code:`str`. Must be between 0 and 1.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
     random_seed : int, optional
@@ -473,7 +473,7 @@ class MSubj_HMM_MVN(Simulation):
         Scale of variability between subject observation parameters.
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob`
-        is a :code:`str`. Must be between :code:`0` and :code:`1`.
+        is a :code:`str`. Must be between 0 and 1.
     subject_tc_std : float, optional
         Standard deviation when generating subject specific stay probability.
     observation_error : float, optional
@@ -611,7 +611,7 @@ class HierarchicalHMM_MVN(Simulation):
     top_level_trans_prob : np.ndarray or str
         Transition probability matrix of the top level HMM, which
         selects the bottom level HMM at each time point. Used when
-        :code:`top_level_hmm_type = 'hmm'`.
+        :code:`top_level_hmm_type='hmm'`.
     bottom_level_trans_prob : list of np.ndarray or str
         Transitions probability matrices for the bottom level HMMs,
         which generate the observed data.

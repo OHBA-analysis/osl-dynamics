@@ -283,7 +283,7 @@ def save(
         Power map to save. Can be of shape: (n_components, n_modes, n_channels),
         (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
         array can also be passed. Warning: this function
-        cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
+        cannot be used if :code:`n_modes=n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
@@ -309,7 +309,7 @@ def save(
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_. By default we pass::
 
-            plot_kwargs = {
+            {
                 "views": ["lateral", "medial"],
                 "hemispheres": ["left", "right"],
                 "colorbar": True,
@@ -520,7 +520,7 @@ def multi_save(
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_. By default we pass::
 
-            plot_kwargs = {
+            {
                 "views": ["lateral", "medial"],
                 "hemispheres": ["left", "right"],
                 "colorbar": True,

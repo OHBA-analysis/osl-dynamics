@@ -1616,7 +1616,7 @@ def plot_brain_surface(
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_. By default we use::
 
-            plot_kwargs={
+            {
                 "views": ["lateral", "medial"],
                 "hemispheres": ["left", "right"],
                 "colorbar": True,
