@@ -5,36 +5,31 @@
 import numpy as np
 
 
-def epoch(
-    data,
-    time_index,
-    pre,
-    post,
-    pad=False,
-):
-    """Transform [time x channel] data to [time x channel x epoch] data.
+def epoch(data, time_index, pre, post, pad=False):
+    """Transform (time, channel) data to (time, channel, epoch) data.
 
-    Given a series of triggers given by `time_index`, spit a continuous dataset into
-    epochs. `time_index` should be a sequence of integers representing the triggers
-    of the epochs. `pre` and `post` specify the window around each trigger event.
+    Given a series of triggers given by :code:`time_index`, spit a continuous
+    dataset into epochs. :code:`time_index` should be a sequence of integers
+    representing the triggers of the epochs. :code:`pre` and :code:`post` specify
+    the window around each trigger event.
 
     Parameters
     ----------
-    data: numpy.ndarray
-        A [time x channels] dataset to be epoched.
-    time_index: numpy.ndarray
+    data : np.ndarray
+        A (time, channels) dataset to be epoched.
+    time_index : np.ndarray
         The integer indices of the start of each epoch.
-    pre: int
+    pre : int
         The integer number of samples to include before the trigger.
-    post: int
+    post : int
         The integer number of samples to include after the trigger.
-    pad: bool
+    pad : bool, optional
         Pad with NaNs so that initial epochs will always been included.
 
     Returns
     -------
-    epoched : numpy.ndarray
-        A [time x channels x epochs] dataset.
+    epoched : np.ndarray
+        A (time, channels, epochs) dataset.
     """
     if pad:
         # Pad before and after the data with zeros
@@ -51,27 +46,28 @@ def epoch(
 
 
 def epoch_mean(data, time_index, pre, post, pad=False):
-    """Get the mean over epochs of a [time x channels] dataset.
+    """Get the mean over epochs of a (time, channels) dataset.
 
-    Calls `epoch_mean`, and takes a mean over epochs, returning data with dimensions
-    [time x channels] in which the time is the length of the epoch window.
+    Calls :code:`epoch_mean`, and takes a mean over epochs, returning data
+    with dimensions (time, channels) in which the time is the length of the
+    epoch window.
 
     Parameters
     ----------
-    data: numpy.ndarray
-        A [time x channels] dataset to be epoched.
-    time_index: numpy.ndarray
+    data : np.ndarray
+        A (time, channels) dataset to be epoched.
+    time_index : np.ndarray
         The integer indices of the start of each epoch.
-    pre: int
+    pre : int
         The integer number of samples to include before the trigger.
-    post: int
+    post : int
         The integer number of samples to include after the trigger.
-    pad: bool
+    pad : bool, optional
         Pad with NaNs so that initial epochs will always been included.
 
     Returns
     -------
-    epoch_mean : numpy.ndarray
-        [time x channels] data meaned over epochs.
+    epoch_mean : np.ndarray
+        (time, channels) data meaned over epochs.
     """
     return np.nanmean(epoch(data, time_index, pre, post, pad=pad), axis=0)

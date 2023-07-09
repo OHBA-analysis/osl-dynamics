@@ -18,9 +18,9 @@ def standardize(x, axis=0, create_copy=True):
     ----------
     x : np.ndarray
         Time series data. Shape must be (n_samples, n_channels).
-    axis : int
+    axis : int, optional
         Axis on which to perform the transformation.
-    create_copy : bool
+    create_copy : bool, optional
         Should we return a new array containing the standardized data or modify
         the original time series array?
 
@@ -83,7 +83,7 @@ def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
         Frequency in Hz for a low pass filter.
     sampling_frequency : float
         Sampling frequency in Hz.
-    order : int
+    order : int, optional
         Order for a butterworth filter.
 
     Returns
