@@ -1,5 +1,10 @@
 """Multi-Dynamic Network Modes (M-DyNeMo).
 
+See Also
+--------
+`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples\
+/simulation/mdynemo_hmm-mvn.py>`_ for training M-DyNeMo on simulated data (with multiple
+dynamics).
 """
 
 import logging

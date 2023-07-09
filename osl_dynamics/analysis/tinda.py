@@ -4,6 +4,11 @@ This module contains functions for calculating the density profile (i.e., fracti
 occupancy over) in any interval between events it is originally intended to use it on
 an HMM state time course to ask questions like what is the density of state j in the
 first and second part of the interval between visits to state i.
+
+See Also
+--------
+`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
+/examples/simulation/hmm_tinda.py>`_ applying TINDA to simulated HMM data.
 """
 
 from itertools import permutations

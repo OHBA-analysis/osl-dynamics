@@ -266,9 +266,9 @@ class ModelBase:
 
         Parameters
         ----------
-        inputs : osl_dynamics.data.Data
-            Data object. If a str or numpy array is passed this function will
-            convert it into a Data object.
+        inputs : osl_dynamics.data.Data or str or np.ndarray
+            Data object. If a :code:`str` or :np.ndarray: is passed this function
+            will first convert it into a Data object.
         shuffle : bool, optional
             Should we shuffle the data?
         concatenate : bool, optional
