@@ -46,7 +46,7 @@ def override_dict_defaults(default_dict, override_dict=None):
     ----------
     default_dict : dict
         Dictionary of default values.
-    override_dict : dict
+    override_dict : dict, optional
         Dictionary of user values.
 
     Returns
@@ -101,7 +101,7 @@ def replace_argument(func, name, item, args, kwargs, append=False):
         Original arguments.
     kwargs : dict
         Original keyword arguments.
-    append : bool
+    append : bool, optional
         Whether the value should be appended or replace the existing argument.
 
     Returns
@@ -227,7 +227,7 @@ class MockFlags:
     ----------
     shape : list of int
         The shape of the array being mapped.
-    c_contiguous : bool
+    c_contiguous : bool, optional
         Is the array C contiguous or F contiguous?
     """
 
@@ -245,7 +245,7 @@ class MockArray:
         Dimensions or the array being created.
     dtype : type
         The data type of the array.
-    c_contiguous : bool
+    c_contiguous : bool, optional
         Is the array C contiguous or F contiguous?
     """
 

@@ -163,11 +163,11 @@ class LatexTable(Table):
         The table headers.
     rows : list of list of str
         The table rows.
-    vertical_lines : bool
+    vertical_lines : bool, optional
         Whether to draw vertical lines, by default :code:`True`.
-    horizontal_lines : bool
+    horizontal_lines : bool, optional
         Whether to draw horizontal lines, by default :code:`True`.
-    header_lines : bool
+    header_lines : bool, optional
         Whether to draw horizontal lines above the header, by default :code:`True`.
     """
 

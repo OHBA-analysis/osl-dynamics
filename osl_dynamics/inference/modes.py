@@ -26,11 +26,11 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     alpha : list or np.ndarray
         Mode mixing factors or state probabilities. Shape must be
         (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
-    concatenate : bool
+    concatenate : bool, optional
         If :code:`alpha` is a :code:`list`, should we concatenate the time courses?
-    n_modes : int
+    n_modes : int, optional
         Number of modes/states there should be. Useful if there are
-        modes/states which never activate. Optional.
+        modes/states which never activate.
 
     Returns
     -------
@@ -81,21 +81,21 @@ def gmm_time_courses(
     alpha : list of np.ndarray or np.ndarray
         Mode time courses. Shape must be (n_subjects, n_samples, n_modes) or
         (n_samples, n_modes).
-    logit_transform : bool
+    logit_transform : bool, optional
         Should we logit transform the mode time course?
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the mode time course?
-    p_value : float
+    p_value : float, optional
         Used to determine a threshold. We ensure the data points assigned
         to the 'on' component have a probability of less than :code:`p_value` of
         belonging to the 'off' component.
-    filename : str
+    filename : str, optional
         Path to directory to plot the GMM fit plots.
-    sklearn_kwargs : dict
+    sklearn_kwargs : dict, optional
         Keyword arguments to pass to `sklean.mixture.GaussianMixture \
         <https://scikit-learn.org/stable/modules/generated/\
         sklearn.mixture.GaussianMixture.html>`_.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
         `osl_dynamics.utils.plotting.plot_gmm \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/\
@@ -221,10 +221,10 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
     covariances : tuple of np.ndarray
         Covariance matrices to match. Each covariance must be (n_modes, n_channel,
         n_channels).
-    comparison : str
+    comparison : str, optional
         Either :code:`'rv_coefficient'`, :code:`'correlation'` or :code:`'frobenius'`.
         Default is :code:`'rv_coefficient'`.
-    return_order : bool
+    return_order : bool, optional
         Should we return the order instead of the covariances?
 
     Returns
@@ -307,6 +307,8 @@ def match_modes(*mode_time_courses, return_order=False):
     ----------
     mode_time_courses : list of np.ndarray
         Mode time courses. Each time course must be (n_samples, n_modes).
+    return_order : bool, optional
+        Should we return the order instead of the mode time courses.
 
     Returns
     -------
@@ -419,17 +421,16 @@ def convert_to_mne_raw(
     raw : mne.io.Raw or str
         Raw object to extract info from. If a :code:`str` is passed, it must be the
         path to a fif file containing the Raw object.
-    ch_names : list
-        Name for each channel. Optional, defaults to
-        :code:`alpha_0, ..., alpha_{n_modes-1}`.
-    n_embeddings : int
+    ch_names : list, optional
+        Name for each channel. Defaults to :code:`alpha_0, ..., alpha_{n_modes-1}`.
+    n_embeddings : int, optional
         Number of embeddings that was used to prepare time-delay embedded
-        training data. Optional.
-    n_window : int
-        Number of samples used to smooth amplitude envelope data. Optional.
-    extra_chans : str or list of str
+        training data.
+    n_window : int, optional
+        Number of samples used to smooth amplitude envelope data.
+    extra_chans : str or list of str, optional
         Extra channel types to add to the Raw object.
-    verbose : bool
+    verbose : bool, optional
         Should we print a verbose?
 
     Returns
@@ -550,10 +551,9 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     alpha : list of list of np.ndarray or list of np.ndarray
         State probabilities. Shape must be (n_runs, n_subjects, n_samples, n_states)
         or (n_runs, n_samples, n_states).
-    n_clusters : int
-        Number of clusters to fit. Optional, defaults to the largest number of
-        states in alpha.
-    return_cluster_info : bool
+    n_clusters : int, optional
+        Number of clusters to fit. Defaults to the largest number of states in alpha.
+    return_cluster_info : bool, optional
         Should we return information describing the clustering?
 
     Returns

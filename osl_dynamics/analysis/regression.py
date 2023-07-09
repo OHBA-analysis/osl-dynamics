@@ -23,9 +23,9 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
         dimensions are concatenated.
     fit_intercept : bool
         Should we fit an intercept?
-    normalize : bool
+    normalize : bool, optional
         Should we z-transform the regressors?
-    log_message : bool
+    log_message : bool, optional
         Should we log a message?
 
     Returns

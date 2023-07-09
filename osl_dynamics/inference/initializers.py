@@ -207,7 +207,7 @@ def reinitialize_model_weights(model, keep=None):
     ----------
     model : tf.keras.Model
         Model to re-initialize weights for.
-    keep : list
+    keep : list, optional
         List of :code:`str` containing names for layers to not reinitialize.
     """
     if keep is None:

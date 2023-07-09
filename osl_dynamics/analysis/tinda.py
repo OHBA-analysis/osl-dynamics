@@ -46,7 +46,7 @@ def split_intervals(intervals, n_bins=2):
     ----------
     intervals : list
         List of tuples of start and end indices of intervals.
-    n_bins : int
+    n_bins : int, optional
         Number of bins to split each interval into.
 
     Returns
@@ -97,15 +97,15 @@ def split_interval_duration(
     ----------
     durations : array_like
         Array of durations of intervals (in samples).
-    interval_range : array_like
+    interval_range : array_like, optional
         Array of bin edges (in samples, seconds, or percentiles) to split durations
         into bins are defined as :code:`[>=interval_range[i], <interval_range[i+1])`.
         If :code:`None`, all durations are in the same bin.
-    mode : str
+    mode : str, optional
         Mode of interval_range, either "sample" (e.g., :code:`[4, 20, 100]`),
         "perc" (e.g., :code:`range(20,100,20)`), or "sec" (e.g.,
         :code:`[0, 0.01, 0.1, 1, np.inf]`). If "sec", :code:`sfreq` must be provided.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency (in Hz) of the data, only used if :code:`mode` is "sec".
 
     Returns
@@ -151,9 +151,9 @@ def compute_fo_stats(
     divided_intervals : list
         List with each element corresponding to an interval, each itself being a
         list of tuples of start and end indices of interval bins.
-    interval_mask : array_like
+    interval_mask : array_like, optional
         Array of zeros and ones indicating whether the interval was in the bin.
-    return_all_intervals : bool
+    return_all_intervals : bool, optional
         Whether to return the density/sum of all intervals in addition to the interval
         averages/sums.
 
@@ -303,11 +303,11 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
         that is the output of :code:`compute_fo_stats`.
     field : str
         Field of stats to collate, e.g., :code:`"interval_wavg"`, :code:`"interval_sum"`.
-    all_to_all : bool
+    all_to_all : bool, optional
         Whether the density_of was used to compute the stats (in which case the first
         2 dimensions are not :code:`n_states` x :code:`n_states`). Default is
         :code:`False`.
-    ignore_elements : list
+    ignore_elements : list, optional
         List of indices in stats to ignore (i.e. because they don't contain binary
         events).
 
@@ -359,22 +359,22 @@ def tinda(
         Time courses of shape (n_samples, n_states) define intervals from will use the
         same time courses to compute density of when :code:`density_of` is :code:`None`.
         Can be a list of time courses (e.g. state time courses for each subject).
-    density_of : array_like
+    density_of : array_like, optional
         Time course of shape (n_samples, n_states) to compute density of if
         :code:`None` (default), density is computed for all columns of tc.
-    n_bins : int
+    n_bins : int, optional
         Number of bins to divide each interval into (default 2).
-    interval_mode : str
+    interval_mode : str, optional
         Mode of :code:`interval_range`, either :code:`"sample"` (default),
         "sec" (seconds) or "perc" (percentile). To interpret the interval range
         as seconds, :code:`sfreq` must be provided.
-    interval_range : array_like
-        Array of bin edges (in samples, seconds, or percentiles) used to split durations
-        into bins (default :code:`None`), e.g. :code:`np.arange(0, 1, 0.1)` for 100 ms
-        bins.
-    sampling_frequency : float
+    interval_range : array_like, optional
+        Array of bin edges (in samples, seconds, or percentiles) used to split
+        durations into bins (default :code:`None`), e.g. :code:`np.arange(0, 1, 0.1)`
+        for 100 ms bins.
+    sampling_frequency : float, optional
         Sampling frequency of tc (in Hz), only used if :code:`interval_mode="sec"`.
-    return_all_intervals : bool
+    return_all_intervals : bool, optional
         Whether to return the density/sum of all intervals in addition to the interval
         averages/sums. If :code:`True`, will return a list of arrays in
         :code:`stats[i]['all_interval_wavg'/'all_interval_sum']`, each corresponding
@@ -538,7 +538,7 @@ def optimise_sequence(fo_density, metric_to_use=0):
     fo_density : array_like
         Time-in-state densities array of shape (n_interval_states, n_density_states,
         2, n_subjects).
-    metric : int
+    metric : int, optional
         Metric to use for optimisation:
 
         - :code:`0`: mean FO asymmetry.
@@ -630,9 +630,9 @@ def plot_cycle(ordering, fo_density, edges, new_figure=False, color_scheme=None)
         2, (n_interval_ranges,) n_subjects).
     edges : array_like
         Array of zeros and ones indicating whether the connection should be plotted.
-    new_figure : bool
+    new_figure : bool, optional
         Whether to create a new figure (default is :code:`False`).
-    color_scheme : array_like
+    color_scheme : array_like, optional
         Array of size (K,3) color scheme to use for plotting (default is :code:`None`).
         If :code:`None`, will use the default color scheme from the matlab code.
     """

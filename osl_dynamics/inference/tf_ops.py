@@ -52,7 +52,7 @@ def suppress_messages(level=3):
 
     Parameters
     ----------
-    level : int
+    level : int, optional
         The level for the messages to suppress.
     """
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = str(level)

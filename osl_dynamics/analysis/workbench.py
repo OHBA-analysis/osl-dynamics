@@ -49,13 +49,13 @@ def render(
     ----------
     nii : str
         Path to nii image file.
-    save_dir : str
+    save_dir : str, optional
         Path to save rendered surface plots.
-    interptype : str
+    interptype : str, optional
         Interpolation type. Default is :code:`'trilinear'`.
-    gui : bool
+    gui : bool, optional
         Should we display the rendered plots in workbench? Default is :code:`True`.
-    image_name : str
+    image_name : str, optional
         Filename of image to save.
     """
     nii = pathlib.Path(nii)

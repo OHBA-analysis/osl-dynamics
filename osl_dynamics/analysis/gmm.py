@@ -34,33 +34,33 @@ def fit_gaussian_mixture(
     ----------
     X : np.ndarray
         Data to fit GMM to. Must be 1D.
-    logit_transform : bool
+    logit_transform : bool, optional
         Should we logit transform the :code:`X`?
-    standardize : bool
+    standardize : bool, optional
         Should we standardize :code:`X`?
-    p_value : float
+    p_value : float, optional
         Used to determine a threshold. We ensure the data points assigned to the
         'on' component have a probability of less than :code:`p_value` of belonging
         to the 'off' component.
-    one_component_percentile : float
+    one_component_percentile : float, optional
         Percentile threshold if only one component is found. Should be a between 0 and
         100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
-    n_sigma : float
+    n_sigma : float, optional
         Number of standard deviations of the 'off' component the mean of the 'on'
         component must be for the fit to be considered to have two components.
-    label_order: str
+    label_order: str, optional
         How do we order the inferred classes?
-    sklearn_kwargs : dict
+    sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
         `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable/modules\
         /generated/sklearn.mixture.GaussianMixture.html>`_.
-    return_statistics: bool
+    return_statistics: bool, optional
         Should we return statistics of the Gaussian mixture components?
-    show_plot : bool
+    show_plot : bool, optional
         Should we show the GMM fit to the distribution of :code:`X`.
-    plot_filename : str
+    plot_filename : str, optional
         Filename to save a plot of the Gaussian mixture model.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `utils.plotting.plot_gmm
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
         /plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_

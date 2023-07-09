@@ -33,12 +33,12 @@ def load_data(inputs, kwargs=None, prepare=None):
     ----------
     inputs : str
         Path to directory containing :code:`npy` files.
-    kwargs : dict
+    kwargs : dict, optional
         Keyword arguments to pass to the `Data <https://osl-dynamics.readthedocs.io\
         /en/latest/autoapi/osl_dynamics/data/index.html#osl_dynamics.data.Data>`_ class.
         Useful keyword arguments to pass are :code:`sampling_frequency`,
         :code:`mask_file` and :code:`parcellation_file`.
-    prepare : dict
+    prepare : dict, optional
         Methods dict to pass to the prepare method. See docstring for
         `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /data/index.html#osl_dynamics.data.Data>`_.prepare.
@@ -98,15 +98,15 @@ def train_hmm(
              'batch_size': 32,
              'learning_rate': 0.01,
              'n_epochs': 20}.
-    init_kwargs : dict
+    init_kwargs : dict, optional
         Keyword arguments to pass to
-        :code:`Model.random_state_time_course_initialization`. Optional, defaults to::
+        :code:`Model.random_state_time_course_initialization`. Defaults to::
 
             {'n_init': 3, 'n_epochs': 1}.
-    fit_kwargs : dict
-        Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
-    save_inf_params : bool
-        Should we save the inferred parameters? Optional, defaults to :code:`True`.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`. No defaults.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
     """
     if data is None:
         raise ValueError("data must be passed.")
@@ -216,15 +216,15 @@ def train_dynemo(
              'batch_size': 128,
              'learning_rate': 0.01,
              'n_epochs': 40}
-    init_kwargs : dict
+    init_kwargs : dict, optional
         Keyword arguments to pass to :code:`Model.random_subset_initialization`.
-        Optional, defaults to::
+        Defaults to::
 
             {'n_init': 5, 'n_epochs': 1, 'take': 0.25}.
-    fit_kwargs : dict
-        Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
-    save_inf_params : bool
-        Should we save the inferred parameters? Optional, defaults to :code:`True`.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`. No defaults.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
     """
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
@@ -439,7 +439,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
              'time_half_bandwidth': 4,
              'n_tapers': 7,
              'keepdims': True}
-    nnmf_components : int
+    nnmf_components : int, optional
         Number of non-negative matrix factorization (NNMF) components to fit to
         the stacked subject-specific coherence spectra.
     """
@@ -640,16 +640,15 @@ def plot_group_ae_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    aec_abs : bool
+    aec_abs : bool, optional
         Should we take the absolute value of the amplitude envelope correlations?
-        Optional, defaults to :code:`True`.
-    power_save_kwargs : dict
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
@@ -657,7 +656,7 @@ def plot_group_ae_networks(
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
              'parcellation_file': data.parcellation_file}
-    conn_save_kwargs : dict
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
@@ -760,19 +759,19 @@ def plot_group_tde_hmm_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    frequency_range : list
+    frequency_range : list, optional
         List of length 2 containing the minimum and maximum frequency to integrate
-        spectra over. Optional, defaults to the full frequency range.
-    percentile : float
+        spectra over. Defaults to the full frequency range.
+    percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    power_save_kwargs : dict
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
@@ -781,7 +780,7 @@ def plot_group_tde_hmm_networks(
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
-    conn_save_kwargs : dict
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
@@ -933,18 +932,18 @@ def plot_group_nnmf_tde_hmm_networks(
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_)
         containing the NNMF components.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    component : int
+    component : int, optional
         NNMF component to plot. Defaults to the first component.
-    percentile : float
+    percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    power_save_kwargs : dict
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
@@ -954,7 +953,7 @@ def plot_group_nnmf_tde_hmm_networks(
              'component': component,
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
-    conn_save_kwargs : dict
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
@@ -1115,19 +1114,19 @@ def plot_group_tde_dynemo_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    frequency_range : list
+    frequency_range : list, optional
         List of length 2 containing the minimum and maximum frequency to integrate
-        spectra over. Optional, defaults to the full frequency range.
-    percentile : float
+        spectra over. Defaults to the full frequency range.
+    percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict
+    plot_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /power/index.html#osl_dynamics.analysis.power.save>`_. Defaults to::
@@ -1136,7 +1135,7 @@ def plot_group_tde_dynemo_networks(
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
-    conn_save_kwargs : dict
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
@@ -1274,21 +1273,21 @@ def plot_alpha(
         Data object.
     output_dir : str
         Path to output directory.
-    subject : int
+    subject : int, optional
         Index for subject to plot. If 'all' is passed we create a separate plot
         for each subject.
-    normalize : bool
+    normalize : bool, optional
         Should we also plot the alphas normalized using the trace of the inferred
-        covariance matrices? Optional. Useful if we are plotting the inferred alphas
+        covariance matrices? Useful if we are plotting the inferred alphas
         from DyNeMo.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we see if it is
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we see if it is
         present in :code:`data.sampling_frequency`.
-    kwargs : dict
+    kwargs : dict, optional
         Keyword arguments to pass to `utils.plotting.plot_alpha
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
         /plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
-        Optional. Defaults to::
+        Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
              'filename': '<output_dir>/alphas/alpha_<subject>.png'}
@@ -1358,7 +1357,7 @@ def calc_gmm_alpha(data, output_dir, kwargs=None):
         Data object.
     output_dir : str
         Path to output directory.
-    kwargs : dict
+    kwargs : dict, optional
         Keyword arguments to pass to `inference.modes.gmm_time_courses
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference\
         /modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_.
@@ -1410,12 +1409,12 @@ def plot_hmm_network_summary_stats(
         Data object.
     output_dir : str
         Path to output directory.
-    use_gmm_alpha : bool
+    use_gmm_alpha : bool, optional
         Should we use alphas binarised using a Gaussian mixture model?
         This function assumes :code:`calc_gmm_alpha` has been called and the file
         :code:`<output_dir>/inf_params/gmm_alp.pkl` exists.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we use
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
     """
     if sampling_frequency is None:
@@ -1526,10 +1525,10 @@ def compare_groups_hmm_summary_stats(
         Path to output directory.
     group2_indices : np.ndarray or list
         Indices indicating which subjects belong to the second group.
-    separate_tests : bool
+    separate_tests : bool, optional
         Should we perform a maximum statistic permutation test for each summary
         statistic separately?
-    covariates : str
+    covariates : str, optional
         Path to a pickle file containing a dict with covariances. Each item in the
         dict must be the covariate name and value for each subject. The covariates
         will be loaded with::
@@ -1540,12 +1539,12 @@ def compare_groups_hmm_summary_stats(
         Example covariates::
 
             covariates = {"age": [...], "sex": [...]}
-    n_perm : int
+    n_perm : int, optional
         Number of permutations.
-    n_jobs : int
+    n_jobs : int, optional
         Number of jobs for parallel processing.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we use
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
     """
     if sampling_frequency is None:
@@ -1668,8 +1667,8 @@ def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
         Data object.
     output_dir : str
         Path to output directory.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we use
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
     """
     if sampling_frequency is None:

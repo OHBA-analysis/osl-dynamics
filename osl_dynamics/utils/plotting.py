@@ -81,7 +81,7 @@ def show(tight_layout=False):
 
     Parameters
     ----------
-    tight_layout : bool
+    tight_layout : bool, optional
         Should we call :code:`plt.tight_layout()`?
     """
     if tight_layout:
@@ -98,7 +98,7 @@ def save(fig, filename, tight_layout=False):
         Matplotlib figure object.
     filename : str
         Output filename.
-    tight_layout : bool
+    tight_layout : bool, optional
         Should we call :code:`fig.tight_layout()`?
     """
     _logger.info(f"Saving {filename}")
@@ -113,7 +113,7 @@ def close(fig=None):
 
     Parameters
     ----------
-    fig : plt.figure
+    fig : plt.figure, optional
         Figure to close. Defaults to all figures.
     """
     if fig is None:
@@ -160,7 +160,7 @@ def get_colors(n, colormap="magma"):
     ----------
     n : int
         The number of colors to return.
-    colormap : str
+    colormap : str, optional
         The name of a matplotlib colormap.
 
     Returns
@@ -201,31 +201,31 @@ def plot_line(
         x-ordinates.
     y : list of np.ndarray
         y-ordinates.
-    labels : list of str
+    labels : list of str, optional
         Legend labels for each line.
-    legend_loc : int
+    legend_loc : int, optional
         Matplotlib legend location identifier. Default is top right.
-    errors : list with 2 items
+    errors : list with 2 items, optional
         Min and max errors.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Arguments to pass to the `ax.plot
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_
         method.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -348,35 +348,35 @@ def plot_scatter(
         x-ordinates.
     y : list of np.ndarray
         y-ordinates.
-    labels : list of str
+    labels : list of str, optional
         Legend labels for each line.
-    legend_loc : int
+    legend_loc : int, optional
         Matplotlib legend location identifier. Default is top right.
-    errors : list
+    errors : list, optional
         Error bars.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    markers : list of str
+    markers : list of str, optional
         Markers to used for each set of data points.
-    annotate : List of array like objects
+    annotate : List of array like objects, optional
         Annotation for each data point for each set of data points.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Arguments to pass to the `ax.scatter
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.scatter.html>`_
         method.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -511,29 +511,29 @@ def plot_hist(
         Raw data to plot (i.e. non-histogramed data).
     bins : list of int
         Number of bins for each item in data.
-    labels : list of str
+    labels : list of str, optional
         Legend labels for each line.
-    legend_loc : int
+    legend_loc : int, optional
         Matplotlib legend location identifier. Default is top right.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Arguments to pass to the `ax.hist
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html>`_
         method. Defaults to :code:`{"histtype": "step"}`.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -634,27 +634,27 @@ def plot_bar_chart(
     ----------
     counts : list of np.ndarray
         Data to plot.
-    x : list or np.ndarray
+    x : list or np.ndarray, optional
         x-values for counts.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Arguments to pass to the `ax.bar
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.bar.html>`_
         method.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -751,25 +751,25 @@ def plot_gmm(
         Mean of each Gaussian component.
     stddevs : np.ndarray
         Standard deviation of each Gaussian component.
-    bins : list of int
+    bins : list of int, optional
         Number of bins for the historgram.
-    legend_loc : int
+    legend_loc : int, optional
         Position for the legend.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -857,19 +857,19 @@ def plot_violin(
     ----------
     data : list of np.ndarray
         Data to plot.
-    x : list or np.ndarray
+    x : list or np.ndarray, optional
         x-values for data.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : matplotlib.axes.axes
+    ax : matplotlib.axes.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -950,19 +950,19 @@ def plot_time_series(
     ----------
     time_series : np.ndarray
         The time series to be plotted. Shape must be (n_samples, n_channels).
-    n_samples : int
+    n_samples : int, optional
         The number of time points to be plotted.
-    y_tick_values:
+    y_tick_values:, optional
         Labels for the channels to be placed on the y-axis.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to be passed on to `ax.plot
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
         Defaults to :code:`{"lw": 0.7, "color": "tab:blue"}`.
-    ax : plt.axes
+    ax : plt.axes, optional
         The axis on which to plot the data. If not given, a new axis is created.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1046,17 +1046,17 @@ def plot_separate_time_series(
     time_series : np.ndarray
         Time series to be plotted. Should be (n_samples, n_lines). Each line is
         its own subplot.
-    sampling_frequency: float
+    sampling_frequency: float, optional
         Sampling frequency of the input data, enabling us to label the x-axis.
-    n_samples : int
+    n_samples : int, optional
         Number of samples to be shown on the x-axis.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to be passed on to `ax.plot
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
         Defaults to :code:`{"lw": 0.7}`.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1134,28 +1134,28 @@ def plot_epoched_time_series(
         Data to be epoched. Shape must be (n_samples, n_channels).
     time_index : np.ndarray
         The integer indices of the start of each epoch.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         The sampling frequency of the data in Hz.
-    pre : int
+    pre : int, optional
         The integer number of samples to include before the trigger.
-    post : int
+    post : int, optional
         The integer number of samples to include after the trigger.
-    baseline_correct : bool
+    baseline_correct : bool, optional
         Should we subtract the mean value pre-trigger.
-    legend : bool
+    legend : bool, optional
         Should a legend be created.
-    legend_loc : int
+    legend_loc : int, optional
         Location of the legend.
-    title : str
+    title : str, optional
         Title of the figure.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to be passed on to `ax.plot
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
-    ax : plt.axes
+    ax : plt.axes, optional
         The axis on which to plot the data. If not given, a new axis is created.
-    filename : str
+    filename : str, optional
         Output_filename.
 
     Returns
@@ -1245,20 +1245,20 @@ def plot_matrices(
     ----------
     matrix: list of np.ndarray
         The matrices to plot.
-    group_color_scale: bool
+    group_color_scale: bool, optional
         If True, all matrices will have the same colormap scale, where we use the
         minimum and maximum across all matrices as the scale.
-    titles: list of str
+    titles: list of str, optional
         Titles to give to each matrix axis.
-    main_title: str
+    main_title: str, optional
         Main title to be placed at the top of the plot.
-    cmap: str
+    cmap: str, optional
         Matplotlib colormap.
-    nan_color: str
+    nan_color: str, optional
         Matplotlib color to use for :code:`NaN` values.
-    log_norm: bool
+    log_norm: bool, optional
         Should we show the elements on a log scale?
-    filename: str
+    filename: str, optional
         Output filename.
 
     Returns
@@ -1351,15 +1351,15 @@ def plot_connections(
     ----------
     weights : np.ndarray
         An :code:`NxN` matrix of weights.
-    labels : list of str
+    labels : list of str, optional
         A name for each node in the weights matrix (e.g. parcel names)
-    ax : plt.axes
+    ax : plt.axes, optional
         A matplotlib axis on which to plot.
-    cmap : str
+    cmap : str, optional
         A string corresponding to a matplotlib colormap.
-    text_color : str
+    text_color : str, optional
         A string corresponding to a matplotlib color.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1530,25 +1530,25 @@ def topoplot(
         The name of an MEG layout (matching one from FieldTrip).
     data : np.ndarray
         The value of the field at each sensor.
-    channel_names : list of str
+    channel_names : list of str, optional
         A list of channel names which are present in the data (removes missing channels).
-    plot_boxes : bool
+    plot_boxes : bool, optional
         Show boxes representing the height and width of sensors.
-    show_deleted_sensors : bool
+    show_deleted_sensors : bool, optional
         Show sensors missing from :code:`channel_names` in red.
-    show_names : bool
+    show_names : bool, optional
         Show the names of channels (can get very cluttered).
-    title : str
+    title : str, optional
         A title for the figure.
-    colorbar : bool
+    colorbar : bool, optional
         Show a colorbar for the field.
-    axis : plt.axis
+    axis : plt.axis, optional
         matplotlib axis to plot on.
-    cmap : str
+    cmap : str, optional
         matplotlib colourmap.
-    n_contours : int
+    n_contours : int, optional
         number of field isolines to show on the plot.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1601,17 +1601,17 @@ def plot_brain_surface(
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcellate the training data.
-    filename : str
+    filename : str, optional
         Output filename. If extension is :code:`.nii.gz` the power map is saved
         as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
-        as images. Optional, if :code:`None` is passed then the image is shown on
+        as images. If :code:`None` is passed then the image is shown on
         screen and the Matplotlib objects are returned.
-    subtract_mean : bool
+    subtract_mean : bool, optional
         Should we subtract the mean power across modes?
-    mean_weights: np.ndarray
+    mean_weights: np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_. By default we use::
@@ -1663,24 +1663,24 @@ def plot_alpha(
     ----------
     alpha : np.ndarray
         A collection of alphas passed as separate arguments.
-    n_samples: int
+    n_samples: int, optional
         Number of time points to be plotted.
-    cmap : str
+    cmap : str, optional
         A matplotlib colormap string.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         The sampling frequency of the data in Hz.
-    y_labels : str
+    y_labels : str, optional
         Labels for the y-axis of each alpha time series.
-    title : str
+    title : str, optional
         Title for the plot.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Any parameters to be passed to `plt.stackplot
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.stackplot.html>`_.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    filename : str
+    filename : str, optional
         Output filename.
-    axes : list of plt.axes
+    axes : list of plt.axes, optional
         A list of matplotlib axes to plot on. If :code:`None`, a new figure is created.
 
     Returns
@@ -1805,27 +1805,27 @@ def plot_state_lifetimes(
     ----------
     state_time_course : np.ndarray
         Mode time course to analyse.
-    bins : int
+    bins : int, optional
         Number of bins for the histograms.
-    density : bool
+    density : bool, optional
         If :code:`True`, plot the probability density of the state activation lengths.
         If :code:`False`, raw number.
-    match_scale_x : bool
+    match_scale_x : bool, optional
         If True, all histograms will share the same x-axis scale.
-    match_scale_y : bool
+    match_scale_y : bool, optional
         If True, all histograms will share the same y-axis scale.
-    x_range : list
+    x_range : list, optional
         The limits on the values presented on the x-axis.
-    x_label : str
+    x_label : str, optional
         x-axis label.
-    y_label : str
+    y_label : str, optional
         y-axis label.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `ax.hist
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html>`_.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1936,17 +1936,17 @@ def plot_psd_topo(
         Frequency axis. Shape must be (n_freq,).
     psd : np.ndarray
         PSD for each parcel. Shape must be (n_parcels, n_freq).
-    only_show : list
+    only_show : list, optional
         Indices for parcels to include in the plot. Defaults to all parcels.
-    parcellation_file : str
+    parcellation_file : str, optional
         Path to parcellation file.
-    topomap_pos : list
+    topomap_pos : list, optional
         Positioning and size of the topomap: :code:`[x0, y0, width, height]`.
         :code:`x0`, :code:`y0`, :code:`width`, :code:`height` should be floats
         between :code:`0` and :code:`1`. E.g. :code:`[0.45, 0.55, 0.5, 0.55]`
         to place the topomap on the top right. This is not used if
         :code:`parcellation_file=None`.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -2025,11 +2025,11 @@ def plot_summary_stats_group_diff(
         p-values for each summary statistic difference. Shape is (n_states,).
     assignments : np.ndarray
         Array of 1s and 2s indicating group assignment. Shape is (n_subjects,).
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -2118,26 +2118,26 @@ def plot_evoked_response(
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
         /statistics/index.html#osl_dynamics.analysis.statistics\
         .evoked_response_max_stat_perm>`_.
-    significance_level : float
+    significance_level : float, optional
         Value to threshold the p-values with to consider significant.
         By default :code:`pvalues < 0.05` are significant.
-    offset_between_bars : float
+    offset_between_bars : float, optional
         Vertical offset between bars that highlight significance.
-    labels : list
+    labels : list, optional
         Label for each evoked response time series.
-    legend_loc : int
+    legend_loc : int, optional
         Position of the legend.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
@@ -2238,32 +2238,32 @@ def plot_wavelet(
         1D time series data.
     sampling_frequency : float
         Sampling frequency in Hz.
-    w : float
+    w : float, optional
         :code:`w` parameter to pass to `scipy.signal.morlet2 
         <https://docs.scipy.org/doc/scipy/reference/generated\
         /scipy.signal.morlet2.html>`_.
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the data before calculating the wavelet?
-    time_range : list
+    time_range : list, optional
         Start time and end time to plot in seconds.
         Default is the full time axis of the data.
-    frequency_range : list of length 2
+    frequency_range : list of length 2, optional
         Start and end frequency to plot in Hz.
         Default is :code:`[1, sampling_frequency / 2]`.
-    title : str
+    title : str, optional
         Figure title.
-    add_colorbar : bool
+    add_colorbar : bool, optional
         If :code:`True` (default), space will be stolen from the figure to create
         a colorbar.
-    fig_kwargs : dict
+    fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `ax.pcolormesh 
         <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes\
         .Axes.pcolormesh.html>`_. Defaults to :code:`{"cmap": "rainbow"}`.
-    ax : plt.axes
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns

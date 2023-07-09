@@ -24,7 +24,7 @@ class MAR:
     covs : np.ndarray
         Covariance of the error :math:`\epsilon_t`. Shape must be
         (n_states, n_channels) or (n_states, n_channels, n_channels).
-    random_seed: int
+    random_seed: int, optional
         Seed for the random number generator.
 
     Note

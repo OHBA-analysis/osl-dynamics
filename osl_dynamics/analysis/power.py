@@ -30,12 +30,12 @@ def sliding_window_power(
         or (n_samples, n_channels).
     window_length : int
         Window length in samples.
-    step_size : int
+    step_size : int, optional
         Number of samples to slide the window along the time series.
         If :code:`None` is passed, then a 50% overlap is used.
-    power_type : str
+    power_type : str, optional
         Type of power to calculate. Can be :code:`"mean"` or :code:`"var"`.
-    concatenate : bool
+    concatenate : bool, optional
         Should we concatenate the sliding window power from each subject
         into one big time series?
 
@@ -98,9 +98,9 @@ def variance_from_spectra(
     power_spectra : np.ndarray
         Power/cross spectra for each channel. Shape must be (n_channels, n_channels)
         or (n_channels,).
-    components : np.ndarray
+    components : np.ndarray, optional
         Spectral components. Shape must be (n_components, n_freq).
-    frequency_range : list
+    frequency_range : list, optional
         Frequency range in Hz to integrate the PSD over. Default is full range.
 
     Returns
@@ -288,23 +288,23 @@ def save(
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcellate the training data.
-    filename : str
+    filename : str, optional
         Output filename. If extension is :code:`.nii.gz` the power map is saved as a
         NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved as images.
-        Optional, if :code:`None` is passed then the image is shown on screen and the
-        Matplotlib objects are returned.
-    component : int
+        If :code:`None` is passed then the image is shown on screen and the Matplotlib
+        objects are returned.
+    component : int, optional
         Spectral component to save.
-    subtract_mean : bool
+    subtract_mean : bool, optional
         Should we subtract the mean power across modes?
-    mean_weights: np.ndarray
+    mean_weights: np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
-    asymmetric_data : bool
+    asymmetric_data : bool, optional
         If :code:`True`, the power map is scaled to the range :code:`[-1, 1]` before
         plotting. The colorbar is rescaled to show the correct values. Useful for
         plotting maps of statistics such as lifetimes.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_. By default we pass::
@@ -503,19 +503,19 @@ def multi_save(
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcellate the training data.
-    filename : str
+    filename : str, optional
         Output filename. If extension is :code:`.nii.gz` the power map is saved as a
         NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved as images.
-        Optional, if :code:`None` is passed then the image is shown on screen and the
-        Matplotlib objects are returned.
-    subjects : list
+        If :code:`None` is passed then the image is shown on screen and the Matplotlib
+        objects are returned.
+    subjects : list, optional
         List of subject indices to be plot power maps for.
-    subtract_mean : bool
+    subtract_mean : bool, optional
         Should we subtract the mean power across modes?
-    mean_weights: np.ndarray
+    mean_weights: np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_. By default we pass::

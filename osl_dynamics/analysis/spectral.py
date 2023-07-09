@@ -85,9 +85,9 @@ def window_mean(data, window_length, step_size=1, n_sub_windows=1):
         Time series data. Shape is (n_samples, n_modes).
     window_length : int
         Number of data points in a window.
-    step_size : int
+    step_size : int, optional
         Step size for shifting the window.
-    n_sub_windows : int
+    n_sub_windows : int, optional
         Should we split the window into a set of sub-windows and average each sub-window.
 
     Returns
@@ -148,7 +148,7 @@ def coherence_spectra(power_spectra, log_message=False):
     ----------
     power_spectra : np.ndarray
         Power spectra. Shape is (n_modes, n_channels, n_channels, n_freq).
-    log_message : bool
+    log_message : bool, optional
         Should we log a message to screen?
 
     Returns
@@ -193,13 +193,13 @@ def decompose_spectra(
         Coherences spectra. Shape must be (..., n_channels, n_channels, n_freq,).
     n_components : int
         Number of spectral components to fit.
-    max_iter : int
+    max_iter : int, optional
         Maximum number of iterations in `sklearn.decomposion.non_negative_factorization
         <https://scikit-learn.org/stable/modules/generated/sklearn.decomposition\
         .non_negative_factorization.html>`_.
-    random_state : int
+    random_state : int, optional
         Seed for the random number generator.
-    verbose : int
+    verbose : int, optional
         Show verbose? (:code:`1`) yes, (:code:`0`) no.
 
     Returns
@@ -263,9 +263,9 @@ def fourier_transform(
         Data with shape (n_samples, n_channels) to FFT.
     nfft : int
         Number of points in the FFT.
-    args_range : list
+    args_range : list, optional
         Minimum and maximum indices of the FFT to keep.
-    one_side : bool
+    one_side : bool, optional
         Should we return a one-sided FFT?
 
     Returns
@@ -325,7 +325,7 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
         (n_channels, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
-    n_freq : int
+    n_freq : int, optional
         Number of frequency bins in the cross power spectral density to calculate.
 
     Returns
@@ -408,13 +408,12 @@ def autocorr_to_spectra(
         or (n_modes, n_channels, n_channels, n_lags).
     sampling_frequency : float
         Sampling frequency in Hz.
-    nfft : int
+    nfft : int, optional
         Number of data points in the FFT. The auto-correlation function will only
         have :code:`2 * (n_embeddings + 2) - 1` data points. We pad the auto-correlation
         function with zeros to have :code:`nfft` data points if the number of data points
         in the auto-correlation function is less than :code:`nfft`.
-        Default is :code:`64`.
-    frequency_range : list
+    frequency_range : list, optional
         Minimum and maximum frequency to keep (Hz).
 
     Returns
@@ -483,15 +482,15 @@ def multitaper(
         Data with shape (n_samples, n_channels) to calculate a multitaper for.
     sampling_frequency : float
         Sampling frequency in Hz.
-    nfft : int
+    nfft : int, optional
         Number of points in the FFT.
-    tapers : np.ndarray
+    tapers : np.ndarray, optional
         Taper functions.
-    time_half_bandwidth : float
+    time_half_bandwidth : float, optional
         Parameter to control the resolution of the multitaper.
-    n_tapers : int
+    n_tapers : int, optional
         Number of tapers.
-    args_range : list
+    args_range : list, optional
         Minimum and maximum indices of the multitaper to keep.
 
     Returns
@@ -687,18 +686,18 @@ def multitaper_spectra(
         Parameter to control the resolution of the spectra.
     n_tapers : int
         Number of tapers to use when calculating the multitaper.
-    segment_length : int
+    segment_length : int, optional
         Length of the data segement to use to calculate the multitaper.
-    frequency_range : list
+    frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    return_weights : bool
+    return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
-    n_jobs : int
+    n_jobs : int, optional
         Number of parallel jobs.
-    keepdims : bool
+    keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions of
         length 1.
@@ -970,31 +969,31 @@ def regression_spectra(
         or (n_samples, n_modes).
     window_length : int
         Number samples to use in the window to calculate a PSD.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling_frequency in Hz.
-    frequency_range : list
+    frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    n_embeddings : int
+    n_embeddings : int, optional
         Number of time embeddings applied when inferring alpha.
-    psd_only : bool
+    psd_only : bool, optional
         Should we only calculate the PSD?
-    step_size : int
+    step_size : int, optional
         Step size for shifting the window.
-    n_sub_windows : int
+    n_sub_windows : int, optional
         We split the window into a number of sub-windows and average the
         spectra for each sub-window. window_length must be divisible by
         :code:`n_sub_windows`.
-    return_weights : bool
+    return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    return_coef_int : bool
+    return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
         separately for the PSDs?
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the data before calculating the spectrogram?
-    n_jobs : int
+    n_jobs : int, optional
         Number of parallel jobs.
-    keepdims : bool
+    keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions of
         length 1.
@@ -1206,16 +1205,16 @@ def spectrogram(
         Shape must be (n_samples, n_channels).
     window_length : int
         Number of data points to use when calculating the periodogram.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz.
-    calc_cpsd : bool
+    calc_cpsd : bool, optional
         Should we calculate cross spectra?
-    step_size : int
+    step_size : int, optional
         Step size for shifting the window.
-    n_sub_windows : int
+    n_sub_windows : int, optional
         Should we split the window into a set of sub-windows and average the
         spectra for each sub-window.
-    print_progress_bar : bool
+    print_progress_bar : bool, optional
         Should we print a progress bar?
 
     Returns
@@ -1354,9 +1353,9 @@ def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windo
         n_modes) or (n_samples, n_modes).
     window_length : int
         Number samples used as the window to calcualte a PSD.
-    step_size : int
+    step_size : int, optional
         Step size used for shifting the window.
-    n_sub_windows : int
+    n_sub_windows : int, optional
         Number of sub-windows used to average the spectra. :code:`window_length`
         must be divisible by :code:`n_sub_windows`.
 
@@ -1435,16 +1434,16 @@ def wavelet(
         1D time series data. Shape must be (n_samples,).
     sampling_frequency : float
         Sampling frequency in Hz.
-    w : float
+    w : float, optional
         :code:`w` parameter to pass to `scipy.signal.morlet2 
         <https://docs.scipy.org/doc/scipy/reference/generated\
         /scipy.signal.morlet2.html>`_.
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the data before calculating the wavelet?
-    time_range : list
+    time_range : list, optional
         Start time and end time to plot in seconds.
         Default is the full time axis of the data.
-    frequency_range : list of length 2
+    frequency_range : list of length 2, optional
         Start and end frequency to plot in Hz.
         Default is :code:`[1, sampling_frequency / 2]`.
 

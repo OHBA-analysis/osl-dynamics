@@ -20,7 +20,7 @@ def functional_connectivity(data, conn_type="corr"):
     data : np.ndarray
         Time series data. Shape must be (n_subjects, n_samples, n_channels)
         or (n_samples, n_channels).
-    conn_type : str
+    conn_type : str, optional
         What metric should we use? :code:`"corr"` (Pearson correlation) or
         :code:`"cov"` (covariance).
 
@@ -66,19 +66,19 @@ def power_spectra(
         (n_subjects, n_samples, n_channels) or (n_samples, n_channels).
     window_length : int
         Number of data points to use when calculating the periodogram.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz.
-    step_size : int
+    step_size : int, optional
         Step size for shifting the window. By default we will use
         :code:`step_size=window_length // 2`.
-    return_weights : bool
+    return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    standardize : bool
+    standardize : bool, optional
         Should we standardise the data?
-    calc_coh : bool
+    calc_coh : bool, optional
         Should we also return the coherence spectra?
-    n_jobs : int
+    n_jobs : int, optional
         Number of parallel jobs.
 
     Returns
@@ -211,16 +211,16 @@ def multitaper_spectra(
         Parameter to control the resolution of the spectra.
     n_tapers : int
         Number of tapers to use when calculating the multitaper.
-    segment_length : int
+    segment_length : int, optional
         Length of the data segement to use to calculate the multitaper.
-    frequency_range : list
+    frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    return_weights : bool
+    return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
-    n_jobs : int
+    n_jobs : int, optional
         Number of parallel jobs.
 
     Returns

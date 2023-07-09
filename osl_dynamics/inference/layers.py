@@ -24,7 +24,7 @@ def add_epsilon(A, epsilon, diag=False):
     epsilon : float
         Small error added to the diagonal of the matrices or every element of the
         vectors.
-    diag : bool
+    diag : bool, optional
         Do we want to add epsilon to the diagonal only?
     """
     epsilon = tf.cast(epsilon, dtype=tf.float32)
@@ -48,7 +48,7 @@ def NormalizationLayer(norm_type, *args, **kwargs):
         :code:`None`.
     args : arguments
         Arguments to pass to the normalization layer.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the normalization layer.
     """
     if norm_type == "layer":
@@ -70,7 +70,7 @@ def RNNLayer(rnn_type, *args, **kwargs):
         Type of RNN. Either :code:`'lstm'` or :code:`'gru'`.
     args : arguments
         Arguments to pass to the normalization layer.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the normalization layer.
     """
     if rnn_type == "lstm":
@@ -102,7 +102,7 @@ class AddRegularizationLossLayer(layers.Layer):
     strength : float
         Strength of regularization. The regularization is multiplied
         by the strength before being added to the loss.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -124,7 +124,7 @@ class ConcatenateLayer(layers.Layer):
     ----------
     axis : int
         Axis to concatenate along.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -156,7 +156,7 @@ class TFRangeLayer(layers.Layer):
     ----------
     limit : int
         Upper limit for range.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -175,7 +175,7 @@ class ZeroLayer(layers.Layer):
     ----------
     shape : tuple
         Shape of the zeros tensor.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -199,7 +199,7 @@ class InverseCholeskyLayer(layers.Layer):
     ----------
     epsilon : float
         Small error added to the diagonal of the matrices.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -223,7 +223,7 @@ class SampleGammaDistributionLayer(layers.Layer):
     ----------
     epsilon : float
         Error to add to the shape and rate for numerical stability.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -256,7 +256,7 @@ class SampleNormalDistributionLayer(layers.Layer):
     ----------
     epsilon : float
         Error to add to the standard deviations for numerical stability.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -288,7 +288,7 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
     ----------
     temperature : float
         Temperature for the Gumbel-Softmax distribution.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -327,7 +327,7 @@ class SoftmaxLayer(layers.Layer):
         Temperature parameter.
     learn_temperature : bool
         Should we learn the alpha temperature?
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -354,17 +354,17 @@ class LearnableTensorLayer(layers.Layer):
     ----------
     shape : tuple
         Shape of the tensor.
-    learn : bool
+    learn : bool, optional
         Should we learn the tensor?
-    initializer : tf.keras.initializers.Initializer
+    initializer : tf.keras.initializers.Initializer, optional
         Initializer for the tensor.
-    initial_value : float
+    initial_value : float, optional
         Initial value for the tensor if initializer is not passed.
-    regularizer : osl-dynamics regularizer
+    regularizer : osl-dynamics regularizer, optional
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -452,11 +452,11 @@ class VectorsLayer(layers.Layer):
         Should we learn the vectors?
     initial_value : np.ndarray
         Initial value for the vectors. Shape must be (n, m).
-    regularizer : osl-dynamics regularizer
+    regularizer : osl-dynamics regularizer, optional
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -529,11 +529,11 @@ class CovarianceMatricesLayer(layers.Layer):
         Initial values for the matrices. Shape must be (n, m, m).
     epsilon : float
         Error added to the diagonal of covariances matrices for numerical stability.
-    regularizer : osl-dynamics regularizer
+    regularizer : osl-dynamics regularizer, optional
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -623,11 +623,11 @@ class CorrelationMatricesLayer(layers.Layer):
         Initial values for the matrices. Shape must be (n, m, m).
     epsilon : float
         Error added to the diagonal of correlation matrices for numerical stability.
-    regularizer : osl-dynamics regularizer
+    regularizer : osl-dynamics regularizer, optional
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -718,11 +718,11 @@ class DiagonalMatricesLayer(layers.Layer):
         Initial values for the matrices. Shape must be (n, m, m) or (n, m).
     epsilon : float
         Error added to the diagonal matrices for numerical stability.
-    regularizer : osl-dynamics regularizer
+    regularizer : osl-dynamics regularizer, optional
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -803,11 +803,11 @@ class MatrixLayer(layers.Layer):
         Initial value for the matrix.
     epsilon : float
         Error added to the matrices for numerical stability.
-    regularizer : osl-dynamics regularizer
+    regularizer : osl-dynamics regularizer, optional
         Regularizer for the tensor. Must be from `inference.regularizers \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -909,7 +909,7 @@ class LogLikelihoodLossLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the covariance matrices for numerical stability.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -957,7 +957,7 @@ class AdversarialLogLikelihoodLossLayer(layers.Layer):
     ----------
     n_channels : int
         Number of channels.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -994,10 +994,10 @@ class KLDivergenceLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
-    clip_start : int
-        Index to clip the sequences inputted to this layer. Optional, default is
-        no clipping.
-    kwargs : keyword arguments
+    clip_start : int, optional
+        Index to clip the sequences inputted to this layer.
+        Default is no clipping.
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1047,7 +1047,7 @@ class KLLossLayer(layers.Layer):
     ----------
     do_annealing : bool
         Should we perform KL annealing?
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1092,7 +1092,7 @@ class InferenceRNNLayer(layers.Layer):
         Dropout rate for the output of each layer.
     reg : str
         Regularization for each layer.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1153,7 +1153,7 @@ class ModelRNNLayer(layers.Layer):
         Dropout rate for the output of each layer.
     reg : str
         Regularization for each layer.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1198,10 +1198,10 @@ class CategoricalKLDivergenceLayer(layers.Layer):
 
     Parameters
     ----------
-    clip_start : int
-        Index to clip the sequences inputted to this layer. Optional, default is
-        no clipping.
-    kwargs : keyword arguments
+    clip_start : int, optional
+        Index to clip the sequences inputted to this layer.
+        Default is no clipping.
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1241,7 +1241,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         Number of states.
     epsilon : float
         Error added to the covariances for numerical stability.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1324,7 +1324,7 @@ class SubjectMapLayer(layers.Layer):
         Which spatial map are we using? Must be :code:`'means'` or :code:`'covariances'`.
     epsilon : float
         Error added to the diagonal of covariances for numerical stability.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1396,7 +1396,7 @@ class StaticKLDivergenceLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
@@ -1442,11 +1442,11 @@ class MultiLayerPerceptronLayer(layers.Layer):
         Activation type.
     drop_rate : float
         Dropout rate.
-    regularizer : str
+    regularizer : str, optional
         Regularizer type.
-    regularizer_factor : float
+    regularizer_factor : float, optional
         Regularizer factor.
-    kwargs : keyword arguments
+    kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 

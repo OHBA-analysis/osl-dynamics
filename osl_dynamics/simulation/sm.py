@@ -27,7 +27,7 @@ class MixedSine:
         Frequency of each sinusoid.
     sampling_frequency : float
         Sampling frequency.
-    random_seed : int
+    random_seed : int, optional
         Seed used for the random number generator, which is used to sample
         an initial phase for each sinusoid.
     """
@@ -101,15 +101,15 @@ class MixedSine_MVN(Simulation):
     covariances : np.ndarray or str
         Covariance matrix for each mode, shape should be (n_modes, n_channels,
         n_channels). Either a numpy array or :code:`'random'`.
-    n_covariances_act : int
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for random number generator.
     """
 
@@ -194,27 +194,27 @@ class MSubj_MixedSine_MVN(Simulation):
         Subject covariance matrix for each mode, shape should be
         (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
-    n_covariances_act : int
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_subjects : int
+    n_subjects : int, optional
         Number of subjects.
-    n_subject_embedding_dim : int
+    n_subject_embedding_dim : int, optional
         Number of dimensions for subject embedding.
-    n_mode_embedding_dim : int
+    n_mode_embedding_dim : int, optional
         Number of dimensions for mode embedding.
-    subject_embedding_scale : float
+    subject_embedding_scale : float, optional
         Scale of variability between subject observation parameters.
-    n_groups : int
+    n_groups : int, optional
         Number of groups of subjects when subject means or covariances are 'random'.
-    between_group_scale : float
+    between_group_scale : float, optional
         Scale of variability between groups.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for random number generator.
     """
 

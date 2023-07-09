@@ -20,8 +20,8 @@ class DiceCoefficientCallback(callbacks.Callback):
         2D or 3D numpy array containing the ground truth state/mode time course of
         the training data. Shape must be (n_time_courses, n_samples, n_modes)
         or (n_samples, n_modes).
-    names : list of str
-        Names for the time courses. Shape must be (n_time_courses,). Optional.
+    names : list of str, optional
+        Names for the time courses. Shape must be (n_time_courses,).
     """
 
     def __init__(self, prediction_dataset, ground_truth_time_course, names=None):
@@ -54,7 +54,7 @@ class DiceCoefficientCallback(callbacks.Callback):
         ---------
         epochs : int
             Integer, index of epoch.
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
@@ -102,7 +102,7 @@ class KLAnnealingCallback(callbacks.Callback):
         Parameter to control the shape of the annealing curve.
     n_annealing_epochs : int
         Number of epochs to apply annealing.
-    n_cycles : int
+    n_cycles : int, optional
         Number of times to perform KL annealing with :code:`n_annealing_epochs`.
     """
 
@@ -124,7 +124,7 @@ class KLAnnealingCallback(callbacks.Callback):
         ---------
         epochs : int
             Integer, index of epoch.
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
@@ -185,7 +185,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         ---------
         epochs : int
             Integer, index of epoch.
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
@@ -199,7 +199,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
 
         Parameters
         ----------
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """

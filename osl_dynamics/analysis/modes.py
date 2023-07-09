@@ -25,10 +25,10 @@ def autocorr_from_tde_cov(
         (n_channels, n_channels) or (n_modes, n_channels, n_channels).
     n_embeddings : int
         Number of embeddings.
-    pca_components : np.ndarray
+    pca_components : np.ndarray, optional
         PCA components used for dimensionality reduction. Only needs to be passed
         if PCA was performed on the time embedded data.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling_frequency in Hz.
 
     Returns
@@ -110,7 +110,7 @@ def raw_covariances(
         Number of embeddings applied to the training data.
     pca_components : np.ndarray
         PCA components used for dimensionality reduction.
-    zero_lag : bool
+    zero_lag : bool, optional
         Should we return just the zero-lag elements? Otherwise, we return
         the mean over time lags.
 
@@ -268,9 +268,9 @@ def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
     state_time_course : numpy.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, or n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
-    squeeze : bool
+    squeeze : bool, optional
         If :code:`True`, squeeze the output to remove singleton dimensions.
 
     Returns
@@ -312,7 +312,7 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
     state_time_course : list or np.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
@@ -340,7 +340,7 @@ def mean_lifetimes(state_time_course, sampling_frequency=None):
     state_time_course : list or np.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
@@ -361,9 +361,9 @@ def intervals(state_time_course, sampling_frequency=None, squeeze=True):
     state_time_course : list or numpy.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If passed returns the intervals in seconds.
-    squeeze : bool
+    squeeze : bool, optional
         If :code:`True`, squeeze the output to remove singleton dimensions.
 
     Returns
@@ -409,7 +409,7 @@ def interval_statistics(state_time_course, sampling_frequency=None):
     state_time_course : list or np.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If passed returns the lifetimes in seconds.
 
     Returns
@@ -435,7 +435,7 @@ def mean_intervals(state_time_course, sampling_frequency=None):
     state_time_course : list or np.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If passed returns the intervals in seconds.
 
     Returns
@@ -483,7 +483,7 @@ def switching_rates(state_time_course, sampling_frequency=None):
     state_time_course : list or np.ndarray
         State time course (strictly binary). Shape must be (n_subjects, n_samples,
         n_states) or (n_samples, n_states).
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz. If :code:`None`, defaults to 1 Hz.
 
     Returns
@@ -570,7 +570,7 @@ def fano_factor(state_time_course, window_lengths, sampling_frequency=1.0):
         n_states) or (n_samples, n_states).
     window_lengths : list or np.ndarray
         Window lengths to use. Must be in samples.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz.
 
     Returns
@@ -621,7 +621,7 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
     state_time_course : list of np.ndarray or np.ndarray
         State time courses. Shape must be (n_subjects, n_samples, n_states)
         or (n_samples, n_states).
-    n_states : int
+    n_states : int, optional
         Number of states.
 
     Returns

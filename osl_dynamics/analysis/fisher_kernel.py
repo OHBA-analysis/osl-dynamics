@@ -39,8 +39,8 @@ class FisherKernel:
         ----------
         dataset : osl_dynamics.data.Data
             Data.
-        batch_size : int
-            Batch size. If :code:`None`, we use the :code:`model.config.batch_size`.
+        batch_size : int, optional
+            Batch size. If :code:`None`, we use :code:`model.config.batch_size`.
 
         Returns
         -------

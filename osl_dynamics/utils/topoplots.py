@@ -171,22 +171,22 @@ class Topology:
         ----------
         data : numpy.array or list
             A vector with data corresponding to each sensor.
-        plot_boxes : bool
+        plot_boxes : bool, optional
             Plot boxes to display the height and width of sensors,
             rather than just the centers.
-        show_names : bool
+        show_names : bool, optional
             Display channel names.
-        title : str
+        title : str, optional
             Title for plot.
-        show_deleted_sensors : bool
+        show_deleted_sensors : bool, optional
             Plot the sensors which have been deleted, in red.
-        colorbar : bool
+        colorbar : bool, optional
             Display colorbar
-        axis : matplotlib.pyplot.Axes
+        axis : matplotlib.pyplot.Axes, optional
             matplotlib axis to plot on.
-        cmap : str
-            Colourmap to use in plot. Defaults to matplotlib's plasma
-        n_contours : int
+        cmap : str, optional
+            Colourmap to use in plot. Defaults to matplotlib's plasma.
+        n_contours : int, optional
             Number of contours to use in plot.
 
         Returns

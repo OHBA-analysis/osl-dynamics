@@ -12,21 +12,21 @@ class MVN:
 
     Parameters
     ----------
-    n_channels : int
-        Number of channels.
-    n_modes : int
-        Number of modes.
     means : np.ndarray or str
         Mean vector for each mode, shape should be (n_modes, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
         Covariance matrix for each mode, shape should be (n_modes, n_channels,
         n_channels). Either a numpy array or :code:`'random'`.
-    n_covariances_act : int
+    n_modes : int, optional
+        Number of modes.
+    n_channels : int, optional
+        Number of channels.
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for the random number generator.
     """
 
@@ -191,15 +191,15 @@ class MDyn_MVN(MVN):
     covariances : np.ndarray or str
         Covariance matrix for each mode, shape should be (n_modes, n_channels,
         n_channels). Either a numpy array or :code:`'random'`.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_covariances_act : int
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for the random number generator.
     """
 
@@ -304,27 +304,27 @@ class MSubj_MVN(MVN):
         Subject covariance matrix for each mode for each subject, shape should be
         (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_covariances_act : int
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_subjects : int
+    n_subjects : int, optional
         Number of subjects.
-    n_subject_embedding_dim : int
+    n_subject_embedding_dim : int, optional
         Dimension of subject embeddings.
-    n_mode_embedding_dim : int
+    n_mode_embedding_dim : int, optional
         Dimension of mode embeddings.
-    subject_embedding_scale : float
+    subject_embedding_scale : float, optional
         Standard deviation when generating subject embeddings with a normal distribution.
-    n_groups : int
+    n_groups : int, optional
         Number of groups of subjects when generating subject embeddings.
-    between_group_scale : float
+    between_group_scale : float, optional
         Standard deviation when generating centroids of groups of subject embeddings.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for the random number generator.
     """
 

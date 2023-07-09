@@ -166,7 +166,7 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=False):
     ----------
     matrices : np.ndarray
         Matrices. Shape must be (M, N, N).
-    remove_diagonal : bool
+    remove_diagonal : bool, optional
         Should we remove the diagonal before calculating the correction?
 
     Returns
@@ -195,7 +195,7 @@ def riemannian_distance(M1, M2, threshold=1e-3):
         First matrix. Shape must be (N, N).
     M2 : np.ndarray
         Second matrix. Shape must be (N, N).
-    threshold : float
+    threshold : float, optional
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
     Returns
@@ -218,7 +218,7 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     ----------
     matrices : np.ndarray
         Matrices. Shape must be (M, N, N).
-    threshold : float
+    threshold : float, optional
         Threshold to apply when there are negative eigenvalues. Must be positive.
 
     Returns
@@ -254,7 +254,7 @@ def pairwise_rv_coefficient(matrices, remove_diagonal=False):
     ----------
     matrices : np.ndarray
         Set of matrices. Shape must be (M, N, N).
-    remove_diagonal : bool
+    remove_diagonal : bool, optional
         Should we remove the diagonal before calculating the correction?
 
     Returns
@@ -298,7 +298,7 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
     ----------
     matrices : np.ndarray
         Set of symmetric semi-positive definite matrices. Shape is (M, N, N).
-    remove_diagonal : bool
+    remove_diagonal : bool, optional
         Should we remove the diagonal before calculating the correction?
 
     Returns
@@ -329,7 +329,7 @@ def pairwise_l2_distance(arrays, batch_dims=0):
     ----------
     arrays : np.ndarray
         Set of arrays. Shape is (..., n_arrays, ...).
-    batch_dims : int
+    batch_dims : int, optional
         Number of batch dimensions.
 
     Returns

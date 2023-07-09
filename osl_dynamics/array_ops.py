@@ -41,7 +41,7 @@ def get_one_hot(values, n_states=None):
         1D array of categorical values with shape (n_samples,). The values should
         be integers (0, 1, 2, 3, ... , :code:`n_states` - 1). Or 2D array of shape
         (n_samples, n_states) to be binarized.
-    n_states : int
+    n_states : int, optional
         Total number of states in :code:`values`. Must be at least the number of states
         present in :code:`values`. Default is the number of unique values in
         :code:`values`.
@@ -192,7 +192,7 @@ def check_symmetry(mat, precision=1e-6):
     ----------
     mat : np.ndarray or list of np.ndarray
         Matrices to be checked. Shape of a matrix should be (..., N, N).
-    precision : float
+    precision : float, optional
         Precision for comparing values. Corresponds to an absolute tolerance parameter.
         Default is :code:`1e-6`.
 
@@ -271,7 +271,7 @@ def apply_to_lists(list_of_lists, func, check_empty=True):
         List of lists.
     func : callable
         Function to apply to each list.
-    check_empty : bool
+    check_empty : bool, optional
         Return :code:`0` for empty lists if set as :code:`True`.
         If :code:`False`, the function will be applied to an empty list.
 
