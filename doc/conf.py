@@ -139,18 +139,17 @@ html_theme_options = {
 #    pass
 # else:
 #    release = version
-
 html_title = "OSL Dynamics"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-# html_short_title = None
+html_short_title = "osl-dynamics"
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-# html_logo = ""
+html_logo = "https://avatars.githubusercontent.com/u/15248840?s=200&v=4"
 
 # The name of an image file (within the static path) to use as favicon of the
-# docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
+# docs. This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
 # html_favicon = None
 
