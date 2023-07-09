@@ -6,7 +6,7 @@ Multi-dynamic Adversarial Generator Encoder
 Introduction
 ------------
 
-Functional connectivity (FC) in fMRI data shows little variation with time. This maybe due to limitations in the methods used to estimate time-varying FC. In particular, modelling the data with a single time course for dynamics. **Multi-dynamic Adversarial Generator Encoder** (MAGE) [1] proposes two separate dynamics for neuroimaging data: one for the mean activity and another for the FC.
+Functional connectivity (FC) in fMRI data shows little variation with time. This maybe due to limitations in the methods used to estimate time-varying FC. In particular, modelling the data with a single time course for dynamics. **Multi-dynamic Adversarial Generator Encoder** (MAGE) [1] proposes two separate dynamics for neuroimaging data: one for the mean activity (and variance) and another for the FC.
 
 Generative Model
 ----------------
@@ -57,10 +57,9 @@ The generative model for MAGE is shown below.
 Inference
 ---------
 
-Other models in osl-dynamics use variational Bayes to infer model parameters. MAGE takes a different approach based on adversarial networks. See [2] for further details and the cost function used for training.
+Other models in osl-dynamics use variational Bayes to infer model parameters. MAGE takes a different approach based on adversarial networks. See [1] for further details and the cost function used for training.
 
 References
 ----------
 
-#. Long-short term memory. `Wikipedia <https://en.wikipedia.org/wiki/Long_short-term_memory>`_.
 #. U Pervaiz, et al., Multi-dynamic modelling reveals strongly time-varying resting fMRI correlations. `Medical Image Analysis, 2022 <https://www.sciencedirect.com/science/article/pii/S1361841522000196>`_.
