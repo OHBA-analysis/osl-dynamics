@@ -1,7 +1,13 @@
-OSL Dynamics
-============
+OSL Dynamics Toolbox
+====================
 
-This package contains models for analysing neuroimaging data developed by the Oxford Centre for Human Brain Activity (OHBA) group at the University of Oxford. Our group website is `here <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_.
+This package contains models for analysing neuroimaging data. In particular, this package contains methods (based on generative models) for studying dynamics in time series data. This package can be used for:
+
+* Inferring and visualising dynamic (and static) functional networks.
+* Burst detection.
+* Spectral estimation: including multitaper spectra and wavelet transforms.
+* Statistical significant testing (using GLM permutation testing).
+* And much more!
 
 Models included:
 
@@ -11,9 +17,11 @@ Models included:
 
 For more information on how to use osl-dynamics see the :doc:`documentation <documentation>`.
 
+This package was developed by the Oxford Centre for Human Brain Activity (OHBA) Methods Group at the University of Oxford. Our group website is `here <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_.
+
 .. |logo1| image:: https://avatars.githubusercontent.com/u/15248840?s=200&v=4
     :width: 125px
-    :target: https://github.com/OHBA-analysis
+    :target: https://www.win.ox.ac.uk/research/our-locations/OHBA
 
 .. |logo2| image:: https://www.win.ox.ac.uk/images/site-logos/integrative-neuroimaging-rgb
     :width: 200px

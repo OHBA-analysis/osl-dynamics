@@ -1,7 +1,7 @@
 Development
 ===========
 
-This package is under active development. Some of the models and analysis functions are still a work in progress.
+This package is under active development. Some of the newer models (extensions to the HMM/DyNeMo) and analysis functions are still a work in progress.
 
 Issues and New Features
 -----------------------
