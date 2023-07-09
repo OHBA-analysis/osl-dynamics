@@ -4,8 +4,8 @@ OSL Dynamics Toolbox
 This package contains models for analysing neuroimaging data. In particular, this package contains methods (based on generative models) for studying dynamics in time series data. This package can be used for:
 
 * Inferring and visualising dynamic (and static) functional networks.
-* Burst detection.
 * Spectral estimation: including multitaper spectra and wavelet transforms.
+* Burst detection.
 * Statistical significant testing (using GLM permutation testing).
 * And much more!
 

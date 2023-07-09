@@ -58,44 +58,46 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_untis : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
         Regularizer.
 
     theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
+        Type of normalization to apply to the posterior samples, :code:`theta`.
+        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature?
+        Should we learn :code:`alpha_temperature`?
     initial_alpha_temperature : float
-        Initial value for the alpha temperature.
+        Initial value for :code:`alpha_temperature`.
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
@@ -115,10 +117,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
@@ -127,12 +129,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
+        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
+        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -237,7 +239,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             or self.mode_embeddings_dim is None
         ):
             raise ValueError(
-                "n_subjects, subject_embedding_dim and mode_embedding_dim must be passed."
+                "n_subjects, subject_embedding_dim and mode_embedding_dim must "
+                "be passed."
             )
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
@@ -284,7 +287,8 @@ class Model(VariationalInferenceModelBase):
 
     def get_group_means_covariances(self):
         """Get the group level mode means and covariances.
-        This is a wrapper for get_group_means and get_group_covariances.
+
+        This is a wrapper for :code:`get_group_means` and :code:`get_group_covariances`.
 
         Returns
         -------
@@ -296,7 +300,7 @@ class Model(VariationalInferenceModelBase):
         return self.get_group_means(), self.get_group_covariances()
 
     def get_group_observation_model_parameters(self):
-        """Wrapper for get_group_means_covariances."""
+        """Wrapper for :code:`get_group_means_covariances`."""
         return self.get_group_means_covariances()
 
     def get_subject_embeddings(self):
@@ -315,10 +319,11 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        subject_embeddings : np.ndarray
-            Input embedding vectors for subjects. Shape is (n_subjects, subject_embeddings_dim).
-        n_neighbours : int
-            Number of nearest neighbours. Ignored if subject_embedding=None.
+        subject_embeddings : np.ndarray, optional
+            Input embedding vectors for subjects.
+            Shape is (n_subjects, subject_embeddings_dim).
+        n_neighbours : int, optional
+            Number of nearest neighbours. Ignored if :code:`subject_embedding=None`.
 
         Returns
         -------
@@ -339,13 +344,14 @@ class Model(VariationalInferenceModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2) and an inverse Wishart prior is applied to the
-        covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(range).
+        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
+        :code:`sigma=diag((range/2)**2)` and an inverse Wishart prior is applied to
+        the covariances matrices with :code:`nu=n_channels-1+0.1` and
+        :code:`psi=diag(range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -370,7 +376,7 @@ class Model(VariationalInferenceModelBase):
         ----------
         group_means : np.ndarray
             Group level mode means. Shape is (n_modes, n_channels).
-        update_initializer : bool
+        update_initializer : bool, optional
             Do we want to use the passed group means when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
@@ -387,7 +393,7 @@ class Model(VariationalInferenceModelBase):
         ----------
         group_covariances : np.ndarray
             Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
-        update_initializer : bool
+        update_initializer : bool, optional
             Do we want to use the passed group covariances when we re-initialize
             the model?
         """
@@ -401,7 +407,8 @@ class Model(VariationalInferenceModelBase):
     def set_group_means_covariances(
         self, group_means, group_covariances, update_initializer=True
     ):
-        """This is a wrapper for set_group_means and set_group_covariances."""
+        """This is a wrapper for :code:`set_group_means` and
+        :code:`set_group_covariances`."""
         self.set_group_means(
             group_means,
             update_initializer=update_initializer,
@@ -414,7 +421,7 @@ class Model(VariationalInferenceModelBase):
     def set_group_observation_model_parameters(
         self, group_observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_group_means_covariances."""
+        """Wrapper for :code:`set_group_means_covariances`."""
         self.set_group_means_covariances(
             group_observation_model_parameters[0],
             group_observation_model_parameters[1],
@@ -426,7 +433,7 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -442,7 +449,7 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
