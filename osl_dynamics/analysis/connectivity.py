@@ -412,10 +412,10 @@ def fit_gmm(
     keep_positive_only=False,
     one_component_percentile=0,
     n_sigma=0,
-    sklearn_kwargs={},
+    sklearn_kwargs=None,
     show=False,
     filename=None,
-    plot_kwargs={},
+    plot_kwargs=None,
 ):
     """Fit a two component Gaussian mixture model to connections to identify a
     threshold.
@@ -463,6 +463,12 @@ def fit_gmm(
     percentile : np.ndarray
         Percentile threshold. Shape is (n_components, n_modes) or (n_modes,).
     """
+    if sklearn_kwargs is None:
+        sklearn_kwargs = {}
+    
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
     # Validation
     conn_map = array_ops.validate(
         conn_map,
