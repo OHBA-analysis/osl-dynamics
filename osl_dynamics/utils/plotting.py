@@ -2033,8 +2033,6 @@ def plot_summary_stats_group_diff(
         Axis object to plot on.
     filename : str, optional
         Output filename.
-    fig_kwargs : dict
-        Keyword arguments to pass to create_figure().
 
     Returns
     -------
