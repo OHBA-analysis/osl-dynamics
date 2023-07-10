@@ -70,7 +70,7 @@ def gmm_time_courses(
     p_value=None,
     filename=None,
     sklearn_kwargs=None,
-    plot_kwargs={},
+    plot_kwargs=None,
 ):
     """Fit a two component GMM to time courses to get a binary time course.
 
@@ -99,6 +99,8 @@ def gmm_time_courses(
     gmm_tcs : list of np.ndarray or np.ndarray
         GMM time courses with binary entries.
     """
+    if plot_kwargs is None:
+        plot_kwargs = {}
 
     if not isinstance(alpha, list):
         alpha = [alpha]
