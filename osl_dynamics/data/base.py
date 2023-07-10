@@ -1164,6 +1164,16 @@ class Data:
                 # We don't want to include this file in the dataset
                 continue
 
+            tfrecord_filepath = tfrecord_paths.format(
+                store_dir=self.store_dir,
+                array=i,
+                n_array=self.n_arrays - 1,
+                v=len(str(self.n_arrays - 1)),
+            )
+            if path.exists(tfrecord_filepath):
+                # The dataset already exists
+                continue
+
             # Get time series data and ensure an integer multiple of sequence length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
@@ -1176,14 +1186,8 @@ class Data:
                     {"data": array, "subj_id": array_tracker},
                     self.sequence_length,
                     self.step_size,
-                    tfrecord_paths.format(
-                        store_dir=self.store_dir,
-                        array=i,
-                        n_array=self.n_arrays - 1,
-                        v=len(str(self.n_arrays - 1)),
-                    ),
+                    tfrecord_filepath,
                 )
-                feature_names = ["data", "subj_id"]
             else:
                 # Create a dataset with just the time series data
 
@@ -1192,14 +1196,10 @@ class Data:
                     {"data": array},
                     self.sequence_length,
                     self.step_size,
-                    tfrecord_paths.format(
-                        store_dir=self.store_dir,
-                        array=i,
-                        n_array=self.n_arrays - 1,
-                        v=len(str(self.n_arrays - 1)),
-                    ),
+                    tfrecord_filepath,
                 )
-                feature_names = ["data"]
+
+        feature_names = ["data", "subj_id"] if subj_id else ["data"]
 
         def parse_example(example):
             """Helper function to parse a TFRecord example.
