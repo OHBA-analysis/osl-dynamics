@@ -98,4 +98,4 @@ sm_stc = sm.mode_time_course
 plotting.plot_alpha(hmm_stc, sm_stc, y_labels=["HMM", "SM"], filename="stc.png")
 
 # Mode lifetimes
-plotting.plot_mode_lifetimes(hmm_stc, filename="slt.png")
+plotting.plot_state_lifetimes(hmm_stc, filename="slt.png")

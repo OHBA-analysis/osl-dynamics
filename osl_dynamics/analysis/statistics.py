@@ -78,12 +78,13 @@ def evoked_response_max_stat_perm(
         Must be shape (n_subjects, n_samples, ...).
     n_perm : int
         Number of permutations.
-    covariates : dict
+    covariates : dict, optional
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
         Must be of shape (n_subjects,).
-    metric : str
-        Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
-    n_jobs : int
+    metric : str, optional
+        Metric to use to build the null distribution. Can be :code:`'tstats'` or
+        :code:`'copes'`.
+    n_jobs : int, optional
         Number of processes to run in parallel.
 
     Returns
@@ -174,15 +175,16 @@ def group_diff_max_stat_perm(
     assignments : np.ndarray
         1D numpy array containing group assignments. A value of 1 indicates
         Group1 and a value of 2 indicates Group2. Note, we test the contrast
-        abs(Group1 - Group2) > 0.
+        :code:`abs(Group1 - Group2) > 0`.
     n_perm : int
         Number of permutations.
-    covariates : dict
+    covariates : dict, optional
         Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
         Must be of shape (n_subjects,).
-    metric : str
-        Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
-    n_jobs : int
+    metric : str, optional
+        Metric to use to build the null distribution. Can be :code:`'tstats'` or
+        :code:`'copes'`.
+    n_jobs : int, optional
         Number of processes to run in parallel.
 
     Returns

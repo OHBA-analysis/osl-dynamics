@@ -1,5 +1,13 @@
 """Hidden Markov Model (HMM).
 
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models/hmm.html\
+>`_ for a description of this model.
+
+See Also
+--------
+- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in electrophysiological data". `Neuroimage 126, 81-95 (2016) <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
+- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in rest and task". `Neuroimage 180, 646-656 (2018) <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
+- `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
 import logging
@@ -14,9 +22,9 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.keras import backend, layers, utils
 from numba.core.errors import NumbaWarning
 from scipy.special import logsumexp, xlogy
-from tensorflow.keras import backend, layers, utils
 from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
@@ -61,39 +69,39 @@ class Config(BaseModelConfig):
     initial_means : np.ndarray
         Initialisation for state means.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. If diagonal_covariances=True
+        Initialisation for state covariances. If :code:`diagonal_covariances=True`
         and full matrices are passed, the diagonal is extracted.
     diagonal_covariances : bool
         Should we learn diagonal covariances?
     covariances_epsilon : float
         Error added to state covariances for numerical stability.
     initial_trans_prob : np.ndarray
-        Initialisation for trans prob matrix
+        Initialisation for the transition probability matrix.
     learn_trans_prob : bool
-        Should we make the trans prob matrix trainable?
+        Should we make the transition probability matrix trainable?
     state_probs_t0: np.ndarray
-        State probabilities at time=0. Not trainable.
+        State probabilities at :code:`time=0`. Not trainable.
     batch_size : int
         Mini-batch size.
     learning_rate : float
         Learning rate.
     trans_prob_update_delay : float
         We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the delay parameter.
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
+        ** -trans_prob_update_forget`. This is the delay parameter.
     trans_prob_update_forget : float
         We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the forget parameter.
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
+        ** -trans_prob_update_forget`. This is the forget parameter.
     observation_update_decay : float
         Decay rate for the learning rate of the observation model.
-        We update the learning rate (lr) as
-        lr = config.learning_rate * exp(-observation_update_decay * epoch).
+        We update the learning rate (:code:`lr`) as
+        :code:`lr = config.learning_rate * exp(-observation_update_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
+    optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
     multi_gpu : bool
         Should be use multiple GPUs for training?
@@ -167,22 +175,23 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
-        epochs : int
+        epochs : int, optional
             Number of epochs.
-        use_tqdm : bool
-            Should we use tqdm to display a progress bar?
-        verbose : int
-            Verbosity level. 0 = silent.
-        kwargs : keyword arguments
+        use_tqdm : bool, optional
+            Should we use :code:`tqdm` to display a progress bar?
+        verbose : int, optional
+            Verbosity level. :code:`0=silent`.
+        kwargs : keyword arguments, optional
             Keyword arguments for the TensorFlow observation model training.
-            These keywords arguments will be passed to self.model.fit().
+            These keywords arguments will be passed to :code:`self.model.fit()`.
 
         Returns
         -------
         history : dict
-            Dictionary with history of the loss and learning rates (lr and rho).
+            Dictionary with history of the loss and learning rates (:code:`lr`
+            and :code:`rho`).
         """
         if epochs is None:
             epochs = self.config.n_epochs
@@ -266,7 +275,7 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
@@ -274,7 +283,7 @@ class Model(ModelBase):
             Number of initializations.
         take : float
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -334,15 +343,15 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
         n_init : int
             Number of initializations.
-        take : float
+        take : float, optional
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -400,18 +409,19 @@ class Model(ModelBase):
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-        subj_id : np.ndarray
+        subj_id : np.ndarray, optional
             Subject ID. Shape is (batch_size, sequence_length).
-            Only used in osl_dynamics.models.sehmm.
+            Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
         -------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive time
+            points, :math:`q(s_t, s_{t+1})`. Shape is (batch_size*sequence_length-1,
+            n_states*n_states).
         """
 
         # Use Baum-Welch algorithm to calculate gamma, xi
@@ -440,11 +450,12 @@ class Model(ModelBase):
         Returns
         -------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (n_samples, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (n_samples, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (n_samples-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is (n_samples-1,
+            n_states*n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -482,13 +493,13 @@ class Model(ModelBase):
         return gamma, xi
 
     def _get_likelihood(self, x, subj_id=None):
-        """Get the likelihood, p(x_t | s_t).
+        """Get the likelihood, :math:`p(x_t | s_t)`.
 
         Parameters
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-        subj_id : np.ndarray
+        subj_id : np.ndarray, optional
             Subject ID. Shape is (batch_size, sequence_length).
             Only used in for osl_dynamics.models.sehmm
 
@@ -540,11 +551,12 @@ class Model(ModelBase):
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
         """
         # Calculate the new transition probability matrix using the posterior from
         # the Baum-Welch algorithm:
@@ -585,16 +597,19 @@ class Model(ModelBase):
         .. math::
             E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
 
-              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \displaystyle\sum_{t=2}^{T-1} \int q(s_t) \log q(s_t) ds_t
+              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \
+                 \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \displaystyle\sum_{t=2}^{T-1} \
+                 \int q(s_t) \log q(s_t) ds_t
 
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
 
         Returns
         -------
@@ -625,11 +640,11 @@ class Model(ModelBase):
         x : np.ndarray
             Data. Shape is (batch_size, sequence_length, n_channels).
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
-        subj_id : np.ndarray
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
+        subj_id : np.ndarray, optional
             Subject ID. Shape is (batch_size, sequence_length).
-            Only used in osl_dynamics.models.sehmm
+            Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
         -------
@@ -649,16 +664,18 @@ class Model(ModelBase):
         .. math::
             P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
 
-              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
+              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \
+                 \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
 
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
 
         Returns
         -------
@@ -685,17 +702,18 @@ class Model(ModelBase):
         """Predict step for calculating the evidence.
 
         .. math::
-            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) p(s_{t-1} = i | x_{1:t-1})
+            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) \
+                                                       p(s_{t-1} = i | x_{1:t-1})
 
         Parameters
         ----------
         log_smoothing_distribution : np.ndarray
-            log p(s_t-1 | x_1:t-1). Shape is (batch_size, n_states).
+            :math:`\log p(s_{t-1} | x_{1:t-1})`. Shape is (batch_size, n_states).
 
         Returns
         -------
         log_prediction_distribution : np.ndarray
-            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
+            :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
         """
         log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
         log_smoothing_distribution = np.expand_dims(log_smoothing_distribution, -1)
@@ -705,15 +723,15 @@ class Model(ModelBase):
         return log_prediction_distribution
 
     def _get_log_likelihood(self, data, subj_id=None):
-        """Get the log-likelihood of data, log p(x_t | s_t).
+        """Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
 
         Parameters
         ----------
         data : np.ndarray
             Data. Shape is (batch_size, ..., n_channels).
-        subj_id : np.ndarray
+        subj_id : np.ndarray, optional
             Subject ID. Shape is (batch_size, ...).
-            Only used in osl_dynamics.models.sehmm
+            Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
         -------
@@ -740,26 +758,28 @@ class Model(ModelBase):
         """Update step for calculating the evidence.
 
         .. math::
-            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
+            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) \
+                                    p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
 
-            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) p(s_t = i | x_{1:t-1})
+            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) \
+                                                      p(s_t = i | x_{1:t-1})
 
         Parameters
         ----------
         data : np.ndarray
             Data for the update step. Shape is (batch_size, n_channels).
         log_prediction_distribution : np.ndarray
-            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
-        subj_id : np.ndarray
+            :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
+        subj_id : np.ndarray, optional
             Subject ID. Shape is (batch_size,).
-            Only used in osl_dynamics.models.sehmm
+            Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
         -------
         log_smoothing_distribution : np.ndarray
-            log p(s_t | x_1:t). Shape is (batch_size, n_states).
+            :math:`\log p(s_t | x_{1:t})`. Shape is (batch_size, n_states).
         predictive_log_likelihood : np.ndarray
-            log p(x_t | x_1:t-1). Shape is (batch_size).
+            :math:`\log p(x_t | x_{1:t-1})`. Shape is (batch_size,).
         """
         log_likelihood = self._get_log_likelihood(data, subj_id)
         log_smoothing_distribution = log_likelihood + log_prediction_distribution
@@ -834,7 +854,8 @@ class Model(ModelBase):
 
     def get_means_covariances(self):
         """Get the state means and covariances.
-        This is a wrapper for get_means and get_covariances.
+
+        This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
@@ -846,7 +867,7 @@ class Model(ModelBase):
         return self.get_means(), self.get_covariances()
 
     def get_observation_model_parameters(self):
-        """Wrapper for get_means_covariances."""
+        """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
@@ -856,9 +877,8 @@ class Model(ModelBase):
         ----------
         means : np.ndarray
             State means. Shape is (n_states, n_channels).
-        update_initializer : bool
-            Do we want to use the passed means when we re-initialize
-            the model?
+        update_initializer : bool, optional
+            Do we want to use the passed means when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model, means, layer_name="means", update_initializer=update_initializer
@@ -871,9 +891,8 @@ class Model(ModelBase):
         ----------
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
-        update_initializer : bool
-            Do we want to use the passed covariances when we re-initialize
-            the model?
+        update_initializer : bool, optional
+            Do we want to use the passed covariances when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model,
@@ -884,14 +903,14 @@ class Model(ModelBase):
         )
 
     def set_means_covariances(self, means, covariances, update_initializer=True):
-        """This is a wrapper for set_means and set_covariances."""
+        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_covariances(covariances, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_means_covariances."""
+        """Wrapper for :code:`set_means_covariances`."""
         self.set_means_covariances(
             observation_model_parameters[0],
             observation_model_parameters[1],
@@ -933,7 +952,7 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training data.
         """
         _logger.info("Setting random means and covariances")
@@ -986,15 +1005,16 @@ class Model(ModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
-        normal prior is applied to the diagonal of the covariances matrices with mu=0,
-        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
-        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
+        :code:`sigma=diag((range/2)**2)`. If :code:`config.diagonal_covariances=True`,
+        a log normal prior is applied to the diagonal of the covariances matrices with
+        :code:`mu=0`, :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart
+        prior is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        and :code:`psi=diag(1/range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -1016,11 +1036,12 @@ class Model(ModelBase):
         This calculates:
 
         .. math::
-            \mathcal{F} = \int q(s_{1:T}) \log \left[ \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the free energy for.
 
         Returns
@@ -1062,11 +1083,11 @@ class Model(ModelBase):
         return np.mean(free_energy)
 
     def evidence(self, dataset):
-        """Calculate the model evidence, p(x), of HMM on a dataset.
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the model evidence on.
 
         Returns
@@ -1116,9 +1137,9 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate alpha for each subject?
 
         Returns
@@ -1147,8 +1168,7 @@ class Model(ModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the transition probabiltity matrix, state means and
-        covariances.
+        This includes the transition probabiltity matrix, state means and covariances.
 
         Returns
         -------
@@ -1173,8 +1193,9 @@ class Model(ModelBase):
         ----------
         dataset : osl_dynamics.data.Data
             Dataset to calculate the BIC for.
-        loss_type : str
-            Which loss to use for the BIC. Can be "free_energy" or "evidence".
+        loss_type : str, optional
+            Which loss to use for the BIC. Can be :code:`"free_energy"`
+            or :code:`"evidence"`.
 
         Returns
         -------
@@ -1214,13 +1235,13 @@ class Model(ModelBase):
         ----------
         training_data : osl_dynamics.data.Data
             Training dataset.
-        n_epochs : int
-            Number of epochs to train for. Defaults to the value in the config
-            used to create the model.
-        learning_rate : float
-            Learning rate. Defaults to the value in the config used to create
-            the model.
-        store_dir : str
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
             Directory to temporarily store the model in.
 
         Returns
@@ -1290,13 +1311,13 @@ class Model(ModelBase):
         ----------
         training_data : osl_dynamics.data.Data
             Training data.
-        n_epochs : int
-            Number of epochs to train for. Defaults to the value in the config
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config`
             used to create the model.
-        learning_rate : float
-            Learning rate. Defaults to the value in the config used to create
-            the model.
-        store_dir : str
+        store_dir : str, optional
             Directory to temporarily store the model in.
 
         Returns
@@ -1364,9 +1385,9 @@ class Model(ModelBase):
         ----------
         training_data : osl_dynamics.data.Data
             Data object.
-        prepared : bool
+        prepared : bool, optional
             Should we return the prepared data? If not, we return the raw data.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate the data for each subject?
 
         Returns

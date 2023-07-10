@@ -27,7 +27,7 @@ class MixedSine:
         Frequency of each sinusoid.
     sampling_frequency : float
         Sampling frequency.
-    random_seed : int
+    random_seed : int, optional
         Seed used for the random number generator, which is used to sample
         an initial phase for each sinusoid.
     """
@@ -88,28 +88,28 @@ class MixedSine_MVN(Simulation):
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
         operation. This argument can use use to change the relative values
-        of each mode time course.
+        of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
-        Amplitude of each sinusoid.
+        Amplitude of each sinusoid. Shape must be (n_modes,).
     frequencies : np.ndarray or list
-        Frequency of each sinusoid.
+        Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
     means : np.ndarray or str
         Mean vector for each mode, shape should be (n_modes, n_channels).
-        Either a numpy array or 'zero' or 'random'.
+        Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be (n_modes,
-        n_channels, n_channels). Either a numpy array or 'random'.
-    n_covariances_act : int
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for random number generator.
     """
 
@@ -179,40 +179,42 @@ class MSubj_MixedSine_MVN(Simulation):
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
         operation. This argument can use use to change the relative values
-        of each mode time course.
+        of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
-        Amplitude of each sinusoid.
+        Amplitude of each sinusoid. Shape must be (n_modes,).
     frequencies : np.ndarray or list
-        Frequency of each sinusoid.
+        Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
     subject_means : np.ndarray or str
-        Subject mean vector for each state, shape should be (n_subjects, n_states, n_channels).
-        Either a numpy array or 'zero' or 'random'.
+        Subject mean vector for each mode, shape should be (n_subjects, n_modes,
+        n_channels). Either a numpy array or :code:`'zero'` or
+        :code:`'random'`.
     subject_covariances : np.ndarray or str
-        Subject covariance matrix for each state, shape should be
-        (n_subjects, n_states, n_channels, n_channels). Either a numpy array or 'random'.
-    n_covariances_act : int
+        Subject covariance matrix for each mode, shape should be
+        (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
+        or :code:`'random'`.
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_subjects : int
+    n_subjects : int, optional
         Number of subjects.
-    n_subject_embedding_dim : int
+    n_subject_embedding_dim : int, optional
         Number of dimensions for subject embedding.
-    n_mode_embedding_dim : int
+    n_mode_embedding_dim : int, optional
         Number of dimensions for mode embedding.
-    subject_embedding_scale : float
+    subject_embedding_scale : float, optional
         Scale of variability between subject observation parameters.
-    n_groups : int
+    n_groups : int, optional
         Number of groups of subjects when subject means or covariances are 'random'.
-    between_group_scale : float
+    between_group_scale : float, optional
         Scale of variability between groups.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for random number generator.
     """
 

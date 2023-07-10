@@ -1,5 +1,18 @@
 """Dynamic Network Modes (DyNeMo).
 
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models/dynemo.html\
+>`_ for a description of this model.
+
+See Also
+--------
+- C. Gohil, et al., "Mixtures of large-scale functional brain network modes".
+  `Neuroimage 263, 119595 (2022) <https://www.sciencedirect.com/science/article/pii\
+  /S1053811922007108>`_.
+- Tutorials demonstrating DyNeMo's ability to learn `long-range temporal structure
+  <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
+  /dynemo_long_range_dep_simulation.html>`_ and a `soft mixture of modes
+  <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
+  /dynemo_soft_mix_simulation.html>`_.
 """
 
 import os
@@ -55,44 +68,45 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'` or
+        :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either None, :code:`'batch'` or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
         Regularizer.
 
     theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
+        Type of normalization to apply to the posterior samples, :code:`theta`.
+        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature?
+        Should we learn :code:`alpha_temperature`?
     initial_alpha_temperature : float
-        Initial value for the alpha temperature.
+        Initial value for :code:`alpha_temperature`.
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
@@ -101,7 +115,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. If diagonal_covariances=True
+        Initialisation for state covariances. If :code:`diagonal_covariances=True`
         and full matrices are passed, the diagonal is extracted.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
@@ -115,10 +129,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
@@ -127,12 +141,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
+        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
+        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -231,7 +245,8 @@ class Model(VariationalInferenceModelBase):
 
     def get_means_covariances(self):
         """Get the mode means and covariances.
-        This is a wrapper for get_means and get_covariances.
+
+        This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
@@ -243,7 +258,7 @@ class Model(VariationalInferenceModelBase):
         return self.get_means(), self.get_covariances()
 
     def get_observation_model_parameters(self):
-        """Wrapper for get_means_covariances."""
+        """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
@@ -268,7 +283,7 @@ class Model(VariationalInferenceModelBase):
         ----------
         covariances : np.ndarray
             Mode covariances. Shape is (n_modes, n_channels, n_channels).
-        update_initializer : bool
+        update_initializer : bool, optional
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
@@ -281,7 +296,7 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_means_covariances(self, means, covariances, update_initializer=True):
-        """This is a wrapper for set_means and set_covariances."""
+        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(
             means,
             update_initializer=update_initializer,
@@ -294,7 +309,7 @@ class Model(VariationalInferenceModelBase):
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_means_covariances."""
+        """Wrapper for :code:`set_means_covariances`."""
         self.set_means_covariances(
             observation_model_parameters[0],
             observation_model_parameters[1],
@@ -304,15 +319,16 @@ class Model(VariationalInferenceModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
-        normal prior is applied to the diagonal of the covariances matrices with mu=0,
-        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
-        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
+        :code:`sigma=diag((range/2)**2)`. If :code:`config.diagonal_covariances=True`,
+        a log normal prior is applied to the diagonal of the covariances matrices with
+        :code:`mu=0`, :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart
+        prior is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        and :code:`psi=diag(1/range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -329,15 +345,15 @@ class Model(VariationalInferenceModelBase):
             )
 
     def sample_alpha(self, n_samples, theta_norm=None):
-        """Uses the model RNN to sample mode mixing factors, alpha.
+        """Uses the model RNN to sample mode mixing factors, :code:`alpha`.
 
         Parameters
         ----------
         n_samples : int
             Number of samples to take.
-        theta_norm : np.ndarray
-            Normalized logits to initialise the sampling with. Shape must be
-            (sequence_length, n_modes).
+        theta_norm : np.ndarray, optional
+            Normalized logits to initialise the sampling with.
+            Shape must be (sequence_length, n_modes).
 
         Returns
         -------
@@ -430,13 +446,13 @@ class Model(VariationalInferenceModelBase):
         ----------
         training_data : osl_dynamics.data.Data
             Training dataset.
-        n_epochs : int
-            Number of epochs to train for. Defaults to the value in the config
-            used to create the model.
-        learning_rate : float
-            Learning rate. Defaults to the value in the config used to create
-            the model.
-        store_dir : str
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
             Directory to temporarily store the model in.
 
         Returns
@@ -507,13 +523,13 @@ class Model(VariationalInferenceModelBase):
         ----------
         training_data : osl_dynamics.data.Data
             Training dataset.
-        n_epochs : int
-            Number of epochs to train for. Defaults to the value in the config
-            used to create the model.
-        learning_rate : float
-            Learning rate. Defaults to the value in the config used to create
-            the model.
-        store_dir : str
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
             Directory to temporarily store the model in.
 
         Returns

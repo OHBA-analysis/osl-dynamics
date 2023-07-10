@@ -26,63 +26,69 @@ class Data:
     files, it produces a set of numpy memory maps which contain their raw data.
     It also provides methods for batching data and creating TensorFlow Datasets.
 
+    See Also
+    --------
+    The tutorials, `Loading Data <https://osl-dynamics.readthedocs.io/en\
+    /latest/tutorials_build/data_loading.html>`_ and `Preparing Data
+    <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
+    /data_preparation.html>`_.
+
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
-        - A path to a directory containing .npy files.
-          Each .npy file should be a subject or session.
-        - A list of paths to .npy, .mat or .fif files. Each file should be a subject
-          or session. If a .fif file is passed is must end with 'raw.fif' or 'epo.fif'.
+        - A path to a directory containing :code:`.npy` files. Each :code:`.npy` file
+          should be a subject or session.
+        - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files. Each
+          file should be a subject or session. If a :code:`.fif` file is passed is
+          must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
         - A numpy array. The array will be treated as continuous data from the
           same subject.
         - A list of numpy arrays. Each numpy array should be the data for a subject
           or session.
 
         The data files or numpy arrays should be in the format (n_samples, n_channels).
-        If your data is in (n_channels, n_samples) format, use time_axis_first=False.
-    data_field : str
-        If a MATLAB (.mat) file is passed, this is the field that corresponds to the
-        time series data. By default we read the field 'X'. If a numpy (.npy) file is
-        passed, this is ignored. This argument is optional.
-    picks : str or list of str
-        If a fif file is passed we load the data using the MNE object's get_data()
-        method. We pass this argument to the get_data() method. See the
-        `MNE docs <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw.get_data>`_
-        for further details. This argument is optional. By default picks=None retrieves
+        If your data is in (n_channels, n_samples) format, use
+        :code:`time_axis_first=False`.
+    data_field : str, optional
+        If a MATLAB (:code:`.mat`) file is passed, this is the field that corresponds
+        to the time series data. By default we read the field :code:`'X'`. If a numpy
+        (:code:`.npy`) or fif (:code:`.fif`) file is passed, this is ignored.
+    picks : str or list of str, optional
+        Only used if a fif file is passed. We load the data using the
+        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io.Raw.html\
+        #mne.io.Raw.get_data>`_ method. We pass this argument to the
+        :code:`Raw.get_data` method. By default :code:`picks=None` retrieves
         all channel types.
-    reject_by_annotation : str
-        If a fif file is passed we load the data using the MNE object's get_data()
-        method. If the fif file contains a mne.Raw object, we pass this argument to
-        the get_data() method. This argument is optional. By default
-        reject_by_annotation=None retrieves all time points. Use
-        reject_by_annotation="omit" to remove segments marked as bad.
-    sampling_frequency : float
-        Sampling frequency of the data in Hz. This argument is optional.
-    mask_file : str
-        Path to mask file used to source reconstruct the data. This argument is
-        optional.
-    parcellation_file : str
-        Path to parcellation file used to source reconstruct the data. This argument
-        is optional.
-    store_dir : str
+    reject_by_annotation : str, optional
+        Only used if a fif file is passed. We load the data using the
+        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io.Raw.html\
+        #mne.io.Raw.get_data>`_ method. We pass this argument to the
+        :code:`Raw.get_data` method. By default :code:`reject_by_annotation=None`
+        retrieves all time points. Use :code:`reject_by_annotation="omit"` to
+        remove segments marked as bad.
+    sampling_frequency : float, optional
+        Sampling frequency of the data in Hz.
+    mask_file : str, optional
+        Path to mask file used to source reconstruct the data.
+    parcellation_file : str, optional
+        Path to parcellation file used to source reconstruct the data.
+    store_dir : str, optional
         We don't read all the data into memory. Instead we create store them on
-        disk and create memmaps (unless load_memmaps=False is passed).
-        This is the directory to save memmaps to. Default is ./tmp.
-        This argument is optional.
-    time_axis_first : bool
-        Is the input data of shape (n_samples, n_channels)? Default is True.
+        disk and create memmaps (unless :code:`load_memmaps=False` is passed).
+        This is the directory to save memmaps to. Default is :code:`./tmp`.
+    time_axis_first : bool, optional
+        Is the input data of shape (n_samples, n_channels)? Default is :code:`True`.
         If your data is in format (n_channels, n_samples), use
-        time_axis_first=False. This argument is optional.
-    load_memmaps : bool
-        Should we load the data as memory maps (memmaps)? If False, we will load data
-        into memory rather than storing it on disk. By default we will keep the data
-        on disk and use memmaps. This argument is optional.
-    buffer_size : int
+        :code:`time_axis_first=False`.
+    load_memmaps : bool, optional
+        Should we load the data as memory maps (memmaps)? If :code:`False`, we will
+        load data into memory rather than storing it on disk. By default we will keep
+        the data on disk and use memmaps.
+    buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-        to less random shuffling but will be quicker. This argument is optional.
-        Default is 100000.
-    n_jobs : int
-        Number of processes to load the data in parallel. This argument is optional.
+        to less random shuffling but will be quicker. Default is 100000.
+    n_jobs : int, optional
+        Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
     """
 
@@ -210,7 +216,7 @@ class Data:
             self.keep = current_keep
 
     def set_sampling_frequency(self, sampling_frequency):
-        """Sets the sampling_frequency attribute.
+        """Sets the :code:`sampling_frequency` attribute.
 
         Parameters
         ----------
@@ -220,7 +226,7 @@ class Data:
         self.sampling_frequency = sampling_frequency
 
     def set_buffer_size(self, buffer_size):
-        """Set the buffer_size attribute.
+        """Set the :code:`buffer_size` attribute.
 
         Parameters
         ----------
@@ -235,10 +241,10 @@ class Data:
 
         Parameters
         ----------
-        prepared : bool
+        prepared : bool, optional
             Should we return the latest data after we have prepared it or
             the original data we loaded into the Data object?
-        concatenate : bool
+        concatenate : bool, optional
             Should we return the time series for each array concatenated?
 
         Returns
@@ -332,11 +338,13 @@ class Data:
 
         Parameters
         ----------
-        low_freq : float
-            Frequency in Hz for a high pass filter.
-        high_freq : float
-            Frequency in Hz for a low pass filter.
-        use_raw : bool
+        low_freq : float, optional
+            Frequency in Hz for a high pass filter. If :code:`None`, no high pass
+            filtering is applied.
+        high_freq : float, optional
+            Frequency in Hz for a low pass filter. If :code:`None`, no low pass
+            filtering is applied.
+        use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
         Returns
@@ -396,7 +404,7 @@ class Data:
         ----------
         freq : float
             Frequency in Hz to downsample to.
-        use_raw : bool
+        use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
         Returns
@@ -457,13 +465,15 @@ class Data:
 
         Parameters
         ----------
-        n_pca_components : int
-            Number of PCA components to keep.
-        pca_components : np.ndarray
+        n_pca_components : int, optional
+            Number of PCA components to keep. If :code:`None`, then
+            :code:`pca_components` should be passed.
+        pca_components : np.ndarray, optional
             PCA components to apply if they have already been calculated.
-        whiten : bool
+            If :code:`None`, then :code:`n_pca_components` should be passed.
+        whiten : bool, optional
             Should we whiten the PCA'ed data?
-        use_raw : bool
+        use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
         Returns
@@ -541,7 +551,7 @@ class Data:
         ----------
         n_embeddings : int
             Number of data points to embed the data.
-        use_raw : bool
+        use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
         Returns
@@ -597,13 +607,15 @@ class Data:
         ----------
         n_embeddings : int
             Number of data points to embed the data.
-        n_pca_components : int
-            Number of PCA components to keep.
-        pca_components : np.ndarray
+        n_pca_components : int, optional
+            Number of PCA components to keep. If :code:`None`, then
+            :code:`pca_components` should be passed.
+        pca_components : np.ndarray, optional
             PCA components to apply if they have already been calculated.
-        whiten : bool
+            If :code:`None`, then :code:`n_pca_components` should be passed.
+        whiten : bool, optional
             Should we whiten the PCA'ed data?
-        use_raw : bool
+        use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
         Returns
@@ -721,7 +733,7 @@ class Data:
         ----------
         n_window : int
             Number of data points in the sliding window. Must be odd.
-        use_raw : bool
+        use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
         Returns
@@ -800,30 +812,33 @@ class Data:
         Parameters
         ----------
         methods : dict
-            Each key is the name of a method to call. Each value is a dict
-            containing keyword arguments to pass to the method. Example use
-            for TDE-PCA data preparation::
-
-                methods = {
-                    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
-                    "standardize": {},
-                }
-                data.prepare(methods)
-
-            Or for amplitude envelope data preparation::
-
-                methods = {
-                    "filter": {"low_freq": 1, "high_freq": 45},
-                    "amplitude_envelope": {},
-                    "moving_average": {"n_window": 5},
-                    "standardize": {},
-                }
-                data.prepare(methods)
+            Each key is the name of a method to call. Each value is a :code:`dict`
+            containing keyword arguments to pass to the method.
 
         Returns
         -------
         data : osl_dynamics.data.Data
             The modified Data object.
+
+        Examples
+        --------
+        TDE-PCA data preparation::
+
+            methods = {
+                "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+                "standardize": {},
+            }
+            data.prepare(methods)
+
+        Amplitude envelope data preparation::
+
+            methods = {
+                "filter": {"low_freq": 1, "high_freq": 45},
+                "amplitude_envelope": {},
+                "moving_average": {"n_window": 5},
+                "standardize": {},
+            }
+            data.prepare(methods)
         """
         for method_name, kwargs in methods.items():
             method = getattr(self, method_name)
@@ -848,17 +863,21 @@ class Data:
 
         Parameters
         ----------
-        sequence_length : int
+        sequence_length : int, optional
             Length of the segement of data to feed into the model.
-        n_embeddings : int
-            Number of data points used to embed the data.
-        n_window : int
+            Can be pass to trim the time points that are lost when separating
+            into sequences.
+        n_embeddings : int, optional
+            Number of data points used to embed the data. If :code:`None`,
+            then we use :code:`Data.n_embeddings` (if it exists).
+        n_window : int, optional
             Number of data points the sliding window applied to the data.
-        prepared : bool
+            If :code:`None`, then we use :code:`Data.n_window` (if it exists).
+        prepared : bool, optional
             Should we return the prepared data? If not we return the raw data.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate the data for each array?
-        verbose : bool
+        verbose : bool, optional
             Should we print the number of data points we're removing?
 
         Returns
@@ -959,22 +978,20 @@ class Data:
             Should we shuffle sequences (within a batch) and batches.
         validation_split : float
             Ratio to split the dataset into a training and validation set.
-        concatenate : bool
-            Should we concatenate the datasets for each array? Optional, default
-            is True.
-        subj_id : bool
-            Should we include the subject id in the dataset? Optional, default is
-            False. This argument can be used to prepare datasets for subject-specific
-            models.
-        step_size : int
-            Number of samples to slide the sequence across the dataset. Optional.
+        concatenate : bool, optional
+            Should we concatenate the datasets for each array?
+        subj_id : bool, optional
+            Should we include the subject id in the dataset? This argument can be
+            used to prepare datasets for subject-specific models.
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
             Default is no overlap.
 
         Returns
         -------
-        dataset : tensorflow.data.Dataset or tuple
+        dataset : tf.data.Dataset or tuple
             Dataset for training or evaluating the model along with the validation
-            set if validation_split was passed.
+            set if :code:`validation_split` was passed.
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
