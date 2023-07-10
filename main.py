@@ -6,6 +6,7 @@ import numpy as np
 import scipy.stats as stats
 from rotation.preprocessing import PrepareData
 from rotation.training import HMM_training, Dynemo_training
+from rotation.utils import *
 from osl_dynamics.data import Data
 from osl_dynamics.analysis import connectivity
 
@@ -95,13 +96,9 @@ if __name__ == '__main__':
     
     index = int(sys.argv[1]) - 1
     
-    if index >= 30:
-        model = models[1]
-        index -= 30
-    else:
-        model = models[0]
-    n_channels = list_channels[index // 5]
-    n_states = list_states[index % 5]
+    model,n_channels, n_states = parse_index(index,models,list_channels,list_states)
+    
+    
     save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')

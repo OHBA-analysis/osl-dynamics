@@ -19,6 +19,7 @@ def HMM_post(dataset):
     print('#################################')
 
 if __name__ == '__main__':
+    '''
     data_dir = pathlib.Path('/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d15_ts2/')
     subjs = []
     np_datas = []
@@ -32,3 +33,6 @@ if __name__ == '__main__':
 
     dataset = Data(np_datas)
     HMM_post(dataset)
+    '''
+    
+    
