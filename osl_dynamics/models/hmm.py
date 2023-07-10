@@ -219,7 +219,7 @@ class Model(ModelBase):
             # Setup a progress bar for this epoch
             if verbose > 0 and not use_tqdm:
                 print("Epoch {}/{}".format(n + 1, epochs))
-                pb_i = utils.Progbar(len(dataset))
+                pb_i = utils.Progbar(dtf.get_n_batches(dataset))
 
             # Update rho
             self._update_rho(n)

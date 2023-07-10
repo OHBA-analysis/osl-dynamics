@@ -111,6 +111,46 @@ def create_dataset(data, sequence_length, step_size):
     return dataset
 
 
+def save_tfrecord(data, sequence_length, step_size, filepath):
+    """Save dataset to a TFRecord file.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing data to batch. Keys correspond to the input name
+        for the model and the value is the data.
+    sequence_length : int
+        Sequence length to batch the data.
+    step_size : int
+        Number of samples to slide the sequence across the data.
+    filepath : str
+        Path to save the TFRecord file.
+    """
+    import tensorflow as tf
+    from tensorflow.train import Feature, Features, Example, BytesList
+
+    dataset = create_dataset(data, sequence_length, step_size)
+
+    # Helper function to serialize a sequence to a tensorflow example byte string
+    def make_example(sequence):
+        # Note this function assumes all features are tf tensors
+        # and can be converted to bytes
+        features = Features(
+            feature={
+                k: Feature(
+                    bytes_list=BytesList(value=[tf.io.serialize_tensor(v).numpy()])
+                )
+                for k, v in sequence.items()
+            }
+        )
+        return Example(features=features).SerializeToString()
+
+    # Serialize each sequence and write to a TFRecord file
+    with tf.io.TFRecordWriter(filepath) as writer:
+        for sequence in dataset:
+            writer.write(make_example(sequence))
+
+
 def get_range(dataset):
     """The range (max-min) of values contained in a batched Tensorflow dataset.
 
@@ -170,4 +210,7 @@ def get_n_batches(dataset):
     n_batches : int
         Number of batches.
     """
-    return dataset.cardinality().numpy()
+    counter = 0
+    for _ in dataset:
+        counter += 1
+    return counter
