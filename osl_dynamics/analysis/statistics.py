@@ -63,7 +63,7 @@ def _check_glm_data(data, covariates, assignments=None):
 
 
 def evoked_response_max_stat_perm(
-    data, n_perm, covariates={}, metric="copes", n_jobs=1
+    data, n_perm, covariates=None, metric="copes", n_jobs=1
 ):
     """Statistical significant testing for evoked responses.
 
@@ -91,6 +91,9 @@ def evoked_response_max_stat_perm(
     pvalues : np.ndarray
         P-values for the evoked response. Shape is (n_subjects, n_samples, ...).
     """
+    if covariates is None:
+        covariates = {}
+    
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
 
