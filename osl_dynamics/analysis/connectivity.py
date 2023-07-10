@@ -328,10 +328,10 @@ def gmm_threshold(
     keep_positive_only=False,
     one_component_percentile=0,
     n_sigma=0,
-    sklearn_kwargs={},
+    sklearn_kwargs=None,
     show=False,
     filename=None,
-    plot_kwargs={},
+    plot_kwargs=None,
 ):
     """Threshold a connectivity matrix using the GMM method.
 
@@ -379,6 +379,12 @@ def gmm_threshold(
     conn_map : np.ndarray
         Thresholded connectivity matrix.
     """
+    if sklearn_kwargs is None:
+        sklearn_kwargs = {}
+    
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
     percentile = fit_gmm(
         conn_map,
         subtract_mean,
