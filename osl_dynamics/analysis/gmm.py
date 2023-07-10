@@ -73,7 +73,7 @@ def fit_gaussian_mixture(
     """
     if sklearn_kwargs is None:
         sklearn_kwargs = {}
-    
+
     if plot_kwargs is None:
         plot_kwargs = {}
 
