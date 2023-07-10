@@ -13,7 +13,6 @@ resting fMRI correlations". `Medical Image Analysis 77, 102366 (2022)
 import logging
 import time
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -142,28 +141,28 @@ class Config(BaseModelConfig):
     model_name: str = "MAGE"
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_rnn: str = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
-    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_normalization: str = None
     inference_activation: str = "elu"
     inference_dropout: float = 0.0
     inference_regularizer: str = None
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_rnn: str = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
-    model_normalization: Literal[None, "batch", "layer"] = None
+    model_normalization: str = None
     model_activation: str = "elu"
     model_dropout: float = 0.0
     model_regularizer: str = None
 
     # Descriminator network parameters
-    discriminator_rnn: Literal["gru", "lstm"] = "lstm"
+    discriminator_rnn: str = "lstm"
     discriminator_n_layers: int = 1
     discriminator_n_units: int = None
-    discriminator_normalization: Literal[None, "batch", "layer"] = None
+    discriminator_normalization: str = None
     discriminator_activation: str = "elu"
     discriminator_dropout: float = 0.0
     discriminator_regularizer: str = None

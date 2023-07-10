@@ -4,7 +4,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -128,19 +127,19 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_name: str = "State-DyNeMo"
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_rnn: str = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
-    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_normalization: str = None
     inference_activation: str = None
     inference_dropout: float = 0.0
     inference_regularizer: str = None
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_rnn: str = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
-    model_normalization: Literal[None, "batch", "layer"] = None
+    model_normalization: str = None
     model_activation: str = None
     model_dropout: float = 0.0
     model_regularizer: str = None

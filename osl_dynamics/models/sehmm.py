@@ -5,7 +5,6 @@
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -156,7 +155,7 @@ class Config(HMMConfig):
 
     # KL annealing parameters
     do_kl_annealing: bool = False
-    kl_annealing_curve: Literal["linear", "tanh"] = None
+    kl_annealing_curve: str = None
     kl_annealing_sharpness: float = None
     n_kl_annealing_epochs: int = None
 

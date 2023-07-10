@@ -533,7 +533,7 @@ class CovarianceMatricesLayer(layers.Layer):
     """Layer to learn a set of covariance matrices.
 
     A cholesky factor is learnt and used to calculate a covariance matrix as
-    :math:`C = LL^T`, where :code:`L` is the cholesky factor. The cholesky
+    :math:`C = LL^T`, where :math:`L` is the cholesky factor. The cholesky
     factor is learnt as a vector of free parameters.
 
     Parameters
@@ -1415,8 +1415,8 @@ class MixSubjectSpecificParametersLayer(layers.Layer):
 
     The mixture is calculated as
 
-    - :math:`m_t = \displaystyle\sum_j \alpha_jt \mu_j^{s_t}`
-    - :math:`C_t = \displaystyle\sum_j \alpha_jt D_j^{s_t}`
+    - :math:`m_t = \displaystyle\sum_j \alpha_{jt} \mu_j^{s_t}`
+    - :math:`C_t = \displaystyle\sum_j \alpha_{jt} D_j^{s_t}`
 
     where :math:`s_t` is the subject at time :math:`t`.
     """

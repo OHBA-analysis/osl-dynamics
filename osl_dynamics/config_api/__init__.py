@@ -1,7 +1,7 @@
 """Config API.
 
-See the `toolbox paper examples
-<https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
+See the `toolbox paper examples <https://github.com/OHBA-analysis/osl-dynamics\
+/tree/main/examples/toolbox_paper>`_
 for scripts that use the config API:
 
 - `TDE-HMM burst analysis <https://github.com/OHBA-analysis/osl-dynamics\
@@ -29,8 +29,8 @@ Optionally, you can specify a particular GPU to use with::
 
     % osl-dynamics <config-file> <output-directory> --restrict <restrict>
 
-where :code:`<restrict>` is an integer specifying the GPU number. E.g. if you would
-just like to use the first GPU, you can pass::
+where :code:`<restrict>` is an integer specifying the GPU number. E.g. if you
+would just like to use the first GPU, you can pass::
 
     % osl-dynamics <config-file> <output-directory> --restrict 0
 
