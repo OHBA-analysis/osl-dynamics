@@ -2014,7 +2014,6 @@ def plot_summary_stats_group_diff(
     fig_kwargs=None,
     ax=None,
     filename=None,
-    fig_kwargs=None,
 ):
     """Plot summary statistics for two groups as violin plots.
 
