@@ -1925,7 +1925,7 @@ def plot_psd_topo(
     psd,
     only_show=None,
     parcellation_file=None,
-    topomap_pos=[0.45, 0.55, 0.5, 0.55],
+    topomap_pos=None,
     filename=None,
 ):
     """PLot PSDs for parcels and a topomap.
@@ -1943,8 +1943,8 @@ def plot_psd_topo(
     topomap_pos : list, optional
         Positioning and size of the topomap: :code:`[x0, y0, width, height]`.
         :code:`x0`, :code:`y0`, :code:`width`, :code:`height` should be floats
-        between 0 and 1. E.g. :code:`[0.45, 0.55, 0.5, 0.55]` to place the
-        topomap on the top right. This is not used if
+        between 0 and 1. Defaults to :code:`[0.45, 0.55, 0.5, 0.55]` to place
+        the topomap on the top right. This is not used if
         :code:`parcellation_file=None`.
     filename : str, optional
         Output filename.
@@ -1958,6 +1958,8 @@ def plot_psd_topo(
         Matplotlib axis object(s). Only returned if :code:`ax=None` and
         :code:`filename=None`.
     """
+    if topomap_pos is None:
+        topomap_pos = [0.45, 0.55, 0.5, 0.55]
 
     if parcellation_file is not None:
         # Get the center of each parcel
@@ -2012,6 +2014,7 @@ def plot_summary_stats_group_diff(
     fig_kwargs=None,
     ax=None,
     filename=None,
+    fig_kwargs=None,
 ):
     """Plot summary statistics for two groups as violin plots.
 
@@ -2031,6 +2034,8 @@ def plot_summary_stats_group_diff(
         Axis object to plot on.
     filename : str, optional
         Output filename.
+    fig_kwargs : dict
+        Keyword arguments to pass to create_figure().
 
     Returns
     -------

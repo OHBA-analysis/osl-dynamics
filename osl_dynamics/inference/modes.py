@@ -71,7 +71,7 @@ def gmm_time_courses(
     p_value=None,
     filename=None,
     sklearn_kwargs=None,
-    plot_kwargs={},
+    plot_kwargs=None,
 ):
     """Fit a two component Gaussian Mixture Model (GMM) to time courses to get
     a binary time course.
@@ -107,6 +107,8 @@ def gmm_time_courses(
         GMM time courses with binary entries. Shape is
         (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
     """
+    if plot_kwargs is None:
+        plot_kwargs = {}
 
     if not isinstance(alpha, list):
         alpha = [alpha]

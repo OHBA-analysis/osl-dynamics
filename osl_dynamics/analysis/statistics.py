@@ -63,7 +63,7 @@ def _check_glm_data(data, covariates, assignments=None):
 
 
 def evoked_response_max_stat_perm(
-    data, n_perm, covariates={}, metric="copes", n_jobs=1
+    data, n_perm, covariates=None, metric="copes", n_jobs=1
 ):
     """Statistical significant testing for evoked responses.
 
@@ -92,6 +92,9 @@ def evoked_response_max_stat_perm(
     pvalues : np.ndarray
         P-values for the evoked response. Shape is (n_subjects, n_samples, ...).
     """
+    if covariates is None:
+        covariates = {}
+
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
 
@@ -159,7 +162,7 @@ def evoked_response_max_stat_perm(
 
 
 def group_diff_max_stat_perm(
-    data, assignments, n_perm, covariates={}, metric="tstats", n_jobs=1
+    data, assignments, n_perm, covariates=None, metric="tstats", n_jobs=1
 ):
     """Statistical significant testing for the difference between two groups.
 
@@ -194,6 +197,9 @@ def group_diff_max_stat_perm(
     pvalues : np.ndarray
         P-values for the features. Shape is (features1, features2, ...).
     """
+    if covariates is None:
+        covariates = {}
+
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
 

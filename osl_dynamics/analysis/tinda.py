@@ -297,7 +297,7 @@ def compute_fo_stats(
         return interval_weighted_avg, interval_sum, None, None
 
 
-def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
+def collate_stats(stats, field, all_to_all=False, ignore_elements=None):
     """Collate list of stats (e.g., of different states) into a single array.
 
     Parameters
@@ -325,6 +325,9 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=[]):
         then the first two dimensions are :code:`n_states` and the diagonal is
         :code:`np.nan`.
     """
+    if ignore_elements is None:
+        ignore_elements = []
+
     num_states = len(stats)
     shp = stats[0][field].shape  # (n_states, n_bins, n_interval_ranges)
     if num_states > 1:
