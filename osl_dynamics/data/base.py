@@ -1208,8 +1208,6 @@ class Data:
             ----------
             example : tf.train.Example
                 TensorFlow example.
-            feature_names : list
-                List of feature names.
 
             Returns
             -------
