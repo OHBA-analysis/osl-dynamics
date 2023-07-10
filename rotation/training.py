@@ -1,5 +1,6 @@
+import pickle
 
-def HMM_training(dataset,n_states,n_channels,save_dir):
+def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False):
     from osl_dynamics.models.hmm import Config, Model
     # Create a config object
     config = Config(
@@ -23,9 +24,15 @@ def HMM_training(dataset,n_states,n_channels,save_dir):
     # Full training
     history = model.fit(dataset)
     model.save(save_dir)
+    
+    # Compute state
+    if compute_state:
+        alpha = model.get_alpha(dataset)
+        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
+        
 
 
-def Dynemo_training(dataset, n_modes, n_channels, save_dir):
+def Dynemo_training(dataset, n_modes, n_channels, save_dir,compute_state=False):
     from osl_dynamics.models.dynemo import Config, Model
     # Create a config object
     config = Config(
@@ -59,3 +66,8 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir):
     # Full training
     history = model.fit(dataset)
     model.save(save_dir)
+    
+    # Compute state
+    if compute_state:
+        alpha = model.get_alpha(dataset)
+        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
