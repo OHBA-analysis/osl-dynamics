@@ -193,7 +193,7 @@ def get_n_batches(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
