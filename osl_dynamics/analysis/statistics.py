@@ -1,5 +1,15 @@
 """Functions to perform statistical significance testing.
 
+Note
+----
+This module is used in the following tutorials:
+
+- `Static Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/static_power_analysis.html>`_
+- `HMM Summary Statistics Analysis <https://osl-dynamics.readthedocs.io/en\
+  /latest/tutorials_build/hmm_summary_stats_analysis.html>`_.
+- `HMM Evoked Response Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/hmm_evoked_response_analysis.html>`_
 """
 
 import logging

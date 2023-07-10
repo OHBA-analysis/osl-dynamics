@@ -1,5 +1,13 @@
 """Functions to calculate and save network power maps.
 
+Note
+----
+This module is used in the following tutorials:
+
+- `Static Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/static_power_analysis.html>`_
+- `HMM Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/hmm_power_analysis.html>`_
 """
 
 import os

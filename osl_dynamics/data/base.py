@@ -27,13 +27,6 @@ class Data:
     data. It also provides methods for batching data and creating TensorFlow
     Datasets.
 
-    See Also
-    --------
-    The tutorials, `Loading Data <https://osl-dynamics.readthedocs.io/en\
-    /latest/tutorials_build/data_loading.html>`_ and `Preparing Data
-    <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
-    /data_preparation.html>`_.
-
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
@@ -1433,6 +1426,6 @@ class Data:
         self.save_preparation(output_dir)
 
     def delete_dir(self):
-        """Deletes store_dir."""
+        """Deletes :code:`store_dir`."""
         if self.store_dir.exists():
             rmtree(self.store_dir)

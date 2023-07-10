@@ -1,5 +1,13 @@
 """Implementation of the Fisher kernel for prediction studies.
 
+See the `HMM description <https://osl-dynamics.readthedocs.io/en/latest/models\
+/hmm.html>`_ for further details.
+
+See Also
+--------
+`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
+/examples/simulation/hmm_hmm-mvn_fisher-kernel.py>`_ applying the Fisher kernel
+to simulated HMM data.
 """
 
 import logging

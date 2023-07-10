@@ -1,4 +1,5 @@
-"""Functions to use Connectome Workbench.
+"""Functions to use `Connectome Workbench <https://www.humanconnectome.org\
+/software/connectome-workbench>`_.
 
 """
 

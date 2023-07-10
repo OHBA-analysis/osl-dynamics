@@ -9,9 +9,7 @@ from tqdm.auto import trange
 
 
 def alpha_correlation(alpha_1, alpha_2):
-    """Calculates the `correlation \
-    <https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html>`_
-    between modes of two mixing coefficient time series.
+    """Calculates the correlation between mixing coefficient time series.
 
     Parameters
     ----------
@@ -102,7 +100,7 @@ def frobenius_norm(A, B):
     """Calculates the Frobenius norm of the difference of two matrices.
 
     The Frobenius norm is calculated as
-    :math:`\sqrt{\displaystyle\sum_{ij} \mathrm{abs}(a_{ij} - b_{ij})^2}`.
+    :math:`\sqrt{\displaystyle\sum_{ij} |a_{ij} - b_{ij}|^2}`.
 
     Parameters
     ----------
@@ -161,9 +159,7 @@ def pairwise_frobenius_distance(matrices):
 
 
 def pairwise_matrix_correlations(matrices, remove_diagonal=False):
-    """Calculate the `correlation \
-    <https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html>`_
-    between (flattened) covariance matrices.
+    """Calculate the correlation between (flattened) covariance matrices.
 
     Parameters
     ----------
@@ -306,8 +302,7 @@ def pairwise_rv_coefficient(matrices, remove_diagonal=False):
 
 
 def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
-    """Computes the congruence coefficient between covariance/correlation
-    matrices.
+    """Computes the congruence coefficient between matrices.
 
     Parameters
     ----------
@@ -344,8 +339,8 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
 
 
 def pairwise_l2_distance(arrays, batch_dims=0):
-    """Calculate the pairwise L2 distance along the first axis after
-    :code:`batch_dims`.
+    """Calculate the pairwise L2 distance
+    along the first axis after :code:`batch_dims`.
 
     Parameters
     ----------

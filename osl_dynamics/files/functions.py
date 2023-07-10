@@ -6,8 +6,7 @@ from os import path
 
 
 def check_exists(filename, directory):
-    """Looks for a file in the current working directory and in a osl-dynamics
-    directory.
+    """Looks for a file in the current working directory and in osl-dynamics.
 
     Parameters
     ----------

@@ -77,8 +77,7 @@ def gmm_time_courses(
     sklearn_kwargs=None,
     plot_kwargs=None,
 ):
-    """Fit a two component Gaussian Mixture Model (GMM) to time courses to get
-    a binary time course.
+    """Fit a two-component GMM to time courses to get a binary time course.
 
     Parameters
     ----------
@@ -534,8 +533,7 @@ def convert_to_mne_raw(
 
 
 def reweight_alphas(alpha, covs):
-    """Re-weight mixing coefficients to account for the magnitude of the mode
-    covariances.
+    """Re-weight mixing coefficients to account for the magnitude of the mode covariances.
 
     Parameters
     ----------
@@ -567,8 +565,7 @@ def reweight_alphas(alpha, covs):
 
 
 def average_runs(alpha, n_clusters=None, return_cluster_info=False):
-    """Average the state probabilities from different runs using hierarchical
-    clustering.
+    """Average the state probabilities from different runs using hierarchical clustering.
 
     Parameters
     ----------

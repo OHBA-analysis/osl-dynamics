@@ -1,8 +1,30 @@
 """Config API.
 
+------
+
+Specify a pipeline using a config, e.g. to train a TDE-HMM::
+
+    config = ```
+        load_data:
+            inputs: training_data
+            prepare:
+                tde_pca: {n_embeddings: 15, n_pca_components: 80}
+                standardize: {}
+        train_hmm:
+            config_kwargs:
+                n_states: 8
+                learn_means: False
+                learn_covariances: True
+    ```
+
+and run with::
+
+    run_pipeline(config, output_dir="results")
+
+------
+
 See the `toolbox paper examples <https://github.com/OHBA-analysis/osl-dynamics\
-/tree/main/examples/toolbox_paper>`_
-for scripts that use the config API:
+/tree/main/examples/toolbox_paper>`_ for scripts that use the config API:
 
 - `TDE-HMM burst analysis <https://github.com/OHBA-analysis/osl-dynamics\
   /blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_bursts.py>`_.
@@ -13,9 +35,10 @@ for scripts that use the config API:
 - `TDE-DyNeMo network analysis <https://github.com/OHBA-analysis/osl-dynamics\
   /blob/main/examples/toolbox_paper/ctf_rest/tde_dynemo_networks.py>`_.
 
-Command Line Usage
-------------------
+------
 
+Note
+----
 The config API can be used via the command line with::
 
     % osl-dynamics <config-file> <output-directory>

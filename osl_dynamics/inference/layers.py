@@ -14,8 +14,8 @@ tfb = tfp.bijectors
 
 @tf.function
 def add_epsilon(A, epsilon, diag=False):
-    """Adds epsilon the the diagonal of batches of square matrices or all
-    elements of matrices.
+    """Adds epsilon the the diagonal of batches of square matrices
+    or all elements of matrices.
 
     Parameters
     ----------
@@ -197,8 +197,7 @@ class ZeroLayer(layers.Layer):
 
 
 class InverseCholeskyLayer(layers.Layer):
-    """Layer for getting Cholesky vectors from postive definite symmetric
-    matrices.
+    """Layer for getting Cholesky vectors from postive definite symmetric matrices.
 
     Parameters
     ----------
@@ -1550,12 +1549,12 @@ class MultiLayerPerceptronLayer(layers.Layer):
 
 
 class StaticLossScalingFactorLayer(layers.Layer):
-    r"""Layer to calculate the scaling factor for losses that are associated
-    with static parameters (e.g. regularisation for observation model
-    parameters).
+    r"""Layer for calculating the scaling factor for static losses.
 
-    When calculating loss, we sum over the sequence length and average over the
-    sequences. The scaling factor is given by
+    When calculating loss, we sum over the sequence length (time dimension)
+    and average over the sequences. If we add a static quantity to each
+    time point we need to rescale it to account for the summation over time.
+    The scaling factor is given by
 
     .. math::
         \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times
