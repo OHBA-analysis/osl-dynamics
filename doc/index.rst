@@ -7,6 +7,7 @@ This package contains models for analysing neuroimaging data. In particular, thi
 * Spectral estimation: including multitaper spectra and wavelet transforms.
 * Burst detection.
 * Statistical significant testing (using GLM permutation testing).
+* Simulating time series data (e.g. HMMs, autoregressive models, etc).
 * And much more!
 
 Models included:
