@@ -1943,8 +1943,8 @@ def plot_psd_topo(
     topomap_pos : list, optional
         Positioning and size of the topomap: :code:`[x0, y0, width, height]`.
         :code:`x0`, :code:`y0`, :code:`width`, :code:`height` should be floats
-        between :code:`0` and :code:`1`. E.g. :code:`[0.45, 0.55, 0.5, 0.55]`
-        to place the topomap on the top right. This is not used if
+        between 0 and 1. E.g. :code:`[0.45, 0.55, 0.5, 0.55]` to place the
+        topomap on the top right. This is not used if
         :code:`parcellation_file=None`.
     filename : str, optional
         Output filename.

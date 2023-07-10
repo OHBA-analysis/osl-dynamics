@@ -443,8 +443,7 @@ def fit_gmm(
         Should we only keep positive values to fit a GMM to?
     one_component_percentile : float, optional
         Percentile threshold if only one component is found. Should be a between
-        :code:`0` and :code:`100`. E.g. for the 95th percentile,
-        :code:`one_component_percentile=95`.
+        0 and 100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
     n_sigma : float, optional
         Number of standard deviations of the 'off' component the mean of the 'on'
         component must be for the fit to be considered to have two components.
@@ -558,7 +557,7 @@ def threshold(
         n_channels, n_channels), (n_modes, n_channels, n_channels) or (n_channels,
         n_channels).
     percentile : float or np.ndarray
-        Percentile to threshold with. Should be between :code:`0` and :code:`100`.
+        Percentile to threshold with. Should be between 0 and 100.
         Shape must be (n_components, n_modes), (n_modes,) or a float.
     subtract_mean : bool, optional
         Should we subtract the mean over modes before thresholding? The thresholding
@@ -698,8 +697,8 @@ def save(
     component : int, optional
         Spectral component to save.
     threshold : float or np.ndarray, optional
-        Threshold to determine which connectivity to show. Should be between :code:`0`
-        and :code:`1`. If a :code:`float` is passed the same threshold is used for all
+        Threshold to determine which connectivity to show. Should be between 0
+        and 1. If a :code:`float` is passed the same threshold is used for all
         modes. Otherwise, threshold should be a numpy array of shape (n_modes,).
     glassbrain : bool, optional
         Sholud we create a 3D glass brain plot (as an interactive HTML file)
