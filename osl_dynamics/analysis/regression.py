@@ -12,7 +12,8 @@ _logger = logging.getLogger("osl-dynamics")
 
 def linear(X, y, fit_intercept, normalize=False, log_message=False):
     """Wrapper for `sklearn.linear_model.LinearRegression \
-    <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html>`_.
+    <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model\
+    .LinearRegression.html>`_.
 
     Parameters
     ----------

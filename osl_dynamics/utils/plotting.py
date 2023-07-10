@@ -30,8 +30,8 @@ def set_style(params):
     Wrapper for `plt.rcParams.update
     <https://matplotlib.org/stable/tutorials/introductory/customizing.html>`_.
     List of parameters can be found `here
-    <https://matplotlib.org/stable/api/matplotlib_configuration_api.html#matplotlib\
-    .rcParams>`_.
+    <https://matplotlib.org/stable/api/matplotlib_configuration_api.html\
+    #matplotlib.rcParams>`_.
 
     Parameters
     ----------
@@ -59,8 +59,8 @@ def create_figure(*args, **kwargs):
     Parameters
     ----------
     fig_kwargs
-        Arguments to pass to `plt.subplots <https://matplotlib.org/stable/api/_as_gen\
-        /matplotlib.pyplot.subplots.html>`_.
+        Arguments to pass to `plt.subplots <https://matplotlib.org/stable/api\
+        /_as_gen/matplotlib.pyplot.subplots.html>`_.
 
     Returns
     -------
@@ -124,8 +124,8 @@ def close(fig=None):
 def rough_square_axes(n_plots):
     """Get the most square axis layout for n_plots.
 
-    Given :code:`n_plots`, find the side lengths of the rectangle which gives the closest
-    layout to a square grid of axes.
+    Given :code:`n_plots`, find the side lengths of the rectangle which gives
+    the closest layout to a square grid of axes.
 
     Parameters
     ----------
@@ -152,9 +152,10 @@ def rough_square_axes(n_plots):
 def get_colors(n, colormap="magma"):
     """Produce equidistant colors from a matplotlib colormap.
 
-    Given a matplotlib colormap, produce a series of RGBA colors which are equally
-    spaced by value. There is no guarantee that these colors will be perceptually
-    uniformly distributed and with many colors will likely be extremely close.
+    Given a matplotlib colormap, produce a series of RGBA colors which are
+    equally spaced by value. There is no guarantee that these colors will be
+    perceptually uniformly distributed and with many colors will likely be
+    extremely close.
 
     Parameters
     ----------
@@ -218,9 +219,8 @@ def plot_line(
     title : str, optional
         Figure title.
     plot_kwargs : dict, optional
-        Arguments to pass to the `ax.plot
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_
-        method.
+        Arguments to pass to the `ax.plot <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.plot.html>`_ method.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     ax : plt.axes, optional
@@ -369,9 +369,8 @@ def plot_scatter(
     annotate : List of array like objects, optional
         Annotation for each data point for each set of data points.
     plot_kwargs : dict, optional
-        Arguments to pass to the `ax.scatter
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.scatter.html>`_
-        method.
+        Arguments to pass to the `ax.scatter <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.scatter.html>`_ method.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     ax : plt.axes, optional
@@ -526,9 +525,9 @@ def plot_hist(
     title : str, optional
         Figure title.
     plot_kwargs : dict, optional
-        Arguments to pass to the `ax.hist
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html>`_
-        method. Defaults to :code:`{"histtype": "step"}`.
+        Arguments to pass to the `ax.hist <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.hist.html>`_ method. Defaults to
+        :code:`{"histtype": "step"}`.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     ax : plt.axes, optional
@@ -647,9 +646,8 @@ def plot_bar_chart(
     title : str, optional
         Figure title.
     plot_kwargs : dict, optional
-        Arguments to pass to the `ax.bar
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.bar.html>`_
-        method.
+        Arguments to pass to the `ax.bar <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.bar.html>`_ method.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     ax : plt.axes, optional
@@ -909,7 +907,10 @@ def plot_violin(
     max_len = max([d.size for d in data])
     data_dict = {
         k: np.pad(
-            v, pad_width=(0, max_len - v.size), mode="constant", constant_values=np.nan
+            v,
+            pad_width=(0, max_len - v.size),
+            mode="constant",
+            constant_values=np.nan,
         )
         for k, v in zip(x, data)
     }
@@ -957,9 +958,9 @@ def plot_time_series(
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     plot_kwargs : dict, optional
-        Keyword arguments to be passed on to `ax.plot
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
-        Defaults to :code:`{"lw": 0.7, "color": "tab:blue"}`.
+        Keyword arguments to be passed on to `ax.plot <https://matplotlib.org\
+        /stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_. Defaults to
+        :code:`{"lw": 0.7, "color": "tab:blue"}`.
     ax : plt.axes, optional
         The axis on which to plot the data. If not given, a new axis is created.
     filename : str, optional
@@ -1000,7 +1001,7 @@ def plot_time_series(
 
     # Calculate separation
     separation = (
-        np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min()) * 1.2
+        np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min()) * 1.2,
     )
     gaps = np.arange(n_channels)[::-1] * separation
 
@@ -1053,9 +1054,9 @@ def plot_separate_time_series(
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     plot_kwargs : dict, optional
-        Keyword arguments to be passed on to `ax.plot
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
-        Defaults to :code:`{"lw": 0.7}`.
+        Keyword arguments to be passed on to `ax.plot <https://matplotlib.org\
+        /stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_. Defaults to
+        :code:`{"lw": 0.7}`.
     filename : str, optional
         Output filename.
 
@@ -1151,8 +1152,8 @@ def plot_epoched_time_series(
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     plot_kwargs : dict, optional
-        Keyword arguments to be passed on to `ax.plot
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
+        Keyword arguments to be passed on to `ax.plot <https://matplotlib.org\
+        /stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
     ax : plt.axes, optional
         The axis on which to plot the data. If not given, a new axis is created.
     filename : str, optional
@@ -1238,16 +1239,16 @@ def plot_matrices(
 ):
     """Plot a collection of matrices.
 
-    Given an iterable of matrices, plot each matrix in its own axis. The axes are
-    arranged as close to a square (:code:`N x N` axis grid) as possible.
+    Given an iterable of matrices, plot each matrix in its own axis. The axes
+    are arranged as close to a square (:code:`N x N` axis grid) as possible.
 
     Parameters
     ----------
     matrix: list of np.ndarray
         The matrices to plot.
     group_color_scale: bool, optional
-        If True, all matrices will have the same colormap scale, where we use the
-        minimum and maximum across all matrices as the scale.
+        If True, all matrices will have the same colormap scale, where we use
+        the minimum and maximum across all matrices as the scale.
     titles: list of str, optional
         Titles to give to each matrix axis.
     main_title: str, optional
@@ -1301,7 +1302,11 @@ def plot_matrices(
                 im = axis.matshow(grid, vmin=v_min, vmax=v_max, cmap=cmap)
         else:
             if log_norm:
-                im = axis.matshow(grid, cmap=cmap, norm=matplotlib.colors.LogNorm())
+                im = axis.matshow(
+                    grid,
+                    cmap=cmap,
+                    norm=matplotlib.colors.LogNorm(),
+                )
             else:
                 im = axis.matshow(grid, cmap=cmap)
         axis.set_title(title)
@@ -1341,11 +1346,11 @@ def plot_connections(
     """Create a chord diagram representing the values of a matrix.
 
     For a matrix of weights, create a chord diagram where the color of the line
-    connecting two nodes represents the value indexed by the position of the nodes in
-    the lower triangle of the matrix.
+    connecting two nodes represents the value indexed by the position of the
+    nodes in the lower triangle of the matrix.
 
-    This is useful for showing things like co-activation between sensors/parcels or
-    relations between nodes in a network.
+    This is useful for showing things like co-activation between sensors/parcels
+    or relations between nodes in a network.
 
     Parameters
     ----------
@@ -1519,10 +1524,11 @@ def topoplot(
 ):
     """Make a contour plot in sensor space.
 
-    Create a contour plot by interpolating a field from a set of values provided for
-    each sensor location in an MEG layout. Within the context of DyNeMo this is likely
-    to be an array of (all positive) values taken from the diagonal of a covariance
-    matrix, but one can also plot any sensor level M/EEG data.
+    Create a contour plot by interpolating a field from a set of values
+    provided for each sensor location in an MEG layout. Within the context of
+    DyNeMo this is likely to be an array of (all positive) values taken from
+    the diagonal of a covariance matrix, but one can also plot any sensor
+    level M/EEG data.
 
     Parameters
     ----------
@@ -1531,7 +1537,8 @@ def topoplot(
     data : np.ndarray
         The value of the field at each sensor.
     channel_names : list of str, optional
-        A list of channel names which are present in the data (removes missing channels).
+        A list of channel names which are present in the data
+        (removes missing channels).
     plot_boxes : bool, optional
         Show boxes representing the height and width of sensors.
     show_deleted_sensors : bool, optional
@@ -1596,7 +1603,7 @@ def plot_brain_surface(
     values : np.ndarray
         Data to plot. Can be of shape: (n_maps, n_channels) or (n_channels,).
         A (..., n_channels, n_channels) array can also be passed. Warning: this
-        function cannot be used if :code:`n_maps` is equal to :code:`n_channels`.
+        function cannot be used if :code:`n_maps=n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
@@ -1674,14 +1681,15 @@ def plot_alpha(
     title : str, optional
         Title for the plot.
     plot_kwargs : dict, optional
-        Any parameters to be passed to `plt.stackplot
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.stackplot.html>`_.
+        Any parameters to be passed to `plt.stackplot <https://matplotlib.org\
+        /stable/api/_as_gen/matplotlib.pyplot.stackplot.html>`_.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     filename : str, optional
         Output filename.
     axes : list of plt.axes, optional
-        A list of matplotlib axes to plot on. If :code:`None`, a new figure is created.
+        A list of matplotlib axes to plot on. If :code:`None`, a new
+        figure is created.
 
     Returns
     -------
@@ -1798,8 +1806,8 @@ def plot_state_lifetimes(
 ):
     """Create a histogram of state lifetimes.
 
-    For a state time course, create a histogram for each state with the distribution
-    of the lengths of time for which it is active.
+    For a state time course, create a histogram for each state with the
+    distribution of the lengths of time for which it is active.
 
     Parameters
     ----------
@@ -1808,8 +1816,8 @@ def plot_state_lifetimes(
     bins : int, optional
         Number of bins for the histograms.
     density : bool, optional
-        If :code:`True`, plot the probability density of the state activation lengths.
-        If :code:`False`, raw number.
+        If :code:`True`, plot the probability density of the state activation
+        lengths. If :code:`False`, raw number.
     match_scale_x : bool, optional
         If True, all histograms will share the same x-axis scale.
     match_scale_y : bool, optional
@@ -1821,8 +1829,8 @@ def plot_state_lifetimes(
     y_label : str, optional
         y-axis label.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `ax.hist
-        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html>`_.
+        Keyword arguments to pass to `ax.hist <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.hist.html>`_.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     filename : str, optional
@@ -2071,14 +2079,29 @@ def plot_summary_stats_group_diff(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot a half violin for each group
-    sns.violinplot(data=ss_df, x="State", y=name, hue="Group", split=True, ax=ax)
+    sns.violinplot(
+        data=ss_df,
+        x="State",
+        y=name,
+        hue="Group",
+        split=True,
+        ax=ax,
+    )
 
     # Add a star above the violin to indicate significance
     scatter_kwargs = {"c": "black", "s": 32, "marker": "*"}
     for i in range(n_states):
         if pvalues[i] < 0.01:
-            ax.scatter(i - 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
-            ax.scatter(i + 0.075, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
+            ax.scatter(
+                i - 0.075,
+                summary_stats[:, i].max() * 1.6,
+                **scatter_kwargs,
+            )
+            ax.scatter(
+                i + 0.075,
+                summary_stats[:, i].max() * 1.6,
+                **scatter_kwargs,
+            )
         elif pvalues[i] < 0.05:
             ax.scatter(i, summary_stats[:, i].max() * 1.6, **scatter_kwargs)
 
@@ -2117,8 +2140,8 @@ def plot_evoked_response(
     pvalues : np.ndarray
         p-value for each evoked response. This can be calculated with
         `osl_dynamics.analysis.statistics.evoked_response_max_stat_perm 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
-        /statistics/index.html#osl_dynamics.analysis.statistics\
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/statistics/index.html#osl_dynamics.analysis.statistics\
         .evoked_response_max_stat_perm>`_.
     significance_level : float, optional
         Value to threshold the p-values with to consider significant.
@@ -2186,7 +2209,12 @@ def plot_evoked_response(
     if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
-    for i, e, l, s in zip(range(epochs.shape[1]), epochs.T, labels, significant.T):
+    for i, e, l, s in zip(
+        range(epochs.shape[1]),
+        epochs.T,
+        labels,
+        significant.T,
+    ):
         # Plot evoked response
         p = ax.plot(t, e, label=l)
 
@@ -2196,7 +2224,12 @@ def plot_evoked_response(
             y = 1.1 * np.max(epochs) + i * offset_between_bars
             dt = (t[1] - t[0]) / 2
             for st in sig_times:
-                ax.plot((st - dt, st + dt), (y, y), color=p[0].get_color(), linewidth=3)
+                ax.plot(
+                    (st - dt, st + dt),
+                    (y, y),
+                    color=p[0].get_color(),
+                    linewidth=3,
+                )
 
     # Add a dashed line at time = 0
     ax.axvline(0, linestyle="--", color="black")
@@ -2255,8 +2288,8 @@ def plot_wavelet(
     title : str, optional
         Figure title.
     add_colorbar : bool, optional
-        If :code:`True` (default), space will be stolen from the figure to create
-        a colorbar.
+        If :code:`True` (default), space will be stolen from the figure to
+        create a colorbar.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     plot_kwargs : dict, optional

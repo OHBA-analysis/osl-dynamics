@@ -1,6 +1,6 @@
 """Config API.
 
-See the `toolbox examples
+See the `toolbox paper examples
 <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
 for scripts that use the config API:
 

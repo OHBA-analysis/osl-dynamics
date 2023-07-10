@@ -1,15 +1,15 @@
 """Dynamic Network Modes (DyNeMo).
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models/dynemo.html\
->`_ for a description of this model.
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
+/dynemo.html>`_ for a description of this model.
 
 See Also
 --------
 - C. Gohil, et al., "Mixtures of large-scale functional brain network modes".
-  `Neuroimage 263, 119595 (2022) <https://www.sciencedirect.com/science/article/pii\
-  /S1053811922007108>`_.
-- Tutorials demonstrating DyNeMo's ability to learn `long-range temporal structure
-  <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
+  `Neuroimage 263, 119595 (2022) <https://www.sciencedirect.com/science\
+  /article/pii/S1053811922007108>`_.
+- Tutorials demonstrating DyNeMo's ability to learn `long-range temporal
+  structure <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
   /dynemo_long_range_dep_simulation.html>`_ and a `soft mixture of modes
   <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
   /dynemo_soft_mix_simulation.html>`_.
@@ -91,7 +91,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, :code:`'batch'` or :code:`'layer'`.
+        Type of normalization to use. Either None, :code:`'batch'` or
+        :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
         E.g. :code:`'relu'`, :code:`'elu'`, etc.
@@ -115,8 +116,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. If :code:`diagonal_covariances=True`
-        and full matrices are passed, the diagonal is extracted.
+        Initialisation for state covariances.
+        If :code:`diagonal_covariances=True` and full matrices are passed,
+        the diagonal is extracted.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
     diagonal_covariances : bool
@@ -141,8 +143,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
-        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
+        Value to clip gradients by. This is the :code:`clipnorm` argument
+        passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -273,7 +275,10 @@ class Model(VariationalInferenceModelBase):
             the model?
         """
         obs_mod.set_observation_model_parameter(
-            self.model, means, layer_name="means", update_initializer=update_initializer
+            self.model,
+            means,
+            layer_name="means",
+            update_initializer=update_initializer,
         )
 
     def set_covariances(self, covariances, update_initializer=True):
@@ -295,8 +300,14 @@ class Model(VariationalInferenceModelBase):
             diagonal_covariances=self.config.diagonal_covariances,
         )
 
-    def set_means_covariances(self, means, covariances, update_initializer=True):
-        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """This is a wrapper for :code:`set_means` and
+        :code:`set_covariances`."""
         self.set_means(
             means,
             update_initializer=update_initializer,
@@ -319,11 +330,12 @@ class Model(VariationalInferenceModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
-        :code:`sigma=diag((range/2)**2)`. If :code:`config.diagonal_covariances=True`,
-        a log normal prior is applied to the diagonal of the covariances matrices with
-        :code:`mu=0`, :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart
-        prior is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
+        :code:`config.diagonal_covariances=True`, a log normal prior is
+        applied to the diagonal of the covariances matrices with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior
+        is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
         and :code:`psi=diag(1/range)`.
 
         Parameters
@@ -385,14 +397,14 @@ class Model(VariationalInferenceModelBase):
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling mode time course"):
-            # If there are leading zeros we trim theta so that we don't pass the zeros
+            # If there are leading zeros we trim theta so that we don't pass
+            # the zeros
             trimmed_theta = theta_norm[~np.all(theta_norm == 0, axis=1)][
                 np.newaxis, :, :
             ]
 
-            # Predict the probability distribution function for theta one time step
-            # in the future,
-            # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
+            # Predict the probability distribution function for theta one time
+            # step in the future, p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta)
             mod_mu = mod_mu_layer(model_rnn)[0, -1]
             mod_sigma = mod_sigma_layer(model_rnn)[0, -1]
@@ -412,8 +424,8 @@ class Model(VariationalInferenceModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the model RNN weights and biases, mixing coefficients, mode
-        means and covariances.
+        This includes the model RNN weights and biases, mixing coefficients,
+        mode means and covariances.
 
         Returns
         -------
@@ -492,7 +504,11 @@ class Model(VariationalInferenceModelBase):
                 # Train on this subject
                 with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
-                    a = self.get_alpha(training_data, concatenate=True, verbose=0)
+                    a = self.get_alpha(
+                        training_data,
+                        concatenate=True,
+                        verbose=0,
+                    )
 
                 # Get inferred parameters
                 m, c = self.get_means_covariances()
@@ -514,10 +530,12 @@ class Model(VariationalInferenceModelBase):
     def dual_estimation(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Dual estimation to get the subject-specific observation model parameters.
+        """Dual estimation to get the subject-specific observation model
+        parameters.
 
-        Here, we train the observation model parameters (mode means and covariances)
-        with the inference RNN and model RNN held fixed at the group-level.
+        Here, we train the observation model parameters (mode means and
+        covariances) with the inference RNN and model RNN held fixed at
+        the group-level.
 
         Parameters
         ----------
@@ -620,8 +638,14 @@ def _model_structure(config):
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-    theta_layer = SampleNormalDistributionLayer(config.theta_std_epsilon, name="theta")
-    theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
+    theta_layer = SampleNormalDistributionLayer(
+        config.theta_std_epsilon,
+        name="theta",
+    )
+    theta_norm_layer = NormalizationLayer(
+        config.theta_normalization,
+        name="theta_norm",
+    )
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
@@ -638,8 +662,8 @@ def _model_structure(config):
     alpha = alpha_layer(theta_norm)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each mode as the observation model.
+    # - We use a multivariate normal with a mean vector and covariance matrix
+    #   for each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
@@ -674,7 +698,10 @@ def _model_structure(config):
         )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(
+        config.covariances_epsilon,
+        name="ll_loss",
+    )
 
     # Data flow
     mu = means_layer(
@@ -693,7 +720,10 @@ def _model_structure(config):
     #     - mod_sigma ~ softplus(RNN(theta_<t))
 
     # Definition of layers
-    theta_norm_drop_layer = layers.Dropout(config.model_dropout, name="theta_norm_drop")
+    theta_norm_drop_layer = layers.Dropout(
+        config.model_dropout,
+        name="theta_norm_drop",
+    )
     mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,

@@ -1,13 +1,13 @@
 """Multi-dynamic Adversarial Generator Encoder (MAGE).
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models/mage.html\
->`_ for a description of this model.
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
+/mage.html>`_ for a description of this model.
 
 See Also
 --------
-U. Pervaiz, et al., "Multi-dynamic modelling reveals strongly time-varying resting fMRI 
-correlations". `Medical Image Analysis 77, 102366 (2022) <https://www.sciencedirect.com\
-/science/article/pii/S1361841522000196>`_.
+U. Pervaiz, et al., "Multi-dynamic modelling reveals strongly time-varying
+resting fMRI correlations". `Medical Image Analysis 77, 102366 (2022)
+<https://www.sciencedirect.com/science/article/pii/S1361841522000196>`_.
 """
 
 import logging
@@ -52,7 +52,8 @@ class Config(BaseModelConfig):
     n_channels : int
         Number of channels.
     sequence_length : int
-        Length of sequence passed to the inference, generative and discriminator network.
+        Length of sequence passed to the inference, generative and
+        discriminator network.
 
     inference_rnn : str
         RNN to use, either :code:`'gru'` or :code:`'lstm'`.
@@ -229,8 +230,8 @@ class Model(ModelBase):
     config_type = Config
 
     def build_model(self):
-        """Builds a keras model for the inference, generator and discriminator model
-        and the full MAGE model.
+        """Builds a keras model for the inference, generator and discriminator
+        model and the full MAGE model.
         """
         _logger.info("Build models")
         self.inference_model = _build_inference_model(self.config)
@@ -289,8 +290,8 @@ class Model(ModelBase):
         self.discriminator_model_cov.trainable = False
 
         # Reconstruction (Likelihood) loss:
-        # The first loss corresponds to the likelihood - this tells us how well we
-        # are explaining our data according to the current estimate of the
+        # The first loss corresponds to the likelihood - this tells us how well
+        # we are explaining our data according to the current estimate of the
         # generative model, and is given by:
         # L = \sum_{t=1}^{T} log p(Y_t | \theta_t^m = \mu^{m,\theta}_t,
         #                                \theta_t^c = \mu^{c,\theta}_t)
@@ -300,9 +301,9 @@ class Model(ModelBase):
 
         # Regularization (Prior) Loss:
         # The second loss regularises the estimate of the latent, time-varying
-        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this penalises
-        # when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the
-        # prior:
+        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this
+        # penalises when the posterior estimates of [$\theta^m$, $\theta^c$]
+        # deviate from the prior:
         # R = \sum_{t=1}^{T} [
         #     CrossEntropy(\mu^{m,\theta}_t|| \hat{\mu}^{m,\theta}_{t})
         #     + CrossEntropy(\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})
@@ -329,7 +330,8 @@ class Model(ModelBase):
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training data.
         epochs : int, optional
-            Number of epochs to train. Defaults to value in :code:`config` if not passed.
+            Number of epochs to train. Defaults to value in :code:`config`
+            if not passed.
         verbose : int, optional
             Should we print a progress bar?
 
@@ -436,7 +438,8 @@ class Model(ModelBase):
     def get_mode_time_courses(self, inputs, concatenate=False):
         """Get mode time courses.
 
-        This method is used to get mode time courses for the multi-time-scale model.
+        This method is used to get mode time courses for the multi-time-scale
+        model.
 
         Parameters
         ----------
@@ -545,23 +548,27 @@ class Model(ModelBase):
         Returns
         -------
         fcs : np.ndarray
-            Mode functional connectivities. Shape (n_modes, n_channels, n_channels).
+            Mode functional connectivities.
+            Shape (n_modes, n_channels, n_channels).
         """
         return obs_mod.get_observation_model_parameter(self.inference_model, "fcs")
 
     def get_means_stds_fcs(self):
         """Get the mode means, standard deviations, functional connectivities.
 
-        This is a wrapper for :code:`get_means`, :code:`get_stds`, :code:`get_fcs`.
+        This is a wrapper for :code:`get_means`, :code:`get_stds`,
+        :code:`get_fcs`.
 
         Returns
         -------
         means : np.ndarray
             Mode means. Shape is (n_modes, n_channels).
         stds : np.ndarray
-            Mode standard deviations. Shape is (n_modes, n_channels, n_channels).
+            Mode standard deviations.
+            Shape is (n_modes, n_channels, n_channels).
         fcs : np.ndarray
-            Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
+            Mode functional connectivities.
+            Shape is (n_modes, n_channels, n_channels).
         """
         return self.get_means(), self.get_stds(), self.get_fcs()
 
@@ -577,7 +584,8 @@ class Model(ModelBase):
         means : np.ndarray
             Mode means. Shape is (n_modes, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed parameters when we re-initialize the model?
+            Do we want to use the passed parameters when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -595,7 +603,8 @@ class Model(ModelBase):
             Mode standard deviations.
             Shape is (n_modes, n_channels, n_channels) or (n_modes, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed parameters when we re-initialize the model?
+            Do we want to use the passed parameters when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -610,9 +619,11 @@ class Model(ModelBase):
         Parameters
         ----------
         fcs : np.ndarray
-            Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
+            Mode functional connectivities.
+            Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed parameters when we re-initialize the model?
+            Do we want to use the passed parameters when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -622,7 +633,8 @@ class Model(ModelBase):
         )
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
-        """This is a wrapper for :code:`set_means`, :code:`set_stds`, :code:`set_fcs`."""
+        """This is a wrapper for :code:`set_means`, :code:`set_stds`,
+        :code:`set_fcs`."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_stds(stds, update_initializer=update_initializer)
         self.set_fcs(fcs, update_initializer=update_initializer)
@@ -685,8 +697,8 @@ def _build_inference_model(config):
     gamma = gamma_layer(theta)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each mode as the observation model.
+    # - We use a multivariate normal with a mean vector and covariance matrix
+    #   for each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
@@ -786,8 +798,12 @@ def _build_generator_model(config, name):
 
 def _build_discriminator_model(config, name):
     # Descriminator RNN:
-    #   D_{theta^m_t} = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t), zeta(mu^{m,theta}_t)],omega^m_d), lambda_d^m))
-    #   D_{theta^c_t} = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t), zeta(mu^{c,theta}_t)],omega^c_d), lambda_d^c))
+    #   D_{theta^m_t} = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t),
+    #                                  zeta(mu^{m,theta}_t)],omega^m_d),
+    #                           lambda_d^m))
+    #   D_{theta^c_t} = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t),
+    #                                  zeta(mu^{c,theta}_t)],omega^c_d),
+    #                           lambda_d^c))
 
     # Definition of layers
     inputs = layers.Input(

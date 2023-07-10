@@ -105,17 +105,20 @@ class Config(HMMConfig):
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
-        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget`. This is the delay parameter.
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`. This is the
+        delay parameter.
     trans_prob_update_forget : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
-        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget`. This is the forget parameter.
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`. This is the
+        forget parameter.
     observation_update_decay : float
         Decay rate for the learning rate of the observation model.
         We update the learning rate (:code:`lr`) as
-        :code:`lr = config.learning_rate * exp(-observation_update_decay * epoch)`.
+        :code:`lr = config.learning_rate * exp(-observation_update_decay *
+        epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -169,8 +172,7 @@ class Config(HMMConfig):
             or self.mode_embeddings_dim is None
         ):
             raise ValueError(
-                "n_subjects, subject_embeddings_dim and mode_embeddings_dim must "
-                "be passed."
+                "n_subjects, subject_embeddings_dim and mode_embeddings_dim must be passed."
             )
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
@@ -249,8 +251,8 @@ class Model(HMMModel):
         Returns
         -------
         history : dict
-            Dictionary with history of the loss and learning rates (:code:`lr` and
-            :code:`rho`).
+            Dictionary with history of the loss and learning rates (:code:`lr`
+            and :code:`rho`).
         """
         if epochs is None:
             epochs = self.config.n_epochs
@@ -308,7 +310,12 @@ class Model(HMMModel):
                 x_gamma_and_subj_id = np.concatenate(
                     [x, gamma, np.expand_dims(subj_id, -1)], axis=2
                 )
-                h = self.model.fit(x_gamma_and_subj_id, epochs=1, verbose=0, **kwargs)
+                h = self.model.fit(
+                    x_gamma_and_subj_id,
+                    epochs=1,
+                    verbose=0,
+                    **kwargs,
+                )
 
                 # Get the new loss
                 l = h.history["loss"][0]
@@ -321,7 +328,10 @@ class Model(HMMModel):
                 if use_tqdm:
                     _range.set_postfix(rho=self.rho, lr=lr, loss=l)
                 else:
-                    pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
+                    pb_i.add(
+                        1,
+                        values=[("rho", self.rho), ("lr", lr), ("loss", l)],
+                    )
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
@@ -386,7 +396,11 @@ class Model(HMMModel):
             The training history of the best initialization.
         """
         # Make a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, concatenate=True, subj_id=True)
+        training_data = self.make_dataset(
+            training_data,
+            concatenate=True,
+            subj_id=True,
+        )
 
         return super().random_subset_initialization(
             training_data, n_epochs, n_init, take, **kwargs
@@ -435,7 +449,10 @@ class Model(HMMModel):
         means : np.ndarray
             Group means. Shape is (n_modes, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.model, "group_means")
+        return obs_mod.get_observation_model_parameter(
+            self.model,
+            "group_means",
+        )
 
     def get_means(self):
         """Wrapper for :code:`get_group_means`."""
@@ -458,7 +475,8 @@ class Model(HMMModel):
     def get_group_means_covariances(self):
         """Get the group level mode means and covariances.
 
-        This is a wrapper for :code:`get_group_means` and :code:`get_group_covariances`.
+        This is a wrapper for :code:`get_group_means` and
+        :code:`get_group_covariances`.
 
         Returns
         -------
@@ -481,7 +499,11 @@ class Model(HMMModel):
         """Wrapper for :code:`get_group_observation_model_parameters`."""
         return self.get_group_observation_model_parameters()
 
-    def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
+    def get_subject_means_covariances(
+        self,
+        subject_embeddings=None,
+        n_neighbours=2,
+    ):
         """Get the subject means and covariances.
 
         Parameters
@@ -490,14 +512,16 @@ class Model(HMMModel):
             Input embedding vectors for subjects.
             Shape is (n_subjects, subject_embeddings_dim).
         n_neighbours : int, optional
-            Number of nearest neighbours. Ignored if :code:`subject_embedding=None`.
+            Number of nearest neighbours. Ignored if
+            :code:`subject_embedding=None`.
 
         Returns
         -------
         means : np.ndarray
             Subject means. Shape is (n_subjects, n_states, n_channels).
         covs : np.ndarray
-            Subject covariances. Shape is (n_subjects, n_states, n_channels, n_channels).
+            Subject covariances.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
         """
         return obs_mod.get_subject_means_covariances(
             self.model,
@@ -526,7 +550,8 @@ class Model(HMMModel):
         group_means : np.ndarray
             Group level mode means. Shape is (n_modes, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed group means when we re-initialize the model?
+            Do we want to use the passed group means when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model,
@@ -541,7 +566,8 @@ class Model(HMMModel):
         Parameters
         ----------
         group_covariances : np.ndarray
-            Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
+            Group level mode covariances.
+            Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool, optional
             Do we want to use the passed group covariances when we re-initialize
             the model?
@@ -556,7 +582,8 @@ class Model(HMMModel):
     def set_group_means_covariances(
         self, group_means, group_covariances, update_initializer=True
     ):
-        """Wrapper for :code:`set_group_means` and :code:`set_group_covariances`."""
+        """Wrapper for :code:`set_group_means` and
+        :code:`set_group_covariances`."""
         self.set_group_means(
             group_means,
             update_initializer=update_initializer,
@@ -584,7 +611,12 @@ class Model(HMMModel):
         """Wrapper for :code:`set_group_covariances`."""
         self.set_group_covariances(covariances, update_initializer)
 
-    def set_means_covariances(self, means, covariances, update_initializer=True):
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
         """Wrapper for :code:`set_group_means_covariances`."""
         self.set_group_means_covariances(means, covariances, update_initializer)
 
@@ -599,11 +631,12 @@ class Model(HMMModel):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
-        :code:`sigma=diag((range/2)**2)`. If :code:`config.diagonal_covariances=True`,
-        a log normal prior is applied to the diagonal of the covariances matrices with
-        :code:`mu=0`, :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart
-        prior is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
+        :code:`config.diagonal_covariances=True`, a log normal prior is applied
+        to the diagonal of the covariances matrices with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior is
+        applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
         and :code:`psi=diag(1/range)`.
 
         Parameters
@@ -627,7 +660,8 @@ class Model(HMMModel):
             )
 
     def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior and prior.
+        """Set the correct scaling for KL loss between deviation posterior
+        and prior.
 
         Parameters
         ----------
@@ -665,7 +699,8 @@ class Model(HMMModel):
 
         .. math::
             \mathcal{F} = \int q(s_{1:T}) \log \left[ \
-                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right]
+                          ds_{1:T}
 
         Parameters
         ----------
@@ -772,7 +807,8 @@ class Model(HMMModel):
         Parameters
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
+            Prediction dataset. This can be a list of datasets, one for each
+            subject.
         concatenate : bool, optional
             Should we concatenate alpha for each subject?
 
@@ -850,7 +886,9 @@ def _model_structure(config):
     # Subject embedding layers
     subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
     subject_embeddings_layer = layers.Embedding(
-        config.n_subjects, config.subject_embeddings_dim, name="subject_embeddings"
+        config.n_subjects,
+        config.subject_embeddings_dim,
+        name="subject_embeddings",
     )
 
     # Group level observation model parameters
@@ -905,7 +943,10 @@ def _model_structure(config):
             config.dev_regularizer_factor,
             name="means_dev_map_input",
         )
-        means_dev_map_layer = layers.Dense(config.n_channels, name="means_dev_map")
+        means_dev_map_layer = layers.Dense(
+            config.n_channels,
+            name="means_dev_map",
+        )
         norm_means_dev_map_layer = layers.LayerNormalization(
             axis=-1, name="norm_means_dev_map"
         )
@@ -952,7 +993,9 @@ def _model_structure(config):
 
         # Get the deviation magnitudes (scale deviation maps globally)
 
-        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
+        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(
+            data,
+        )
         means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
             means_dev_mag_inf_alpha_input
         )
@@ -995,7 +1038,8 @@ def _model_structure(config):
             name="covs_dev_map_input",
         )
         covs_dev_map_layer = layers.Dense(
-            config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_map"
+            config.n_channels * (config.n_channels + 1) // 2,
+            name="covs_dev_map",
         )
         norm_covs_dev_map_layer = layers.LayerNormalization(
             axis=-1, name="norm_covs_dev_map"
@@ -1048,7 +1092,9 @@ def _model_structure(config):
             covs_dev_mag_inf_alpha_input
         )
         covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
-        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
+        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(
+            covs_dev_mag_inf_beta_input,
+        )
         covs_dev_mag = covs_dev_mag_layer(
             [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta]
         )
@@ -1135,7 +1181,10 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
-        means_dev_mag_kl_loss_layer = ZeroLayer((), name="means_dev_mag_kl_loss")
+        means_dev_mag_kl_loss_layer = ZeroLayer(
+            (),
+            name="means_dev_mag_kl_loss",
+        )
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
 
     if config.learn_covariances:
@@ -1165,7 +1214,9 @@ def _model_structure(config):
             covs_concat_embeddings,
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
-        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
+        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+            covs_dev_mag_mod_beta_input,
+        )
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
             [
                 data,
@@ -1186,4 +1237,8 @@ def _model_structure(config):
     # Data flow
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss, kl_loss], name="SE-HMM")
+    return tf.keras.Model(
+        inputs=inputs,
+        outputs=[ll_loss, kl_loss],
+        name="SE-HMM",
+    )

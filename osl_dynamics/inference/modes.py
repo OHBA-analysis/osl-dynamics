@@ -1,4 +1,5 @@
-"""Functions to manipulate and calculate statistics for inferred mode/state time courses.
+"""Functions to manipulate and calculate statistics for inferred mode/state
+time courses.
 
 """
 
@@ -27,7 +28,8 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
         Mode mixing factors or state probabilities. Shape must be
         (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
     concatenate : bool, optional
-        If :code:`alpha` is a :code:`list`, should we concatenate the time courses?
+        If :code:`alpha` is a :code:`list`, should we concatenate the
+        time courses?
     n_modes : int, optional
         Number of modes/states there should be. Useful if there are
         modes/states which never activate.
@@ -51,7 +53,9 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
         if n_modes is None:
             n_modes = alpha.shape[-1]
         tcs = alpha.argmax(axis=2)
-        tcs = np.array([array_ops.get_one_hot(tc, n_states=n_modes) for tc in tcs])
+        tcs = np.array(
+            [array_ops.get_one_hot(tc, n_states=n_modes) for tc in tcs],
+        )
         if len(tcs) == 1:
             tcs = tcs[0]
         elif concatenate:
@@ -99,7 +103,8 @@ def gmm_time_courses(
         Dictionary of keyword arguments to pass to
         `osl_dynamics.utils.plotting.plot_gmm \
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/\
-        osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting\
+        .plot_gmm>`_.
 
     Returns
     -------
@@ -144,7 +149,8 @@ def gmm_time_courses(
             gmm_tc[:, mode] = a > threshold
             gmm_metric.append(metrics)
 
-        # Add to list containing subject-specific time courses and component metrics
+        # Add to list containing subject-specific time courses and
+        # component metrics
         gmm_tcs.append(gmm_tc)
         gmm_metrics.append(gmm_metric)
 
@@ -192,9 +198,10 @@ def gmm_time_courses(
 def correlate_modes(mode_time_course_1, mode_time_course_2):
     """Calculate the correlation matrix between modes in two mode time courses.
 
-    Given two mode time courses, calculate the correlation between each pair of modes
-    in the mode time courses. The output for each value in the matrix is the value
-    :code:`numpy.corrcoef(mode_time_course_1, mode_time_course_2)[0, 1]`.
+    Given two mode time courses, calculate the correlation between each pair of
+    modes in the mode time courses. The output for each value in the matrix is
+    the value :code:`numpy.corrcoef(mode_time_course_1,
+    mode_time_course_2)[0, 1]`.
 
     Parameters
     ----------
@@ -208,24 +215,30 @@ def correlate_modes(mode_time_course_1, mode_time_course_2):
     correlation_matrix : np.ndarray
         Correlation matrix. Shape is (n_modes, n_modes).
     """
-    correlation = np.zeros((mode_time_course_1.shape[1], mode_time_course_2.shape[1]))
+    correlation = np.zeros(
+        (mode_time_course_1.shape[1], mode_time_course_2.shape[1]),
+    )
     for i, mode1 in enumerate(mode_time_course_1.T):
         for j, mode2 in enumerate(mode_time_course_2.T):
             correlation[i, j] = np.corrcoef(mode1, mode2)[0, 1]
     return correlation
 
 
-def match_covariances(*covariances, comparison="rv_coefficient", return_order=False):
+def match_covariances(
+    *covariances,
+    comparison="rv_coefficient",
+    return_order=False,
+):
     """Matches covariances.
 
     Parameters
     ----------
     covariances : tuple of np.ndarray
-        Covariance matrices to match. Each covariance must be (n_modes, n_channel,
-        n_channels).
+        Covariance matrices to match. Each covariance must be (n_modes,
+        n_channel, n_channels).
     comparison : str, optional
-        Either :code:`'rv_coefficient'`, :code:`'correlation'` or :code:`'frobenius'`.
-        Default is :code:`'rv_coefficient'`.
+        Either :code:`'rv_coefficient'`, :code:`'correlation'` or
+        :code:`'frobenius'`. Default is :code:`'rv_coefficient'`.
     return_order : bool, optional
         Should we return the order instead of the covariances?
 
@@ -297,13 +310,13 @@ def match_covariances(*covariances, comparison="rv_coefficient", return_order=Fa
 def match_modes(*mode_time_courses, return_order=False):
     """Find correlated modes between mode time courses.
 
-    Given N mode time courses and using the first given mode time course as a basis,
-    find the best matches for modes between all of the mode time courses. Once found,
-    the mode time courses are returned with the modes reordered so that the modes
-    match.
+    Given N mode time courses and using the first given mode time course as a
+    basis, find the best matches for modes between all of the mode time courses.
+    Once found, the mode time courses are returned with the modes reordered so
+    that the modes match.
 
-    Given two arrays with columns ABCD and CBAD, both will be returned with modes in
-    the order ABCD.
+    Given two arrays with columns ABCD and CBAD, both will be returned with
+    modes in the order ABCD.
 
     Parameters
     ----------
@@ -330,7 +343,8 @@ def match_modes(*mode_time_courses, return_order=False):
     >>> print(orders[0])  # order for alp1 (always unchanged)
     >>> print(orders[1])  # order for alp2
     """
-    # If the mode time courses have different length we only use the first n_samples
+    # If the mode time courses have different length we only use the
+    # first n_samples
     n_samples = min([stc.shape[0] for stc in mode_time_courses])
 
     # Match time courses based on correlation
@@ -371,36 +385,39 @@ def reduce_state_time_course(state_time_course):
 
 def fractional_occupancies(state_time_course):
     """Wrapper for `analysis.modes.fractional_occupancies \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/\
-    modes/index.html#osl_dynamics.analysis.modes.fractional_occupancies>`_."""
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    .fractional_occupancies>`_."""
     return analysis.modes.fractional_occupancies(state_time_course)
 
 
 def mean_lifetimes(state_time_course, sampling_frequency=None):
     """Wrapper for `analysis.modes.mean_lifetimes \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/\
-    modes/index.html#osl_dynamics.analysis.modes.mean_lifetimes>`_."""
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes.mean_lifetimes>`_."""
     return analysis.modes.mean_lifetimes(state_time_course, sampling_frequency)
 
 
 def mean_intervals(state_time_course, sampling_frequency=None):
     """Wrapper for `analysis.modes.mean_intervals \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/\
-    modes/index.html#osl_dynamics.analysis.modes.mean_intervals>`_."""
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes.mean_intervals>`_."""
     return analysis.modes.mean_intervals(state_time_course, sampling_frequency)
 
 
 def switching_rates(state_time_course, sampling_frequency=None):
     """Wrapper for `analysis.modes.switching_rates \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/\
-    modes/index.html#osl_dynamics.analysis.modes.switching_rates>`_."""
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    .switching_rates>`_."""
     return analysis.modes.switching_rates(state_time_course, sampling_frequency)
 
 
 def mean_amplitudes(state_time_course, data):
     """Wrapper for `analysis.modes.mean_amplitudes \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/\
-    modes/index.html#osl_dynamics.analysis.modes.mean_amplitudes>`_."""
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    .mean_amplitudes>`_."""
     return analysis.modes.mean_amplitudes(state_time_course, data)
 
 
@@ -421,10 +438,11 @@ def convert_to_mne_raw(
     alpha : np.ndarray
         Time series containing raw data. Shape must be (n_samples, n_modes).
     raw : mne.io.Raw or str
-        Raw object to extract info from. If a :code:`str` is passed, it must be the
-        path to a fif file containing the Raw object.
+        Raw object to extract info from. If a :code:`str` is passed, it must
+        be the path to a fif file containing the Raw object.
     ch_names : list, optional
-        Name for each channel. Defaults to :code:`alpha_0, ..., alpha_{n_modes-1}`.
+        Name for each channel. Defaults to :code:`alpha_0, ...,
+        alpha_{n_modes-1}`.
     n_embeddings : int, optional
         Number of embeddings that was used to prepare time-delay embedded
         training data.
@@ -438,8 +456,8 @@ def convert_to_mne_raw(
     Returns
     -------
     alpha_raw : mne.io.Raw
-        `MNE Raw <https://mne.tools/stable/generated/mne.io.Raw.html>`_ object for
-        :code:`alpha`.
+        `MNE Raw <https://mne.tools/stable/generated/mne.io.Raw.html>`_ object
+        for :code:`alpha`.
     """
     # Validation
     if extra_chans is None:
@@ -481,7 +499,10 @@ def convert_to_mne_raw(
     if ch_names is None:
         ch_names = [f"alpha_{ch}" for ch in range(n_channels)]
     alpha_info = mne.create_info(
-        ch_names=ch_names, ch_types="misc", sfreq=raw.info["sfreq"], verbose=verbose
+        ch_names=ch_names,
+        ch_types="misc",
+        sfreq=raw.info["sfreq"],
+        verbose=verbose,
     )
 
     # Create Raw object
@@ -546,15 +567,17 @@ def reweight_alphas(alpha, covs):
 
 
 def average_runs(alpha, n_clusters=None, return_cluster_info=False):
-    """Average the state probabilities from different runs using hierarchical clustering.
+    """Average the state probabilities from different runs using hierarchical
+    clustering.
 
     Parameters
     ----------
     alpha : list of list of np.ndarray or list of np.ndarray
-        State probabilities. Shape must be (n_runs, n_subjects, n_samples, n_states)
-        or (n_runs, n_samples, n_states).
+        State probabilities. Shape must be (n_runs, n_subjects, n_samples,
+        n_states) or (n_runs, n_samples, n_states).
     n_clusters : int, optional
-        Number of clusters to fit. Defaults to the largest number of states in alpha.
+        Number of clusters to fit. Defaults to the largest number of states
+        in alpha.
     return_cluster_info : bool, optional
         Should we return information describing the clustering?
 
@@ -564,8 +587,8 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
         State probabilities averaged over runs. Shape is (n_subjects, n_states).
     cluster_info : dict
         Clustering info. Only returned if :code:`return_cluster_info=True`.
-        This is a dictionary with keys :code:`'correlation'`, :code:`'dissimiarity'`,
-        :code:`'ids'` and :code:`'linkage'`.
+        This is a dictionary with keys :code:`'correlation'`,
+        :code:`'dissimiarity'`, :code:`'ids'` and :code:`'linkage'`.
 
     See Also
     --------

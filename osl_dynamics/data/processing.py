@@ -186,5 +186,10 @@ def downsample(x, new_freq, old_freq):
             + f"frequency ({old_freq} Hz)."
         )
     ratio = old_freq / new_freq
-    X = mne.filter.resample(x.astype(np.float64), down=ratio, axis=0, verbose=False)
+    X = mne.filter.resample(
+        x.astype(np.float64),
+        down=ratio,
+        axis=0,
+        verbose=False,
+    )
     return X.astype(x.dtype)

@@ -88,8 +88,8 @@ def set_observation_model_parameter(
 def set_means_regularizer(model, training_dataset, layer_name="means"):
     """Set the means regularizer based on training data.
 
-    A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
-    :code:`sigma=diag((range/2)**2)`.
+    A multivariate normal prior is applied to the mean vectors with
+    :code:`mu=0`, :code:`sigma=diag((range/2)**2)`.
 
     Parameters
     ----------
@@ -98,7 +98,8 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     training_dataset : osl_dynamics.data.Data
         The training dataset.
     layer_name : str, optional
-        Layer name of the means. Can be :code:`"means"` or :code:`"group_means"`.
+        Layer name of the means. Can be :code:`"means"` or
+        :code:`"group_means"`.
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
@@ -108,7 +109,10 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
 
     means_layer = model.get_layer(layer_name)
     learnable_tensor_layer = means_layer.layers[0]
-    learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(mu, sigma)
+    learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(
+        mu,
+        sigma,
+    )
 
 
 def set_covariances_regularizer(
@@ -120,10 +124,10 @@ def set_covariances_regularizer(
 ):
     """Set the covariances regularizer based on training data.
 
-    If config.diagonal_covariances is True, a log-normal prior is applied to the
-    diagonal of the covariance matrices with :code:`mu=0`,
-    :code:`sigma=sqrt(log(2*range))`. Otherwise, an inverse Wishart prior is applied
-    to the covariance matrices with :code:`nu=n_channels-1+0.1`,
+    If config.diagonal_covariances is True, a log-normal prior is applied to
+    the diagonal of the covariance matrices with :code:`mu=0`,
+    :code:`sigma=sqrt(log(2*range))`. Otherwise, an inverse Wishart prior is
+    applied to the covariance matrices with :code:`nu=n_channels-1+0.1`,
     :code:`psi=diag(1/range)`.
 
     Parameters
@@ -137,7 +141,8 @@ def set_covariances_regularizer(
     diagonal : bool, optional
         Whether the covariances are diagonal.
     layer_name : str, optional
-        Layer name of the covariances. Can be :code:`"covs"` or :code:`"group_covs"`.
+        Layer name of the covariances. Can be :code:`"covs"` or
+        :code:`"group_covs"`.
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
@@ -147,7 +152,11 @@ def set_covariances_regularizer(
         mu = np.zeros([n_channels], dtype=np.float32)
         sigma = np.sqrt(np.log(2 * range_))
         learnable_tensor_layer = covs_layer.layers[0]
-        learnable_tensor_layer.regularizer = regularizers.LogNormal(mu, sigma, epsilon)
+        learnable_tensor_layer.regularizer = regularizers.LogNormal(
+            mu,
+            sigma,
+            epsilon,
+        )
 
     else:
         nu = n_channels - 1 + 0.1
@@ -181,7 +190,11 @@ def set_stds_regularizer(model, training_dataset, epsilon):
 
     stds_layer = model.get_layer("stds")
     learnable_tensor_layer = stds_layer.layers[0]
-    learnable_tensor_layer.regularizer = regularizers.LogNormal(mu, sigma, epsilon)
+    learnable_tensor_layer.regularizer = regularizers.LogNormal(
+        mu,
+        sigma,
+        epsilon,
+    )
 
 
 def set_fcs_regularizer(model, training_dataset, epsilon):
@@ -260,7 +273,8 @@ def get_covs_mode_embeddings(model):
     Returns
     -------
     covs_mode_embeddings : np.ndarray
-        The covariances mode embeddings. Shape is (n_modes, mode_embeddings_dim).
+        The covariances mode embeddings.
+        Shape is (n_modes, mode_embeddings_dim).
     """
     cholesky_bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
     group_covs = get_observation_model_parameter(model, "group_covs")
@@ -291,14 +305,14 @@ def get_concatenated_embeddings(model, map, subject_embeddings=None):
     map : str
         The map to use. Either :code:`"means"` or :code:`"covs"`.
     subject_embeddings : np.ndarray, optional
-        Input subject embeddings. If :code:`None`, they are retrieved from the model.
-        Shape is (n_subjects, subject_embeddings_dim).
+        Input subject embeddings. If :code:`None`, they are retrieved from
+        the model. Shape is (n_subjects, subject_embeddings_dim).
 
     Returns
     -------
     concat_embeddings : np.ndarray
-        The concatenated embeddings.
-        Shape is (n_subjects, n_modes, subject_embeddings_dim + mode_embeddings_dim).
+        The concatenated embeddings. Shape is (n_subjects, n_modes,
+        subject_embeddings_dim + mode_embeddings_dim).
     """
     if subject_embeddings is None:
         subject_embeddings = get_subject_embeddings(model)
@@ -426,8 +440,8 @@ def get_dev_map(model, map, subject_embeddings=None):
     map : str
         The map to use. Either :code:`"means"` or :code:`"covs"`.
     subject_embeddings : np.ndarray, optional
-        Input subject embeddings. If :code:`None`, they are retrieved from the model.
-        Shape is (n_subjects, subject_embeddings_dim).
+        Input subject embeddings. If :code:`None`, they are retrieved from
+        the model. Shape is (n_subjects, subject_embeddings_dim).
 
     Returns
     -------
@@ -437,7 +451,11 @@ def get_dev_map(model, map, subject_embeddings=None):
         If :code:`map="covs"`, shape is (n_subjects, n_modes,
         n_channels * (n_channels + 1) // 2).
     """
-    concat_embeddings = get_concatenated_embeddings(model, map, subject_embeddings)
+    concat_embeddings = get_concatenated_embeddings(
+        model,
+        map,
+        subject_embeddings,
+    )
     if map == "means":
         dev_map_input_layer = model.get_layer("means_dev_map_input")
         dev_map_layer = model.get_layer("means_dev_map")
@@ -455,7 +473,11 @@ def get_dev_map(model, map, subject_embeddings=None):
 
 
 def get_subject_dev(
-    model, learn_means, learn_covariances, subject_embeddings=None, n_neighbours=2
+    model,
+    learn_means,
+    learn_covariances,
+    subject_embeddings=None,
+    n_neighbours=2,
 ):
     """Get the subject deviation.
 
@@ -469,7 +491,8 @@ def get_subject_dev(
         Whether the covariances are learnt.
     subject_embeddings : np.ndarray, optional
         Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
-        If :code:`None`, then the subject embeddings are retrieved from the model.
+        If :code:`None`, then the subject embeddings are retrieved from the
+        model.
     n_neighbours : int, optional
         The number of nearest neighbours if :code:`subject_embedding` is not
         :code:`None`.
@@ -522,7 +545,11 @@ def get_subject_dev(
 
 
 def get_subject_means_covariances(
-    model, learn_means, learn_covariances, subject_embeddings=None, n_neighbours=2
+    model,
+    learn_means,
+    learn_covariances,
+    subject_embeddings=None,
+    n_neighbours=2,
 ):
     """Get the subject means and covariances.
 
@@ -578,7 +605,8 @@ def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
     Returns
     -------
     nearest_neighbours : np.ndarray
-        The indices of the nearest neighbours. Shape is (n_subjects, n_neighbours).
+        The indices of the nearest neighbours.
+        Shape is (n_subjects, n_neighbours).
     """
     model_subject_embeddings = get_subject_embeddings(model)
     distances = np.linalg.norm(

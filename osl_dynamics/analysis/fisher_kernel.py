@@ -18,8 +18,8 @@ class FisherKernel:
     Parameters
     ----------
     model : osl-dynamics model
-        Model. Currently only the :code:`HMM`, :code:`DyNeMo` and :code:`M-DyNeMo`
-        are implemented.
+        Model. Currently only the :code:`HMM`, :code:`DyNeMo` and
+        :code:`M-DyNeMo` are implemented.
     """
 
     def __init__(self, model):
@@ -53,7 +53,11 @@ class FisherKernel:
         if batch_size is not None:
             self.model.config.batch_size = batch_size
 
-        dataset = self.model.make_dataset(dataset, concatenate=False, shuffle=False)
+        dataset = self.model.make_dataset(
+            dataset,
+            concatenate=False,
+            shuffle=False,
+        )
 
         # Initialise list to hold subject features
         features = []
@@ -124,8 +128,8 @@ class FisherKernel:
         return kernel_matrix
 
     def _d_trans_prob(self, xi):
-        """Get the derivative of free energy with respect to the transition probability
-        in the HMM.
+        """Get the derivative of free energy with respect to the transition
+        probability in the HMM.
 
         Parameters
         ----------
@@ -135,8 +139,8 @@ class FisherKernel:
         Returns
         -------
         d_trans_prob : np.ndarray
-            Derivative of free energy with respect to the transition probability.
-            Shape is (n_states, n_states).
+            Derivative of free energy with respect to the transition
+            probability. Shape is (n_states, n_states).
         """
         trans_prob = self.model.trans_prob
         n_states = trans_prob.shape[0]
@@ -152,8 +156,8 @@ class FisherKernel:
         return d_trans_prob
 
     def _d_initial_distribution(self, gamma):
-        """Get the derivative of free energy with respect to the initial distribution
-        in HMM.
+        """Get the derivative of free energy with respect to the initial
+        distribution in HMM.
 
         Parameters
         ----------

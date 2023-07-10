@@ -113,8 +113,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
-        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
+        Value to clip gradients by. This is the :code:`clipnorm` argument
+        passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -263,7 +263,8 @@ class Model(DyNeMo):
         return best_history
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time course.
+        """Sets the initial means/covariances based on a random state time
+        course.
 
         Parameters
         ----------
@@ -312,7 +313,10 @@ class Model(DyNeMo):
 
 def _model_structure(config):
     # Layer for input
-    data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
+    data = layers.Input(
+        shape=(config.sequence_length, config.n_channels),
+        name="data",
+    )
 
     # Static loss scaling factor
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(

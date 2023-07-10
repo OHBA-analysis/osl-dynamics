@@ -1,7 +1,7 @@
 """Functions for running full pipelines via the config API.
 
-See the documentation `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
-/osl_dynamics/config_api/index.html>`_ for example usage.
+See the documentation `here <https://osl-dynamics.readthedocs.io/en/latest\
+/autoapi/osl_dynamics/config_api/index.html>`_ for example usage.
 """
 
 import argparse
@@ -159,7 +159,8 @@ def run_pipeline_from_file(config_file, output_directory, restrict=None):
 
 
 def osl_dynamics_cli():
-    """Command line interface function for running a pipeline from a config file."""
+    """Command line interface function for running a pipeline from a config
+    file."""
 
     # Arguments
     parser = argparse.ArgumentParser()

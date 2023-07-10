@@ -22,9 +22,10 @@ _logger = logging.getLogger("osl-dynamics")
 class Data:
     """Data Class.
 
-    The Data class enables the input and processing of data. When given a list of
-    files, it produces a set of numpy memory maps which contain their raw data.
-    It also provides methods for batching data and creating TensorFlow Datasets.
+    The Data class enables the input and processing of data. When given a list
+    of files, it produces a set of numpy memory maps which contain their raw
+    data. It also provides methods for batching data and creating TensorFlow
+    Datasets.
 
     See Also
     --------
@@ -36,36 +37,37 @@ class Data:
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
-        - A path to a directory containing :code:`.npy` files. Each :code:`.npy` file
-          should be a subject or session.
-        - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files. Each
-          file should be a subject or session. If a :code:`.fif` file is passed is
-          must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
+        - A path to a directory containing :code:`.npy` files. Each
+          :code:`.npy` file should be a subject or session.
+        - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files.
+          Each file should be a subject or session. If a :code:`.fif` file is
+          passed is must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
         - A numpy array. The array will be treated as continuous data from the
           same subject.
-        - A list of numpy arrays. Each numpy array should be the data for a subject
-          or session.
+        - A list of numpy arrays. Each numpy array should be the data for a
+          subject or session.
 
-        The data files or numpy arrays should be in the format (n_samples, n_channels).
-        If your data is in (n_channels, n_samples) format, use
+        The data files or numpy arrays should be in the format (n_samples,
+        n_channels). If your data is in (n_channels, n_samples) format, use
         :code:`time_axis_first=False`.
     data_field : str, optional
-        If a MATLAB (:code:`.mat`) file is passed, this is the field that corresponds
-        to the time series data. By default we read the field :code:`'X'`. If a numpy
-        (:code:`.npy`) or fif (:code:`.fif`) file is passed, this is ignored.
+        If a MATLAB (:code:`.mat`) file is passed, this is the field that
+        corresponds to the time series data. By default we read the field
+        :code:`'X'`. If a numpy (:code:`.npy`) or fif (:code:`.fif`) file is
+        passed, this is ignored.
     picks : str or list of str, optional
         Only used if a fif file is passed. We load the data using the
-        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io.Raw.html\
-        #mne.io.Raw.get_data>`_ method. We pass this argument to the
+        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io\
+        .Raw.html#mne.io.Raw.get_data>`_ method. We pass this argument to the
         :code:`Raw.get_data` method. By default :code:`picks=None` retrieves
         all channel types.
     reject_by_annotation : str, optional
         Only used if a fif file is passed. We load the data using the
-        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io.Raw.html\
-        #mne.io.Raw.get_data>`_ method. We pass this argument to the
-        :code:`Raw.get_data` method. By default :code:`reject_by_annotation=None`
-        retrieves all time points. Use :code:`reject_by_annotation="omit"` to
-        remove segments marked as bad.
+        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io\
+        .Raw.html#mne.io.Raw.get_data>`_ method. We pass this argument to the
+        :code:`Raw.get_data` method. By default
+        :code:`reject_by_annotation=None` retrieves all time points. Use
+        :code:`reject_by_annotation="omit"` to remove segments marked as bad.
     sampling_frequency : float, optional
         Sampling frequency of the data in Hz.
     mask_file : str, optional
@@ -77,13 +79,13 @@ class Data:
         disk and create memmaps (unless :code:`load_memmaps=False` is passed).
         This is the directory to save memmaps to. Default is :code:`./tmp`.
     time_axis_first : bool, optional
-        Is the input data of shape (n_samples, n_channels)? Default is :code:`True`.
-        If your data is in format (n_channels, n_samples), use
+        Is the input data of shape (n_samples, n_channels)? Default is
+        :code:`True`. If your data is in format (n_channels, n_samples), use
         :code:`time_axis_first=False`.
     load_memmaps : bool, optional
-        Should we load the data as memory maps (memmaps)? If :code:`False`, we will
-        load data into memory rather than storing it on disk. By default we will keep
-        the data on disk and use memmaps.
+        Should we load the data as memory maps (memmaps)? If :code:`False`, we
+        will load data into memory rather than storing it on disk. By default
+        we will keep the data on disk and use memmaps.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
         to less random shuffling but will be quicker. Default is 100000.
@@ -231,8 +233,8 @@ class Data:
         Parameters
         ----------
         buffer_size : int
-            Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-            to less random shuffling but will be quicker.
+            Buffer size for shuffling a TensorFlow Dataset. Smaller values will
+            lead to less random shuffling but will be quicker.
         """
         self.buffer_size = buffer_size
 
@@ -281,8 +283,8 @@ class Data:
             str(self.store_dir / raw_data_pattern.format(i=i))
             for i in range(len(self.inputs))
         ]
-        # self.raw_data_filenames is not used if self.inputs is a list of strings,
-        # where the strings are paths to .npy files
+        # self.raw_data_filenames is not used if self.inputs is a list of
+        # strings, where the strings are paths to .npy files
 
         # Load data
         memmaps = pqdm(
@@ -339,8 +341,8 @@ class Data:
         Parameters
         ----------
         low_freq : float, optional
-            Frequency in Hz for a high pass filter. If :code:`None`, no high pass
-            filtering is applied.
+            Frequency in Hz for a high pass filter. If :code:`None`, no high
+            pass filtering is applied.
         high_freq : float, optional
             Frequency in Hz for a low pass filter. If :code:`None`, no low pass
             filtering is applied.
@@ -358,9 +360,10 @@ class Data:
 
         if self.sampling_frequency is None:
             raise ValueError(
-                "Data.sampling_frequency must be set if we are filtering the data. "
-                + "Use Data.set_sampling_frequency() or pass "
-                + "Data(..., sampling_frequency=...) when creating the Data object."
+                "Data.sampling_frequency must be set if we are filtering the "
+                "data. Use Data.set_sampling_frequency() or pass "
+                "Data(..., sampling_frequency=...) when creating the Data "
+                "object."
             )
 
         self.low_freq = low_freq
@@ -414,9 +417,10 @@ class Data:
         """
         if self.sampling_frequency is None:
             raise ValueError(
-                "Data.sampling_frequency must be set if we are downsampling the data. "
-                + "Use Data.set_sampling_frequency() or pass "
-                + "Data(..., sampling_frequency=...) when creating the Data object."
+                "Data.sampling_frequency must be set if we are filtering the "
+                "data. Use Data.set_sampling_frequency() or pass "
+                "Data(..., sampling_frequency=...) when creating the Data "
+                "object."
             )
 
         if use_raw and hasattr(self, "original_sampling_frequency"):
@@ -456,7 +460,11 @@ class Data:
         return self
 
     def pca(
-        self, n_pca_components=None, pca_components=None, whiten=False, use_raw=False
+        self,
+        n_pca_components=None,
+        pca_components=None,
+        whiten=False,
+        use_raw=False,
     ):
         """Principal component analysis (PCA).
 
@@ -599,9 +607,10 @@ class Data:
     ):
         """Time-delay embedding (TDE) and principal component analysis (PCA).
 
-        This function will first standardize the data, then perform TDE then PCA.
-        It is useful to do both operations in a single methods because it avoids
-        having to save the time-embedded data. This is an in-place operation.
+        This function will first standardize the data, then perform TDE then
+        PCA. It is useful to do both operations in a single methods because
+        it avoids having to save the time-embedded data. This is an in-place
+        operation.
 
         Parameters
         ----------
@@ -812,8 +821,8 @@ class Data:
         Parameters
         ----------
         methods : dict
-            Each key is the name of a method to call. Each value is a :code:`dict`
-            containing keyword arguments to pass to the method.
+            Each key is the name of a method to call. Each value is a
+            :code:`dict` containing keyword arguments to pass to the method.
 
         Returns
         -------
@@ -942,7 +951,8 @@ class Data:
         sequence_length : int
             Length of the segement of data to feed into the model.
         step_size : int
-            The number of samples by which to move the sliding window between sequences.
+            The number of samples by which to move the sliding window between
+            sequences.
 
         Returns
         -------
@@ -973,7 +983,8 @@ class Data:
         sequence_length : int
             Length of the segement of data to feed into the model.
         batch_size : int
-            Number sequences in each mini-batch which is used to train the model.
+            Number sequences in each mini-batch which is used to train the
+            model.
         shuffle : bool
             Should we shuffle sequences (within a batch) and batches.
         validation_split : float
@@ -981,8 +992,8 @@ class Data:
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
         subj_id : bool, optional
-            Should we include the subject id in the dataset? This argument can be
-            used to prepare datasets for subject-specific models.
+            Should we include the subject id in the dataset? This argument can
+            be used to prepare datasets for subject-specific models.
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
@@ -990,8 +1001,8 @@ class Data:
         Returns
         -------
         dataset : tf.data.Dataset or tuple
-            Dataset for training or evaluating the model along with the validation
-            set if :code:`validation_split` was passed.
+            Dataset for training or evaluating the model along with the
+            validation set if :code:`validation_split` was passed.
         """
         self.sequence_length = sequence_length
         self.batch_size = batch_size
@@ -1005,7 +1016,8 @@ class Data:
                 # We don't want to include this file in the dataset
                 continue
 
-            # Get time series data and ensure an integer multiple of sequence length
+            # Get time series data and ensure an integer multiple of sequence
+            # length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             if subj_id:
@@ -1056,7 +1068,8 @@ class Data:
                 validation_dataset = full_dataset.skip(training_dataset_size)
                 _logger.info(
                     f"{len(training_dataset)} batches in training dataset, "
-                    + f"{len(validation_dataset)} batches in the validation dataset."
+                    + f"{len(validation_dataset)} batches in the validation "
+                    + "dataset."
                 )
 
                 return training_dataset.prefetch(-1), validation_dataset.prefetch(-1)
@@ -1114,7 +1127,8 @@ class Data:
         Parameters
         ----------
         output_dir : str
-            Path to save data files to. Default is the current working directory.
+            Path to save data files to. Default is the current working
+            directory.
         """
         attributes = list(self.__dict__.keys())
         dont_keep = [
@@ -1150,7 +1164,8 @@ class Data:
         Parameters
         ----------
         inputs : str
-            Path to directory containing the pickle file with preparation settings.
+            Path to directory containing the pickle file with preparation
+            settings.
         """
         if path.isdir(inputs):
             for file in rw.list_dir(inputs):
@@ -1166,7 +1181,8 @@ class Data:
         Parameters
         ----------
         output_dir : str
-            Path to save data files to. Default is the current working directory.
+            Path to save data files to. Default is the current working
+            directory.
         """
         # Create output directory
         output_dir = pathlib.Path(output_dir)

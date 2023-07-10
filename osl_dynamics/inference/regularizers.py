@@ -32,7 +32,9 @@ class InverseWishart(regularizers.Regularizer):
         self.psi = psi
         self.epsilon = epsilon
         self.n_channels = psi.shape[-1]
-        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+        self.bijector = tfb.Chain(
+            [tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()],
+        )
 
         # Validation
         if not self.nu > self.n_channels - 1:
@@ -108,7 +110,8 @@ class MultivariateNormal(regularizers.Regularizer):
             tf.matmul(
                 tf.expand_dims(vectors, -2),
                 tf.matmul(
-                    tf.expand_dims(self.inv_sigma, 0), tf.expand_dims(vectors, -1)
+                    tf.expand_dims(self.inv_sigma, 0),
+                    tf.expand_dims(vectors, -1),
                 ),
             )
         )

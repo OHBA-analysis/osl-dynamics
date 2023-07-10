@@ -74,13 +74,13 @@ def evoked_response_max_stat_perm(
     Parameters
     ----------
     data : np.ndarray
-        Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape (n_subjects, n_samples, ...).
+        Baseline corrected evoked responses. This will be the target data for
+        the GLM. Must be shape (n_subjects, n_samples, ...).
     n_perm : int
         Number of permutations.
     covariates : dict, optional
-        Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
-        Must be of shape (n_subjects,).
+        Covariates (extra regressors) to add to the GLM fit. These will be
+        z-transformed. Must be of shape (n_subjects,).
     metric : str, optional
         Metric to use to build the null distribution. Can be :code:`'tstats'` or
         :code:`'copes'`.
@@ -117,7 +117,12 @@ def evoked_response_max_stat_perm(
     # Create design matrix
     DC = glm.design.DesignConfig()
     for name in covariates:
-        DC.add_regressor(name=name, rtype="Parametric", datainfo=name, preproc="z")
+        DC.add_regressor(
+            name=name,
+            rtype="Parametric",
+            datainfo=name,
+            preproc="z",
+        )
     DC.add_regressor(name="Mean", rtype="Constant")
     DC.add_contrast(name="Mean", values=[1] + [0] * len(covariates))
     design = DC.design_from_datainfo(data.info)
@@ -173,8 +178,8 @@ def group_diff_max_stat_perm(
     Parameters
     ----------
     data : np.ndarray
-        Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape (n_subjects, features1, features2, ...).
+        Baseline corrected evoked responses. This will be the target data for
+        the GLM. Must be shape (n_subjects, features1, features2, ...).
     assignments : np.ndarray
         1D numpy array containing group assignments. A value of 1 indicates
         Group1 and a value of 2 indicates Group2. Note, we test the contrast
@@ -182,8 +187,8 @@ def group_diff_max_stat_perm(
     n_perm : int
         Number of permutations.
     covariates : dict, optional
-        Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
-        Must be of shape (n_subjects,).
+        Covariates (extra regressors) to add to the GLM fit. These will be
+        z-transformed. Must be of shape (n_subjects,).
     metric : str, optional
         Metric to use to build the null distribution. Can be :code:`'tstats'` or
         :code:`'copes'`.
@@ -210,7 +215,11 @@ def group_diff_max_stat_perm(
     if metric not in ["tstats", "copes"]:
         raise ValueError("metric must be 'tstats' or 'copes'.")
 
-    data, covariates, assignments = _check_glm_data(data, covariates, assignments)
+    data, covariates, assignments = _check_glm_data(
+        data,
+        covariates,
+        assignments,
+    )
 
     # Calculate group difference
     group1_mean = np.mean(data[assignments == 1], axis=0)
@@ -230,7 +239,12 @@ def group_diff_max_stat_perm(
     DC.add_regressor(name="Group1", rtype="Categorical", codes=1)
     DC.add_regressor(name="Group2", rtype="Categorical", codes=2)
     for name in covariates:
-        DC.add_regressor(name=name, rtype="Parametric", datainfo=name, preproc="z")
+        DC.add_regressor(
+            name=name,
+            rtype="Parametric",
+            datainfo=name,
+            preproc="z",
+        )
     DC.add_contrast(name="GroupDiff", values=[1, -1] + [0] * len(covariates))
     design = DC.design_from_datainfo(data.info)
 

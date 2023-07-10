@@ -164,13 +164,13 @@ class ModelBase:
         args : arguments
             Arguments for :code:`keras.Model.fit()`.
         use_tqdm : bool, optional
-            Should we use a :code:`tqdm` progress bar instead of the usual output from
-            tensorflow.
+            Should we use a :code:`tqdm` progress bar instead of the usual
+            output from tensorflow.
         tqdm_class : TqdmCallback, optional
             Class for the :code:`tqdm` progress bar.
         save_best_after : int, optional
-            Epoch number after which we should save the best model. The best model is
-            that which achieves the lowest loss.
+            Epoch number after which we should save the best model. The best
+            model is that which achieves the lowest loss.
         save_filepath : str, optional
             Path to save the best model to.
         additional_callbacks : list, optional
@@ -183,8 +183,8 @@ class ModelBase:
         history : history
             The training history.
         """
-        # If a osl_dynamics.data.Data object has been passed for the x arguments,
-        # replace it with a tensorflow dataset
+        # If a osl_dynamics.data.Data object has been passed for the x
+        # arguments, replace it with a tensorflow dataset
         x = get_argument(self.model.fit, "x", args, kwargs)
         x = self.make_dataset(x, shuffle=True, concatenate=True)
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
@@ -231,9 +231,16 @@ class ModelBase:
             append=True,
         )
         if use_tqdm:
-            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "verbose",
+                0,
+                args,
+                kwargs,
+            )
 
-        # Set the scaling factor for losses that are associated with static quantities
+        # Set the scaling factor for losses that are associated with static
+        # quantities
         self.set_static_loss_scaling_factor(x)
 
         history = self.model.fit(*args, **kwargs)
@@ -260,15 +267,20 @@ class ModelBase:
         self.compile()
 
     def make_dataset(
-        self, inputs, shuffle=False, concatenate=False, subj_id=False, step_size=None
+        self,
+        inputs,
+        shuffle=False,
+        concatenate=False,
+        subj_id=False,
+        step_size=None,
     ):
         """Converts a Data object into a TensorFlow Dataset.
 
         Parameters
         ----------
         inputs : osl_dynamics.data.Data or str or np.ndarray
-            Data object. If a :code:`str` or :np.ndarray: is passed this function
-            will first convert it into a Data object.
+            Data object. If a :code:`str` or :np.ndarray: is passed this
+            function will first convert it into a Data object.
         shuffle : bool, optional
             Should we shuffle the data?
         concatenate : bool, optional
@@ -308,7 +320,12 @@ class ModelBase:
 
         return outputs
 
-    def get_training_time_series(self, training_data, prepared=True, concatenate=False):
+    def get_training_time_series(
+        self,
+        training_data,
+        prepared=True,
+        concatenate=False,
+    ):
         """Get the time series used for training from a Data object.
 
         Parameters
@@ -326,14 +343,16 @@ class ModelBase:
             Training data time series.
         """
         return training_data.trim_time_series(
-            self.config.sequence_length, prepared=prepared, concatenate=concatenate
+            self.config.sequence_length,
+            prepared=prepared,
+            concatenate=concatenate,
         )
 
     def summary_string(self):
         """Return a summary of the model as a string.
 
-        This is a modified version of the :code:`keras.Model.summary()` method which
-        makes the output easier to parse.
+        This is a modified version of the :code:`keras.Model.summary()` method
+        which makes the output easier to parse.
         """
         stringio = StringIO()
         self.model.summary(
@@ -428,12 +447,14 @@ class ModelBase:
     def save(self, dirname):
         """Saves config object and weights of the model.
 
-        This is a wrapper for :code:`self.save_config` and :code:`self.save_weights`.
+        This is a wrapper for :code:`self.save_config` and
+        :code:`self.save_weights`.
 
         Parameters
         ----------
         dirname : str
-            Directory to save the :code:`config` object and weights of the model.
+            Directory to save the :code:`config` object and weights of
+            the model.
         """
         self.save_config(dirname)
         self.save_weights(
@@ -451,15 +472,17 @@ class ModelBase:
 
         Note
         ----
-        This assumes every model has a layer called :code:`"static_loss_scaling_factor"`,
-        with an attribure called :code:`"n_batches"`.
+        This assumes every model has a layer called
+        :code:`"static_loss_scaling_factor"`, with an attribure called
+        :code:`"n_batches"`.
         """
         n_batches = dtf.get_n_batches(dataset)
         self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     @contextmanager
     def set_trainable(self, layers, values):
-        """Context manager to temporarily set the :code:`trainable` attribute of layers.
+        """Context manager to temporarily set the :code:`trainable`
+        attribute of layers.
 
         Parameters
         ----------
@@ -511,7 +534,8 @@ class ModelBase:
         Returns
         -------
         config : dict
-            Dictionary containing values used to create the :code:`config` object.
+            Dictionary containing values used to create the :code:`config`
+            object.
         version : str
             Version used to train the model.
         """

@@ -42,7 +42,8 @@ class Config(BaseModelConfig):
     n_channels : int
         Number of channels.
     sequence_length : int
-        Length of sequence passed to the inference, generative and discriminator network.
+        Length of sequence passed to the inference, generative and
+        discriminator network.
     inference_rnn : str
         RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
@@ -188,8 +189,8 @@ class Model(ModelBase):
     config_type = Config
 
     def build_model(self):
-        """Builds a keras model for the inference, generator and discriminator model
-        and the full SAGE model.
+        """Builds a keras model for the inference, generator and discriminator
+        model and the full SAGE model.
         """
         _logger.info("Build models")
         self.inference_model = _build_inference_model(self.config)
@@ -203,12 +204,17 @@ class Model(ModelBase):
         print()
 
         data = layers.Input(
-            shape=(self.config.sequence_length, self.config.n_channels), name="data"
+            shape=(self.config.sequence_length, self.config.n_channels),
+            name="data",
         )
         C_m, alpha_posterior = self.inference_model(data)
         alpha_prior = self.generator_model(alpha_posterior)
         discriminator_output_prior = self.discriminator_model(alpha_prior)
-        self.model = models.Model(data, [C_m, discriminator_output_prior], name="SAGE")
+        self.model = models.Model(
+            data,
+            [C_m, discriminator_output_prior],
+            name="SAGE",
+        )
         self.model.summary()
         print()
 
@@ -223,8 +229,8 @@ class Model(ModelBase):
         self.discriminator_model.trainable = False
 
         # Reconstruction (Likelihood) loss:
-        # The first loss corresponds to the likelihood - this tells us how well we
-        # are explaining our data according to the current estimate of the
+        # The first loss corresponds to the likelihood - this tells us how well
+        # we are explaining our data according to the current estimate of the
         # generative model, and is given by:
         # L = \sum_{t=1}^{T} log p(Y_t | \theta_t^m = \mu^{m,\theta}_t,
         #                                \theta_t^c = \mu^{c,\theta}_t)
@@ -234,9 +240,9 @@ class Model(ModelBase):
 
         # Regularization (Prior) Loss:
         # The second loss regularises the estimate of the latent, time-varying
-        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this penalises
-        # when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the
-        # prior:
+        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this
+        # penalises when the posterior estimates of [$\theta^m$, $\theta^c$]
+        # deviate from the prior:
         # R = \sum_{t=1}^{T} [
         #     CrossEntropy(\mu^{m,\theta}_t|| \hat{\mu}^{m,\theta}_{t})
         #     + CrossEntropy(\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})
@@ -263,7 +269,8 @@ class Model(ModelBase):
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         epochs : int, optional
-            Number of epochs to train. Defaults to value in :code:`config` if not passed.
+            Number of epochs to train. Defaults to value in :code:`config`
+            if not passed.
         verbose : int, optional
             Should we print a progress bar?
 
@@ -276,7 +283,11 @@ class Model(ModelBase):
             epochs = self.config.n_epochs
 
         # Make sure training data is a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+        training_data = self.make_dataset(
+            training_data,
+            shuffle=True,
+            concatenate=True,
+        )
 
         # Path to save the best model weights
         timestr = time.strftime("%Y%m%d-%H%M%S")  # current date-time
@@ -300,7 +311,10 @@ class Model(ModelBase):
                 alpha_prior = self.generator_model.predict_on_batch(alpha_posterior)
 
                 # Train discriminator, inference and generator model
-                discriminator_loss = train_discriminator(alpha_posterior, alpha_prior)
+                discriminator_loss = train_discriminator(
+                    alpha_posterior,
+                    alpha_prior,
+                )
                 generator_loss = self.model.train_on_batch(batch, [batch, real])
 
                 if verbose:
@@ -376,7 +390,10 @@ class Model(ModelBase):
         means : np.ndarray
             Mode means. Shape (n_modes, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.inference_model, "means")
+        return obs_mod.get_observation_model_parameter(
+            self.inference_model,
+            "means",
+        )
 
     def get_covariances(self):
         """Get the mode covariances.
@@ -386,7 +403,10 @@ class Model(ModelBase):
         covariances : np.ndarary
             Mode covariances. Shape (n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.inference_model, "covs")
+        return obs_mod.get_observation_model_parameter(
+            self.inference_model,
+            "covs",
+        )
 
     def get_means_covariances(self):
         """Get the mode means and covariances.
@@ -431,7 +451,8 @@ class Model(ModelBase):
         covariances : np.ndarray
             Mode covariances. Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed covariances when we re-initialize the model?
+            Do we want to use the passed covariances when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -441,8 +462,14 @@ class Model(ModelBase):
             diagonal_covariances=self.config.diagonal_covariances,
         )
 
-    def set_means_covariances(self, means, covariances, update_initializer=True):
-        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """This is a wrapper for :code:`set_means` and
+        :code:`set_covariances`."""
         self.set_means(
             means,
             update_initializer=update_initializer,
@@ -476,7 +503,10 @@ class Model(ModelBase):
             Predicted :code:`alpha`.
         """
         n_samples = np.shape(alpha)[0]
-        alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        alpha_sampled = np.empty(
+            [n_samples, self.config.n_modes],
+            dtype=np.float32,
+        )
 
         for i in trange(
             n_samples - self.config.sequence_length,
@@ -533,8 +563,8 @@ def _build_inference_model(config):
     alpha = alpha_layer(theta)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each mode as the observation model.
+    # - We use a multivariate normal with a mean vector and covariance matrix
+    #   for each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
@@ -599,7 +629,8 @@ def _build_generator_model(config):
         name="gen_rnn",
     )
     prior_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), name="gen_softmax_alpha"
+        layers.Dense(config.n_modes, activation="softmax"),
+        name="gen_softmax_alpha",
     )
 
     # Data flow
@@ -612,11 +643,18 @@ def _build_generator_model(config):
 
 def _build_discriminator_model(config):
     # Descriminator RNN:
-    #   D_theta^m_t = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t), zeta(mu^{m,theta}_t)],omega^m_d), \lambda_d^m))
-    #   D_theta^c_t = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t), zeta(mu^{c,theta}_t)],omega^c_d), \lambda_d^c))
+    #   D_theta^m_t = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t),
+    #                                zeta(mu^{m,theta}_t)],omega^m_d),
+    #                         \lambda_d^m))
+    #   D_theta^c_t = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t),
+    #                                zeta(mu^{c,theta}_t)],omega^c_d),
+    #                        \lambda_d^c))
 
     # Definition of layers
-    inputs = layers.Input(shape=(config.sequence_length, config.n_modes), name="data")
+    inputs = layers.Input(
+        shape=(config.sequence_length, config.n_modes),
+        name="data",
+    )
     drop_layer = layers.TimeDistributed(
         layers.Dropout(config.model_dropout, name="dis_data_drop")
     )

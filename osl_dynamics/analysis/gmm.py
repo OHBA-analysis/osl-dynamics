@@ -39,21 +39,23 @@ def fit_gaussian_mixture(
     standardize : bool, optional
         Should we standardize :code:`X`?
     p_value : float, optional
-        Used to determine a threshold. We ensure the data points assigned to the
-        'on' component have a probability of less than :code:`p_value` of belonging
-        to the 'off' component.
+        Used to determine a threshold. We ensure the data points assigned to
+        the 'on' component have a probability of less than :code:`p_value` of
+        belonging to the 'off' component.
     one_component_percentile : float, optional
-        Percentile threshold if only one component is found. Should be a between 0 and
-        100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
+        Percentile threshold if only one component is found. Should be between
+        0 and 100. E.g. for the 95th percentile,
+        :code:`one_component_percentile=95`.
     n_sigma : float, optional
-        Number of standard deviations of the 'off' component the mean of the 'on'
-        component must be for the fit to be considered to have two components.
+        Number of standard deviations of the 'off' component the mean of the
+        'on' component must be for the fit to be considered to have two
+        components.
     label_order: str, optional
         How do we order the inferred classes?
     sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
-        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable/modules\
-        /generated/sklearn.mixture.GaussianMixture.html>`_.
+        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
+        /modules/generated/sklearn.mixture.GaussianMixture.html>`_.
     return_statistics: bool, optional
         Should we return statistics of the Gaussian mixture components?
     show_plot : bool, optional
@@ -62,8 +64,8 @@ def fit_gaussian_mixture(
         Filename to save a plot of the Gaussian mixture model.
     plot_kwargs : dict, optional
         Keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
-        /plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_
         Only used if :code:`plot_filename` is not :code:`None`.
     log_message : bool
         Should we log a message?
@@ -142,12 +144,13 @@ def fit_gaussian_mixture(
         index = one_component_percentile * len(X) // 100
 
     elif p_value is not None:
-        # We decide the threshold based on the probability of a data point belonging
-        # to the 'off' component. We assign a data point to the 'on' component if
-        # its probability of belonging to the 'off' component is less than the p_value
+        # We decide the threshold based on the probability of a data point
+        # belonging to the 'off' component. We assign a data point to the 'on'
+        # component if its probability of belonging to the 'off' component is
+        # less than the p_value
 
-        # Calculate the probability of each data point belonging to each component
-        # The variable 'a' is the 'activation'
+        # Calculate the probability of each data point belonging to each
+        # component. The variable 'a' is the 'activation'
         dX = max(X_) / 100
         x = np.arange(means[0], max(X_) + dX, dX)
         a = np.array(
@@ -161,7 +164,8 @@ def fit_gaussian_mixture(
         index = np.argmin(np.abs(X_[:, 0] - x_threshold))
 
     else:
-        # Calculate the probability of each data point belonging to each component
+        # Calculate the probability of each data point belonging to each
+        # component
         ascending = np.argsort(X_[:, 0])
         X_ = X_[ascending]
         X = X[ascending]

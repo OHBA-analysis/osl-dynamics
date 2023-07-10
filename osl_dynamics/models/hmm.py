@@ -1,12 +1,16 @@
 """Hidden Markov Model (HMM).
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models/hmm.html\
->`_ for a description of this model.
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
+/hmm.html>`_ for a description of this model.
 
 See Also
 --------
-- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in electrophysiological data". `Neuroimage 126, 81-95 (2016) <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
-- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in rest and task". `Neuroimage 180, 646-656 (2018) <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
+- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
+  electrophysiological data". `Neuroimage 126, 81-95 (2016)
+  <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
+- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in
+  rest and task". `Neuroimage 180, 646-656 (2018)
+  <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
 - `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
@@ -69,8 +73,9 @@ class Config(BaseModelConfig):
     initial_means : np.ndarray
         Initialisation for state means.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. If :code:`diagonal_covariances=True`
-        and full matrices are passed, the diagonal is extracted.
+        Initialisation for state covariances. If
+        :code:`diagonal_covariances=True` and full matrices are passed,
+        the diagonal is extracted.
     diagonal_covariances : bool
         Should we learn diagonal covariances?
     covariances_epsilon : float
@@ -88,17 +93,20 @@ class Config(BaseModelConfig):
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
-        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget`. This is the delay parameter.
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the delay parameter.
     trans_prob_update_forget : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
-        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget`. This is the forget parameter.
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the forget parameter.
     observation_update_decay : float
         Decay rate for the learning rate of the observation model.
         We update the learning rate (:code:`lr`) as
-        :code:`lr = config.learning_rate * exp(-observation_update_decay * epoch)`.
+        :code:`lr = config.learning_rate * exp(-observation_update_decay *
+        epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -254,7 +262,10 @@ class Model(ModelBase):
                     if use_tqdm:
                         _range.set_postfix(rho=self.rho, lr=lr, loss=l)
                     else:
-                        pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
+                        pb_i.add(
+                            1,
+                            values=[("rho", self.rho), ("lr", lr), ("loss", l)],
+                        )
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
@@ -419,9 +430,9 @@ class Model(ModelBase):
             Marginal posterior distribution of hidden states given the data,
             :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time
-            points, :math:`q(s_t, s_{t+1})`. Shape is (batch_size*sequence_length-1,
-            n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
         """
 
         # Use Baum-Welch algorithm to calculate gamma, xi
@@ -534,8 +545,9 @@ class Model(ModelBase):
             log_likelihood[state] = mvn.log_prob(x)
         log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
 
-        # We add a constant to the log-likelihood for time points where all states
-        # have a negative log-likelihood. This is critical for numerical stability.
+        # We add a constant to the log-likelihood for time points where all
+        # states have a negative log-likelihood. This is critical for numerical
+        # stability.
         time_points_with_all_states_negative = np.all(log_likelihood < 0, axis=0)
         if np.any(time_points_with_all_states_negative):
             log_likelihood[:, time_points_with_all_states_negative] -= np.max(
@@ -558,8 +570,8 @@ class Model(ModelBase):
             time points, :math:`q(s_t, s_{t+1})`. Shape is
             (batch_size*sequence_length-1, n_states*n_states).
         """
-        # Calculate the new transition probability matrix using the posterior from
-        # the Baum-Welch algorithm:
+        # Calculate the new transition probability matrix using the posterior
+        # from the Baum-Welch algorithm:
         #
         # p(s_t+1 | s_t) = E{q(s_t, s_t+1)} / E{q(s_t)}
         #                = sum^{T-1}_{t=1} xi(t, t+1) / sum^{T-1}_{t=1} gamma(t)
@@ -569,7 +581,8 @@ class Model(ModelBase):
             self.config.n_states, self.config.n_states
         ).T / np.sum(gamma[:-1], axis=0).reshape(self.config.n_states, 1)
 
-        # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
+        # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the
+        # paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
         self.trans_prob = (1 - self.rho) * self.trans_prob + self.rho * phi_interim
 
@@ -598,7 +611,8 @@ class Model(ModelBase):
             E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
 
               &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \
-                 \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \displaystyle\sum_{t=2}^{T-1} \
+                 \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \
+                 \displaystyle\sum_{t=2}^{T-1} \
                  \int q(s_t) \log q(s_t) ds_t
 
         Parameters
@@ -616,7 +630,8 @@ class Model(ModelBase):
         entropy : float
             Entropy.
         """
-        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1) log(q(s_t, s_t+1)) ds_t ds_t+1
+        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
+        # log(q(s_t, s_t+1)) ds_t ds_t+1
         first_term = np.sum(xlogy(xi, xi))
 
         # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
@@ -702,13 +717,14 @@ class Model(ModelBase):
         """Predict step for calculating the evidence.
 
         .. math::
-            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) \
-                                                       p(s_{t-1} = i | x_{1:t-1})
+            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i)\
+                                                     p(s_{t-1} = i | x_{1:t-1})
 
         Parameters
         ----------
         log_smoothing_distribution : np.ndarray
-            :math:`\log p(s_{t-1} | x_{1:t-1})`. Shape is (batch_size, n_states).
+            :math:`\log p(s_{t-1} | x_{1:t-1})`.
+            Shape is (batch_size, n_states).
 
         Returns
         -------
@@ -716,7 +732,10 @@ class Model(ModelBase):
             :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
         """
         log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
-        log_smoothing_distribution = np.expand_dims(log_smoothing_distribution, -1)
+        log_smoothing_distribution = np.expand_dims(
+            log_smoothing_distribution,
+            axis=-1,
+        )
         log_prediction_distribution = logsumexp(
             log_trans_prob + log_smoothing_distribution, -2
         )
@@ -754,7 +773,12 @@ class Model(ModelBase):
         log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
         return log_likelihood.numpy()
 
-    def _evidence_update_step(self, data, log_prediction_distribution, subj_id=None):
+    def _evidence_update_step(
+        self,
+        data,
+        log_prediction_distribution,
+        subj_id=None,
+    ):
         """Update step for calculating the evidence.
 
         .. math::
@@ -786,7 +810,10 @@ class Model(ModelBase):
         predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
 
         # Normalise the log smoothing distribution
-        log_smoothing_distribution -= np.expand_dims(predictive_log_likelihood, -1)
+        log_smoothing_distribution -= np.expand_dims(
+            predictive_log_likelihood,
+            axis=-1,
+        )
         return log_smoothing_distribution, predictive_log_likelihood
 
     def get_stationary_distribution(self):
@@ -881,7 +908,10 @@ class Model(ModelBase):
             Do we want to use the passed means when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
-            self.model, means, layer_name="means", update_initializer=update_initializer
+            self.model,
+            means,
+            layer_name="means",
+            update_initializer=update_initializer,
         )
 
     def set_covariances(self, covariances, update_initializer=True):
@@ -892,7 +922,8 @@ class Model(ModelBase):
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed covariances when we re-initialize the model?
+            Do we want to use the passed covariances when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model,
@@ -902,8 +933,14 @@ class Model(ModelBase):
             diagonal_covariances=self.config.diagonal_covariances,
         )
 
-    def set_means_covariances(self, means, covariances, update_initializer=True):
-        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """This is a wrapper for :code:`set_means` and
+        :code:`set_covariances`."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_covariances(covariances, update_initializer=update_initializer)
 
@@ -948,7 +985,8 @@ class Model(ModelBase):
         self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time course.
+        """Sets the initial means/covariances based on a random state time
+        course.
 
         Parameters
         ----------
@@ -1005,11 +1043,12 @@ class Model(ModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
-        :code:`sigma=diag((range/2)**2)`. If :code:`config.diagonal_covariances=True`,
-        a log normal prior is applied to the diagonal of the covariances matrices with
-        :code:`mu=0`, :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart
-        prior is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
+        :code:`config.diagonal_covariances=True`, a log normal prior is applied
+        to the diagonal of the covariances matrices with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior is
+        applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
         and :code:`psi=diag(1/range)`.
 
         Parameters
@@ -1037,7 +1076,8 @@ class Model(ModelBase):
 
         .. math::
             \mathcal{F} = \int q(s_{1:T}) \log \left[ \
-                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] \
+                          ds_{1:T}
 
         Parameters
         ----------
@@ -1138,7 +1178,8 @@ class Model(ModelBase):
         Parameters
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
+            Prediction dataset. This can be a list of datasets, one for
+            each subject.
         concatenate : bool, optional
             Should we concatenate alpha for each subject?
 
@@ -1168,7 +1209,8 @@ class Model(ModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the transition probabiltity matrix, state means and covariances.
+        This includes the transition probabiltity matrix, state means and
+        covariances.
 
         Returns
         -------
@@ -1303,9 +1345,10 @@ class Model(ModelBase):
     ):
         """Dual estimation to get subject-specific observation model parameters.
 
-        Here, we estimate the state means and covariances for individual subjects
-        with the rest of the model held fixed at the best parameters (posterior
-        distribution and transition probability) estimated at the group-level.
+        Here, we estimate the state means and covariances for individual
+        subjects with the rest of the model held fixed at the best parameters
+        (posterior distribution and transition probability) estimated at the
+        group-level.
 
         Parameters
         ----------
@@ -1342,7 +1385,11 @@ class Model(ModelBase):
         self.compile()
 
         # Create a TensorFlow Dataset
-        dataset = self.make_dataset(training_data, shuffle=True, concatenate=False)
+        dataset = self.make_dataset(
+            training_data,
+            shuffle=True,
+            concatenate=False,
+        )
 
         # Perform dual estimation
         means = []
@@ -1378,7 +1425,12 @@ class Model(ModelBase):
 
         return np.array(means), np.array(covariances)
 
-    def get_training_time_series(self, training_data, prepared=True, concatenate=False):
+    def get_training_time_series(
+        self,
+        training_data,
+        prepared=True,
+        concatenate=False,
+    ):
         """Get the time series used for training from a Data object.
 
         Parameters
@@ -1396,7 +1448,9 @@ class Model(ModelBase):
             Training data time series.
         """
         return training_data.trim_time_series(
-            self.config.sequence_length, prepared=prepared, concatenate=concatenate
+            self.config.sequence_length,
+            prepared=prepared,
+            concatenate=concatenate,
         )
 
     def save_weights(self, filepath):
@@ -1408,7 +1462,10 @@ class Model(ModelBase):
             Location to save model weights to.
         """
         self.model.save_weights(filepath)
-        np.save(op.join(str(Path(filepath).parent), "trans_prob.npy"), self.trans_prob)
+        np.save(
+            op.join(str(Path(filepath).parent), "trans_prob.npy"),
+            self.trans_prob,
+        )
 
     def load_weights(self, filepath):
         """Load all model parameters.
@@ -1418,7 +1475,9 @@ class Model(ModelBase):
         filepath : str
             Location to load model weights from.
         """
-        self.trans_prob = np.load(op.join(str(Path(filepath).parent), "trans_prob.npy"))
+        self.trans_prob = np.load(
+            op.join(str(Path(filepath).parent), "trans_prob.npy"),
+        )
         return self.model.load_weights(filepath)
 
     def get_weights(self):
