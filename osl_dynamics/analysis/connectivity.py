@@ -381,7 +381,7 @@ def gmm_threshold(
     """
     if sklearn_kwargs is None:
         sklearn_kwargs = {}
-    
+
     if plot_kwargs is None:
         plot_kwargs = {}
 
@@ -465,7 +465,7 @@ def fit_gmm(
     """
     if sklearn_kwargs is None:
         sklearn_kwargs = {}
-    
+
     if plot_kwargs is None:
         plot_kwargs = {}
 
