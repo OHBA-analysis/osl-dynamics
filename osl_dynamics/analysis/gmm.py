@@ -21,11 +21,11 @@ def fit_gaussian_mixture(
     one_component_percentile=None,
     n_sigma=0,
     label_order="mean",
-    sklearn_kwargs={},
+    sklearn_kwargs=None,
     return_statistics=False,
     show_plot=False,
     plot_filename=None,
-    plot_kwargs={},
+    plot_kwargs=None,
     log_message=True,
 ):
     """Fits a two component Bayesian Gaussian mixture model.
@@ -71,6 +71,12 @@ def fit_gaussian_mixture(
     threshold : float
         Threshold for the on class.
     """
+    if sklearn_kwargs is None:
+        sklearn_kwargs = {}
+    
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
     if log_message:
         _logger.info("Fitting GMM")
 
