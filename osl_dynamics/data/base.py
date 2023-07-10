@@ -1159,7 +1159,7 @@ class Data:
 
         n_sequences = self.count_sequences(self.sequence_length, self.step_size)
 
-        for i in range(self.n_arrays):
+        for i in tqdm(range(self.n_arrays), desc="Creating TFRecord datasets"):
             if i not in self.keep:
                 # We don't want to include this file in the dataset
                 continue
@@ -1183,6 +1183,7 @@ class Data:
                         v=len(str(self.n_arrays - 1)),
                     ),
                 )
+                feature_names = ["data", "subj_id"]
             else:
                 # Create a dataset with just the time series data
 
@@ -1198,9 +1199,38 @@ class Data:
                         v=len(str(self.n_arrays - 1)),
                     ),
                 )
+                feature_names = ["data"]
+
+        def parse_example(example):
+            """Helper function to parse a TFRecord example.
+
+            Parameters
+            ----------
+            example : tf.train.Example
+                TensorFlow example.
+            feature_names : list
+                List of feature names.
+
+            Returns
+            -------
+            parsed_example : dict
+                Dictionary of parsed tensors.
+            """
+            feature_description = {
+                name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
+            }
+
+            # Parse the example
+            parsed_example = tf.io.parse_single_example(example, feature_description)
+
+            # Parse the tensors from bytes
+            return {
+                name: tf.io.parse_tensor(tensor, tf.float32)
+                for name, tensor in parsed_example.items()
+            }
 
         # Create the TFRecord dataset
-        tf_record_filenames = tf.io.matching_files(f"{store_dir}/*.tfrecord")
+        tf_record_filenames = tf.io.matching_files(f"{self.store_dir}/*.tfrecord")
 
         if concatenate:
             tf_record_filenames = tf.data.Dataset.from_tensor_slices(
@@ -1217,7 +1247,7 @@ class Data:
                 full_dataset = tf_record_filenames.interleave(tf.data.TFRecordDataset)
 
                 # Parse the examples
-                full_dataset = full_dataset.map(dtf.parse_example)
+                full_dataset = full_dataset.map(parse_example)
 
                 # Shuffle sequences
                 full_dataset = full_dataset.shuffle(self.buffer_size)
@@ -1233,7 +1263,7 @@ class Data:
                 full_dataset = tf_record_filenames.interleave(tf.data.TFRecordDataset)
 
                 # Parse the examples
-                full_dataset = full_dataset.map(dtf.parse_example)
+                full_dataset = full_dataset.map(parse_example)
 
                 # Group into batches
                 full_dataset = full_dataset.batch(self.batch_size)
@@ -1264,7 +1294,7 @@ class Data:
                 ds = tf.data.TFRecordDataset(filename)
 
                 # Parse the examples
-                ds = ds.map(dtf.parse_example)
+                ds = ds.map(parse_example)
 
                 if shuffle:
                     # Shuffle sequences

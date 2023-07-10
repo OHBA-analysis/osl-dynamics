@@ -142,33 +142,6 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
             writer.write(make_example(sequence))
 
 
-def parse_example(example):
-    """Helper function to parse a TFRecord example.
-
-    Parameters
-    ----------
-    example : tf.train.Example
-        TensorFlow example.
-
-    Returns
-    -------
-    parsed_example : dict
-        Dictionary of parsed tensors.
-    """
-    feature_description = {
-        name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
-    }
-
-    # Parse the example
-    parsed_example = tf.io.parse_single_example(example, feature_desciption)
-
-    # Parse the tensors from bytes
-    return {
-        name: tf.io.parse_tensor(tensor, tf.float32)
-        for name, tensor in parsed_example.items()
-    }
-
-
 def get_range(dataset):
     """The range (max-min) of values contained in a batched Tensorflow dataset.
 
@@ -231,3 +204,4 @@ def get_n_batches(dataset):
     counter = 0
     for _ in dataset:
         counter += 1
+    return counter
