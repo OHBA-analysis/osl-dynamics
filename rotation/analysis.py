@@ -6,7 +6,7 @@ def HMM_analysis(dataset, save_dir):
     model = load(save_dir)
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
-        pickle.dump(alpha, open(f'{result_1_dir}alpha.pkl', "wb"))
+        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
         
     
 
@@ -15,4 +15,4 @@ def Dynemo_analysis(dataset, save_dir):
     model = load(save_dir)
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
-        pickle.dump(alpha, open(f'{result_1_dir}alpha.pkl', "wb"))
+        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
