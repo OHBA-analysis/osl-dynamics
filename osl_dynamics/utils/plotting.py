@@ -1859,7 +1859,7 @@ def plot_psd_topo(
     psd,
     only_show=None,
     parcellation_file=None,
-    topomap_pos=[0.45, 0.55, 0.5, 0.55],
+    topomap_pos=None,
     filename=None,
 ):
     """PLot PSDs for parcels and a topomap.
@@ -1877,7 +1877,7 @@ def plot_psd_topo(
     topomap_pos : list
         Positioning and size of the topomap: [x0, y0, width, height].
         x0, y0, width, height should be floats between 0 and 1.
-        E.g. [0.45, 0.55, 0.5, 0.55] to place the topomap on the top
+        Default [0.45, 0.55, 0.5, 0.55] to place the topomap on the top
         right. This is not used if parcellation_file=None.
     filename : str
         Output filename.
@@ -1889,6 +1889,8 @@ def plot_psd_topo(
     ax : matplotlib.pyplot.axis.
         Matplotlib axis object(s). Only returned if filename=None.
     """
+    if topomap_pos is None:
+        topomap_pos = [0.45, 0.55, 0.5, 0.55]
 
     if parcellation_file is not None:
         # Get the center of each parcel
