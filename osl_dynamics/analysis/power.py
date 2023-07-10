@@ -201,24 +201,29 @@ def variance_from_spectra(
     return np.squeeze(var)
 
 
-def power_map_grid(mask_file, parcellation_file, power_map):
-    """Takes the power at each parcel and returns the power at each voxel.
+def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
+    """Takes a vector of parcel values and return a 3D voxel grid.
 
     Parameters
     ----------
     mask_file : str
-        Mask file used to preprocess the training data.
-    power_map : np.ndarray
-        Power at each parcel. Shape must be (n_modes, n_parcels).
+        Mask file for the voxel grid. Must be a NIFTI file.
     parcellation_file : str
-        Parcellation file used to parcellate the training data.
+        Parcellation file. Must be a NIFTI file.
+    vector : np.ndarray
+        Value at each parcel. Shape must be (n_parcels,).
 
     Returns
     -------
-    power_map : np.ndarray
-        Power at each voxel. Shape is (x, y, z, n_modes), where
-        :code:`x`, :code:`y` and :code:`z` correspond to 3D voxel locations.
+    voxel_grid : np.ndarray
+        Value at each voxel. Shape is (x, y, z), where :code:`x`,
+        :code:`y` and :code:`z` correspond to 3D voxel locations.
     """
+    # Validation
+    mask_file = files.check_exists(mask_file, files.mask.directory)
+    parcellation_file = files.check_exists(
+        parcellation_file, files.parcellation.directory
+    )
 
     # Load the mask
     mask = nib.load(mask_file)
@@ -235,33 +240,28 @@ def power_map_grid(mask_file, parcellation_file, power_map):
     # Make a 2D array of voxel weights for each parcel
     n_parcels = parcellation.shape[-1]
 
-    # check parcellation is compatible:
-    if power_map.shape[1] is not n_parcels:
+    # Check parcellation is compatible
+    if vector.shape[0] != n_parcels:
         _logger.error(
-            "parcellation_file has a different number of parcels to the power_maps"
+            "parcellation_file has a different number of parcels to the vector"
         )
 
     voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
 
     # Normalise the voxels weights
-    voxel_weights /= voxel_weights.max(axis=0)[np.newaxis, ...]
+    voxel_weights /= voxel_weights.max(axis=0, keepdims=True)
 
-    # Generate a spatial map vector for each mode
-    n_voxels = voxel_weights.shape[0]
-    n_modes = power_map.shape[0]
-    spatial_map_values = np.empty([n_voxels, n_modes])
+    # Generate a vector containing value at each voxel
+    voxel_values = voxel_weights @ vector
 
-    for i in range(n_modes):
-        spatial_map_values[:, i] = voxel_weights @ power_map[i]
-
-    # Final spatial map as a 3D grid for each mode
-    spatial_map = np.zeros([mask_grid.shape[0], n_modes])
-    spatial_map[non_zero_voxels] = spatial_map_values
-    spatial_map = spatial_map.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], n_modes, order="F"
+    # Final 3D voxel grid
+    voxel_grid = np.zeros(mask_grid.shape[0])
+    voxel_grid[non_zero_voxels] = voxel_values
+    voxel_grid = voxel_grid.reshape(
+        mask.shape[0], mask.shape[1], mask.shape[2], order="F"
     )
 
-    return spatial_map
+    return voxel_grid
 
 
 def save(
@@ -399,14 +399,17 @@ def save(
             p *= 2
             p -= 1
 
-    # Calculate power map grid
-    power_map = power_map_grid(mask_file, parcellation_file, power_map)
+    # Calculate power map grid for each mode
+    power_map = [
+        parcel_vector_to_voxel_grid(mask_file, parcellation_file, p) for p in power_map
+    ]
+
+    # Make sure n_modes is the last dimension for compatibility with nii files
+    # (n_modes, x, y, z) -> (x, y, z, n_modes)
+    power_map = np.moveaxis(power_map, 0, -1)
 
     # Load the mask
     mask = nib.load(mask_file)
-
-    # Number of modes
-    n_modes = power_map.shape[-1]
 
     # Keyword arguments to pass to nilearn.plotting.plot_img_on_surf
     default_plot_kwargs = {
