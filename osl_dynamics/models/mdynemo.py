@@ -1,5 +1,10 @@
 """Multi-Dynamic Network Modes (M-DyNeMo).
 
+See Also
+--------
+`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples\
+/simulation/mdynemo_hmm-mvn.py>`_ for training M-DyNeMo on simulated data (with multiple
+dynamics).
 """
 
 import logging
@@ -50,54 +55,57 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_modes : int
         Number of modes for both power.
     n_fc_modes : int
-        Number of modes for FC. If None, then set to n_modes.
+        Number of modes for functional connectivity.
+        If :code:`None`, then set to :code:`n_modes`.
     n_channels : int
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
         Regularizer.
 
     theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
-        The same parameter is used for the gamma time course.
+        Type of normalization to apply to the posterior samples, :code:`theta`.
+        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
+        The same parameter is used for the :code:`gamma` time course.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature?
-        The same parameter is used for the gamma time course.
+        Should we learn the :code:`alpha_temperature`?
+        The same parameter is used for the :code:`gamma` time course.
     initial_alpha_temperature : float
-        Initial value for the alpha temperature.
-        The same parameter is used for the gamma time course.
+        Initial value for :code:`alpha_temperature`.
+        The same parameter is used for the :code:`gamma` time course.
 
     learn_means : bool
         Should we make the mean for each mode trainable?
@@ -125,10 +133,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
@@ -137,12 +145,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
+        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
+        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -272,7 +280,8 @@ class Model(VariationalInferenceModelBase):
 
     def get_means_stds_fcs(self):
         """Get the mode means, standard deviations, functional connectivities.
-        This is a wrapper for get_means, get_stds, get_fcs.
+
+        This is a wrapper for :code:`get_means`, :code:`get_stds`, :code:`get_fcs`.
 
         Returns
         -------
@@ -286,7 +295,7 @@ class Model(VariationalInferenceModelBase):
         return self.get_means(), self.get_stds(), self.get_fcs()
 
     def get_observation_model_parameters(self):
-        """Wrapper for get_means_stds_fcs."""
+        """Wrapper for :code:`get_means_stds_fcs`."""
         return self.get_means_stds_fcs()
 
     def set_means(self, means, update_initializer=True):
@@ -297,8 +306,7 @@ class Model(VariationalInferenceModelBase):
         means : np.ndarray
             Mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
-            Do we want to use the passed parameters when we re_initialize
-            the model?
+            Do we want to use the passed parameters when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model, means, layer_name="means", update_initializer=update_initializer
@@ -313,8 +321,7 @@ class Model(VariationalInferenceModelBase):
             Mode standard deviations.
             Shape is (n_modes, n_channels, n_channels) or (n_modes, n_channels).
         update_initializer : bool
-            Do we want to use the passed parameters when we re_initialize
-            the model?
+            Do we want to use the passed parameters when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model, stds, layer_name="stds", update_initializer=update_initializer
@@ -328,8 +335,7 @@ class Model(VariationalInferenceModelBase):
         fcs : np.ndarray
             Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
-            Do we want to use the passed parameters when we re_initialize
-            the model?
+            Do we want to use the passed parameters when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model, fcs, layer_name="fcs", update_initializer=update_initializer
@@ -355,14 +361,15 @@ class Model(VariationalInferenceModelBase):
     def set_regularizers(self, training_dataset):
         """Set the regularizers of means, stds and fcs based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu=0,
-        sigma=diag((range / 2)**2), a log normal prior is applied to the standard
-        deviations with mu=0, sigma=sqrt(log(2 * (range))) and a marginal inverse
-        Wishart prior is applied to the fcs matrices with nu = n_channels - 1 + 0.1.
+        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
+        :code:`sigma=diag((range/2)**2)`, a log normal prior is applied to the standard
+        deviations with :code:`mu=0`, :code:`sigma=sqrt(log(2*range))` and a marginal
+        inverse Wishart prior is applied to the functional connectivity matrices with
+        :code:`nu=n_channels-1+0.1`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -381,7 +388,8 @@ class Model(VariationalInferenceModelBase):
             )
 
     def sample_time_courses(self, n_samples: int):
-        """Uses the model RNN to sample mode mixing factors, alpha and gamma.
+        """Uses the model RNN to sample mode mixing factors,
+        :code:`alpha` and :code:`gamma`.
 
         Parameters
         ----------
@@ -391,9 +399,9 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         alpha : np.ndarray
-            Sampled alpha.
+            Sampled :code:`alpha`.
         gamma : np.ndarray
-            Sampled gamma.
+            Sampled :code:`gamma`.
         """
         # Get layers
         model_rnn_layer = self.model.get_layer("mod_rnn")

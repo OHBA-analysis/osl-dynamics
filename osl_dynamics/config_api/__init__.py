@@ -2,9 +2,21 @@
 
 See the `toolbox examples
 <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
-for scripts that use the config API.
+for scripts that use the config API:
 
-Note, the config API can be used via the command line with::
+- `TDE-HMM burst analysis <https://github.com/OHBA-analysis/osl-dynamics\
+  /blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_bursts.py>`_.
+- `AE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics\
+  /blob/main/examples/toolbox_paper/elekta_task/ae_hmm.py>`_.
+- `TDE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics\
+  /blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_networks.py>`_.
+- `TDE-DyNeMo network analysis <https://github.com/OHBA-analysis/osl-dynamics\
+  /blob/main/examples/toolbox_paper/ctf_rest/tde_dynemo_networks.py>`_.
+
+Command Line Usage
+------------------
+
+The config API can be used via the command line with::
 
     % osl-dynamics <config-file> <output-directory>
 

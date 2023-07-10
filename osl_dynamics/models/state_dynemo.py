@@ -48,32 +48,34 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
@@ -99,10 +101,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
@@ -111,12 +113,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
+        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
+        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -200,15 +202,15 @@ class Model(DyNeMo):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
         n_init : int
             Number of initializations.
-        take : float
+        take : float, optional
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -218,8 +220,7 @@ class Model(DyNeMo):
         """
         if n_init is None or n_init == 0:
             _logger.warning(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 

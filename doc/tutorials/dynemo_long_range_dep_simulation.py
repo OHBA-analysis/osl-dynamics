@@ -150,8 +150,8 @@ plotting.plot_alpha(sim_stc, inf_stc, y_labels=["Ground Truth", "DyNeMo"])
 #%%
 # Let's also look at the lifetime distribution of the states.
 
-plotting.plot_mode_lifetimes(sim_stc, x_label="Lifetime", y_label="Occurrence")
-plotting.plot_mode_lifetimes(inf_stc, x_label="Lifetime", y_label="Occurrence")
+plotting.plot_state_lifetimes(sim_stc, x_label="Lifetime", y_label="Occurrence")
+plotting.plot_state_lifetimes(inf_stc, x_label="Lifetime", y_label="Occurrence")
 
 #%%
 # We see the simulated and inferred lifetime distribution match very well.
@@ -186,7 +186,7 @@ plotting.plot_alpha(sam_alp)
 #%%
 # We can see long lived states similar to the ones used to simulate the training data. Let's plot the lifetime distribution of the samples.
 
-plotting.plot_mode_lifetimes(
+plotting.plot_state_lifetimes(
     sam_stc,
     x_label="Lifetime",
     x_range=[0, 150],

@@ -1,4 +1,5 @@
 """Subject Embedding HMM.
+
 """
 
 import logging
@@ -8,8 +9,8 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from numba.core.errors import NumbaWarning
 from tensorflow.keras import backend, layers, utils, initializers
+from numba.core.errors import NumbaWarning
 from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
@@ -79,10 +80,10 @@ class Config(HMMConfig):
         Number of units for the MLP for deviations.
     dev_normalization : str
         Type of normalization for the MLP for deviations.
-        Either None, 'batch' or 'layer'.
+        Either :code:`None`, :code:`'batch'` or :code:`'layer'`.
     dev_activation : str
         Type of activation to use for the MLP for deviations.
-        E.g. 'relu', 'sigmoid', 'tanh', etc.
+        E.g. :code:`'relu'`, :code:`'sigmoid'`, :code:`'tanh'`, etc.
     dev_dropout : float
         Dropout rate for the MLP for deviations.
     dev_regularizer : str
@@ -92,32 +93,32 @@ class Config(HMMConfig):
         This will be scaled by the amount of data.
 
     initial_trans_prob : np.ndarray
-        Initialisation for trans prob matrix
+        Initialisation for transition probability matrix.
     learn_trans_prob : bool
-        Should we make the trans prob matrix trainable?
+        Should we make the transition probability matrix trainable?
     state_probs_t0: np.ndarray
-        State probabilities at time=0. Not trainable.
+        State probabilities at :code:`time=0`. Not trainable.
     batch_size : int
         Mini-batch size.
     learning_rate : float
         Learning rate.
     trans_prob_update_delay : float
         We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the delay parameter.
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
+        ** -trans_prob_update_forget`. This is the delay parameter.
     trans_prob_update_forget : float
         We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the forget parameter.
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
+        ** -trans_prob_update_forget`. This is the forget parameter.
     observation_update_decay : float
         Decay rate for the learning rate of the observation model.
-        We update the learning rate (lr) as
-        lr = config.learning_rate * exp(-observation_update_decay * epoch).
+        We update the learning rate (:code:`lr`) as
+        :code:`lr = config.learning_rate * exp(-observation_update_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
+    optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
     multi_gpu : bool
         Should be use multiple GPUs for training?
@@ -127,10 +128,10 @@ class Config(HMMConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
     """
@@ -168,7 +169,8 @@ class Config(HMMConfig):
             or self.mode_embeddings_dim is None
         ):
             raise ValueError(
-                "n_subjects, subject_embeddings_dim and mode_embeddings_dim must be passed."
+                "n_subjects, subject_embeddings_dim and mode_embeddings_dim must "
+                "be passed."
             )
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
@@ -189,7 +191,7 @@ class Config(HMMConfig):
                 if self.kl_annealing_sharpness is None:
                     raise ValueError(
                         "kl_annealing_sharpness must be passed if "
-                        + "kl_annealing_curve='tanh'."
+                        "kl_annealing_curve='tanh'."
                     )
 
                 if self.kl_annealing_sharpness < 0:
@@ -198,7 +200,7 @@ class Config(HMMConfig):
             if self.n_kl_annealing_epochs is None:
                 raise ValueError(
                     "If we are performing KL annealing, "
-                    + "n_kl_annealing_epochs must be passed."
+                    "n_kl_annealing_epochs must be passed."
                 )
 
             if self.n_kl_annealing_epochs < 1:
@@ -236,18 +238,19 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
-        epochs : int
+        epochs : int, optional
             Number of epochs.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the TensorFlow observation model training.
-            These keywords arguments will be passed to self.model.fit().
+            These keywords arguments will be passed to :code:`self.model.fit()`.
 
         Returns
         -------
         history : dict
-            Dictionary with history of the loss and learning rates (lr and rho).
+            Dictionary with history of the loss and learning rates (:code:`lr` and
+            :code:`rho`).
         """
         if epochs is None:
             epochs = self.config.n_epochs
@@ -366,7 +369,7 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
@@ -374,7 +377,7 @@ class Model(HMMModel):
             Number of initializations.
         take : float
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -399,15 +402,15 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
         n_init : int
             Number of initializations.
-        take : float
+        take : float, optional
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -435,7 +438,7 @@ class Model(HMMModel):
         return obs_mod.get_observation_model_parameter(self.model, "group_means")
 
     def get_means(self):
-        """Overwrite get_means method of the HMM."""
+        """Wrapper for :code:`get_group_means`."""
         return self.get_group_means()
 
     def get_group_covariances(self):
@@ -449,12 +452,13 @@ class Model(HMMModel):
         return obs_mod.get_observation_model_parameter(self.model, "group_covs")
 
     def get_covariances(self):
-        """Overwrite get_covariances method of the HMM."""
+        """Wrapper for :code:`get_group_covariances`."""
         return self.get_group_covariances()
 
     def get_group_means_covariances(self):
         """Get the group level mode means and covariances.
-        This is a wrapper for get_group_means and get_group_covariances.
+
+        This is a wrapper for :code:`get_group_means` and :code:`get_group_covariances`.
 
         Returns
         -------
@@ -466,7 +470,7 @@ class Model(HMMModel):
         return self.get_group_means(), self.get_group_covariances()
 
     def get_means_covariances(self):
-        """Overwrite get_means_covariances method of the HMM."""
+        """Wrapper for :code:`get_group_means_covariances`."""
         return self.get_group_means_covariances()
 
     def get_group_observation_model_parameters(self):
@@ -474,7 +478,7 @@ class Model(HMMModel):
         return self.get_group_means_covariances()
 
     def get_observation_model_parameters(self):
-        """Overwrite get_observation_model_parameters method of the HMM."""
+        """Wrapper for :code:`get_group_observation_model_parameters`."""
         return self.get_group_observation_model_parameters()
 
     def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
@@ -482,10 +486,11 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        subject_embeddings : np.ndarray
-            Input embedding vectors for subjects. Shape is (n_subjects, subject_embeddings_dim).
-        n_neighbours : int
-            Number of nearest neighbours. Ignored if subject_embedding=None.
+        subject_embeddings : np.ndarray, optional
+            Input embedding vectors for subjects.
+            Shape is (n_subjects, subject_embeddings_dim).
+        n_neighbours : int, optional
+            Number of nearest neighbours. Ignored if :code:`subject_embedding=None`.
 
         Returns
         -------
@@ -503,7 +508,7 @@ class Model(HMMModel):
         )
 
     def get_subject_embeddings(self):
-        """Get the subject embedding vectors
+        """Get the subject embedding vectors.
 
         Returns
         -------
@@ -520,7 +525,7 @@ class Model(HMMModel):
         ----------
         group_means : np.ndarray
             Group level mode means. Shape is (n_modes, n_channels).
-        update_initializer : bool
+        update_initializer : bool, optional
             Do we want to use the passed group means when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
@@ -537,7 +542,7 @@ class Model(HMMModel):
         ----------
         group_covariances : np.ndarray
             Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
-        update_initializer : bool
+        update_initializer : bool, optional
             Do we want to use the passed group covariances when we re-initialize
             the model?
         """
@@ -551,7 +556,7 @@ class Model(HMMModel):
     def set_group_means_covariances(
         self, group_means, group_covariances, update_initializer=True
     ):
-        """This is a wrapper for set_group_means and set_group_covariances."""
+        """Wrapper for :code:`set_group_means` and :code:`set_group_covariances`."""
         self.set_group_means(
             group_means,
             update_initializer=update_initializer,
@@ -564,7 +569,7 @@ class Model(HMMModel):
     def set_group_observation_model_parameters(
         self, group_observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_group_means_covariances."""
+        """Wrapper for :code:`set_group_means_covariances`."""
         self.set_group_means_covariances(
             group_observation_model_parameters[0],
             group_observation_model_parameters[1],
@@ -572,21 +577,21 @@ class Model(HMMModel):
         )
 
     def set_means(self, means, update_initializer=True):
-        """Overwrite set_means method of the HMM."""
+        """Wrapper for :code:`set_group_means`."""
         self.set_group_means(means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Overwrite set_covariances method of the HMM."""
+        """Wrapper for :code:`set_group_covariances`."""
         self.set_group_covariances(covariances, update_initializer)
 
     def set_means_covariances(self, means, covariances, update_initializer=True):
-        """Overwrite set_means_covariances method of the HMM."""
+        """Wrapper for :code:`set_group_means_covariances`."""
         self.set_group_means_covariances(means, covariances, update_initializer)
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Overwrite set_observation_model_parameters method of the HMM."""
+        """Wrapper for :code:`set_group_observation_model_parameters`."""
         self.set_group_observation_model_parameters(
             observation_model_parameters, update_initializer
         )
@@ -594,15 +599,16 @@ class Model(HMMModel):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
-        normal prior is applied to the diagonal of the covariances matrices with mu=0,
-        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
-        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
+        :code:`sigma=diag((range/2)**2)`. If :code:`config.diagonal_covariances=True`,
+        a log normal prior is applied to the diagonal of the covariances matrices with
+        :code:`mu=0`, :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart
+        prior is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        and :code:`psi=diag(1/range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -625,7 +631,7 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -641,7 +647,7 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
@@ -658,11 +664,12 @@ class Model(HMMModel):
         This calculates:
 
         .. math::
-            \mathcal{F} = \int q(s_{1:T}) \log \left[ \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the free energy for.
 
         Returns
@@ -707,11 +714,11 @@ class Model(HMMModel):
         return np.mean(free_energy)
 
     def evidence(self, dataset):
-        """Calculate the model evidence, p(x), of HMM on a dataset.
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the model evidence on.
 
         Returns
@@ -764,9 +771,9 @@ class Model(HMMModel):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate alpha for each subject?
 
         Returns

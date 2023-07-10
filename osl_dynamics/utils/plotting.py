@@ -27,13 +27,28 @@ _logger = logging.getLogger("osl-dynamics")
 def set_style(params):
     """Sets matplotlib's style.
 
-    Wrapper for plt.rcParams.update(). List of parameters can be found here:
-    https://matplotlib.org/stable/api/matplotlib_configuration_api.html#matplotlib.rcParams
+    Wrapper for `plt.rcParams.update
+    <https://matplotlib.org/stable/tutorials/introductory/customizing.html>`_.
+    List of parameters can be found `here
+    <https://matplotlib.org/stable/api/matplotlib_configuration_api.html#matplotlib\
+    .rcParams>`_.
 
     Parameters
     ----------
     params : dict
         Dictionary of style parameters to update.
+
+    Examples
+    --------
+    Make labels and linewidth larger::
+
+        plotting.set_style({
+            "axes.labelsize": 16,
+            "xtick.labelsize": 14,
+            "ytick.labelsize": 14,
+            "legend.fontsize": 14,
+            "lines.linewidth": 3,
+        })
     """
     plt.rcParams.update(params)
 
@@ -41,12 +56,18 @@ def set_style(params):
 def create_figure(*args, **kwargs):
     """Creates matplotlib figure and axes objects.
 
-    Wrapper for plt.subplots().
-
     Parameters
     ----------
     fig_kwargs
-        Arguments to pass to plt.subplots().
+        Arguments to pass to `plt.subplots <https://matplotlib.org/stable/api/_as_gen\
+        /matplotlib.pyplot.subplots.html>`_.
+
+    Returns
+    -------
+    fig : plt.figure
+        Matplotlib figure.
+    ax : array of plt.axes
+        Array of axes (or single axis).
     """
     fig, ax = plt.subplots(*args, **kwargs)
     return fig, ax
@@ -55,12 +76,13 @@ def create_figure(*args, **kwargs):
 def show(tight_layout=False):
     """Displays all figures in memory.
 
-    Wrapper for plt.show().
+    Wrapper for `plt.show <https://matplotlib.org/stable/api/_as_gen/\
+    matplotlib.pyplot.show.html>`_.
 
     Parameters
     ----------
-    tight_layout : bool
-        Should we call plt.tight_layout()?
+    tight_layout : bool, optional
+        Should we call :code:`plt.tight_layout()`?
     """
     if tight_layout:
         plt.tight_layout()
@@ -72,12 +94,12 @@ def save(fig, filename, tight_layout=False):
 
     Parameters
     ----------
-    fig : matplotlib.figure.Figure
-        matplotlib figure object.
+    fig : plt.figure
+        Matplotlib figure object.
     filename : str
         Output filename.
-    tight_layout : bool
-        Should we call fig.tight_layout()?
+    tight_layout : bool, optional
+        Should we call :code:`fig.tight_layout()`?
     """
     _logger.info(f"Saving {filename}")
     if tight_layout:
@@ -91,7 +113,7 @@ def close(fig=None):
 
     Parameters
     ----------
-    fig : matplotlib.pyplot.Figure
+    fig : plt.figure, optional
         Figure to close. Defaults to all figures.
     """
     if fig is None:
@@ -102,21 +124,21 @@ def close(fig=None):
 def rough_square_axes(n_plots):
     """Get the most square axis layout for n_plots.
 
-    Given n_plots, find the side lengths of the rectangle which gives the closest
+    Given :code:`n_plots`, find the side lengths of the rectangle which gives the closest
     layout to a square grid of axes.
 
     Parameters
     ----------
-    n_plots: int
+    n_plots : int
         Number of plots to arrange.
 
     Returns
     -------
-    short: int
+    short : int
         Number of axes on the short side.
-    long: int
+    long : int
         Number of axes on the long side.
-    empty: int
+    empty : int
         Number of axes left blank from the rectangle.
     """
     long = np.floor(n_plots**0.5).astype(int)
@@ -133,19 +155,22 @@ def get_colors(n, colormap="magma"):
     Given a matplotlib colormap, produce a series of RGBA colors which are equally
     spaced by value. There is no guarantee that these colors will be perceptually
     uniformly distributed and with many colors will likely be extremely close.
-    Alpha is 1.0 for all colors.
 
     Parameters
     ----------
     n : int
         The number of colors to return.
-    colormap : str
+    colormap : str, optional
         The name of a matplotlib colormap.
 
     Returns
     -------
     colors: list of tuple of float
-        A list of colors in RGBA format. A = 1.0 in all cases.
+        Colors in RGBA format.
+
+    Note
+    ----
+    :code:`alpha=1.0` for all colors.
     """
     colormap = plt.get_cmap(colormap)
     colors = [colormap(1 * i / n) for i in range(n)]
@@ -172,41 +197,45 @@ def plot_line(
 
     Parameters
     ----------
-    x : list of numpy arrays
+    x : list of np.ndarray
         x-ordinates.
-    y : list of numpy arrays
+    y : list of np.ndarray
         y-ordinates.
-    labels : list of str
+    labels : list of str, optional
         Legend labels for each line.
-    legend_loc : int
+    legend_loc : int, optional
         Matplotlib legend location identifier. Default is top right.
-    errors : list with 2 items
+    errors : list with 2 items, optional
         Min and max errors.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    plot_kwargs : dict
-        Arguments to pass to the ax.plot method.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.axes
+    plot_kwargs : dict, optional
+        Arguments to pass to the `ax.plot
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_
+        method.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -315,45 +344,49 @@ def plot_scatter(
 
     Parameters
     ----------
-    x : list of numpy arrays
+    x : list of np.ndarray
         x-ordinates.
-    y : list of numpy arrays
+    y : list of np.ndarray
         y-ordinates.
-    labels : list of str
+    labels : list of str, optional
         Legend labels for each line.
-    legend_loc : int
+    legend_loc : int, optional
         Matplotlib legend location identifier. Default is top right.
-    errors : list
+    errors : list, optional
         Error bars.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    markers : list of str
+    markers : list of str, optional
         Markers to used for each set of data points.
-    annotate : List of array like objects
+    annotate : List of array like objects, optional
         Annotation for each data point for each set of data points.
-    plot_kwargs : dict
-        Arguments to pass to the ax.scatter method.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.Axes
+    plot_kwargs : dict, optional
+        Arguments to pass to the `ax.scatter
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.scatter.html>`_
+        method.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -478,35 +511,39 @@ def plot_hist(
         Raw data to plot (i.e. non-histogramed data).
     bins : list of int
         Number of bins for each item in data.
-    labels : list of str
+    labels : list of str, optional
         Legend labels for each line.
-    legend_loc : int
+    legend_loc : int, optional
         Matplotlib legend location identifier. Default is top right.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    plot_kwargs : dict
-        Arguments to pass to the ax.hist method. Defaults to {"histtype": "step"}.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.Axes
+    plot_kwargs : dict, optional
+        Arguments to pass to the `ax.hist
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html>`_
+        method. Defaults to :code:`{"histtype": "step"}`.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -597,33 +634,37 @@ def plot_bar_chart(
     ----------
     counts : list of np.ndarray
         Data to plot.
-    x : list or np.ndarray
+    x : list or np.ndarray, optional
         x-values for counts.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    plot_kwargs : dict
-        Arguments to pass to the ax.bar method.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.Axes
+    plot_kwargs : dict, optional
+        Arguments to pass to the `ax.bar
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.bar.html>`_
+        method.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -710,33 +751,35 @@ def plot_gmm(
         Mean of each Gaussian component.
     stddevs : np.ndarray
         Standard deviation of each Gaussian component.
-    bins : list of int
+    bins : list of int, optional
         Number of bins for the historgram.
-    legend_loc : int
+    legend_loc : int, optional
         Position for the legend.
-    x_range : list
+    x_range : list, optional
         Minimum and maximum for x-axis.
-    y_range : list
+    y_range : list, optional
         Minimum and maximum for y-axis.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.Axes
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -814,27 +857,29 @@ def plot_violin(
     ----------
     data : list of np.ndarray
         Data to plot.
-    x : list or np.ndarray
+    x : list or np.ndarray, optional
         x-values for data.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.axes
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : matplotlib.axes.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -903,28 +948,31 @@ def plot_time_series(
 
     Parameters
     ----------
-    time_series : numpy.ndarray
+    time_series : np.ndarray
         The time series to be plotted. Shape must be (n_samples, n_channels).
-    n_samples : int
+    n_samples : int, optional
         The number of time points to be plotted.
-    y_tick_values:
+    y_tick_values:, optional
         Labels for the channels to be placed on the y-axis.
-    fig_kwargs : dict
-        Keyword arguments to be passed on to matplotlib.pyplot.subplots.
-    plot_kwargs : dict
-        Keyword arguments to be passed on to matplotlib.pyplot.plot.
-        Defaults to {"lw": 0.7, "color": "tab:blue"}.
-    ax : matplotlib.axes.Axes
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    plot_kwargs : dict, optional
+        Keyword arguments to be passed on to `ax.plot
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
+        Defaults to :code:`{"lw": 0.7, "color": "tab:blue"}`.
+    ax : plt.axes, optional
         The axis on which to plot the data. If not given, a new axis is created.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     time_series = np.asarray(time_series)
     n_samples = min(n_samples or np.inf, time_series.shape[0])
@@ -995,27 +1043,30 @@ def plot_separate_time_series(
 
     Parameters
     ----------
-    time_series : numpy.ndarrays
-        Time series to be plotted. Should be (n_samples, n_lines). Each line
-        is its own subplot.
-    sampling_frequency: float
+    time_series : np.ndarray
+        Time series to be plotted. Should be (n_samples, n_lines). Each line is
+        its own subplot.
+    sampling_frequency: float, optional
         Sampling frequency of the input data, enabling us to label the x-axis.
-    n_samples : int
+    n_samples : int, optional
         Number of samples to be shown on the x-axis.
-    fig_kwargs : dict
-        Keyword arguments to be passed on to matplotlib.pyplot.subplots.
-    plot_kwargs : dict
-        Keyword arguments to be passed on to matplotlib.pyplot.plot.
-        Defaults to {"lw": 0.7}.
-    filename : str
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    plot_kwargs : dict, optional
+        Keyword arguments to be passed on to `ax.plot
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
+        Defaults to :code:`{"lw": 0.7}`.
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     time_series = np.asarray(time_series)
     n_samples = n_samples or min([ts.shape[0] for ts in time_series])
@@ -1079,39 +1130,42 @@ def plot_epoched_time_series(
 
     Parameters
     ----------
-    data : numpy.ndarray
-        A [time x channels] dataset to be epoched.
-    time_index : numpy.ndarray
+    data : np.ndarray
+        Data to be epoched. Shape must be (n_samples, n_channels).
+    time_index : np.ndarray
         The integer indices of the start of each epoch.
-    sampling_frequency : float
-        The sampling frequency of the data in Hertz.
-    pre : int
+    sampling_frequency : float, optional
+        The sampling frequency of the data in Hz.
+    pre : int, optional
         The integer number of samples to include before the trigger.
-    post : int
+    post : int, optional
         The integer number of samples to include after the trigger.
-    baseline_correct : bool
+    baseline_correct : bool, optional
         Should we subtract the mean value pre-trigger.
-    legend : bool
+    legend : bool, optional
         Should a legend be created.
-    legend_loc : int
+    legend_loc : int, optional
         Location of the legend.
-    title : str
+    title : str, optional
         Title of the figure.
-    fig_kwargs : dict
-        Keyword arguments to be passed on to matplotlib.pyplot.subplots.
-    plot_kwargs : dict
-        Keyword arguments to be passed on to matplotlib.pyplot.plot.
-    ax : matplotlib.axes.Axes
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    plot_kwargs : dict, optional
+        Keyword arguments to be passed on to `ax.plot
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html>`_.
+    ax : plt.axes, optional
         The axis on which to plot the data. If not given, a new axis is created.
-    filename : str
+    filename : str, optional
         Output_filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if ax=None and filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if ax=None and filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     from osl_dynamics.data.task import epoch_mean
 
@@ -1185,34 +1239,36 @@ def plot_matrices(
     """Plot a collection of matrices.
 
     Given an iterable of matrices, plot each matrix in its own axis. The axes are
-    arranged as close to a square (N x N axis grid) as possible.
+    arranged as close to a square (:code:`N x N` axis grid) as possible.
 
     Parameters
     ----------
-    matrix: list of np.ndarrays
+    matrix: list of np.ndarray
         The matrices to plot.
-    group_color_scale: bool
+    group_color_scale: bool, optional
         If True, all matrices will have the same colormap scale, where we use the
         minimum and maximum across all matrices as the scale.
-    titles: list of str
+    titles: list of str, optional
         Titles to give to each matrix axis.
-    main_title: str
+    main_title: str, optional
         Main title to be placed at the top of the plot.
-    cmap: str
+    cmap: str, optional
         Matplotlib colormap.
-    nan_color: str
-        Matplotlib color to use for NaN values.
-    log_norm: bool
+    nan_color: str, optional
+        Matplotlib color to use for :code:`NaN` values.
+    log_norm: bool, optional
         Should we show the elements on a log scale?
-    filename: str
-        A file to which to save the figure.
+    filename: str, optional
+        Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     matrix = np.array(matrix)
     if matrix.ndim == 2:
@@ -1293,25 +1349,27 @@ def plot_connections(
 
     Parameters
     ----------
-    weights : numpy.ndarray
-        An NxN matrix of weights.
-    labels : list of str
+    weights : np.ndarray
+        An :code:`NxN` matrix of weights.
+    labels : list of str, optional
         A name for each node in the weights matrix (e.g. parcel names)
-    ax : matplotlib.pyplot.Axes
+    ax : plt.axes, optional
         A matplotlib axis on which to plot.
-    cmap : str
+    cmap : str, optional
         A string corresponding to a matplotlib colormap.
-    text_color : str
+    text_color : str, optional
         A string corresponding to a matplotlib color.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     weights = np.abs(weights)
     x, y = np.diag_indices_from(weights)
@@ -1468,36 +1526,36 @@ def topoplot(
 
     Parameters
     ----------
-    layout: str
+    layout : str
         The name of an MEG layout (matching one from FieldTrip).
-    data: numpy.ndarray
+    data : np.ndarray
         The value of the field at each sensor.
-    channel_names: List[str]
-        A list of channel names which are present in the
-        data (removes missing channels).
-    plot_boxes: bool
+    channel_names : list of str, optional
+        A list of channel names which are present in the data (removes missing channels).
+    plot_boxes : bool, optional
         Show boxes representing the height and width of sensors.
-    show_deleted_sensors: bool
-        Show sensors missing from `channel_names` in red.
-    show_names: bool
+    show_deleted_sensors : bool, optional
+        Show sensors missing from :code:`channel_names` in red.
+    show_names : bool, optional
         Show the names of channels (can get very cluttered).
-    title: str
+    title : str, optional
         A title for the figure.
-    colorbar: bool
+    colorbar : bool, optional
         Show a colorbar for the field.
-    axis: matplotlib.pyplot.Axes
+    axis : plt.axis, optional
         matplotlib axis to plot on.
-    cmap: str
+    cmap : str, optional
         matplotlib colourmap.
-    n_contours: int
+    n_contours : int, optional
         number of field isolines to show on the plot.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     topology = Topology(layout)
 
@@ -1537,40 +1595,42 @@ def plot_brain_surface(
     ----------
     values : np.ndarray
         Data to plot. Can be of shape: (n_maps, n_channels) or (n_channels,).
-        A (..., n_channels, n_channels) array can also be passed.
-        Warning: this function cannot be used if n_maps is equal to n_channels.
+        A (..., n_channels, n_channels) array can also be passed. Warning: this
+        function cannot be used if :code:`n_maps` is equal to :code:`n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
-        Parcellation file used to parcelate the training data.
-    filename : str
-        Output filename. If extension is .nii.gz the power map is saved as a
-        NIFTI file. Or if the extension is png/svg/pdf, it is saved as images.
-        Optional, if None is passed then the image is shown on screen and the
-        Matplotlib objects are returned.
-    subtract_mean : bool
+        Parcellation file used to parcellate the training data.
+    filename : str, optional
+        Output filename. If extension is :code:`.nii.gz` the power map is saved
+        as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
+        as images. If :code:`None` is passed then the image is shown on
+        screen and the Matplotlib objects are returned.
+    subtract_mean : bool, optional
         Should we subtract the mean power across modes?
-    mean_weights: np.ndarray
+    mean_weights: np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
-    plot_kwargs : dict
+    plot_kwargs : dict, optional
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
-        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_img_on_surf.html>`_.
-        By default we pass:
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
+        .plot_img_on_surf.html>`_. By default we use::
 
-        - views=["lateral", "medial"]
-        - hemispheres=["left", "right"]
-        - colorbar=True
-        - output_file=filename
+            {
+                "views": ["lateral", "medial"],
+                "hemispheres": ["left", "right"],
+                "colorbar": True,
+                "output_file": filename,
+            }
 
         Any keyword arguments passed here will override these.
 
     Returns
     -------
-    figures : list of matplotlib.pyplot.figure
-        List of Matplotlib figure object. Only returned if filename=None.
-    axes : list of matplotlib.pyplot.axis.
-        List of Matplotlib axis object(s). Only returned if filename=None.
+    fig : list of plt.figure
+        Matplotlib figure object. Only returned if :code:`filename=None`.
+    ax : list of plt.axes
+        Matplotlib axis object(s). Only returned if :code:`filename=None`.
     """
     from osl_dynamics.analysis import power
 
@@ -1601,33 +1661,36 @@ def plot_alpha(
 
     Parameters
     ----------
-    alpha : numpy.ndarray
+    alpha : np.ndarray
         A collection of alphas passed as separate arguments.
-    n_samples: int
+    n_samples: int, optional
         Number of time points to be plotted.
-    cmap : str
+    cmap : str, optional
         A matplotlib colormap string.
-    sampling_frequency : float
-        The sampling frequency of the data in Hertz.
-    y_labels : str
+    sampling_frequency : float, optional
+        The sampling frequency of the data in Hz.
+    y_labels : str, optional
         Labels for the y-axis of each alpha time series.
-    title : str
+    title : str, optional
         Title for the plot.
-    plot_kwargs : dict
-        Any parameters to be passed to matplotlib.pyplot.stackplot.
-    fig_kwargs : dict
-        Arguments to pass to matplotlib.pyplot.subplots.
-    filename : str
+    plot_kwargs : dict, optional
+        Any parameters to be passed to `plt.stackplot
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.stackplot.html>`_.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    filename : str, optional
         Output filename.
-    axes: list of matplotlib.pyplot.Axes
-        A list of matplotlib axes to plot on. If None, a new figure is created.
+    axes : list of plt.axes, optional
+        A list of matplotlib axes to plot on. If :code:`None`, a new figure is created.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     n_alphas = len(alpha)
     if isinstance(axes, plt.Axes):
@@ -1720,8 +1783,8 @@ def plot_alpha(
         return fig, axes
 
 
-def plot_mode_lifetimes(
-    mode_time_course,
+def plot_state_lifetimes(
+    state_time_course,
     bins="auto",
     density=False,
     match_scale_x=False,
@@ -1733,55 +1796,58 @@ def plot_mode_lifetimes(
     fig_kwargs=None,
     filename=None,
 ):
-    """Create a histogram of mode lifetimes.
+    """Create a histogram of state lifetimes.
 
-    For a mode time course, create a histogram for each mode with the distribution
+    For a state time course, create a histogram for each state with the distribution
     of the lengths of time for which it is active.
 
     Parameters
     ----------
-    mode_time_course : numpy.ndarray
+    state_time_course : np.ndarray
         Mode time course to analyse.
-    bins : int
+    bins : int, optional
         Number of bins for the histograms.
-    density : bool
-        If True, plot the probability density of the mode activation lengths.
-        If False, raw number.
-    match_scale_x : bool
+    density : bool, optional
+        If :code:`True`, plot the probability density of the state activation lengths.
+        If :code:`False`, raw number.
+    match_scale_x : bool, optional
         If True, all histograms will share the same x-axis scale.
-    match_scale_y : bool
+    match_scale_y : bool, optional
         If True, all histograms will share the same y-axis scale.
-    x_range : list
+    x_range : list, optional
         The limits on the values presented on the x-axis.
-    x_label : str
+    x_label : str, optional
         x-axis label.
-    y_label : str
+    y_label : str, optional
         y-axis label.
-    plot_kwargs : dict
-        Keyword arguments to pass to matplotlib.pyplot.hist.
-    fig_kwargs : dict
-        Keyword arguments to pass to matplotlib.pyplot.subplots.
-    filename : str
-        A file to which to save the figure.
+    plot_kwargs : dict, optional
+        Keyword arguments to pass to `ax.hist
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html>`_.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    filename : str, optional
+        Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     from osl_dynamics.analysis import modes
 
-    n_plots = mode_time_course.shape[1]
+    n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
     colors = get_colors(n_plots)
 
     # Validation
-    if mode_time_course.ndim == 1:
-        mode_time_course = get_one_hot(mode_time_course)
-    if mode_time_course.ndim != 2:
-        raise ValueError("mode_timecourse must be a 2D array")
+    if state_time_course.ndim == 1:
+        state_time_course = get_one_hot(state_time_course)
+    if state_time_course.ndim != 2:
+        raise ValueError("state_time_course must be a 2D array.")
 
     if fig_kwargs is None:
         fig_kwargs = {}
@@ -1791,8 +1857,8 @@ def plot_mode_lifetimes(
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    # Calculate mode lifetimes
-    channel_lifetimes = modes.lifetimes(mode_time_course)
+    # Calculate state lifetimes
+    channel_lifetimes = modes.lifetimes(state_time_course)
 
     # Create figure
     fig, axes = create_figure(short, long, **fig_kwargs)
@@ -1825,7 +1891,7 @@ def plot_mode_lifetimes(
         t = axis.text(
             0.95,
             0.95,
-            f"{np.sum(channel) / len(mode_time_course) * 100:.2f}%",
+            f"{np.sum(channel) / len(state_time_course) * 100:.2f}%",
             fontsize=10,
             horizontalalignment="right",
             verticalalignment="top",
@@ -1870,24 +1936,27 @@ def plot_psd_topo(
         Frequency axis. Shape must be (n_freq,).
     psd : np.ndarray
         PSD for each parcel. Shape must be (n_parcels, n_freq).
-    only_show : list
+    only_show : list, optional
         Indices for parcels to include in the plot. Defaults to all parcels.
-    parcellation_file : str
+    parcellation_file : str, optional
         Path to parcellation file.
-    topomap_pos : list
-        Positioning and size of the topomap: [x0, y0, width, height].
-        x0, y0, width, height should be floats between 0 and 1.
-        Default [0.45, 0.55, 0.5, 0.55] to place the topomap on the top
-        right. This is not used if parcellation_file=None.
-    filename : str
+    topomap_pos : list, optional
+        Positioning and size of the topomap: :code:`[x0, y0, width, height]`.
+        :code:`x0`, :code:`y0`, :code:`width`, :code:`height` should be floats
+        between 0 and 1. E.g. :code:`[0.45, 0.55, 0.5, 0.55]` to place the
+        topomap on the top right. This is not used if
+        :code:`parcellation_file=None`.
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     if topomap_pos is None:
         topomap_pos = [0.45, 0.55, 0.5, 0.55]
@@ -1942,6 +2011,7 @@ def plot_summary_stats_group_diff(
     summary_stats,
     pvalues,
     assignments,
+    fig_kwargs=None,
     ax=None,
     filename=None,
     fig_kwargs=None,
@@ -1958,19 +2028,23 @@ def plot_summary_stats_group_diff(
         p-values for each summary statistic difference. Shape is (n_states,).
     assignments : np.ndarray
         Array of 1s and 2s indicating group assignment. Shape is (n_subjects,).
-    ax : matplotlib.axes.axes
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
     fig_kwargs : dict
         Keyword arguments to pass to create_figure().
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     # Validation
     if ax is not None:
@@ -1993,6 +2067,8 @@ def plot_summary_stats_group_diff(
     ss_df = pd.DataFrame(ss_dict)
 
     # Create figure
+    if fig_kwargs is None:
+        fig_kwargs = {}
     create_fig = ax is None
     if create_fig:
         fig, ax = create_figure(**fig_kwargs)
@@ -2043,36 +2119,40 @@ def plot_evoked_response(
         Evoked responses. Shape must be (n_samples, n_channels).
     pvalues : np.ndarray
         p-value for each evoked response. This can be calculated with
-        `osl_dynamics.analysis.statistics.evoked_response_max_stat_perm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/statistics/index.html#osl_dynamics.analysis.statistics.evoked_response_max_stat_perm>`_.
-    significance_level : float
-        Value to threshold the p-values with to consider significant. By
-        default pvalues < 0.05 are significant.
-    offset_between_bars : float
+        `osl_dynamics.analysis.statistics.evoked_response_max_stat_perm 
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
+        /statistics/index.html#osl_dynamics.analysis.statistics\
+        .evoked_response_max_stat_perm>`_.
+    significance_level : float, optional
+        Value to threshold the p-values with to consider significant.
+        By default :code:`pvalues < 0.05` are significant.
+    offset_between_bars : float, optional
         Vertical offset between bars that highlight significance.
-    labels : list
+    labels : list, optional
         Label for each evoked response time series.
-    legend_loc : int
+    legend_loc : int, optional
         Position of the legend.
-    x_label : str
+    x_label : str, optional
         Label for x-axis.
-    y_label : str
+    y_label : str, optional
         Label for y-axis.
-    title : str
+    title : str, optional
         Figure title.
-    fig_kwargs : dict
-        Arguments to pass to plt.subplots.
-    ax : matplotlib.axes.axes
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
 
     # Validation
@@ -2163,35 +2243,42 @@ def plot_wavelet(
         1D time series data.
     sampling_frequency : float
         Sampling frequency in Hz.
-    w : float
-        w parameter to pass to scipy.signal.morlet2.
-    standardize : bool
+    w : float, optional
+        :code:`w` parameter to pass to `scipy.signal.morlet2 
+        <https://docs.scipy.org/doc/scipy/reference/generated\
+        /scipy.signal.morlet2.html>`_.
+    standardize : bool, optional
         Should we standardize the data before calculating the wavelet?
-    time_range : list
+    time_range : list, optional
         Start time and end time to plot in seconds.
         Default is the full time axis of the data.
-    frequency_range : list of length 2
-        Start and end frequency to plot in Hertz.
-        Default is [1, sampling_frequency / 2].
-    title : str
+    frequency_range : list of length 2, optional
+        Start and end frequency to plot in Hz.
+        Default is :code:`[1, sampling_frequency / 2]`.
+    title : str, optional
         Figure title.
-    add_colorbar : bool
-        If True (default), space will be stolen from the figure to create a colorbar.
-    fig_kwargs : dict
-        Keyword arguments to pass to plt.subplots. Default to {"figsize": (12, 3)}.
-    plot_kwargs : dict
-        Keyword arguments to pass to pcolormesh. Defaults to {"cmap": "rainbow"}.
-    ax : matplotlib.axes.axes
+    add_colorbar : bool, optional
+        If :code:`True` (default), space will be stolen from the figure to create
+        a colorbar.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    plot_kwargs : dict, optional
+        Keyword arguments to pass to `ax.pcolormesh 
+        <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes\
+        .Axes.pcolormesh.html>`_. Defaults to :code:`{"cmap": "rainbow"}`.
+    ax : plt.axes, optional
         Axis object to plot on.
-    filename : str
+    filename : str, optional
         Output filename.
 
     Returns
     -------
-    fig : matplotlib.pyplot.figure
-        Matplotlib figure object. Only returned if filename=None.
-    ax : matplotlib.pyplot.axis.
-        Matplotlib axis object(s). Only returned if filename=None.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     from osl_dynamics.analysis import spectral
 

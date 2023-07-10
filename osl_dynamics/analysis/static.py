@@ -20,8 +20,9 @@ def functional_connectivity(data, conn_type="corr"):
     data : np.ndarray
         Time series data. Shape must be (n_subjects, n_samples, n_channels)
         or (n_samples, n_channels).
-    conn_type : str
-        What metric should we use? "corr" (Pearson correlation) or "cov" (covariance).
+    conn_type : str, optional
+        What metric should we use? :code:`"corr"` (Pearson correlation) or
+        :code:`"cov"` (covariance).
 
     Returns
     -------
@@ -62,22 +63,22 @@ def power_spectra(
     ----------
     data : np.ndarray
         Data to calculate the spectrogram for. Shape must be
-        (n_subjects,  n_samples, n_channels) or (n_samples, n_channels).
+        (n_subjects, n_samples, n_channels) or (n_samples, n_channels).
     window_length : int
         Number of data points to use when calculating the periodogram.
-    sampling_frequency : float
+    sampling_frequency : float, optional
         Sampling frequency in Hz.
-    step_size : int
-        Step size for shifting the window. By default we will use half
-        the window length.
-    return_weights : bool
+    step_size : int, optional
+        Step size for shifting the window. By default we will use
+        :code:`step_size=window_length // 2`.
+    return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    standardize : bool
+    standardize : bool, optional
         Should we standardise the data?
-    calc_coh : bool
+    calc_coh : bool, optional
         Should we also return the coherence spectra?
-    n_jobs : int
+    n_jobs : int, optional
         Number of parallel jobs.
 
     Returns
@@ -88,9 +89,10 @@ def power_spectra(
         Power spectral density. Shape is (n_subjects, n_channels, n_freq).
     coh : np.ndarray
         Coherence spectra. Shape is (n_subjects, n_channels, n_channels, n_freq).
-        Only returned is calc_coh=True.
+        Only returned is :code:`calc_coh=True`.
     weights : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
+        Weight for each subject-specific PSD. Only returned if
+        :code:`return_weights=True`.
     """
 
     # Validation
@@ -209,32 +211,30 @@ def multitaper_spectra(
         Parameter to control the resolution of the spectra.
     n_tapers : int
         Number of tapers to use when calculating the multitaper.
-    segment_length : int
+    segment_length : int, optional
         Length of the data segement to use to calculate the multitaper.
-    frequency_range : list
+    frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    return_weights : bool
+    return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    standardize : bool
+    standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
-    n_jobs : int
+    n_jobs : int, optional
         Number of parallel jobs.
 
     Returns
     -------
     frequencies : np.ndarray
-        Frequencies of the power spectra and coherences.
-        Shape is (n_freq,).
+        Frequencies of the power spectra and coherences. Shape is (n_freq,).
     power_spectra : np.ndarray
-        Power spectra for each state.
-        Shape is (n_subjects, n_channels, n_freq).
+        Power spectra for each state. Shape is (n_subjects, n_channels, n_freq).
     coherences : np.ndarray
         Coherences for each state.
         Shape is (n_subjects, n_channels, n_channels, n_freq).
     weights : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
-        Shape is (n_subjects,).
+        Weight for each subject-specific PSD. Only returned if
+        :code:`return_weights=True`. Shape is (n_subjects,).
     """
     if isinstance(data, np.ndarray):
         if data.ndim != 3:

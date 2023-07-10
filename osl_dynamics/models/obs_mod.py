@@ -54,10 +54,11 @@ def set_observation_model_parameter(
         The value of the observation model parameter to set.
     layer_name : str
         Layer name of the observation model parameter.
-    update_initializer : bool
+    update_initializer : bool, optional
         Whether to update the initializer of the layer.
-    diagonal_covariances : bool
-        Whether the covariances are diagonal. Ignored if layer_name is not "covs".
+    diagonal_covariances : bool, optional
+        Whether the covariances are diagonal.
+        Ignored if :code:`layer_name` is not :code:`"covs"`.
     """
     available_layers = ["means", "covs", "stds", "fcs", "group_means", "group_covs"]
     if layer_name not in available_layers:
@@ -87,8 +88,8 @@ def set_observation_model_parameter(
 def set_means_regularizer(model, training_dataset, layer_name="means"):
     """Set the means regularizer based on training data.
 
-    A multivariate normal prior is applied to the mean vectors with mu = 0,
-    sigma=diag((range / 2)**2).
+    A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
+    :code:`sigma=diag((range/2)**2)`.
 
     Parameters
     ----------
@@ -96,8 +97,8 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
         The model.
     training_dataset : osl_dynamics.data.Data
         The training dataset.
-    layer_name : str
-        Layer name of the means. Can be "means" or "group_means".
+    layer_name : str, optional
+        Layer name of the means. Can be :code:`"means"` or :code:`"group_means"`.
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
@@ -120,9 +121,10 @@ def set_covariances_regularizer(
     """Set the covariances regularizer based on training data.
 
     If config.diagonal_covariances is True, a log-normal prior is applied to the
-    diagonal of the covariance matrices with mu = 0, sigma=sqrt(log(2 * range)).
-    Otherwise, an inverse Wishart prior is applied to the covariance matrices with
-    nu = n_channels - 1 + 0.1, psi=diag(1 / range).
+    diagonal of the covariance matrices with :code:`mu=0`,
+    :code:`sigma=sqrt(log(2*range))`. Otherwise, an inverse Wishart prior is applied
+    to the covariance matrices with :code:`nu=n_channels-1+0.1`,
+    :code:`psi=diag(1/range)`.
 
     Parameters
     ----------
@@ -132,10 +134,10 @@ def set_covariances_regularizer(
         The training dataset.
     epsilon : float
         Error added to the covariance matrices.
-    diagonal : bool
+    diagonal : bool, optional
         Whether the covariances are diagonal.
-    layer_name : str
-        Layer name of the covariances. Can be "covs" or "group_covs".
+    layer_name : str, optional
+        Layer name of the covariances. Can be :code:`"covs"` or :code:`"group_covs"`.
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
@@ -159,8 +161,8 @@ def set_covariances_regularizer(
 def set_stds_regularizer(model, training_dataset, epsilon):
     """Set the standard deviations regularizer based on training data.
 
-    A log-normal prior is applied to the standard deviations with mu = 0,
-    sigma=sqrt(log(2 * range)).
+    A log-normal prior is applied to the standard deviations with :code:`mu=0`,
+    :code:`sigma=sqrt(log(2*range))`.
 
     Parameters
     ----------
@@ -185,8 +187,8 @@ def set_stds_regularizer(model, training_dataset, epsilon):
 def set_fcs_regularizer(model, training_dataset, epsilon):
     """Set the FCS regularizer based on training data.
 
-    A marginal inverse Wishart prior is applied to the FCS
-    with nu = n_channels - 1 + 0.1.
+    A marginal inverse Wishart prior is applied to the functional connectivities
+    with :code:`nu=n_channels-1+0.1`.
 
     Parameters
     ----------
@@ -195,7 +197,7 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     training_dataset : osl_dynamics.data.Data
         The training dataset.
     epsilon : float
-        Error added to the FCS.
+        Error added to the functional connectivities.
     """
     n_channels = dtf.get_n_channels(training_dataset)
 
@@ -216,7 +218,7 @@ def get_subject_embeddings(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
 
     Returns
     -------
@@ -234,7 +236,7 @@ def get_means_mode_embeddings(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
 
     Returns
     -------
@@ -253,7 +255,7 @@ def get_covs_mode_embeddings(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
 
     Returns
     -------
@@ -285,11 +287,11 @@ def get_concatenated_embeddings(model, map, subject_embeddings=None):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
     map : str
-        The map to use. Either "means" or "covs".
-    subject_embeddings : np.ndarray
-        Input subject embeddings. If None, they are retrieved from the model.
+        The map to use. Either :code:`"means"` or :code:`"covs"`.
+    subject_embeddings : np.ndarray, optional
+        Input subject embeddings. If :code:`None`, they are retrieved from the model.
         Shape is (n_subjects, subject_embeddings_dim).
 
     Returns
@@ -318,7 +320,7 @@ def get_means_dev_mag_parameters(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
 
     Returns
     -------
@@ -352,7 +354,7 @@ def get_covs_dev_mag_parameters(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
 
     Returns
     -------
@@ -377,8 +379,8 @@ def get_covs_dev_mag_parameters(model):
 
 
 def get_dev_mag_parameters(model, map):
-    """Wrapper for getting the deviance magnitude parameters
-    for the means and covariances."""
+    """Wrapper for getting the deviance magnitude parameters for the means
+    and covariances."""
     if map == "means":
         return get_means_dev_mag_parameters(model)
     elif map == "covs":
@@ -393,9 +395,9 @@ def get_dev_mag(model, map):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
     map : str
-        The map. Must be either 'means' or 'covs'.
+        The map. Must be either :code:`'means'` or :code:`'covs'`.
 
     Returns
     -------
@@ -420,19 +422,20 @@ def get_dev_map(model, map, subject_embeddings=None):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
     map : str
-        The map to use. Either "means" or "covs".
-    subject_embeddings : np.ndarray
-        Input subject embeddings. If None, they are retrieved from the model.
+        The map to use. Either :code:`"means"` or :code:`"covs"`.
+    subject_embeddings : np.ndarray, optional
+        Input subject embeddings. If :code:`None`, they are retrieved from the model.
         Shape is (n_subjects, subject_embeddings_dim).
 
     Returns
     -------
     dev_map : np.ndarray
         The deviance map.
-        If map == "means", shape is (n_subjects, n_modes, n_channels).
-        If map == "covs", shape is (n_subjects, n_modes, n_channels * (n_channels + 1) // 2).
+        If :code:`map="means"`, shape is (n_subjects, n_modes, n_channels).
+        If :code:`map="covs"`, shape is (n_subjects, n_modes,
+        n_channels * (n_channels + 1) // 2).
     """
     concat_embeddings = get_concatenated_embeddings(model, map, subject_embeddings)
     if map == "means":
@@ -459,16 +462,17 @@ def get_subject_dev(
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
         Whether the covariances are learnt.
-    subject_embeddings : np.ndarray
+    subject_embeddings : np.ndarray, optional
         Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
-        If None, then the subject embeddings are retrieved from the model.
-    n_neighbours : int
-        The number of nearest neighbours if subject_embedding is not None.
+        If :code:`None`, then the subject embeddings are retrieved from the model.
+    n_neighbours : int, optional
+        The number of nearest neighbours if :code:`subject_embedding` is not
+        :code:`None`.
 
     Returns
     -------
@@ -525,16 +529,17 @@ def get_subject_means_covariances(
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
         Whether the covariances are learnt.
-    subject_embeddings : np.ndarray
+    subject_embeddings : np.ndarray, optional
         Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
         If None, then the subject embeddings are retrieved from the model.
-    n_neighbours : int
-        The number of nearest neighbours if subject_embedding is not None.
+    n_neighbours : int, optional
+        The number of nearest neighbours if :code:`subject_embedding` is not
+        :code:`None`.
 
     Returns
     -------
@@ -564,7 +569,7 @@ def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be sehmm or sedynemo.
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
     subject_embeddings : np.ndarray
         Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
     n_neighbours : int

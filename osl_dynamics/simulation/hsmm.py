@@ -3,6 +3,7 @@
 """
 
 import numpy as np
+
 from osl_dynamics import array_ops
 from osl_dynamics.simulation.mvn import MVN
 from osl_dynamics.simulation.base import Simulation
@@ -12,25 +13,25 @@ class HSMM:
     """HSMM base class.
 
     Contains the probability distribution function for sampling state lifetimes.
-    Uses a gamma distribution for the probability distribution function.
+    Uses a Gamma distribution for the probability distribution function.
 
     Parameters
     ----------
     gamma_shape : float
-        Shape parameter for the gamma distribution of state lifetimes.
+        Shape parameter for the Gamma distribution of state lifetimes.
     gamma_scale : float
-        Scale parameter for the gamma distribution of state lifetimes.
-    off_diagonal_trans_prob : np.ndarray
+        Scale parameter for the Gamma distribution of state lifetimes.
+    off_diagonal_trans_prob : np.ndarray, optional
         Transition probabilities for out of state transitions.
-    full_trans_prob : np.ndarray
+    full_trans_prob : np.ndarray, optional
         A transition probability matrix, the diagonal of which will be ignored.
-    n_states : int
+    n_states : int, optional
         Number of states.
-    state_vectors : np.ndarray
+    state_vectors : np.ndarray, optional
         Mode vectors define the activation of each components for a state.
-        E.g. state_vectors=[[1,0,0],[0,1,0],[0,0,1]] are mutually exclusive
-        states. state_vector.shape[0] must be more than n_states.
-    random_seed : int
+        E.g. :code:`state_vectors=[[1,0,0],[0,1,0],[0,0,1]]` are mutually exclusive
+        states. :code:`state_vector.shape[0]` must be more than :code:`n_states`.
+    random_seed : int, optional
         Seed for random number generator.
     """
 
@@ -61,7 +62,7 @@ class HSMM:
         elif n_states is None:
             raise ValueError(
                 "If off_diagonal_trans_prob and full_trans_prob are not given, "
-                + "n_states must be passed."
+                "n_states must be passed."
             )
         else:
             self.n_states = n_states
@@ -142,28 +143,26 @@ class HSMM_MVN(Simulation):
     n_samples : int
         Number of samples to draw from the model.
     gamma_shape : float
-        Shape parameter for the gamma distribution of state lifetimes.
+        Shape parameter for the Gamma distribution of state lifetimes.
     gamma_scale : float
-        Scale parameter for the gamma distribution of state lifetimes.
-    off_diagonal_trans_prob : np.ndarray
+        Scale parameter for the Gamma distribution of state lifetimes.
+    off_diagonal_trans_prob : np.ndarray, optional
         Transition probabilities for out of state transitions.
-    full_trans_prob : np.ndarray
+    full_trans_prob : np.ndarray, optional
         A transition probability matrix, the diagonal of which will be ignored.
-    means : np.ndarray or str
+    means : np.ndarray or str, optional
         Mean vector for each state, shape should be (n_states, n_channels).
-        Or 'zero' or 'random'.
-    covariances : numpy.ndarray or str
+        Or :code:`'zero'` or :code:`'random'`.
+    covariances : numpy.ndarray or str, optional
         Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels). Or 'random'.
-    n_states : int
-        Number of states. Can pass this argument with keyword n_modes instead.
-    n_channels : int
+        n_channels). Or :code:`'random'`.
+    n_states : int, optional
+        Number of states. Can pass this argument with keyword :code:`n_modes` instead.
+    n_channels : int, optional
         Number of channels in the observation model.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
-    random_seed : int
+    random_seed : int, optional
         Seed for reproducibility.
     """
 
@@ -247,36 +246,36 @@ class MixedHSMM_MVN(Simulation):
     The lifetime of each state mixture is sampled from a Gamma distribution.
 
     state_mixing_vectors is a 2D numpy array containing mixtures of the
-    the states that can be simulated, e.g. with n_states=3 we could have
-    state_mixing_vectors=[[0.5, 0.5, 0], [0.1, 0, 0.9]]
+    the states that can be simulated, e.g. with :code:`n_states=3` we could have
+    :code:`state_mixing_vectors=[[0.5, 0.5, 0], [0.1, 0, 0.9]]`.
 
     Parameters
     ----------
     n_samples : int
         Number of samples to draw from the model.
-    mixed_state_vectors : np.ndarray
-        Vectors containing mixing factors for mixed states.
     gamma_shape : float
-        Shape parameter for the gamma distribution of state lifetimes.
+        Shape parameter for the Gamma distribution of state lifetimes.
     gamma_scale : float
-        Scale parameter for the gamma distribution of state lifetimes.
-    off_diagonal_trans_prob : np.ndarray
+        Scale parameter for the Gamma distribution of state lifetimes.
+    mixed_state_vectors : np.ndarray, optional
+        Vectors containing mixing factors for mixed states.
+    mixed_mode_vectors : np.ndarray, optional
+        Vectors containing mixing factors for mixed states.
+    off_diagonal_trans_prob : np.ndarray, optional
         Transition probabilities for out of state transitions.
-    full_trans_prob : np.ndarray
+    full_trans_prob : np.ndarray, optional
         A transition probability matrix, the diagonal of which will be ignored.
-    means : np.ndarray or str
+    means : np.ndarray or str, optional
         Mean vector for each state, shape should be (n_states, n_channels).
-        Or 'zero' or 'random'.
-    covariances : numpy.ndarray or str
+        Or :code:`'zero'` or :code:`'random'`.
+    covariances : numpy.ndarray or str, optional
         Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels). Or 'random'.
-    n_channels : int
+        n_channels). Or :code:`'random'`.
+    n_channels : int, optional
         Number of channels in the observation model.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of random noise to be added to the observations.
-    simulate : bool
-        Should data be simulated? Can be called using .simulate later.
-    random_seed : int
+    random_seed : int, optional
         Seed for reproducibility.
     """
 

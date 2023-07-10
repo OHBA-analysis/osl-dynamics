@@ -1,5 +1,13 @@
 """Multi-dynamic Adversarial Generator Encoder (MAGE).
 
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models/mage.html\
+>`_ for a description of this model.
+
+See Also
+--------
+U. Pervaiz, et al., "Multi-dynamic modelling reveals strongly time-varying resting fMRI 
+correlations". `Medical Image Analysis 77, 102366 (2022) <https://www.sciencedirect.com\
+/science/article/pii/S1361841522000196>`_.
 """
 
 import logging
@@ -47,48 +55,51 @@ class Config(BaseModelConfig):
         Length of sequence passed to the inference, generative and discriminator network.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
         Regularizer.
 
     discriminator_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     discriminator_n_layers : int
         Number of layers.
     discriminator_n_units : int
         Number of units.
     discriminator_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     discriminator_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     discriminator_dropout : float
         Dropout rate.
     discriminator_regularizer : str
@@ -119,8 +130,8 @@ class Config(BaseModelConfig):
         Learning rate.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -315,17 +326,17 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training data.
-        epochs : int
-            Number of epochs to train. Defaults to value in config if not passed.
-        verbose : int
+        epochs : int, optional
+            Number of epochs to train. Defaults to value in :code:`config` if not passed.
+        verbose : int, optional
             Should we print a progress bar?
 
         Returns
         -------
         history : history
-            History of discriminator_loss and generator_loss.
+            History of :code:`discriminator_loss` and :code:`generator_loss`.
         """
         if epochs is None:
             epochs = self.config.n_epochs
@@ -422,20 +433,16 @@ class Model(ModelBase):
 
         return train
 
-    def get_mode_time_courses(
-        self,
-        inputs,
-        concatenate=False,
-    ):
+    def get_mode_time_courses(self, inputs, concatenate=False):
         """Get mode time courses.
 
         This method is used to get mode time courses for the multi-time-scale model.
 
         Parameters
         ----------
-        inputs : tensorflow.data.Dataset or osl_dynamics.data.Data
+        inputs : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate alpha for each subject?
 
         Returns
@@ -475,10 +482,9 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        alpha : np.ndarray
+        alpha : np.ndarray, optional
             Shape must be (n_samples, n_modes).
-
-        gamma : np.ndarray
+        gamma : np.ndarray, optional
             Shape must be (n_samples, n_modes).
 
         Returns
@@ -545,7 +551,8 @@ class Model(ModelBase):
 
     def get_means_stds_fcs(self):
         """Get the mode means, standard deviations, functional connectivities.
-        This is a wrapper for get_means, get_stds, get_fcs.
+
+        This is a wrapper for :code:`get_means`, :code:`get_stds`, :code:`get_fcs`.
 
         Returns
         -------
@@ -569,9 +576,8 @@ class Model(ModelBase):
         ----------
         means : np.ndarray
             Mode means. Shape is (n_modes, n_channels).
-        update_initializer : bool
-            Do we want to use the passed parameters when we re_initialize
-            the model?
+        update_initializer : bool, optional
+            Do we want to use the passed parameters when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -588,9 +594,8 @@ class Model(ModelBase):
         stds : np.ndarray
             Mode standard deviations.
             Shape is (n_modes, n_channels, n_channels) or (n_modes, n_channels).
-        update_initializer : bool
-            Do we want to use the passed parameters when we re_initialize
-            the model?
+        update_initializer : bool, optional
+            Do we want to use the passed parameters when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -606,9 +611,8 @@ class Model(ModelBase):
         ----------
         fcs : np.ndarray
             Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
-        update_initializer : bool
-            Do we want to use the passed parameters when we re_initialize
-            the model?
+        update_initializer : bool, optional
+            Do we want to use the passed parameters when we re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.inference_model,
@@ -618,7 +622,7 @@ class Model(ModelBase):
         )
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
-        """This is a wrapper for set_means, set_stds, set_fcs."""
+        """This is a wrapper for :code:`set_means`, :code:`set_stds`, :code:`set_fcs`."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_stds(stds, update_initializer=update_initializer)
         self.set_fcs(fcs, update_initializer=update_initializer)
@@ -626,7 +630,7 @@ class Model(ModelBase):
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_means_stds_fcs."""
+        """Wrapper for :code:`set_means_stds_fcs`."""
         self.set_means_stds_fcs(
             observation_model_parameters[0],
             observation_model_parameters[1],

@@ -74,6 +74,10 @@ def plot_parcellation(parcellation, **kwargs):
     ----------
     parcellation : str or Parcellation
         Parcellation to plot.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to `nilearn.plotting.plot_markers
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
+        .plot_markers.html#nilearn.plotting.plot_markers>`_.
     """
     parcellation = Parcellation(parcellation)
     return plot_markers(

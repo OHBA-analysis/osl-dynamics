@@ -1,4 +1,4 @@
-"""Base classes for models with inference.
+"""Base classes inference models.
 
 """
 
@@ -55,7 +55,7 @@ class VariationalInferenceModelConfig:
                 if self.kl_annealing_sharpness is None:
                     raise ValueError(
                         "kl_annealing_sharpness must be passed if "
-                        + "kl_annealing_curve='tanh'."
+                        "kl_annealing_curve='tanh'."
                     )
 
                 if self.kl_annealing_sharpness < 0:
@@ -64,7 +64,7 @@ class VariationalInferenceModelConfig:
             if self.n_kl_annealing_epochs is None:
                 raise ValueError(
                     "If we are performing KL annealing, "
-                    + "n_kl_annealing_epochs must be passed."
+                    "n_kl_annealing_epochs must be passed."
                 )
 
             if self.n_kl_annealing_epochs < 1:
@@ -76,22 +76,17 @@ class VariationalInferenceModelConfig:
 class VariationalInferenceModelBase(ModelBase):
     """Base class for a variational inference model."""
 
-    def fit(
-        self,
-        *args,
-        kl_annealing_callback=None,
-        **kwargs,
-    ):
+    def fit(self, *args, kl_annealing_callback=None, **kwargs):
         """Wrapper for the standard keras fit method.
 
         Parameters
         ----------
-        *args
-            Arguments for ModelBase.fit().
-        kl_annealing_callback : bool
+        *args : arguments
+            Arguments for :code:`ModelBase.fit()`.
+        kl_annealing_callback : bool, optional
             Should we update the KL annealing factor during training?
-        **kwargs
-            Keyword arguments for ModelBase.fit()
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`ModelBase.fit()`.
 
         Returns
         -------
@@ -137,7 +132,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
@@ -145,9 +140,9 @@ class VariationalInferenceModelBase(ModelBase):
             Number of initializations.
         take : float
             Fraction of total batches to take.
-        n_kl_annealing_epochs : int
+        n_kl_annealing_epochs : int, optional
             Number of KL annealing epochs.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -225,22 +220,22 @@ class VariationalInferenceModelBase(ModelBase):
 
         Parameters
         ----------
-        training_data : list of tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : list of tf.data.Dataset or osl_dynamics.data.Data
             Datasets for each subject.
         n_epochs : int
             Number of epochs to train.
         n_init : int
             How many subjects should we train on?
-        n_kl_annealing_epochs : int
-            Number of KL annealing epochs to use during initialization. If None
-            then the KL annealing epochs in the config is used.
-        kwargs : keyword arguments
+        n_kl_annealing_epochs : int, optional
+            Number of KL annealing epochs to use during initialization. If
+            :code:`None` then the KL annealing epochs in the :code:`config`
+            is used.
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
         """
         if n_init is None or n_init == 0:
             _logger.warning(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 
@@ -307,7 +302,7 @@ class VariationalInferenceModelBase(ModelBase):
     ):
         """Multi-start initialization.
 
-        Wrapper for random_subset_initialization with take=1.
+        Wrapper for :code:`random_subset_initialization` with :code:`take=1`.
 
         Returns
         -------
@@ -327,7 +322,7 @@ class VariationalInferenceModelBase(ModelBase):
     def reset_kl_annealing_factor(self):
         """Sets the KL annealing factor to zero.
 
-        This method assumes there is a keras layer named 'kl_loss' in the model.
+        This method assumes there is a keras layer named :code:`'kl_loss'` in the model.
         """
         if self.config.do_kl_annealing:
             kl_loss_layer = self.model.get_layer("kl_loss")
@@ -338,7 +333,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         Parameters
         ----------
-        keep : list of str
+        keep : list of str, optional
             Layer names to NOT reset.
         """
         initializers.reinitialize_model_weights(self.model, keep)
@@ -364,28 +359,29 @@ class VariationalInferenceModelBase(ModelBase):
     def get_theta(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
     ):
-        """Mode mixing logits, theta.
+        """Mode mixing logits, :code:`theta`.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate theta for each subject?
-        remove_edge_effects : bool
+        remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
-            We can remove these by predicting overlapping thetas and disregarding
-            the alphas near the ends. Passing True does this by using sequences with
-            50% overlap and throwing away the first at last 25% of predictions.
+            We can remove these by predicting overlapping :code:`theta` and
+            disregarding the :code:`theta` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
 
         Returns
         -------
         theta : list or np.ndarray
-            Mode mixing logits with shape (n_subjects, n_samples, n_modes) or
-            (n_samples, n_modes).
+            Mode mixing logits with shape (n_subjects, n_samples, n_modes)
+            or (n_samples, n_modes).
         fc_theta : list or np.ndarray
             Mode mixing logits for FC.
-            Only returned if self.config.multiple_dynamics=True.
+            Only returned if :code:`self.config.multiple_dynamics=True`.
         """
         if self.config.multiple_dynamics:
             return self.get_mode_logits(dataset, concatenate, remove_edge_effects)
@@ -419,19 +415,20 @@ class VariationalInferenceModelBase(ModelBase):
     def get_mode_logits(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
     ):
-        """Get logits (theta) for a multi-time-scale model.
+        """Get logits (:code:`theta`) for a multi-time-scale model.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate theta for each subject?
-        remove_edge_effects : bool
+        remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
-            We can remove these by predicting overlapping thetas and disregarding
-            the alphas near the ends. Passing True does this by using sequences with
-            50% overlap and throwing away the first at last 25% of predictions.
+            We can remove these by predicting overlapping :code:`theta` and
+            disregarding the :code:`theta` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
 
         Returns
         -------
@@ -483,19 +480,20 @@ class VariationalInferenceModelBase(ModelBase):
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
     ):
-        """Get mode mixing coefficients, alpha.
+        """Get mode mixing coefficients, :code:`alpha`.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate alpha for each subject?
-        remove_edge_effects : bool
+        remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
-            We can remove these by predicting overlapping alphas and disregarding
-            the alphas near the ends. Passing True does this by using sequences with
-            50% overlap and throwing away the first at last 25% of predictions.
+            We can remove these by predicting overlapping :code:`alpha` and
+            disregarding the :code:`alpha` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
 
         Returns
         -------
@@ -504,7 +502,7 @@ class VariationalInferenceModelBase(ModelBase):
             (n_samples, n_modes).
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_time_courses(dataset, concatenate, step_size)
+            return self.get_mode_time_courses(dataset, concatenate, remove_edge_effects)
 
         if remove_edge_effects:
             step_size = self.config.sequence_length // 2  # 50% overlap
@@ -537,20 +535,20 @@ class VariationalInferenceModelBase(ModelBase):
     def get_mode_time_courses(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
     ):
-        """Get mode time courses (alpha) for a multi-time-scale model.
+        """Get mode time courses (:code:`alpha`) for a multi-time-scale model.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate alpha/gamma for each subject?
-        remove_edge_effects : bool
+        remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
-            We can remove these by predicting overlapping alphas/gammas and
-            disregarding the alphas near the ends. Passing True does this by
-            using sequences with 50% overlap and throwing away the first at
-            last 25% of predictions.
+            We can remove these by predicting overlapping :code:`alpha`/
+            :code:`gamma` and disregarding the :code:`alpha`/:code:`gamma` near
+            the ends. Passing :code:`True` does this by using sequences with 50%
+            overlap and throwing away the first and last 25% of predictions.
 
         Returns
         -------
@@ -608,7 +606,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to calculate losses for.
 
         Returns
@@ -636,7 +634,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data.
+        dataset : tf.data.Dataset or osl_dynamics.data.Data.
             Dataset to calculate the variational free energy for.
 
         Returns

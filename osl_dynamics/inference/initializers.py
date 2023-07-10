@@ -20,9 +20,8 @@ class WeightInitializer(Initializer):
 
     Parameters
     ----------
-    initial_value : numpy.ndarray
-        Value to initialise weights to.
-        Note, the shape is not checked.
+    initial_value : np.ndarray
+        Value to initialise weights to. Note, the shape is not checked.
     """
 
     def __init__(self, initial_value):
@@ -134,7 +133,7 @@ class CopyTensorInitializer(Initializer):
 
     Parameters
     ----------
-    tensor : tensorflow.Tensor
+    tensor : tf.Tensor
         Tensor to copy.
     """
 
@@ -148,14 +147,16 @@ class CopyTensorInitializer(Initializer):
 def reinitialize_layer_weights(layer):
     """Re-initializes the weights in a particular layer.
 
-    This function relies on each layer having an initializer attribute.
-    Therefore, you must specify a self.*_initializer attribute in custom
-    layers, otherwise this function will break.
-
     Parameters
     ----------
-    layer: tensorflow.keras.layers.Layer
+    layer: tf.keras.layers.Layer
         Layer to initialize weights for.
+
+    Note
+    ----
+    This function relies on each layer having an attribute for the initializer.
+    Standard TensorFlow layers have this. You must specify a :code:`self.*_initializer`
+    attribute in any custom layer, otherwise this function will break.
     """
 
     # Get the initialisation container
@@ -200,14 +201,14 @@ def reinitialize_layer_weights(layer):
 
 
 def reinitialize_model_weights(model, keep=None):
-    """Re-initialize the weights in the model.
+    """Re-initialize the weights in a model.
 
     Parameters
     ----------
-    model : tensorflow.keras.Model
+    model : tf.keras.Model
         Model to re-initialize weights for.
-    keep : list
-        List of str containing names for layers to not reinitialize.
+    keep : list, optional
+        List of :code:`str` containing names for layers to not reinitialize.
     """
     if keep is None:
         keep = []

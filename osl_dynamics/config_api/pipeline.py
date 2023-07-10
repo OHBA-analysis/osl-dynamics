@@ -1,29 +1,7 @@
 """Functions for running full pipelines via the config API.
 
-See the `toolbox examples
-<https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_
-for scripts that use the config API.
-
-Note, the config API can be used via the command line with::
-
-    % osl-dynamics <config-file> <output-directory>
-
-where
-
-- :code:`<config-file>` is a yaml file containing the config.
-- :code:`<output-directory>` is the output directory.
-
-Optionally, you can specify a particular GPU to use with::
-
-    % osl-dynamics <config-file> <output-directory> --restrict <restrict>
-
-where :code:`<restrict>` is an integer specifying the GPU number. E.g. if you would
-just like to use the first GPU, you can pass::
-
-    % osl-dynamics <config-file> <output-directory> --restrict 0
-
-Remember you need to activate the :code:`osld` conda environment to use the
-command line interface.
+See the documentation `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+/osl_dynamics/config_api/index.html>`_ for example usage.
 """
 
 import argparse
@@ -46,8 +24,8 @@ def load_config(config):
     Parameters
     ----------
     config : str or dict
-        Path to yaml file, string to convert to dict, or dict
-        containing the config.
+        Path to yaml file, :code:`str` to convert to :code:`dict`,
+        or :code:`dict` containing the config.
 
     Returns
     -------
@@ -76,7 +54,7 @@ def find_function(name, extra_funcs=None):
     ----------
     name : str
         Function name.
-    extra_funcs : list of function
+    extra_funcs : list of functions, optional
         Custom functions passed by the user.
 
     Returns
@@ -110,12 +88,13 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
     Parameters
     ----------
     config : str or dict
-        Path to yaml file, string to convert to dict, or dict containing the config.
+        Path to yaml file, :code:`str` to convert to :code:`dict`,
+        or :code:`dict` containing the config.
     output_dir : str
         Path to output directory.
-    data : osl_dynamics.data.Data
-        Data object. Optional.
-    extra_funcs : list of functions
+    data : osl_dynamics.data.Data, optional
+        Data object.
+    extra_funcs : list of functions, optional
         User-defined functions referenced in the config.
     """
 
@@ -156,11 +135,7 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
         data.delete_dir()
 
 
-def run_pipeline_from_file(
-    config_file,
-    output_directory,
-    restrict=None,
-):
+def run_pipeline_from_file(config_file, output_directory, restrict=None):
     """Run a pipeline from a config file.
 
     Parameters
@@ -169,8 +144,8 @@ def run_pipeline_from_file(
         Path to the config file.
     output_directory : str
         Path to the output directory.
-    restrict : int or str
-        GPU to use. If a str is passed it will be cast to an int. Optional.
+    restrict : int or str, optional
+        GPU to use. If a str is passed it will be cast to an int.
     """
     if restrict is not None:
         from osl_dynamics.inference import tf_ops

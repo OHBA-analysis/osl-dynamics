@@ -10,11 +10,11 @@ def get_n_sequences(arr, sequence_length, step_size=None):
 
     Parameters
     ----------
-    arr : numpy.ndarray
+    arr : np.ndarray
         Time series data.
     sequence_length : int
         Length of sequences which the data will be segmented in to.
-    step_size : int
+    step_size : int, optional
         The number of samples by which to move the sliding window between sequences.
 
     Returns
@@ -37,7 +37,7 @@ def concatenate_datasets(datasets):
 
     Returns
     -------
-    full_dataset : tensorflow.data.Dataset
+    full_dataset : tf.data.Dataset
         Concatenated dataset.
     """
     full_dataset = datasets[0]
@@ -61,7 +61,7 @@ def create_dataset(data, sequence_length, step_size):
 
     Returns
     -------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
     """
     from tensorflow.data import Dataset  # moved here to avoid slow imports
@@ -107,7 +107,7 @@ def get_range(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
@@ -133,7 +133,7 @@ def get_n_channels(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
@@ -153,7 +153,7 @@ def get_n_batches(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
