@@ -88,8 +88,8 @@ def power_spectra(
     psd : np.ndarray
         Power spectral density. Shape is (n_subjects, n_channels, n_freq).
     coh : np.ndarray
-        Coherence spectra. Shape is (n_subjects, n_channels, n_channels, n_freq).
-        Only returned is :code:`calc_coh=True`.
+        Coherence spectra. Shape is (n_subjects, n_channels, n_channels,
+        n_freq). Only returned is :code:`calc_coh=True`.
     weights : np.ndarray
         Weight for each subject-specific PSD. Only returned if
         :code:`return_weights=True`.
@@ -110,7 +110,8 @@ def power_spectra(
         data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
     if len(data) == 1:
-        # We only have one subject so we don't need to parallelise the calculation
+        # We only have one subject so we don't need to parallelise
+        # the calculation
         results = spectral.spectrogram(
             data=data[0],
             window_length=window_length,
@@ -142,7 +143,12 @@ def power_spectra(
 
         # Calculate power spectra
         _logger.info("Calculating spectra")
-        results = pqdm(args, spectral.spectrogram, n_jobs=n_jobs, argument_type="args")
+        results = pqdm(
+            args,
+            spectral.spectrogram,
+            n_jobs=n_jobs,
+            argument_type="args",
+        )
 
     # Unpack results
     psd = []
@@ -203,8 +209,8 @@ def multitaper_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Raw time series data. Must have shape (n_subjects, n_samples, n_channels)
-        or (n_samples, n_channels).
+        Raw time series data. Must have shape (n_subjects, n_samples,
+        n_channels) or (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
     time_half_bandwidth : float

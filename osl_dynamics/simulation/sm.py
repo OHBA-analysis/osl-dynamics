@@ -64,7 +64,9 @@ class MixedSine:
         # Generator mode time courses
         self.logits = np.empty([n_samples, self.n_modes], dtype=np.float32)
         t = np.arange(
-            0, n_samples / self.sampling_frequency, 1.0 / self.sampling_frequency
+            0,
+            n_samples / self.sampling_frequency,
+            1.0 / self.sampling_frequency,
         )
         for i in range(self.n_modes):
             self.logits[:, i] = self.relative_activation[i] + self.amplitudes[
@@ -78,7 +80,8 @@ class MixedSine:
 
 
 class MixedSine_MVN(Simulation):
-    """Simulates sinusoidal alphas with a multivariable normal observation model.
+    """Simulates sinusoidal alphas with a multivariable normal observation
+    model.
 
     Parameters
     ----------
@@ -209,7 +212,8 @@ class MSubj_MixedSine_MVN(Simulation):
     subject_embedding_scale : float, optional
         Scale of variability between subject observation parameters.
     n_groups : int, optional
-        Number of groups of subjects when subject means or covariances are 'random'.
+        Number of groups of subjects when subject means or covariances are
+        :code:`'random'`.
     between_group_scale : float, optional
         Scale of variability between groups.
     observation_error : float, optional
@@ -298,8 +302,10 @@ class MSubj_MixedSine_MVN(Simulation):
             self.obs_mod.subject_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :],
+            axis=1,
         )
         self.obs_mod.instantaneous_covs /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :],
+            axis=1,
         )

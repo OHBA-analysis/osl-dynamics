@@ -32,7 +32,8 @@ class WeightInitializer(Initializer):
 
 
 class IdentityCholeskyInitializer(Initializer):
-    """Initialize weights to a flattened cholesky factor of identity matrices."""
+    """Initialize weights to a flattened cholesky factor of identity
+    matrices."""
 
     def __init__(self):
         # Bijector used to transform learnable vectors to covariance matrices
@@ -155,8 +156,9 @@ def reinitialize_layer_weights(layer):
     Note
     ----
     This function relies on each layer having an attribute for the initializer.
-    Standard TensorFlow layers have this. You must specify a :code:`self.*_initializer`
-    attribute in any custom layer, otherwise this function will break.
+    Standard TensorFlow layers have this. You must specify a
+    :code:`self.*_initializer` attribute in any custom layer, otherwise this
+    function will break.
     """
 
     # Get the initialisation container

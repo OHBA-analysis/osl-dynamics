@@ -7,7 +7,8 @@ import numpy as np
 
 
 def get_one_hot(values, n_states=None):
-    """Expand a categorical variable to a series of boolean columns (one-hot encoding).
+    """Expand a categorical variable to a series of boolean columns
+    (one-hot encoding).
 
     +----------------------+
     | Categorical Variable |
@@ -38,13 +39,13 @@ def get_one_hot(values, n_states=None):
     Parameters
     ----------
     values : np.ndarray
-        1D array of categorical values with shape (n_samples,). The values should
-        be integers (0, 1, 2, 3, ... , :code:`n_states` - 1). Or 2D array of shape
-        (n_samples, n_states) to be binarized.
+        1D array of categorical values with shape (n_samples,). The values
+        should be integers (0, 1, 2, 3, ... , :code:`n_states` - 1). Or 2D
+        array of shape (n_samples, n_states) to be binarized.
     n_states : int, optional
-        Total number of states in :code:`values`. Must be at least the number of states
-        present in :code:`values`. Default is the number of unique values in
-        :code:`values`.
+        Total number of states in :code:`values`. Must be at least the number
+        of states present in :code:`values`. Default is the number of unique
+        values in :code:`values`.
 
     Returns
     -------
@@ -61,7 +62,8 @@ def get_one_hot(values, n_states=None):
 
 
 def cov2corr(cov):
-    """Converts batches of covariance matrices into batches of correlation matrives.
+    """Converts batches of covariance matrices into batches of correlation
+    matrices.
 
     Parameters
     ----------
@@ -103,7 +105,14 @@ def cov2std(cov):
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
-def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=False):
+def sliding_window_view(
+    x,
+    window_shape,
+    axis=None,
+    *,
+    subok=False,
+    writeable=False,
+):
     """Create a sliding window over an array in arbitrary dimensions.
 
     Unceremoniously ripped from numpy 1.20,
@@ -111,8 +120,12 @@ def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=Fa
     <https://numpy.org/doc/1.20/reference/generated/\
     numpy.lib.stride_tricks.sliding_window_view.html>`_.
     """
-    window_shape = tuple(window_shape) if np.iterable(window_shape) else (window_shape,)
-    # first convert input to array, possibly keeping subclass
+    if np.iterable(window_shape):
+        window_shape = tuple(window_shape)
+    else:
+        window_shape = (window_shape,)
+
+    # First convert input to array, possibly keeping subclass
     x = np.array(x, copy=False, subok=subok)
 
     window_shape_array = np.array(window_shape)
@@ -129,7 +142,11 @@ def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=Fa
                 f"and `x.ndim` is {x.ndim}."
             )
     else:
-        axis = np.core.numeric.normalize_axis_tuple(axis, x.ndim, allow_duplicate=True)
+        axis = np.core.numeric.normalize_axis_tuple(
+            axis,
+            x.ndim,
+            allow_duplicate=True,
+        )
         if len(window_shape) != len(axis):
             raise ValueError(
                 f"Must provide matching length window_shape and "
@@ -143,11 +160,16 @@ def sliding_window_view(x, window_shape, axis=None, *, subok=False, writeable=Fa
     x_shape_trimmed = list(x.shape)
     for ax, dim in zip(axis, window_shape):
         if x_shape_trimmed[ax] < dim:
-            raise ValueError("window shape cannot be larger than input array shape")
+            msg = "window shape cannot be larger than input array shape"
+            raise ValueError(msg)
         x_shape_trimmed[ax] -= dim - 1
     out_shape = tuple(x_shape_trimmed) + window_shape
     return np.lib.stride_tricks.as_strided(
-        x, strides=out_strides, shape=out_shape, subok=subok, writeable=writeable
+        x,
+        strides=out_strides,
+        shape=out_shape,
+        subok=subok,
+        writeable=writeable,
     )
 
 
@@ -161,7 +183,8 @@ def validate(array, correct_dimensionality, allow_dimensions, error_message):
     correct_dimensionality : int
         The desired number of dimensions in the array.
     allow_dimensions : int
-        The number of dimensions that is acceptable for the passed array to have.
+        The number of dimensions that is acceptable for the passed array to
+        have.
     error_message : str
         Message to print if the array is not valid.
 
@@ -193,8 +216,8 @@ def check_symmetry(mat, precision=1e-6):
     mat : np.ndarray or list of np.ndarray
         Matrices to be checked. Shape of a matrix should be (..., N, N).
     precision : float, optional
-        Precision for comparing values. Corresponds to an absolute tolerance parameter.
-        Default is :code:`1e-6`.
+        Precision for comparing values. Corresponds to an absolute tolerance
+        parameter. Default is :code:`1e-6`.
 
     Returns
     -------
@@ -203,7 +226,8 @@ def check_symmetry(mat, precision=1e-6):
     """
     mat = np.array(mat)
     if mat.ndim < 2:
-        raise ValueError("Input matrix must be an array with shape (..., N, N).")
+        msg = "Input matrix must be an array with shape (..., N, N)."
+        raise ValueError(msg)
     transpose_axes = np.concatenate((np.arange(mat.ndim - 2), [-1, -2]))
     symmetry = np.all(
         np.isclose(
@@ -219,7 +243,8 @@ def check_symmetry(mat, precision=1e-6):
 
 
 def ezclump(binary_array):
-    """Find the clumps (groups of data with the same values) for a 1D bool array.
+    """Find the clumps (groups of data with the same values) for a 1D bool
+    array.
 
     Taken wholesale from :code:`numpy.ma.extras.ezclump`.
     """

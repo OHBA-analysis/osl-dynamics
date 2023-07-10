@@ -168,7 +168,11 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Make a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+        training_data = self.make_dataset(
+            training_data,
+            shuffle=True,
+            concatenate=True,
+        )
 
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_data)
@@ -182,12 +186,16 @@ class VariationalInferenceModelBase(ModelBase):
             self.reset()
             training_data_subset = training_data.shuffle(100000).take(n_batches)
             try:
-                history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+                history = self.fit(
+                    training_data_subset,
+                    epochs=n_epochs,
+                    **kwargs,
+                )
             except tf.errors.InvalidArgumentError as e:
                 _logger.warning(e)
                 _logger.warning(
-                    "Training failed! Could be due to instability of the KL term. "
-                    + "Skipping initialization."
+                    "Training failed! Could be due to instability of the KL "
+                    + "term. Skipping initialization."
                 )
                 continue
 
@@ -211,7 +219,12 @@ class VariationalInferenceModelBase(ModelBase):
         return best_history
 
     def single_subject_initialization(
-        self, training_data, n_epochs, n_init, n_kl_annealing_epochs=None, **kwargs
+        self,
+        training_data,
+        n_epochs,
+        n_init,
+        n_kl_annealing_epochs=None,
+        **kwargs,
     ):
         """Initialization for the mode means/covariances.
 
@@ -259,7 +272,11 @@ class VariationalInferenceModelBase(ModelBase):
 
         # Pick n_init subjects at random
         n_all_subjects = len(training_data)
-        subjects_to_use = np.random.choice(range(n_all_subjects), n_init, replace=False)
+        subjects_to_use = np.random.choice(
+            range(n_all_subjects),
+            n_init,
+            replace=False,
+        )
 
         # Train the model a few times and keep the best one
         best_loss = np.Inf
@@ -322,7 +339,8 @@ class VariationalInferenceModelBase(ModelBase):
     def reset_kl_annealing_factor(self):
         """Sets the KL annealing factor to zero.
 
-        This method assumes there is a keras layer named :code:`'kl_loss'` in the model.
+        This method assumes there is a keras layer named :code:`'kl_loss'`
+        in the model.
         """
         if self.config.do_kl_annealing:
             kl_loss_layer = self.model.get_layer("kl_loss")
@@ -364,7 +382,8 @@ class VariationalInferenceModelBase(ModelBase):
         Parameters
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
+            Prediction dataset. This can be a list of datasets, one for each
+            subject.
         concatenate : bool, optional
             Should we concatenate theta for each subject?
         remove_edge_effects : bool, optional
@@ -384,7 +403,11 @@ class VariationalInferenceModelBase(ModelBase):
             Only returned if :code:`self.config.multiple_dynamics=True`.
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_logits(dataset, concatenate, remove_edge_effects)
+            return self.get_mode_logits(
+                dataset,
+                concatenate,
+                remove_edge_effects,
+            )
 
         if remove_edge_effects:
             step_size = self.config.sequence_length // 2  # 50% overlap
@@ -420,7 +443,8 @@ class VariationalInferenceModelBase(ModelBase):
         Parameters
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
+            Prediction dataset. This can be a list of datasets, one for each
+            subject.
         concatenate : bool, optional
             Should we concatenate theta for each subject?
         remove_edge_effects : bool, optional
@@ -433,11 +457,11 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         mean_theta : list or np.ndarray
-            Mode mixing logits for mean with shape (n_subjects, n_samples, n_modes) or
-            (n_samples, n_modes).
+            Mode mixing logits for mean with shape (n_subjects, n_samples,
+            n_modes) or (n_samples, n_modes).
         fc_theta : list or np.ndarray
-            Mode mixing logits for FC with shape (n_subjects, n_samples, n_modes) or
-            (n_samples, n_modes).
+            Mode mixing logits for FC with shape (n_subjects, n_samples,
+            n_modes) or (n_samples, n_modes).
         """
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_theta for a single time scale model.")
@@ -485,7 +509,8 @@ class VariationalInferenceModelBase(ModelBase):
         Parameters
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
+            Prediction dataset. This can be a list of datasets, one for each
+            subject.
         concatenate : bool, optional
             Should we concatenate alpha for each subject?
         remove_edge_effects : bool, optional
@@ -498,11 +523,15 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Mode mixing coefficients with shape (n_subjects, n_samples, n_modes) or
-            (n_samples, n_modes).
+            Mode mixing coefficients with shape (n_subjects, n_samples,
+            n_modes) or (n_samples, n_modes).
         """
         if self.config.multiple_dynamics:
-            return self.get_mode_time_courses(dataset, concatenate, remove_edge_effects)
+            return self.get_mode_time_courses(
+                dataset,
+                concatenate,
+                remove_edge_effects,
+            )
 
         if remove_edge_effects:
             step_size = self.config.sequence_length // 2  # 50% overlap
@@ -540,7 +569,8 @@ class VariationalInferenceModelBase(ModelBase):
         Parameters
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction data. This can be a list of datasets, one for each subject.
+            Prediction data. This can be a list of datasets, one for each
+            subject.
         concatenate : bool, optional
             Should we concatenate alpha/gamma for each subject?
         remove_edge_effects : bool, optional

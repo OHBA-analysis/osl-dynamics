@@ -13,8 +13,9 @@ class MAR:
     .. math::
         x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + \epsilon_t
 
-    where :math:`\epsilon_t \sim N(0, \Sigma)`. The MAR model is therefore parameterized
-    by the MAR coefficients (:math:`A`) and covariance (:math:`\Sigma`).
+    where :math:`\epsilon_t \sim N(0, \Sigma)`. The MAR model is therefore
+    parameterized by the MAR coefficients (:math:`A`) and covariance
+    (:math:`\Sigma`).
 
     Parameters
     ----------

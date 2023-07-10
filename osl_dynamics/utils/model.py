@@ -6,7 +6,8 @@ import re
 
 
 def tex_escape(text):
-    """Escape characters which require control sequences in text for use in LaTeX.
+    """Escape characters which require control sequences in text for use
+    in LaTeX.
 
     Parameters
     ----------
@@ -168,7 +169,8 @@ class LatexTable(Table):
     horizontal_lines : bool, optional
         Whether to draw horizontal lines, by default :code:`True`.
     header_lines : bool, optional
-        Whether to draw horizontal lines above the header, by default :code:`True`.
+        Whether to draw horizontal lines above the header,
+        by default :code:`True`.
     """
 
     outer = "".join(
@@ -183,7 +185,12 @@ class LatexTable(Table):
     )
 
     def __init__(
-        self, headers, *, vertical_lines=True, horizontal_lines=True, header_lines=True
+        self,
+        headers,
+        *,
+        vertical_lines=True,
+        horizontal_lines=True,
+        header_lines=True,
     ):
         super().__init__(headers)
         self.vertical_lines = vertical_lines

@@ -40,8 +40,8 @@ def sliding_window_connectivity(
         Should use :code:`"corr"` for Pearson correlation or :code:`"cov"`
         for covariance.
     concatenate : bool, optional
-        Should we concatenate the sliding window connectivities from each subject
-        into one big time series?
+        Should we concatenate the sliding window connectivities from each
+        subject into one big time series?
 
     Returns
     -------
@@ -101,15 +101,16 @@ def covariance_from_spectra(
     Parameters
     ----------
     frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if :code:`frequency_range` is given.
-        Shape must be (n_freq,).
+        Frequency axis of the PSDs. Only used if :code:`frequency_range`
+        is given. Shape must be (n_freq,).
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape must be (n_modes, n_channels,
-        n_channels, n_freq).
+        Power/cross spectra for each channel.
+        Shape must be (n_modes, n_channels, n_channels, n_freq).
     components : np.ndarray, optional
         Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list, optional
-        Frequency range to integrate the PSD over (Hz). Default is the full range.
+        Frequency range to integrate the PSD over (Hz).
+        Default is the full range.
 
     Returns
     -------
@@ -187,8 +188,8 @@ def mean_coherence_from_spectra(
     Parameters
     ----------
     frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if :code:`frequency_range` is given.
-        Shape must be (n_freq,).
+        Frequency axis of the PSDs. Only used if :code:`frequency_range` is
+        given. Shape must be (n_freq,).
     coherence : np.ndarray
         Coherence for each channel. Shape must be (n_modes, n_channels,
         n_channels, n_freq).
@@ -277,7 +278,12 @@ def mean_connections(conn_map):
     return np.mean(conn_map, axis=-1)
 
 
-def eigenvectors(conn_map, n_eigenvectors=1, absolute_value=False, as_network=False):
+def eigenvectors(
+    conn_map,
+    n_eigenvectors=1,
+    absolute_value=False,
+    as_network=False,
+):
     """Calculate eigenvectors of a connectivity matrix.
 
     Parameters
@@ -339,48 +345,52 @@ def gmm_threshold(
 ):
     """Threshold a connectivity matrix using the GMM method.
 
-    Wrapper for combining `connectivity.fit_gmm <https://osl-dynamics.readthedocs.io\
-    /en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics\
-    .analysis.connectivity.fit_gmm>`_ and `connectivity.threshold \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
-    /connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_.
+    Wrapper for combining `connectivity.fit_gmm <https://osl-dynamics\
+    .readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity\
+    /index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_ and
+    `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest\
+    /autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics\
+    .analysis.connectivity.threshold>`_.
 
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
-        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+        Connectivity matrix. Shape must be (n_components, n_modes,
+        n_channels, n_channels) or (n_modes, n_channels, n_channels)
+        or (n_channels, n_channels).
     subtract_mean : bool, optional
         Should we subtract the mean over modes before fitting a GMM?
     mean_weights: np.ndarray, optional
-        Numpy array with weightings for each mode/state to use to calculate the mean.
-        Default is equal weighting.
+        Numpy array with weightings for each mode/state to use to calculate
+        the mean. Default is equal weighting.
     standardize : bool, optional
         Should we standardize the input to the GMM?
     p_value : float, optional
-        Used to determine a threshold. We ensure the data points assigned to the 'on'
-        component have a probability of less than :code:`p_value` of belonging to the
-        'off' component.
+        Used to determine a threshold. We ensure the data points assigned to
+        the 'on' component have a probability of less than :code:`p_value` of
+        belonging to the 'off' component.
     keep_positive_only : bool, optional
         Should we only keep positive values to fit a GMM to?
     one_component_percentile : float, optional
-        Percentile threshold if only one component is found. Should be a between
-        0 and 100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
+        Percentile threshold if only one component is found. Should be a
+        between 0 and 100. E.g. for the 95th percentile,
+        :code:`one_component_percentile=95`.
     n_sigma : float, optional
-        Number of standard deviations of the 'off' component the mean of the 'on'
-        component must be for the fit to be considered to have two components.
+        Number of standard deviations of the 'off' component the mean of the
+        'on' component must be for the fit to be considered to have two
+        components.
     sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
-        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable/modules\
-        /generated/sklearn.mixture.GaussianMixture.html>`_.
+        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
+        /modules/generated/sklearn.mixture.GaussianMixture.html>`_.
     show : bool, optional
         Should we show the GMM fit to the distribution of :code:`conn_map`.
     filename : str, optional
         Filename to save fit to.
     plot_kwargs : dict, optional
         Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
-        /plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
 
     Returns
     -------
@@ -420,45 +430,49 @@ def fit_gmm(
     filename=None,
     plot_kwargs=None,
 ):
-    """Fit a two component Gaussian Mixture Model (GMM) to connections to identify a
-    threshold.
+    """Fit a two component Gaussian Mixture Model (GMM) to connections to
+    identify a threshold.
 
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity map. Shape must be (n_components, n_modes, n_channels, n_channels)
-        or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+        Connectivity map. Shape must be (n_components, n_modes, n_channels,
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels,
+        n_channels).
     subtract_mean : bool, optional
         Should we subtract the mean over modes before fitting a GMM?
     mean_weights: np.ndarray, optional
-        Numpy array with weightings for each mode/state to use to calculate the mean.
-        Default is equal weighting.
+        Numpy array with weightings for each mode/state to use to calculate
+        the mean. Default is equal weighting.
     standardize : bool, optional
         Should we standardize the input to the GMM?
     p_value : float, optional
-        Used to determine a threshold. We ensure the data points assigned to the 'on'
-        component have a probability of less than :code:`p_value` of belonging to the
-        'off' component.
+        Used to determine a threshold. We ensure the data points assigned to
+        the 'on' component have a probability of less than :code:`p_value` of
+        belonging to the 'off' component.
     keep_positive_only : bool, optional
         Should we only keep positive values to fit a GMM to?
     one_component_percentile : float, optional
-        Percentile threshold if only one component is found. Should be a between
-        0 and 100. E.g. for the 95th percentile, :code:`one_component_percentile=95`.
+        Percentile threshold if only one component is found. Should be a
+        between 0 and 100. E.g. for the 95th percentile,
+        :code:`one_component_percentile=95`.
     n_sigma : float, optional
-        Number of standard deviations of the 'off' component the mean of the 'on'
-        component must be for the fit to be considered to have two components.
+        Number of standard deviations of the 'off' component the mean of the
+        'on' component must be for the fit to be considered to have two
+        components.
     sklearn_kwargs : dict, optional
-        Dictionary of keyword arguments to pass to `sklearn.mixture.GaussianMixture
-        <https://scikit-learn.org/stable/modules/generated/sklearn.mixture\
-        .GaussianMixture.html>`_ Default is :code:`{"max_iter": 5000, "n_init": 10}`.
+        Dictionary of keyword arguments to pass to
+        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
+        /modules/generated/sklearn.mixture.GaussianMixture.html>`_
+        Default is :code:`{"max_iter": 5000, "n_init": 10}`.
     show : bool, optional
         Should we show the GMM fit to the distribution of :code:`conn_map`.
     filename : str, optional
         Filename to save fit to.
     plot_kwargs : dict, optional
         Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
-        /plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
 
     Returns
     -------
@@ -556,31 +570,32 @@ def threshold(
     ---------
     conn_map : np.ndarray
         Connectivity matrix to threshold. Shape must be (n_components, n_modes,
-        n_channels, n_channels), (n_modes, n_channels, n_channels) or (n_channels,
-        n_channels).
+        n_channels, n_channels), (n_modes, n_channels, n_channels) or
+        (n_channels, n_channels).
     percentile : float or np.ndarray
         Percentile to threshold with. Should be between 0 and 100.
         Shape must be (n_components, n_modes), (n_modes,) or a float.
     subtract_mean : bool, optional
-        Should we subtract the mean over modes before thresholding? The thresholding
-        is only done to identify edges, the values returned in :code:`conn_map` are
-        not mean subtracted.
+        Should we subtract the mean over modes before thresholding? The
+        thresholding is only done to identify edges, the values returned in
+        :code:`conn_map` are not mean subtracted.
     mean_weights : np.ndarray, optional
         Weights when calculating the mean over modes.
     absolute_value : bool, optional
-        Should we take the absolute value before thresholding? The thresholding is
-        only done to identify edges, the values returned in :code:`conn_map` are not
-        absolute values. If :code:`subtract_mean=True`, the mean is subtracted before
-        the absolute value.
+        Should we take the absolute value before thresholding? The thresholding
+        is only done to identify edges, the values returned in :code:`conn_map`
+        are not absolute values. If :code:`subtract_mean=True`, the mean is
+        subtracted before the absolute value.
     return_edges : bool, optional
-        Should we return a boolean array for whether edges are above the threshold?
+        Should we return a boolean array for whether edges are above the
+        threshold?
 
     Returns
     -------
     conn_map : np.ndarray
         Connectivity matrix with connections below the threshold set to zero.
-        Or a boolean array if :code:`return_edges=True`. Shape is the same as the
-        original :code:`conn_map`.
+        Or a boolean array if :code:`return_edges=True`. Shape is the same as
+        the original :code:`conn_map`.
     """
     # Validation
     conn_map = array_ops.validate(
@@ -630,7 +645,10 @@ def threshold(
     m, n = np.triu_indices(n_channels, k=1)
 
     # Which edges are greater than the threshold?
-    edges = np.empty([n_components, n_modes, n_channels, n_channels], dtype=bool)
+    edges = np.empty(
+        [n_components, n_modes, n_channels, n_channels],
+        dtype=bool,
+    )
     for i in range(n_components):
         for j in range(n_modes):
             if c_is_symmetric[i, j]:
@@ -665,9 +683,11 @@ def separate_edges(conn_map):
     Returns
     -------
     pos_conn_map : np.ndarray
-        Connectivity map with positive edges. Shape is the same as :code:`conn_map`.
+        Connectivity map with positive edges. Shape is the same as
+        :code:`conn_map`.
     neg_conn_map : np.ndarray
-        Connectivity map with negative edges. Shape is the same as :code:`conn_map`.
+        Connectivity map with negative edges. Shape is the same as
+        :code:`conn_map`.
     """
     pos_conn_map = conn_map.copy()
     neg_conn_map = conn_map.copy()
@@ -695,24 +715,28 @@ def save(
     parcellation_file : str
         Name of parcellation file used.
     filename : str, optional
-        Output filename. If :code:`None` is passed then the image is shown on screen.
+        Output filename. If :code:`None` is passed then the image is shown
+        on screen.
     component : int, optional
         Spectral component to save.
     threshold : float or np.ndarray, optional
         Threshold to determine which connectivity to show. Should be between 0
         and 1. If a :code:`float` is passed the same threshold is used for all
-        modes. Otherwise, threshold should be a numpy array of shape (n_modes,).
+        modes. Otherwise, threshold should be a numpy array of shape
+        (n_modes,).
     glassbrain : bool, optional
         Sholud we create a 3D glass brain plot (as an interactive HTML file)
-        or a 2D image plot (as a :code:`png`, :code:`pdf`, :code:`svg`, etc. file).
+        or a 2D image plot (as a :code:`png`, :code:`pdf`, :code:`svg`, etc.
+        file).
     plot_kwargs : dict, optional
         Keyword arguments to pass to the nilearn plotting function:
 
-        - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable/modules\
-          /generated/nilearn.plotting.plot_connectome.html>`_ if
+        - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable\
+          /modules/generated/nilearn.plotting.plot_connectome.html>`_ if
           :code:`glassbrain=False`.
-        - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable/modules\
-          /generated/nilearn.plotting.view_connectome.html>`_ if :code:`glassbrain=True`.
+        - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable\
+          /modules/generated/nilearn.plotting.view_connectome.html>`_ if
+          :code:`glassbrain=True`.
 
     Examples
     --------

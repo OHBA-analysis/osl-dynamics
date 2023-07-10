@@ -115,7 +115,8 @@ def load_data(
 ):
     """Loads time series data.
 
-    Checks the data shape is time by channels and that the data is :code:`float32`.
+    Checks the data shape is time by channels and that the data is
+    :code:`float32`.
 
     Parameters
     ----------
@@ -127,12 +128,14 @@ def load_data(
         the data.
     picks : str or list of str, optional
         Argument passed to `mne.io.Raw.get_data
-        <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw.get_data>`_
-        or `mne.Epochs.get_data <https://mne.tools/stable/generated/mne.Epochs.html\
-        #mne.Epochs.get_data>`_. Only used if a fif file is passed.
+        <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw\
+        .get_data>`_ or `mne.Epochs.get_data <https://mne.tools/stable\
+        /generated/mne.Epochs.html#mne.Epochs.get_data>`_.
+        Only used if a fif file is passed.
     reject_by_annotation : str, optional
-        Argument passed to `mne.io.Raw.get_data <https://mne.tools/stable/generated\
-        /mne.io.Raw.html#mne.io.Raw.get_data>`_. Only used if a fif file is passed.
+        Argument passed to `mne.io.Raw.get_data <https://mne.tools/stable\
+        /generated/mne.io.Raw.html#mne.io.Raw.get_data>`_.
+        Only used if a fif file is passed.
     mmap_location : str, optional
         Filename to save the data as a numpy memory map.
     mmap_mode : str, optional
@@ -218,12 +221,12 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
         Path to fif file. Must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
     picks : str or list of str, optional
         Argument passed to `mne.io.Raw.get_data
-        <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw.get_data>`_
-        or `mne.Epochs.get_data <https://mne.tools/stable/generated/mne.Epochs.html\
-        #mne.Epochs.get_data>`_.
+        <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw\
+        .get_data>`_ or `mne.Epochs.get_data <https://mne.tools/stable\
+        /generated/mne.Epochs.html#mne.Epochs.get_data>`_.
     reject_by_annotation : str, optional
-        Argument passed to `mne.io.Raw.get_data <https://mne.tools/stable/generated\
-        /mne.io.Raw.html#mne.io.Raw.get_data>`_.
+        Argument passed to `mne.io.Raw.get_data <https://mne.tools/stable\
+        /generated/mne.io.Raw.html#mne.io.Raw.get_data>`_.
 
     Returns
     -------

@@ -40,7 +40,10 @@ class Parcellation:
 
     def nonzero_coords(self):
         return [
-            nib.affines.apply_affine(self.parcellation.affine, np.array(nonzero).T)
+            nib.affines.apply_affine(
+                self.parcellation.affine,
+                np.array(nonzero).T,
+            )
             for nonzero in self.nonzero()
         ]
 

@@ -129,8 +129,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
-        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
+        Value to clip gradients by. This is the :code:`clipnorm` argument
+        passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -273,7 +273,10 @@ class Model(VariationalInferenceModelBase):
         means : np.ndarray
             Group means. Shape is (n_modes, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.model, "group_means")
+        return obs_mod.get_observation_model_parameter(
+            self.model,
+            "group_means",
+        )
 
     def get_group_covariances(self):
         """Get the group level mode covariances.
@@ -288,7 +291,8 @@ class Model(VariationalInferenceModelBase):
     def get_group_means_covariances(self):
         """Get the group level mode means and covariances.
 
-        This is a wrapper for :code:`get_group_means` and :code:`get_group_covariances`.
+        This is a wrapper for :code:`get_group_means` and
+        :code:`get_group_covariances`.
 
         Returns
         -------
@@ -314,7 +318,11 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_subject_embeddings(self.model)
 
-    def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
+    def get_subject_means_covariances(
+        self,
+        subject_embeddings=None,
+        n_neighbours=2,
+    ):
         """Get the means and covariances for each subject.
 
         Parameters
@@ -323,12 +331,14 @@ class Model(VariationalInferenceModelBase):
             Input embedding vectors for subjects.
             Shape is (n_subjects, subject_embeddings_dim).
         n_neighbours : int, optional
-            Number of nearest neighbours. Ignored if :code:`subject_embedding=None`.
+            Number of nearest neighbours.
+            Ignored if :code:`subject_embedding=None`.
 
         Returns
         -------
         subject_means : np.ndarray
-            Mode means for each subject. Shape is (n_subjects, n_modes, n_channels).
+            Mode means for each subject.
+            Shape is (n_subjects, n_modes, n_channels).
         subject_covs : np.ndarray
             Mode covariances for each subject.
             Shape is (n_subjects, n_modes, n_channels, n_channels).
@@ -344,10 +354,10 @@ class Model(VariationalInferenceModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
-        :code:`sigma=diag((range/2)**2)` and an inverse Wishart prior is applied to
-        the covariances matrices with :code:`nu=n_channels-1+0.1` and
-        :code:`psi=diag(range)`.
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)` and an inverse Wishart
+        prior is applied to the covariances matrices with
+        :code:`nu=n_channels-1+0.1` and :code:`psi=diag(range)`.
 
         Parameters
         ----------
@@ -377,7 +387,8 @@ class Model(VariationalInferenceModelBase):
         group_means : np.ndarray
             Group level mode means. Shape is (n_modes, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed group means when we re-initialize the model?
+            Do we want to use the passed group means when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model,
@@ -392,7 +403,8 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         group_covariances : np.ndarray
-            Group level mode covariances. Shape is (n_modes, n_channels, n_channels).
+            Group level mode covariances.
+            Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool, optional
             Do we want to use the passed group covariances when we re-initialize
             the model?
@@ -429,7 +441,8 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior and prior.
+        """Set the correct scaling for KL loss between deviation posterior
+        and prior.
 
         Parameters
         ----------
@@ -469,8 +482,9 @@ class Model(VariationalInferenceModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the model RNN weights and biases, mixing coefficients, mode
-        means and covariances (group and subject deviation) and subject embeddings.
+        This includes the model RNN weights and biases, mixing coefficients,
+        mode means and covariances (group and subject deviation) and subject
+        embeddings.
 
         Returns
         -------
@@ -496,7 +510,10 @@ class Model(VariationalInferenceModelBase):
 
 def _model_structure(config):
     # Layers for inputs
-    data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
+    data = layers.Input(
+        shape=(config.sequence_length, config.n_channels),
+        name="data",
+    )
     subj_id = layers.Input(shape=(config.sequence_length,), name="subj_id")
 
     # Static loss scaling factor
@@ -527,8 +544,14 @@ def _model_structure(config):
 
     # Layers to sample theta from q(theta) and to convert to mode mixing
     # factors alpha
-    theta_layer = SampleNormalDistributionLayer(config.theta_std_epsilon, name="theta")
-    theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
+    theta_layer = SampleNormalDistributionLayer(
+        config.theta_std_epsilon,
+        name="theta",
+    )
+    theta_norm_layer = NormalizationLayer(
+        config.theta_normalization,
+        name="theta_norm",
+    )
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
@@ -550,7 +573,9 @@ def _model_structure(config):
     # Subject embedding layers
     subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
     subject_embeddings_layer = layers.Embedding(
-        config.n_subjects, config.subject_embeddings_dim, name="subject_embeddings"
+        config.n_subjects,
+        config.subject_embeddings_dim,
+        name="subject_embeddings",
     )
 
     # Group level observation model parameters
@@ -605,7 +630,10 @@ def _model_structure(config):
             config.dev_regularizer_factor,
             name="means_dev_map_input",
         )
-        means_dev_map_layer = layers.Dense(config.n_channels, name="means_dev_map")
+        means_dev_map_layer = layers.Dense(
+            config.n_channels,
+            name="means_dev_map",
+        )
 
         norm_means_dev_map_layer = layers.LayerNormalization(
             axis=-1, name="norm_means_dev_map"
@@ -653,7 +681,9 @@ def _model_structure(config):
 
         # Get the deviation magnitudes (scale deviation maps globally)
 
-        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
+        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(
+            data,
+        )
         means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
             means_dev_mag_inf_alpha_input
         )
@@ -749,7 +779,9 @@ def _model_structure(config):
             covs_dev_mag_inf_alpha_input
         )
         covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
-        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
+        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(
+            covs_dev_mag_inf_beta_input,
+        )
         covs_dev_mag = covs_dev_mag_layer(
             [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta]
         )
@@ -788,7 +820,10 @@ def _model_structure(config):
     mix_subject_means_covs_layer = MixSubjectSpecificParametersLayer(
         name="mix_subject_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(
+        config.covariances_epsilon,
+        name="ll_loss",
+    )
 
     # Data flow
     m, C = mix_subject_means_covs_layer([alpha, mu, D, subj_id])
@@ -866,7 +901,10 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
-        means_dev_mag_kl_loss_layer = ZeroLayer((), name="means_dev_mag_kl_loss")
+        means_dev_mag_kl_loss_layer = ZeroLayer(
+            (),
+            name="means_dev_mag_kl_loss",
+        )
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
 
     if config.learn_covariances:
@@ -896,7 +934,9 @@ def _model_structure(config):
             covs_concat_embeddings,
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
-        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
+        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+            covs_dev_mag_mod_beta_input,
+        )
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
             [
                 data,
@@ -915,7 +955,9 @@ def _model_structure(config):
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
     # Data flow
-    kl_loss = kl_loss_layer([kl_div, means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
+    kl_loss = kl_loss_layer(
+        [kl_div, means_dev_mag_kl_loss, covs_dev_mag_kl_loss],
+    )
 
     return tf.keras.Model(
         inputs=[data, subj_id],

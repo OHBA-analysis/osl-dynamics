@@ -17,14 +17,19 @@ class DiceCoefficientCallback(callbacks.Callback):
     prediction_dataset : tf.data.Dataset
         Dataset to use to calculate outputs of the model.
     ground_truth_time_course : np.ndarray
-        2D or 3D numpy array containing the ground truth state/mode time course of
-        the training data. Shape must be (n_time_courses, n_samples, n_modes)
-        or (n_samples, n_modes).
+        2D or 3D numpy array containing the ground truth state/mode time
+        course of the training data. Shape must be (n_time_courses, n_samples,
+        n_modes) or (n_samples, n_modes).
     names : list of str, optional
         Names for the time courses. Shape must be (n_time_courses,).
     """
 
-    def __init__(self, prediction_dataset, ground_truth_time_course, names=None):
+    def __init__(
+        self,
+        prediction_dataset,
+        ground_truth_time_course,
+        names=None,
+    ):
         super().__init__()
         self.prediction_dataset = prediction_dataset
         if ground_truth_time_course.ndim == 2:
@@ -67,7 +72,8 @@ class DiceCoefficientCallback(callbacks.Callback):
                 "Mismatch between number of ground truth and predicted time courses."
             )
 
-        # For each time course calculate the dice with respect to the ground truth
+        # For each time course calculate the dice with respect to the
+        # ground truth
         dices = []
         for i in range(self.n_time_courses):
             pmtc = inference.modes.argmax_time_courses(
@@ -92,7 +98,8 @@ class DiceCoefficientCallback(callbacks.Callback):
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
-    This callback assumes there is a keras layer named :code:`'kl_loss'` in the model.
+    This callback assumes there is a keras layer named :code:`'kl_loss'`
+    in the model.
 
     Parameters
     ----------
@@ -106,7 +113,13 @@ class KLAnnealingCallback(callbacks.Callback):
         Number of times to perform KL annealing with :code:`n_annealing_epochs`.
     """
 
-    def __init__(self, curve, annealing_sharpness, n_annealing_epochs, n_cycles=1):
+    def __init__(
+        self,
+        curve,
+        annealing_sharpness,
+        n_annealing_epochs,
+        n_cycles=1,
+    ):
         if curve not in ["linear", "tanh"]:
             raise NotImplementedError(curve)
 

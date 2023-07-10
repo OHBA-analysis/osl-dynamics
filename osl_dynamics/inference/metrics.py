@@ -43,10 +43,10 @@ def confusion_matrix(state_time_course_1, state_time_course_2):
     sklearn.metrics.confusion_matrix.html>`_ of two state time courses.
 
     For two state time courses, calculate the confusion matrix (i.e. the
-    disagreement between the state selection for each sample). If either sequence
-    is two dimensional, it will first have :code:`argmax(axis=1)` applied to it.
-    The produces the expected result for a one-hot encoded sequence but other
-    inputs are not guaranteed to behave.
+    disagreement between the state selection for each sample). If either
+    sequence is two dimensional, it will first have :code:`argmax(axis=1)`
+    applied to it. The produces the expected result for a one-hot encoded
+    sequence but other inputs are not guaranteed to behave.
 
     Parameters
     ----------
@@ -117,8 +117,8 @@ def frobenius_norm(A, B):
     -------
     norm : float
         The Frobenius norm of the difference of :code:`A` and :code:`B`.
-        If :code:`A` and :code:`B` are stacked matrices, we sum the Frobenius norm
-        of each sub-matrix.
+        If :code:`A` and :code:`B` are stacked matrices, we sum the Frobenius
+        norm of each sub-matrix.
     """
     if A.ndim == 2 and B.ndim == 2:
         norm = np.linalg.norm(A - B, ord="fro")
@@ -143,7 +143,8 @@ def pairwise_frobenius_distance(matrices):
     Returns
     -------
     pairwise_distance : np.ndarray
-        Matrix of pairwise Frobenius distance. Shape is (n_matrices, n_matrices).
+        Matrix of pairwise Frobenius distance.
+        Shape is (n_matrices, n_matrices).
 
     See Also
     --------
@@ -151,7 +152,9 @@ def pairwise_frobenius_distance(matrices):
     """
     return np.sqrt(
         np.sum(
-            np.square(np.expand_dims(matrices, 0) - np.expand_dims(matrices, 1)),
+            np.square(
+                np.expand_dims(matrices, 0) - np.expand_dims(matrices, 1),
+            ),
             axis=(-2, -1),
         )
     )
@@ -196,7 +199,8 @@ def riemannian_distance(M1, M2, threshold=1e-3):
     M2 : np.ndarray
         Second matrix. Shape must be (N, N).
     threshold : float, optional
-        Threshold to apply when there are negative eigenvalues. Must be positive.
+        Threshold to apply when there are negative eigenvalues.
+        Must be positive.
 
     Returns
     -------
@@ -219,7 +223,8 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     matrices : np.ndarray
         Matrices. Shape must be (M, N, N).
     threshold : float, optional
-        Threshold to apply when there are negative eigenvalues. Must be positive.
+        Threshold to apply when there are negative eigenvalues.
+        Must be positive.
 
     Returns
     -------
@@ -274,13 +279,22 @@ def pairwise_rv_coefficient(matrices, remove_diagonal=False):
 
     for index, element in np.ndenumerate(rv_coefficients):
         nom = np.trace(
-            np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[1]])
+            np.dot(
+                np.transpose(scal_arr_list[index[0]]),
+                scal_arr_list[index[1]],
+            )
         )
         denom1 = np.trace(
-            np.dot(np.transpose(scal_arr_list[index[0]]), scal_arr_list[index[0]])
+            np.dot(
+                np.transpose(scal_arr_list[index[0]]),
+                scal_arr_list[index[0]],
+            )
         )
         denom2 = np.trace(
-            np.dot(np.transpose(scal_arr_list[index[1]]), scal_arr_list[index[1]])
+            np.dot(
+                np.transpose(scal_arr_list[index[1]]),
+                scal_arr_list[index[1]],
+            )
         )
         Rv = nom / np.sqrt(np.dot(denom1, denom2))
         rv_coefficients[index[0], index[1]] = Rv
@@ -292,7 +306,8 @@ def pairwise_rv_coefficient(matrices, remove_diagonal=False):
 
 
 def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
-    """Computes the congruence coefficient between covariance/correlation matrices.
+    """Computes the congruence coefficient between covariance/correlation
+    matrices.
 
     Parameters
     ----------
@@ -310,9 +325,15 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
     n_matrices = matrices.shape[0]
     congruence_coefficient = np.zeros([n_matrices, n_matrices])
     for index, element in np.ndenumerate(congruence_coefficient):
-        nom = np.trace(np.dot(np.transpose(matrices[index[0]]), matrices[index[1]]))
-        denom1 = np.trace(np.dot(np.transpose(matrices[index[0]]), matrices[index[0]]))
-        denom2 = np.trace(np.dot(np.transpose(matrices[index[1]]), matrices[index[1]]))
+        nom = np.trace(
+            np.dot(np.transpose(matrices[index[0]]), matrices[index[1]]),
+        )
+        denom1 = np.trace(
+            np.dot(np.transpose(matrices[index[0]]), matrices[index[0]]),
+        )
+        denom2 = np.trace(
+            np.dot(np.transpose(matrices[index[1]]), matrices[index[1]]),
+        )
         cc = nom / np.sqrt(np.dot(denom1, denom2))
         congruence_coefficient[index[0], index[1]] = cc
 
@@ -323,7 +344,8 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
 
 
 def pairwise_l2_distance(arrays, batch_dims=0):
-    """Calculate the pairwise L2 distance along the first axis after :code:`batch_dims`.
+    """Calculate the pairwise L2 distance along the first axis after
+    :code:`batch_dims`.
 
     Parameters
     ----------

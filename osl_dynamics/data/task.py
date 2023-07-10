@@ -10,8 +10,8 @@ def epoch(data, time_index, pre, post, pad=False):
 
     Given a series of triggers given by :code:`time_index`, spit a continuous
     dataset into epochs. :code:`time_index` should be a sequence of integers
-    representing the triggers of the epochs. :code:`pre` and :code:`post` specify
-    the window around each trigger event.
+    representing the triggers of the epochs. :code:`pre` and :code:`post`
+    specify the window around each trigger event.
 
     Parameters
     ----------
@@ -37,7 +37,10 @@ def epoch(data, time_index, pre, post, pad=False):
         time_index = time_index + pre
     else:
         # Only keep epochs we have all time points for
-        keep = np.logical_and(time_index - pre > 0, time_index + post < data.shape[0])
+        keep = np.logical_and(
+            time_index - pre > 0,
+            time_index + post < data.shape[0],
+        )
         time_index = time_index[keep]
 
     starts, stops = time_index - pre, time_index + post

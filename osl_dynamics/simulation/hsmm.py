@@ -29,8 +29,9 @@ class HSMM:
         Number of states.
     state_vectors : np.ndarray, optional
         Mode vectors define the activation of each components for a state.
-        E.g. :code:`state_vectors=[[1,0,0],[0,1,0],[0,0,1]]` are mutually exclusive
-        states. :code:`state_vector.shape[0]` must be more than :code:`n_states`.
+        E.g. :code:`state_vectors=[[1,0,0],[0,1,0],[0,0,1]]` are mutually
+        exclusive states. :code:`state_vector.shape[0]` must be more than
+        :code:`n_states`.
     random_seed : int, optional
         Seed for random number generator.
     """
@@ -105,7 +106,10 @@ class HSMM:
         )
 
     def generate_states(self, n_samples):
-        cumsum_off_diagonal_trans_prob = np.cumsum(self.off_diagonal_trans_prob, axis=1)
+        cumsum_off_diagonal_trans_prob = np.cumsum(
+            self.off_diagonal_trans_prob,
+            axis=1,
+        )
         alpha = np.zeros([n_samples, self.state_vectors.shape[1]])
 
         gamma_sample = self._rng.gamma
@@ -157,7 +161,8 @@ class HSMM_MVN(Simulation):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels). Or :code:`'random'`.
     n_states : int, optional
-        Number of states. Can pass this argument with keyword :code:`n_modes` instead.
+        Number of states. Can pass this argument with keyword :code:`n_modes`
+        instead.
     n_channels : int, optional
         Number of channels in the observation model.
     observation_error : float, optional
@@ -240,10 +245,12 @@ class HSMM_MVN(Simulation):
 
 
 class MixedHSMM_MVN(Simulation):
-    """Hidden Semi-Markov Model Simulation with a mixture of states at each time point.
+    """Hidden Semi-Markov Model Simulation with a mixture of states at each
+    time point.
 
-    Each mixture of states has it's own row/column in the transition probability matrix.
-    The lifetime of each state mixture is sampled from a Gamma distribution.
+    Each mixture of states has it's own row/column in the transition
+    probability matrix. The lifetime of each state mixture is sampled from
+    a Gamma distribution.
 
     state_mixing_vectors is a 2D numpy array containing mixtures of the
     the states that can be simulated, e.g. with :code:`n_states=3` we could have

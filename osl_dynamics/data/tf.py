@@ -15,7 +15,8 @@ def get_n_sequences(arr, sequence_length, step_size=None):
     sequence_length : int
         Length of sequences which the data will be segmented in to.
     step_size : int, optional
-        The number of samples by which to move the sliding window between sequences.
+        The number of samples by which to move the sliding window between
+        sequences.
 
     Returns
     -------
@@ -74,7 +75,11 @@ def create_dataset(data, sequence_length, step_size):
     # Create an overlapping single model input dataset
     elif len(data) == 1:
         dataset = Dataset.from_tensor_slices(list(data.values())[0])
-        dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
+        dataset = dataset.window(
+            sequence_length,
+            step_size,
+            drop_remainder=True,
+        )
         dataset = dataset.flat_map(
             lambda window: window.batch(sequence_length, drop_remainder=True)
         )
@@ -95,7 +100,11 @@ def create_dataset(data, sequence_length, step_size):
 
         dataset = tuple([Dataset.from_tensor_slices(v) for v in data.values()])
         dataset = Dataset.zip(dataset)
-        dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
+        dataset = dataset.window(
+            sequence_length,
+            step_size,
+            drop_remainder=True,
+        )
         dataset = dataset.flat_map(batch_windows)
         dataset = dataset.map(tuple_to_dict)
 

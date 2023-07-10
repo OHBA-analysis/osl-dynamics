@@ -42,8 +42,8 @@ def sliding_window_power(
     Returns
     -------
     sliding_window_power : list or np.ndarray
-        Time series of power vectors. Shape is (n_subjects, n_windows, n_channels)
-        or (n_windows, n_channels).
+        Time series of power vectors. Shape is (n_subjects, n_windows,
+        n_channels) or (n_windows, n_channels).
     """
     # Validation
     if power_type not in ["mean", "var"]:
@@ -93,11 +93,11 @@ def variance_from_spectra(
     Parameters
     ----------
     frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if :code:`frequency_range` is given.
-        Shape must be (n_freq,).
+        Frequency axis of the PSDs. Only used if :code:`frequency_range` is
+        given. Shape must be (n_freq,).
     power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape must be (n_channels, n_channels)
-        or (n_channels,).
+        Power/cross spectra for each channel.
+        Shape must be (n_channels, n_channels) or (n_channels,).
     components : np.ndarray, optional
         Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list, optional
@@ -289,10 +289,10 @@ def save(
     parcellation_file : str
         Parcellation file used to parcellate the training data.
     filename : str, optional
-        Output filename. If extension is :code:`.nii.gz` the power map is saved as a
-        NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved as images.
-        If :code:`None` is passed then the image is shown on screen and the Matplotlib
-        objects are returned.
+        Output filename. If extension is :code:`.nii.gz` the power map is saved
+        as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
+        as images. If :code:`None` is passed then the image is shown on screen
+        and the Matplotlib objects are returned.
     component : int, optional
         Spectral component to save.
     subtract_mean : bool, optional
@@ -301,9 +301,9 @@ def save(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     asymmetric_data : bool, optional
-        If :code:`True`, the power map is scaled to the range :code:`[-1, 1]` before
-        plotting. The colorbar is rescaled to show the correct values. Useful for
-        plotting maps of statistics such as lifetimes.
+        If :code:`True`, the power map is scaled to the range :code:`[-1, 1]`
+        before plotting. The colorbar is rescaled to show the correct values.
+        Useful for plotting maps of statistics such as lifetimes.
     plot_kwargs : dict, optional
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
@@ -320,10 +320,11 @@ def save(
     Returns
     -------
     figures : list of plt.figure
-        List of Matplotlib figure object. Only returned if :code:`filename=None`.
+        List of Matplotlib figure object. Only returned if
+        :code:`filename=None`.
     axes : list of plt.axis
-        List of Matplotlib axis object(s). Only returned if :code:`filename=None`.
-
+        List of Matplotlib axis object(s). Only returned if
+        :code:`filename=None`.
 
     Examples
     --------
@@ -450,7 +451,11 @@ def save(
         else:
             # Save each map as an image
             for i in trange(n_modes, desc="Saving images"):
-                nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
+                nii = nib.Nifti1Image(
+                    power_map[:, :, :, i],
+                    mask.affine,
+                    mask.header,
+                )
                 fig, ax = plotting.plot_img_on_surf(
                     nii, output_file=None, **plot_kwargs
                 )
@@ -486,31 +491,32 @@ def multi_save(
 
     When training subject-specific models we want to plot the group-level map
     and subject-specific deviations. This function is a wrapper for `power.save
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis\
-    /power/index.html#osl_dynamics.analysis.power.save>`_, which helps us plot power
-    maps for subject-specific models.
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/power/index.html#osl_dynamics.analysis.power.save>`_, which helps
+    us plot power maps for subject-specific models.
 
     Parameters
     ----------
     group_power_map : np.ndarray
         Group level power map to save.
-        Can be of shape: (n_modes, n_channels) or (n_channels,). A (..., n_channels,
-        n_channels) can also be passed. Warning: this function cannot be used if
-        :code:`n_modes` is equal to :code:`n_channels`.
+        Can be of shape: (n_modes, n_channels) or (n_channels,). A (...,
+        n_channels, n_channels) can also be passed. Warning: this function
+        cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
     subject_power_map : np.ndarray
         Subject level power maps to save.
-        Can be of shape: (n_subjects, n_modes, n_channels), (n_modes, n_channels)
-        or (n_channels,). A (..., n_channels, n_channels) array can also be passed.
-        Warning: this function cannot be used if :code:`n_modes=n_channels`.
+        Can be of shape: (n_subjects, n_modes, n_channels), (n_modes,
+        n_channels) or (n_channels,). A (..., n_channels, n_channels) array can
+        also be passed. Warning: this function cannot be used if
+        :code:`n_modes=n_channels`.
     mask_file : str
         Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcellate the training data.
     filename : str, optional
-        Output filename. If extension is :code:`.nii.gz` the power map is saved as a
-        NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved as images.
-        If :code:`None` is passed then the image is shown on screen and the Matplotlib
-        objects are returned.
+        Output filename. If extension is :code:`.nii.gz` the power map is saved
+        as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
+        as images. If :code:`None` is passed then the image is shown on screen
+        and the Matplotlib objects are returned.
     subjects : list, optional
         List of subject indices to be plot power maps for.
     subtract_mean : bool, optional
@@ -575,7 +581,11 @@ def multi_save(
     if n_modes == 1:
         subtract_mean = False
     if subtract_mean:
-        mean_group_power = np.average(group_power_map, axis=0, weights=mean_weights)
+        mean_group_power = np.average(
+            group_power_map,
+            axis=0,
+            weights=mean_weights,
+        )
         group_power_map -= mean_group_power[np.newaxis, ...]
         subject_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
 

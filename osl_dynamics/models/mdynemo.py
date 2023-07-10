@@ -2,9 +2,9 @@
 
 See Also
 --------
-`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples\
-/simulation/mdynemo_hmm-mvn.py>`_ for training M-DyNeMo on simulated data (with multiple
-dynamics).
+`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
+/examples/simulation/mdynemo_hmm-mvn.py>`_ for training M-DyNeMo on simulated
+data (with multiple dynamics).
 """
 
 import logging
@@ -145,8 +145,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learning_rate : float
         Learning rate.
     gradient_clip : float
-        Value to clip gradients by. This is the :code:`clipnorm` argument passed to
-        the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
+        Value to clip gradients by. This is the :code:`clipnorm` argument
+        passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -274,23 +274,27 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         fcs : np.ndarray
-            Mode functional connectivities. Shape (n_modes, n_channels, n_channels).
+            Mode functional connectivities.
+            Shape (n_modes, n_channels, n_channels).
         """
         return obs_mod.get_observation_model_parameter(self.model, "fcs")
 
     def get_means_stds_fcs(self):
         """Get the mode means, standard deviations, functional connectivities.
 
-        This is a wrapper for :code:`get_means`, :code:`get_stds`, :code:`get_fcs`.
+        This is a wrapper for :code:`get_means`, :code:`get_stds`,
+        :code:`get_fcs`.
 
         Returns
         -------
         means : np.ndarray
             Mode means. Shape is (n_modes, n_channels).
         stds : np.ndarray
-            Mode standard deviations. Shape is (n_modes, n_channels, n_channels).
+            Mode standard deviations.
+            Shape is (n_modes, n_channels, n_channels).
         fcs : np.ndarray
-            Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
+            Mode functional connectivities.
+            Shape is (n_modes, n_channels, n_channels).
         """
         return self.get_means(), self.get_stds(), self.get_fcs()
 
@@ -306,10 +310,14 @@ class Model(VariationalInferenceModelBase):
         means : np.ndarray
             Mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
-            Do we want to use the passed parameters when we re-initialize the model?
+            Do we want to use the passed parameters when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
-            self.model, means, layer_name="means", update_initializer=update_initializer
+            self.model,
+            means,
+            layer_name="means",
+            update_initializer=update_initializer,
         )
 
     def set_stds(self, stds, update_initializer=True):
@@ -321,10 +329,14 @@ class Model(VariationalInferenceModelBase):
             Mode standard deviations.
             Shape is (n_modes, n_channels, n_channels) or (n_modes, n_channels).
         update_initializer : bool
-            Do we want to use the passed parameters when we re-initialize the model?
+            Do we want to use the passed parameters when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
-            self.model, stds, layer_name="stds", update_initializer=update_initializer
+            self.model,
+            stds,
+            layer_name="stds",
+            update_initializer=update_initializer,
         )
 
     def set_fcs(self, fcs, update_initializer=True):
@@ -333,12 +345,17 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         fcs : np.ndarray
-            Mode functional connectivities. Shape is (n_modes, n_channels, n_channels).
+            Mode functional connectivities.
+            Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
-            Do we want to use the passed parameters when we re-initialize the model?
+            Do we want to use the passed parameters when we re-initialize
+            the model?
         """
         obs_mod.set_observation_model_parameter(
-            self.model, fcs, layer_name="fcs", update_initializer=update_initializer
+            self.model,
+            fcs,
+            layer_name="fcs",
+            update_initializer=update_initializer,
         )
 
     def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
@@ -359,12 +376,14 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_regularizers(self, training_dataset):
-        """Set the regularizers of means, stds and fcs based on the training data.
+        """Set the regularizers of means, stds and fcs based on the training
+        data.
 
-        A multivariate normal prior is applied to the mean vectors with :code:`mu=0`,
-        :code:`sigma=diag((range/2)**2)`, a log normal prior is applied to the standard
-        deviations with :code:`mu=0`, :code:`sigma=sqrt(log(2*range))` and a marginal
-        inverse Wishart prior is applied to the functional connectivity matrices with
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`, a log normal prior is
+        applied to the standard deviations with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))` and a marginal inverse Wishart prior
+        is applied to the functional connectivity matrices with
         :code:`nu=n_channels-1+0.1`.
 
         Parameters
@@ -439,7 +458,8 @@ class Model(VariationalInferenceModelBase):
         alpha = np.empty([n_samples, self.config.n_modes])
         gamma = np.empty([n_samples, self.config.n_fc_modes])
         for i in trange(n_samples, desc="Sampling mode time courses"):
-            # If there are leading zeros we trim theta so that we don't pass the zeros
+            # If there are leading zeros we trim theta so that we don't pass
+            # the zeros
             trimmed_mean_theta = mean_theta_norm[~np.all(mean_theta_norm == 0, axis=1)][
                 np.newaxis, :, :
             ]
@@ -474,8 +494,8 @@ class Model(VariationalInferenceModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the model RNN weights and biases, mixing coefficients, mode
-        means and covariances.
+        This includes the model RNN weights and biases, mixing coefficients,
+        mode means and covariances.
 
         Returns
         -------
@@ -651,7 +671,10 @@ def _model_structure(config):
 
     # Layers
     concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
-    theta_norm_drop_layer = layers.Dropout(config.model_dropout, name="theta_norm_drop")
+    theta_norm_drop_layer = layers.Dropout(
+        config.model_dropout,
+        name="theta_norm_drop",
+    )
     mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,
@@ -677,7 +700,10 @@ def _model_structure(config):
     mean_mod_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="mean_mod_sigma"
     )
-    kl_div_layer_mean = KLDivergenceLayer(config.theta_std_epsilon, name="mean_kl_div")
+    kl_div_layer_mean = KLDivergenceLayer(
+        config.theta_std_epsilon,
+        name="mean_kl_div",
+    )
 
     # Data flow
     mean_mod_mu = mean_mod_mu_layer(mod_rnn)
@@ -695,12 +721,17 @@ def _model_structure(config):
     fc_mod_sigma_layer = layers.Dense(
         config.n_fc_modes, activation="softplus", name="fc_mod_sigma"
     )
-    fc_kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="fc_kl_div")
+    fc_kl_div_layer = KLDivergenceLayer(
+        config.theta_std_epsilon,
+        name="fc_kl_div",
+    )
 
     # Data flow
     fc_mod_mu = fc_mod_mu_layer(mod_rnn)
     fc_mod_sigma = fc_mod_sigma_layer(mod_rnn)
-    fc_kl_div = fc_kl_div_layer([fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma])
+    fc_kl_div = fc_kl_div_layer(
+        [fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma],
+    )
 
     #
     # Total KL loss
