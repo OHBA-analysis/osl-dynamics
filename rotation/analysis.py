@@ -1,4 +1,5 @@
 import os
+import pickle
 
 def HMM_analysis(dataset, save_dir):
     from osl_dynamics.models import load
