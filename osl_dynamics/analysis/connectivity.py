@@ -388,12 +388,6 @@ def gmm_threshold(
         Thresholded connectivity matrix. The shape is the same as the original
         :code:`conn_map`.
     """
-    if sklearn_kwargs is None:
-        sklearn_kwargs = {}
-
-    if plot_kwargs is None:
-        plot_kwargs = {}
-
     percentile = fit_gmm(
         conn_map,
         subtract_mean,
@@ -471,12 +465,6 @@ def fit_gmm(
     percentile : np.ndarray
         Percentile threshold. Shape is (n_components, n_modes) or (n_modes,).
     """
-    if sklearn_kwargs is None:
-        sklearn_kwargs = {}
-
-    if plot_kwargs is None:
-        plot_kwargs = {}
-
     # Validation
     conn_map = array_ops.validate(
         conn_map,
@@ -486,6 +474,8 @@ def fit_gmm(
         + "or (n_channels, n_channels).",
     )
 
+    if sklearn_kwargs is None:
+        sklearn_kwargs = {}
     default_sklearn_kwargs = {"max_iter": 5000, "n_init": 10}
     sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
 
