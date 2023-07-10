@@ -1944,6 +1944,7 @@ def plot_summary_stats_group_diff(
     assignments,
     ax=None,
     filename=None,
+    fig_kwargs=None,
 ):
     """Plot summary statistics for two groups as violin plots.
 
@@ -1961,6 +1962,8 @@ def plot_summary_stats_group_diff(
         Axis object to plot on.
     filename : str
         Output filename.
+    fig_kwargs : dict
+        Keyword arguments to pass to create_figure().
 
     Returns
     -------
