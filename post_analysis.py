@@ -7,6 +7,7 @@ import numpy as np
 from osl_dynamics.data import Data
 from rotation.utils import *
 from rotation.preprocessing import PrepareData
+from rotation.analysis import HMM_analysis, Dynemo_analysis
 
 def HMM_post(dataset):
     from osl_dynamics.models import load
