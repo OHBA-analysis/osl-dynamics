@@ -10,6 +10,7 @@ from shutil import rmtree
 from os import path
 
 import numpy as np
+import tensorflow as tf
 from pqdm.threads import pqdm
 from tqdm.auto import tqdm
 
@@ -1019,19 +1020,19 @@ class Data:
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             if subj_id:
-                # Create a dataset with the time series data and ID
+                # Dataset with the time series data and ID
                 array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
-                dataset = dtf.create_dataset(
-                    {"data": array, "subj_id": array_tracker},
-                    self.sequence_length,
-                    self.step_size,
-                )
+                data = {"data": array, "subj_id": array_tracker}
             else:
-                # Create a dataset with just the time series data
-                dataset = dtf.create_dataset(
-                    {"data": array}, self.sequence_length, self.step_size
-                )
+                # Dataset with just the time series data
+                data = {"data": array}
 
+            # Create dataset
+            dataset = dtf.create_dataset(
+                data,
+                self.sequence_length,
+                self.step_size,
+            )
             datasets.append(dataset)
 
         # Create a dataset from all the arrays concatenated
@@ -1155,8 +1156,6 @@ class Data:
         dataset : tf.data.Dataset
             Dataset for training or evaluating the model.
         """
-        import tensorflow as tf
-
         tfrecord_paths = "{store_dir}/dataset_{array:0{v}d}-of-{n_array:0{v}d}.tfrecord"
 
         self.sequence_length = sequence_length
@@ -1165,6 +1164,7 @@ class Data:
 
         n_sequences = self.count_sequences(self.sequence_length, self.step_size)
 
+        # Create TFRecords
         for i in tqdm(range(self.n_arrays), desc="Creating TFRecord datasets"):
             if i not in self.keep:
                 # We don't want to include this file in the dataset
@@ -1180,61 +1180,45 @@ class Data:
                 # The dataset already exists
                 continue
 
-            # Get time series data and ensure an integer multiple of sequence length
+            # Get time series data and ensure an integer multiple of
+            # sequence length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             if subj_id:
                 # Create a dataset with the time series data and ID
                 array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
-
-                # Save the dataset
-                dtf.save_tfrecord(
-                    {"data": array, "subj_id": array_tracker},
-                    self.sequence_length,
-                    self.step_size,
-                    tfrecord_filepath,
-                )
+                data = {"data": array, "subj_id": array_tracker}
             else:
                 # Create a dataset with just the time series data
+                data = {"data": array}
 
-                # Save the dataset
-                dtf.save_tfrecord(
-                    {"data": array},
-                    self.sequence_length,
-                    self.step_size,
-                    tfrecord_filepath,
-                )
+            # Save the dataset
+            dtf.save_tfrecord(
+                data,
+                self.sequence_length,
+                self.step_size,
+                tfrecord_filepath,
+            )
 
-        feature_names = ["data", "subj_id"] if subj_id else ["data"]
-
-        def parse_example(example):
-            """Helper function to parse a TFRecord example.
-
-            Parameters
-            ----------
-            example : tf.train.Example
-                TensorFlow example.
-
-            Returns
-            -------
-            parsed_example : dict
-                Dictionary of parsed tensors.
-            """
+        # Helper function for parsing training examples
+        def _parse_example(example):
+            feature_names = ["data", "subj_id"] if subj_id else ["data"]
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
             }
-
-            # Parse the example
-            parsed_example = tf.io.parse_single_example(example, feature_description)
-
-            # Parse the tensors from bytes
+            parsed_example = tf.io.parse_single_example(
+                example,
+                feature_description,
+            )
             return {
                 name: tf.io.parse_tensor(tensor, tf.float32)
                 for name, tensor in parsed_example.items()
             }
 
         # Create the TFRecord dataset
-        tf_record_filenames = tf.io.matching_files(f"{self.store_dir}/*.tfrecord")
+        tf_record_filenames = tf.io.matching_files(
+            f"{self.store_dir}/*.tfrecord",
+        )
 
         if concatenate:
             tf_record_filenames = tf.data.Dataset.from_tensor_slices(
@@ -1251,7 +1235,7 @@ class Data:
                 full_dataset = tf_record_filenames.interleave(tf.data.TFRecordDataset)
 
                 # Parse the examples
-                full_dataset = full_dataset.map(parse_example)
+                full_dataset = full_dataset.map(_parse_example)
 
                 # Shuffle sequences
                 full_dataset = full_dataset.shuffle(self.buffer_size)
@@ -1267,7 +1251,7 @@ class Data:
                 full_dataset = tf_record_filenames.interleave(tf.data.TFRecordDataset)
 
                 # Parse the examples
-                full_dataset = full_dataset.map(parse_example)
+                full_dataset = full_dataset.map(_parse_example)
 
                 # Group into batches
                 full_dataset = full_dataset.batch(self.batch_size)
@@ -1298,7 +1282,7 @@ class Data:
                 ds = tf.data.TFRecordDataset(filename)
 
                 # Parse the examples
-                ds = ds.map(parse_example)
+                ds = ds.map(_parse_example)
 
                 if shuffle:
                     # Shuffle sequences
