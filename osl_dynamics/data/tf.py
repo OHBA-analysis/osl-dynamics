@@ -126,19 +126,22 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
     filepath : str
         Path to save the TFRecord file.
     """
-    import tensorflow as tf
+    import tensorflow as tf  # moved here to avoid slow imports
     from tensorflow.train import Feature, Features, Example, BytesList
 
     dataset = create_dataset(data, sequence_length, step_size)
 
-    # Helper function to serialize a sequence to a tensorflow example byte string
-    def make_example(sequence):
+    # Helper function to serialize a sequence to a tensorflow example
+    # byte string
+    def _make_example(sequence):
         # Note this function assumes all features are tf tensors
         # and can be converted to bytes
         features = Features(
             feature={
                 k: Feature(
-                    bytes_list=BytesList(value=[tf.io.serialize_tensor(v).numpy()])
+                    bytes_list=BytesList(
+                        value=[tf.io.serialize_tensor(v).numpy()],
+                    )
                 )
                 for k, v in sequence.items()
             }
@@ -148,7 +151,7 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
     # Serialize each sequence and write to a TFRecord file
     with tf.io.TFRecordWriter(filepath) as writer:
         for sequence in dataset:
-            writer.write(make_example(sequence))
+            writer.write(_make_example(sequence))
 
 
 def get_range(dataset):

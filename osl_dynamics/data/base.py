@@ -10,7 +10,6 @@ from shutil import rmtree
 from os import path
 
 import numpy as np
-import tensorflow as tf
 from pqdm.threads import pqdm
 from tqdm.auto import tqdm
 
@@ -285,10 +284,26 @@ class Data:
         # self.raw_data_filenames is not used if self.inputs is a list of
         # strings, where the strings are paths to .npy files
 
+        # Function to save a single memory map
+        def _make_memmap(raw_data, mmap_location):
+            if not self.load_memmaps:  # do not load into the memory maps
+                mmap_location = None
+            raw_data_mmap = rw.load_data(
+                raw_data,
+                self.data_field,
+                self.picks,
+                self.reject_by_annotation,
+                mmap_location,
+                mmap_mode="r",
+            )
+            if not self.time_axis_first:
+                raw_data_mmap = raw_data_mmap.T
+            return raw_data_mmap
+
         # Load data
         memmaps = pqdm(
             array=zip(self.inputs, raw_data_filenames),
-            function=self.make_memmap,
+            function=_make_memmap,
             n_jobs=self.n_jobs,
             desc="Loading files",
             argument_type="args",
@@ -296,35 +311,6 @@ class Data:
         )
 
         return memmaps, raw_data_filenames
-
-    def make_memmap(self, raw_data, mmap_location):
-        """Make a memory map for a single file.
-
-        Parameters
-        ----------
-        raw_data : str
-            Path to file.
-        mmap_location : str
-            Path to save memory map to.
-
-        Returns
-        -------
-        raw_data_mmap: np.memmap
-            Memory map of the raw data.
-        """
-        if not self.load_memmaps:  # do not load into the memory maps
-            mmap_location = None
-        raw_data_mmap = rw.load_data(
-            raw_data,
-            self.data_field,
-            self.picks,
-            self.reject_by_annotation,
-            mmap_location,
-            mmap_mode="r",
-        )
-        if not self.time_axis_first:
-            raw_data_mmap = raw_data_mmap.T
-        return raw_data_mmap
 
     def validate_data(self):
         """Validate data files."""
@@ -1156,7 +1142,13 @@ class Data:
         dataset : tf.data.Dataset
             Dataset for training or evaluating the model.
         """
-        tfrecord_paths = "{store_dir}/dataset_{array:0{v}d}-of-{n_array:0{v}d}.tfrecord"
+        import tensorflow as tf  # moved here to avoid slow imports
+
+        tfrecord_paths = (
+            f"{self.store_dir}"
+            "/dataset_{array:0{v}d}-of-{n_array:0{v}d}"
+            f".{self._identifier}.tfrecord"
+        )
 
         self.sequence_length = sequence_length
         self.batch_size = batch_size
@@ -1164,22 +1156,21 @@ class Data:
 
         n_sequences = self.count_sequences(self.sequence_length, self.step_size)
 
-        # Create TFRecords
-        for i in tqdm(range(self.n_arrays), desc="Creating TFRecord datasets"):
-            if i not in self.keep:
-                # We don't want to include this file in the dataset
-                continue
-
-            tfrecord_filepath = tfrecord_paths.format(
-                store_dir=self.store_dir,
+        # TFRecords we need to save
+        tfrecord_filenames = []
+        tfrecords_to_save = []
+        for i in self.keep:
+            filepath = tfrecord_paths.format(
                 array=i,
                 n_array=self.n_arrays - 1,
                 v=len(str(self.n_arrays - 1)),
             )
-            if path.exists(tfrecord_filepath):
-                # The dataset already exists
-                continue
+            tfrecord_filenames.append(filepath)
+            if not path.exists(filepath):
+                tfrecords_to_save.append((i, filepath))
 
+        # Function for saving a single TFRecord
+        def _save_tfrecord(i, filepath):
             # Get time series data and ensure an integer multiple of
             # sequence length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
@@ -1197,7 +1188,18 @@ class Data:
                 data,
                 self.sequence_length,
                 self.step_size,
-                tfrecord_filepath,
+                filepath,
+            )
+
+        # Save TFRecords
+        if len(tfrecords_to_save) > 0:
+            pqdm(
+                array=tfrecords_to_save,
+                function=_save_tfrecord,
+                n_jobs=self.n_jobs,
+                desc="Creating TFRecord datasets",
+                argument_type="args",
+                total=len(tfrecords_to_save),
             )
 
         # Helper function for parsing training examples
@@ -1216,23 +1218,15 @@ class Data:
             }
 
         # Create the TFRecord dataset
-        tf_record_filenames = tf.io.matching_files(
-            f"{self.store_dir}/*.tfrecord",
-        )
-
         if concatenate:
-            tf_record_filenames = tf.data.Dataset.from_tensor_slices(
-                tf_record_filenames
-            )
+            tfrecord_filenames = tf.data.Dataset.from_tensor_slices(tfrecord_filenames)
 
             if shuffle:
                 # First shuffle the shards
-                tf_record_filenames = tf_record_filenames.shuffle(
-                    len(tf_record_filenames)
-                )
+                tfrecord_filenames = tfrecord_filenames.shuffle(len(tfrecord_filenames))
 
                 # Create the TFRecord dataset
-                full_dataset = tf_record_filenames.interleave(tf.data.TFRecordDataset)
+                full_dataset = tfrecord_filenames.interleave(tf.data.TFRecordDataset)
 
                 # Parse the examples
                 full_dataset = full_dataset.map(_parse_example)
@@ -1248,7 +1242,7 @@ class Data:
 
             else:
                 # Create the TFRecord dataset
-                full_dataset = tf_record_filenames.interleave(tf.data.TFRecordDataset)
+                full_dataset = tfrecord_filenames.interleave(tf.data.TFRecordDataset)
 
                 # Parse the examples
                 full_dataset = full_dataset.map(_parse_example)
@@ -1278,7 +1272,7 @@ class Data:
         # Otherwise create a dataset for each array separately
         else:
             full_datasets = []
-            for filename in tf_record_filenames:
+            for filename in tfrecord_filenames:
                 ds = tf.data.TFRecordDataset(filename)
 
                 # Parse the examples
