@@ -205,7 +205,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         self.epochs_since_last_save += 1
         if epoch >= self.save_best_after:
             if self.save_freq == "epoch":
-                self._save_model(epoch=epoch, logs=logs)
+                self._save_model(epoch=epoch, logs=logs, batch=None)
 
     def on_train_end(self, logs=None):
         """Action to perform at the end of training.
