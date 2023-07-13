@@ -42,7 +42,7 @@ class MixedSine:
         random_seed=None,
     ):
         if len(relative_activation) != n_modes:
-            raise ValueError("n_modes relative_activation must be passed.")
+            raise ValueError("len(relative_activation) does not match len(n_modes).")
 
         if len(amplitudes) != n_modes:
             raise ValueError("n_modes amplitudes must be passed.")
@@ -168,6 +168,18 @@ class MixedSine_MVN(Simulation):
             return getattr(self.sm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
+
+    def standardize(self):
+        mu = np.mean(self.time_series, axis=0).astype(np.float64)
+        sigma = np.std(self.time_series, axis=0).astype(np.float64)
+        super().standardize()
+        # TODO: need to double check this is the correct normalisation to
+        # apply when using a soft mixture simulation
+        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
+            np.newaxis, ...
+        ]
+        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MSubj_MixedSine_MVN(Simulation):

@@ -314,18 +314,14 @@ class HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        means = np.mean(self.time_series, axis=0).astype(np.float64)
-        standard_deviations = np.std(self.time_series, axis=0).astype(np.float64)
+        mu = np.mean(self.time_series, axis=0).astype(np.float64)
+        sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
-        self.obs_mod.means = (
-            self.obs_mod.means - means[None, ...]
-        ) / standard_deviations[None, ...]
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
+        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
             np.newaxis, ...
         ]
-        self.obs_mod.instantaneous_covs /= np.outer(
-            standard_deviations, standard_deviations
-        )[np.newaxis, ...]
+        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MDyn_HMM_MVN(Simulation):
@@ -437,16 +433,14 @@ class MDyn_HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        means = np.mean(self.time_series, axis=0).astype(np.float64)
-        standard_deviations = np.std(self.time_series, axis=0).astype(np.float64)
+        mu = np.mean(self.time_series, axis=0).astype(np.float64)
+        sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
-        self.obs_mod.means = (
-            self.obs_mod.means - means[None, ...]
-        ) / standard_deviations[None, ...]
-        self.obs_mod.stds /= standard_deviations[None, ...]
-        self.obs_mod.instantaneous_covs /= np.outer(
-            standard_deviations, standard_deviations
-        )[np.newaxis, ...]
+        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
+            np.newaxis, ...
+        ]
+        self.obs_mod.stds /= sigma[np.newaxis, ...]
+        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MSubj_HMM_MVN(Simulation):
@@ -599,17 +593,17 @@ class MSubj_HMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        means = np.mean(self.time_series, axis=1).astype(np.float64)
-        standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
+        mu = np.mean(self.time_series, axis=1).astype(np.float64)
+        sigma = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
         self.obs_mod.subject_means = (
-            self.obs_mod.subject_means - means[:, None, :]
-        ) / standard_deviations[:, None, :]
+            self.obs_mod.subject_means - mu[:, np.newaxis, :]
+        ) / sigma[:, np.newaxis, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+            sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
         )
         self.obs_mod.instantaneous_covs /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+            sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
         )
 
 
@@ -785,11 +779,7 @@ class HierarchicalHMM_MVN(Simulation):
         return stc
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0).astype(np.float64)
+        sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
-            np.newaxis, ...
-        ]
-        self.obs_mod.instantaneous_covs /= np.outer(
-            standard_deviations, standard_deviations
-        )[np.newaxis, ...]
+        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]

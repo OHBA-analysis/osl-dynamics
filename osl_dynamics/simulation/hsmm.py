@@ -237,11 +237,9 @@ class HSMM_MVN(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0)
+        sigma = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
-            np.newaxis, ...
-        ]
+        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MixedHSMM_MVN(Simulation):
@@ -370,8 +368,6 @@ class MixedHSMM_MVN(Simulation):
         )
 
     def standardize(self):
-        standard_deviations = np.std(self.time_series, axis=0)
+        sigma = np.std(self.time_series, axis=0)
         super().standardize()
-        self.obs_mod.covariances /= np.outer(standard_deviations, standard_deviations)[
-            np.newaxis, ...
-        ]
+        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
