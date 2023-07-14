@@ -321,7 +321,6 @@ class HMM_MVN(Simulation):
             np.newaxis, ...
         ]
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
-        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MDyn_HMM_MVN(Simulation):
@@ -416,7 +415,6 @@ class MDyn_HMM_MVN(Simulation):
 
         # Simulate data
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-        self.instantaneous_covs = self.obs_mod.instantaneous_covs
 
     @property
     def n_modes(self):
@@ -440,7 +438,6 @@ class MDyn_HMM_MVN(Simulation):
             np.newaxis, ...
         ]
         self.obs_mod.stds /= sigma[np.newaxis, ...]
-        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MSubj_HMM_MVN(Simulation):
@@ -600,9 +597,6 @@ class MSubj_HMM_MVN(Simulation):
             self.obs_mod.subject_means - mu[:, np.newaxis, :]
         ) / sigma[:, np.newaxis, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
-            sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
-        )
-        self.obs_mod.instantaneous_covs /= np.expand_dims(
             sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
         )
 
@@ -782,4 +776,3 @@ class HierarchicalHMM_MVN(Simulation):
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
-        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
