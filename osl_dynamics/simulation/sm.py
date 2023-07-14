@@ -173,13 +173,10 @@ class MixedSine_MVN(Simulation):
         mu = np.mean(self.time_series, axis=0).astype(np.float64)
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
-        # TODO: need to double check this is the correct normalisation to
-        # apply when using a soft mixture simulation
         self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
             np.newaxis, ...
         ]
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
-        self.obs_mod.instantaneous_covs /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
 class MSubj_MixedSine_MVN(Simulation):
@@ -314,10 +311,6 @@ class MSubj_MixedSine_MVN(Simulation):
             self.obs_mod.subject_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :],
-            axis=1,
-        )
-        self.obs_mod.instantaneous_covs /= np.expand_dims(
             standard_deviations[:, :, None] @ standard_deviations[:, None, :],
             axis=1,
         )
