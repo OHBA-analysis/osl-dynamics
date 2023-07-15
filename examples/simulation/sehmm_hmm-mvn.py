@@ -74,6 +74,8 @@ model.summary()
 
 # Set regularizers
 model.set_regularizers(training_data)
+
+model.random_subset_initialization(training_data, n_epochs=3, n_init=3, take=0.3)
 # Train model
 history = model.fit(training_data)
 
