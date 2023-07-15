@@ -256,14 +256,13 @@ class Model(HMMModel):
         if epochs is None:
             epochs = self.config.n_epochs
 
-        # Set the scalings
-        self.set_dev_mlp_reg_scaling(dataset)
-        self.set_bayesian_kl_scaling(dataset)
-
         # Make a TensorFlow dataset
         dataset = self.make_dataset(
             dataset, shuffle=True, concatenate=True, subj_id=True
         )
+
+        # Set static loss scaling factor
+        self.set_static_loss_scaling_factor(dataset)
 
         # Training curves
         history = {"loss": [], "rho": [], "lr": []}
@@ -277,7 +276,7 @@ class Model(HMMModel):
             # Setup a progress bar for this epoch
             if not use_tqdm:
                 print("Epoch {}/{}".format(n + 1, epochs))
-                pb_i = utils.Progbar(len(dataset))
+                pb_i = utils.Progbar(dtf.get_n_batches(dataset))
 
             # Update rho
             self._update_rho(n)
@@ -367,6 +366,18 @@ class Model(HMMModel):
 
         kl_loss_layer = self.model.get_layer("kl_loss")
         kl_loss_layer.annealing_factor.assign(new_value)
+
+    def set_static_loss_scaling_factor(self, dataset):
+        """Set the :code:`n_batches` attribute of the
+        :code:`"static_loss_scaling_factor"` layer.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset
+            TensorFlow dataset.
+        """
+        n_batches = dtf.get_n_batches(dataset)
+        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -657,39 +668,6 @@ class Model(HMMModel):
                 self.config.covariances_epsilon,
                 layer_name="group_covs",
             )
-
-    def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior
-        and prior.
-
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(training_dataset)
-        learn_means = self.config.learn_means
-        learn_covariances = self.config.learn_covariances
-        obs_mod.set_bayesian_kl_scaling(
-            self.model, n_batches, learn_means, learn_covariances
-        )
-
-    def set_dev_mlp_reg_scaling(self, training_dataset):
-        """Set the correct scaling for the deviation MLP regularization.
-
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(training_dataset)
-        learn_means = self.config.learn_means
-        learn_covariances = self.config.learn_covariances
-        obs_mod.set_dev_mlp_reg_scaling(
-            self.model, n_batches, learn_means, learn_covariances
-        )
 
     def free_energy(self, dataset):
         """Get the variational free energy.

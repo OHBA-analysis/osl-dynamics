@@ -207,6 +207,9 @@ class Model(ModelBase):
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
+        # Set static loss scaling factor
+        self.set_static_loss_scaling_factor(dataset)
+
         # Training curves
         history = {"loss": [], "rho": [], "lr": []}
 
@@ -275,6 +278,18 @@ class Model(ModelBase):
             _range.close()
 
         return history
+
+    def set_static_loss_scaling_factor(self, dataset):
+        """Set the :code:`n_batches` attribute of the
+        :code:`"static_loss_scaling_factor"` layer.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset
+            TensorFlow dataset.
+        """
+        n_batches = dtf.get_n_batches(dataset)
+        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
