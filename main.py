@@ -99,7 +99,7 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states)
     
     
-    save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}'
+    save_dir = f'./results_20230714/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
