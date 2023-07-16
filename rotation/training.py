@@ -1,5 +1,5 @@
 import pickle
-
+import os
 import numpy as np
 
 from osl_dynamics.analysis import connectivity
@@ -93,4 +93,8 @@ def SWC_computation(dataset,window_length,step_size,save_dir):
     ts = dataset.time_series()
     # Calculate the sliding window connectivity
     swc = connectivity.sliding_window_connectivity(ts, window_length=window_length, step_size=step_size, conn_type="corr")
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
     np.save(f'{save_dir}/fc_swc.npy',swc,allow_pickle=True)
