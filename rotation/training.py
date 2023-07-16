@@ -1,5 +1,9 @@
 import pickle
 
+import numpy as np
+
+from osl_dynamics.analysis import connectivity
+
 def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False):
     from osl_dynamics.models.hmm import Config, Model
     # Create a config object
@@ -28,7 +32,7 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False):
     # Compute state
     if compute_state:
         alpha = model.get_alpha(dataset)
-        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
+        pickle.dump(alpha, open(f'{save_dir}/alpha.pkl', "wb"))
         
 
 
@@ -70,4 +74,23 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir,compute_state=False):
     # Compute state
     if compute_state:
         alpha = model.get_alpha(dataset)
-        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
+        pickle.dump(alpha, open(f'{save_dir}/alpha.pkl', "wb"))
+
+def SWC_computation(dataset,window_length,step_size,save_dir):
+    '''
+
+    Parameters
+    ----------
+    dataset: (osl_dynamics.data.Data): Dataset for training
+    window_length: (int) sliding window length
+    step_size: (int) step size of sliding window
+    save_dir: save directions
+
+    Returns
+    -------
+
+    '''
+    ts = dataset.time_series()
+    # Calculate the sliding window connectivity
+    swc = connectivity.sliding_window_connectivity(ts, window_length=window_length, step_size=step_size, conn_type="corr")
+    np.save(f'{save_dir}/fc_swc.npy',swc,allow_pickle=True)

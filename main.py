@@ -5,7 +5,7 @@ import pathlib
 import numpy as np
 import scipy.stats as stats
 from rotation.preprocessing import PrepareData
-from rotation.training import HMM_training, Dynemo_training
+from rotation.training import HMM_training, Dynemo_training, SWC_computation
 from rotation.utils import *
 from osl_dynamics.data import Data
 from osl_dynamics.analysis import connectivity
@@ -90,7 +90,12 @@ def Dynemo_analysis(dataset):
     model.save("results/model_Dynemo")
 
 if __name__ == '__main__':
-    models = ['HMM','Dynemo']
+    # Index
+    # 1-30: HMM
+    # 31-60: Dynemo
+    # 61-90: MAGE
+    # 91-96: SWC
+    models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
     list_states = [4,8,12,16,20]
     
@@ -98,8 +103,10 @@ if __name__ == '__main__':
     
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states)
     
-    
-    save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}'
+    if n_states is None:
+        save_dir = f'./results/{model}_ICA_{n_channels}'
+    else:
+        save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
@@ -115,6 +122,8 @@ if __name__ == '__main__':
         HMM_training(dataset,n_states,n_channels,save_dir)
     elif model == 'Dynemo':
         Dynemo_training(dataset, n_states, n_channels,save_dir)
+    elif model == 'SWC':
+        SWC_computation(dataset,window_length=83,step_size=10,save_dir=save_dir)
     else:
         raise ValueError('The model name is incorrect!')
         
