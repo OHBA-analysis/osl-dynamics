@@ -24,6 +24,11 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list):
     
     model = models[index // (N_n_channels * N_n_states)]
     index = index % (N_n_channels * N_n_states)
+
+    # For SWC, we do not need to specify n_states
+    if model == 'SWC':
+        n_channels = list_channels[index]
+        return model, n_channels, None
     
     n_channels = list_channels[index // N_n_states]
     n_states = list_states[index % N_n_states]
