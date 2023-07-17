@@ -96,5 +96,5 @@ def SWC_computation(dataset,window_length,step_size,save_dir):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
+
     np.save(f'{save_dir}/fc_swc.npy',swc,allow_pickle=True)
