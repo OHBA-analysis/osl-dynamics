@@ -32,7 +32,7 @@ config = """
             standardize: {}
     train_dynemo:
         config_kwargs:
-            n_modes: 8
+            n_modes: 7
             learn_means: False
             learn_covariances: True
     regression_spectra:
