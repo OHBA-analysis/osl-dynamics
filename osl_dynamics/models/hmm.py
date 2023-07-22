@@ -552,10 +552,12 @@ class Model(ModelBase):
         # observed data
         log_likelihood = np.empty([n_states, batch_size, sequence_length])
         for state in range(n_states):
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=tf.gather(means, state, axis=-2),
-                scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
-                allow_nan_stats=False,
+            mvn = tf.stop_gradient(
+                tfp.distributions.MultivariateNormalTriL(
+                    loc=tf.gather(means, state, axis=-2),
+                    scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
+                    allow_nan_stats=False,
+                )
             )
             log_likelihood[state] = mvn.log_prob(x)
         log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
@@ -683,7 +685,7 @@ class Model(ModelBase):
         """
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
         log_likelihood = self._get_log_likelihood(x, subj_id)
-        return tf.reduce_sum(log_likelihood * gamma)
+        return tf.stop_gradient(tf.reduce_sum(log_likelihood * gamma))
 
     def _get_posterior_expected_prior(self, gamma, xi):
         """Posterior expected prior.
@@ -780,10 +782,12 @@ class Model(ModelBase):
             means = tf.gather(means, subj_id)
             covs = tf.gather(covs, subj_id)
 
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=means,
-            scale_tril=tf.linalg.cholesky(covs),
-            allow_nan_stats=False,
+        mvn = tf.stop_gradient(
+            tfp.distributions.MultivariateNormalTriL(
+                loc=means,
+                scale_tril=tf.linalg.cholesky(covs),
+                allow_nan_stats=False,
+            )
         )
         log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
         return log_likelihood.numpy()
