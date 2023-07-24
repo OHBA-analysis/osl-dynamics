@@ -1,7 +1,7 @@
 
 
 
-def parse_index(index:int,models:list,list_channels:list,list_states:list):
+def parse_index(index:int,models:list,list_channels:list,list_states:list,training:bool=False):
     '''
     This function is used in the array job. Given an index,
     return the model, n_channels, n_states accordingly
@@ -11,6 +11,7 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list):
     models: (list) the model list
     list_channels: (list) the n_channel list
     list_states: (list) the n_state list
+    training: (bool) Whether we are in the training mode.
     
     Returns:
         tuple: A tuple containing the following
@@ -24,6 +25,11 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list):
     
     model = models[index // (N_n_channels * N_n_states)]
     index = index % (N_n_channels * N_n_states)
+
+    # For SWC, we do not need to specify n_states
+    if (model == 'SWC') & training:
+        n_channels = list_channels[index]
+        return model, n_channels, None
     
     n_channels = list_channels[index // N_n_states]
     n_states = list_states[index % N_n_states]
