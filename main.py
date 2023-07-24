@@ -5,7 +5,7 @@ import pathlib
 import numpy as np
 import scipy.stats as stats
 from rotation.preprocessing import PrepareData
-from rotation.training import HMM_training, Dynemo_training, SWC_computation
+from rotation.training import HMM_training, Dynemo_training, MAGE_training,SWC_computation
 from rotation.utils import *
 from osl_dynamics.data import Data
 from osl_dynamics.analysis import connectivity
@@ -123,6 +123,8 @@ if __name__ == '__main__':
         HMM_training(dataset,n_states,n_channels,save_dir)
     elif model == 'Dynemo':
         Dynemo_training(dataset, n_states, n_channels,save_dir)
+    elif model == 'MAGE':
+        MAGE_training(dataset,n_states,n_channels,save_dir)
     elif model == 'SWC':
         SWC_computation(dataset,window_length=83,step_size=10,save_dir=save_dir)
     else:
