@@ -100,8 +100,8 @@ if __name__ == '__main__':
     list_channels = [15, 25, 50, 100, 200, 300]
     list_states = [4,8,12,16,20]
     
-    #index = int(sys.argv[1]) - 1
-    index = 91
+    index = int(sys.argv[1]) - 1
+    #index = 91
     
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states)
     
