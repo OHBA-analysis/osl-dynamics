@@ -38,7 +38,7 @@ def HMM_analysis(dataset, save_dir):
     from osl_dynamics.inference import modes
 
     model = load(save_dir)
-    '''
+
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
@@ -90,7 +90,7 @@ def HMM_analysis(dataset, save_dir):
     plt.savefig(f'{plot_dir}mintv_violin.jpg')
     plt.savefig(f'{plot_dir}mintv_violin.pdf')
     plt.close()
-    '''
+
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
     if not os.path.isfile(f'{save_dir}tpm_partition.pkl'):
