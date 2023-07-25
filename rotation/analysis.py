@@ -111,8 +111,8 @@ def HMM_analysis(dataset, save_dir):
         os.makedirs(dist_dir)
         model = load(save_dir)
         means, covariances = model.get_means_covariances()
-        np.save(f'{save_dir}state_means.npy')
-        np.save(f'{save_dir}state_covariances.npy')
+        np.save(f'{save_dir}state_means.npy',means)
+        np.save(f'{save_dir}state_covariances.npy',covariances)
         correlations = cov2corr(covariances)
 
         # Compute four distance/correlation metrics
@@ -136,8 +136,8 @@ def Dynemo_analysis(dataset, save_dir):
         os.makedirs(dist_dir)
         model = load(save_dir)
         means, covariances = model.get_means_covariances()
-        np.save(f'{save_dir}state_means.npy')
-        np.save(f'{save_dir}state_covariances.npy')
+        np.save(f'{save_dir}state_means.npy',means)
+        np.save(f'{save_dir}state_covariances.npy',covariances)
         correlations = cov2corr(covariances)
 
         # Compute four distance/correlation metrics
