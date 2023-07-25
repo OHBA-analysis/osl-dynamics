@@ -14,7 +14,6 @@ import logging
 
 
 import numpy as np
-import tensorflow as tf
 from tqdm.auto import trange
 
 _logger = logging.getLogger("osl-dynamics")
@@ -31,6 +30,8 @@ class FisherKernel:
     """
 
     def __init__(self, model):
+        import tensorflow as tf  # avoid slow imports
+
         compatible_models = ["HMM", "DyNeMo", "M-DyNeMo"]
         if model.config.model_name not in compatible_models:
             raise NotImplementedError(
