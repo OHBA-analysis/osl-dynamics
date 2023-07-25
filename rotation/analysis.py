@@ -4,8 +4,11 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-
 import networkx as nx
+
+from osl_dynamics.array_ops import cov2corr
+from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
+    pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
 
 
 def construct_graph(tpm:np.ndarray):
@@ -47,49 +50,49 @@ def HMM_analysis(dataset, save_dir):
     plot_dir = f'{save_dir}plot/'
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
-    # Plot the state probability time course for the first subject
-    with open(f'{save_dir}alpha.pkl', 'rb') as file:
-        alpha = pickle.load(file)
-        
-    plotting.plot_alpha(alpha[0], n_samples=1200)
-    plt.savefig(f'{plot_dir}state_prob_example.jpg')
-    plt.savefig(f'{plot_dir}state_prob_example.pdf')
-    plt.close()
+        # Plot the state probability time course for the first subject
+        with open(f'{save_dir}alpha.pkl', 'rb') as file:
+            alpha = pickle.load(file)
 
-    # Hard classify the state probabilities
-    stc = modes.argmax_time_courses(alpha)
-    # Plot the state time course for the first subject (8 seconds)
-    plotting.plot_alpha(stc[0], n_samples=1200)
-    plt.savefig(f'{plot_dir}state_hard_example.jpg')
-    plt.savefig(f'{plot_dir}state_hard_example.pdf')
-    plt.close()
+        plotting.plot_alpha(alpha[0], n_samples=1200)
+        plt.savefig(f'{plot_dir}state_prob_example.jpg')
+        plt.savefig(f'{plot_dir}state_prob_example.pdf')
+        plt.close()
 
-    # Calculate fractional occupancies
-    fo = modes.fractional_occupancies(stc)
-    np.save(f'{save_dir}fo.npy',fo)
-    # Plot the distribution of fractional occupancy (FO) across subjects
-    plotting.plot_violin(fo.T, x_label="State", y_label="FO")
-    plt.savefig(f'{plot_dir}fo_violin.jpg')
-    plt.savefig(f'{plot_dir}fo_violin.pdf')
-    plt.close()
+        # Hard classify the state probabilities
+        stc = modes.argmax_time_courses(alpha)
+        # Plot the state time course for the first subject (8 seconds)
+        plotting.plot_alpha(stc[0], n_samples=1200)
+        plt.savefig(f'{plot_dir}state_hard_example.jpg')
+        plt.savefig(f'{plot_dir}state_hard_example.pdf')
+        plt.close()
 
-    # Calculate mean lifetimes (in seconds)
-    mlt = modes.mean_lifetimes(stc, sampling_frequency=1/0.7)
-    np.save(f'{save_dir}mlt.npy',mlt)
-    # Plot distribution across subjects
-    plotting.plot_violin(mlt.T, x_label="State", y_label="Mean Lifetime (s)")
-    plt.savefig(f'{plot_dir}mlt_violin.jpg')
-    plt.savefig(f'{plot_dir}mlt_violin.pdf')
-    plt.close()
+        # Calculate fractional occupancies
+        fo = modes.fractional_occupancies(stc)
+        np.save(f'{save_dir}fo.npy', fo)
+        # Plot the distribution of fractional occupancy (FO) across subjects
+        plotting.plot_violin(fo.T, x_label="State", y_label="FO")
+        plt.savefig(f'{plot_dir}fo_violin.jpg')
+        plt.savefig(f'{plot_dir}fo_violin.pdf')
+        plt.close()
 
-    # Calculate mean intervals (in seconds)
-    mintv = modes.mean_intervals(stc, sampling_frequency=1/0.7)
-    np.save(f'{save_dir}mintv.npy',mintv)
-    # Plot distribution across subjects
-    plotting.plot_violin(mintv.T, x_label="State", y_label="Mean Interval (s)")
-    plt.savefig(f'{plot_dir}mintv_violin.jpg')
-    plt.savefig(f'{plot_dir}mintv_violin.pdf')
-    plt.close()
+        # Calculate mean lifetimes (in seconds)
+        mlt = modes.mean_lifetimes(stc, sampling_frequency=1 / 0.7)
+        np.save(f'{save_dir}mlt.npy', mlt)
+        # Plot distribution across subjects
+        plotting.plot_violin(mlt.T, x_label="State", y_label="Mean Lifetime (s)")
+        plt.savefig(f'{plot_dir}mlt_violin.jpg')
+        plt.savefig(f'{plot_dir}mlt_violin.pdf')
+        plt.close()
+
+        # Calculate mean intervals (in seconds)
+        mintv = modes.mean_intervals(stc, sampling_frequency=1 / 0.7)
+        np.save(f'{save_dir}mintv.npy', mintv)
+        # Plot distribution across subjects
+        plotting.plot_violin(mintv.T, x_label="State", y_label="Mean Interval (s)")
+        plt.savefig(f'{plot_dir}mintv_violin.jpg')
+        plt.savefig(f'{plot_dir}mintv_violin.pdf')
+        plt.close()
 
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
@@ -102,6 +105,24 @@ def HMM_analysis(dataset, save_dir):
         with open(f'{save_dir}tpm_partition.pkl', 'wb') as file:
             pickle.dump(partition, file)
 
+    # Analyze the distance between different states/modes
+    dist_dir = f'{save_dir}/distance/'
+    if not os.path.exists(dist_dir):
+        os.makedirs(dist_dir)
+        model = load(save_dir)
+        means, covariances = model.get_means_covariances()
+        np.save(f'{save_dir}state_means.npy')
+        np.save(f'{save_dir}state_covariances.npy')
+        correlations = cov2corr(covariances)
+
+        # Compute four distance/correlation metrics
+        np.save(f'{dist_dir}/frobenius_distance.npy',pairwise_frobenius_distance(correlations))
+        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(correlations))
+        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
+        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
+
+
+
 
 def Dynemo_analysis(dataset, save_dir):
     from osl_dynamics.models import load
@@ -109,6 +130,22 @@ def Dynemo_analysis(dataset, save_dir):
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
+
+    dist_dir = f'{save_dir}/distance/'
+    if not os.path.exists(dist_dir):
+        os.makedirs(dist_dir)
+        model = load(save_dir)
+        means, covariances = model.get_means_covariances()
+        np.save(f'{save_dir}state_means.npy')
+        np.save(f'{save_dir}state_covariances.npy')
+        correlations = cov2corr(covariances)
+
+        # Compute four distance/correlation metrics
+        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(correlations))
+        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(correlations))
+        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
+        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
+
 
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
