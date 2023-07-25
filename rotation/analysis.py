@@ -87,7 +87,7 @@ def HMM_analysis(dataset, save_dir):
     plt.savefig(f'{plot_dir}mintv_violin.jpg')
     plt.savefig(f'{plot_dir}mintv_violin.pdf')
     plt.close()
-    
+
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
     tpm = np.load(f'{save_dir}trans_prob.npy')

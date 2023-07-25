@@ -55,7 +55,11 @@ if __name__ == '__main__':
         old_dir = f'./results/{model}_ICA_{n_channels}/'
         SWC_analysis(save_dir,old_dir,n_channels,n_states)
     else:
-        data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
+        # Work on jalapeno
+        #data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
+
+        # Work on BMRC
+        data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
         prepare_data = PrepareData(data_dir)
         subj, dataset = prepare_data.load()
         print(f'Number of subjects: {len(subj)}')
