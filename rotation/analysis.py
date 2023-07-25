@@ -146,7 +146,27 @@ def Dynemo_analysis(dataset, save_dir):
         np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
         np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
 
+def MAGE_analysis(dataset,save_dir):
+    from osl_dynamics.models import load
+    model = load(save_dir)
+    if not os.path.isfile(f'{save_dir}alpha.pkl'):
+        alpha = model.get_alpha(dataset)
+        pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
+    dist_dir = f'{save_dir}/distance/'
+    if not os.path.exists(dist_dir):
+        os.makedirs(dist_dir)
+        model = load(save_dir)
+        means, stds, correlations = model.get_means_stds_fcs()
+        np.save(f'{save_dir}state_means.npy', means)
+        np.save(f'{save_dir}state_stds.npy',stds)
+        np.save(f'{save_dir}state_correlations.npy', correlations)
+
+        # Compute four distance/correlation metrics
+        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(correlations))
+        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(correlations))
+        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
+        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
