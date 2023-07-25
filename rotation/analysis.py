@@ -38,16 +38,19 @@ def HMM_analysis(dataset, save_dir):
     from osl_dynamics.inference import modes
 
     model = load(save_dir)
+    '''
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
-
+    
     # Summary statistics analysis
     plot_dir = f'{save_dir}plot/'
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
     # Plot the state probability time course for the first subject
-    alpha = model.get_alpha(dataset)
+    with open(f'{save_dir}alpha.pkl', 'rb') as file:
+        alpha = pickle.load(file)
+        
     plotting.plot_alpha(alpha[0], n_samples=1200)
     plt.savefig(f'{plot_dir}state_prob_example.jpg')
     plt.savefig(f'{plot_dir}state_prob_example.pdf')
@@ -87,16 +90,17 @@ def HMM_analysis(dataset, save_dir):
     plt.savefig(f'{plot_dir}mintv_violin.jpg')
     plt.savefig(f'{plot_dir}mintv_violin.pdf')
     plt.close()
-
+    '''
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
-    tpm = np.load(f'{save_dir}trans_prob.npy')
-    G = construct_graph(tpm)
-    partition = nx.community.louvain_communities(G)
-    print('The final partition is: ',partition)
+    if not os.path.isfile(f'{save_dir}tpm_partition.pkl'):
+        tpm = np.load(f'{save_dir}trans_prob.npy')
+        G = construct_graph(tpm)
+        partition = nx.community.louvain_communities(G)
+        print('The final partition is: ', partition)
 
-    with open(f'{save_dir}tpm_partition.pkl', 'wb') as file:
-        pickle.dump(partition, file)
+        with open(f'{save_dir}tpm_partition.pkl', 'wb') as file:
+            pickle.dump(partition, file)
 
 
 def Dynemo_analysis(dataset, save_dir):
