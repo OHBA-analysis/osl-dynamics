@@ -7,7 +7,7 @@ import numpy as np
 from osl_dynamics.data import Data
 from rotation.utils import *
 from rotation.preprocessing import PrepareData
-from rotation.analysis import HMM_analysis, Dynemo_analysis, SWC_analysis
+from rotation.analysis import HMM_analysis, Dynemo_analysis, MAGE_analysis, SWC_analysis
 
 def HMM_post(dataset):
     from osl_dynamics.models import load
@@ -68,6 +68,8 @@ if __name__ == '__main__':
             HMM_analysis(dataset, save_dir)
         elif model == 'Dynemo':
             Dynemo_analysis(dataset, save_dir)
+        elif model == 'MAGE':
+            MAGE_analysis(dataset,save_dir)
         else:
             raise ValueError('The model name is incorrect!')
 
