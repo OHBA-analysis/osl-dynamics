@@ -66,8 +66,8 @@ def plot_FO(fo_matrix:np.ndarray,plot_dir:str):
     fig, axes = plt.subplots(n_cols, 4, figsize=(15, 5 * n_cols), sharex=True)
 
     # Flatten the axes if x=1 to avoid issues with indexing
-    if n_cols == 1:
-        axes = np.array(axes).flatten()
+    #if n_cols == 1:
+    axes = np.array(axes).flatten()
 
     # Iterate over states and plot histograms in each subplot
     for state_idx in range(n_state):

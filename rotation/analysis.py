@@ -133,6 +133,25 @@ def HMM_analysis(dataset, save_dir):
         # Plot the FO distribution of each state
         plot_FO(fo_matrix,FO_dir)
 
+        from scipy.spatial.distance import squareform
+        # Convert correlation matrix to 1D condensed distance
+        fo_dist = squareform(1 - fo_corr)
+
+        import scipy.cluster.hierarchy as sch
+        Z = sch.linkage(fo_dist, method='ward',optimal_ordering=True)
+        np.save(f'{save_dir}cluster_Z.npy',Z)
+
+        # Plot the dendrogram
+        plt.figure(figsize=(10, 5))
+        sch.dendrogram(Z)
+        plt.xlabel('Data Points')
+        plt.ylabel('Distance')
+        plt.title('Dendrogram')
+        plt.savefig(f'{FO_dir}dendrogram_FO.jpg')
+        plt.savefig(f'{FO_dir}dendrogram_FO.pdf')
+        plt.close()
+
+
 
 def Dynemo_analysis(dataset, save_dir):
     from osl_dynamics.models import load
