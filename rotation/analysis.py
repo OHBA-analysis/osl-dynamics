@@ -113,13 +113,12 @@ def HMM_analysis(dataset, save_dir):
         means, covariances = model.get_means_covariances()
         np.save(f'{save_dir}state_means.npy',means)
         np.save(f'{save_dir}state_covariances.npy',covariances)
-        correlations = cov2corr(covariances)
 
         # Compute four distance/correlation metrics
-        np.save(f'{dist_dir}/frobenius_distance.npy',pairwise_frobenius_distance(correlations))
-        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(correlations))
-        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
-        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
+        np.save(f'{dist_dir}/frobenius_distance.npy',pairwise_frobenius_distance(covariances))
+        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
+        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
+        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
 
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
@@ -172,10 +171,10 @@ def Dynemo_analysis(dataset, save_dir):
         correlations = cov2corr(covariances)
 
         # Compute four distance/correlation metrics
-        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(correlations))
-        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(correlations))
-        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
-        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
+        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(covariances))
+        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
+        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
+        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
 
 def MAGE_analysis(dataset,save_dir):
     from osl_dynamics.models import load
@@ -189,6 +188,7 @@ def MAGE_analysis(dataset,save_dir):
         os.makedirs(dist_dir)
         model = load(save_dir)
         means, stds, correlations = model.get_means_stds_fcs()
+        #covariances = corstd2cov(stds,correlations)
         np.save(f'{save_dir}state_means.npy', means)
         np.save(f'{save_dir}state_stds.npy',stds)
         np.save(f'{save_dir}state_correlations.npy', correlations)
