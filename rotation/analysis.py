@@ -135,7 +135,9 @@ def HMM_analysis(dataset, save_dir):
 
         from scipy.spatial.distance import squareform
         # Convert correlation matrix to 1D condensed distance
-        fo_dist = squareform(1 - fo_corr)
+        # Do not check symmetry because there might be round-off
+        # errors in fo_corr.
+        fo_dist = squareform(1 - fo_corr,checks=False)
 
         import scipy.cluster.hierarchy as sch
         Z = sch.linkage(fo_dist, method='ward',optimal_ordering=True)
