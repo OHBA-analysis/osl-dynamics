@@ -9,7 +9,7 @@ import networkx as nx
 from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
-
+from rotation.utils import plot_FO
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -121,7 +121,17 @@ def HMM_analysis(dataset, save_dir):
         np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
         np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
 
+    # Fractional occupancy analysis
+    FO_dir = f'{save_dir}FO_analysis/'
+    if not os.path.exists(FO_dir):
+        os.makedirs(FO_dir)
+        fo_matrix = np.load(f'{save_dir}fo.npy')
+        n_subj, n_state = fo_matrix.shape
+        fo_corr = np.corrcoef(fo_matrix.T)
+        np.save(f'{save_dir}fo_corr.npy',fo_corr)
 
+        # Plot the FO distribution of each state
+        plot_FO(fo_matrix,FO_dir)
 
 
 def Dynemo_analysis(dataset, save_dir):
