@@ -106,9 +106,10 @@ def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
     """
 
     # Step 1: Convert the 2D array of standard deviations to a diagonal matrix
-    M, N = stds.shape
-    std_diagonal = np.zeros((M, N, N))
-    np.fill_diagonal(std_diagonal, stds)
+    #M, N = stds.shape
+    #std_diagonal = np.zeros((M, N, N))
+    #np.fill_diagonal(std_diagonal, stds)
 
     # Step 2: Perform element-wise matrix multiplication to get M covariance matrices
-    return std_diagonal * corrs
+    #return std_diagonal * corrs
+    return (np.expand_dims(stds,-1) @ np.expand_dims(stds,-2)) * corrs
