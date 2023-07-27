@@ -9,7 +9,7 @@ import networkx as nx
 from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
-from rotation.utils import plot_FO
+from rotation.utils import plot_FO, stdcor2cov
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -188,16 +188,17 @@ def MAGE_analysis(dataset,save_dir):
         os.makedirs(dist_dir)
         model = load(save_dir)
         means, stds, correlations = model.get_means_stds_fcs()
-        #covariances = corstd2cov(stds,correlations)
+        covariances = stdcor2cov(stds,correlations)
         np.save(f'{save_dir}state_means.npy', means)
         np.save(f'{save_dir}state_stds.npy',stds)
         np.save(f'{save_dir}state_correlations.npy', correlations)
+        np.save(f'{save_dir}state_covariances.npy',covariances)
 
         # Compute four distance/correlation metrics
-        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(correlations))
-        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(correlations))
-        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(correlations))
-        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(correlations))
+        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(covariances))
+        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
+        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
+        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)

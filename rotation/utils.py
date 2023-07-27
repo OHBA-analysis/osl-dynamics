@@ -88,6 +88,27 @@ def plot_FO(fo_matrix:np.ndarray,plot_dir:str):
     plt.savefig(f'{plot_dir}/fo_hist.pdf')
     plt.close()
 
+def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
+    """
+    Convert from M standard deviations vectors (N) and M correlation matrices (N*N)
+    to M covariance matrices
+    Parameters
+    ----------
+    stds: np.ndarray
+    standard deviation vectors with shape (M, N)
+    cors: np.ndarray
+    correlation matrices with shape (M, N, N)
 
+    Returns
+    -------
+    covariances: np.ndarray
+    covariance matrices with shape (M, N, N)
+    """
 
+    # Step 1: Convert the 2D array of standard deviations to a diagonal matrix
+    M, N = stds.shape
+    std_diagonal = np.zeros((M, N, N))
+    np.fill_diagonal(std_diagonal, stds)
 
+    # Step 2: Perform element-wise matrix multiplication to get M covariance matrices
+    return std_diagonal * corrs
