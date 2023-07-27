@@ -95,7 +95,7 @@ def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
     Parameters
     ----------
     stds: np.ndarray
-    standard deviation vectors with shape (M, N)
+    standard deviation vectors with shape (M, N) or (M,N,N) (diagonal)
     cors: np.ndarray
     correlation matrices with shape (M, N, N)
 
@@ -112,4 +112,9 @@ def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
 
     # Step 2: Perform element-wise matrix multiplication to get M covariance matrices
     #return std_diagonal * corrs
-    return (np.expand_dims(stds,-1) @ np.expand_dims(stds,-2)) * corrs
+    if stds.ndim == 2:
+        return (np.expand_dims(stds,-1) @ np.expand_dims(stds,-2)) * corrs
+    elif stds.ndim == 3:
+        return stds @ corrs @ stds
+    else:
+        raise ValueError('Check the dimension of your standard deviation!')
