@@ -363,7 +363,9 @@ class Model(VariationalInferenceModelBase):
         training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+        training_dataset = self.make_dataset(
+            training_dataset, concatenate=True, subj_id=True
+        )
 
         if self.config.learn_means:
             obs_mod.set_means_regularizer(
@@ -734,7 +736,7 @@ def _model_structure(config):
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=0, stddev=0.02),
+            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
             name="covs_dev_mag_inf_alpha_input",
         )
         covs_dev_mag_inf_alpha_layer = layers.Activation(
@@ -743,7 +745,7 @@ def _model_structure(config):
         covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=10, stddev=0.02),
+            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
             name="covs_dev_mag_inf_beta_input",
         )
         covs_dev_mag_inf_beta_layer = layers.Activation(

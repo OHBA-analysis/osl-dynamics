@@ -654,7 +654,9 @@ class Model(HMMModel):
         training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+        training_dataset = self.make_dataset(
+            training_dataset, concatenate=True, subj_id=True
+        )
 
         if self.config.learn_means:
             obs_mod.set_means_regularizer(
