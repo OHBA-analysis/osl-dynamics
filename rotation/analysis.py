@@ -296,13 +296,21 @@ def FC_mapping(save_dir:str,spatial_map_dir:str):
 
     # Rank-one approximation
     r1_approxs = []
+    sum_of_degrees = []
     for i in range(len(correlations)):
-        r1_approxs.append(first_eigenvector(correlations[i, :, :]))
+        correlation = correlations[i,:,:]
+        r1_approxs.append(first_eigenvector(correlation))
+        np.fill_diagonal(correlation,0)
+        sum_of_degrees = np.sum(np.abs(correlation),axis=1)
     r1_approxs = np.array(r1_approxs)
+    sum_of_degrees = np.array(sum_of_degrees)
     np.save(f'{save_dir}r1_approx_FC.npy', r1_approxs)
+    np.save(f'{save_dir}sum_of_degree.npy',sum_of_degrees)
 
     # Component map to spatial map
     spatial_map = nib.load(spatial_map_dir)
     FC_degree_map = IC2brain(spatial_map, r1_approxs.T)
     nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')
+    sum_of_degree_map = IC2brain(spatial_map, sum_of_degrees.T)
+    nib.save(sum_of_degree_map, f'{save_dir}FC_sum_of_degree_map.nii.gz')
 
