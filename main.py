@@ -127,7 +127,7 @@ if __name__ == '__main__':
     elif model == 'MAGE':
         MAGE_training(dataset,n_states,n_channels,save_dir)
     elif model == 'SWC':
-        SWC_computation(dataset,window_length=83,step_size=10,save_dir=save_dir)
+        SWC_computation(dataset,window_length=100,step_size=75,save_dir=save_dir)
     else:
         raise ValueError('The model name is incorrect!')
         
