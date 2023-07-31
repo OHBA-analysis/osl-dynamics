@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
 
 def parse_index(index:int,models:list,list_channels:list,list_states:list,training:bool=False):
@@ -118,3 +119,20 @@ def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
         return stds @ corrs @ stds
     else:
         raise ValueError('Check the dimension of your standard deviation!')
+
+def first_eigenvector(matrix: np.ndarray):
+    """
+    Compute the first eigenvector (corresponding to the largest eigenvector)
+    of a symmetric matrix
+    Parameters
+    ----------
+    matrix: numpy.ndarray
+    N * N. Symmetric matrix.
+
+    Returns
+    -------
+    eigenvector: numpy.ndarray
+    N: the first eigenvector.
+    """
+    _, eigenvector = eigsh(matrix,k=1,which='LM')
+    return np.squeeze(eigenvector)
