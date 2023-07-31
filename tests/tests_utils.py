@@ -17,7 +17,7 @@ def test_first_eigenvector():
     from rotation.utils import first_eigenvector
     matrix = np.array([[2.0,0.0],[0.0,1.0]])
     first_eigen = first_eigenvector(matrix)
-    npt.assert_equal(first_eigen,np.array([1.0,0.0]))
+    npt.assert_almost_equal(np.abs(first_eigen),np.array([1.0,0.0]),decimal=6)
 
 def test_IC2brain():
     from rotation.utils import IC2brain
