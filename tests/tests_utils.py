@@ -18,3 +18,17 @@ def test_first_eigenvector():
     matrix = np.array([[2.0,0.0],[0.0,1.0]])
     first_eigen = first_eigenvector(matrix)
     npt.assert_equal(first_eigen,np.array([1.0,0.0]))
+
+def test_IC2brain():
+    from rotation.utils import IC2brain
+    import nibabel as nib
+    spatial_maps_data = np.reshape(np.arange(16),(2,2,2,2))
+    mean_activation = np.array([[1.0,0.0,],[0.0,-1.0]])
+
+    # Construct from spatial_maps data to spatial maps Nifti1Image
+    spatial_map = nib.Nifti1Image(spatial_maps_data,affine = np.eye(4))
+    brain_map = IC2brain(spatial_map,mean_activation)
+    brain_map_data = brain_map.get_fdata()
+
+    brain_map_true = np.reshape(np.array([i * (-1) ** i for i in range(16)]),(2,2,2,2))
+    np.assert_equal(brain_map_data,brain_map_true)

@@ -157,7 +157,12 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
         state_means = np.load(f'{save_dir}state_means.npy')
         spatial_map = nib.load(spatial_map_dir)
-        state_activation_map = IC2brain(spatial_map,state_means.T)
+        mean_activation_map = IC2brain(spatial_map,state_means.T)
+
+        nib.save(mean_activation_map,f'{save_dir}mean_activation_map.nii.gz')
+
+    # Compute rank-one decomposition of FC map
+
 
 
 

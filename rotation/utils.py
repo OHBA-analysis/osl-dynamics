@@ -152,7 +152,8 @@ def IC2brain(spatial_map:Nifti1Image,IC_metric:np.ndarray):
 
     # Implement the multiplication
     brain_map_data = np.matmul(spatial_map_data,IC_metric)
-    # Store brain map to a Nifti1Image type
-    nifti_img = Nifti1Image(brain_map_data, affine=spatial_map.affine, header=spatial_map.header)
-    print('The Nifti Image has been created successfully!')
+    #Store brain map to a Nifti1Image type
+    brain_map = Nifti1Image(brain_map_data, affine=spatial_map.affine, header=spatial_map.header)
+
+    return brain_map
 
