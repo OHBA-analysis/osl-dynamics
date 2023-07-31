@@ -5,11 +5,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import networkx as nx
+import nibabel as nib
 
 from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
-from rotation.utils import plot_FO, stdcor2cov
+from rotation.utils import plot_FO, stdcor2cov, IC2brain
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -35,7 +36,7 @@ def construct_graph(tpm:np.ndarray):
                 G.add_edge(i, j, weight=weight)
 
     return G
-def HMM_analysis(dataset, save_dir):
+def HMM_analysis(dataset, save_dir,spatial_map_dir):
     from osl_dynamics.models import load
     from osl_dynamics.utils import plotting
     from osl_dynamics.inference import modes
@@ -151,6 +152,14 @@ def HMM_analysis(dataset, save_dir):
         plt.savefig(f'{FO_dir}dendrogram_FO.jpg')
         plt.savefig(f'{FO_dir}dendrogram_FO.pdf')
         plt.close()
+
+    # Compute the mean activation map
+    if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
+        state_means = np.load(f'{save_dir}state_means.npy')
+        spatial_map = nib.load(spatial_map_dir)
+        state_activation_map = IC2brain(spatial_map,state_means.T)
+
+
 
 
 

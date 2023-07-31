@@ -46,6 +46,7 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
     
     save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}/'
+    spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
@@ -55,7 +56,7 @@ if __name__ == '__main__':
         old_dir = f'./results/{model}_ICA_{n_channels}/'
         SWC_analysis(save_dir,old_dir,n_channels,n_states)
     else:
-        # Work on jalapeno
+        # Work on Jalapeno
         #data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
 
         # Work on BMRC
@@ -65,7 +66,7 @@ if __name__ == '__main__':
         print(f'Number of subjects: {len(subj)}')
 
         if model == 'HMM':
-            HMM_analysis(dataset, save_dir)
+            HMM_analysis(dataset, save_dir,spatial_map_dir)
         elif model == 'Dynemo':
             Dynemo_analysis(dataset, save_dir)
         elif model == 'MAGE':

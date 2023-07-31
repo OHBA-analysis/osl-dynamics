@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
+from nibabel.nifti1 import Nifti1Image
 
 def parse_index(index:int,models:list,list_channels:list,list_states:list,training:bool=False):
     '''
@@ -36,15 +37,6 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list,traini
     n_states = list_states[index % N_n_states]
     
     return model, n_channels, n_states
-    '''
-    if index >= 30:
-            model = models[1]
-            index -= 30
-        else:
-            model = models[0]
-    n_channels = list_channels[index // 5]
-    n_states = list_states[index % 5]
-    '''
 
 def plot_FO(fo_matrix:np.ndarray,plot_dir:str):
     """
@@ -136,3 +128,31 @@ def first_eigenvector(matrix: np.ndarray):
     """
     _, eigenvector = eigsh(matrix,k=1,which='LM')
     return np.squeeze(eigenvector)
+
+def IC2brain(spatial_map:Nifti1Image,IC_metric:np.ndarray):
+    """
+    Project the IC_metric map to a brain map according to spatial maps of IC components.
+    For example, IC_metric can be the mean activation of states, or the rank-one decomposition
+    of FC matrix corresponding to different states.
+    Parameters
+    ----------
+    spatial_map: Nifti1Image, represent the spatial map obtained from groupICA
+    IC_metric: np.ndarray(K, N),
+    where K is the number of independent components, and N is the number of states
+
+    Returns
+    -------
+    brain_map: Nifti1Image, represent the whole brain map of different states.
+    """
+    spatial_map_data = spatial_map.get_fdata()
+    spatial_map_shape = spatial_map_data.shape
+    K, N = IC_metric.shape
+    # Assert the matrix multiplication is plausible
+    assert spatial_map_shape[-1] == K
+
+    # Implement the multiplication
+    brain_map_data = np.matmul(spatial_map_data,IC_metric)
+    # Store brain map to a Nifti1Image type
+    nifti_img = Nifti1Image(brain_map_data, affine=spatial_map.affine, header=spatial_map.header)
+    print('The Nifti Image has been created successfully!')
+
