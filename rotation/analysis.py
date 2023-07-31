@@ -155,15 +155,11 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
-        state_means = np.load(f'{save_dir}state_means.npy')
-        spatial_map = nib.load(spatial_map_dir)
-        mean_activation_map = IC2brain(spatial_map,state_means.T)
-
-        nib.save(mean_activation_map,f'{save_dir}mean_activation_map.nii.gz')
+        mean_mapping(save_dir,spatial_map_dir)
 
     # Compute rank-one decomposition of FC map
     if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
-        FC_map(save_dir,spatial_map_dir)
+        FC_mapping(save_dir,spatial_map_dir)
 
 
 
@@ -192,10 +188,11 @@ def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
-        state_means = np.load(f'{save_dir}state_means.npy')
-        spatial_map = nib.load(spatial_map_dir)
-        mean_activation_map = IC2brain(spatial_map, state_means.T)
-        nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+        mean_mapping(save_dir,spatial_map_dir)
+
+    if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
+        FC_mapping(save_dir,spatial_map_dir)
+
 def MAGE_analysis(dataset,save_dir, spatial_map_dir):
     from osl_dynamics.models import load
     model = load(save_dir)
@@ -222,10 +219,10 @@ def MAGE_analysis(dataset,save_dir, spatial_map_dir):
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
-        state_means = np.load(f'{save_dir}state_means.npy')
-        spatial_map = nib.load(spatial_map_dir)
-        mean_activation_map = IC2brain(spatial_map, state_means.T)
-        nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+        mean_mapping(save_dir,spatial_map_dir)
+
+    if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
+        FC_mapping(save_dir,spatial_map_dir)
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -260,14 +257,30 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
 
     np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
 
-def FC_map(save_dir,spatial_map_dir):
+def mean_mapping(save_dir:str,spatial_map_dir:str):
+    """
+    Obtain mean activation spatial maps of each state/mode in the specified directory
+    Parameters
+    ----------
+    save_dir: (string) directory to work in
+    spatial_map_dir: (string) spatial map of independent components
+
+    Returns
+    -------
+    """
+    state_means = np.load(f'{save_dir}state_means.npy')
+    spatial_map = nib.load(spatial_map_dir)
+    mean_activation_map = IC2brain(spatial_map, state_means.T)
+    nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+
+def FC_mapping(save_dir:str,spatial_map_dir:str):
     """
     obtain the FC spatial maps of each state/mode in the specified directory
     pipeline: correlation/covariance matrix --> rank-one approximation --> brain map
     Parameters
     ----------
-    save_dir: (string) directory to work on
-    spatial_map_dir (string) spatial map of indepedent components
+    save_dir: (string) directory to work in
+    spatial_map_dir (string) spatial map of independent components
 
     Returns
     -------
@@ -292,3 +305,4 @@ def FC_map(save_dir,spatial_map_dir):
     spatial_map = nib.load(spatial_map_dir)
     FC_degree_map = IC2brain(spatial_map, r1_approxs.T)
     nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')
+
