@@ -168,7 +168,7 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
 
 
 
-def Dynemo_analysis(dataset, save_dir):
+def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
     from osl_dynamics.models import load
     model = load(save_dir)
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
@@ -190,7 +190,13 @@ def Dynemo_analysis(dataset, save_dir):
         np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
         np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
 
-def MAGE_analysis(dataset,save_dir):
+    # Compute the mean activation map
+    if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
+        state_means = np.load(f'{save_dir}state_means.npy')
+        spatial_map = nib.load(spatial_map_dir)
+        mean_activation_map = IC2brain(spatial_map, state_means.T)
+        nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+def MAGE_analysis(dataset,save_dir, spatial_map_dir):
     from osl_dynamics.models import load
     model = load(save_dir)
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
@@ -213,6 +219,13 @@ def MAGE_analysis(dataset,save_dir):
         np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
         np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
         np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
+
+    # Compute the mean activation map
+    if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
+        state_means = np.load(f'{save_dir}state_means.npy')
+        spatial_map = nib.load(spatial_map_dir)
+        mean_activation_map = IC2brain(spatial_map, state_means.T)
+        nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)

@@ -66,11 +66,11 @@ if __name__ == '__main__':
         print(f'Number of subjects: {len(subj)}')
 
         if model == 'HMM':
-            HMM_analysis(dataset, save_dir,spatial_map_dir)
+            HMM_analysis(dataset, save_dir, spatial_map_dir)
         elif model == 'Dynemo':
-            Dynemo_analysis(dataset, save_dir)
+            Dynemo_analysis(dataset, save_dir, spatial_map_dir)
         elif model == 'MAGE':
-            MAGE_analysis(dataset,save_dir)
+            MAGE_analysis(dataset, save_dir, spatial_map_dir)
         else:
             raise ValueError('The model name is incorrect!')
 
