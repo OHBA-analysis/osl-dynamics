@@ -10,7 +10,7 @@ import nibabel as nib
 from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
-from rotation.utils import plot_FO, stdcor2cov, IC2brain
+from rotation.utils import plot_FO, stdcor2cov,first_eigenvector, IC2brain
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -46,7 +46,7 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
-    
+
     # Summary statistics analysis
     plot_dir = f'{save_dir}plot/'
     if not os.path.exists(plot_dir):
@@ -162,8 +162,8 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
         nib.save(mean_activation_map,f'{save_dir}mean_activation_map.nii.gz')
 
     # Compute rank-one decomposition of FC map
-
-
+    if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
+        FC_map(save_dir,spatial_map_dir)
 
 
 
@@ -259,3 +259,36 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     kmean_networks[:, j, i] = centroids
 
     np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
+
+def FC_map(save_dir,spatial_map_dir):
+    """
+    obtain the FC spatial maps of each state/mode in the specified directory
+    pipeline: correlation/covariance matrix --> rank-one approximation --> brain map
+    Parameters
+    ----------
+    save_dir: (string) directory to work on
+    spatial_map_dir (string) spatial map of indepedent components
+
+    Returns
+    -------
+    """
+    # Obtain the correlation matrices first (or compute from covariance matrices)
+    try:
+        correlations = np.load(f'{save_dir}state_correlations.npy')
+    except FileNotFoundError:
+        covariances = np.load(f'{save_dir}state_covariances.npy')
+        correlations = cov2corr(covariances)
+        # Remember to save back!
+        np.save(f'{save_dir}state_correlations.npy', correlations)
+
+    # Rank-one approximation
+    r1_approxs = []
+    for i in range(len(correlations)):
+        r1_approxs.append(first_eigenvector(correlations[i, :, :]))
+    r1_approxs = np.array(r1_approxs)
+    np.save(f'{save_dir}r1_approx_FC.npy', r1_approxs)
+
+    # Component map to spatial map
+    spatial_map = nib.load(spatial_map_dir)
+    FC_degree_map = IC2brain(spatial_map, r1_approxs.T)
+    nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')

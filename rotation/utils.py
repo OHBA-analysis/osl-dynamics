@@ -127,7 +127,9 @@ def first_eigenvector(matrix: np.ndarray):
     N: the first eigenvector.
     """
     _, eigenvector = eigsh(matrix,k=1,which='LM')
-    return np.squeeze(eigenvector)
+    eigenvector = np.squeeze(eigenvector)
+    # Ensure that the returned eigenvector has norm 1
+    return eigenvector / (np.linalg.norm(eigenvector) + 1e-10)
 
 def IC2brain(spatial_map:Nifti1Image,IC_metric:np.ndarray):
     """
