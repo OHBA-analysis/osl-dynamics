@@ -112,6 +112,10 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
         os.makedirs(dist_dir)
         compute_distance(save_dir,dist_dir,model_name='HMM')
 
+    # Plot the distance between different states/modes
+    if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
+        plot_distance(dist_dir,plot_dir,model='HMM')
+
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
     if not os.path.exists(FO_dir):
@@ -260,6 +264,58 @@ def mean_mapping(save_dir:str,spatial_map_dir:str):
     spatial_map = nib.load(spatial_map_dir)
     mean_activation_map = IC2brain(spatial_map, state_means.T)
     nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+
+def plot_distance(dist_dir:str,plot_dir:str,model:str):
+    """
+    Plot the distance distribution within each N_states, N_channels
+    Parameters
+    ----------
+    dist_dir: (str) directory containing distance matrices
+    dist_plot_dir: (str) directory to save the plot
+    model: (str) the model name
+
+    Returns
+    -------
+    """
+    frobenius_distance = np.load(f'{dist_dir}frobenius_distance.npy')
+    correlation_distance = np.load(f'{dist_dir}matrix_correlation.npy')
+    riemannian_distance = np.load(f'{dist_dir}riemannian_distance.npy')
+    congruence_distance = np.load(f'{dist_dir}congruence_distance.npy')
+
+    N_states = len(frobenius_distance)
+    f_d = frobenius_distance[np.triu_indices(N_states, k=1)]
+    corr_d = correlation_distance[np.triu_indices(N_states, k=1)]
+    r_d = riemannian_distance[np.triu_indices(N_states, k=1)]
+    cong_d = congruence_distance[np.triu_indices(N_states, k=1)]
+
+    distances = np.array([f_d,corr_d,r_d,cong_d])
+    measures = ['Frobenius','Correlation','Riemannian','Congruence']
+    n_measures = len(distances)
+    # Start plotting
+    fig, axes = plt.subplots(n_measures, n_measures, figsize=(12, 12))
+
+    # Loop through each pair of measures and plot histograms on the diagonal and scatter plots on the off-diagonal
+    for i in range(n_measures):
+        for j in range(n_measures):
+            if i == j:
+                # Plot histogram for diagonal entries
+                axes[i, j].hist(distances[i, :], bins=20, color='blue', alpha=0.7)
+            else:
+                data_1 = distances[j,:]
+                data_2 = distances[i,:]
+                # Plot scatter plot for off-diagonal entries (i,j)
+                axes[i, j].scatter(data_1, data_2, color='blue', alpha=0.5)
+                axes[i, j].set_xlabel(measures[j])
+                axes[i, j].set_ylabel(measures[i])
+
+    # Add labels to the diagonal plots
+    for i in range(n_measures):
+        axes[i, i].set_xlabel(measures[i])
+        axes[i, i].set_ylabel('Frequency')
+
+    plt.savefig(f'{plot_dir}distance_plot.jpg')
+    plt.savefig(f'{plot_dir}distance_plot.pdf')
+    plt.close()
 
 def FC_mapping(save_dir:str,spatial_map_dir:str):
     """

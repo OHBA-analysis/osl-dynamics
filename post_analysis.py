@@ -50,6 +50,7 @@ if __name__ == '__main__':
     list_states = [4,8,12,16,20]
     index = int(sys.argv[1]) - 1
 
+
     # index = 120 represent comparison analysis.
     if index == 120:
         save_dir = './result/comparison/'
