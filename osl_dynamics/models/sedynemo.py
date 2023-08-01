@@ -260,10 +260,6 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-    def make_dataset(self, inputs, **kwargs):
-        """SE-DyNeMo requires subject id to be included in the dataset."""
-        return super().make_dataset(inputs, subj_id=True, **kwargs)
-
     def get_group_means(self):
         """Get the group level mode means.
 
@@ -364,7 +360,7 @@ class Model(VariationalInferenceModelBase):
             Training dataset.
         """
         training_dataset = self.make_dataset(
-            training_dataset, concatenate=True, subj_id=True
+            training_dataset, concatenate=True, array_id=True
         )
 
         if self.config.learn_means:
@@ -515,7 +511,7 @@ def _model_structure(config):
         shape=(config.sequence_length, config.n_channels),
         name="data",
     )
-    subj_id = layers.Input(shape=(config.sequence_length,), name="subj_id")
+    array_id = layers.Input(shape=(config.sequence_length,), name="array_id")
 
     # Static loss scaling factor
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -827,7 +823,7 @@ def _model_structure(config):
     )
 
     # Data flow
-    m, C = mix_subject_means_covs_layer([alpha, mu, D, subj_id])
+    m, C = mix_subject_means_covs_layer([alpha, mu, D, array_id])
     ll_loss = ll_loss_layer([data, m, C])
 
     # ---------
@@ -961,7 +957,7 @@ def _model_structure(config):
     )
 
     return tf.keras.Model(
-        inputs=[data, subj_id],
+        inputs=[data, array_id],
         outputs=[ll_loss, kl_loss, theta_norm],
         name="Se-DyNeMo",
     )

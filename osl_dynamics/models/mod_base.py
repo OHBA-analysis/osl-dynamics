@@ -271,7 +271,7 @@ class ModelBase:
         inputs,
         shuffle=False,
         concatenate=False,
-        subj_id=False,
+        array_id=True,
         step_size=None,
     ):
         """Converts a Data object into a TensorFlow Dataset.
@@ -285,8 +285,8 @@ class ModelBase:
             Should we shuffle the data?
         concatenate : bool, optional
             Should we return a single TensorFlow Dataset or a list of Datasets.
-        subj_id : bool, optional
-            Should we include the subject id in the dataset?
+        array_id : bool, optional
+            Should we include the array id in the dataset?
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
@@ -310,7 +310,7 @@ class ModelBase:
                     self.config.batch_size,
                     shuffle=shuffle,
                     concatenate=concatenate,
-                    subj_id=subj_id,
+                    array_id=array_id,
                     step_size=step_size,
                 )
             else:
@@ -319,7 +319,7 @@ class ModelBase:
                     self.config.batch_size,
                     shuffle=shuffle,
                     concatenate=concatenate,
-                    subj_id=subj_id,
+                    array_id=array_id,
                     step_size=step_size,
                 )
         elif isinstance(inputs, Dataset) and not concatenate:

@@ -428,15 +428,15 @@ class Model(ModelBase):
 
         return best_history
 
-    def _get_state_probs(self, x, subj_id=None):
+    def _get_state_probs(self, x, array_id=None):
         """Get state probabilities.
 
         Parameters
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-        subj_id : np.ndarray, optional
-            Subject ID. Shape is (batch_size, sequence_length).
+        array_id : np.ndarray, optional
+            Array ID. Shape is (batch_size, sequence_length).
             Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
@@ -451,7 +451,7 @@ class Model(ModelBase):
         """
 
         # Use Baum-Welch algorithm to calculate gamma, xi
-        B = self._get_likelihood(x, subj_id)
+        B = self._get_likelihood(x, array_id)
         Pi_0 = self.state_probs_t0
         P = self.trans_prob
 
@@ -518,15 +518,15 @@ class Model(ModelBase):
 
         return gamma, xi
 
-    def _get_likelihood(self, x, subj_id=None):
+    def _get_likelihood(self, x, array_id=None):
         """Get the likelihood, :math:`p(x_t | s_t)`.
 
         Parameters
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-        subj_id : np.ndarray, optional
-            Subject ID. Shape is (batch_size, sequence_length).
+        array_id : np.ndarray, optional
+            Array ID. Shape is (batch_size, sequence_length).
             Only used in for osl_dynamics.models.sehmm
 
         Returns
@@ -535,15 +535,15 @@ class Model(ModelBase):
             Likelihood. Shape is (n_states, batch_size*sequence_length).
         """
         # Get the current observation model parameters
-        if subj_id is None:
+        if array_id is None:
             means, covs = self.get_means_covariances()
             n_states = means.shape[0]
         else:
             means, covs = self.get_subject_means_covariances()
             n_states = means.shape[1]
-            subj_id = tf.cast(subj_id, tf.int32)
-            means = tf.gather(means, subj_id)
-            covs = tf.gather(covs, subj_id)
+            array_id = tf.cast(array_id, tf.int32)
+            means = tf.gather(means, array_id)
+            covs = tf.gather(covs, array_id)
 
         batch_size = x.shape[0]
         sequence_length = x.shape[1]
@@ -656,7 +656,7 @@ class Model(ModelBase):
 
         return first_term - second_term
 
-    def _get_posterior_expected_log_likelihood(self, x, gamma, subj_id=None):
+    def _get_posterior_expected_log_likelihood(self, x, gamma, array_id=None):
         """Expected log-likelihood.
 
         Calculates the expected log-likelihood with respect to the posterior
@@ -674,8 +674,8 @@ class Model(ModelBase):
         gamma : np.ndarray
             Marginal posterior distribution of hidden states given the data,
             :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
-        subj_id : np.ndarray, optional
-            Subject ID. Shape is (batch_size, sequence_length).
+        array_id : np.ndarray, optional
+            Array ID. Shape is (batch_size, sequence_length).
             Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
@@ -684,7 +684,7 @@ class Model(ModelBase):
             Posterior expected log-likelihood.
         """
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
-        log_likelihood = self._get_log_likelihood(x, subj_id)
+        log_likelihood = self._get_log_likelihood(x, array_id)
         return tf.stop_gradient(tf.reduce_sum(log_likelihood * gamma))
 
     def _get_posterior_expected_prior(self, gamma, xi):
@@ -758,15 +758,15 @@ class Model(ModelBase):
         )
         return log_prediction_distribution
 
-    def _get_log_likelihood(self, data, subj_id=None):
+    def _get_log_likelihood(self, data, array_id=None):
         """Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
 
         Parameters
         ----------
         data : np.ndarray
             Data. Shape is (batch_size, ..., n_channels).
-        subj_id : np.ndarray, optional
-            Subject ID. Shape is (batch_size, ...).
+        array_id : np.ndarray, optional
+            Array ID. Shape is (batch_size, ...).
             Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
@@ -774,13 +774,13 @@ class Model(ModelBase):
         log_likelihood : np.ndarray
             Log-likelihood. Shape is (batch_size, ..., n_states)
         """
-        if subj_id is None:
+        if array_id is None:
             means, covs = self.get_means_covariances()
         else:
             means, covs = self.get_subject_means_covariances()
-            subj_id = tf.cast(subj_id, tf.int32)
-            means = tf.gather(means, subj_id)
-            covs = tf.gather(covs, subj_id)
+            array_id = tf.cast(array_id, tf.int32)
+            means = tf.gather(means, array_id)
+            covs = tf.gather(covs, array_id)
 
         mvn = tf.stop_gradient(
             tfp.distributions.MultivariateNormalTriL(
@@ -796,7 +796,7 @@ class Model(ModelBase):
         self,
         data,
         log_prediction_distribution,
-        subj_id=None,
+        array_id=None,
     ):
         """Update step for calculating the evidence.
 
@@ -813,8 +813,8 @@ class Model(ModelBase):
             Data for the update step. Shape is (batch_size, n_channels).
         log_prediction_distribution : np.ndarray
             :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
-        subj_id : np.ndarray, optional
-            Subject ID. Shape is (batch_size,).
+        array_id : np.ndarray, optional
+            Array ID. Shape is (batch_size,).
             Only used in :code:`osl_dynamics.models.sehmm`.
 
         Returns
@@ -824,7 +824,7 @@ class Model(ModelBase):
         predictive_log_likelihood : np.ndarray
             :math:`\log p(x_t | x_{1:t-1})`. Shape is (batch_size,).
         """
-        log_likelihood = self._get_log_likelihood(data, subj_id)
+        log_likelihood = self._get_log_likelihood(data, array_id)
         log_smoothing_distribution = log_likelihood + log_prediction_distribution
         predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
 

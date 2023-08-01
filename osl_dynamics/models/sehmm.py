@@ -258,7 +258,7 @@ class Model(HMMModel):
 
         # Make a TensorFlow dataset
         dataset = self.make_dataset(
-            dataset, shuffle=True, concatenate=True, subj_id=True
+            dataset, shuffle=True, concatenate=True, array_id=True
         )
 
         # Set static loss scaling factor
@@ -291,10 +291,10 @@ class Model(HMMModel):
             loss = []
             for data in dataset:
                 x = data["data"]
-                subj_id = data["subj_id"]
+                array_id = data["array_id"]
 
                 # Update state probabilities
-                gamma, xi = self._get_state_probs(x, subj_id)
+                gamma, xi = self._get_state_probs(x, array_id)
 
                 # Update transition probability matrix
                 if self.config.learn_trans_prob:
@@ -305,11 +305,11 @@ class Model(HMMModel):
                 gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
 
                 # Update observation model parameters
-                x_gamma_and_subj_id = np.concatenate(
-                    [x, gamma, np.expand_dims(subj_id, -1)], axis=2
+                x_gamma_and_array_id = np.concatenate(
+                    [x, gamma, np.expand_dims(array_id, -1)], axis=2
                 )
                 h = self.model.fit(
-                    x_gamma_and_subj_id,
+                    x_gamma_and_array_id,
                     epochs=1,
                     verbose=0,
                     **kwargs,
@@ -409,7 +409,7 @@ class Model(HMMModel):
         training_data = self.make_dataset(
             training_data,
             concatenate=True,
-            subj_id=True,
+            array_id=True,
         )
 
         return super().random_subset_initialization(
@@ -444,7 +444,7 @@ class Model(HMMModel):
         """
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, concatenate=True, subj_id=True
+            training_data, concatenate=True, array_id=True
         )
 
         return super().random_state_time_course_initialization(
@@ -655,7 +655,7 @@ class Model(HMMModel):
             Training dataset.
         """
         training_dataset = self.make_dataset(
-            training_dataset, concatenate=True, subj_id=True
+            training_dataset, concatenate=True, array_id=True
         )
 
         if self.config.learn_means:
@@ -694,17 +694,17 @@ class Model(HMMModel):
         _logger.info("Getting free energy")
 
         # Convert to a TensorFlow dataset if not already
-        dataset = self.make_dataset(dataset, concatenate=True, subj_id=True)
+        dataset = self.make_dataset(dataset, concatenate=True, array_id=True)
 
         # Calculate variational free energy for each batch
         free_energy = []
         for data in dataset:
             x = data["data"]
-            subj_id = data["subj_id"]
+            array_id = data["array_id"]
             batch_size = x.shape[0]
 
             # Get the marginal and join posterior to calculate the free energy
-            gamma, xi = self._get_state_probs(x, subj_id)
+            gamma, xi = self._get_state_probs(x, array_id)
 
             # Calculate the free energy:
             #
@@ -715,7 +715,7 @@ class Model(HMMModel):
             #     - int q(s) log p(s) ds        [prior]
 
             log_likelihood = self._get_posterior_expected_log_likelihood(
-                x, gamma, subj_id
+                x, gamma, array_id
             )
             entropy = self._get_posterior_entropy(gamma, xi)
             prior = self._get_posterior_expected_prior(gamma, xi)
@@ -741,13 +741,13 @@ class Model(HMMModel):
             Model evidence.
         """
         _logger.info("Getting model evidence")
-        dataset = self.make_dataset(dataset, concatenate=True, subj_id=True)
+        dataset = self.make_dataset(dataset, concatenate=True, array_id=True)
         n_batches = dtf.get_n_batches(dataset)
 
         evidence = 0
         for n, data in enumerate(dataset):
             x = data["data"]
-            subj_id = data["subj_id"]
+            array_id = data["array_id"]
             print("Batch {}/{}".format(n + 1, n_batches))
             pb_i = utils.Progbar(self.config.sequence_length)
             batch_size = tf.shape(x)[0]
@@ -770,7 +770,7 @@ class Model(HMMModel):
                     log_smoothing_distribution,
                     predictive_log_likelihood,
                 ) = self._evidence_update_step(
-                    x[:, t, :], log_prediction_distribution, subj_id[:, t]
+                    x[:, t, :], log_prediction_distribution, array_id[:, t]
                 )
 
                 # Update the batch evidence
@@ -797,7 +797,7 @@ class Model(HMMModel):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset, subj_id=True)
+        dataset = self.make_dataset(dataset, array_id=True)
 
         _logger.info("Getting alpha")
         alpha = []
@@ -805,8 +805,8 @@ class Model(HMMModel):
             gamma = []
             for data in ds:
                 x = data["data"]
-                subj_id = data["subj_id"]
-                g, _ = self._get_state_probs(x, subj_id)
+                array_id = data["array_id"]
+                g, _ = self._get_state_probs(x, array_id)
                 gamma.append(g)
             alpha.append(np.concatenate(gamma).astype(np.float32))
 
@@ -851,10 +851,10 @@ def _model_structure(config):
         shape=(config.sequence_length, config.n_channels + config.n_states + 1),
         name="input",
     )
-    data, gamma, subj_id = tf.split(
+    data, gamma, array_id = tf.split(
         inputs, [config.n_channels, config.n_states, 1], axis=2
     )
-    subj_id = tf.squeeze(subj_id, axis=2)
+    array_id = tf.squeeze(array_id, axis=2)
 
     # Static loss scaling factor
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -1114,7 +1114,7 @@ def _model_structure(config):
     )
 
     # Data flow
-    ll_loss = ll_loss_layer([data, mu, D, gamma, subj_id])
+    ll_loss = ll_loss_layer([data, mu, D, gamma, array_id])
 
     # ---------
     # KL losses
