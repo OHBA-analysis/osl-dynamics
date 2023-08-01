@@ -162,6 +162,12 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
 def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
     from osl_dynamics.models import load
     model = load(save_dir)
+
+    # Specify plot directory
+    plot_dir = f'{save_dir}plot/'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
@@ -170,6 +176,10 @@ def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
         compute_distance(save_dir,dist_dir,model_name='Dynemo')
+
+    # Plot the distance between different states/modes
+    if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
+        plot_distance(dist_dir, plot_dir, model='Dynemo')
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
@@ -181,6 +191,12 @@ def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
 def MAGE_analysis(dataset,save_dir, spatial_map_dir):
     from osl_dynamics.models import load
     model = load(save_dir)
+
+    # Specify plot directory
+    plot_dir = f'{save_dir}plot/'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
@@ -189,6 +205,11 @@ def MAGE_analysis(dataset,save_dir, spatial_map_dir):
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
         compute_distance(save_dir,dist_dir,model_name='MAGE')
+
+    # Plot the distance between different states/modes
+    if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
+        plot_distance(dist_dir, plot_dir, model='MAGE')
+
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
