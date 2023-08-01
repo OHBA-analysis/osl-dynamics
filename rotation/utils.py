@@ -21,7 +21,7 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list,traini
             - n_channels (int): The number of channels to use
             - n_states (int): The number of states to use
     '''
-    
+
     N_n_channels = len(list_channels)
     N_n_states = len(list_states)
     

@@ -110,16 +110,7 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
     dist_dir = f'{save_dir}/distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-        model = load(save_dir)
-        means, covariances = model.get_means_covariances()
-        np.save(f'{save_dir}state_means.npy',means)
-        np.save(f'{save_dir}state_covariances.npy',covariances)
-
-        # Compute four distance/correlation metrics
-        np.save(f'{dist_dir}/frobenius_distance.npy',pairwise_frobenius_distance(covariances))
-        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
-        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
-        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
+        compute_distance(save_dir,dist_dir,model_name='HMM')
 
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
@@ -174,17 +165,7 @@ def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
     dist_dir = f'{save_dir}/distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-        model = load(save_dir)
-        means, covariances = model.get_means_covariances()
-        np.save(f'{save_dir}state_means.npy',means)
-        np.save(f'{save_dir}state_covariances.npy',covariances)
-        correlations = cov2corr(covariances)
-
-        # Compute four distance/correlation metrics
-        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(covariances))
-        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
-        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
-        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
+        compute_distance(save_dir,dist_dir,model_name='Dynemo')
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
@@ -203,19 +184,7 @@ def MAGE_analysis(dataset,save_dir, spatial_map_dir):
     dist_dir = f'{save_dir}/distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-        model = load(save_dir)
-        means, stds, correlations = model.get_means_stds_fcs()
-        covariances = stdcor2cov(stds,correlations)
-        np.save(f'{save_dir}state_means.npy', means)
-        np.save(f'{save_dir}state_stds.npy',stds)
-        np.save(f'{save_dir}state_correlations.npy', correlations)
-        np.save(f'{save_dir}state_covariances.npy',covariances)
-
-        # Compute four distance/correlation metrics
-        np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(covariances))
-        np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
-        np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
-        np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
+        compute_distance(save_dir,dist_dir,model_name='MAGE')
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
@@ -256,6 +225,25 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     kmean_networks[:, j, i] = centroids
 
     np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
+
+def compute_distance(save_dir:str,dist_dir:str,model_name:str):
+    from osl_dynamics.models import load
+    model = load(save_dir)
+    if model_name == 'MAGE':
+        means, stds, correlations = model.get_means_stds_fcs()
+        covariances = stdcor2cov(stds, correlations)
+        np.save(f'{save_dir}state_stds.npy', stds)
+        np.save(f'{save_dir}state_correlations.npy', correlations)
+    else:
+        means, covariances = model.get_means_covariances()
+    np.save(f'{save_dir}state_means.npy', means)
+    np.save(f'{save_dir}state_covariances.npy', covariances)
+
+    # Compute four distance/correlation metrics
+    np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(covariances))
+    np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
+    np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
+    np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
 
 def mean_mapping(save_dir:str,spatial_map_dir:str):
     """
@@ -314,3 +302,19 @@ def FC_mapping(save_dir:str,spatial_map_dir:str):
     sum_of_degree_map = IC2brain(spatial_map, sum_of_degrees.T)
     nib.save(sum_of_degree_map, f'{save_dir}FC_sum_of_degree_map.nii.gz')
 
+def comparison_analysis(models:list,list_channels:list,list_states:list,save_dir:str):
+    """
+    Compare results obtained from different models, channel numbers, state numbers.
+    Parameters
+    ----------
+    models: (list) model list.
+    list_channels: (list) N_channels list
+    list_states: (list) N_states list
+    save_dir: (str) where to save comparison results
+
+    Returns
+    -------
+    """
+    # Create directory
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)

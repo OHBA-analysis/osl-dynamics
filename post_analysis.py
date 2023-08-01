@@ -7,7 +7,8 @@ import numpy as np
 from osl_dynamics.data import Data
 from rotation.utils import *
 from rotation.preprocessing import PrepareData
-from rotation.analysis import HMM_analysis, Dynemo_analysis, MAGE_analysis, SWC_analysis
+from rotation.analysis import HMM_analysis, Dynemo_analysis, \
+    MAGE_analysis, SWC_analysis, comparison_analysis
 
 def HMM_post(dataset):
     from osl_dynamics.models import load
@@ -23,6 +24,12 @@ def HMM_post(dataset):
     print('#################################')
 
 if __name__ == '__main__':
+    # Index
+    # 1-30: HMM
+    # 31-60: Dynemo
+    # 61-90: MAGE
+    # 91-96: SWC (training)
+    # 91-120: SWC (analysis)
     '''
     data_dir = pathlib.Path('/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d15_ts2/')
     subjs = []
@@ -43,8 +50,15 @@ if __name__ == '__main__':
     list_states = [4,8,12,16,20]
     index = int(sys.argv[1]) - 1
 
+    # index = 120 represent comparison analysis.
+    if index == 120:
+        save_dir = './result/comparison/'
+        comparison_analysis(models,list_channels,list_states,save_dir)
+
+
+
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
-    
+
     save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     

@@ -139,3 +139,7 @@ def SWC_computation(dataset,window_length,step_size,save_dir):
     # Calculate the sliding window connectivity
     swc = connectivity.sliding_window_connectivity(ts, window_length=window_length, step_size=step_size, conn_type="corr")
     np.save(f'{save_dir}/fc_swc.npy',swc,allow_pickle=True)
+
+    swc_cov = connectivity.sliding_window_connectivity(ts, window_length=window_length, step_size=step_size,
+                                                   conn_type="cov")
+    np.save(f'{save_dir}/cov_swc.npy', swc_cov, allow_pickle=True)
