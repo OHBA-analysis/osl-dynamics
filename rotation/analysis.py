@@ -107,7 +107,7 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
             pickle.dump(partition, file)
 
     # Analyze the distance between different states/modes
-    dist_dir = f'{save_dir}/distance/'
+    dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
         compute_distance(save_dir,dist_dir,model_name='HMM')
@@ -280,7 +280,7 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str):
     frobenius_distance = np.load(f'{dist_dir}frobenius_distance.npy')
     correlation_distance = np.load(f'{dist_dir}matrix_correlation.npy')
     riemannian_distance = np.load(f'{dist_dir}riemannian_distance.npy')
-    congruence_distance = np.load(f'{dist_dir}congruence_distance.npy')
+    congruence_distance = np.load(f'{dist_dir}congruence_coefficient.npy')
 
     N_states = len(frobenius_distance)
     f_d = frobenius_distance[np.triu_indices(N_states, k=1)]
