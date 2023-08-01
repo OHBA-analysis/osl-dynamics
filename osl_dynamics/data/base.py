@@ -958,7 +958,6 @@ class Data:
         shuffle=True,
         validation_split=None,
         concatenate=True,
-        array_id=True,
         step_size=None,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
@@ -976,9 +975,6 @@ class Data:
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
-        array_id : bool, optional
-            Should we include the array id in the dataset? This argument can
-            be used to prepare datasets for subject-specific models.
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
@@ -1005,13 +1001,9 @@ class Data:
             # length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            if array_id:
-                # Dataset with the time series data and ID
-                array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
-                data = {"data": array, "array_id": array_tracker}
-            else:
-                # Dataset with just the time series data
-                data = {"data": array}
+            # Dataset with the time series data and ID
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            data = {"data": array, "array_id": array_tracker}
 
             # Create dataset
             dataset = dtf.create_dataset(
@@ -1113,7 +1105,6 @@ class Data:
         shuffle=True,
         validation_split=None,
         concatenate=True,
-        array_id=True,
         step_size=None,
     ):
         """Create a TFRecord Dataset for training or evaluation.
@@ -1130,9 +1121,6 @@ class Data:
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
-        array_id : bool, optional
-            Should we include the subject id in the dataset? This argument can be
-            used to prepare datasets for subject-specific models.
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
@@ -1175,13 +1163,9 @@ class Data:
             # sequence length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            if array_id:
-                # Create a dataset with the time series data and ID
-                array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
-                data = {"data": array, "array_id": array_tracker}
-            else:
-                # Create a dataset with just the time series data
-                data = {"data": array}
+            # Create a dataset with the time series data and ID
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            data = {"data": array, "array_id": array_tracker}
 
             # Save the dataset
             dtf.save_tfrecord(
@@ -1204,7 +1188,7 @@ class Data:
 
         # Helper function for parsing training examples
         def _parse_example(example):
-            feature_names = ["data", "array_id"] if array_id else ["data"]
+            feature_names = ["data", "array_id"]
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
             }

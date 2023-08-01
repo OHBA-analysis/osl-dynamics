@@ -360,7 +360,8 @@ class Model(VariationalInferenceModelBase):
             Training dataset.
         """
         training_dataset = self.make_dataset(
-            training_dataset, concatenate=True, array_id=True
+            training_dataset,
+            concatenate=True,
         )
 
         if self.config.learn_means:

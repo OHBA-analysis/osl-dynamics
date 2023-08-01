@@ -258,7 +258,9 @@ class Model(HMMModel):
 
         # Make a TensorFlow dataset
         dataset = self.make_dataset(
-            dataset, shuffle=True, concatenate=True, array_id=True
+            dataset,
+            shuffle=True,
+            concatenate=True,
         )
 
         # Set static loss scaling factor
@@ -409,7 +411,6 @@ class Model(HMMModel):
         training_data = self.make_dataset(
             training_data,
             concatenate=True,
-            array_id=True,
         )
 
         return super().random_subset_initialization(
@@ -444,7 +445,8 @@ class Model(HMMModel):
         """
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, concatenate=True, array_id=True
+            training_data,
+            concatenate=True,
         )
 
         return super().random_state_time_course_initialization(
@@ -655,7 +657,8 @@ class Model(HMMModel):
             Training dataset.
         """
         training_dataset = self.make_dataset(
-            training_dataset, concatenate=True, array_id=True
+            training_dataset,
+            concatenate=True,
         )
 
         if self.config.learn_means:
@@ -694,7 +697,10 @@ class Model(HMMModel):
         _logger.info("Getting free energy")
 
         # Convert to a TensorFlow dataset if not already
-        dataset = self.make_dataset(dataset, concatenate=True, array_id=True)
+        dataset = self.make_dataset(
+            dataset,
+            concatenate=True,
+        )
 
         # Calculate variational free energy for each batch
         free_energy = []
@@ -741,7 +747,10 @@ class Model(HMMModel):
             Model evidence.
         """
         _logger.info("Getting model evidence")
-        dataset = self.make_dataset(dataset, concatenate=True, array_id=True)
+        dataset = self.make_dataset(
+            dataset,
+            concatenate=True,
+        )
         n_batches = dtf.get_n_batches(dataset)
 
         evidence = 0
@@ -797,7 +806,7 @@ class Model(HMMModel):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset, array_id=True)
+        dataset = self.make_dataset(dataset)
 
         _logger.info("Getting alpha")
         alpha = []
