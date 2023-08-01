@@ -103,7 +103,7 @@ if __name__ == '__main__':
     index = int(sys.argv[1]) - 1
     #index = 91
     
-    model,n_channels, n_states = parse_index(index,models,list_channels,list_states)
+    model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
         save_dir = f'./results/{model}_ICA_{n_channels}'
