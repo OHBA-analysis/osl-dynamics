@@ -380,19 +380,23 @@ def intervals(state_time_course, sampling_frequency=None, squeeze=True):
     """
     sampling_frequency = sampling_frequency or 1
     slices = state_activations(state_time_course)
-    result = [
-        [
-            np.array(
-                [
-                    slice_1.start - slice_0.stop
-                    for slice_0, slice_1 in itertools.pairwise(state_slices)
-                ],
+    result = []
+    for subject_slice in slices:
+        r = []
+        for state_slices in subject_slice:
+            a, b = itertools.tee(state_slices)
+            next(b, None)
+            state_slices_iter = zip(a, b)
+            r.append(
+                np.array(
+                    [
+                        slice_1.start - slice_0.stop
+                        for slice_0, slice_1 in state_slices_iter
+                    ]
+                )
+                / sampling_frequency
             )
-            / sampling_frequency
-            for state_slices in subject_slice
-        ]
-        for subject_slice in slices
-    ]
+        result.append(r)
 
     if not squeeze:
         return result
