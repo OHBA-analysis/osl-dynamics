@@ -10,7 +10,7 @@ import nibabel as nib
 from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
-from rotation.utils import plot_FO, stdcor2cov,first_eigenvector, IC2brain
+from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector, IC2brain
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -256,12 +256,17 @@ def compute_distance(save_dir:str,dist_dir:str,model_name:str):
     model = load(save_dir)
     if model_name == 'MAGE':
         means, stds, correlations = model.get_means_stds_fcs()
+        # Compact stds (M*N*N) to (M*N)
+        if stds.ndim == 3:
+            stds = np.array([np.diag(matrix) for matrix in stds])
         covariances = stdcor2cov(stds, correlations)
-        np.save(f'{save_dir}state_stds.npy', stds)
-        np.save(f'{save_dir}state_correlations.npy', correlations)
+
     else:
         means, covariances = model.get_means_covariances()
+        stds, correlations = cov2stdcor(covariances)
     np.save(f'{save_dir}state_means.npy', means)
+    np.save(f'{save_dir}state_stds.npy', stds)
+    np.save(f'{save_dir}state_correlations.npy', correlations)
     np.save(f'{save_dir}state_covariances.npy', covariances)
 
     # Compute four distance/correlation metrics
@@ -269,22 +274,6 @@ def compute_distance(save_dir:str,dist_dir:str,model_name:str):
     np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
     np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
     np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
-
-def mean_mapping(save_dir:str,spatial_map_dir:str):
-    """
-    Obtain mean activation spatial maps of each state/mode in the specified directory
-    Parameters
-    ----------
-    save_dir: (string) directory to work in
-    spatial_map_dir: (string) spatial map of independent components
-
-    Returns
-    -------
-    """
-    state_means = np.load(f'{save_dir}state_means.npy')
-    spatial_map = nib.load(spatial_map_dir)
-    mean_activation_map = IC2brain(spatial_map, state_means.T)
-    nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
 
 def plot_distance(dist_dir:str,plot_dir:str,model:str):
     """
@@ -337,6 +326,23 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str):
     plt.savefig(f'{plot_dir}distance_plot.jpg')
     plt.savefig(f'{plot_dir}distance_plot.pdf')
     plt.close()
+def mean_mapping(save_dir:str,spatial_map_dir:str):
+    """
+    Obtain mean activation spatial maps of each state/mode in the specified directory
+    Parameters
+    ----------
+    save_dir: (string) directory to work in
+    spatial_map_dir: (string) spatial map of independent components
+
+    Returns
+    -------
+    """
+    state_means = np.load(f'{save_dir}state_means.npy')
+    spatial_map = nib.load(spatial_map_dir)
+    mean_activation_map = IC2brain(spatial_map, state_means.T)
+    nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+
+
 
 def FC_mapping(save_dir:str,spatial_map_dir:str):
     """

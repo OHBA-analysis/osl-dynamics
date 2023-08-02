@@ -83,7 +83,7 @@ def plot_FO(fo_matrix:np.ndarray,plot_dir:str):
 
 def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
     """
-    Convert from M standard deviations vectors (N) and M correlation matrices (N*N)
+    Convert from M standard deviations vectors (N) or diagonal matrices (N*N) and M correlation matrices (N*N)
     to M covariance matrices
     Parameters
     ----------
@@ -98,19 +98,34 @@ def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
     covariance matrices with shape (M, N, N)
     """
 
-    # Step 1: Convert the 2D array of standard deviations to a diagonal matrix
-    #M, N = stds.shape
-    #std_diagonal = np.zeros((M, N, N))
-    #np.fill_diagonal(std_diagonal, stds)
-
-    # Step 2: Perform element-wise matrix multiplication to get M covariance matrices
-    #return std_diagonal * corrs
     if stds.ndim == 2:
         return (np.expand_dims(stds,-1) @ np.expand_dims(stds,-2)) * corrs
     elif stds.ndim == 3:
         return stds @ corrs @ stds
     else:
         raise ValueError('Check the dimension of your standard deviation!')
+
+def cov2stdcor(covs:np.ndarray):
+    """
+    convert from covariance matrices (M*N*N) to
+    stds (M*N) and correlation matrices (M * N * N)
+    Parameters
+    ----------
+    covs: numpy.ndarray (M*N*N)
+
+    Returns
+    -------
+    stds: numpy.ndarray (M*N)
+    corrs: numpy.ndarray (M*N*N)
+    """
+    # Validation
+    if covs.ndim < 2:
+        raise ValueError("input covariances must have more than 1 dimension.")
+
+    # Extract batches of standard deviations
+    stds = np.sqrt(np.diagonal(covs, axis1=-2, axis2=-1))
+    normalisation = np.expand_dims(stds, -1) @ np.expand_dims(stds, -2)
+    return stds, covs / normalisation
 
 def first_eigenvector(matrix: np.ndarray):
     """

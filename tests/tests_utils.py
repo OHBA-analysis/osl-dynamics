@@ -13,6 +13,12 @@ def test_stdcor2cov():
     covs = stdcor2cov(stds,corrs)
     npt.assert_equal(covs, np.array([[[16.0, 4.0], [4.0, 4.0]], [[100.0, -40.0], [-40.0, 400.0]]]))
 
+def test_cov2stdcor():
+    from rotation.utils import cov2stdcor
+    covs = np.array([[[16.0, 4.0], [4.0, 4.0]], [[100.0, -40.0], [-40.0, 400.0]]])
+    stds, corrs = cov2stdcor(covs)
+    npt.assert_equal(stds, np.array([[4.0,2.0],[10.0,20.0]]))
+    npt.assert_equal(corrs, np.array([[[1.0,0.5],[0.5,1.0]],[[1.0,-0.2],[-0.2,1.0]]]))
 def test_first_eigenvector():
     from rotation.utils import first_eigenvector
     matrix = np.array([[2.0,0.0],[0.0,1.0]])
