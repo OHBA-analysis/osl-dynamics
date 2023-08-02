@@ -384,7 +384,7 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     # means box plot
     fig, ax = plt.subplots(figsize=(6,10))
     boxplot = ax.boxplot(means.T,vert=True)
-    ax.set_xticklabels([f'{i+1}'for i in range(n_channels)])
+    ax.set_xticklabels([f'{i+1}'for i in range(n_states)])
     ax.set_xlabel('State',fontsize=12)
     ax.set_ylabel(r'$\mu$')
     plt.tight_layout()
