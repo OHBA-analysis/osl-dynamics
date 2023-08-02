@@ -121,14 +121,27 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         with open(f'{save_dir}tpm_partition.pkl', 'wb') as file:
             pickle.dump(partition, file)
 
+    # Obtain the statistics (mean,std,cov,cor) of states
+    if not os.path.isfile(f'{save_dir}state_covariances.npy'):
+        extract_state_statistics(save_dir,model_name='HMM')
+
+    # Plot the statistics (mean,std,cor) of states
+    if not os.path.isfile(f'{plot_dir}plot_state_correlations.pdf'):
+        plot_state_statistics(save_dir,plot_dir,
+                              model_name='HMM',
+                              n_channels=n_channels,
+                              n_states=n_states
+                              )
+
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-        compute_distance(save_dir,dist_dir,model_name='HMM')
+    if not os.path.isfile(f'{dist_dir}congruence_coefficient_cor.npy'):
+        compute_distance(save_dir,dist_dir)
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot_covp.jpg'):
+    if not os.path.isfile(f'{plot_dir}/distance_plot_cor.pdf'):
         plot_distance(dist_dir,plot_dir,
                       model='HMM',
                       n_channels=n_channels,
@@ -204,13 +217,27 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
-    dist_dir = f'{save_dir}/distance/'
+    # Obtain the statistics (mean,std, cov,cor) of states
+    if not os.path.isfile(f'{save_dir}state_covariances.npy'):
+        extract_state_statistics(save_dir, model_name='Dynemo')
+
+    # Plot the statistics (mean,std,cor) of states
+    if not os.path.isfile(f'{plot_dir}plot_state_correlations.pdf'):
+        plot_state_statistics(save_dir, plot_dir,
+                              model_name='Dynemo',
+                              n_channels=n_channels,
+                              n_states=n_states
+                              )
+
+    # Analyze the distance between different states/modes
+    dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-        compute_distance(save_dir,dist_dir,model_name='Dynemo')
+    if not os.path.isfile(f'{dist_dir}congruence_coefficient_cor.npy'):
+        compute_distance(save_dir, dist_dir)
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot_cov.jpg'):
+    if not os.path.isfile(f'{plot_dir}/distance_plot_cor.pdf'):
         plot_distance(dist_dir, plot_dir,
                       model='Dynemo',
                       n_channels=n_channels,
@@ -251,13 +278,27 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
-    dist_dir = f'{save_dir}/distance/'
+    # Obtain the statistics (mean,std, cov,cor) of states
+    if not os.path.isfile(f'{save_dir}state_covariances.npy'):
+        extract_state_statistics(save_dir, model_name='MAGE')
+
+    # Plot the statistics (mean,std,cor) of states
+    if not os.path.isfile(f'{plot_dir}plot_state_correlations.pdf'):
+        plot_state_statistics(save_dir, plot_dir,
+                              model_name='MAGE',
+                              n_channels=n_channels,
+                              n_states=n_states
+                              )
+
+    # Analyze the distance between different states/modes
+    dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-        compute_distance(save_dir,dist_dir,model_name='MAGE')
+    if not os.path.isfile(f'{dist_dir}congruence_coefficient_cor.npy'):
+        compute_distance(save_dir, dist_dir)
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot_cov.jpg'):
+    if not os.path.isfile(f'{plot_dir}/distance_plot_cor.pdf'):
         plot_distance(dist_dir, plot_dir,
                       model='MAGE',
                       n_channels=n_channels,
@@ -305,8 +346,6 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
 
 def extract_state_statistics(save_dir:str,model_name:str):
-    pass
-def compute_distance(save_dir:str,dist_dir:str,model_name:str):
     from osl_dynamics.models import load
     model = load(save_dir)
     if model_name == 'MAGE':
@@ -322,6 +361,54 @@ def compute_distance(save_dir:str,dist_dir:str,model_name:str):
     np.save(f'{save_dir}state_stds.npy', stds)
     np.save(f'{save_dir}state_correlations.npy', correlations)
     np.save(f'{save_dir}state_covariances.npy', covariances)
+
+def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:int,n_states:int):
+    """
+    plot the mean, std, correlation of states
+    Parameters
+    ----------
+    save_dir: (str) directory to read in mean,std,correlations
+    plot_dir: (str) directory to save the plot
+    model_name: (str) model name
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+
+    Returns
+    -------
+
+    """
+    means = np.load(f'{save_dir}state_means.npy')
+    stds = np.load(f'{save_dir}state_stds.npy')
+    corrs = np.load(f'{save_dir}state_correlations.npy')
+
+    # means box plot
+    fig, ax = plt.subplots(figsize=(6,10))
+    boxplot = ax.boxplot(means.T,vert=True)
+    ax.set_xticklabels([f'{i+1}'for i in range(n_channels)])
+    ax.set_xlabel('State',fontsize=12)
+    ax.set_ylabel(r'$\mu$')
+    plt.tight_layout()
+    plt.suptitle(f'Mean, {model_name}_ICA_{n_channels}_state_{n_states}',fontsize=15)
+    plt.savefig(f'{plot_dir}plot_state_means.jpg')
+    plt.savefig(f'{plot_dir}plot_state_means.pdf')
+    plt.close()
+
+def compute_distance(save_dir:str,dist_dir:str):
+    """
+    Compute distance of corrletion and covariance matrices
+    Parameters
+    ----------
+    save_dir: (str) directory to read these matrices
+    dist_dir: (str) directory to save distances
+
+    Returns
+    -------
+
+    """
+    #means = np.load(f'{save_dir}state_means.npy')
+    #stds = np.load(f'{save_dir}state_stds.npy')
+    correlations = np.load(f'{save_dir}state_correlations.npy')
+    covariances = np.load(f'{save_dir}state_covariances.npy')
 
     # Compute four distance/correlation metrics
     np.save(f'{dist_dir}/frobenius_distance_cov.npy', pairwise_frobenius_distance(covariances))
