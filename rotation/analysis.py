@@ -8,6 +8,7 @@ import networkx as nx
 import nibabel as nib
 
 from osl_dynamics.array_ops import cov2corr
+import osl_dynamics.data
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector, IC2brain
@@ -36,7 +37,21 @@ def construct_graph(tpm:np.ndarray):
                 G.add_edge(i, j, weight=weight)
 
     return G
-def HMM_analysis(dataset, save_dir,spatial_map_dir):
+def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
+                 spatial_map_dir:str,n_channels:int, n_states:int):
+    """
+    Post-training analysis of HMM model
+    Parameters
+    ----------
+    dataset: (osl_dynamics.data.Data) dataset to work on
+    save_dir: (str) directory to save results
+    spatial_map_dir: (str) directory of groupICA spatial maps
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+
+    Returns
+    -------
+    """
     from osl_dynamics.models import load
     from osl_dynamics.utils import plotting
     from osl_dynamics.inference import modes
@@ -114,7 +129,10 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
 
     # Plot the distance between different states/modes
     if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
-        plot_distance(dist_dir,plot_dir,model='HMM')
+        plot_distance(dist_dir,plot_dir,
+                      model='HMM',
+                      n_channels=n_channels,
+                      n_states=n_states)
 
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
@@ -159,7 +177,21 @@ def HMM_analysis(dataset, save_dir,spatial_map_dir):
 
 
 
-def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
+def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
+                    spatial_map_dir:str, n_channels:int,n_states:int):
+    """
+    Post-training analysis of Dynemo model
+    Parameters
+    ----------
+    dataset: (osl_dynamics.data.Data) dataset to work on
+    save_dir: (str) directory to save results
+    spatial_map_dir: (str) directory of spatial maps
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+
+    Returns
+    -------
+    """
     from osl_dynamics.models import load
     model = load(save_dir)
 
@@ -179,7 +211,10 @@ def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
 
     # Plot the distance between different states/modes
     if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
-        plot_distance(dist_dir, plot_dir, model='Dynemo')
+        plot_distance(dist_dir, plot_dir,
+                      model='Dynemo',
+                      n_channels=n_channels,
+                      n_states=n_states)
 
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
@@ -188,7 +223,22 @@ def Dynemo_analysis(dataset, save_dir, spatial_map_dir):
     if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
         FC_mapping(save_dir,spatial_map_dir)
 
-def MAGE_analysis(dataset,save_dir, spatial_map_dir):
+def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
+                  spatial_map_dir:str, n_channels:int, n_states:int):
+    """
+    Post-training analysis of MAGE
+    Parameters
+    ----------
+    dataset: (osl_dynamics.data.Data) dataset to work on
+    save_dir: (str) directory to save results
+    spatial_map_dir: (str) directory of spatial maps
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+
+    Returns
+    -------
+
+    """
     from osl_dynamics.models import load
     model = load(save_dir)
 
@@ -208,7 +258,10 @@ def MAGE_analysis(dataset,save_dir, spatial_map_dir):
 
     # Plot the distance between different states/modes
     if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
-        plot_distance(dist_dir, plot_dir, model='MAGE')
+        plot_distance(dist_dir, plot_dir,
+                      model='MAGE',
+                      n_channels=n_channels,
+                      n_states=n_states)
 
 
     # Compute the mean activation map
@@ -260,7 +313,6 @@ def compute_distance(save_dir:str,dist_dir:str,model_name:str):
         if stds.ndim == 3:
             stds = np.array([np.diag(matrix) for matrix in stds])
         covariances = stdcor2cov(stds, correlations)
-
     else:
         means, covariances = model.get_means_covariances()
         stds, correlations = cov2stdcor(covariances)
@@ -270,12 +322,17 @@ def compute_distance(save_dir:str,dist_dir:str,model_name:str):
     np.save(f'{save_dir}state_covariances.npy', covariances)
 
     # Compute four distance/correlation metrics
-    np.save(f'{dist_dir}/frobenius_distance.npy', pairwise_frobenius_distance(covariances))
-    np.save(f'{dist_dir}/matrix_correlation.npy', pairwise_matrix_correlations(covariances))
-    np.save(f'{dist_dir}/riemannian_distance.npy', pairwise_riemannian_distances(covariances))
-    np.save(f'{dist_dir}/congruence_coefficient.npy', pairwise_congruence_coefficient(covariances))
+    np.save(f'{dist_dir}/frobenius_distance_cov.npy', pairwise_frobenius_distance(covariances))
+    np.save(f'{dist_dir}/matrix_correlation_cov.npy', pairwise_matrix_correlations(covariances))
+    np.save(f'{dist_dir}/riemannian_distance_cov.npy', pairwise_riemannian_distances(covariances))
+    np.save(f'{dist_dir}/congruence_coefficient_cov.npy', pairwise_congruence_coefficient(covariances))
 
-def plot_distance(dist_dir:str,plot_dir:str,model:str):
+    np.save(f'{dist_dir}/frobenius_distance_cor.npy', pairwise_frobenius_distance(correlations))
+    np.save(f'{dist_dir}/matrix_correlation_cor.npy', pairwise_matrix_correlations(correlations))
+    np.save(f'{dist_dir}/riemannian_distance_cor.npy', pairwise_riemannian_distances(correlations))
+    np.save(f'{dist_dir}/congruence_coefficient_cor.npy', pairwise_congruence_coefficient(correlations))
+
+def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:int):
     """
     Plot the distance distribution within each N_states, N_channels
     Parameters
@@ -283,49 +340,57 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str):
     dist_dir: (str) directory containing distance matrices
     dist_plot_dir: (str) directory to save the plot
     model: (str) the model name
+    n_channels: (int) number of channels
+    n_states: (int) number of states
 
     Returns
     -------
     """
-    frobenius_distance = np.load(f'{dist_dir}frobenius_distance.npy')
-    correlation_distance = np.load(f'{dist_dir}matrix_correlation.npy')
-    riemannian_distance = np.load(f'{dist_dir}riemannian_distance.npy')
-    congruence_distance = np.load(f'{dist_dir}congruence_coefficient.npy')
+    measures = ['cov','cor']
+    for measure in measures:
+        frobenius_distance = np.load(f'{dist_dir}frobenius_distance_{measure}.npy')
+        correlation_distance = np.load(f'{dist_dir}matrix_correlation_{measure}.npy')
+        riemannian_distance = np.load(f'{dist_dir}riemannian_distance_{measure}.npy')
+        congruence_distance = np.load(f'{dist_dir}congruence_coefficient_{measure}.npy')
 
-    N_states = len(frobenius_distance)
-    f_d = frobenius_distance[np.triu_indices(N_states, k=1)]
-    corr_d = correlation_distance[np.triu_indices(N_states, k=1)]
-    r_d = riemannian_distance[np.triu_indices(N_states, k=1)]
-    cong_d = congruence_distance[np.triu_indices(N_states, k=1)]
+        N_states = len(frobenius_distance)
+        f_d = frobenius_distance[np.triu_indices(N_states, k=1)]
+        corr_d = correlation_distance[np.triu_indices(N_states, k=1)]
+        r_d = riemannian_distance[np.triu_indices(N_states, k=1)]
+        cong_d = congruence_distance[np.triu_indices(N_states, k=1)]
 
-    distances = np.array([f_d,corr_d,r_d,cong_d])
-    measures = ['Frobenius','Correlation','Riemannian','Congruence']
-    n_measures = len(distances)
-    # Start plotting
-    fig, axes = plt.subplots(n_measures, n_measures, figsize=(12, 12))
+        distances = np.array([f_d, corr_d, r_d, cong_d])
+        measures = ['Frobenius', 'Correlation', 'Riemannian', 'Congruence']
+        n_measures = len(distances)
+        # Start plotting
+        fig, axes = plt.subplots(n_measures, n_measures, figsize=(12, 12))
 
-    # Loop through each pair of measures and plot histograms on the diagonal and scatter plots on the off-diagonal
-    for i in range(n_measures):
-        for j in range(n_measures):
-            if i == j:
-                # Plot histogram for diagonal entries
-                axes[i, j].hist(distances[i, :], bins=20, color='blue', alpha=0.7)
-            else:
-                data_1 = distances[j,:]
-                data_2 = distances[i,:]
-                # Plot scatter plot for off-diagonal entries (i,j)
-                axes[i, j].scatter(data_1, data_2, color='blue', alpha=0.5)
-                axes[i, j].set_xlabel(measures[j])
-                axes[i, j].set_ylabel(measures[i])
+        # Loop through each pair of measures and plot histograms on the diagonal and scatter plots on the off-diagonal
+        for i in range(n_measures):
+            for j in range(n_measures):
+                if i == j:
+                    # Plot histogram for diagonal entries
+                    axes[i, j].hist(distances[i, :], bins=20, color='blue', alpha=0.7)
+                else:
+                    data_1 = distances[j, :]
+                    data_2 = distances[i, :]
+                    # Plot scatter plot for off-diagonal entries (i,j)
+                    axes[i, j].scatter(data_1, data_2, color='blue', alpha=0.5)
+                    axes[i, j].set_xlabel(measures[j])
+                    axes[i, j].set_ylabel(measures[i])
 
-    # Add labels to the diagonal plots
-    for i in range(n_measures):
-        axes[i, i].set_xlabel(measures[i])
-        axes[i, i].set_ylabel('Frequency')
+        # Add labels to the diagonal plots
+        for i in range(n_measures):
+            axes[i, i].set_xlabel(measures[i])
+            axes[i, i].set_ylabel('Frequency')
 
-    plt.savefig(f'{plot_dir}distance_plot.jpg')
-    plt.savefig(f'{plot_dir}distance_plot.pdf')
-    plt.close()
+        # Title
+        plt.suptitle(f'{measure} distance, {model}_ICA_{n_channels}_states_{n_states}',fontsize=20)
+
+        plt.savefig(f'{plot_dir}distance_plot_{measure}.jpg')
+        plt.savefig(f'{plot_dir}distance_plot_{measure}.pdf')
+        plt.close()
+
 def mean_mapping(save_dir:str,spatial_map_dir:str):
     """
     Obtain mean activation spatial maps of each state/mode in the specified directory
