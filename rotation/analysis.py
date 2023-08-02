@@ -393,6 +393,18 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     plt.savefig(f'{plot_dir}plot_state_means.pdf')
     plt.close()
 
+    # stds box plot
+    fig, ax = plt.subplots(figsize=(6, 10))
+    boxplot = ax.boxplot(stds.T, vert=True)
+    ax.set_xticklabels([f'{i + 1}' for i in range(n_states)])
+    ax.set_xlabel('State', fontsize=12)
+    ax.set_ylabel(r'$\sigma$')
+    plt.tight_layout()
+    plt.suptitle(f'Standard deviation, {model_name}_ICA_{n_channels}_state_{n_states}', fontsize=15)
+    plt.savefig(f'{plot_dir}plot_state_stds.jpg')
+    plt.savefig(f'{plot_dir}plot_state_stds.pdf')
+    plt.close()
+
 def compute_distance(save_dir:str,dist_dir:str):
     """
     Compute distance of corrletion and covariance matrices
