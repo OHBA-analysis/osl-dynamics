@@ -128,7 +128,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         compute_distance(save_dir,dist_dir,model_name='HMM')
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
+    if not os.path.isfile(f'{plot_dir}/distance_plot_covp.jpg'):
         plot_distance(dist_dir,plot_dir,
                       model='HMM',
                       n_channels=n_channels,
@@ -210,7 +210,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         compute_distance(save_dir,dist_dir,model_name='Dynemo')
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
+    if not os.path.isfile(f'{plot_dir}/distance_plot_cov.jpg'):
         plot_distance(dist_dir, plot_dir,
                       model='Dynemo',
                       n_channels=n_channels,
@@ -257,7 +257,7 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         compute_distance(save_dir,dist_dir,model_name='MAGE')
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot.jpg'):
+    if not os.path.isfile(f'{plot_dir}/distance_plot_cov.jpg'):
         plot_distance(dist_dir, plot_dir,
                       model='MAGE',
                       n_channels=n_channels,
@@ -304,6 +304,8 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
 
     np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
 
+def extract_state_statistics(save_dir:str,model_name:str):
+    pass
 def compute_distance(save_dir:str,dist_dir:str,model_name:str):
     from osl_dynamics.models import load
     model = load(save_dir)
