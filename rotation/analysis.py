@@ -382,7 +382,7 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     corrs = np.load(f'{save_dir}state_correlations.npy')
 
     # means box plot
-    fig, ax = plt.subplots(figsize=(6,10))
+    fig, ax = plt.subplots(figsize=(10,6))
     boxplot = ax.boxplot(means.T,vert=True)
     ax.set_xticklabels([f'{i+1}'for i in range(n_states)])
     ax.set_xlabel('State',fontsize=12)
@@ -418,8 +418,13 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     for i in range(n_states):
         row = i // num_cols
         col = i % num_cols
-        ax = axes[row, col]
+        if num_rows == 1:
+            ax = axes[col]
+        else:
+            ax = axes[row, col]
         corr_matrix = corrs[i, :, :]
+        # Set the diagonal to zero
+        corr_matrix = corr_matrix - np.eye(len(corr_matrix))
 
         # Plot the correlation matrix as an image (heatmap)
         cax = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
@@ -430,7 +435,7 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     cbar = fig.colorbar(cax, ax=axes, fraction=0.05, pad=0.04)
     cbar.set_label('Correlation')
     # Adjust spacing between subplots
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.savefig(f'{plot_dir}plot_state_correlations.jpg')
     plt.savefig(f'{plot_dir}plot_state_correlations.pdf')
     plt.close()
