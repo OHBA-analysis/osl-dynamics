@@ -168,14 +168,14 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Make a TensorFlow Dataset
-        training_data = self.make_dataset(
+        training_dataset = self.make_dataset(
             training_data,
             shuffle=True,
             concatenate=True,
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_data)
+        n_total_batches = dtf.get_n_batches(training_dataset)
         n_batches = max(round(n_total_batches * take), 1)
         _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
@@ -184,7 +184,16 @@ class VariationalInferenceModelBase(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_data.shuffle(100000).take(n_batches)
+
+            training_dataset = self.make_dataset(
+                training_data,
+                shuffle=True,
+                concatenate=True,
+            )
+            training_data_subset = training_dataset.shuffle(
+                training_data.buffer_size
+            ).take(n_batches)
+
             try:
                 history = self.fit(
                     training_data_subset,
