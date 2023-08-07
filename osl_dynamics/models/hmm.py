@@ -326,6 +326,9 @@ class Model(ModelBase):
 
         _logger.info("Random subset initialization")
 
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
@@ -345,9 +348,7 @@ class Model(ModelBase):
             training_dataset = self.make_dataset(
                 training_data, shuffle=True, concatenate=True
             )
-            training_data_subset = training_dataset.shuffle(
-                training_data.buffer_size
-            ).take(n_batches)
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
@@ -403,6 +404,9 @@ class Model(ModelBase):
 
         _logger.info("Random state time course initialization")
 
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
@@ -422,9 +426,7 @@ class Model(ModelBase):
             training_dataset = self.make_dataset(
                 training_data, shuffle=True, concatenate=True
             )
-            training_data_subset = training_dataset.shuffle(
-                training_data.buffer_size
-            ).take(n_batches)
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             self.set_random_state_time_course_initialization(training_data_subset)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)

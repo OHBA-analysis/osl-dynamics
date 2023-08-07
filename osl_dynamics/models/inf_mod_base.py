@@ -167,6 +167,9 @@ class VariationalInferenceModelBase(ModelBase):
             n_kl_annealing_epochs or original_n_kl_annealing_epochs
         )
 
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data,
@@ -190,9 +193,7 @@ class VariationalInferenceModelBase(ModelBase):
                 shuffle=True,
                 concatenate=True,
             )
-            training_data_subset = training_dataset.shuffle(
-                training_data.buffer_size
-            ).take(n_batches)
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             try:
                 history = self.fit(
