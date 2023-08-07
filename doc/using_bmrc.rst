@@ -76,7 +76,11 @@ Submit with: ``sbatch job.sh``.
 
 Monitor jobs: ``watch squeue -u <username>``.
 
+Look at a queue: ``squeue -p <queue>``, e.g. ``squeue -p gpu_short``.
+
 Cancel a particular job: ``scancel <job-id>``.
+
+Cancel a set of jobs: ``scancel {<start>..<end>}``.
 
 Cancel all your jobs: ``scancel -u <username>``.
 
