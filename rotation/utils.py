@@ -174,3 +174,61 @@ def IC2brain(spatial_map:Nifti1Image,IC_metric:np.ndarray):
 
     return brain_map
 
+def fisher_z_transform(v:np.ndarray):
+    """
+    Fisher z-transform each element of the input
+    z = \frac{1}{2}\ln(\frac{1+r}{1-r})
+    Parameters
+    ----------
+    v: (numpy.ndarray) Elements in [-1,1]
+
+    Returns
+    -------
+    Fisher z-transformed matrix
+    """
+    return 0.5 * np.log((1 + v)/(1 - v))
+def fisher_z_correlation(M1:np.ndarray,M2:np.ndarray):
+    """
+    Compute the Fisher z-transformed vector correlation.
+    Fisher z-transformation: z = \frac{1}{2}\ln(\frac{1+r}{1-r})
+    Suppose M1 and M2 are in shape N*N, semi-positive definite
+    Step 1: Obtain the lower triangular element of M1 and M2,
+    unwrap to vectors v1, v2 with length N * (N - 1) / 2
+    Step 2: Fisher z-transform vectors v1, v2 to z1, z2
+    Step 3: return the Pearson's correlation between z1, z2
+    Parameters
+    ----------
+    M1: (numpy.ndarray) correlation/matrix 1
+    M2: (numpy.ndarray) matrix 2
+
+    Returns
+    -------
+    dist: (float) distance between M1 and M2
+    """
+    N = M1.shape[0]
+    assert N == M2.shape[0]
+
+    # Obtain the upper triangular elements
+    upper_indices = np.triu_indices(N, k=1)
+    v1 = M1[upper_indices]
+    v2 = M2[upper_indices]
+
+    # Fisher-z-transformation
+    z1 = fisher_z_transform(v1)
+    z2 = fisher_z_transform(v2)
+
+    # return the correlation
+    return np.cov(z1,z2)[0,1]/ (np.std(z1) * np.std(z2))
+
+def pairwise_fisher_z_correlations(matrices:np.ndarray):
+    """
+    Compute the pairwise Fisher z-transformed correlations of matrices
+    See function fisher_z_correlation for details
+    Parameters
+    ----------
+    matrices: numpy.ndarray with shape M*N*N
+
+    Returns
+    -------
+    correlations: numpy.ndarray with shape M * M
+    """

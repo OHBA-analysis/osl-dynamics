@@ -55,8 +55,6 @@ if __name__ == '__main__':
         save_dir = './result/comparison/'
         comparison_analysis(models,list_channels,list_states,save_dir)
 
-
-
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 
     save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}/'
