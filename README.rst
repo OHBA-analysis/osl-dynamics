@@ -4,6 +4,13 @@ osl-dynamics
 
 See the read the docs page for a description of this project: `https://osl-dynamics.readthedocs.io <https://osl-dynamics.readthedocs.io>`_.
 
+Citation
+========
+
+If you find this toolbox useful, please cite:
+
+    **Gohil C., et al., 2023. osl-dynamics: A toolbox for modelling fast dynamic brain activity. bioRxiv doi: https://doi.org/10.1101/2023.08.07.549346.**
+
 Installation
 ============
 
