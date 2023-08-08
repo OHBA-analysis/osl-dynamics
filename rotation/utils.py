@@ -218,7 +218,7 @@ def fisher_z_correlation(M1:np.ndarray,M2:np.ndarray):
     z2 = fisher_z_transform(v2)
 
     # return the correlation
-    return np.cov(z1,z2)[0,1]/ (np.std(z1) * np.std(z2))
+    return np.cov(z1,z2,ddof=0)[0,1]/ (np.std(z1,ddof=0) * np.std(z2,ddof=0))
 
 def pairwise_fisher_z_correlations(matrices:np.ndarray):
     """
@@ -239,5 +239,6 @@ def pairwise_fisher_z_correlations(matrices:np.ndarray):
             correlation_metrics[i][j] = fisher_z_correlation(
                 matrices[i], matrices[j]
             )
+            correlation_metrics[j][i] = correlation_metrics[i][j]
 
     return correlation_metrics
