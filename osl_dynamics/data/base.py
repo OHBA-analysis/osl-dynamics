@@ -681,7 +681,7 @@ class Data:
 
         return self
 
-    def amplitude_envelope(self):
+    def amplitude_envelope(self, use_raw=False):
         """Calculate the amplitude envelope.
 
         This is an in-place operation.
@@ -690,6 +690,8 @@ class Data:
         -------
         data : osl_dynamics.data.Data
             The modified Data object.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
         """
 
         # Function to calculate amplitude envelope for a single array
@@ -700,7 +702,8 @@ class Data:
             return array
 
         # Prepare the data in parallel
-        args = zip(self.arrays, self.prepared_data_filenames)
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
             args,
             function=_apply,
@@ -764,7 +767,7 @@ class Data:
 
         return self
 
-    def standardize(self):
+    def standardize(self, use_raw=False):
         """Standardize (z-transform) the data.
 
         This is an in-place operation.
@@ -773,6 +776,8 @@ class Data:
         -------
         data : osl_dynamics.data.Data
             The modified Data object.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
         """
 
         # Function to apply standardisation to a single array
@@ -780,8 +785,9 @@ class Data:
             return processing.standardize(array, create_copy=False)
 
         # Apply standardisation to each array in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
         self.arrays = pqdm(
-            array=zip(self.arrays),
+            array=zip(arrays),
             function=_apply,
             desc="Standardize",
             n_jobs=self.n_jobs,
