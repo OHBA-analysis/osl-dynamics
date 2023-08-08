@@ -232,3 +232,12 @@ def pairwise_fisher_z_correlations(matrices:np.ndarray):
     -------
     correlations: numpy.ndarray with shape M * M
     """
+    N = len(matrices)
+    correlation_metrics = np.eye(N)
+    for i in range(N):
+        for j in range(i + 1, N):
+            correlation_metrics[i][j] = fisher_z_correlation(
+                matrices[i], matrices[j]
+            )
+
+    return correlation_metrics

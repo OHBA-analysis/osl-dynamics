@@ -38,3 +38,14 @@ def test_IC2brain():
 
     brain_map_true = np.array(np.reshape(np.array([i * (-1) ** i for i in range(16)]),(2,2,2,2)),dtype=np.float64)
     npt.assert_equal(brain_map_data,brain_map_true)
+
+def test_pairwise_fisher_z_correlations():
+    from rotation.utils import pairwise_fisher_z_correlations
+    x1, x2, x3 = -0.2,0.5,0.3
+    y1, y2, y3 = 0.7,-0.1,0.4
+
+    answer = np.corrcoef(np.array([[x1,x2,x3],[y1,y2,y3]]))
+
+    matrices = np.array([[[1.0,x1,x2],[x1,1.0,x3],[x2,x3,1.0]],
+                         [[1.0,y1,y2],[y1,1.0,y3],[y2,y3,1.0]]])
+    npt.assert_equal(pairwise_fisher_z_correlations(matrices),answer)
