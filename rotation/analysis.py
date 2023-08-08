@@ -1,4 +1,5 @@
 import os
+import warnings
 import pickle
 
 import numpy as np
@@ -11,7 +12,8 @@ from osl_dynamics.array_ops import cov2corr
 import osl_dynamics.data
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
-from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector, IC2brain
+from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
+    IC2brain, pairwise_fisher_z_correlations
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -137,11 +139,11 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-    if not os.path.isfile(f'{dist_dir}congruence_coefficient_cor.npy'):
+    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
         compute_distance(save_dir,dist_dir)
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot_cor.pdf'):
+    if not os.path.isfile(f'{plot_dir}/correct_distance_plot_cor.pdf'):
         plot_distance(dist_dir,plot_dir,
                       model='HMM',
                       n_channels=n_channels,
@@ -233,11 +235,11 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-    if not os.path.isfile(f'{dist_dir}congruence_coefficient_cor.npy'):
+    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
         compute_distance(save_dir, dist_dir)
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot_cor.pdf'):
+    if not os.path.isfile(f'{plot_dir}/correct_distance_plot_cor.pdf'):
         plot_distance(dist_dir, plot_dir,
                       model='Dynemo',
                       n_channels=n_channels,
@@ -294,11 +296,11 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-    if not os.path.isfile(f'{dist_dir}congruence_coefficient_cor.npy'):
+    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
         compute_distance(save_dir, dist_dir)
 
     # Plot the distance between different states/modes
-    if not os.path.isfile(f'{plot_dir}/distance_plot_cor.pdf'):
+    if not os.path.isfile(f'{plot_dir}/correct_distance_plot_cor.pdf'):
         plot_distance(dist_dir, plot_dir,
                       model='MAGE',
                       n_channels=n_channels,
@@ -459,15 +461,23 @@ def compute_distance(save_dir:str,dist_dir:str):
     covariances = np.load(f'{save_dir}state_covariances.npy')
 
     # Compute four distance/correlation metrics
-    np.save(f'{dist_dir}/frobenius_distance_cov.npy', pairwise_frobenius_distance(covariances))
-    np.save(f'{dist_dir}/matrix_correlation_cov.npy', pairwise_matrix_correlations(covariances))
-    np.save(f'{dist_dir}/riemannian_distance_cov.npy', pairwise_riemannian_distances(covariances))
-    np.save(f'{dist_dir}/congruence_coefficient_cov.npy', pairwise_congruence_coefficient(covariances))
+    np.save(f'{dist_dir}frobenius_distance_cov.npy', pairwise_frobenius_distance(covariances))
+    np.save(f'{dist_dir}matrix_correlation_cov.npy', pairwise_matrix_correlations(covariances))
+    try:
+        np.save(f'{dist_dir}riemannian_distance_cov.npy', pairwise_riemannian_distances(covariances))
+    except np.linalg.LinAlgError:
+        warnings.warn("Riemannian distance is not computed properly for covariances!")
+    np.save(f'{dist_dir}congruence_coefficient_cov.npy', pairwise_congruence_coefficient(covariances))
+    np.save(f'{dist_dir}fisher_z_correlation_cov.npy',pairwise_fisher_z_correlations(covariances))
 
-    np.save(f'{dist_dir}/frobenius_distance_cor.npy', pairwise_frobenius_distance(correlations))
-    np.save(f'{dist_dir}/matrix_correlation_cor.npy', pairwise_matrix_correlations(correlations))
-    np.save(f'{dist_dir}/riemannian_distance_cor.npy', pairwise_riemannian_distances(correlations))
-    np.save(f'{dist_dir}/congruence_coefficient_cor.npy', pairwise_congruence_coefficient(correlations))
+    np.save(f'{dist_dir}frobenius_distance_cor.npy', pairwise_frobenius_distance(correlations))
+    np.save(f'{dist_dir}matrix_correlation_cor.npy', pairwise_matrix_correlations(correlations))
+    try:
+        np.save(f'{dist_dir}riemannian_distance_cor.npy', pairwise_riemannian_distances(correlations))
+    except np.linalg.LinAlgError:
+        warnings.warn("Riemannian distance is not computed properly for correlations!")
+    np.save(f'{dist_dir}congruence_coefficient_cor.npy', pairwise_congruence_coefficient(correlations))
+    np.save(f'{dist_dir}fisher_z_correlation_cor.npy',pairwise_fisher_z_correlations(correlations))
 
 def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:int):
     """
@@ -484,6 +494,36 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
     -------
     """
     measures = ['cov','cor']
+    # Remark by swimming 8th Aug 2023
+    # Correct implementations are Riemannian distance and Fisher z-transformed correlation
+    # So our plot should be only 2 * 2 now.
+    # For those Riemannian distance is not available (numerical issues),
+    # only plot the histogram of Fisher z-transformed
+    for measure in measures:
+        fisher = np.load(f'{dist_dir}fisher_z_correlation_{measure}.npy')
+        N_states = len(fisher)
+        fisher_d = fisher[np.triu_indices(N_states, k=1)]
+        try:
+            riemannian = np.load(f'{dist_dir}riemannian_distance_{measure}.npy')
+            riemannian_d = riemannian[np.triu_indices(N_states, k=1)]
+        except  FileNotFoundError:
+            fig = plt.figure()
+            plt.hist(fisher_d, bins=20, color='blue', alpha=0.7)
+            plt.title(f'{measure} distance, {model}_ICA_{n_channels}_states_{n_states}',fontsize=20)
+        else:
+            fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+            axes[0, 0].hist(riemannian_d, bins=20, color='blue', alpha=0.7)
+            axes[1, 1].hist(fisher_d,bins=20,color='blue',alpha=0.7)
+            axes[0, 1].scatter(riemannian_d, fisher_d, color='blue', alpha=0.5)
+
+        plt.savefig(f'{plot_dir}correct_distance_plot_{measure}.jpg')
+        plt.savefig(f'{plot_dir}correct_distance_plot_{measure}.pdf')
+        plt.close()
+
+
+
+
+    '''
     for measure in measures:
         frobenius_distance = np.load(f'{dist_dir}frobenius_distance_{measure}.npy')
         correlation_distance = np.load(f'{dist_dir}matrix_correlation_{measure}.npy')
@@ -527,6 +567,7 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
         plt.savefig(f'{plot_dir}distance_plot_{measure}.jpg')
         plt.savefig(f'{plot_dir}distance_plot_{measure}.pdf')
         plt.close()
+    '''
 
 def mean_mapping(save_dir:str,spatial_map_dir:str):
     """
