@@ -175,7 +175,7 @@ def IC2brain(spatial_map:Nifti1Image,IC_metric:np.ndarray):
 
     return brain_map
 
-def fisher_z_transform(v:np.ndarray):
+def fisher_z_transform(v:np.ndarray)->np.ndarray:
     """
     Fisher z-transform each element of the input
     z = \frac{1}{2}\ln(\frac{1+r}{1-r})
@@ -188,7 +188,7 @@ def fisher_z_transform(v:np.ndarray):
     Fisher z-transformed matrix
     """
     return 0.5 * np.log((1 + v)/(1 - v))
-def fisher_z_correlation(M1:np.ndarray,M2:np.ndarray):
+def fisher_z_correlation(M1:np.ndarray,M2:np.ndarray)->float:
     """
     Compute the Fisher z-transformed vector correlation.
     Fisher z-transformation: z = \frac{1}{2}\ln(\frac{1+r}{1-r})
@@ -221,7 +221,7 @@ def fisher_z_correlation(M1:np.ndarray,M2:np.ndarray):
     # return the correlation
     return np.cov(z1,z2,ddof=0)[0,1]/ (np.std(z1,ddof=0) * np.std(z2,ddof=0))
 
-def pairwise_fisher_z_correlations(matrices:np.ndarray):
+def pairwise_fisher_z_correlations(matrices:np.ndarray)->np.ndarray:
     """
     Compute the pairwise Fisher z-transformed correlations of matrices
     See function fisher_z_correlation for details
@@ -243,3 +243,49 @@ def pairwise_fisher_z_correlations(matrices:np.ndarray):
             correlation_metrics[j][i] = correlation_metrics[i][j]
 
     return correlation_metrics
+
+def high_pass_filter(data:np.ndarray,T:float,cutoff_frequency:float,order:int)->np.ndarray:
+    """
+
+    Parameters
+    ----------
+    data: (np.ndarray) N_channels*N_timepoints
+    T: (float) temporal resolution of the signal
+    cutoff_frequency: (float) cutoff frequency of the filter
+    order: (int) order of the filter
+    Returns
+    -------
+    filtered_data: np.ndarray, having the same format as data
+    """
+    from scipy.signal import butter,filtfilt
+    N = data.shape[1]
+    fs = 1 / T # Sampling frequency
+    nyquist = 0.5 * fs #Nyquist frequency
+    b_butter,a_butter = butter(order,cutoff_frequency,btype="highpass",fs=fs)
+    filtered_data = filtfilt(b_butter,a_butter,data)
+
+    return filtered_data
+
+def group_high_pass_filter(ts:list,T:float=0.7,cutoff_frequency:float=0.15,order:int=16) -> list:
+    """
+    Apply high pass filter to the group time series
+    Parameters
+    ----------
+    ts: (list) group time series, each element should be a np.ndarray (N_timepoint, N_channels)
+    T: (float) temporal resolution of the signal
+    cutoff_frequency: (float) cutoff frequency of the filter
+    order: (int) order of the high-pass filter
+
+    Returns
+    -------
+    returned_ts: (list) filtered signal with the same format as ts
+    """
+    returned_ts = []
+    for i in trange(len(ts),desc='high pass filtering signals'):
+        returned_ts.append(high_pass_filter(ts[i].T,
+                                            T=T,
+                                            cutoff_frequency=cutoff_frequency,
+                                            order=order).T
+                           )
+
+    return returned_ts
