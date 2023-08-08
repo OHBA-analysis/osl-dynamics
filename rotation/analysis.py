@@ -511,10 +511,33 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
             plt.hist(fisher_d, bins=20, color='blue', alpha=0.7)
             plt.title(f'{measure} distance, {model}_ICA_{n_channels}_states_{n_states}',fontsize=20)
         else:
-            fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+            fig, axes = plt.subplots(2, 2, figsize=(8, 8))
             axes[0, 0].hist(riemannian_d, bins=20, color='blue', alpha=0.7)
+            axes[0, 0].set_xlabel('Riemannian',fontsize=15)
+            axes[0, 0].set_ylabel('Frequency',fontsize=15)
+            axes[0, 0].set_xticks(axes[0, 0].get_xticks())
+            axes[0, 0].set_xticklabels(axes[0, 0].get_xticklabels(),fontsize=13)
+            axes[0, 0].set_yticks(axes[0, 0].get_yticks())
+            axes[0, 0].set_yticklabels(axes[0, 0].get_yticklabels(),fontsize=13)
+
             axes[1, 1].hist(fisher_d,bins=20,color='blue',alpha=0.7)
-            axes[0, 1].scatter(riemannian_d, fisher_d, color='blue', alpha=0.5)
+            axes[1, 1].set_xlabel('Fisher-z',fontsize=15)
+            axes[1, 1].set_ylabel('Frequency',fontsize=15)
+            axes[1, 1].set_xticks(axes[1, 1].get_xticks())
+            axes[1, 1].set_xticklabels(axes[1, 1].get_xticklabels(),fontsize=13)
+            axes[1, 1].set_yticks(axes[1, 1].get_yticks())
+            axes[1, 1].set_yticklabels(axes[1, 1].get_yticklabels(),fontsize=13)
+
+            axes[0, 1].scatter(fisher_d, riemannian_d, color='blue', alpha=0.5)
+            axes[0, 1].set_xlabel('Fisher-z',fontsize=15)
+            axes[0, 1].set_ylabel('Riemannian',fontsize=15)
+
+            axes[0, 1].set_xticks(axes[0, 1].get_xticks())
+            axes[0, 1].set_xticklabels(axes[0, 1].get_xticklabels(),fontsize=13)
+            axes[0, 1].set_yticks(axes[0, 1].get_yticks())
+            axes[0, 1].set_yticklabels(axes[0, 1].get_yticklabels(),fontsize=13)
+
+            plt.suptitle(f'{measure} distance, {model}_ICA_{n_channels}_states_{n_states}',fontsize=20)
 
         plt.savefig(f'{plot_dir}correct_distance_plot_{measure}.jpg')
         plt.savefig(f'{plot_dir}correct_distance_plot_{measure}.pdf')

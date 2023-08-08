@@ -1,3 +1,4 @@
+from tqdm import trange
 import numpy as np
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
@@ -234,7 +235,7 @@ def pairwise_fisher_z_correlations(matrices:np.ndarray):
     """
     N = len(matrices)
     correlation_metrics = np.eye(N)
-    for i in range(N):
+    for i in trange(N,desc='Compute Fisher-z transformated correlation'):
         for j in range(i + 1, N):
             correlation_metrics[i][j] = fisher_z_correlation(
                 matrices[i], matrices[j]
