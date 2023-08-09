@@ -12,6 +12,7 @@ from osl_dynamics.array_ops import cov2corr
 import osl_dynamics.data
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
+from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
     IC2brain, pairwise_fisher_z_correlations
 
@@ -231,7 +232,10 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                               n_states=n_states
                               )
     # Fractional occupancy analysis (similar to HMM)
-    FO_dir
+    FO_dir = f'{save_dir}FO_analysis/'
+    if not os.path.exists(FO_dir):
+        os.makedirs(FO_dir)
+    FO_dynemo(save_dir,FO_dir,n_channels,n_states)
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
@@ -677,6 +681,27 @@ def FC_mapping(save_dir:str,spatial_map_dir:str):
     nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')
     sum_of_degree_map = IC2brain(spatial_map, sum_of_degrees.T)
     nib.save(sum_of_degree_map, f'{save_dir}FC_sum_of_degree_map.nii.gz')
+
+def FO_dynemo(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
+    """
+    Fractional Occupancy Analysis in Dynemo, similar to HMM.
+    The aim is to summarize the mixing coefficient time course
+    Parameters
+    ----------
+    save_dir: (str) directory to work in
+    FO_dir: (str) directory to save the results
+    n_channels: number of channels
+    n_states: number of states 
+
+    Returns
+    -------
+    """
+    alpha = pickle.load(open(f"{save_dir}alpha.pkl","rb"))
+    plotting.plot_alpha(alpha[0],n_samples=1200)
+    plt.savefig(f'{FO_dir}example_alpha.jpg')
+    plt.savefig(f'{FO_dir}example_alpha.pdf')
+    plt.close()
+
 
 def comparison_analysis(models:list,list_channels:list,list_states:list,save_dir:str):
     """
