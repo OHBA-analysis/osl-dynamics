@@ -327,15 +327,6 @@ Create an issue `here <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ o
 How can I cite the package?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Currently there's no peer reviewed publication that can be cited (working on it). For now, please cite the GitHub repo:
+Please cite the preprint:
 
-- `github.com/OHBA-analysis/osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_.
-
-If you use the HMM, please cite:
-
-- D. Vidaurre, et al., Spectrally resolved fast transient brain states in electrophysiological data, `Neuroimage 126, 81-95 (2016) <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
-- D. Vidaurre, et al., Discovering dynamic brain networks from big data in rest and task. `Neuroimage 180, 646-656 (2018) <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
-
-If you use DyNeMo, please cite:
-
-- C. Gohil, et al., Mixtures of large-scale dynamic functional brain network modes. `Neuroimage 263, 119595 (2022) <https://www.sciencedirect.com/science/article/pii/S1053811922007108>`_.
+    **Gohil C., et al., 2023. osl-dynamics: A toolbox for modelling fast dynamic brain activity. bioRxiv doi: https://doi.org/10.1101/2023.08.07.549346.**

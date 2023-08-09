@@ -20,6 +20,10 @@ For more information on how to use osl-dynamics see the :doc:`documentation <doc
 
 This package was developed by the Oxford Centre for Human Brain Activity (OHBA) Methods Group at the University of Oxford. Our group website is `here <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_.
 
+If you find this toolbox useful, please cite:
+
+    **Gohil C., et al., 2023. osl-dynamics: A toolbox for modelling fast dynamic brain activity. bioRxiv doi: https://doi.org/10.1101/2023.08.07.549346.**
+
 .. |logo1| image:: https://avatars.githubusercontent.com/u/15248840?s=200&v=4
     :width: 125px
     :target: https://www.win.ox.ac.uk/research/our-locations/OHBA
