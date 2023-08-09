@@ -30,8 +30,6 @@ class FisherKernel:
     """
 
     def __init__(self, model):
-        import tensorflow as tf  # avoid slow imports
-
         compatible_models = ["HMM", "DyNeMo", "M-DyNeMo"]
         if model.config.model_name not in compatible_models:
             raise NotImplementedError(
@@ -202,6 +200,8 @@ class FisherKernel:
         gradients : dict
             Gradients with respect to the trainable variables.
         """
+        import tensorflow as tf  # avoid slow imports
+
         with tf.GradientTape() as tape:
             loss = self.model.model(inputs)
             trainable_weights = {var.name: var for var in self.model.trainable_weights}
