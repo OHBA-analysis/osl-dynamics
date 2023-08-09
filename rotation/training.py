@@ -140,7 +140,7 @@ def SWC_computation(dataset,window_length,step_size,save_dir):
     filtered_ts = group_high_pass_filter(ts)
     # Calculate the sliding window connectivity
     swc = connectivity.sliding_window_connectivity(filtered_ts, window_length=window_length, step_size=step_size, conn_type="corr")
-    np.save(f'{save_dir}/fc_swc.npy',swc,allow_pickle=True)
+    np.save(f'{save_dir}/cor_swc.npy',swc,allow_pickle=True)
 
     swc_cov = connectivity.sliding_window_connectivity(filtered_ts, window_length=window_length, step_size=step_size,
                                                    conn_type="cov")

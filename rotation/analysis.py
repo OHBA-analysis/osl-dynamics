@@ -230,7 +230,8 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                               n_channels=n_channels,
                               n_states=n_states
                               )
-
+    # Fractional occupancy analysis (similar to HMM)
+    FO_dir
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
@@ -317,35 +318,61 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    swc = np.load(f'{old_dir}/fc_swc.npy')
+    plot_dir = f'{save_dir}plot/'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
 
-    swc = np.concatenate(swc)
+    measures = ['cor','cov']
+    file_name = {'cor':'state_correlations',
+                 'cov':'state_covariances'}
+    if not os.path.isfile(f'{save_dir}state_stds.npy'):
+        for measure in measures:
+            swc = np.load(f'{old_dir}/{measure}_swc.npy')
+            swc = np.concatenate(swc)
 
-    # Initiate the K-means class
-    kmeans = KMeans(n_clusters=n_states, verbose=0)
+            # Initiate the K-means class
+            kmeans = KMeans(n_clusters=n_states, verbose=0)
 
-    # Get indices that correspond to an upper triangle of a matrix
-    # (not including the diagonal)
-    i, j = np.triu_indices(n_channels, k=1)
+            # Get indices that correspond to an upper triangle of a matrix
+            # (not including the diagonal)
+            i, j = np.triu_indices(n_channels, k=1)
 
-    # Now let's convert the sliding window connectivity matrices to a series of vectors
-    swc_vectors = swc[:, i, j]
+            # Now let's convert the sliding window connectivity matrices to a series of vectors
+            swc_vectors = swc[:, i, j]
 
-    # Check the shape of swc vectors
-    print(f'SWC vectors shape: {swc_vectors.shape}')
+            # Check the shape of swc vectors
+            print(f'SWC vectors shape: {swc_vectors.shape}')
 
-    # Fitting
-    kmeans.fit(swc_vectors)  # should take a few seconds
+            # Fitting
+            kmeans.fit(swc_vectors)  # should take a few seconds
 
-    centroids = kmeans.cluster_centers_
-    print(f'centroids shape: {centroids.shape}')
+            centroids = kmeans.cluster_centers_
+            print(f'centroids shape: {centroids.shape}')
 
-    # Convert from a vector to a connectivity matrix
-    kmean_networks = np.empty([n_states, n_channels, n_channels])
-    kmean_networks[:, i, j] = centroids
-    kmean_networks[:, j, i] = centroids
+            # Convert from a vector to a connectivity matrix
+            kmean_networks = np.empty([n_states, n_channels, n_channels])
+            kmean_networks[:, i, j] = centroids
+            kmean_networks[:, j, i] = centroids
+            np.save(f'{save_dir}{file_name[measure]}.npy',kmean_networks)
 
-    np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
+            if measure == 'cov':
+                stds,_ = cov2stdcor(kmean_networks)
+                np.save(f'{save_dir}state_stds.npy',stds)
+
+    # Analyze the distance between different states/modes
+    dist_dir = f'{save_dir}distance/'
+    if not os.path.exists(dist_dir):
+        os.makedirs(dist_dir)
+    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
+        compute_distance(save_dir, dist_dir)
+
+    # Plot the distance between different states/modes
+    if not os.path.isfile(f'{plot_dir}/correct_distance_plot_cor.pdf'):
+        plot_distance(dist_dir, plot_dir,
+                      model='SWC',
+                      n_channels=n_channels,
+                      n_states=n_states
+                      )
 
 def extract_state_statistics(save_dir:str,model_name:str):
     from osl_dynamics.models import load
