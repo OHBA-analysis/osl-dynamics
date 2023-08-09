@@ -235,7 +235,8 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     FO_dir = f'{save_dir}FO_analysis/'
     if not os.path.exists(FO_dir):
         os.makedirs(FO_dir)
-    FO_dynemo(save_dir,FO_dir,n_channels,n_states)
+    if not os.path.isfile(f'{FO_dir}fo_violin.pdf'):
+        FO_dynemo(save_dir,FO_dir,n_channels,n_states)
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
@@ -691,16 +692,131 @@ def FO_dynemo(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
     save_dir: (str) directory to work in
     FO_dir: (str) directory to save the results
     n_channels: number of channels
-    n_states: number of states 
+    n_states: number of states
 
     Returns
     -------
     """
+    # Step 1: Plot unnormalised alpha
     alpha = pickle.load(open(f"{save_dir}alpha.pkl","rb"))
-    plotting.plot_alpha(alpha[0],n_samples=1200)
-    plt.savefig(f'{FO_dir}example_alpha.jpg')
-    plt.savefig(f'{FO_dir}example_alpha.pdf')
+    plotting.plot_alpha(alpha[0],n_samples=200)
+    plt.title('Unnormalised alpha',fontsize=20)
+    plt.savefig(f'{FO_dir}example_unnormalised_alpha.jpg')
+    plt.savefig(f'{FO_dir}example_unnormalised_alpha.pdf')
     plt.close()
+
+    # Step 2: normalise the alpha
+    def normalize_alpha(a:np.ndarray, D:np.ndarray) -> np.ndarray:
+        """
+        Calculate the weighting for each mode
+        measured by the trace of each mode covariance
+        Parameters
+        ----------
+        a: (np.ndarray) N_time_points * N_states
+        D: (np.ndarray) covariance matrices N_states * N_channels * N_channels
+
+        Returns
+        -------
+        wa: (np.ndarray) weighted alpha, having the shape as a
+        """
+        # Calculate the weighting for each mode
+        # We use the trace of each mode covariance
+        w = np.trace(D, axis1=1, axis2=2)
+
+        # Weight the alphas
+        wa = w[np.newaxis, ...] * a
+
+        # Renormalize so the alphas sum to one
+        wa /= np.sum(wa, axis=1, keepdims=True)
+        return wa
+
+    # Load the inferred mode covariances
+    covs = np.load(f'{save_dir}state_covariances.npy')
+
+    # Renormalize the mixing coefficients
+    norm_alpha = [normalize_alpha(a, covs) for a in alpha]
+
+    # Plot the renormalized mixing coefficient time course for the first subject (8 seconds)
+    plotting.plot_alpha(norm_alpha[0], n_samples=200)
+    plt.title('Normalised alpha',fontsize=20)
+    plt.savefig(f'{FO_dir}example_normalised_alpha.jpg')
+    plt.savefig(f'{FO_dir}example_normalised_alpha.pdf')
+    plt.close()
+
+    # Step 3: Summary statistics
+    # Analogous to FO in HMM, we can compute the time average mixing coefficient
+    mean_norm_alpha = np.array([np.mean(a, axis=0) for a in norm_alpha])
+    np.save(f'{save_dir}fo.npy',mean_norm_alpha)
+
+    plot_FO(mean_norm_alpha, FO_dir)
+
+    std_norm_alpha = np.array([np.std(a, axis=0) for a in norm_alpha])
+    np.save(f'{save_dir}normalised_alpha_std.npy',std_norm_alpha)
+
+    # Plot the distribution of fractional occupancy (FO) across subjects
+    plotting.plot_violin(mean_norm_alpha.T, x_label="State", y_label="FO")
+    plt.savefig(f'{FO_dir}fo_violin.jpg')
+    plt.savefig(f'{FO_dir}fo_violin.pdf')
+    plt.close()
+
+def FO_MAGE(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
+    """
+    Fractional Occupancy Analysis in MAGE, similar to HMM.
+    The aim is to summarize the mixing coefficient time course
+    Parameters
+    ----------
+    save_dir: (str) directory to work in
+    FO_dir: (str) directory to save the results
+    n_channels: number of channels
+    n_states: number of states
+
+    Returns
+    -------
+
+    """
+    # Step 1: Plot alpha
+    alpha = pickle.load(open(f"{save_dir}alpha.pkl", "rb"))
+    alpha_1 = alpha[0]
+    alpha_2 = alpha[1]
+
+    plotting.plot_alpha(alpha_1, n_samples=200)
+    plt.title('alpha 1', fontsize=20)
+    plt.savefig(f'{FO_dir}example_alpha_1.jpg')
+    plt.savefig(f'{FO_dir}example_alpha_1.pdf')
+    plt.close()
+
+    plotting.plot_alpha(alpha_2, n_samples=200)
+    plt.title('alpha 2', fontsize=20)
+    plt.savefig(f'{FO_dir}example_alpha_2.jpg')
+    plt.savefig(f'{FO_dir}example_alpha_2.pdf')
+    plt.close()
+
+    # Step 2: Summary Statistics
+    mean_alpha_1 = np.array([np.mean(a, axis=0) for a in alpha_1])
+    np.save(f'{save_dir}fo_alpha_1.npy', mean_alpha_1)
+    mean_alpha_2 = np.array([np.mean(a, axis=0) for a in alpha_2])
+    np.save(f'{save_dir}fo_alpha_2.npy', mean_alpha_2)
+
+    plot_FO(mean_alpha_1, FO_dir,file_name='fo_alpha_1_hist')
+    plot_FO(mean_alpha_2,FO_dir,file_name='fo_alpha_2_hist')
+
+    std_alpha_1 = np.array([np.std(a, axis=0) for a in alpha_1])
+    np.save(f'{save_dir}alpha_1_std.npy', std_alpha_1)
+
+    std_alpha_2 = np.array([np.std(a, axis=0) for a in alpha_2])
+    np.save(f'{save_dir}alpha_2_std.npy', std_alpha_2)
+
+    # Plot the distribution of fractional occupancy (FO) across subjects
+    plotting.plot_violin(mean_alpha_1.T, x_label="State", y_label="FO")
+    plt.savefig(f'{FO_dir}fo_alpha_1_violin.jpg')
+    plt.savefig(f'{FO_dir}fo_alpha_1_violin.pdf')
+    plt.close()
+
+    plotting.plot_violin(mean_alpha_2.T, x_label="State", y_label="FO")
+    plt.savefig(f'{FO_dir}fo_alpha_2_violin.jpg')
+    plt.savefig(f'{FO_dir}fo_alpha_2_violin.pdf')
+    plt.close()
+
 
 
 def comparison_analysis(models:list,list_channels:list,list_states:list,save_dir:str):
