@@ -67,15 +67,38 @@ def test_group_high_pass_filter():
     t = np.array([i * T for i in range(N)])
     signal_1 = np.sin(2 * np.pi * f1 * t)
     signal_2 = np.cos(2 * np.pi * f2 * t)
-    signals = [signal_1,signal_2]
+    signals = [np.array([signal_1,signal_2]).T]
 
-    filtered_signals = group_high_pass_filter(signals)
+    filtered_signals = group_high_pass_filter(signals)[0].T
     filtered_signal_1 = filtered_signals[0]
     filtered_signal_2 = filtered_signals[1]
 
     frequencies = np.fft.fftfreq(N,1/fs)
-    spectrum_1 = np.fft.fft(filtered_signal_1)
-    spectrum_2 = np.fft.fft(filtered_signal_2)
-    npt.assert_almost_equal(np.sum(spectrum_1),0,decimal=6)
+    spectrum_1 = np.fft.fft(filtered_signal_1,norm='forward')
+    spectrum_2 = np.fft.fft(filtered_signal_2,norm='forward')
+    '''
+    import matplotlib.pyplot as plt
+    plt.plot(t,signal_1)
+    plt.title('Original Signal 1 (t)')
+    plt.show()
+    plt.plot(frequencies,np.abs(np.fft.fft(signal_1,norm='forward')))
+    plt.title('Original Signal 1 (f)')
+    plt.show()
+    plt.plot(t,signal_2)
+    plt.title('Original Signal 2 (t)')
+    plt.show()
+    plt.plot(frequencies,np.abs(np.fft.fft(signal_2,norm='forward')))
+    plt.title('Original Signal 2 (f)')
+    plt.show()
+
+    plt.plot(frequencies,np.abs(spectrum_1))
+    plt.title('Filtered Signal 1 (f)')
+    plt.show()
+    plt.plot(frequencies,np.abs(spectrum_2))
+    plt.title('Filtered Signal 2 (f)')
+    plt.show()
+    '''
+    npt.assert_almost_equal(np.max(np.abs(spectrum_1)),0,decimal=3)
+    npt.assert_almost_equal(np.max(np.abs(spectrum_2)),0.5,decimal=3)
 
 
