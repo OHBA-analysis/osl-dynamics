@@ -1338,6 +1338,7 @@ class Data:
             "n_raw_data_channels",
             "arrays",
             "keep",
+            "use_tfrecord",
         ]
         for item in dont_keep:
             if item in attributes:
