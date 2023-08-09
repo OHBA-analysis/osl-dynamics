@@ -1529,6 +1529,98 @@ def plot_hmm_network_summary_stats(
     )
 
 
+def plot_dynemo_network_summary_stats(data, output_dir):
+    """Plot DyNeMo summary statistics for networks as violin plots.
+
+    This function will plot the distribution over subjects for the following
+    summary statistics:
+
+    - Mean (renormalised) mixing coefficients.
+    - Standard deviation of (renormalised) mixing coefficients.
+
+    This function expects a model has been trained and the following directories
+    to exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/summary_stats`, which contains plots of the summary
+      statistics.
+
+    The :code:`<output_dir>/summary_stats` directory will also contain numpy
+    files with the summary statistics.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+    summary_stats_dir = output_dir + "/summary_stats"
+    os.makedirs(summary_stats_dir, exist_ok=True)
+
+    # Load inferred parameters
+    alp = load(f"{inf_params_dir}/alp.pkl")
+    if isinstance(alp, np.ndarray):
+        raise ValueError(
+            "We must train on multiple subjects to plot the distribution "
+            "of summary statistics."
+        )
+
+    # Get the config used to create the model
+    from osl_dynamics.models.mod_base import ModelBase
+
+    config, _ = ModelBase.load_config(model_dir)
+
+    # Renormalise (only if we are learning covariances)
+    from osl_dynamics.inference import modes
+
+    if config["learn_covariances"]:
+        covs = load(f"{inf_params_dir}/covs.npy")
+        alp = modes.reweight_alphas(alp, covs)
+
+    # Calculate summary stats
+    alp_mean = np.array([np.mean(a, axis=0) for a in alp])
+    alp_std = np.array([np.std(a, axis=0) for a in alp])
+    alp_corr = np.array([np.corrcoef(a, rowvar=False) for a in alp])
+    for c in alp_corr:
+        np.fill_diagonal(c, 0)  # remove diagonal to see the off-diagonals better
+
+    # Save summary stats
+    save(f"{summary_stats_dir}/alp_mean.npy", alp_mean)
+    save(f"{summary_stats_dir}/alp_std.npy", alp_std)
+    save(f"{summary_stats_dir}/alp_corr.npy", alp_corr)
+
+    # Plot
+    from osl_dynamics.utils import plotting
+
+    n_modes = alp_mean.shape[1]
+    x = range(1, n_modes + 1)
+    plotting.plot_violin(
+        alp_mean.T,
+        x=x,
+        x_label="Mode",
+        y_label="Mean",
+        filename=f"{summary_stats_dir}/alp_mean.png",
+    )
+    plotting.plot_violin(
+        alp_std.T,
+        x=x,
+        x_label="Mode",
+        y_label="Standard Deviation",
+        filename=f"{summary_stats_dir}/alp_std.png",
+    )
+    plotting.plot_matrices(
+        np.mean(alp_corr, axis=0), filename=f"{summary_stats_dir}/alp_corr.png"
+    )
+
+
 def compare_groups_hmm_summary_stats(
     data,
     output_dir,
