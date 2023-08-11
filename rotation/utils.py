@@ -268,7 +268,7 @@ def high_pass_filter(data:np.ndarray,T:float,cutoff_frequency:float,order:int)->
 
     return filtered_data
 
-def group_high_pass_filter(ts:list,T:float=0.7,cutoff_frequency:float=0.15,order:int=16) -> list:
+def group_high_pass_filter(ts:list,T:float=0.7,cutoff_frequency:float=0.25,order:int=16) -> list:
     """
     Apply high pass filter to the group time series
     Parameters

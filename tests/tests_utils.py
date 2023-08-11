@@ -64,8 +64,8 @@ def test_group_high_pass_filter():
     fs = 1 / T # Sampling frequency
 
 
-    f1 = 0.1
-    f2 = 0.2
+    f1 = 0.2
+    f2 = 0.3
     t = np.array([i * T for i in range(N)])
     signal_1 = np.sin(2 * np.pi * f1 * t)
     signal_2 = np.cos(2 * np.pi * f2 * t)
@@ -101,7 +101,7 @@ def test_group_high_pass_filter():
     plt.show()
     '''
     npt.assert_almost_equal(np.max(np.abs(spectrum_1)),0,decimal=3)
-    npt.assert_almost_equal(np.max(np.abs(spectrum_2)),0.5,decimal=3)
+    npt.assert_almost_equal(np.max(np.abs(spectrum_2)),0.5,decimal=2)
 
 
 

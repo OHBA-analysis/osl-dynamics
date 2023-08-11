@@ -117,6 +117,11 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     # using Louvain community detection algorithm
     if not os.path.isfile(f'{save_dir}tpm_partition.pkl'):
         tpm = np.load(f'{save_dir}trans_prob.npy')
+        # Added by swimming 2023-08-09: try to reproduce Diego's results
+        # Only work on HMM_ICA_50_state_12
+        for i in range(len(tpm)):
+            tpm[i,i] = 0
+            tpm[i,:] = tpm[i,:] / np.sum(tpm[i,:])
         G = construct_graph(tpm)
         partition = nx.community.louvain_communities(G)
         print('The final partition is: ', partition)
