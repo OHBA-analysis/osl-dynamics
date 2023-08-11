@@ -76,12 +76,32 @@ def test_group_high_pass_filter():
     filtered_signal_2 = filtered_signals[1]
     
     frequencies = np.fft.fftfreq(N,1/fs)
-    spectrum_1 = np.fft.fft(filtered_signal_1)
-    spectrum_2 = np.fft.fft(filtered_signal_2)
-    npt.assert_almost_equal(np.sum(spectrum_1),0,decimal=6)
-    #import matplotlib.pyplot as plt
-    #plt.plot(frequencies,spectrum_2)
-    #plt.show()
+    spectrum_1 = np.fft.fft(filtered_signal_1,norm='forward')
+    spectrum_2 = np.fft.fft(filtered_signal_2,norm='forward')
+    '''
+    import matplotlib.pyplot as plt
+    plt.plot(t,signal_1)
+    plt.title('Original Signal 1 (t)')
+    plt.show()
+    plt.plot(frequencies,np.abs(np.fft.fft(signal_1,norm='forward')))
+    plt.title('Original Signal 1 (f)')
+    plt.show()
+    plt.plot(t,signal_2)
+    plt.title('Original Signal 2 (t)')
+    plt.show()
+    plt.plot(frequencies,np.abs(np.fft.fft(signal_2,norm='forward')))
+    plt.title('Original Signal 2 (f)')
+    plt.show()
+
+    plt.plot(frequencies,np.abs(spectrum_1))
+    plt.title('Filtered Signal 1 (f)')
+    plt.show()
+    plt.plot(frequencies,np.abs(spectrum_2))
+    plt.title('Filtered Signal 2 (f)')
+    plt.show()
+    '''
+    npt.assert_almost_equal(np.max(np.abs(spectrum_1)),0,decimal=3)
+    npt.assert_almost_equal(np.max(np.abs(spectrum_2)),0.5,decimal=3)
 
 
 

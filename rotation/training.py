@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 from osl_dynamics.analysis import connectivity
-from utils import high_pass_filter
+from rotation.utils import group_high_pass_filter
 
 def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False):
     from osl_dynamics.models.hmm import Config, Model
@@ -137,11 +137,11 @@ def SWC_computation(dataset,window_length,step_size,save_dir):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     ts = dataset.time_series()
-    group_high_pass_filter(ts)
+    filtered_ts = group_high_pass_filter(ts)
     # Calculate the sliding window connectivity
-    swc = connectivity.sliding_window_connectivity(ts, window_length=window_length, step_size=step_size, conn_type="corr")
-    np.save(f'{save_dir}/fc_swc.npy',swc,allow_pickle=True)
+    swc = connectivity.sliding_window_connectivity(filtered_ts, window_length=window_length, step_size=step_size, conn_type="corr")
+    np.save(f'{save_dir}/cor_swc.npy',swc,allow_pickle=True)
 
-    swc_cov = connectivity.sliding_window_connectivity(ts, window_length=window_length, step_size=step_size,
+    swc_cov = connectivity.sliding_window_connectivity(filtered_ts, window_length=window_length, step_size=step_size,
                                                    conn_type="cov")
     np.save(f'{save_dir}/cov_swc.npy', swc_cov, allow_pickle=True)

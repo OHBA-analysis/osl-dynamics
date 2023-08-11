@@ -12,6 +12,7 @@ from osl_dynamics.array_ops import cov2corr
 import osl_dynamics.data
 from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
+from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
     IC2brain, pairwise_fisher_z_correlations
 
@@ -230,7 +231,12 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                               n_channels=n_channels,
                               n_states=n_states
                               )
-
+    # Fractional occupancy analysis (similar to HMM)
+    FO_dir = f'{save_dir}FO_analysis/'
+    if not os.path.exists(FO_dir):
+        os.makedirs(FO_dir)
+    if not os.path.isfile(f'{FO_dir}fo_violin.pdf'):
+        FO_dynemo(save_dir,FO_dir,n_channels,n_states)
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
@@ -317,35 +323,61 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    swc = np.load(f'{old_dir}/fc_swc.npy')
+    plot_dir = f'{save_dir}plot/'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
 
-    swc = np.concatenate(swc)
+    measures = ['cor','cov']
+    file_name = {'cor':'state_correlations',
+                 'cov':'state_covariances'}
+    if not os.path.isfile(f'{save_dir}state_stds.npy'):
+        for measure in measures:
+            swc = np.load(f'{old_dir}/{measure}_swc.npy')
+            swc = np.concatenate(swc)
 
-    # Initiate the K-means class
-    kmeans = KMeans(n_clusters=n_states, verbose=0)
+            # Initiate the K-means class
+            kmeans = KMeans(n_clusters=n_states, verbose=0)
 
-    # Get indices that correspond to an upper triangle of a matrix
-    # (not including the diagonal)
-    i, j = np.triu_indices(n_channels, k=1)
+            # Get indices that correspond to an upper triangle of a matrix
+            # (not including the diagonal)
+            i, j = np.triu_indices(n_channels, k=1)
 
-    # Now let's convert the sliding window connectivity matrices to a series of vectors
-    swc_vectors = swc[:, i, j]
+            # Now let's convert the sliding window connectivity matrices to a series of vectors
+            swc_vectors = swc[:, i, j]
 
-    # Check the shape of swc vectors
-    print(f'SWC vectors shape: {swc_vectors.shape}')
+            # Check the shape of swc vectors
+            print(f'SWC vectors shape: {swc_vectors.shape}')
 
-    # Fitting
-    kmeans.fit(swc_vectors)  # should take a few seconds
+            # Fitting
+            kmeans.fit(swc_vectors)  # should take a few seconds
 
-    centroids = kmeans.cluster_centers_
-    print(f'centroids shape: {centroids.shape}')
+            centroids = kmeans.cluster_centers_
+            print(f'centroids shape: {centroids.shape}')
 
-    # Convert from a vector to a connectivity matrix
-    kmean_networks = np.empty([n_states, n_channels, n_channels])
-    kmean_networks[:, i, j] = centroids
-    kmean_networks[:, j, i] = centroids
+            # Convert from a vector to a connectivity matrix
+            kmean_networks = np.empty([n_states, n_channels, n_channels])
+            kmean_networks[:, i, j] = centroids
+            kmean_networks[:, j, i] = centroids
+            np.save(f'{save_dir}{file_name[measure]}.npy',kmean_networks)
 
-    np.save(f'{save_dir}/kmean_networks.npy',kmean_networks)
+            if measure == 'cov':
+                stds,_ = cov2stdcor(kmean_networks)
+                np.save(f'{save_dir}state_stds.npy',stds)
+
+    # Analyze the distance between different states/modes
+    dist_dir = f'{save_dir}distance/'
+    if not os.path.exists(dist_dir):
+        os.makedirs(dist_dir)
+    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
+        compute_distance(save_dir, dist_dir)
+
+    # Plot the distance between different states/modes
+    if not os.path.isfile(f'{plot_dir}/correct_distance_plot_cor.pdf'):
+        plot_distance(dist_dir, plot_dir,
+                      model='SWC',
+                      n_channels=n_channels,
+                      n_states=n_states
+                      )
 
 def extract_state_statistics(save_dir:str,model_name:str):
     from osl_dynamics.models import load
@@ -650,6 +682,142 @@ def FC_mapping(save_dir:str,spatial_map_dir:str):
     nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')
     sum_of_degree_map = IC2brain(spatial_map, sum_of_degrees.T)
     nib.save(sum_of_degree_map, f'{save_dir}FC_sum_of_degree_map.nii.gz')
+
+def FO_dynemo(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
+    """
+    Fractional Occupancy Analysis in Dynemo, similar to HMM.
+    The aim is to summarize the mixing coefficient time course
+    Parameters
+    ----------
+    save_dir: (str) directory to work in
+    FO_dir: (str) directory to save the results
+    n_channels: number of channels
+    n_states: number of states
+
+    Returns
+    -------
+    """
+    # Step 1: Plot unnormalised alpha
+    alpha = pickle.load(open(f"{save_dir}alpha.pkl","rb"))
+    plotting.plot_alpha(alpha[0],n_samples=200)
+    plt.title('Unnormalised alpha',fontsize=20)
+    plt.savefig(f'{FO_dir}example_unnormalised_alpha.jpg')
+    plt.savefig(f'{FO_dir}example_unnormalised_alpha.pdf')
+    plt.close()
+
+    # Step 2: normalise the alpha
+    def normalize_alpha(a:np.ndarray, D:np.ndarray) -> np.ndarray:
+        """
+        Calculate the weighting for each mode
+        measured by the trace of each mode covariance
+        Parameters
+        ----------
+        a: (np.ndarray) N_time_points * N_states
+        D: (np.ndarray) covariance matrices N_states * N_channels * N_channels
+
+        Returns
+        -------
+        wa: (np.ndarray) weighted alpha, having the shape as a
+        """
+        # Calculate the weighting for each mode
+        # We use the trace of each mode covariance
+        w = np.trace(D, axis1=1, axis2=2)
+
+        # Weight the alphas
+        wa = w[np.newaxis, ...] * a
+
+        # Renormalize so the alphas sum to one
+        wa /= np.sum(wa, axis=1, keepdims=True)
+        return wa
+
+    # Load the inferred mode covariances
+    covs = np.load(f'{save_dir}state_covariances.npy')
+
+    # Renormalize the mixing coefficients
+    norm_alpha = [normalize_alpha(a, covs) for a in alpha]
+
+    # Plot the renormalized mixing coefficient time course for the first subject (8 seconds)
+    plotting.plot_alpha(norm_alpha[0], n_samples=200)
+    plt.title('Normalised alpha',fontsize=20)
+    plt.savefig(f'{FO_dir}example_normalised_alpha.jpg')
+    plt.savefig(f'{FO_dir}example_normalised_alpha.pdf')
+    plt.close()
+
+    # Step 3: Summary statistics
+    # Analogous to FO in HMM, we can compute the time average mixing coefficient
+    mean_norm_alpha = np.array([np.mean(a, axis=0) for a in norm_alpha])
+    np.save(f'{save_dir}fo.npy',mean_norm_alpha)
+
+    plot_FO(mean_norm_alpha, FO_dir)
+
+    std_norm_alpha = np.array([np.std(a, axis=0) for a in norm_alpha])
+    np.save(f'{save_dir}normalised_alpha_std.npy',std_norm_alpha)
+
+    # Plot the distribution of fractional occupancy (FO) across subjects
+    plotting.plot_violin(mean_norm_alpha.T, x_label="State", y_label="FO")
+    plt.savefig(f'{FO_dir}fo_violin.jpg')
+    plt.savefig(f'{FO_dir}fo_violin.pdf')
+    plt.close()
+
+def FO_MAGE(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
+    """
+    Fractional Occupancy Analysis in MAGE, similar to HMM.
+    The aim is to summarize the mixing coefficient time course
+    Parameters
+    ----------
+    save_dir: (str) directory to work in
+    FO_dir: (str) directory to save the results
+    n_channels: number of channels
+    n_states: number of states
+
+    Returns
+    -------
+
+    """
+    # Step 1: Plot alpha
+    alpha = pickle.load(open(f"{save_dir}alpha.pkl", "rb"))
+    alpha_1 = alpha[0]
+    alpha_2 = alpha[1]
+
+    plotting.plot_alpha(alpha_1, n_samples=200)
+    plt.title('alpha 1', fontsize=20)
+    plt.savefig(f'{FO_dir}example_alpha_1.jpg')
+    plt.savefig(f'{FO_dir}example_alpha_1.pdf')
+    plt.close()
+
+    plotting.plot_alpha(alpha_2, n_samples=200)
+    plt.title('alpha 2', fontsize=20)
+    plt.savefig(f'{FO_dir}example_alpha_2.jpg')
+    plt.savefig(f'{FO_dir}example_alpha_2.pdf')
+    plt.close()
+
+    # Step 2: Summary Statistics
+    mean_alpha_1 = np.array([np.mean(a, axis=0) for a in alpha_1])
+    np.save(f'{save_dir}fo_alpha_1.npy', mean_alpha_1)
+    mean_alpha_2 = np.array([np.mean(a, axis=0) for a in alpha_2])
+    np.save(f'{save_dir}fo_alpha_2.npy', mean_alpha_2)
+
+    plot_FO(mean_alpha_1, FO_dir,file_name='fo_alpha_1_hist')
+    plot_FO(mean_alpha_2,FO_dir,file_name='fo_alpha_2_hist')
+
+    std_alpha_1 = np.array([np.std(a, axis=0) for a in alpha_1])
+    np.save(f'{save_dir}alpha_1_std.npy', std_alpha_1)
+
+    std_alpha_2 = np.array([np.std(a, axis=0) for a in alpha_2])
+    np.save(f'{save_dir}alpha_2_std.npy', std_alpha_2)
+
+    # Plot the distribution of fractional occupancy (FO) across subjects
+    plotting.plot_violin(mean_alpha_1.T, x_label="State", y_label="FO")
+    plt.savefig(f'{FO_dir}fo_alpha_1_violin.jpg')
+    plt.savefig(f'{FO_dir}fo_alpha_1_violin.pdf')
+    plt.close()
+
+    plotting.plot_violin(mean_alpha_2.T, x_label="State", y_label="FO")
+    plt.savefig(f'{FO_dir}fo_alpha_2_violin.jpg')
+    plt.savefig(f'{FO_dir}fo_alpha_2_violin.pdf')
+    plt.close()
+
+
 
 def comparison_analysis(models:list,list_channels:list,list_states:list,save_dir:str):
     """

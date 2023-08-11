@@ -39,15 +39,15 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list,traini
     
     return model, n_channels, n_states
 
-def plot_FO(fo_matrix:np.ndarray,plot_dir:str):
+def plot_FO(fo_matrix:np.ndarray,plot_dir:str,file_name:str=None):
     """
     Plot the histogram of fractional occupancy (FO)
     and save the plot to plot_dir
     Parameters
     ----------
-    fo_matrix: the fractional occupancy matrix
-    plot_dir: the save direction
-
+    fo_matrix: (np.ndarray)the fractional occupancy matrix
+    plot_dir: (str)the save direction
+    file_name: (str) the file name
     Returns
     -------
     """
@@ -77,9 +77,11 @@ def plot_FO(fo_matrix:np.ndarray,plot_dir:str):
     # Adjust the layout
     plt.tight_layout()
 
+    if file_name is None:
+        file_name = 'fo_hist'
     # Show the plot
-    plt.savefig(f'{plot_dir}/fo_hist.jpg')
-    plt.savefig(f'{plot_dir}/fo_hist.pdf')
+    plt.savefig(f'{plot_dir}/{file_name}.jpg')
+    plt.savefig(f'{plot_dir}/{file_name}.pdf')
     plt.close()
 
 def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
