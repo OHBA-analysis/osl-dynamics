@@ -57,25 +57,31 @@ def test_pairwise_fisher_z_correlations():
     npt.assert_almost_equal(pairwise_fisher_z_correlations(matrices),answer,decimal=6)
 
 def test_group_high_pass_filter():
+
     from rotation.utils import group_high_pass_filter
     N = 1200 # Number of time points
     T = 0.7 # Time resolution (seconds)
     fs = 1 / T # Sampling frequency
+
 
     f1 = 0.1
     f2 = 0.2
     t = np.array([i * T for i in range(N)])
     signal_1 = np.sin(2 * np.pi * f1 * t)
     signal_2 = np.cos(2 * np.pi * f2 * t)
-    signals = [signal_1,signal_2]
+    signals = [np.array([signal_1,signal_2]).T]
 
-    filtered_signals = group_high_pass_filter(signals)
+    filtered_signals = group_high_pass_filter(signals)[0].T
     filtered_signal_1 = filtered_signals[0]
     filtered_signal_2 = filtered_signals[1]
-
+    
     frequencies = np.fft.fftfreq(N,1/fs)
     spectrum_1 = np.fft.fft(filtered_signal_1)
     spectrum_2 = np.fft.fft(filtered_signal_2)
     npt.assert_almost_equal(np.sum(spectrum_1),0,decimal=6)
+    #import matplotlib.pyplot as plt
+    #plt.plot(frequencies,spectrum_2)
+    #plt.show()
+
 
 
