@@ -1934,6 +1934,7 @@ def plot_psd_topo(
     only_show=None,
     parcellation_file=None,
     topomap_pos=None,
+    fig_kwargs=None,
     filename=None,
 ):
     """PLot PSDs for parcels and a topomap.
@@ -1954,6 +1955,8 @@ def plot_psd_topo(
         between 0 and 1. Defaults to :code:`[0.45, 0.55, 0.5, 0.55]` to place
         the topomap on the top right. This is not used if
         :code:`parcellation_file=None`.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
     filename : str, optional
         Output filename.
 
@@ -1968,6 +1971,9 @@ def plot_psd_topo(
     """
     if topomap_pos is None:
         topomap_pos = [0.45, 0.55, 0.5, 0.55]
+
+    if fig_kwargs is None:
+        fig_kwargs = {}
 
     if parcellation_file is not None:
         # Get the center of each parcel
@@ -1986,7 +1992,7 @@ def plot_psd_topo(
         only_show = np.arange(n_parcels)
 
     # Plot PSDs
-    fig, ax = create_figure()
+    fig, ax = create_figure(**fig_kwargs)
     cmap = plt.cm.viridis_r
     for i in reversed(range(n_parcels)):
         if i in only_show:

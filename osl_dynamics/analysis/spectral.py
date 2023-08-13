@@ -490,6 +490,7 @@ def multitaper(
     time_half_bandwidth=None,
     n_tapers=None,
     args_range=None,
+    calc_cpsd=True,
 ):
     """Calculates a power (or cross) spectral density using the multitaper
     method.
@@ -510,12 +511,14 @@ def multitaper(
         Number of tapers.
     args_range : list, optional
         Minimum and maximum indices of the multitaper to keep.
+    calc_cpsd : bool, optional
+        Should we calculate cross spectra?
 
     Returns
     -------
     P : np.ndarray
         Power (or cross) spectral density with shape (n_channels, n_channels,
-        n_freq).
+        n_freq) if :code:`calc_cpsd=True`, otherwise (n_channels, n_freq).
     """
 
     # Transpose the data so that it is [n_channels, n_samples]
@@ -553,14 +556,21 @@ def multitaper(
     # Number of frequency bins in the FFT
     n_freq = X.shape[-1]
 
-    # Calculate the periodogram with each taper
-    P = np.zeros([n_channels, n_channels, n_freq], dtype=np.complex64)
-    for i in range(n_tapers):
-        for j in range(n_channels):
-            for k in range(j, n_channels):
-                P[j, k] += np.conjugate(X[i, j]) * X[i, k]
-                if i == n_tapers - 1 and k != j:
-                    P[k, j] = np.conjugate(P[j, k])
+    if calc_cpsd:
+        # Calculate the cross periodogram with each taper
+        P = np.zeros([n_channels, n_channels, n_freq], dtype=np.complex64)
+        for i in range(n_tapers):
+            for j in range(n_channels):
+                for k in range(j, n_channels):
+                    P[j, k] += np.conjugate(X[i, j]) * X[i, k]
+                    if i == n_tapers - 1 and k != j:
+                        P[k, j] = np.conjugate(P[j, k])
+    else:
+        # Calculate the periodogram with each taper
+        P = np.zeros([n_channels, n_freq], dtype=np.float32)
+        for i in range(n_tapers):
+            for j in range(n_channels):
+                P[j] += np.abs(X[i, j]) ** 2
 
     return P
 
@@ -573,6 +583,7 @@ def single_multitaper_spectra(
     sampling_frequency,
     nfft,
     args_range,
+    calc_coh,
     parallel,
 ):
     """Calculate a multitaper spectrum for a single subject.
@@ -594,6 +605,8 @@ def single_multitaper_spectra(
         Number of data points to use in the FFT.
     args_range : list
         Minimum and maximum indices of the multitaper to keep.
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
     parallel : bool
         Is this function being called in parallel? Only affects whether
         a progress bar is displayed or not.
@@ -604,6 +617,7 @@ def single_multitaper_spectra(
         Power spectra. Shape is (n_states, n_channels, n_freq).
     c : np.ndarray
         Coherence spectra. Shape is (n_states, n_channels, n_channels, n_freq).
+        Only returned is :code:`calc_coh=True`.
     """
 
     # Use the state time course to get a time series for each state
@@ -622,7 +636,10 @@ def single_multitaper_spectra(
     n_segments = round(n_samples / segment_length)
 
     # Power spectra for each state
-    p = np.zeros([n_states, n_channels, n_channels, n_freq], dtype=np.complex64)
+    if calc_coh:
+        p = np.zeros([n_states, n_channels, n_channels, n_freq], dtype=np.complex64)
+    else:
+        p = np.zeros([n_states, n_channels, n_freq], dtype=np.float32)
     for i in range(n_states):
         if parallel:
             iterator = range(n_segments)
@@ -656,22 +673,29 @@ def single_multitaper_spectra(
                 nfft=nfft,
                 tapers=tapers,
                 args_range=args_range,
+                calc_cpsd=calc_coh,
             )
 
     # Normalise the power spectra
     # NOTE: We should be normalising using sum alpha instead of sum
     # alpha^2, but this makes a small difference, so we left it like
     # this for consistency with the HMM-MAR toolbox.
-    sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    if calc_coh:
+        sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
+    else:
+        sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis]
     p *= n_samples / (sum_alpha * n_tapers * n_segments)
 
-    # Coherences for each state
-    c = coherence_spectra(p, log_message=False)
+    if calc_coh:
+        # Coherences for each state
+        c = coherence_spectra(p, log_message=False)
 
-    # Only need to keep the diagonal of the power spectra matrix
-    p = p[:, range(n_channels), range(n_channels)].real
+        # Only need to keep the diagonal of the power spectra matrix
+        p = p[:, range(n_channels), range(n_channels)].real
 
-    return p, c
+        return p, c
+    else:
+        return p
 
 
 def multitaper_spectra(
@@ -684,6 +708,7 @@ def multitaper_spectra(
     frequency_range=None,
     return_weights=False,
     standardize=True,
+    calc_coh=True,
     n_jobs=1,
     keepdims=False,
 ):
@@ -717,6 +742,8 @@ def multitaper_spectra(
         Useful for calculating the group average PSD.
     standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
     n_jobs : int, optional
         Number of parallel jobs.
     keepdims : bool, optional
@@ -735,7 +762,7 @@ def multitaper_spectra(
     coherences : np.ndarray
         Coherences for each state. Shape is (n_subjects, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     weights : np.ndarray
         Weight for each subject-specific PSD. Only returned if
         :code:`return_weights=True`. Shape is (n_subjects,).
@@ -825,6 +852,7 @@ def multitaper_spectra(
             sampling_frequency,
             nfft,
             args_range,
+            calc_coh,
             parallel=False,
         )
         results = [results]
@@ -843,6 +871,7 @@ def multitaper_spectra(
                     sampling_frequency,
                     nfft,
                     args_range,
+                    calc_coh,
                     parallel=False,
                 )
             )
@@ -861,6 +890,7 @@ def multitaper_spectra(
                     sampling_frequency,
                     nfft,
                     args_range,
+                    calc_coh,
                     True,
                 ]
             )
@@ -875,26 +905,36 @@ def multitaper_spectra(
         )
 
     # Unpack the results
-    power_spectra = []
-    coherences = []
-    for result in results:
-        p, c = result
-        power_spectra.append(p)
-        coherences.append(c)
+    if calc_coh:
+        power_spectra = []
+        coherences = []
+        for result in results:
+            p, c = result
+            power_spectra.append(p)
+            coherences.append(c)
+    else:
+        power_spectra = results
+
+    if not keepdims:
+        # Remove any axes that are of length 1
+        power_spectra = np.squeeze(power_spectra)
+        if calc_coh:
+            coherences = np.squeeze(coherences)
 
     # Weights for calculating the group average PSD
     n_samples = [d.shape[0] for d in data]
     weights = np.array(n_samples) / np.sum(n_samples)
 
-    if not keepdims:
-        # Remove any axes that are of length 1
-        power_spectra = np.squeeze(power_spectra)
-        coherences = np.squeeze(coherences)
-
-    if return_weights:
-        return frequencies, power_spectra, coherences, weights
+    if calc_coh:
+        if return_weights:
+            return frequencies, power_spectra, coherences, weights
+        else:
+            return frequencies, power_spectra, coherences
     else:
-        return frequencies, power_spectra, coherences
+        if return_weights:
+            return frequencies, power_spectra, weights
+        else:
+            return frequencies, power_spectra
 
 
 def single_regression_spectra(
@@ -1258,7 +1298,9 @@ def spectrogram(
     f : np.ndarray
         Frequency axis.
     P : np.ndarray
-        Spectrogram.
+        Spectrogram. 3D numpy array with shape (time, channels *
+        (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
+        it is (time, channels, freq).
     """
 
     # Number of samples, channels and modes
@@ -1465,6 +1507,7 @@ def wavelet(
     standardize=True,
     time_range=None,
     frequency_range=None,
+    df=0.5,
 ):
     """Calculate a wavelet transform.
 
@@ -1490,6 +1533,8 @@ def wavelet(
     frequency_range : list of length 2, optional
         Start and end frequency to plot in Hz.
         Default is :code:`[1, sampling_frequency / 2]`.
+    df : float, optional
+        Frequency resolution in Hz.
 
     Returns
     -------
@@ -1531,8 +1576,7 @@ def wavelet(
     t = np.arange(time_range[0], time_range[1], 1 / sampling_frequency)
 
     # Frequency axis (Hz)
-    # Use 100 equally spaced points (on a linear scale)
-    f = np.linspace(frequency_range[0], frequency_range[1], 100)
+    f = np.arange(frequency_range[0], frequency_range[1], df)
 
     # Calculate the width for each Morlet window based on the frequency
     widths = w * sampling_frequency / (2 * f * np.pi)

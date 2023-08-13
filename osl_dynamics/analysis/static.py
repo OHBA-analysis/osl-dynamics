@@ -212,6 +212,7 @@ def multitaper_spectra(
     frequency_range=None,
     return_weights=False,
     standardize=True,
+    calc_coh=False,
     n_jobs=1,
 ):
     """Calculate static power spectra using a multitaper.
@@ -236,6 +237,8 @@ def multitaper_spectra(
         Useful for calculating the group average PSD.
     standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
     n_jobs : int, optional
         Number of parallel jobs.
 
@@ -248,6 +251,7 @@ def multitaper_spectra(
     coherences : np.ndarray
         Coherences for each state.
         Shape is (n_subjects, n_channels, n_channels, n_freq).
+        Only returned is :code:`calc_coh=True`.
     weights : np.ndarray
         Weight for each subject-specific PSD. Only returned if
         :code:`return_weights=True`. Shape is (n_subjects,).
@@ -266,5 +270,6 @@ def multitaper_spectra(
         frequency_range,
         return_weights,
         standardize,
+        calc_coh,
         n_jobs,
     )
