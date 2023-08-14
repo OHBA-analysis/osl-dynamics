@@ -1039,7 +1039,7 @@ class Data:
 
             if validation_split is None:
                 # Return the full dataset
-                return full_dataset.prefetch(-1)
+                return full_dataset.prefetch(tf.data.AUTOTUNE)
 
             else:
                 # Calculate how many batches should be in the training dataset
@@ -1055,7 +1055,9 @@ class Data:
                     + "dataset."
                 )
 
-                return training_dataset.prefetch(-1), validation_dataset.prefetch(-1)
+                return training_dataset.prefetch(
+                    tf.data.AUTOTUNE
+                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
 
         # Otherwise create a dataset for each array separately
         else:
@@ -1072,7 +1074,7 @@ class Data:
                     # Shuffle batches
                     ds = ds.shuffle(self.buffer_size)
 
-                full_datasets.append(ds.prefetch(-1))
+                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
             if validation_split is None:
                 # Return the full dataset for each array
@@ -1216,7 +1218,9 @@ class Data:
                 tfrecord_filenames = tfrecord_filenames.shuffle(len(tfrecord_filenames))
 
                 # Create the TFRecord dataset
-                full_dataset = tfrecord_filenames.interleave(tf.data.TFRecordDataset)
+                full_dataset = tfrecord_filenames.interleave(
+                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
+                )
 
                 # Parse the examples
                 full_dataset = full_dataset.map(_parse_example)
@@ -1232,7 +1236,9 @@ class Data:
 
             else:
                 # Create the TFRecord dataset
-                full_dataset = tfrecord_filenames.interleave(tf.data.TFRecordDataset)
+                full_dataset = tfrecord_filenames.interleave(
+                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
+                )
 
                 # Parse the examples
                 full_dataset = full_dataset.map(_parse_example)
@@ -1242,7 +1248,7 @@ class Data:
 
             if validation_split is None:
                 # Return the dataset
-                return full_dataset.prefetch(-1)
+                return full_dataset.prefetch(tf.data.AUTOTUNE)
 
             else:
                 # Calculate how many batches should be in the training dataset
@@ -1257,7 +1263,9 @@ class Data:
                     + f"{dataset_size - training_dataset_size} batches in the validation "
                     + "dataset."
                 )
-                return training_dataset.prefetch(-1), validation_dataset.prefetch(-1)
+                return training_dataset.prefetch(
+                    tf.data.AUTOTUNE
+                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
 
         # Otherwise create a dataset for each array separately
         else:
@@ -1279,7 +1287,7 @@ class Data:
                     # Shuffle batches
                     ds = ds.shuffle(self.buffer_size)
 
-                full_datasets.append(ds.prefetch(-1))
+                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
             if validation_split is None:
                 # Return the full dataset for each array
