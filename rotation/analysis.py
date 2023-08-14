@@ -14,7 +14,7 @@ from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
 from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
-    IC2brain, pairwise_fisher_z_correlations
+    IC2brain,IC2surface, pairwise_fisher_z_correlations
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -41,7 +41,7 @@ def construct_graph(tpm:np.ndarray):
 
     return G
 def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                 spatial_map_dir:str,n_channels:int, n_states:int):
+                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
     """
     Post-training analysis of HMM model
     Parameters
@@ -49,6 +49,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dataset: (osl_dynamics.data.Data) dataset to work on
     save_dir: (str) directory to save results
     spatial_map_dir: (str) directory of groupICA spatial maps
+    spatial_surface_map_dir: (str) directory of groupICA spatial surface maps
     n_channels: (int) number of channels
     n_states: (int) number of states
 
@@ -188,18 +189,18 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         plt.close()
 
     # Compute the mean activation map
-    if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
-        mean_mapping(save_dir,spatial_map_dir)
+    if not os.path.isfile(f'{save_dir}mean_activation_surface_map.dscalar.nii'):
+        mean_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
     # Compute rank-one decomposition of FC map
-    if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
-        FC_mapping(save_dir,spatial_map_dir)
+    if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
+        FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
 
 
 
 def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                    spatial_map_dir:str, n_channels:int,n_states:int):
+                    spatial_map_dir:str,spatial_surface_map_dir:str, n_channels:int,n_states:int):
     """
     Post-training analysis of Dynemo model
     Parameters
@@ -207,6 +208,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dataset: (osl_dynamics.data.Data) dataset to work on
     save_dir: (str) directory to save results
     spatial_map_dir: (str) directory of spatial maps
+    spatial_surface_map_dir: (str) directory of groupICA spatial surface maps
     n_channels: (int) number of channels
     n_states: (int) number of states
 
@@ -257,21 +259,22 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                       n_states=n_states)
 
     # Compute the mean activation map
-    if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
-        mean_mapping(save_dir,spatial_map_dir)
+    if not os.path.isfile(f'{save_dir}mean_activation_surface_map.dscalar.nii'):
+        mean_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
-    if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
-        FC_mapping(save_dir,spatial_map_dir)
+    if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
+        FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                  spatial_map_dir:str, n_channels:int, n_states:int):
+                  spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
     """
     Post-training analysis of MAGE
     Parameters
     ----------
     dataset: (osl_dynamics.data.Data) dataset to work on
     save_dir: (str) directory to save results
-    spatial_map_dir: (str) directory of spatial maps
+    spatial_map_dir: (str) directory of groupICA spatial maps
+    spatail_surface_map_dir: (str) directory of groupICA spatial surface maps
     n_channels: (int) number of channels
     n_states: (int) number of states
 
@@ -319,11 +322,11 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
 
     # Compute the mean activation map
-    if not os.path.isfile(f'{save_dir}mean_activation_map.nii.gz'):
-        mean_mapping(save_dir,spatial_map_dir)
+    if not os.path.isfile(f'{save_dir}mean_activation_surface_map.dscalar.nii'):
+        mean_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
-    if not os.path.isfile(f'{save_dir}FC_map.nii.gz'):
-        FC_mapping(save_dir,spatial_map_dir)
+    if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
+        FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -629,33 +632,38 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
         plt.close()
     '''
 
-def mean_mapping(save_dir:str,spatial_map_dir:str):
+def mean_mapping(save_dir:str,spatial_map_dir:str,spatial_surface_map_dir:str):
     """
     Obtain mean activation spatial maps of each state/mode in the specified directory
     Parameters
     ----------
-    save_dir: (string) directory to work in
-    spatial_map_dir: (string) spatial map of independent components
-
+    save_dir: (str) directory to work in
+    spatial_map_dir: (str) spatial map of independent components
+    spatial_surface_map_dir: (str) spatial surface map of independent components
     Returns
     -------
     """
     state_means = np.load(f'{save_dir}state_means.npy')
     spatial_map = nib.load(spatial_map_dir)
+    spatial_surface_map = nib.load(spatial_surface_map_dir)
+
     mean_activation_map = IC2brain(spatial_map, state_means.T)
+    mean_activation_surface_map = IC2surface(spatial_surface_map,state_means.T)
+
     nib.save(mean_activation_map, f'{save_dir}mean_activation_map.nii.gz')
+    mean_activation_surface_map.to_filename(f'{save_dir}mean_activation_surface_map.dscalar.nii')
 
 
 
-def FC_mapping(save_dir:str,spatial_map_dir:str):
+def FC_mapping(save_dir:str,spatial_map_dir:str,spatial_surface_map_dir:str):
     """
     obtain the FC spatial maps of each state/mode in the specified directory
     pipeline: correlation/covariance matrix --> rank-one approximation --> brain map
     Parameters
     ----------
-    save_dir: (string) directory to work in
-    spatial_map_dir (string) spatial map of independent components
-
+    save_dir: (str) directory to work in
+    spatial_map_dir: (str) spatial map of independent components
+    spatial_surface_map_dir: (str) spatial surface map of independent components
     Returns
     -------
     """
@@ -683,11 +691,19 @@ def FC_mapping(save_dir:str,spatial_map_dir:str):
 
     # Component map to spatial map
     spatial_map = nib.load(spatial_map_dir)
-    FC_degree_map = IC2brain(spatial_map, r1_approxs.T)
-    nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')
-    sum_of_degree_map = IC2brain(spatial_map, sum_of_degrees.T)
-    nib.save(sum_of_degree_map, f'{save_dir}FC_sum_of_degree_map.nii.gz')
+    spatial_surface_map = nib.load(spatial_surface_map_dir)
 
+    FC_degree_map = IC2brain(spatial_map, r1_approxs.T)
+    FC_degree_surface_map = IC2surface(spatial_surface_map,r1_approxs.T)
+
+    nib.save(FC_degree_map, f'{save_dir}FC_map.nii.gz')
+    FC_degree_surface_map.to_filename(f'{save_dir}FC_surface_map.dscalar.nii')
+
+    sum_of_degree_map = IC2brain(spatial_map, sum_of_degrees.T)
+    sum_of_degree_surface_map = IC2surface(spatial_surface_map,sum_of_degrees.T)
+
+    nib.save(sum_of_degree_map, f'{save_dir}FC_sum_of_degree_map.nii.gz')
+    sum_of_degree_surface_map.to_filename(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii')
 def FO_dynemo(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
     """
     Fractional Occupancy Analysis in Dynemo, similar to HMM.

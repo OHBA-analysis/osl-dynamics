@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
     save_dir = f'./results/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
+    spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
@@ -78,11 +79,11 @@ if __name__ == '__main__':
         print(f'Number of subjects: {len(subj)}')
 
         if model == 'HMM':
-            HMM_analysis(dataset, save_dir, spatial_map_dir, n_channels,n_states)
+            HMM_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels,n_states)
         elif model == 'Dynemo':
-            Dynemo_analysis(dataset, save_dir, spatial_map_dir, n_channels, n_states)
+            Dynemo_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states)
         elif model == 'MAGE':
-            MAGE_analysis(dataset, save_dir, spatial_map_dir, n_channels, n_states)
+            MAGE_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states)
         else:
             raise ValueError('The model name is incorrect!')
 
