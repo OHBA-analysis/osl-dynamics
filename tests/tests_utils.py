@@ -39,6 +39,26 @@ def test_IC2brain():
     brain_map_true = np.array(np.reshape(np.array([i * (-1) ** i for i in range(16)]),(2,2,2,2)),dtype=np.float64)
     npt.assert_equal(brain_map_data,brain_map_true)
 
+def test_IC2surface():
+    from rotation.utils import IC2surface
+    import nibabel as nib
+
+    spatial_map_data = np.array([[0,2,4,6,8,10,12,14],[1,3,5,7,9,11,13,15]], dtype=np.float64)
+    mean_activation = np.array([[1.0, 0.0, ], [0.0, -1.0]])
+    axis_1 = nib.cifti2.cifti2_axes.ScalarAxis([f'Component {i + 1}' for i in range(2)])
+    #axis_2 = nib.cifti2.cifti2_axes.BrainModelAxis(['CORTEX_LEFT'] * 2,vertex=np.arange(2)+1,affine=np.eye(4),volume_shape=(1,1,1))
+    axis_2 = nib.cifti2.cifti2_axes.BrainModelAxis.from_mask(np.ones((2, 2, 2)),affine=np.eye(4),name='thalamus_left')
+    header = nib.cifti2.cifti2.Cifti2Header.from_axes((axis_1, axis_2))
+    spatial_map = nib.cifti2.cifti2.Cifti2Image(spatial_map_data, header)
+
+    surface_map = IC2surface(spatial_map, mean_activation)
+    surface_map_data = surface_map.get_fdata()
+
+    surface_map_true = np.array([[0,2,4,6,8,10,12,14],[-1,-3,-5,-7,-9,-11,-13,-15]], dtype=np.float64)
+    npt.assert_equal(surface_map_data, surface_map_true)
+
+
+
 def test_pairwise_fisher_z_correlations():
     from rotation.utils import pairwise_fisher_z_correlations
     x1, x2, x3 = -0.2,0.5,0.3

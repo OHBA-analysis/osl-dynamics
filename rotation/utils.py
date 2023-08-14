@@ -2,6 +2,7 @@ from tqdm import trange
 import numpy as np
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
+import nibabel as nib
 from nibabel.nifti1 import Nifti1Image
 
 def parse_index(index:int,models:list,list_channels:list,list_states:list,training:bool=False):
@@ -176,6 +177,39 @@ def IC2brain(spatial_map:Nifti1Image,IC_metric:np.ndarray):
     brain_map = Nifti1Image(brain_map_data, affine=spatial_map.affine, header=spatial_map.header)
 
     return brain_map
+
+def IC2surface(spatial_map: nib.cifti2.cifti2.Cifti2Image,IC_metric:np.ndarray)->nib.cifti2.cifti2.Cifti2Image:
+    """
+     Project the IC_metric map to a brain map according to spatial maps of IC components.
+    For example, IC_metric can be the mean activation of states, or the rank-one decomposition
+    of FC matrix corresponding to different states.
+    Different from IC2brain, this function works on CIFTI spatial maps.
+
+    Parameters
+    ----------
+    spatial_map: Cifti2Image, represent the spatial map obtained from groupICA
+    IC_metric: np.ndarray(K, N),
+    where K is the number of independent components, and N is the number of states
+    Returns
+    -------
+    new_cifti: Cifti2Image, represent the whole brain map of different states.
+    """
+    spatial_map_data = spatial_map.get_fdata()
+    header = spatial_map.header
+    K, N = IC_metric.shape
+    new_data = np.matmul(IC_metric.T, spatial_map_data)
+
+    # Define the new axes: the state i(i=1,...,N)
+    new_axes = nib.cifti2.cifti2_axes.ScalarAxis([f'State {i + 1}' for i in range(N)])
+
+    # Define the new header using new_axes + axes[1] from old header
+    new_header = nib.cifti2.cifti2.Cifti2Header.from_axes((new_axes, header.get_axis(1)))
+
+    # Combine new data and new header to obtain new CIFTI object
+    new_cifti = nib.cifti2.cifti2.Cifti2Image(new_data, new_header)
+
+    return new_cifti
+
 
 def fisher_z_transform(v:np.ndarray)->np.ndarray:
     """
