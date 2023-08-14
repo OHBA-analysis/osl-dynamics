@@ -991,6 +991,8 @@ class Data:
             Dataset for training or evaluating the model along with the
             validation set if :code:`validation_split` was passed.
         """
+        import tensorflow as tf  # moved here to avoid slow imports
+
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
