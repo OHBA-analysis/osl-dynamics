@@ -123,5 +123,13 @@ def test_group_high_pass_filter():
     npt.assert_almost_equal(np.max(np.abs(spectrum_1)),0,decimal=3)
     npt.assert_almost_equal(np.max(np.abs(spectrum_2)),0.5,decimal=2)
 
+def test_regularisation():
+    from rotation.utils import regularisation
 
+    matrix = np.eye(2)
+    regularised_matrix = regularisation(matrix, 1e-6)
+    npt.assert_equal(regularised_matrix,np.eye(2) * (1 + 1e-6))
 
+    matrices = np.array([[[1.0,0.0],[0.0,1.0]],[[1.0,0.0],[0.0,1.0]]])
+    regularised_matrix = regularisation(matrices,1e-6)
+    npt.assert_equal(regularised_matrix,np.array([[[1.0,0.0],[0.0,1.0]],[[1.0,0.0],[0.0,1.0]]])*(1 + 1e-6))

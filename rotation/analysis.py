@@ -632,6 +632,29 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
         plt.close()
     '''
 
+def compute_plot_distance_regularisation(save_dir:str,plot_dir:str,model:str,n_channels:int,n_states:int):
+    """
+    This function serves to compute the effect of regularisation on the Riemmanian distance.
+    The Riemannian distance is numerically unstable because some correlation matrices
+    are "almost" positive semi-definite,i.e., scipy.linalg returns small negavive eigenvalues.
+    One of the solutions is to add a small \epsilon to the diagonal (see rotation.utils.regularisation).
+    We need to understand: (1) the appropriate value of \epsilon, (2) the effect of regularistaion
+
+    So we add \epsilon=1e-7,...,1e-4 to the correlation matrix, and scatter plot
+    the "regularised" Riemmanian distance against each other
+    Parameters
+    ----------
+    save_dir: (str) directory to read correlation matrices
+    plot_dir: (str) directory to save the plot
+    model: (str) The model to use
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+
+    Returns
+    -------
+
+    """
+    state_correlaions
 def mean_mapping(save_dir:str,spatial_map_dir:str,spatial_surface_map_dir:str):
     """
     Obtain mean activation spatial maps of each state/mode in the specified directory

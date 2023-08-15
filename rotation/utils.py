@@ -325,3 +325,23 @@ def group_high_pass_filter(ts:list,T:float=0.7,cutoff_frequency:float=0.25,order
                            )
 
     return returned_ts
+def regularisation(matrices:np.ndarray,eps:float=1e-6)->np.ndarray:
+    """
+    Regularise a bunch of matrices by adding eps to the diagonal
+    Parameters
+    ----------
+    matrices: np.ndarray with shape (M,N,N) or (N,N)
+    eps: float
+
+    Returns
+    -------
+    regularised_matrices: np.ndarray with shape (M,N,N) or (N,N)
+    """
+    if matrices.ndim == 2:
+        N = len(matrices)
+    elif matrices.ndim == 3:
+        _,N,_ = matrices.shape
+    else:
+        return ValueError('Matrices dimension is incorrect!')
+
+    return matrices + np.eye(N) * eps
