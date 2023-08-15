@@ -676,7 +676,7 @@ def compute_plot_distance_regularisation(save_dir:str,dist_dir:str, plot_dir:str
     -------
 
     """
-    eps_values = [0,1e-4,1e-5,1e-6,1e-7]
+    eps_values = [0,1e-8,1e-7,1e-6,1e-5]
     distances = {}
     correlations = np.load(f'{save_dir}state_correlations.npy')
 
@@ -696,7 +696,7 @@ def compute_plot_distance_regularisation(save_dir:str,dist_dir:str, plot_dir:str
 
     n_measures = len(eps_values)
     # Start plotting
-    fig, axes = plt.subplots(n_measures, n_measures, figsize=(12, 12))
+    fig, axes = plt.subplots(n_measures, n_measures, figsize=(15, 15))
 
     # Loop through each pair of measures and plot histograms on the diagonal and scatter plots on the off-diagonal
     for i,eps_i in enumerate(eps_values):
@@ -705,21 +705,21 @@ def compute_plot_distance_regularisation(save_dir:str,dist_dir:str, plot_dir:str
                 if i == j:
                     # Plot histogram for diagonal entries
                     axes[i, j].hist(distances[eps_i], bins=20, color='blue', alpha=0.7)
-                    axes[i, j].set_xlabel(str(eps_i))
-                    axes[i, i].set_ylabel('Frequency')
+                    axes[i, j].set_xlabel(str(eps_i),fontsize=15)
+                    axes[i, i].set_ylabel('Frequency',fontsize=15)
                 else:
                     if eps_j in distances.keys():
                         data_1 = distances[eps_j]
                         data_2 = distances[eps_i]
                         # Plot scatter plot for off-diagonal entries (i,j)
                         axes[i, j].scatter(data_1, data_2, color='blue', alpha=0.5)
-                        axes[i, j].set_xlabel(str(eps_j))
-                        axes[i, j].set_ylabel(str(eps_i))
+                        axes[i, j].set_xlabel(str(eps_j),fontsize=15)
+                        axes[i, j].set_ylabel(str(eps_i),fontsize=15)
 
 
     # Title
     plt.suptitle(f'Riemannian distance regularisation, {model}_ICA_{n_channels}_states_{n_states}', fontsize=20)
-
+    plt.tight_layout()
     plt.savefig(f'{plot_dir}Riemannian_distance_regularisation_plot.jpg')
     plt.savefig(f'{plot_dir}Riemannian_distance_regularisation_plot.pdf')
     plt.close()
