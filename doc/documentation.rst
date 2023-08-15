@@ -14,7 +14,6 @@ Various models are implemented in osl-dynamics. Finalised models that have been 
 
 - :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 - :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
-- :doc:`Multi-Dynamic Adversarial Generator Encoder (MAGE) <models/mage>`.
 
 Tutorials
 ---------

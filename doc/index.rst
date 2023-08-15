@@ -14,7 +14,6 @@ Models included:
 
 * :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 * :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
-* :doc:`Multi-Dynamic Adversarial Generator Encoder (MAGE) <models/mage>`.
 
 For more information on how to use osl-dynamics see the :doc:`documentation <documentation>`.
 
