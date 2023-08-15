@@ -196,12 +196,12 @@ def variance_from_spectra(
         else:
             # Integrate over the given frequency range
             if frequency_range is None:
-                p = np.mean(psd, axis=-1)
+                p = np.sum(psd, axis=-1)
             else:
                 [f_min_arg, f_max_arg] = get_frequency_args_range(
                     frequencies, frequency_range
                 )
-                p = np.mean(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+                p = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
         var.append(p)
