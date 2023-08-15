@@ -14,7 +14,7 @@ from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
 from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
-    IC2brain,IC2surface, pairwise_fisher_z_correlations
+    IC2brain,IC2surface, regularisation, pairwise_fisher_z_correlations
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -156,6 +156,13 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                       n_channels=n_channels,
                       n_states=n_states)
 
+    # Plot the influence of regularisation on Riemannian distance
+    if not os.path.isfile(f'{plot_dir}/Riemannian_distance_regularisation_plot.pdf'):
+        compute_plot_distance_regularisation(save_dir,dist_dir, plot_dir,
+                                             model='HMM',
+                                             n_channels=n_channels,
+                                             n_states=n_states)
+
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
     if not os.path.exists(FO_dir):
@@ -258,6 +265,13 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                       n_channels=n_channels,
                       n_states=n_states)
 
+    # Plot the influence of regularisation on Riemannian distance
+    if not os.path.isfile(f'{plot_dir}/Riemannian_distance_regularisation_plot.pdf'):
+        compute_plot_distance_regularisation(save_dir, dist_dir, plot_dir,
+                                             model='Dynemo',
+                                             n_channels=n_channels,
+                                             n_states=n_states)
+
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_surface_map.dscalar.nii'):
         mean_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
@@ -319,6 +333,13 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                       model='MAGE',
                       n_channels=n_channels,
                       n_states=n_states)
+
+    # Plot the influence of regularisation on Riemannian distance
+    if not os.path.isfile(f'{plot_dir}/Riemannian_distance_regularisation_plot.pdf'):
+        compute_plot_distance_regularisation(save_dir, dist_dir, plot_dir,
+                                             model='MAGE',
+                                             n_channels=n_channels,
+                                             n_states=n_states)
 
 
     # Compute the mean activation map
@@ -632,19 +653,20 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
         plt.close()
     '''
 
-def compute_plot_distance_regularisation(save_dir:str,plot_dir:str,model:str,n_channels:int,n_states:int):
+def compute_plot_distance_regularisation(save_dir:str,dist_dir:str, plot_dir:str,model:str,n_channels:int,n_states:int):
     """
-    This function serves to compute the effect of regularisation on the Riemmanian distance.
+    This function serves to compute the effect of regularisation on the Riemannian distance.
     The Riemannian distance is numerically unstable because some correlation matrices
-    are "almost" positive semi-definite,i.e., scipy.linalg returns small negavive eigenvalues.
+    are "almost" positive semi-definite,i.e., scipy.linalg returns small negative eigenvalues.
     One of the solutions is to add a small \epsilon to the diagonal (see rotation.utils.regularisation).
-    We need to understand: (1) the appropriate value of \epsilon, (2) the effect of regularistaion
+    We need to understand: (1) the appropriate value of \epsilon, (2) the effect of regularisation
 
     So we add \epsilon=1e-7,...,1e-4 to the correlation matrix, and scatter plot
-    the "regularised" Riemmanian distance against each other
+    the "regularised" Riemannian distance against each other
     Parameters
     ----------
     save_dir: (str) directory to read correlation matrices
+    dist_dir: (str) directory to store the distances
     plot_dir: (str) directory to save the plot
     model: (str) The model to use
     n_channels: (int) number of channels
@@ -654,7 +676,56 @@ def compute_plot_distance_regularisation(save_dir:str,plot_dir:str,model:str,n_c
     -------
 
     """
-    state_correlaions
+    eps_values = [0,1e-4,1e-5,1e-6,1e-7]
+    distances = {}
+    correlations = np.load(f'{save_dir}state_correlations.npy')
+
+    for eps in eps_values:
+        reg_correlations = regularisation(correlations,eps)
+        try:
+            distances[eps] = pairwise_riemannian_distances(reg_correlations)
+        except np.linalg.LinAlgError:
+            print(f'Riemannian distance when eps = {eps} failed!')
+
+    np.savez(f'{dist_dir}Riemannian_distance_regularisation.npz',distances)
+
+    # Flatten
+    N_states = len(correlations)
+    for eps in distances.keys():
+        distances[eps] = (distances[eps])[np.triu_indices(N_states, k=1)]
+
+    n_measures = len(eps_values)
+    # Start plotting
+    fig, axes = plt.subplots(n_measures, n_measures, figsize=(12, 12))
+
+    # Loop through each pair of measures and plot histograms on the diagonal and scatter plots on the off-diagonal
+    for i,eps_i in enumerate(eps_values):
+        if eps_i in distances.keys():
+            for j,eps_j in enumerate(eps_values):
+                if i == j:
+                    # Plot histogram for diagonal entries
+                    axes[i, j].hist(distances[eps_i], bins=20, color='blue', alpha=0.7)
+                    axes[i, j].set_xlabel(str(eps_i))
+                    axes[i, i].set_ylabel('Frequency')
+                else:
+                    if eps_j in distances.keys():
+                        data_1 = distances[eps_j]
+                        data_2 = distances[eps_i]
+                        # Plot scatter plot for off-diagonal entries (i,j)
+                        axes[i, j].scatter(data_1, data_2, color='blue', alpha=0.5)
+                        axes[i, j].set_xlabel(str(eps_j))
+                        axes[i, j].set_ylabel(str(eps_i))
+
+
+    # Title
+    plt.suptitle(f'Riemannian distance regularisation, {model}_ICA_{n_channels}_states_{n_states}', fontsize=20)
+
+    plt.savefig(f'{plot_dir}Riemannian_distance_regularisation_plot.jpg')
+    plt.savefig(f'{plot_dir}Riemannian_distance_regularisation_plot.pdf')
+    plt.close()
+
+
+
 def mean_mapping(save_dir:str,spatial_map_dir:str,spatial_surface_map_dir:str):
     """
     Obtain mean activation spatial maps of each state/mode in the specified directory
