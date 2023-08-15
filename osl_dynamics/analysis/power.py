@@ -198,10 +198,8 @@ def variance_from_spectra(
             if frequency_range is None:
                 p = np.sum(psd, axis=-1)
             else:
-                [f_min_arg, f_max_arg] = get_frequency_args_range(
-                    frequencies, frequency_range
-                )
-                p = np.sum(psd[..., f_min_arg : f_max_arg + 1], axis=-1)
+                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
+                p = np.sum(psd[..., f_min:f_max], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
         var.append(p)
