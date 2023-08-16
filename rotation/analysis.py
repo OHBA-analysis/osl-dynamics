@@ -521,6 +521,10 @@ def compute_distance(save_dir:str,dist_dir:str):
     correlations = np.load(f'{save_dir}state_correlations.npy')
     covariances = np.load(f'{save_dir}state_covariances.npy')
 
+    # Regularisation for Riemannian distance
+    # Please work on correlation matrix only
+    eps_values = [0,1e-9,1e-8,1e-7,1e-6,1e-5]
+
     # Compute four distance/correlation metrics
     np.save(f'{dist_dir}frobenius_distance_cov.npy', pairwise_frobenius_distance(covariances))
     np.save(f'{dist_dir}matrix_correlation_cov.npy', pairwise_matrix_correlations(covariances))
@@ -533,10 +537,13 @@ def compute_distance(save_dir:str,dist_dir:str):
 
     np.save(f'{dist_dir}frobenius_distance_cor.npy', pairwise_frobenius_distance(correlations))
     np.save(f'{dist_dir}matrix_correlation_cor.npy', pairwise_matrix_correlations(correlations))
-    try:
-        np.save(f'{dist_dir}riemannian_distance_cor.npy', pairwise_riemannian_distances(correlations))
-    except np.linalg.LinAlgError:
-        warnings.warn("Riemannian distance is not computed properly for correlations!")
+    for eps in eps_values:
+        try:
+            np.save(f'{dist_dir}riemannian_distance_cor.npy', pairwise_riemannian_distances(regularisation(correlations,eps)))
+            print(f'Riemannian distance calculation succeeds when eps = {eps}')
+            break
+        except np.linalg.LinAlgError:
+            print(f'Riemannian distance is not computed properly when eps = {eps}')
     np.save(f'{dist_dir}congruence_coefficient_cor.npy', pairwise_congruence_coefficient(correlations))
     np.save(f'{dist_dir}fisher_z_correlation_cor.npy',pairwise_fisher_z_correlations(correlations))
 
@@ -554,7 +561,7 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
     Returns
     -------
     """
-    measures = ['cov','cor']
+    measures = ['cor','cov']
     # Remark by swimming 8th Aug 2023
     # Correct implementations are Riemannian distance and Fisher z-transformed correlation
     # So our plot should be only 2 * 2 now.
