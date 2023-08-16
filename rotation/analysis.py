@@ -146,7 +146,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
+    if not os.path.isfile(f'{dist_dir}riemannian_distance_cor.npy'):
         compute_distance(save_dir,dist_dir)
 
     # Plot the distance between different states/modes
@@ -255,7 +255,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
+    if not os.path.isfile(f'{dist_dir}riemannian_distance_cor.npy'):
         compute_distance(save_dir, dist_dir)
 
     # Plot the distance between different states/modes
@@ -324,7 +324,7 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
-    if not os.path.isfile(f'{dist_dir}fisher_z_correlation_cor.npy'):
+    if not os.path.isfile(f'{dist_dir}riemannian_distance_cor.npy'):
         compute_distance(save_dir, dist_dir)
 
     # Plot the distance between different states/modes
@@ -528,15 +528,18 @@ def compute_distance(save_dir:str,dist_dir:str):
     # Compute four distance/correlation metrics
     np.save(f'{dist_dir}frobenius_distance_cov.npy', pairwise_frobenius_distance(covariances))
     np.save(f'{dist_dir}matrix_correlation_cov.npy', pairwise_matrix_correlations(covariances))
+    np.save(f'{dist_dir}congruence_coefficient_cov.npy', pairwise_congruence_coefficient(covariances))
+    np.save(f'{dist_dir}fisher_z_correlation_cov.npy', pairwise_fisher_z_correlations(covariances))
     try:
         np.save(f'{dist_dir}riemannian_distance_cov.npy', pairwise_riemannian_distances(covariances))
     except np.linalg.LinAlgError:
         warnings.warn("Riemannian distance is not computed properly for covariances!")
-    np.save(f'{dist_dir}congruence_coefficient_cov.npy', pairwise_congruence_coefficient(covariances))
-    np.save(f'{dist_dir}fisher_z_correlation_cov.npy',pairwise_fisher_z_correlations(covariances))
 
     np.save(f'{dist_dir}frobenius_distance_cor.npy', pairwise_frobenius_distance(correlations))
     np.save(f'{dist_dir}matrix_correlation_cor.npy', pairwise_matrix_correlations(correlations))
+    np.save(f'{dist_dir}congruence_coefficient_cor.npy', pairwise_congruence_coefficient(correlations))
+    np.save(f'{dist_dir}fisher_z_correlation_cor.npy', pairwise_fisher_z_correlations(correlations))
+
     for eps in eps_values:
         try:
             np.save(f'{dist_dir}riemannian_distance_cor.npy', pairwise_riemannian_distances(regularisation(correlations,eps)))
@@ -544,8 +547,6 @@ def compute_distance(save_dir:str,dist_dir:str):
             break
         except np.linalg.LinAlgError:
             print(f'Riemannian distance is not computed properly when eps = {eps}')
-    np.save(f'{dist_dir}congruence_coefficient_cor.npy', pairwise_congruence_coefficient(correlations))
-    np.save(f'{dist_dir}fisher_z_correlation_cor.npy',pairwise_fisher_z_correlations(correlations))
 
 def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:int):
     """
