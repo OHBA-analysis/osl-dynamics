@@ -478,7 +478,7 @@ def convert_to_mne_raw(
     _, times = raw.get_data(
         reject_by_annotation="omit", return_times=True, verbose=verbose
     )
-    indices = raw.time_as_index(times)
+    indices = raw.time_as_index(times, use_rounding=True)
 
     # Remove time points lost due to time delay embedding
     indices = indices[n_trim:]
