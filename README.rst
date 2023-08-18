@@ -85,13 +85,14 @@ A couple packages are needed to build and upload a project to PyPI, these can be
 
 The following steps can be used to release a new version:
 
-#. Update the version number on line 5 of ``setup.cfg``.
+#. Update the version on line 5 of ``setup.cfg`` by removing ``dev`` from the version number.
 #. Commit the updated setup.cfg to the ``main`` branch of the GitHub repo.
 #. Delete any old distributions that have been built (if there are any): ``rm -r dist``.
 #. Build a distribution in the osl-dynamics root directory with ``python -m build``. This will create a new directory called ``dist``.
 #. Test the build by installing in a test conda environment with ``cd dist; pip install <build>.whl``.
 #. Upload the distribution to PyPI with ``twine upload dist/*``. You will need to enter the username and password that you used to register with `https://pypi.org <https://pypi.org>`_.
 #. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage.
+#. Change the version to ``X.Y.devZ`` in ``setup.cfg`` and commit the new dev version to ``main``.
 
 The uploaded distribution will then be available to be installed with:
 
