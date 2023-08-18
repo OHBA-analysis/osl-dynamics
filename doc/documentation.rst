@@ -5,7 +5,7 @@ Welcome to the osl-dynamics documentation!
 
 The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics. New users may find the :doc:`FAQ <faq>` useful.
 
-**New users are encouraged to have a look at the config API inferface:** `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_.
+**New users are encouraged to have a look at the config API interface:** `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_.
 
 Models
 ------

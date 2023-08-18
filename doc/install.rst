@@ -17,25 +17,29 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     Note, this environment must be activated every time you want to use osl-dynamics.
 
-#. Install the deep learning library TensorFlow: https://www.tensorflow.org/overview.
+#. Install the deep learning library TensorFlow: https://www.tensorflow.org/overview (and the addon tensorflow-probability).
+
+    To install TensorFlow use:
 
     ::
 
-        pip install tensorflow
+        pip install tensorflow==2.9.1
 
-    If you are using an Apple computer with an M1/M2 chip the above command won't work, instead you can install TensorFlow with:
+    If you have GPU resources you may need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions.
 
-    ::
-
-        pip install tensorflow-macos
-
-    If you have GPU resources you need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions. You maybe able you install a GPU-enabled version of TensorFlow using Anaconda:
+    If you are using an Apple computer with an M1/M2 chip, you will need to use the following instead:
 
     ::
 
-        conda install -c conda-forge tensorflow-gpu
+        pip install tensorflow-macos==2.9.1
 
-#. Install osl-dynamics:
+    After you have installed TensorFlow, install the tensorflow-probability addon with:
+
+    ::
+
+        pip install tensorflow-probability==0.17
+
+#. Finally, install osl-dynamics:
 
     ::
 

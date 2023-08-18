@@ -24,7 +24,7 @@ Here, we describe how to install osl-dynamics from source. We recommend using th
     conda activate osld
     pip install -e .
 
-If you're using a Mac then use the ``envs/mac.yml`` file to create the conda environment instead of ``envs/linux.yml``. Note, the conda environments use ``pip`` to install TensorFlow, you may need to load/install additional libraries (such as CUDA/cuDNN) if you have GPU support.
+Note, if you have a Mac you may want to use the ``envs/mac.yml`` environment file instead.
 
 Developers might want to clone the repo using SSH instead of HTTPS:
 
@@ -46,7 +46,8 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
 
     conda activate osl
     cd osl-dynamics
-    pip install tensorflow
+    pip install tensorflow==2.9.1
+    pip install tensorflow-probability==0.17
     pip install -e .
 
 Documentation
