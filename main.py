@@ -128,10 +128,17 @@ if __name__ == '__main__':
     if len(sys.argv) >= 3:
         mode = sys.argv[2]
 
+    # This either represent run repeat_i or the first/second half
+    sub_index = 1
+    if len(sys.argv) >= 4:
+        sub_index = int(sys.argv[3])
+
     # Default strategy for splitting
     strategy = '0'
-    if len(sys.argv) >= 4:
-        strategy = sys.argv[3]
+    if len(sys.argv) >= 5:
+        strategy = sys.argv[4]
+
+
 
     # For debugging
     #index = 0
@@ -161,32 +168,25 @@ if __name__ == '__main__':
         prepare_data = PrepareData(data_dir)
         subj, dataset = prepare_data.load()
         print(f'Number of subjects: {len(subj)}')
-        repeat_times = 1
-        while True:
-            try:
-                save_dir_sub = f'{save_dir}/repeat_{repeat_times}'
-                print(f'save dir sub is: {save_dir_sub}')
-                #if os.path.exists(save_dir_sub):
-                #    os.rmdir(save_dir_sub)
-                #os.makedirs(save_dir_sub)
-                model_train(model,dataset,n_channels,n_states,save_dir_sub)
-                print('training successful!')
-                repeat_times += 1
 
-            except Exception:
-                warnings.warn(f'Training of repeat {repeat_times} is not successful! Train again')
-            if repeat_times > 5:
-                print('Training finished!')
-                sys.exit()
+        save_dir_sub = f'{save_dir}/repeat_{sub_index}'
+        print(f'save dir sub is: {save_dir_sub}')
+        if os.path.exists(save_dir_sub):
+            os.rmdir(save_dir_sub)
+        model_train(model,dataset,n_channels,n_states,save_dir_sub)
+        print('training successful!')
 
     elif mode == 'split':
         prepare_data = PrepareData(data_dir)
         subj, dataset_1,dataset_2 = prepare_data.load(split_strategy = strategy)
         print(f'Number of subjects: {len(subj)}')
-        save_dir_sub_1 = f'{save_dir}/split_{strategy}_first_half'
-        model_train(model, dataset_1, n_channels, n_states, save_dir_sub_1)
-        save_dir_sub_2 = f'{save_dir}/split_{strategy}_second_half'
-        model_train(model, dataset_2, n_channels, n_states, save_dir_sub_2)
+        if sub_index == 1:
+            save_dir_sub = f'{save_dir}/split_{strategy}_first_half'
+            dataset = dataset_1
+        else:
+            save_dir_sub = f'{save_dir}/split_{strategy}_second_half'
+            dataset = dataset_2
+        model_train(model, dataset_1, n_channels, n_states, save_dir_sub)
     else:
         raise ValueError('Mode is not available now!')
     
