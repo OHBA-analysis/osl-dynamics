@@ -56,6 +56,36 @@ class PrepareData():
 
             first_half = [data_list[i] for i in random_index]
             second_half = [array for i, array in enumerate(data_list) if i not in random_index]
+            return subjs, Data(first_half,load_memmaps=False), Data(second_half,load_memmaps=False)
+        elif split_strategy == '2':
+            N = len(data_list) // self.n_session
+            # Divide the list into groups: 4i, 4i+1 and 4i+2, 4i+3
+            first_half = [data_list[self.n_session * i] for i in range(N)]
+            first_half.extend(data_list[self.n_session * i + 1] for i in range(N))
+
+            second_half = [data_list[self.n_session * i + 2] for i in range(N)]
+            second_half.extend(data_list[self.n_session * i + 3] for i in range(N))
+            return subjs, Data(first_half, load_memmaps=False), Data(second_half, load_memmaps=False)
+        elif split_strategy == '3':
+            N = len(data_list) // self.n_session
+            # Divide the list into groups: 4i, 4i+2 and 4i+1, 4i+3
+            first_half = [data_list[self.n_session * i] for i in range(N)]
+            first_half.extend(data_list[self.n_session * i + 2] for i in range(N))
+
+            second_half = [data_list[self.n_session * i + 1] for i in range(N)]
+            second_half.extend(data_list[self.n_session * i + 3] for i in range(N))
+            return subjs, Data(first_half, load_memmaps=False), Data(second_half, load_memmaps=False)
+        elif split_strategy == '4':
+            N = len(data_list) // self.n_session
+            # Divide the list into groups: 4i, 4i+3 and 4i+1, 4i+2
+            first_half = [data_list[self.n_session * i] for i in range(N)]
+            first_half.extend(data_list[self.n_session * i + 3] for i in range(N))
+
+            second_half = [data_list[self.n_session * i + 1] for i in range(N)]
+            second_half.extend(data_list[self.n_session * i + 2] for i in range(N))
+            return subjs, Data(first_half, load_memmaps=False), Data(second_half, load_memmaps=False)
+        else:
+            raise ValueError('Incorrect split strategy!')
 
 
 
