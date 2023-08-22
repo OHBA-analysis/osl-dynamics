@@ -1,3 +1,5 @@
+import random
+
 import pathlib
 import numpy as np
 import scipy.stats as stats
@@ -9,13 +11,25 @@ class PrepareData():
         self.data_dir = data_dir
         self.n_session = n_session
         
-    def load(self,split_session = True):
+    def load(self,split_session:bool = True,split_strategy:str ='0'):
         '''
         Load data from specified directories
-        Returns:
+        Parameters
+        ----------
+        split_session: (bool) whether to split the session
+        split_strategy: (str) how to split the whole dataset
+        '0': no splitting
+        '1': randomly split into half
+        '2': For each subject, session 12 - 34
+        '3': For each subject, session 13 - 24
+        '4': For each subject, session 14 - 23
+
+        Returns
+        -------
         tuple: A tuple containing the following
             - subjs (list): A list of read-in subjects
-            - dataset (osl_dynamics.data.Data): the wrappeed dataset
+            - dataset (osl_dynamics.data.Data): the wrapped dataset
+            - dataset_2 (osl_dynamics.data.Data): if split strategy ! '0', the second half needs to be returned.
         '''
         subjs = []
         data_list = []
@@ -31,8 +45,18 @@ class PrepareData():
         
         print('Read from directory: ',self.data_dir)
         print('Number of subjects: ',len(subjs))
-        
-        return subjs, Data(data_list,load_memmaps=False)
+
+        if split_strategy == '0':
+            return subjs, Data(data_list,load_memmaps=False)
+        elif split_strategy == '1':
+            # Set the random seed for reproducibility
+            random_seed = 42
+            random.seed(random_seed)
+            random_index = random.sample(range(len(data_list)),int(len(data_list) / 2))
+
+            first_half = [data_list[i] for i in random_index]
+            second_half = [array for i, array in enumerate(data_list) if i not in random_index]
+
 
 
 def z_score(data:np.ndarray,n_session:int = 1):

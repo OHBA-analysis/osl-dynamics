@@ -1,5 +1,7 @@
 import glob
+import warnings
 import sys
+import os
 import pathlib
 
 import numpy as np
@@ -89,6 +91,19 @@ def Dynemo_analysis(dataset):
     # Save the model
     model.save("results/model_Dynemo")
 
+def model_train(model,dataset,n_channels, n_states,save_dir):
+    if model == 'HMM':
+        HMM_training(dataset,n_states,n_channels,save_dir)
+    elif model == 'Dynemo':
+        Dynemo_training(dataset, n_states, n_channels,save_dir)
+    elif model == 'MAGE':
+        MAGE_training(dataset,n_states,n_channels,save_dir)
+    elif model == 'SWC':
+        SWC_computation(dataset,window_length=143,step_size=118,save_dir=save_dir)
+    else:
+        raise ValueError('The model name is incorrect!')
+
+
 if __name__ == '__main__':
     # Index
     # 1-30: HMM
@@ -96,13 +111,33 @@ if __name__ == '__main__':
     # 61-90: MAGE
     # 91-96: SWC (training)
     # 91-120: SWC (analysis)
+
+    # Mode should be encoded in sys.argv[2]
+    # sys.argv[2] == 'training' (or no sys.argv[2]): train the model
+    # sys.argv[2] == 'repeat': reproduce the model training to get reliable KL divergence
+    # sys.argv[2] == 'split': split the data in half to test reproducibility
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
     list_states = [4,8,12,16,20]
-    
+
     index = int(sys.argv[1]) - 1
     #index = 91
-    
+
+    # Default mode is training:
+    mode = 'training'
+    if len(sys.argv) >= 3:
+        mode = sys.argv[2]
+
+    # Default strategy for splitting
+    strategy = '1'
+    if len(sys.argv) >= 4:
+        strategy = sys.argv[3]
+
+    # For debugging
+    #index = 0
+    #mode = 'repeat'
+    #strategy = '1'
+
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
@@ -119,17 +154,33 @@ if __name__ == '__main__':
     prepare_data = PrepareData(data_dir)
     subj,dataset = prepare_data.load()
     print(f'Number of subjects: {len(subj)}')
-    
-    if model == 'HMM':
-        HMM_training(dataset,n_states,n_channels,save_dir)
-    elif model == 'Dynemo':
-        Dynemo_training(dataset, n_states, n_channels,save_dir)
-    elif model == 'MAGE':
-        MAGE_training(dataset,n_states,n_channels,save_dir)
-    elif model == 'SWC':
-        SWC_computation(dataset,window_length=143,step_size=118,save_dir=save_dir)
+
+    if mode == 'training':
+        model_train(model,dataset,n_channels,n_states,save_dir)
+    elif mode == 'repeat':
+        repeat_times = 1
+        while True:
+            try:
+                save_dir_sub = f'{save_dir}/repeat_{repeat_times}'
+                print(f'save dir sub is: {save_dir_sub}')
+                if os.path.exists(save_dir_sub):
+                    os.rmdir(save_dir_sub)
+                #os.makedirs(save_dir_sub)
+                model_train(model,dataset,n_channels,n_states,save_dir_sub)
+                print('training successful!')
+                repeat_times += 1
+
+            except Exception:
+                warnings.warn(f'Training of repeat {repeat_times} is not successful! Train again')
+            if repeat_times > 5:
+                print('Training finished!')
+                sys.exit()
+
+
     else:
-        raise ValueError('The model name is incorrect!')
+        raise ValueError('Mode is not available now!')
+    
+
         
     '''
     data_dir =pathlib.Path('/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d15_ts2/')
