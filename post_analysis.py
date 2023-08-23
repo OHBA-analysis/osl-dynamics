@@ -53,7 +53,8 @@ if __name__ == '__main__':
     # index = 120 represent comparison analysis.
     if index == 120:
         save_dir = './result/comparison/'
-        comparison_analysis(models,list_channels,list_states,save_dir)
+        result_dir = '/result/'
+        comparison_analysis(models,list_channels,list_states,result_dir,save_dir)
 
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 

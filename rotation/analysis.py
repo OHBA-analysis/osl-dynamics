@@ -1,4 +1,5 @@
 import os
+import json
 import warnings
 import pickle
 
@@ -456,6 +457,7 @@ def calculate_metrics(model,dataset,save_dir):
     metrics = {'free_energy':free_energy,'evidence':evidence}
     with open(f'{save_dir}metrics.json', "w") as json_file:
         # Use json.dump to write the data to the file
+        print(f"Free energy is {metrics['free_energy']}, evidence is {metrics['evidence']}")
         json.dump(metrics, json_file)
 def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:int,n_states:int):
     """
@@ -974,7 +976,7 @@ def FO_MAGE(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
 
 
 
-def comparison_analysis(models:list,list_channels:list,list_states:list,save_dir:str):
+def comparison_analysis(models:list,list_channels:list,list_states:list,result_dir:str, save_dir:str):
     """
     Compare results obtained from different models, channel numbers, state numbers.
     Parameters
@@ -982,11 +984,71 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,save_dir
     models: (list) model list.
     list_channels: (list) N_channels list
     list_states: (list) N_states list
+    result_dir: (str) where to find the results of different models
     save_dir: (str) where to save comparison results
 
     Returns
     -------
     """
+    # We do not have results for N_channels = 200,300
+    list_channels = list_channels[:-2]
     # Create directory
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
+
+    # Compare the free energy and model evidence across all methods
+    for model in models:
+        free_energy = {}
+        evidence = {}
+        for N_channel in list_channels:
+            for N_state in list_states:
+                with open(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/metrics.json', "r") as json_file:
+                    # Use json.load to load the data from the file
+                    metrics = json.load(json_file)
+                    free_energy[f'ICA_{N_channel}_state_{N_state}'] = metrics['free_energy']
+                    evidence[f'ICA_{N_channel}_state_{N_state}'] = metrics['evidence']
+
+        group_comparison_plot(free_energy,model,list_channels,list_states,'free_energy',save_dir)
+        group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
+
+def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_states:list,metric_name:str,save_dir:str):
+    """
+    Plot the group comparison results.
+    The metric should be a dictionary with keys: ICA_{N_channels}_state_{N_states}
+    the values should represent some metrics.
+    Parameters
+    ----------
+    metric: (dict) the metrics to plot
+    model_name: (str) the model name
+    list_channels: (list) the list of N_channels
+    list_states: (list) the list of N_states
+    metric_name: (str) the name of the metric plotted
+    save_dir: (str) where to save the plots
+    Returns
+    -------
+    """
+
+    # Create a bar plot
+    plt.figure(figsize=(10, 6))
+
+    bar_width = 0.15
+    colors = plt.cm.viridis(np.linspace(0, 1, len(list_states)))
+
+    for i, N_states in enumerate(list_states):
+        channel_keys = [f'ICA_{N_channels}_state_{N_states}' for N_channels in list_channels]
+        values = [metric[key] for key in channel_keys]
+        plt.bar(np.arange(len(channel_keys)) + i * bar_width, values, bar_width, label=f'N_states = {N_states}',
+                color=colors[i])
+
+    plt.xlabel('N_channels', fontsize=15)
+    plt.ylabel(metric_name, fontsize=15)
+    plt.title(f'Comparison of {metric_name} by N_channels and N_states', fontsize=20)
+    plt.xticks(np.arange(len(channel_keys)) + bar_width * (len(list_states) - 1) / 2,
+               [str(N_channels) for N_channels in list_channels], fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.legend(prop={'size': 15})
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.jpg')
+    plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.pdf')
+    plt.close()
+
