@@ -66,6 +66,10 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
+    # Calculate the metrics
+    if not os.path.isfile(f'{save_dir}metrics.json'):
+        calculate_metrics(model, dataset, save_dir)
+
     # Summary statistics analysis
     plot_dir = f'{save_dir}plot/'
     if not os.path.exists(plot_dir):
@@ -234,6 +238,11 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
+    # Calculate the metrics
+    if not os.path.isfile(f'{save_dir}metrics.json'):
+        calculate_metrics(model, dataset, save_dir)
+
+
     # Obtain the statistics (mean,std, cov,cor) of states
     if not os.path.isfile(f'{save_dir}state_covariances.npy'):
         extract_state_statistics(save_dir, model_name='Dynemo')
@@ -307,6 +316,11 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
+
+    # Calculate the metrics
+    if not os.path.isfile(f'{save_dir}metrics.json'):
+        calculate_metrics(model, dataset, save_dir)
+
 
     # Obtain the statistics (mean,std, cov,cor) of states
     if not os.path.isfile(f'{save_dir}state_covariances.npy'):
@@ -425,6 +439,24 @@ def extract_state_statistics(save_dir:str,model_name:str):
     np.save(f'{save_dir}state_correlations.npy', correlations)
     np.save(f'{save_dir}state_covariances.npy', covariances)
 
+def calculate_metrics(model,dataset,save_dir):
+    """
+    Calculate the metrics: free energy and model evidence of the data
+    Parameters
+    ----------
+    model: the after-training model
+    dataset: data to calculate metrics on
+    save_dir: where to save the metrics
+
+    Returns
+    -------
+    """
+    free_energy = model.free_energy(dataset)
+    evidence = model.evidence(dataset)
+    metrics = {'free_energy':free_energy,'evidence':evidence}
+    with open(f'{save_dir}metrics.json', "w") as json_file:
+        # Use json.dump to write the data to the file
+        json.dump(metrics, json_file)
 def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:int,n_states:int):
     """
     plot the mean, std, correlation of states
