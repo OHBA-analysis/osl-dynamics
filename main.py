@@ -189,7 +189,8 @@ if __name__ == '__main__':
         model_train(model, dataset_1, n_channels, n_states, save_dir_sub)
     else:
         raise ValueError('Mode is not available now!')
-    
+
+
 
         
     '''
