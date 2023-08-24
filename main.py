@@ -171,10 +171,9 @@ if __name__ == '__main__':
 
         save_dir_sub = f'{save_dir}/repeat_{sub_index}'
         print(f'save dir sub is: {save_dir_sub}')
-        if os.path.exists(save_dir_sub):
-            os.rmdir(save_dir_sub)
-        model_train(model,dataset,n_channels,n_states,save_dir_sub)
-        print('training successful!')
+        if not os.path.exists(save_dir_sub):
+            #os.rmdir(save_dir_sub)
+            model_train(model,dataset,n_channels,n_states,save_dir_sub)
 
     elif mode == 'split':
         prepare_data = PrepareData(data_dir)
