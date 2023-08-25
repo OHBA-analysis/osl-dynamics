@@ -1068,7 +1068,7 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     mean activation and FC to be independent, but this is not the case for Dynemo and MAGE.
     Method: compute the sum of FC across rows/columns, but we need to explore whether
     the sign plays a role (both in activation and FC) in that case. So there should be
-    four scatter plots!
+    four histograms!
     Parameters
     ----------
     save_dir: (str) where state mean FC are saved and where to save the raw data for plotting
@@ -1079,4 +1079,34 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     Returns
     -------
     """
-    means = np.load
+    means = np.load('state_means.npy')
+    means_abs = np.abs(means)
+    correlations = np.load('state_correlations.npy')
+    FC = np.sum(correlations,axis=1)
+    FC_abs = np.sum(np.abs(correlations),axis=1)
+
+    result = {'means_FC':np.array([np.corrcoef(means[i, :], FC[i, :])[0, 1] for i in range(n_states)]),
+              'means_abs_FC':np.array([np.corrcoef(means_abs[i, :], FC[i, :])[0, 1] for i in range(n_states)]),
+              'means_FC_abs':np.array([np.corrcoef(means[i, :], FC_abs[i, :])[0, 1] for i in range(n_states)]),
+              'means_abs_FC_abs':np.array([np.corrcoef(means_abs[i, :], FC_abs[i, :])[0, 1] for i in range(n_states)])
+              }
+    np.savez(f'{save_dir}mean_FC_relation.npz',result)
+
+    # Create a 2x2 subplot
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    fig.suptitle(f'{model_name}_ICA_{n_channels}_state_{n_states}', fontsize=20)
+
+    # Loop through dictionary keys and plot histograms
+    for i, (key, value) in enumerate(result.items()):
+        row = i // 2
+        col = i % 2
+        ax = axes[row, col]
+        ax.hist(value, color='blue', alpha=0.7)
+        ax.set_title(key)
+
+    plt.tight_layout()
+    plt.savefig(f'{plot_dir}mean_FC_relation.jpg')
+    plt.savefig(f'{plot_dir}mean_FC_relation.pdf')
+    plt.close()
+
+
