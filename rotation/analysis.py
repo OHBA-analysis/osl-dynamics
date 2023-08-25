@@ -1128,4 +1128,14 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     plt.close()
 
 def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str, split_strategy:str='1'):
-    pass
+    """
+    Analysis the reproducibilit of each model
+    Parameters
+    ----------
+    save_dir: (str) the root directory of the model results
+    reproduce_analysis_dir: (str) directory to save reproducibility analysis results
+    split_strategy: (str) split strategy '1','2','3','4'
+    Returns
+    -------
+    """
+    
