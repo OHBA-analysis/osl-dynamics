@@ -208,6 +208,8 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
         FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
+    if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
+        mean_FC_relation(save_dir,plot_dir,'HMM',n_channels,n_states)
 
 
 
@@ -289,6 +291,9 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
         FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
 
+    if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
+        mean_FC_relation(save_dir,plot_dir,'Dynemo',n_channels,n_states)
+
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                   spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
     """
@@ -363,6 +368,9 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
         FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
+
+    if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
+        mean_FC_relation(save_dir,plot_dir,'MAGE',n_channels,n_states)
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -1052,3 +1060,23 @@ def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_sta
     plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.pdf')
     plt.close()
 
+def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_states:int):
+    """
+    Explore the relationship between mean activation and FC map.
+    Question: Within each state, does the activated component have strong correlation with other componens.
+    Rationale: for HMM, Dynemo, because it's single dynamics, we should expect
+    mean activation and FC to be independent, but this is not the case for Dynemo and MAGE.
+    Method: compute the sum of FC across rows/columns, but we need to explore whether
+    the sign plays a role (both in activation and FC) in that case. So there should be
+    four scatter plots!
+    Parameters
+    ----------
+    save_dir: (str) where state mean FC are saved and where to save the raw data for plotting
+    plot_dir: (str) where to plot the results
+    model_name: (str) model name
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+    Returns
+    -------
+    """
+    means = np.load
