@@ -819,7 +819,7 @@ def FC_mapping(save_dir:str,spatial_map_dir:str,spatial_surface_map_dir:str):
         correlation = correlations[i,:,:]
         r1_approxs.append(first_eigenvector(correlation))
         np.fill_diagonal(correlation,0)
-        sum_of_degrees.append(np.sum(np.abs(correlation),axis=1))
+        sum_of_degrees.append(np.sum(correlation,axis=1))
     r1_approxs = np.array(r1_approxs)
     sum_of_degrees = np.array(sum_of_degrees)
     np.save(f'{save_dir}r1_approx_FC.npy', r1_approxs)
