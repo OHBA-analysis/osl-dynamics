@@ -211,6 +211,12 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
         mean_FC_relation(save_dir,plot_dir,'HMM',n_channels,n_states)
 
+    reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
+    if not os.path.exists(reproduce_analysis_dir):
+        os.makedirs(reproduce_analysis_dir)
+    if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
+        reproduce_analysis(save_dir,reproduce_analysis_dir,split_strategy='1')
+
 
 
 def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
@@ -294,6 +300,12 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
         mean_FC_relation(save_dir,plot_dir,'Dynemo',n_channels,n_states)
 
+    reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
+    if not os.path.exists(reproduce_analysis_dir):
+        os.makedirs(reproduce_analysis_dir)
+    if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
+        reproduce_analysis(save_dir,reproduce_analysis_dir,split_strategy='1')
+
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                   spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
     """
@@ -371,6 +383,12 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
         mean_FC_relation(save_dir,plot_dir,'MAGE',n_channels,n_states)
+
+    reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
+    if not os.path.exists(reproduce_analysis_dir):
+        os.makedirs(reproduce_analysis_dir)
+    if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
+        reproduce_analysis(save_dir, reproduce_analysis_dir, split_strategy='1')
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -1079,9 +1097,9 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     Returns
     -------
     """
-    means = np.load('state_means.npy')
+    means = np.load(f'{save_dir}state_means.npy')
     means_abs = np.abs(means)
-    correlations = np.load('state_correlations.npy')
+    correlations = np.load(f'{save_dir}state_correlations.npy')
     FC = np.sum(correlations,axis=1)
     FC_abs = np.sum(np.abs(correlations),axis=1)
 
@@ -1109,4 +1127,5 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     plt.savefig(f'{plot_dir}mean_FC_relation.pdf')
     plt.close()
 
-
+def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str, split_strategy:str='1'):
+    pass
