@@ -215,7 +215,9 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,split_strategy='1')
+        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', split_strategy='3')
 
 
 
@@ -304,7 +306,9 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,split_strategy='1')
+        reproduce_analysis(save_dir,reproduce_analysis_dir,'Dynemo',split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo', split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo', split_strategy='3')
 
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                   spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
@@ -388,7 +392,9 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
-        reproduce_analysis(save_dir, reproduce_analysis_dir, split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', split_strategy='3')
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -1127,15 +1133,17 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     plt.savefig(f'{plot_dir}mean_FC_relation.pdf')
     plt.close()
 
-def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str, split_strategy:str='1'):
+def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str, split_strategy:str='1'):
     """
     Analysis the reproducibilit of each model
     Parameters
     ----------
     save_dir: (str) the root directory of the model results
     reproduce_analysis_dir: (str) directory to save reproducibility analysis results
+    model_name: (str) the model name
     split_strategy: (str) split strategy '1','2','3','4'
     Returns
     -------
     """
-    
+    extract_state_statistics(f'{save_dir}split_{split_strategy}_first_half/',model_name)
+    extract_state_statistics(f'{save_dir}split_{split_strategy}_second_half/', model_name)
