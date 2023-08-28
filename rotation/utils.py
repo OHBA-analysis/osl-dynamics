@@ -1,6 +1,7 @@
 from tqdm import trange
 import numpy as np
 from scipy.sparse.linalg import eigsh
+from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
 import nibabel as nib
 from nibabel.nifti1 import Nifti1Image
@@ -363,6 +364,7 @@ def twopair_vector_correlation(vectors_1:np.ndarray,vectors_2:np.ndarray)->np.nd
     """
     M1, N1 = vectors_1.shape
     M2, N2 = vectors_2.shape
+    assert M1 == M2
     assert N1 == N2
     correlations = np.empty((M1, M2))
 
@@ -371,3 +373,26 @@ def twopair_vector_correlation(vectors_1:np.ndarray,vectors_2:np.ndarray)->np.nd
             correlation = np.corrcoef(vectors_1[i, :], vectors_2[j, :])[0, 1]
             correlations[i, j] = correlation
     return correlations
+
+def hungarian_pair(matrix:np.ndarray,distance:bool=False):
+    """
+    Use the hungarian algorithm to pair different "states" according to the matrix
+    Parameters
+    ----------
+    matrix: (M*M) distance/correlation matrix as the measure for pairing
+    distance: (str) True: matrix measures distance.
+                    False: matrix measures correlation
+
+    Returns
+    -------
+
+    """
+    if distance:
+        row_indices, col_indices = linear_sum_assignment(matrix)
+    else:
+        row_indices, col_indices = linear_sum_assignment(np.max(matrix) - matrix)
+
+    indices = {'row':row_indices.tolist(),'col':col_indices.tolist()}
+    matrix_reordered = matrix[row_indices,:]
+    matrix_reordered = matrix_reordered[:,col_indices]
+    return indices, matrix_reordered

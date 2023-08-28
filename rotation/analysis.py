@@ -5,6 +5,7 @@ import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.cluster import KMeans
 import networkx as nx
 import nibabel as nib
@@ -15,7 +16,8 @@ from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
     pairwise_matrix_correlations, pairwise_riemannian_distances, pairwise_congruence_coefficient
 from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
-    IC2brain,IC2surface, regularisation, pairwise_fisher_z_correlations
+    IC2brain,IC2surface, regularisation, pairwise_fisher_z_correlations,\
+    twopair_vector_correlation, hungarian_pair
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -215,9 +217,9 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',split_strategy='1')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', split_strategy='2')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', split_strategy='3')
+        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',n_channels,n_states,split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='3')
 
 
 
@@ -306,9 +308,9 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,'Dynemo',split_strategy='1')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo', split_strategy='2')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo', split_strategy='3')
+        reproduce_analysis(save_dir,reproduce_analysis_dir,'Dynemo',n_channels,n_states,split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo',n_channels,n_states, split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo',n_channels,n_states, split_strategy='3')
 
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                   spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
@@ -392,9 +394,9 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', split_strategy='1')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', split_strategy='2')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', split_strategy='3')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='3')
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -1133,7 +1135,7 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     plt.savefig(f'{plot_dir}mean_FC_relation.pdf')
     plt.close()
 
-def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str, split_strategy:str='1'):
+def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n_channels:int,n_states:int,split_strategy:str='1'):
     """
     Analysis the reproducibility of each model
     Parameters
@@ -1141,6 +1143,8 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str, 
     save_dir: (str) the root directory of the model results
     reproduce_analysis_dir: (str) directory to save reproducibility analysis results
     model_name: (str) the model name
+    n_channels: (int) number of channels
+    n_states: (int) number of states
     split_strategy: (str) split strategy '1','2','3','4'
     Returns
     -------
@@ -1153,4 +1157,25 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str, 
 
     means_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_means.npy')
     correlations_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_correlations.npy')
+
+    means_correlation = twopair_vector_correlation(means_1,means_2)
+    row_column_indices, means_correlation_reorder = hungarian_pair(means_correlation,distance=False)
+    np.save(f'{reproduce_analysis_dir}means_correlation_split_{split_strategy}.npy',means_correlation)
+    with open(f'{reproduce_analysis_dir}means_row_column_indices_split_{split_strategy}.json', 'w') as json_file:
+        json.dump(row_column_indices, json_file)
+    np.save(f'{reproduce_analysis_dir}means_correlation_reorder_split_{split_strategy}.npy',means_correlation_reorder)
+
+    # Set up the figure and axis
+    plt.figure(figsize=(8, 6))
+    sns.set(font_scale=1.2)  # Adjust font size for labels
+
+    # Create a heatmap of the correlation matrix
+    sns.heatmap(means_correlation_reorder, annot=True, cmap="coolwarm", square=True,
+                linewidths=.5, cbar_kws={"shrink": 0.75}, fmt=".2f")
+
+    plt.title(f'{model_name}_ICA_{n_channels}_state_{n_states}_split_{split_strategy}, mean correlation',fontsize=20)
+    plt.savefig(f'{reproduce_analysis_dir}mean_correlations_plot_split_{split_strategy}.jpg')
+    plt.savefig(f'{reproduce_analysis_dir}mean_correlations_plot_split_{split_strategy}.pdf')
+    plt.close()
+
 

@@ -133,3 +133,27 @@ def test_regularisation():
     matrices = np.array([[[1.0,0.0],[0.0,1.0]],[[1.0,0.0],[0.0,1.0]]])
     regularised_matrix = regularisation(matrices,1e-6)
     npt.assert_equal(regularised_matrix,np.array([[[1.0,0.0],[0.0,1.0]],[[1.0,0.0],[0.0,1.0]]])*(1 + 1e-6))
+
+def test_twopair_vector_correlation():
+    from rotation.utils import twopair_vector_correlation
+    vectors_1 = np.array([[1.0,0.0,-1.0],[1.0,0.0,-1.0]])
+    vectors_2 = np.array([[1.0,0.0,-1.0],[-1.0,0.0,1.0]])
+    true_correlation = np.array([[1.0,-1.0,],[1.0,-1.0]])
+    npt.assert_equal(true_correlation,twopair_vector_correlation(vectors_1,vectors_2))
+
+def test_hungarian_pair():
+    from rotation.utils import hungarian_pair
+    # When distance is true
+    matrix = np.array([[8,4,7],[5,2,3],[9,4,8]])
+    indices,matrix_reordered = hungarian_pair(matrix,distance=True)
+    matrix_reordered_true = np.array([[8,7,4],[5,3,2],[9,8,4]])
+    npt.assert_equal(indices['row'],[0,1,2])
+    npt.assert_equal(indices['col'],[0,2,1])
+    npt.assert_equal(matrix_reordered,matrix_reordered_true)
+
+    # When distance is False
+    indices, matrix_reordered = hungarian_pair(-matrix, distance=False)
+    matrix_reordered_true = - np.array([[8, 7, 4], [5, 3, 2], [9, 8, 4]])
+    npt.assert_equal(indices['row'], [0, 1, 2])
+    npt.assert_equal(indices['col'], [0, 2, 1])
+    npt.assert_equal(matrix_reordered, matrix_reordered_true)
