@@ -1,3 +1,4 @@
+from math import sqrt
 import numpy as np
 import numpy.testing as npt
 
@@ -141,7 +142,15 @@ def test_twopair_vector_correlation():
     true_correlation = np.array([[1.0,-1.0,],[1.0,-1.0]])
     npt.assert_equal(true_correlation,twopair_vector_correlation(vectors_1,vectors_2))
 
-def 
+def test_twopair_riemannian_distance():
+    from rotation.utils import twopair_riemannian_distance
+    corr_1 = np.array([[1.0,0.0],[0.0,1.0]])
+    corr_2 = np.array([[2.0,0.0],[0.0,1.0]])
+    corr_3 = np.array([[1.0,0.0],[0.0,2.0]])
+    matrices_1 = np.stack([corr_1,corr_2])
+    matrices_2 = np.stack([corr_1,corr_3])
+    answer = np.array([[0.0,np.log(2)],[np.log(2),sqrt(2) * np.log(2)]])
+    npt.assert_almost_equal(twopair_riemannian_distance(matrices_1,matrices_2),answer,decimal=6)
 def test_hungarian_pair():
     from rotation.utils import hungarian_pair
     # When distance is true

@@ -17,7 +17,7 @@ from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
 from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
     IC2brain,IC2surface, regularisation, pairwise_fisher_z_correlations,\
-    twopair_vector_correlation, hungarian_pair,heatmap_reorder_matrix
+    twopair_vector_correlation, twopair_riemannian_distance, hungarian_pair,heatmap_reorder_matrix
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -1168,6 +1168,18 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
     np.save(f'{reproduce_analysis_dir}means_correlation_reorder_split_{split_strategy}.npy',means_correlation_reorder)
 
     heatmap_reorder_matrix(means_correlation_reorder,reproduce_analysis_dir,
-                           'means',row_column_indices,
+                           'means_correlation',row_column_indices,
                            model_name,n_channels,n_states,split_strategy)
+    # Work on FCs
+    FCs_distance = twopair_riemannian_distance(correlations_1,correlations_2)
+    row_column_indices_FCs,FCs_distance_reorder = hungarian_pair(FCs_distance,distance=True)
+    np.save(f'{reproduce_analysis_dir}FCs_distance_split_{split_strategy}.npy', FCs_distance)
+    with open(f'{reproduce_analysis_dir}FCs_row_column_indices_split_{split_strategy}.json', 'w') as json_file:
+        json.dump(row_column_indices_FCs, json_file)
+    np.save(f'{reproduce_analysis_dir}FCs_correlation_reorder_split_{split_strategy}.npy', FCs_distance_reorder)
+
+    heatmap_reorder_matrix(FCs_distance_reorder,reproduce_analysis_dir,
+                           'FCs_distance',row_column_indices_FCs,
+                           model_name,n_channels,n_states,split_strategy)
+
 
