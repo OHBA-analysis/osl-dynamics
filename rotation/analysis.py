@@ -17,7 +17,7 @@ from osl_dynamics.inference.metrics import pairwise_frobenius_distance,\
 from osl_dynamics.utils import plotting
 from rotation.utils import plot_FO, stdcor2cov,cov2stdcor, first_eigenvector,\
     IC2brain,IC2surface, regularisation, pairwise_fisher_z_correlations,\
-    twopair_vector_correlation, hungarian_pair
+    twopair_vector_correlation, hungarian_pair,heatmap_reorder_matrix
 
 def construct_graph(tpm:np.ndarray):
     """
@@ -220,6 +220,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',n_channels,n_states,split_strategy='1')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='3')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states, split_strategy='4')
 
 
 
@@ -311,6 +312,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         reproduce_analysis(save_dir,reproduce_analysis_dir,'Dynemo',n_channels,n_states,split_strategy='1')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo',n_channels,n_states, split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo',n_channels,n_states, split_strategy='3')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo', n_channels, n_states, split_strategy='4')
 
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                   spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
@@ -397,6 +399,7 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='1')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='3')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE', n_channels, n_states, split_strategy='4')
 def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -487,11 +490,10 @@ def calculate_metrics(model,dataset,save_dir):
     -------
     """
     free_energy = model.free_energy(dataset)
-    evidence = model.evidence(dataset)
-    metrics = {'free_energy':free_energy,'evidence':evidence}
+    #evidence = model.evidence(dataset)
+    metrics = {'free_energy':free_energy.tolist(),}#'evidence':evidence}
     with open(f'{save_dir}metrics.json', "w") as json_file:
         # Use json.dump to write the data to the file
-        print(f"Free energy is {metrics['free_energy']}, evidence is {metrics['evidence']}")
         json.dump(metrics, json_file)
 def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:int,n_states:int):
     """
@@ -1165,19 +1167,7 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
         json.dump(row_column_indices, json_file)
     np.save(f'{reproduce_analysis_dir}means_correlation_reorder_split_{split_strategy}.npy',means_correlation_reorder)
 
-    # Set up the figure and axis
-    plt.figure(figsize=(8, 6))
-    sns.set(font_scale=1.2)  # Adjust font size for labels
-
-    # Create a heatmap of the correlation matrix
-    sns.heatmap(means_correlation_reorder, cmap="coolwarm", square=True,
-                linewidths=.5, cbar_kws={"shrink": 0.75}, fmt=".2f")
-    plt.xticks(np.arange(len(row_column_indices['col'])) + 0.5, row_column_indices['col'],fontsize=13)
-    plt.yticks(np.arange(len(row_column_indices['row'])) + 0.5, row_column_indices['row'],fontsize=13)
-
-    plt.title(f'{model_name}_ICA_{n_channels}_state_{n_states}_split_{split_strategy}, mean correlation',fontsize=20)
-    plt.savefig(f'{reproduce_analysis_dir}mean_correlations_plot_split_{split_strategy}.jpg')
-    plt.savefig(f'{reproduce_analysis_dir}mean_correlations_plot_split_{split_strategy}.pdf')
-    plt.close()
-
+    heatmap_reorder_matrix(means_correlation_reorder,reproduce_analysis_dir,
+                           'means',row_column_indices,
+                           model_name,n_channels,n_states,split_strategy)
 

@@ -1,10 +1,14 @@
 from tqdm import trange
+import warnings
 import numpy as np
 from scipy.sparse.linalg import eigsh
 from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
+import seaborn as sns
 import nibabel as nib
 from nibabel.nifti1 import Nifti1Image
+
+from osl_dynamics.inference.metrics import riemannian_distance
 
 def parse_index(index:int,models:list,list_channels:list,list_states:list,training:bool=False):
     '''
@@ -374,6 +378,43 @@ def twopair_vector_correlation(vectors_1:np.ndarray,vectors_2:np.ndarray)->np.nd
             correlations[i, j] = correlation
     return correlations
 
+def twopair_Riemannian_distance(matrices_1:np.ndarray,matrices_2:np.ndarray,eps_value:list=[0,1e-9,1e-8,1e-7,1e-6,1e-5],threshold:float=1e-3):
+    """
+    Compute the Riemannian distance between two sets of matrices
+    Parameters
+    ----------
+    matrices_1: (np.ndarray) M*N*N, M is the number of matrices,N*N is the matrix size
+    matrices_2: (np.ndarray) M*N*N, M is the number of matrices,N*N is the matrix size
+    eps: (list) regularisation factor
+    threshold: (float) Threshold to apply when there are negative eigenvalues. Must be positive.
+    Returns
+    -------
+    """
+    M1,N1,P1 = matrices_1.shape
+    M2,N2,P2 = matrices_2.shape
+    assert N1 == P1
+    #assert M1 == M2
+    assert N1 == N2
+    assert P1 == P2
+
+    matrices_1.astype(np.float64)
+    matrices_2.astype(np.float64)
+    riemannian_distances = np.zeros([M1,M2])
+    for eps in eps_value:
+        try:
+            for i in trange(M1, desc="Computing Riemannian distances"):
+                for j in range(M2):
+                    riemannian_distances[i][j] = riemannian_distance(
+                        regularisation(matrices_1[i],eps),
+                        regularisation(matrices_2[j],eps),
+                        threshold=threshold
+                    )
+            return riemannian_distances
+        except np.linalg.LinAlgError:
+            warnings.warn(f'Calculation of Riemannian distance failed for eps={eps}')
+
+    raise ValueError('Riemannian distance failed for all eps values!')
+
 def hungarian_pair(matrix:np.ndarray,distance:bool=False):
     """
     Use the hungarian algorithm to pair different "states" according to the matrix
@@ -396,3 +437,38 @@ def hungarian_pair(matrix:np.ndarray,distance:bool=False):
     matrix_reordered = matrix[row_indices,:]
     matrix_reordered = matrix_reordered[:,col_indices]
     return indices, matrix_reordered
+def heatmap_reorder_matrix(matrix:np.ndarray,plot_dir:str,plot_statistics:str,indices:dict,model_name:str,n_channels:int,n_states:int,split_strategy:str=''):
+    """
+    Plot the reordered matrix while putting the row and column indices onto the x and y ticks
+    Parameters
+    ----------
+    matrix: (np.ndarray) matrix to plot
+    plot_dir: (str) the directory to save the plot
+    plot_statistics: (str) 'means' or 'correlations'
+    indices: (dict) indices with keys: 'row' and 'col'
+    model_name: (str) model name
+    n_channels: (int) number of channels
+    n_states: (int) number of states
+    split_strategy: (str) Specific to split half plot, split_strategy = '1','2','3','4'
+
+    Returns
+    -------
+    """
+    # Set up the figure and axis
+    plt.figure(figsize=(8, 6))
+    sns.set(font_scale=1.2)  # Adjust font size for labels
+
+    # Create a heatmap of the correlation matrix
+    sns.heatmap(matrix, cmap="coolwarm", square=True,
+                linewidths=.5, cbar_kws={"shrink": 0.75}, fmt=".2f")
+    plt.xticks(np.arange(len(indices['col'])) + 0.5, indices['col'], fontsize=13)
+    plt.yticks(np.arange(len(indices['row'])) + 0.5, indices['row'], fontsize=13)
+
+    plt.title(f'{model_name}_ICA_{n_channels}_state_{n_states}_split_{split_strategy}, {plot_statistics} correlation', fontsize=20)
+    if split_strategy is not None:
+        plt.savefig(f'{plot_dir}{plot_statistics}_correlations_plot_split_{split_strategy}.jpg')
+        plt.savefig(f'{plot_dir}{plot_statistics}_correlations_plot_split_{split_strategy}.pdf')
+    else:
+        plt.savefig(f'{plot_dir}{plot_statistics}_correlations_plot.jpg')
+        plt.savefig(f'{plot_dir}{plot_statistics}_correlations_plot.pdf')
+    plt.close()

@@ -141,6 +141,7 @@ def test_twopair_vector_correlation():
     true_correlation = np.array([[1.0,-1.0,],[1.0,-1.0]])
     npt.assert_equal(true_correlation,twopair_vector_correlation(vectors_1,vectors_2))
 
+def 
 def test_hungarian_pair():
     from rotation.utils import hungarian_pair
     # When distance is true
