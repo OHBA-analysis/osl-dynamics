@@ -1135,7 +1135,7 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
 
 def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str, split_strategy:str='1'):
     """
-    Analysis the reproducibilit of each model
+    Analysis the reproducibility of each model
     Parameters
     ----------
     save_dir: (str) the root directory of the model results
@@ -1147,3 +1147,10 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str, 
     """
     extract_state_statistics(f'{save_dir}split_{split_strategy}_first_half/',model_name)
     extract_state_statistics(f'{save_dir}split_{split_strategy}_second_half/', model_name)
+
+    means_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_means.npy')
+    correlations_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_correlations.npy')
+
+    means_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_means.npy')
+    correlations_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_correlations.npy')
+

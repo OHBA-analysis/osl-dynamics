@@ -345,3 +345,29 @@ def regularisation(matrices:np.ndarray,eps:float=1e-6)->np.ndarray:
         return ValueError('Matrices dimension is incorrect!')
 
     return matrices + np.eye(N) * eps
+
+def twopair_vector_correlation(vectors_1:np.ndarray,vectors_2:np.ndarray)->np.ndarray:
+    """
+    Compute the pairwise correlation \rho_{ij}
+    between ith vectors_1 and jth vectors_j
+    Parameters
+    ----------
+    matrices_1: (M*N), M is the number of vectors,
+     N is the vector length
+    marices_2: M is the number of vectors,
+     N is the vector length
+
+    Returns
+    -------
+    correlation_map: M*M
+    """
+    M1, N1 = vectors_1.shape
+    M2, N2 = vectors_2.shape
+    assert N1 == N2
+    correlations = np.empty((M1, M2))
+
+    for i in range(M1):
+        for j in range(M2):
+            correlation = np.corrcoef(vectors_1[i, :], vectors_2[j, :])[0, 1]
+            correlations[i, j] = correlation
+    return correlations
