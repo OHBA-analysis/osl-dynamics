@@ -147,13 +147,13 @@ def test_hungarian_pair():
     matrix = np.array([[8,4,7],[5,2,3],[9,4,8]])
     indices,matrix_reordered = hungarian_pair(matrix,distance=True)
     matrix_reordered_true = np.array([[8,7,4],[5,3,2],[9,8,4]])
-    npt.assert_equal(indices['row'],[0,1,2])
-    npt.assert_equal(indices['col'],[0,2,1])
+    npt.assert_equal(np.array(indices['row']),[0,1,2])
+    npt.assert_equal(np.array(indices['col']),[0,2,1])
     npt.assert_equal(matrix_reordered,matrix_reordered_true)
 
     # When distance is False
     indices, matrix_reordered = hungarian_pair(-matrix, distance=False)
     matrix_reordered_true = - np.array([[8, 7, 4], [5, 3, 2], [9, 8, 4]])
-    npt.assert_equal(indices['row'], [0, 1, 2])
-    npt.assert_equal(indices['col'], [0, 2, 1])
+    npt.assert_equal(np.array(indices['row']), [0, 1, 2])
+    npt.assert_equal(np.array(indices['col']), [0, 2, 1])
     npt.assert_equal(matrix_reordered, matrix_reordered_true)

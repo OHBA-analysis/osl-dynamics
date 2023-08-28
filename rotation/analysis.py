@@ -1170,8 +1170,10 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
     sns.set(font_scale=1.2)  # Adjust font size for labels
 
     # Create a heatmap of the correlation matrix
-    sns.heatmap(means_correlation_reorder, annot=True, cmap="coolwarm", square=True,
+    sns.heatmap(means_correlation_reorder, cmap="coolwarm", square=True,
                 linewidths=.5, cbar_kws={"shrink": 0.75}, fmt=".2f")
+    plt.xticks(np.arange(len(row_column_indices['col'])), row_column_indices['col'],fontsize=13)
+    plt.yticks(np.arange(len(row_column_indices['row'])), row_column_indices['row'],fontsize=13)
 
     plt.title(f'{model_name}_ICA_{n_channels}_state_{n_states}_split_{split_strategy}, mean correlation',fontsize=20)
     plt.savefig(f'{reproduce_analysis_dir}mean_correlations_plot_split_{split_strategy}.jpg')
