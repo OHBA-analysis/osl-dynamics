@@ -216,7 +216,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
-    if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
+    if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
         reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',n_channels,n_states,split_strategy='1')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='3')
@@ -308,7 +308,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
-    if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
+    if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
         reproduce_analysis(save_dir,reproduce_analysis_dir,'Dynemo',n_channels,n_states,split_strategy='1')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo',n_channels,n_states, split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo',n_channels,n_states, split_strategy='3')
@@ -395,7 +395,7 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
-    if not os.path.isfile(f'{reproduce_analysis_dir}pair_result.npy'):
+    if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='1')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'MAGE',n_channels,n_states, split_strategy='3')

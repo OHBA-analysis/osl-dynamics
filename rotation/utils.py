@@ -469,6 +469,6 @@ def heatmap_reorder_matrix(matrix:np.ndarray,plot_dir:str,plot_statistics:str,in
         plt.savefig(f'{plot_dir}{plot_statistics}_plot_split_{split_strategy}.jpg')
         plt.savefig(f'{plot_dir}{plot_statistics}_plot_split_{split_strategy}.pdf')
     else:
-        plt.savefig(f'{plot_dir}{plot_statistics}_correlations_plot.jpg')
-        plt.savefig(f'{plot_dir}{plot_statistics}_correlations_plot.pdf')
+        plt.savefig(f'{plot_dir}{plot_statistics}_plot.jpg')
+        plt.savefig(f'{plot_dir}{plot_statistics}_plot.pdf')
     plt.close()
