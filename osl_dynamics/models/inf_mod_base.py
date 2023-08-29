@@ -727,7 +727,6 @@ class MarkovStateInferenceModelConfig:
     # Transition probability matrix
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
-    state_probs_t0: np.ndarray = None
 
     def validate_trans_prob_parameters(self):
         if self.initial_trans_prob is not None:
@@ -739,10 +738,6 @@ class MarkovStateInferenceModelConfig:
 
             if any(np.sum(self.initial_trans_prob, axis=0) != 1):
                 raise ValueError("rows of initial_trans_prob must sum to 1.")
-
-        if self.state_probs_t0 is not None:
-            if np.sum(self.state_probs_t0, axis=1) != 1:
-                raise ValueError("state_probs_t0 must sum to 1.")
 
 
 class MarkovStateInferenceModelBase(ModelBase):

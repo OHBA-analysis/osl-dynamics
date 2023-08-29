@@ -78,8 +78,6 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Initialisation for the transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
-    state_probs_t0: np.ndarray
-        State probabilities at :code:`time=0`. Not trainable.
 
     batch_size : int
         Mini-batch size.
@@ -544,7 +542,6 @@ def _model_structure(config):
     # Hidden state inference
     hidden_state_inference_layer = HiddenStateInferenceLayer(
         config.n_states,
-        config.state_probs_t0,
         config.initial_trans_prob,
         config.learn_trans_prob,
         name="hid_state_inf",

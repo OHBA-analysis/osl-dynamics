@@ -1584,8 +1584,6 @@ class HiddenStateInferenceLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
-    initial_prob : np.ndarray
-        Initial state probabilities. Shape must be (n_states,).
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states, n_states.)
@@ -1595,17 +1593,12 @@ class HiddenStateInferenceLayer(layers.Layer):
         Keyword arguments to pass to the normalization layer.
     """
 
-    def __init__(self, n_states, initial_prob, initial_trans_prob, learn, **kwargs):
+    def __init__(self, n_states, initial_trans_prob, learn, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
 
         # Bijector for converting underlying logits to state probabilites
         self.bijector = tfp.bijectors.SoftmaxCentered()
-
-        # Initial state probabilities
-        if initial_prob is None:
-            initial_prob = np.ones((n_states,)) / n_states
-        self.Pi_0 = initial_prob.astype("float32")
 
         # Default initial transition probability matrix
         if initial_trans_prob is None:
@@ -1639,6 +1632,18 @@ class HiddenStateInferenceLayer(layers.Layer):
         # Small error for improving the numerical stability of
         # the log-likelihood
         self.eps = sys.float_info.epsilon
+
+    def get_stationary_distribution(self, trans_prob):
+        eigval, eigvec = tf.linalg.eig(trans_prob)
+        stationary_distribution = tf.math.real(
+            tf.squeeze(
+                tf.boolean_mask(
+                    eigvec, tf.experimental.numpy.isclose(eigval, 1), axis=1
+                )
+            )
+        )
+        stationary_distribution /= tf.reduce_sum(stationary_distribution)
+        return stationary_distribution
 
     def get_trans_prob(self):
         learnable_tensors_layer = self.layers[0]
@@ -1675,6 +1680,7 @@ class HiddenStateInferenceLayer(layers.Layer):
         # Transition probability matrix
         P = self.get_trans_prob()
         P = tf.stop_gradient(P)
+        Pi_0 = self.get_stationary_distribution(P)
 
         # Temporary variables used in the calculation
         alpha = tf.zeros_like(B)
@@ -1685,7 +1691,7 @@ class HiddenStateInferenceLayer(layers.Layer):
         for i in range(sequence_length):
             indices = _get_indices(i, batch_size)
             if i == 0:
-                values = self.Pi_0 * B[:, 0]
+                values = Pi_0 * B[:, 0]
             else:
                 values = tf.matmul(alpha[:, i - 1], P) * B[:, i]
             alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
