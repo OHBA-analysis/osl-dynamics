@@ -1633,15 +1633,13 @@ class HiddenStateInferenceLayer(layers.Layer):
         # the log-likelihood
         self.eps = sys.float_info.epsilon
 
-    def get_stationary_distribution(self, trans_prob):
+    def get_stationary_distribution(self):
+        trans_prob = self.get_trans_prob()
         eigval, eigvec = tf.linalg.eig(trans_prob)
-        stationary_distribution = tf.math.real(
-            tf.squeeze(
-                tf.boolean_mask(
-                    eigvec, tf.experimental.numpy.isclose(eigval, 1), axis=1
-                )
-            )
+        eigvec = tf.boolean_mask(
+            eigvec, tf.experimental.numpy.isclose(eigval, 1), axis=1
         )
+        stationary_distribution = tf.math.real(tf.squeeze(eigvec))
         stationary_distribution /= tf.reduce_sum(stationary_distribution)
         return stationary_distribution
 
@@ -1662,7 +1660,8 @@ class HiddenStateInferenceLayer(layers.Layer):
             )
 
         def _rescale(probs, scale, indices, time):
-            # Rescale probabilities to help with numerical stability (over/underflow)
+            # Rescale probabilities to help with numerical
+            # stability (over/underflow)
             scale = tf.tensor_scatter_nd_update(
                 scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
             )
@@ -1678,9 +1677,8 @@ class HiddenStateInferenceLayer(layers.Layer):
         sequence_length = tf.shape(B)[1]
 
         # Transition probability matrix
-        P = self.get_trans_prob()
-        P = tf.stop_gradient(P)
-        Pi_0 = self.get_stationary_distribution(P)
+        P = tf.stop_gradient(self.get_trans_prob())
+        Pi_0 = tf.stop_gradient(self.get_stationary_distribution())
 
         # Temporary variables used in the calculation
         alpha = tf.zeros_like(B)
@@ -1714,16 +1712,17 @@ class HiddenStateInferenceLayer(layers.Layer):
         # Joint probabilities
         b = beta[:, 1:] * B[:, 1:]
         t = P * tf.expand_dims(alpha[:, :-1], axis=2) * tf.expand_dims(b, axis=3)
-        t = tf.transpose(t, perm=[0, 1, 3, 2])
-        xi = tf.reshape(t, (-1, sequence_length - 1, self.n_states * self.n_states))
-        xi /= tf.reduce_sum(xi, axis=-1, keepdims=True) + self.eps
+        xi = tf.reshape(
+            tf.transpose(t, perm=[0, 1, 3, 2]),
+            (-1, sequence_length - 1, self.n_states, self.n_states),
+        )
+        xi /= tf.reduce_sum(xi, axis=(-2, -1), keepdims=True) + self.eps
 
         return gamma, xi
 
     def _trans_prob_update(self, gamma, xi):
         # Update for the transition probability matrix
         sum_xi = tf.reduce_sum(xi, axis=1)
-        sum_xi = tf.reshape(sum_xi, [-1, self.n_states, self.n_states])
         sum_xi = tf.transpose(sum_xi, perm=[0, 2, 1])
         sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=1)
         sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
@@ -1750,8 +1749,7 @@ class HiddenStateInferenceLayer(layers.Layer):
                 phi_interim = self._trans_prob_update(gamma, xi)
                 interim_logits = self.bijector.inverse(phi_interim)
                 logits = self.layers[0](1)
-                grad_P = logits - interim_logits
-                return None, [grad_P]
+                return None, [logits - interim_logits]
 
             return (gamma, xi), grad
 
