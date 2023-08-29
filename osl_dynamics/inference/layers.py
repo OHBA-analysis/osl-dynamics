@@ -1659,12 +1659,13 @@ class HiddenStateInferenceLayer(layers.Layer):
                 axis=1,
             )
 
-        def _rescale(probs, scale, indices, time):
+        def _rescale(probs, scale, indices, time, update_scale=True):
             # Rescale probabilities to help with numerical
             # stability (over/underflow)
-            scale = tf.tensor_scatter_nd_update(
-                scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
-            )
+            if update_scale:
+                scale = tf.tensor_scatter_nd_update(
+                    scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
+                )
             probs = tf.tensor_scatter_nd_update(
                 probs,
                 indices,
@@ -1703,7 +1704,7 @@ class HiddenStateInferenceLayer(layers.Layer):
             else:
                 values = tf.matmul(beta[:, i] * B[:, i], tf.transpose(P))
             beta = tf.tensor_scatter_nd_update(beta, indices, values)
-            beta, _ = _rescale(beta, scale, indices, i - 1)
+            beta, _ = _rescale(beta, scale, indices, i - 1, update_scale=False)
 
         # Marginal probabilities
         gamma = alpha * beta
@@ -1711,18 +1712,19 @@ class HiddenStateInferenceLayer(layers.Layer):
 
         # Joint probabilities
         b = beta[:, 1:] * B[:, 1:]
-        t = P * tf.expand_dims(alpha[:, :-1], axis=2) * tf.expand_dims(b, axis=3)
+        t = P * tf.expand_dims(alpha[:, :-1], axis=3) * tf.expand_dims(b, axis=2)
         xi = tf.reshape(
             tf.transpose(t, perm=[0, 1, 3, 2]),
-            (-1, sequence_length - 1, self.n_states, self.n_states),
+            (-1, sequence_length - 1, self.n_states * self.n_states),
         )
-        xi /= tf.reduce_sum(xi, axis=(-2, -1), keepdims=True) + self.eps
+        xi /= tf.reduce_sum(xi, axis=2, keepdims=True) + self.eps
 
         return gamma, xi
 
     def _trans_prob_update(self, gamma, xi):
         # Update for the transition probability matrix
         sum_xi = tf.reduce_sum(xi, axis=1)
+        sum_xi = tf.reshape(sum_xi, [-1, self.n_states, self.n_states])
         sum_xi = tf.transpose(sum_xi, perm=[0, 2, 1])
         sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=1)
         sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
