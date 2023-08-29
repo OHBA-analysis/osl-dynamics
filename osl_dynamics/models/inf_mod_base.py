@@ -10,6 +10,7 @@ import numpy as np
 import tensorflow as tf
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils.misc import replace_argument
@@ -717,3 +718,260 @@ class VariationalInferenceModelBase(ModelBase):
             / n_sequences
         )
         return bic
+
+
+@dataclass
+class MarkovStateInferenceModelConfig:
+    """Settings needed for inferring a Markov chain for hidden states."""
+
+    # Transition probability matrix
+    initial_trans_prob: np.ndarray = None
+    learn_trans_prob: bool = True
+    state_probs_t0: np.ndarray = None
+
+    def validate_trans_prob_parameters(self):
+        if self.initial_trans_prob is not None:
+            if (
+                not isinstance(self.initial_trans_prob, np.ndarray)
+                or self.initial_trans_prob.ndim != 2
+            ):
+                raise ValueError("initial_trans_prob must be a 2D numpy array.")
+
+            if any(np.sum(self.initial_trans_prob, axis=0) != 1):
+                raise ValueError("rows of initial_trans_prob must sum to 1.")
+
+        if self.state_probs_t0 is not None:
+            if np.sum(self.state_probs_t0, axis=1) != 1:
+                raise ValueError("state_probs_t0 must sum to 1.")
+
+
+class MarkovStateInferenceModelBase(ModelBase):
+    """Base class for a Markov chain hidden state inference model."""
+
+    def predict(self, *args, **kwargs):
+        """Wrapper for the standard keras predict method.
+
+        Returns
+        -------
+        predictions : dict
+            Dictionary with labels for each prediction.
+        """
+        predictions = self.model.predict(*args, **kwargs)
+        names = ["ll_loss", "gamma", "xi"]
+        return dict(zip(names, predictions))
+
+    def get_alpha(self, dataset, concatenate=False):
+        """Get state probabilities.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each subject.
+        concatenate : bool, optional
+            Should we concatenate alpha for each subject?
+
+        Returns
+        -------
+        alpha : list or np.ndarray
+            State probabilities with shape (n_subjects, n_samples, n_states)
+            or (n_samples, n_states).
+        """
+        dataset = self.make_dataset(dataset)
+
+        _logger.info("Getting alpha")
+        alpha = []
+        for ds in dataset:
+            predictions = self.predict(ds)
+            alpha.append(np.concatenate(predictions["gamma"]))
+
+        if concatenate or len(alpha) == 1:
+            alpha = np.concatenate(alpha)
+
+        return alpha
+
+    def get_trans_prob(self):
+        """Get the transition probability matrix.
+
+        Returns
+        -------
+        trans_prob : np.ndarray
+            Transition probability matrix. Shape is (n_states, n_states).
+        """
+        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
+        return hidden_state_inference_layer.get_trans_prob().numpy()
+
+    def random_subset_initialization(
+        self, training_data, n_epochs, n_init, take, **kwargs
+    ):
+        """Random subset initialization.
+
+        The model is trained for a few epochs with different random subsets
+        of the training dataset. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float
+            Fraction of total batches to take.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            _logger.info(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        _logger.info("Random subset initialization")
+
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_dataset)
+        n_batches = max(round(n_total_batches * take), 1)
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            _logger.info(f"Initialization {n}")
+            self.reset()
+
+            training_dataset = self.make_dataset(
+                training_data, shuffle=True, concatenate=True
+            )
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            if history is None:
+                continue
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights, best_trans_prob = self.get_weights()
+
+        if best_loss == np.Inf:
+            _logger.error("Initialization failed")
+            return
+
+        _logger.info(f"Using initialization {best_initialization}")
+        self.set_weights(best_weights, best_trans_prob)
+
+        return best_history
+
+    def random_state_time_course_initialization(
+        self, training_data, n_epochs, n_init, take=1, **kwargs
+    ):
+        """Random state time course initialization.
+
+        The model is trained for a few epochs with a sampled state time course
+        initialization. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float, optional
+            Fraction of total batches to take.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            _logger.info(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        _logger.info("Random state time course initialization")
+
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_dataset)
+        n_batches = max(round(n_total_batches * take), 1)
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            _logger.info(f"Initialization {n}")
+            self.reset()
+
+            training_dataset = self.make_dataset(
+                training_data, shuffle=True, concatenate=True
+            )
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+
+            self.set_random_state_time_course_initialization(training_data_subset)
+            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            if history is None:
+                continue
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights, best_trans_prob = self.get_weights()
+
+        if best_loss == np.Inf:
+            _logger.error("Initialization failed")
+            return
+
+        _logger.info(f"Using initialization {best_initialization}")
+        self.set_weights(best_weights, best_trans_prob)
+
+        return best_history
+
+    def sample_state_time_course(self, n_samples):
+        """Sample a state time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        stc : np.ndarray
+            State time course with shape (n_samples, n_states).
+        """
+        trans_prob = self.get_trans_prob()
+        sim = HMM(trans_prob)
+        stc = sim.generate_states(n_samples)
+        return stc

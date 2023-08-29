@@ -4,6 +4,8 @@
 
 import os
 import numpy as np
+import tensorflow as tf
+
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.hmm import Config, Model
@@ -25,7 +27,6 @@ config = Config(
     batch_size=16,
     learning_rate=0.01,
     n_epochs=30,
-    learn_trans_prob=True,
 )
 
 # Simulate data
@@ -34,8 +35,8 @@ sim = simulation.HMM_MVN(
     n_samples=25600,
     n_states=config.n_states,
     n_channels=config.n_channels,
-    trans_prob="sequence",
-    stay_prob=0.9,
+    trans_prob="uniform",
+    stay_prob=0.85,
     means="zero",
     covariances="random",
     random_seed=123,
@@ -49,8 +50,17 @@ training_data = data.Data(sim.time_series)
 model = Model(config)
 model.summary()
 
+# Learning rate scheduler
+def lr_scheduler(epoch, lr):
+    if epoch > config.n_epochs / 2:
+        return config.learning_rate * np.exp(-0.05 * (epoch + 1 - config.n_epochs / 2))
+    else:
+        return config.learning_rate
+
+lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
+
 # Train model
-history = model.fit(training_data)
+history = model.fit(training_data, callbacks=[lr_callback])
 
 # Loss
 plotting.plot_line(
@@ -60,10 +70,6 @@ plotting.plot_line(
     y_label="Loss",
     filename="figures/loss.png",
 )
-
-# Calculate the free energy
-free_energy = model.free_energy(training_data)
-print("Free energy:", free_energy)
 
 # Get inferred parameters
 inf_stc = model.get_alpha(training_data)
