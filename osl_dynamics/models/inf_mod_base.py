@@ -8,6 +8,7 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
+from scipy.special import xlogy
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
@@ -796,6 +797,20 @@ class MarkovStateInferenceModelBase(ModelBase):
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
         return hidden_state_inference_layer.get_trans_prob().numpy()
 
+    def get_initial_distribution(self):
+        """Get the initial distribution.
+
+        Returns
+        -------
+        initial_distribution : np.ndarray
+            Initial distribution. Shape is (n_states,).
+        """
+        trans_prob = self.get_trans_prob()
+        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
+        return hidden_state_inference_layer.get_stationary_distribution(
+            trans_prob
+        ).numpy()
+
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
     ):
@@ -970,3 +985,106 @@ class MarkovStateInferenceModelBase(ModelBase):
         sim = HMM(trans_prob)
         stc = sim.generate_states(n_samples)
         return stc
+
+    def free_energy(self, dataset, **kwargs):
+        # Helper functions
+        def _get_posterior_entropy(gamma, xi):
+            """Posterior entropy.
+
+            Calculate the entropy of the posterior distribution:
+
+            .. math::
+                E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
+
+                &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \
+                    \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \
+                    \displaystyle\sum_{t=2}^{T-1} \
+                    \int q(s_t) \log q(s_t) ds_t
+
+            Parameters
+            ----------
+            gamma : np.ndarray
+                Marginal posterior distribution of hidden states given the data,
+                :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
+            xi : np.ndarray
+                Joint posterior distribution of hidden states at two consecutive
+                time points, :math:`q(s_t, s_{t+1})`. Shape is
+                (batch_size, sequence_length-1, n_states*n_states).
+
+            Returns
+            -------
+            entropy : float
+                Entropy.
+            """
+            # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
+            # log(q(s_t, s_t+1)) ds_t ds_t+1
+            first_term = xlogy(xi, xi)
+            first_term = np.sum(first_term, axis=(1, 2))
+            first_term = np.mean(first_term)
+
+            # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
+            second_term = xlogy(gamma, gamma)[:, 1:-1, :]
+            second_term = np.sum(second_term, axis=(1, 2))
+            second_term = np.mean(second_term)
+            return first_term - second_term
+
+        def _get_posterior_expected_prior(gamma, xi):
+            """Posterior expected prior.
+
+            Calculates the expected prior probability of states with respect to the
+            posterior distribution of the states:
+
+            .. math::
+                P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
+
+                &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \
+                    \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
+
+            Parameters
+            ----------
+            gamma : np.ndarray
+                Marginal posterior distribution of hidden states given the data,
+                :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
+            xi : np.ndarray
+                Joint posterior distribution of hidden states at two consecutive
+                time points, :math:`q(s_t, s_{t+1})`. Shape is
+                (batch_size, sequence_length-1, n_states*n_states).
+
+            Returns
+            -------
+            prior : float
+                Posterior expected prior probability.
+            """
+            initial_distribution = self.get_initial_distribution()
+            trans_prob = self.get_trans_prob()
+
+            # first_term = int q(s_1) log p(s_1) ds_1
+            first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
+            first_term = np.sum(first_term, axis=1)
+            first_term = np.mean(first_term)
+
+            # remaining_terms =
+            # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
+            xi = np.reshape(
+                xi,
+                (
+                    -1,
+                    self.config.sequence_length - 1,
+                    self.config.n_states,
+                    self.config.n_states,
+                ),
+            )
+            xi = np.transpose(xi, (0, 1, 3, 2))
+            remaining_terms = xlogy(xi, trans_prob[None, None, ...])
+            remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
+            remaining_terms = np.mean(remaining_terms)
+
+            return first_term + remaining_terms
+
+        dataset = self.make_dataset(dataset, concatenate=True)
+        predictions = self.predict(dataset, **kwargs)
+        ll_loss = np.mean(predictions["ll_loss"])
+        entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
+        prior = _get_posterior_expected_prior(predictions["gamma"], predictions["xi"])
+        free_energy = ll_loss + entropy - prior
+        return free_energy

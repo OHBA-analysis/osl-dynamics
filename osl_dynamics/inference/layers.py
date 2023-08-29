@@ -1727,7 +1727,7 @@ class HiddenStateInferenceLayer(layers.Layer):
         sum_xi = tf.transpose(sum_xi, perm=[0, 2, 1])
         sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=1)
         sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-        return tf.reduce_mean(sum_xi / sum_gamma, axis=0)
+        return tf.reduce_mean(sum_xi, axis=0) / tf.reduce_mean(sum_gamma, axis=0)
 
     def call(self, B, **kwargs):
         B = tf.stop_gradient(B)
