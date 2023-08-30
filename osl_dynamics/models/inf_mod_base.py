@@ -794,7 +794,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         names = ["ll_loss", "gamma", "xi"]
         return dict(zip(names, predictions))
 
-    def get_alpha(self, dataset, concatenate=False):
+    def get_alpha(self, dataset, concatenate=False, **kwargs):
         """Get state probabilities.
 
         Parameters
@@ -816,7 +816,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         _logger.info("Getting alpha")
         alpha = []
         for ds in dataset:
-            predictions = self.predict(ds)
+            predictions = self.predict(ds, **kwargs)
             alpha.append(np.concatenate(predictions["gamma"]))
 
         if concatenate or len(alpha) == 1:
@@ -855,6 +855,13 @@ class MarkovStateInferenceModelBase(ModelBase):
             Transition probability matrix. Shape must be (n_states, n_states).
             Rows (axis=1) must sum to one.
         """
+        # Validation
+        if not isinstance(trans_prob, np.ndarray) or trans_prob.ndim != 2:
+            raise ValueError("trans_prob must be a 2D numpy array.")
+
+        if not all(np.isclose(np.sum(trans_prob, axis=1), 1)):
+            raise ValueError("rows of trans_prob must sum to one.")
+
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
         learnable_tensor_layer = hidden_state_inference_layer.layers[0]
         learnable_tensor_layer.tensor.assign(trans_prob.astype(np.float32))
@@ -918,22 +925,29 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
-            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
-            if history is None:
+            try:
+                history = self.fit(
+                    training_data_subset,
+                    epochs=n_epochs,
+                    **kwargs,
+                )
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(e)
+                _logger.warning("Training failed! Skipping initialization.")
                 continue
+
             loss = history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                best_weights, best_trans_prob = self.get_weights()
+                best_weights = self.get_weights()
 
         if best_loss == np.Inf:
-            _logger.error("Initialization failed")
-            return
+            raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.set_weights(best_weights, best_trans_prob)
+        self.set_weights(best_weights)
 
         return best_history
 
@@ -997,24 +1011,83 @@ class MarkovStateInferenceModelBase(ModelBase):
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             self.set_random_state_time_course_initialization(training_data_subset)
-            history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
-            if history is None:
+            try:
+                history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(e)
+                _logger.warning("Training failed! Skipping initialization.")
                 continue
+
             loss = history["loss"][-1]
             if loss < best_loss:
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                best_weights, best_trans_prob = self.get_weights()
+                best_weights = self.get_weights()
 
         if best_loss == np.Inf:
-            _logger.error("Initialization failed")
-            return
+            raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
-        self.set_weights(best_weights, best_trans_prob)
+        self.set_weights(best_weights)
 
         return best_history
+
+    def set_random_state_time_course_initialization(self, training_data):
+        """Sets the initial means/covariances based on a random state time
+        course.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Training data.
+        """
+        _logger.info("Setting random means and covariances")
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(training_data, concatenate=True)
+
+        # Mean and covariance for each state
+        means = np.zeros(
+            [self.config.n_states, self.config.n_channels], dtype=np.float32
+        )
+        covariances = np.zeros(
+            [self.config.n_states, self.config.n_channels, self.config.n_channels],
+            dtype=np.float32,
+        )
+
+        for batch in training_dataset:
+            # Concatenate all the sequences in this batch
+            data = np.concatenate(batch["data"])
+
+            # Sample a state time course using the initial transition
+            # probability matrix
+            stc = self.sample_state_time_course(data.shape[0])
+
+            # Calculate the mean/covariance for each state for this batch
+            m = []
+            C = []
+            for j in range(self.config.n_states):
+                x = data[stc[:, j] == 1]
+                mu_j = np.mean(x, axis=0)
+                sigma_j = np.cov(x, rowvar=False)
+                m.append(mu_j)
+                C.append(sigma_j)
+            means += m
+            covariances += C
+
+        # Calculate the average from the running total
+        n_batches = dtf.get_n_batches(training_dataset)
+        means /= n_batches
+        covariances /= n_batches
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(covariances, update_initializer=True)
 
     def sample_state_time_course(self, n_samples):
         """Sample a state time course.

@@ -268,62 +268,6 @@ class Model(MarkovStateInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time
-        course.
-
-        Parameters
-        ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
-            Training data.
-        """
-        _logger.info("Setting random means and covariances")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
-
-        # Mean and covariance for each state
-        means = np.zeros(
-            [self.config.n_states, self.config.n_channels], dtype=np.float32
-        )
-        covariances = np.zeros(
-            [self.config.n_states, self.config.n_channels, self.config.n_channels],
-            dtype=np.float32,
-        )
-
-        for batch in training_dataset:
-            # Concatenate all the sequences in this batch
-            data = np.concatenate(batch["data"])
-
-            # Sample a state time course using the initial transition
-            # probability matrix
-            stc = self.sample_state_time_course(data.shape[0])
-
-            # Calculate the mean/covariance for each state for this batch
-            m = []
-            C = []
-            for j in range(self.config.n_states):
-                x = data[stc[:, j] == 1]
-                mu_j = np.mean(x, axis=0)
-                sigma_j = np.cov(x, rowvar=False)
-                m.append(mu_j)
-                C.append(sigma_j)
-            means += m
-            covariances += C
-
-        # Calculate the average from the running total
-        n_batches = dtf.get_n_batches(training_dataset)
-        means /= n_batches
-        covariances /= n_batches
-
-        if self.config.learn_means:
-            # Set initial means
-            self.set_means(means, update_initializer=True)
-
-        if self.config.learn_covariances:
-            # Set initial covariances
-            self.set_covariances(covariances, update_initializer=True)
-
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
@@ -378,7 +322,7 @@ class Model(MarkovStateInferenceModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Subject specific mixing coefficients.
+            Subject specific state probabilities.
             Each element has shape (n_samples, n_modes).
         means : np.ndarray
             Subject specific means. Shape is (n_subjects, n_modes, n_channels).
@@ -402,12 +346,14 @@ class Model(MarkovStateInferenceModelBase):
         alpha = []
         means = []
         covariances = []
-        with set_logging_level(_logger, logging.WARNING):
+        with set_logging_level(_logger, logging.WARNING), self.set_trainable(
+            ["hid_state_inf"], False
+        ):
             for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
                 # Train on this subject
                 with training_data.set_keep(subject):
                     self.fit(training_data, verbose=0)
-                    a = self.get_alpha(training_data, concatenate=True)
+                    a = self.get_alpha(training_data, concatenate=True, verbose=0)
 
                 # Get the inferred parameters
                 m, c = self.get_means_covariances()
@@ -426,70 +372,33 @@ class Model(MarkovStateInferenceModelBase):
 
         return alpha, np.array(means), np.array(covariances)
 
-    def dual_estimation(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    def get_training_time_series(
+        self,
+        training_data,
+        prepared=True,
+        concatenate=False,
     ):
-        """Dual estimation to get subject-specific observation model parameters.
-
-        Here, we estimate the state means and covariances for individual
-        subjects with the rest of the model held fixed at the best parameters
-        (posterior distribution and transition probability) estimated at the
-        group-level.
+        """Get the time series used for training from a Data object.
 
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
-            Training data.
-        n_epochs : int, optional
-            Number of epochs to train for. Defaults to the value in the
-            :code:`config` used to create the model.
-        learning_rate : float, optional
-            Learning rate. Defaults to the value in the :code:`config`
-            used to create the model.
-        store_dir : str, optional
-            Directory to temporarily store the model in.
+            Data object.
+        prepared : bool, optional
+            Should we return the prepared data? If not, we return the raw data.
+        concatenate : bool, optional
+            Should we concatenate the data for each subject?
 
         Returns
         -------
-        means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_states, n_channels).
-        covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_states, n_channels, n_channels).
+        training_data : np.ndarray or list
+            Training data time series.
         """
-        # Save group-level model parameters
-        os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/weights.h5")
-
-        # Temporarily change hyperparameters
-        original_n_epochs = self.config.n_epochs
-        original_learning_rate = self.config.learning_rate
-        self.config.n_epochs = n_epochs or self.config.n_epochs
-        self.config.learning_rate = learning_rate or self.config.learning_rate
-
-        # Perform dual estimation
-        means = []
-        covariances = []
-        with self.set_trainable(["hid_state_inf"], False):
-            for subject in trange(training_data.n_arrays, desc="Dual estimation"):
-                # Train on this subject's data
-                with training_data.set_keep(subject):
-                    self.fit(training_data, verbose=0)
-
-                # Get the means and covariances estimated for this subject
-                m, c = self.get_means_covariances()
-                means.append(m)
-                covariances.append(c)
-
-                # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/weights.h5")
-                self.compile()
-
-        # Reset hyperparameters
-        self.config.n_epochs = original_n_epochs
-        self.config.learning_rate = original_learning_rate
-
-        return np.array(means), np.array(covariances)
+        return training_data.trim_time_series(
+            self.config.sequence_length,
+            prepared=prepared,
+            concatenate=concatenate,
+        )
 
 
 def _model_structure(config):
