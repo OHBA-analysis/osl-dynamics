@@ -503,7 +503,7 @@ def calculate_metrics(model,dataset,save_dir):
         # We repeat the model for five times
         for i in range(1,6):
             if os.path.exists(f'{save_dir}repeat_{i}'):
-                repeat_model = load(f'{save_dir}repeat_i{i}')
+                repeat_model = load(f'{save_dir}repeat_{i}')
                 free_energy_list.append(repeat_model(dataset))
         with open(f'{save_dir}metrics_repeat.json',"w") as json_file:
             json.dump({'free_energy_repeat':free_energy_list},json_file)
