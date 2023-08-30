@@ -504,7 +504,7 @@ def calculate_metrics(model,dataset,save_dir):
         for i in range(1,6):
             if os.path.exists(f'{save_dir}repeat_{i}'):
                 repeat_model = load(f'{save_dir}repeat_{i}/')
-                free_energy_list.append(repeat_model.free_energy(dataset))
+                free_energy_list.append(repeat_model.free_energy(dataset)[0])
         with open(f'{save_dir}metrics_repeat.json',"w") as json_file:
             json.dump({'free_energy':free_energy_list},json_file)
 
