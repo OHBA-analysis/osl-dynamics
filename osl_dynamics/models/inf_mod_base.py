@@ -758,7 +758,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
 
         # Moving average optimizer for the transition probability matrix
-        ema_optimizer = optimizers.ExponentialMovingAverage()
+        ema_optimizer = optimizers.ExponentialMovingAverage(
+            self.config.trans_prob_decay
+        )
 
         # Optimizer for all other trainable parameters
         base_optimizer = tf.keras.optimizers.get(
