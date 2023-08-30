@@ -253,7 +253,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
     # Calculate the metrics
-    if not os.path.isfile(f'{save_dir}metrics.json'):
+    if not os.path.isfile(f'{save_dir}metrics_repeat.json'):
         calculate_metrics(model, dataset, save_dir)
 
 
@@ -344,7 +344,7 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
     # Calculate the metrics
-    if not os.path.isfile(f'{save_dir}metrics.json'):
+    if not os.path.isfile(f'{save_dir}metrics_repeat.json'):
         calculate_metrics(model, dataset, save_dir)
 
 
