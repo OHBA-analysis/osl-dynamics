@@ -738,8 +738,7 @@ class MarkovStateInferenceModelConfig:
             ):
                 raise ValueError("initial_trans_prob must be a 2D numpy array.")
 
-            if any(np.sum(self.initial_trans_prob, axis=0) != 1):
-                raise ValueError("rows of initial_trans_prob must sum to 1.")
+            # TODO: validate trans prob rows sum to 1
 
         if not 0 < self.trans_prob_decay < 1:
             raise ValueError("trans_prob_decay must be between 0 and 1.")
@@ -843,6 +842,19 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
         return hidden_state_inference_layer.get_stationary_distribution().numpy()
+
+    def set_trans_prob(self, trans_prob, update_initializer=True):
+        """Set the transition probability matrix.
+
+        Parameters
+        ----------
+        trans_prob : np.ndarray
+            Transition probability matrix. Shape must be (n_states, n_states).
+            Rows (axis=1) must sum to one.
+        """
+        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
+        learnable_tensor_layer = hidden_state_inference_layer.layers[0]
+        learnable_tensor_layer.tensor.assign(trans_prob.astype(np.float32))
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -1020,35 +1032,32 @@ class MarkovStateInferenceModelBase(ModelBase):
         return stc
 
     def free_energy(self, dataset, **kwargs):
+        """Get the variational free energy.
+
+        This calculates:
+
+        .. math::
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] \
+                          ds_{1:T}
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the free energy for.
+
+        Returns
+        -------
+        free_energy : float
+            Variational free energy.
+        """
+
         # Helper functions
         def _get_posterior_entropy(gamma, xi):
-            """Posterior entropy.
+            # E = int q(s_1:T) log q(s_1:T) ds_1:T
+            #   = sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log q(s_t,s_{t+1}) ds_t ds_{t+1}
+            #     - sum_{t=2}^{T-1} int q(s_t) log q(s_t) ds_t
 
-            Calculate the entropy of the posterior distribution:
-
-            .. math::
-                E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
-
-                &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \
-                    \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \
-                    \displaystyle\sum_{t=2}^{T-1} \
-                    \int q(s_t) \log q(s_t) ds_t
-
-            Parameters
-            ----------
-            gamma : np.ndarray
-                Marginal posterior distribution of hidden states given the data,
-                :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
-            xi : np.ndarray
-                Joint posterior distribution of hidden states at two consecutive
-                time points, :math:`q(s_t, s_{t+1})`. Shape is
-                (batch_size, sequence_length-1, n_states*n_states).
-
-            Returns
-            -------
-            entropy : float
-                Entropy.
-            """
             # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
             # log(q(s_t, s_t+1)) ds_t ds_t+1
             first_term = xlogy(xi, xi)
@@ -1062,32 +1071,10 @@ class MarkovStateInferenceModelBase(ModelBase):
             return first_term - second_term
 
         def _get_posterior_expected_prior(gamma, xi):
-            """Posterior expected prior.
+            # P = int q(s_1:T) log p(s_1:T) ds
+            #   = int q(s_1) log p(s_1) ds_1
+            #     + sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log p(s_{t+1}|s_t) ds_t ds_{t+1}
 
-            Calculates the expected prior probability of states with respect to the
-            posterior distribution of the states:
-
-            .. math::
-                P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
-
-                &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \
-                    \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
-
-            Parameters
-            ----------
-            gamma : np.ndarray
-                Marginal posterior distribution of hidden states given the data,
-                :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
-            xi : np.ndarray
-                Joint posterior distribution of hidden states at two consecutive
-                time points, :math:`q(s_t, s_{t+1})`. Shape is
-                (batch_size, sequence_length-1, n_states*n_states).
-
-            Returns
-            -------
-            prior : float
-                Posterior expected prior probability.
-            """
             initial_distribution = self.get_initial_distribution()
             trans_prob = self.get_trans_prob()
 
