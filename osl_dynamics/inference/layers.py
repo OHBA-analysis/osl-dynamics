@@ -1709,19 +1709,14 @@ class HiddenStateInferenceLayer(layers.Layer):
         # Joint probabilities
         b = beta[:, 1:] * B[:, 1:]
         t = P * tf.expand_dims(alpha[:, :-1], axis=3) * tf.expand_dims(b, axis=2)
-        xi = tf.reshape(
-            tf.transpose(t, perm=[0, 1, 3, 2]),
-            (-1, sequence_length - 1, self.n_states * self.n_states),
-        )
-        xi /= tf.reduce_sum(xi, axis=2, keepdims=True) + self.eps
+        xi = tf.reshape(t, (-1, sequence_length - 1, self.n_states, self.n_states))
+        xi /= tf.reduce_sum(xi, axis=(2, 3), keepdims=True) + self.eps
 
         return gamma, xi
 
     def _trans_prob_update(self, gamma, xi):
         # Update for the transition probability matrix
         sum_xi = tf.reduce_sum(xi, axis=1)
-        sum_xi = tf.reshape(sum_xi, [-1, self.n_states, self.n_states])
-        sum_xi = tf.transpose(sum_xi, perm=[0, 2, 1])
         sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=1)
         sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
         return tf.reduce_mean(sum_xi, axis=0) / tf.reduce_mean(sum_gamma, axis=0)
