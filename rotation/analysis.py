@@ -70,7 +70,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
 
     # Calculate the metrics
-    if not os.path.isfile(f'{save_dir}metrics.json'):
+    if not os.path.isfile(f'{save_dir}metrics_repeat.json'):
         calculate_metrics(model, dataset, save_dir)
 
     # Summary statistics analysis
@@ -489,12 +489,28 @@ def calculate_metrics(model,dataset,save_dir):
     Returns
     -------
     """
-    free_energy = model.free_energy(dataset)
-    #evidence = model.evidence(dataset)
-    metrics = {'free_energy':free_energy.tolist(),}#'evidence':evidence}
-    with open(f'{save_dir}metrics.json', "w") as json_file:
-        # Use json.dump to write the data to the file
-        json.dump(metrics, json_file)
+    from osl_dynamics.models import load
+
+    if not os.path.isfile(f'{save_dir}metrics.json'):
+        free_energy = model.free_energy(dataset)
+        #evidence = model.evidence(dataset)
+        metrics = {'free_energy':free_energy.tolist(),}#'evidence':evidence}
+        with open(f'{save_dir}metrics.json', "w") as json_file:
+            # Use json.dump to write the data to the file
+            json.dump(metrics, json_file)
+    if not os.path.isfile(f'{save_dir}metrics_repeat.json'):
+        free_energy_list = []
+        # We repeat the model for five times
+        for i in range(1,6):
+            if os.path.exists(f'{save_dir}repeat_{i}'):
+                repeat_model = load(f'{save_dir}repeat_i{i}')
+                free_energy_list.append(repeat_model(dataset))
+        with open(f'{save_dir}metrics_repeat.json',"w") as json_file:
+            json.dump({'free_energy_repeat':free_energy_list},json_file)
+
+
+
+
 def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:int,n_states:int):
     """
     plot the mean, std, correlation of states
