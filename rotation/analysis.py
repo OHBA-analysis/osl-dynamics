@@ -506,7 +506,7 @@ def calculate_metrics(model,dataset,save_dir):
                 repeat_model = load(f'{save_dir}repeat_{i}')
                 free_energy_list.append(repeat_model(dataset))
         with open(f'{save_dir}metrics_repeat.json',"w") as json_file:
-            json.dump({'free_energy_repeat':free_energy_list},json_file)
+            json.dump({'free_energy':free_energy_list},json_file)
 
 
 
@@ -1054,14 +1054,14 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
         evidence = {}
         for N_channel in list_channels:
             for N_state in list_states:
-                with open(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/metrics.json', "r") as json_file:
+                with open(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/metrics_repeat.json', "r") as json_file:
                     # Use json.load to load the data from the file
                     metrics = json.load(json_file)
                     free_energy[f'ICA_{N_channel}_state_{N_state}'] = metrics['free_energy']
-                    evidence[f'ICA_{N_channel}_state_{N_state}'] = metrics['evidence']
+                    #evidence[f'ICA_{N_channel}_state_{N_state}'] = metrics['evidence']
 
         group_comparison_plot(free_energy,model,list_channels,list_states,'free_energy',save_dir)
-        group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
+        #group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
 
 def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_states:list,metric_name:str,save_dir:str):
     """
@@ -1089,8 +1089,10 @@ def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_sta
     for i, N_states in enumerate(list_states):
         channel_keys = [f'ICA_{N_channels}_state_{N_states}' for N_channels in list_channels]
         values = [metric[key] for key in channel_keys]
-        plt.bar(np.arange(len(channel_keys)) + i * bar_width, values, bar_width, label=f'N_states = {N_states}',
-                color=colors[i])
+        means =  [np.mean(vals) for vals in values]
+        stds = [np.std(vals) for vals in values]
+        plt.bar(np.arange(len(channel_keys)) + i * bar_width, means, bar_width, label=f'N_states = {N_states}',
+                yerr=stds,color=colors[i])
 
     plt.xlabel('N_channels', fontsize=15)
     plt.ylabel(metric_name, fontsize=15)
