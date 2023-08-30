@@ -738,7 +738,8 @@ class MarkovStateInferenceModelConfig:
             ):
                 raise ValueError("initial_trans_prob must be a 2D numpy array.")
 
-            # TODO: validate trans prob rows sum to 1
+            if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
+                raise ValueError("rows of initial_trans_prob must sum to one.")
 
         if not 0 < self.trans_prob_decay < 1:
             raise ValueError("trans_prob_decay must be between 0 and 1.")
