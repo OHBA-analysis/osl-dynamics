@@ -837,11 +837,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         initial_distribution : np.ndarray
             Initial distribution. Shape is (n_states,).
         """
-        trans_prob = self.get_trans_prob()
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_stationary_distribution(
-            trans_prob
-        ).numpy()
+        return hidden_state_inference_layer.get_stationary_distribution().numpy()
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
