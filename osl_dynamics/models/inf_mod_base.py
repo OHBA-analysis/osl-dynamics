@@ -12,7 +12,7 @@ from scipy.special import xlogy
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
-from osl_dynamics.inference import callbacks, initializers
+from osl_dynamics.inference import callbacks, initializers, optimizers
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils.misc import replace_argument
 
@@ -743,6 +743,38 @@ class MarkovStateInferenceModelConfig:
 
 class MarkovStateInferenceModelBase(ModelBase):
     """Base class for a Markov chain hidden state inference model."""
+
+    def compile(self, optimizer=None):
+        """Compile the model.
+
+        Parameters
+        ----------
+        optimizer : str or tf.keras.optimizers.Optimizer
+            Optimizer to use when compiling.
+        """
+
+        # Moving average optimizer for the transition probability matrix
+        ma_optimizer = optimizers.MovingAverage()
+
+        # Optimizer for all other trainable parameters
+        base_optimizer = tf.keras.optimizers.get(
+            {
+                "class_name": self.config.optimizer.lower(),
+                "config": {
+                    "learning_rate": self.config.learning_rate,
+                },
+            }
+        )
+
+        # Combine into a single optimizer for the model
+        optimizer = optimizers.MarkovStateModelOptimizer(
+            ma_optimizer,
+            base_optimizer,
+            learning_rate=self.config.learning_rate,
+        )
+
+        # Compile
+        self.model.compile(optimizer)
 
     def predict(self, *args, **kwargs):
         """Wrapper for the standard keras predict method.

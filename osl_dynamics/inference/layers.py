@@ -1597,9 +1597,6 @@ class HiddenStateInferenceLayer(layers.Layer):
         super().__init__(**kwargs)
         self.n_states = n_states
 
-        # Bijector for converting underlying logits to state probabilites
-        self.bijector = tfp.bijectors.SoftmaxCentered()
-
         # Default initial transition probability matrix
         if initial_trans_prob is None:
             initial_trans_prob = np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
@@ -1613,14 +1610,14 @@ class HiddenStateInferenceLayer(layers.Layer):
         initial_trans_prob = initial_trans_prob.astype("float32")
 
         # Initializer
-        initial_value = self.bijector.inverse(initial_trans_prob)
+        initial_value = initial_trans_prob
         initializer = osld_initializers.WeightInitializer(initial_value)
 
         # We use self.layers for compatibility with
         # initializers.reinitialize_model_weights
         self.layers = [
             LearnableTensorLayer(
-                shape=(n_states, n_states - 1),
+                shape=(n_states, n_states),
                 learn=learn,
                 initializer=initializer,
                 initial_value=initial_value,
@@ -1645,8 +1642,7 @@ class HiddenStateInferenceLayer(layers.Layer):
 
     def get_trans_prob(self):
         learnable_tensors_layer = self.layers[0]
-        logits = learnable_tensors_layer(1)
-        return self.bijector(logits)
+        return learnable_tensors_layer(1)
 
     def _baum_welch(self, B):
         # Helper functions
@@ -1748,10 +1744,15 @@ class HiddenStateInferenceLayer(layers.Layer):
 
             # Calculate gradient for the transition probability matrix
             def grad(*args, variables):
+                # Note, this function actually returns the estimated
+                # value for what the transition probability matrix
+                # should be based on the joint and marginal posterior
+                # rather than the gradient.
+                #
+                # This is accounted for in the updating the variable
+                # in inference.optimizers.MovingAverageOptimizer.
                 phi_interim = self._trans_prob_update(gamma, xi)
-                interim_logits = self.bijector.inverse(phi_interim)
-                logits = self.layers[0](1)
-                return None, [logits - interim_logits]
+                return None, [phi_interim]
 
             return (gamma, xi), grad
 
