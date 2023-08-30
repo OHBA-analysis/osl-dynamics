@@ -728,6 +728,7 @@ class MarkovStateInferenceModelConfig:
     # Transition probability matrix
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
+    trans_prob_decay: float = 0.1
 
     def validate_trans_prob_parameters(self):
         if self.initial_trans_prob is not None:
@@ -739,6 +740,9 @@ class MarkovStateInferenceModelConfig:
 
             if any(np.sum(self.initial_trans_prob, axis=0) != 1):
                 raise ValueError("rows of initial_trans_prob must sum to 1.")
+
+        if not 0 < self.trans_prob_decay < 1:
+            raise ValueError("trans_prob_decay must be between 0 and 1.")
 
 
 class MarkovStateInferenceModelBase(ModelBase):
@@ -754,7 +758,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
 
         # Moving average optimizer for the transition probability matrix
-        ma_optimizer = optimizers.MovingAverage()
+        ema_optimizer = optimizers.ExponentialMovingAverage()
 
         # Optimizer for all other trainable parameters
         base_optimizer = tf.keras.optimizers.get(
@@ -768,7 +772,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Combine into a single optimizer for the model
         optimizer = optimizers.MarkovStateModelOptimizer(
-            ma_optimizer,
+            ema_optimizer,
             base_optimizer,
             learning_rate=self.config.learning_rate,
         )

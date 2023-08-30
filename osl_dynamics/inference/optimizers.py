@@ -6,15 +6,24 @@ import tensorflow as tf
 from keras.optimizers.optimizer_v2 import optimizer_v2
 
 
-class MovingAverage(optimizer_v2.OptimizerV2):
-    """Optimizer for applying a moving average update."""
+class ExponentialMovingAverage(optimizer_v2.OptimizerV2):
+    """Optimizer for applying a exponential moving average update.
 
-    def __init__(self):
+    Parameters
+    ----------
+    decay : float
+        Decay for the exponential moving average, which will be
+        calculated as :code:`(1-decay) * old + decay * new`.
+    """
+
+    def __init__(self, decay=0.1):
         super().__init__(name="EMAOptimizer")
+        self.decay = decay
 
     @tf.function
     def _resource_apply_dense(self, grad, var):
-        return var.assign(0.9 * var + 0.1 * grad)
+        # grad should be the new value for var
+        return var.assign((1.0 - self.decay) * var + self.decay * grad)
 
 
 class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
@@ -22,23 +31,23 @@ class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
 
     Parameters
     ----------
-    ma_optimizer : osl_dynamics.inference.optimizers.MovingAverage
-        Moving average optimizer for the transition probability
-        matrix.
+    ema_optimizer : osl_dynamics.inference.optimizers.MovingAverage
+        Exponential moving average optimizer for the transition
+        probability matrix.
     base_optimizer : tf.keras.optimizers.Optimizer
         A TensorFlow optimizer for all other trainable model variables.
     learning_rate : float
         Learning rate for the base optimizer.
     """
 
-    def __init__(self, ma_optimizer, base_optimizer, learning_rate):
-        super().__init__(name="CustomOptimizer")
+    def __init__(self, ema_optimizer, base_optimizer, learning_rate):
+        super().__init__(name="MarkovStateModelOptimizer")
 
         # Set learning rate for this optimizer (needed to avoid and error)
         self._set_hyper("learning_rate", learning_rate)
 
         # Moving average optimizer for the transition probability matrix
-        self.ma_optimizer = ma_optimizer
+        self.ema_optimizer = ema_optimizer
 
         # Optimizer for all other trainable variables
         self.base_optimizer = base_optimizer
@@ -58,7 +67,7 @@ class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
         if "hid_state_inf_kernel" in var.name:
             # This is a HiddenStateInferenceLayer, use a moving
             # average to update the transition probability matrix
-            updated_var = self.ma_optimizer._resource_apply_dense(grad, var)
+            updated_var = self.ema_optimizer._resource_apply_dense(grad, var)
         else:
             # This is a normal TensorFlow variable,
             # use the base optimizer to update this variable

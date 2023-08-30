@@ -78,6 +78,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Initialisation for the transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
+    trans_prob_decay : float
+        Decay for the exponential moving average update of the
+        transition probability matrix. Must be between 0 and 1.
 
     batch_size : int
         Mini-batch size.
