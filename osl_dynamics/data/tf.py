@@ -213,7 +213,20 @@ def get_n_batches(dataset):
     n_batches : int
         Number of batches.
     """
+    import tensorflow as tf  # avoid slow imports
+
+    if isinstance(dataset, list):
+        if len(dataset) == 1:
+            dataset = dataset[0]
+        else:
+            dataset = concatenate_datasets(dataset)
+
+    if not isinstance(dataset, tf.data.Dataset):
+        raise ValueError("dataset must be a TensorFlow dataset or a list of datasets")
+
+    # Count number of batches
     counter = 0
     for _ in dataset:
         counter += 1
+
     return counter
