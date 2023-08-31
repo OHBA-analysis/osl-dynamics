@@ -1708,8 +1708,7 @@ class HiddenStateInferenceLayer(layers.Layer):
 
         # Joint probabilities
         b = beta[:, 1:] * B[:, 1:]
-        t = P * tf.expand_dims(alpha[:, :-1], axis=3) * tf.expand_dims(b, axis=2)
-        xi = tf.reshape(t, (-1, sequence_length - 1, self.n_states, self.n_states))
+        xi = P * tf.expand_dims(alpha[:, :-1], axis=3) * tf.expand_dims(b, axis=2)
         xi /= tf.reduce_sum(xi, axis=(2, 3), keepdims=True) + self.eps
 
         return gamma, xi
