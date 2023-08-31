@@ -794,7 +794,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         names = ["ll_loss", "gamma", "xi"]
         return dict(zip(names, predictions))
 
-    def get_alpha(self, dataset, concatenate=False, **kwargs):
+    def get_alpha(
+        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
+    ):
         """Get state probabilities.
 
         Parameters
@@ -804,6 +806,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             each subject.
         concatenate : bool, optional
             Should we concatenate alpha for each subject?
+        remove_edge_effects : bool, optional
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping :code:`alpha` and
+            disregarding the :code:`alpha` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
 
         Returns
         -------
@@ -811,13 +819,26 @@ class MarkovStateInferenceModelBase(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+        else:
+            step_size = None
+
         dataset = self.make_dataset(dataset)
 
         _logger.info("Getting alpha")
         alpha = []
         for ds in dataset:
             predictions = self.predict(ds, **kwargs)
-            alpha.append(np.concatenate(predictions["gamma"]))
+            alpha_ = predictions["gamma"]
+            if remove_edge_effects:
+                trim = step_size // 2  # throw away 25%
+                alpha_ = (
+                    [alpha_[0, :-trim]]
+                    + list(alpha_[1:-1, trim:-trim])
+                    + [alpha_[-1, trim:]]
+                )
+            alpha.append(np.concatenate(alpha_))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
