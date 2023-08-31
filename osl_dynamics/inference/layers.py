@@ -1774,14 +1774,20 @@ class SeparateLogLikelihoodLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         x, mu, sigma = inputs
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
-        )
-        log_likelihood = mvn.log_prob(tf.expand_dims(x, axis=-2))
-        # shape = (None, sequence_length, n_states)
-        return log_likelihood
+
+        # Calculate log-likelihood for each state
+        n_states = tf.shape(mu)[0]
+        log_likelihood = tf.TensorArray(tf.float32, size=n_states)
+        for state in range(n_states):
+            mvn = tfp.distributions.MultivariateNormalTriL(
+                loc=mu[state],
+                scale_tril=tf.linalg.cholesky(sigma[state]),
+                allow_nan_stats=False,
+            )
+            log_likelihood = log_likelihood.write(state, mvn.log_prob(x))
+        log_likelihood = tf.transpose(log_likelihood.stack(), perm=[1, 2, 0])
+
+        return log_likelihood  # shape = (None, sequence_length, n_states)
 
 
 class SumLogLikelihoodLossLayer(layers.Layer):
