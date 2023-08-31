@@ -8,7 +8,8 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from scipy.special import xlogy
+from tensorflow.keras import utils
+from scipy.special import xlogy, logsumexp
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
@@ -1182,16 +1183,6 @@ class MarkovStateInferenceModelBase(ModelBase):
 
             # remaining_terms =
             # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
-            xi = np.reshape(
-                xi,
-                (
-                    -1,
-                    self.config.sequence_length - 1,
-                    self.config.n_states,
-                    self.config.n_states,
-                ),
-            )
-            xi = np.transpose(xi, (0, 1, 3, 2))
             remaining_terms = xlogy(xi, trans_prob[None, None, ...])
             remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
             remaining_terms = np.mean(remaining_terms)
@@ -1205,3 +1196,91 @@ class MarkovStateInferenceModelBase(ModelBase):
         prior = _get_posterior_expected_prior(predictions["gamma"], predictions["xi"])
         free_energy = ll_loss + entropy - prior
         return free_energy
+
+    def evidence(self, dataset):
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the model evidence on.
+
+        Returns
+        -------
+        evidence : float
+            Model evidence.
+        """
+
+        # Helper functions
+        def _evidence_predict_step(log_smoothing_distribution):
+            # Predict step for calculating the evidence
+            # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
+            # log_smoothing_distribution.shape = (batch_size, n_states)
+            log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
+            log_smoothing_distribution = np.expand_dims(
+                log_smoothing_distribution,
+                axis=-1,
+            )
+            log_prediction_distribution = logsumexp(
+                log_trans_prob + log_smoothing_distribution, axis=-2
+            )
+            return log_prediction_distribution
+
+        def _evidence_update_step(data, log_prediction_distribution):
+            # Update step for calculating the evidence
+            # p(s_t=j|x_{1:t}) = p(x_t|s_t=j) p(s_t=j|x_{1:t-1}) / p(x_t|x_{1:t-1})
+            # p(x_t|x_{1:t-1}) = sum_i p(x_t|s_t=i) p(s_t=i|x_{1:t-1})
+            # data.shape = (batch_size, n_channels)
+            # log_prediction_distribution.shape = (batch_size, n_states)
+
+            # Get the log-likelihood
+            means, covs = self.get_means_covariances()
+            ll_layer = self.model.get_layer("ll")
+            log_likelihood = ll_layer([data, means, covs])
+
+            log_smoothing_distribution = log_likelihood + log_prediction_distribution
+            predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
+
+            # Normalise the log smoothing distribution
+            log_smoothing_distribution -= np.expand_dims(
+                predictive_log_likelihood,
+                axis=-1,
+            )
+            return log_smoothing_distribution, predictive_log_likelihood
+
+        _logger.info("Getting model evidence")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
+
+        evidence = 0
+        for n, data in enumerate(dataset):
+            x = data["data"]
+            print("Batch {}/{}".format(n + 1, n_batches))
+            pb_i = utils.Progbar(self.config.sequence_length)
+            batch_size = tf.shape(x)[0]
+            batch_evidence = np.zeros(batch_size, dtype=np.float32)
+            for t in range(self.config.sequence_length):
+                # Prediction step
+                if t == 0:
+                    initial_distribution = self.get_initial_distribution()
+                    log_prediction_distribution = np.broadcast_to(
+                        np.expand_dims(initial_distribution, axis=0),
+                        (batch_size, self.config.n_states),
+                    )
+                else:
+                    log_prediction_distribution = _evidence_predict_step(
+                        log_smoothing_distribution
+                    )
+
+                # Update step
+                (
+                    log_smoothing_distribution,
+                    predictive_log_likelihood,
+                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
+
+                # Update the batch evidence
+                batch_evidence += predictive_log_likelihood
+                pb_i.add(1)
+            evidence += np.mean(batch_evidence)
+
+        return evidence / n_batches
