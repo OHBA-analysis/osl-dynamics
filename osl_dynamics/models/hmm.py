@@ -372,6 +372,62 @@ class Model(MarkovStateInferenceModelBase):
 
         return alpha, np.array(means), np.array(covariances)
 
+    def dual_estimation(self, training_data):
+        """Dual estimation for subject specific observation model parameters.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+
+        Returns
+        -------
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        """
+        _logger.info("Dual estimation")
+        means = []
+        covariances = []
+        x = training_data.time_series()
+        alpha = self.get_alpha(training_data)
+        for subject in trange(training_data.n_arrays, desc="Dual estimation"):
+            if self.config.learn_means:
+                means_ = np.sum(
+                    np.expand_dims(alpha[subject], axis=2)
+                    * np.expand_dims(x[subject], axis=1),
+                    axis=0,
+                ) / np.expand_dims(np.sum(alpha[subject], axis=0), axis=1)
+            else:
+                means_ = np.zeros((self.config.n_states, self.config.n_channels))
+
+            if self.config.learn_covariances:
+                covariances_ = np.zeros(
+                    (
+                        self.config.n_states,
+                        self.config.n_channels,
+                        self.config.n_channels,
+                    )
+                )
+                for k in range(self.config.n_states):
+                    diff = x[subject] - means_[k]
+                    covariances_[k] = np.sum(
+                        alpha[subject][:, k][:, None, None]
+                        * np.matmul(diff[:, :, None], diff[:, None, :]),
+                        axis=0,
+                    ) / np.sum(alpha[subject][:, k], axis=0)
+            else:
+                covariances_ = np.stack(
+                    [np.eye(self.config.n_channels)] * self.config.n_states
+                )
+
+            means.append(means_)
+            covariances.append(covariances_)
+
+        return np.array(means), np.array(covariances)
+
     def get_training_time_series(
         self,
         training_data,
