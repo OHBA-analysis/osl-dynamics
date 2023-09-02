@@ -139,18 +139,6 @@ class Model(MarkovStateInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
-
     def get_means(self):
         """Get the state means.
 
@@ -505,7 +493,7 @@ def _model_structure(config):
 
     mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
     D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-    ll = ll_layer([data, mu, D])
+    ll = ll_layer([data, mu, D, None])
 
     # Hidden state inference
     hidden_state_inference_layer = HiddenStateInferenceLayer(

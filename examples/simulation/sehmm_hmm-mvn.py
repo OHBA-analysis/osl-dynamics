@@ -7,7 +7,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from osl_dynamics import data, simulation
-from osl_dynamics.inference import metrics, modes, tf_ops
+from osl_dynamics.inference import metrics, modes, tf_ops, callbacks
 from osl_dynamics.models.sehmm import Config, Model
 from osl_dynamics.utils import plotting
 
@@ -34,7 +34,7 @@ config = Config(
     dev_regularizer_factor=10,
     learn_means=False,
     learn_covariances=True,
-    batch_size=16,
+    batch_size=64,
     learning_rate=1e-3,
     n_epochs=30,
     learn_trans_prob=True,
@@ -75,9 +75,17 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-model.random_subset_initialization(training_data, n_epochs=3, n_init=3, take=0.3)
+kl_annealing_callback = callbacks.KLAnnealingCallback(
+    curve=config.kl_annealing_curve,
+    annealing_sharpness=config.kl_annealing_sharpness,
+    n_annealing_epochs=config.n_kl_annealing_epochs,
+)
+
+model.random_state_time_course_initialization(
+    training_data, n_epochs=3, n_init=5, callbacks=[kl_annealing_callback]
+)
 # Train model
-history = model.fit(training_data)
+history = model.fit(training_data, callbacks=[kl_annealing_callback])
 
 # Loss
 plotting.plot_line(

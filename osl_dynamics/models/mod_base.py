@@ -257,9 +257,9 @@ class ModelBase:
         with self.config.strategy.scope():
             return self.model.load_weights(filepath)
 
-    def reset_weights(self):
+    def reset_weights(self, keep=None):
         """Resets trainable variables in the model to their initial value."""
-        initializers.reinitialize_model_weights(self.model)
+        initializers.reinitialize_model_weights(self.model, keep=keep)
 
     def reset(self):
         """Reset the model as if you've built a new model."""

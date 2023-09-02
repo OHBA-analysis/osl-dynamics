@@ -13,7 +13,7 @@ from scipy.special import xlogy, logsumexp
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
-from osl_dynamics.inference import callbacks, initializers, optimizers
+from osl_dynamics.inference import callbacks, optimizers
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils.misc import replace_argument
 
@@ -367,7 +367,7 @@ class VariationalInferenceModelBase(ModelBase):
         keep : list of str, optional
             Layer names to NOT reset.
         """
-        initializers.reinitialize_model_weights(self.model, keep)
+        super().reset_weights(keep=keep)
         self.reset_kl_annealing_factor()
 
     def predict(self, *args, **kwargs):
@@ -792,7 +792,10 @@ class MarkovStateInferenceModelBase(ModelBase):
             Dictionary with labels for each prediction.
         """
         predictions = self.model.predict(*args, **kwargs)
-        names = ["ll_loss", "gamma", "xi"]
+        if self.config.model_name == "SE-HMM":
+            names = ["ll_loss", "kl_loss", "gamma", "xi"]
+        else:
+            names = ["ll_loss", "gamma", "xi"]
         return dict(zip(names, predictions))
 
     def get_alpha(
@@ -1130,7 +1133,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         return stc
 
     def free_energy(self, dataset, **kwargs):
-        """Get the variational free energy.
+        """Get the variational free energy of HMM-based models.
 
         This calculates:
 
@@ -1195,6 +1198,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
         prior = _get_posterior_expected_prior(predictions["gamma"], predictions["xi"])
         free_energy = ll_loss + entropy - prior
+        if self.config.model_name == "SE-HMM":
+            kl_loss = np.mean(predictions["kl_loss"])
+            free_energy += kl_loss
         return free_energy
 
     def evidence(self, dataset):

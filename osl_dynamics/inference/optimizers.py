@@ -77,3 +77,6 @@ class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
                 **kwargs,
             )
         return updated_var
+
+    def _resource_apply_sparse(self, *args, **kwargs):
+        return self.base_optimizer._resource_apply_sparse(*args, **kwargs)
