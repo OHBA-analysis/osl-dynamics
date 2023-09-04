@@ -115,7 +115,7 @@ class ModelBase:
         self.model = None
         with self.config.strategy.scope():
             self.build_model()
-        self.compile()
+            self.compile()
 
     # Allow access to the keras model attributes
     def __getattr__(self, attr):
