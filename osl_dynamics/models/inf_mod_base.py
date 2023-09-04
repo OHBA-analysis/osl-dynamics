@@ -76,7 +76,7 @@ class VariationalInferenceModelConfig:
 class VariationalInferenceModelBase(ModelBase):
     """Base class for a variational inference model."""
 
-    def fit(self, *args, kl_annealing_callback=None, **kwargs):
+    def fit(self, *args, kl_annealing_callback=None, lr_decay=None, **kwargs):
         """Wrapper for the standard keras fit method.
 
         Parameters
@@ -85,6 +85,8 @@ class VariationalInferenceModelBase(ModelBase):
             Arguments for :code:`ModelBase.fit()`.
         kl_annealing_callback : bool, optional
             Should we update the KL annealing factor during training?
+        lr_decay : float, optional
+            Learning rate decay after KL annealing period.
         **kwargs : keyword arguments, optional
             Keyword arguments for :code:`ModelBase.fit()`.
 
@@ -93,9 +95,35 @@ class VariationalInferenceModelBase(ModelBase):
         history : history
             The training history.
         """
+        if lr_decay is None:
+            lr_decay = self.config.lr_decay
+
         if kl_annealing_callback is None:
             # Check config to see if we should do KL annealing
             kl_annealing_callback = self.config.do_kl_annealing
+
+        decay_start_epoch = (
+            self.config.n_kl_annealing_epochs if kl_annealing_callback else 0
+        )
+        learning_rate = self.config.learning_rate
+
+        def lr_scheduler(epoch, lr):
+            if epoch < decay_start_epoch:
+                return learning_rate
+            else:
+                return learning_rate * np.exp(
+                    -lr_decay * (epoch - decay_start_epoch + 1)
+                )
+
+        lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
+        args, kwargs = replace_argument(
+            self.model.fit,
+            "callbacks",
+            [lr_callback],
+            args,
+            kwargs,
+            append=True,
+        )
 
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
