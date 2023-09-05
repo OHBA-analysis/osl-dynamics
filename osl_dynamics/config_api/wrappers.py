@@ -219,6 +219,7 @@ def train_dynemo(
              'n_kl_annealing_epochs': 20,
              'batch_size': 128,
              'learning_rate': 0.01,
+             'lr_decay': 0.1,
              'n_epochs': 40}
     init_kwargs : dict, optional
         Keyword arguments to pass to :code:`Model.random_subset_initialization`.
@@ -227,22 +228,6 @@ def train_dynemo(
             {'n_init': 5, 'n_epochs': 2, 'take': 1}.
     fit_kwargs : dict, optional
         Keyword arguments to pass to the :code:`Model.fit`.
-        We use a TensorFlow callback passed as a keyword argument
-        to apply a learning rate decay after the KL annealing
-        period. The learning rate decay helps with training
-        stability. Defaults to::
-
-            def lr_scheduler(epoch, lr):
-                if epoch < config.n_kl_annealing_epochs:
-                    return config.learning_rate
-                else:
-                    return config.learning_rate * np.exp(
-                        -0.1 * (epoch - config.n_kl_annealing_epochs + 1)
-                    )
-            lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-            fit_kwargs = {"callbacks": lr_callback}
-
-        If :code:`callacks` is passed by the user, this is overridden.
     save_inf_params : bool, optional
         Should we save the inferred parameters?
     """
@@ -277,6 +262,7 @@ def train_dynemo(
         "n_kl_annealing_epochs": 20,
         "batch_size": 128,
         "learning_rate": 0.01,
+        "lr_decay": 0.1,
         "n_epochs": 40,
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
@@ -294,19 +280,8 @@ def train_dynemo(
     _logger.info(f"Using init_kwargs: {init_kwargs}")
     init_history = model.random_subset_initialization(data, **init_kwargs)
 
-    # Use a scheduler to apply a learning rate decay after the KL
-    # annealing period
-    def lr_scheduler(epoch, lr):
-        if epoch < config.n_kl_annealing_epochs:
-            return config.learning_rate
-        else:
-            return config.learning_rate * np.exp(
-                -0.1 * (epoch - config.n_kl_annealing_epochs + 1)
-            )
-
-    lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-
-    default_fit_kwargs = {"callbacks": lr_callback}
+    # Keyword arguments for the fit method
+    default_fit_kwargs = {}
     fit_kwargs = override_dict_defaults(default_fit_kwargs, fit_kwargs)
     _logger.info(f"Using fit_kwargs: {fit_kwargs}")
 

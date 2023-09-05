@@ -45,11 +45,11 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
-    batch_size=32,
+    n_kl_annealing_epochs=20,
+    batch_size=64,
     learning_rate=0.005,
-    n_epochs=200,
-    multi_gpu=False,
+    lr_decay=0.1,
+    n_epochs=40,
 )
 
 # Simulate data
@@ -82,9 +82,10 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-model.random_subset_initialization(training_data, n_init=5, n_epochs=10, take=0.25)
+model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=0.4)
+
 print("Training model")
-history = model.fit(training_data, epochs=config.n_epochs)
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
