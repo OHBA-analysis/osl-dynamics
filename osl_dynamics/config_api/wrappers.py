@@ -95,8 +95,8 @@ def train_hmm(
         .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
         #osl_dynamics.models.hmm.Config>`_. Defaults to::
 
-            {'sequence_length': 2000,
-             'batch_size': 32,
+            {'sequence_length': 200,
+             'batch_size': 128,
              'learning_rate': 0.01,
              'lr_decay': 0.1,
              'n_epochs': 20}.
@@ -127,8 +127,8 @@ def train_hmm(
     _logger.info("Building model")
     default_config_kwargs = {
         "n_channels": data.n_channels,
-        "sequence_length": 2000,
-        "batch_size": 32,
+        "sequence_length": 200,
+        "batch_size": 128,
         "learning_rate": 0.01,
         "lr_decay": 0.1,
         "n_epochs": 20,
