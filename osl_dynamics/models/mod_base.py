@@ -41,6 +41,7 @@ class BaseModelConfig:
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
+    lr_decay: float = 0.0
     gradient_clip: float = None
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"
@@ -68,6 +69,9 @@ class BaseModelConfig:
             raise ValueError("learning_rate must be passed.")
         elif self.learning_rate < 0:
             raise ValueError("learning_rate must be greater than zero.")
+
+        if self.lr_decay < 0:
+            raise ValueError("lr_decay must be non-negative.")
 
         # Strategy for distributed learning
         if self.multi_gpu:

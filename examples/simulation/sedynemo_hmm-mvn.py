@@ -7,7 +7,6 @@ print("Setting up")
 import os
 
 import numpy as np
-import tensorflow as tf
 from matplotlib import pyplot as plt
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
@@ -47,8 +46,9 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=20,
-    batch_size=128,
+    batch_size=64,
     learning_rate=0.005,
+    lr_decay=0.1,
     n_epochs=40,
 )
 
@@ -84,20 +84,8 @@ model.set_regularizers(training_data)
 
 model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=0.4)
 
-
-def lr_scheduler(epoch, lr):
-    if epoch < config.n_kl_annealing_epochs:
-        return config.learning_rate
-    else:
-        return config.learning_rate * np.exp(
-            -0.1 * (epoch - config.n_kl_annealing_epochs + 1)
-        )
-
-
-lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-
 print("Training model")
-history = model.fit(training_data, callbacks=[lr_callback])
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
