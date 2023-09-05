@@ -912,7 +912,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         else:
             step_size = None
 
-        dataset = self.make_dataset(dataset)
+        dataset = self.make_dataset(dataset, step_size=step_size)
 
         _logger.info("Getting alpha")
         alpha = []

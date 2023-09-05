@@ -934,16 +934,16 @@ class Data:
 
         return trimmed_time_series
 
-    def count_sequences(self, sequence_length, step_size):
+    def count_sequences(self, sequence_length, step_size=None):
         """Count sequences.
 
         Parameters
         ----------
         sequence_length : int
             Length of the segement of data to feed into the model.
-        step_size : int
+        step_size : int, optional
             The number of samples by which to move the sliding window between
-            sequences.
+            sequences. Defaults to :code:`sequence_length`.
 
         Returns
         -------
@@ -997,7 +997,7 @@ class Data:
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
-        n_sequences = self.count_sequences(self.sequence_length, self.step_size)
+        n_sequences = self.count_sequences(self.sequence_length)
 
         datasets = []
         for i in range(self.n_arrays):
@@ -1152,7 +1152,7 @@ class Data:
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
-        n_sequences = self.count_sequences(self.sequence_length, self.step_size)
+        n_sequences = self.count_sequences(self.sequence_length)
 
         # TFRecords we need to save
         tfrecord_filenames = []
