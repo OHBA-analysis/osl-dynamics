@@ -95,16 +95,18 @@ class VariationalInferenceModelBase(ModelBase):
         history : history
             The training history.
         """
+        # Validation
         if lr_decay is None:
             lr_decay = self.config.lr_decay
 
         if kl_annealing_callback is None:
-            # Check config to see if we should do KL annealing
             kl_annealing_callback = self.config.do_kl_annealing
 
-        decay_start_epoch = (
-            self.config.n_kl_annealing_epochs if kl_annealing_callback else 0
-        )
+        # Learning rate decay
+        if kl_annealing_callback:
+            decay_start_epoch = self.config.n_kl_annealing_epochs
+        else:
+            decay_start_epoch = 0
         learning_rate = self.config.learning_rate
 
         def lr_scheduler(epoch, lr):
@@ -125,6 +127,7 @@ class VariationalInferenceModelBase(ModelBase):
             append=True,
         )
 
+        # KL annealing
         if kl_annealing_callback:
             kl_annealing_callback = callbacks.KLAnnealingCallback(
                 curve=self.config.kl_annealing_curve,

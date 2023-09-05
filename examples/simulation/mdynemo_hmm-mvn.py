@@ -5,13 +5,12 @@
 """
 
 print("Setting up")
+import os
+import numpy as np
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.mdynemo import Config, Model
 from osl_dynamics.utils import plotting
-import numpy as np
-import tensorflow as tf
-import os
 
 os.makedirs("figures", exist_ok=True)
 
@@ -37,6 +36,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=100,
+    lr_decay=0.1,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=200,
@@ -64,18 +64,8 @@ model.summary()
 # Set regularisers
 model.set_regularizers(training_data)
 
-# Set up learning rate schedule
-def lr_scheduler(epoch, lr):
-    if epoch < config.n_kl_annealing_epochs:
-        return config.learning_rate
-    else:
-        return config.learning_rate * 0.5
-
-
-lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-
 print("Training model")
-history = model.fit(training_data, callbacks=[lr_callback])
+history = model.fit(training_data)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
