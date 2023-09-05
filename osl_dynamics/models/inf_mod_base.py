@@ -778,13 +778,15 @@ class MarkovStateInferenceModelConfig:
 class MarkovStateInferenceModelBase(ModelBase):
     """Base class for a Markov chain hidden state inference model."""
 
-    def fit(self, *args, **kwargs):
+    def fit(self, *args, lr_decay=None, **kwargs):
         """Wrapper for the standard keras fit method.
 
         Parameters
         ----------
         *args : arguments
             Arguments for :code:`ModelBase.fit()`.
+        lr_decay : float, optional
+            Learning rate decay.
         **kwargs : keyword arguments, optional
             Keyword arguments for :code:`ModelBase.fit()`.
 
@@ -793,6 +795,22 @@ class MarkovStateInferenceModelBase(ModelBase):
         history : history
             The training history.
         """
+        # Callback for a learning rate decay
+        if lr_decay is None:
+            lr_decay = self.config.lr_decay
+
+        def lr_scheduler(epoch, lr):
+            return self.config.learning_rate * np.exp(-lr_decay * epoch)
+
+        lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
+        args, kwargs = replace_argument(
+            self.model.fit,
+            "callbacks",
+            [lr_callback],
+            args,
+            kwargs,
+            append=True,
+        )
 
         # Callback for updating the the decay rate used in the
         # EMA update of the transition probability matrix

@@ -78,11 +78,26 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Initialisation for the transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
+    trans_prob_update_delay : float
+        We update the transition probability matrix as
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the delay parameter.
+    trans_prob_update_forget : float
+        We update the transition probability matrix as
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the forget parameter.
 
     batch_size : int
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate.
+        We use :code:`lr_new = lr_old * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer

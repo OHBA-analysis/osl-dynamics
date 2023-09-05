@@ -118,6 +118,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate.
+        We use :code:`lr_new = lr_old * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
