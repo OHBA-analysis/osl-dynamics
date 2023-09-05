@@ -31,7 +31,7 @@ class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
 
     Parameters
     ----------
-    ema_optimizer : osl_dynamics.inference.optimizers.MovingAverage
+    ema_optimizer : osl_dynamics.inference.optimizers.ExponentialMovingAverage
         Exponential moving average optimizer for the transition
         probability matrix.
     base_optimizer : tf.keras.optimizers.Optimizer

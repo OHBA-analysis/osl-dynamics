@@ -729,7 +729,8 @@ class MarkovStateInferenceModelConfig:
     # Transition probability matrix
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
-    trans_prob_decay: float = 0.1
+    trans_prob_update_delay: float = 5  # alpha
+    trans_prob_update_forget: float = 0.7  # beta
 
     def validate_trans_prob_parameters(self):
         if self.initial_trans_prob is not None:
@@ -742,12 +743,45 @@ class MarkovStateInferenceModelConfig:
             if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
 
-        if not 0 < self.trans_prob_decay < 1:
-            raise ValueError("trans_prob_decay must be between 0 and 1.")
-
 
 class MarkovStateInferenceModelBase(ModelBase):
     """Base class for a Markov chain hidden state inference model."""
+
+    def fit(self, *args, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments for :code:`ModelBase.fit()`.
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`ModelBase.fit()`.
+
+        Returns
+        -------
+        history : history
+            The training history.
+        """
+
+        # Callback for updating the the decay rate used in the
+        # EMA update of the transition probability matrix
+        trans_prob_decay_callback = callbacks.EMADecayCallback(
+            delay=self.config.trans_prob_update_delay,
+            forget=self.config.trans_prob_update_forget,
+            n_epochs=self.config.n_epochs,
+        )
+
+        # Update arguments to pass to the fit method
+        args, kwargs = replace_argument(
+            self.model.fit,
+            "callbacks",
+            [trans_prob_decay_callback],
+            args,
+            kwargs,
+            append=True,
+        )
+
+        return super().fit(*args, **kwargs)
 
     def compile(self, optimizer=None):
         """Compile the model.
@@ -759,9 +793,10 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
 
         # Moving average optimizer for the transition probability matrix
-        ema_optimizer = optimizers.ExponentialMovingAverage(
-            self.config.trans_prob_decay
-        )
+        decay = (
+            1 + self.config.trans_prob_update_delay
+        ) ** -self.config.trans_prob_update_forget
+        ema_optimizer = optimizers.ExponentialMovingAverage(decay)
 
         # Optimizer for all other trainable parameters
         base_optimizer = tf.keras.optimizers.get(
