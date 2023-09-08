@@ -225,8 +225,10 @@ def get_n_batches(dataset):
         raise ValueError("dataset must be a TensorFlow dataset or a list of datasets")
 
     # Count number of batches
-    counter = 0
-    for _ in dataset:
-        counter += 1
+    cardinality = dataset.cardinality()
+    if cardinality == tf.data.UNKNOWN_CARDINALITY:
+        for i, _ in enumerate(dataset):
+            pass
+        return i + 1
 
-    return counter
+    return cardinality.numpy()
