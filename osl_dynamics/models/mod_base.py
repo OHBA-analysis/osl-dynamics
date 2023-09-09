@@ -41,7 +41,7 @@ class BaseModelConfig:
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
-    lr_decay: float = 0.0
+    lr_decay: float = 0.1
     gradient_clip: float = None
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"

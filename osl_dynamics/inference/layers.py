@@ -1574,8 +1574,8 @@ class StaticLossScalingFactorLayer(layers.Layer):
         return static_loss_scaling_factor
 
 
-class HiddenStateInferenceLayer(layers.Layer):
-    """Hidden state inference layer.
+class HiddenMarkovStateInferenceLayer(layers.Layer):
+    """Hidden Markov state inference layer.
 
     This layer uses the Baum-Welch algorithm to calculate the posterior
     for the hidden state in a Hidden Markov Model (HMM).
@@ -1589,11 +1589,21 @@ class HiddenStateInferenceLayer(layers.Layer):
         Shape must be (n_states, n_states.)
     learn : bool
         Should we learn the transition probability matrix?
+    use_stationary_distribution : bool, optional
+        Should we use the stationary distribution (estimated from the
+        transition probability matrix) for the initial state probabilities?
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the normalization layer.
     """
 
-    def __init__(self, n_states, initial_trans_prob, learn, **kwargs):
+    def __init__(
+        self,
+        n_states,
+        initial_trans_prob,
+        learn,
+        use_stationary_distribution=False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.n_states = n_states
 
@@ -1629,6 +1639,13 @@ class HiddenStateInferenceLayer(layers.Layer):
         # Small error for improving the numerical stability of
         # the log-likelihood
         self.eps = sys.float_info.epsilon
+
+        # Initial state probabilities
+        self.use_stationary_distribution = use_stationary_distribution
+        if not use_stationary_distribution:
+            self.initial_state_probs = (
+                tf.ones(self.n_states, dtype=tf.float32) / self.n_states
+            )
 
     def get_stationary_distribution(self):
         trans_prob = self.get_trans_prob()
@@ -1675,7 +1692,10 @@ class HiddenStateInferenceLayer(layers.Layer):
 
         # Transition probability matrix
         P = tf.stop_gradient(self.get_trans_prob())
-        Pi_0 = tf.stop_gradient(self.get_stationary_distribution())
+        if self.use_stationary_distribution:
+            Pi_0 = tf.stop_gradient(self.get_stationary_distribution())
+        else:
+            Pi_0 = self.initial_state_probs
 
         # Temporary variables used in the calculation
         alpha = tf.zeros_like(B)
@@ -1723,7 +1743,7 @@ class HiddenStateInferenceLayer(layers.Layer):
     def call(self, B, **kwargs):
         B = tf.stop_gradient(B)
 
-        # Renormalise the log-likliehood for numerical stability
+        # Renormalise the log-likelihood for numerical stability
         max_values = tf.reduce_max(B, axis=-1, keepdims=True)
         max_values = tf.where(max_values > 0, 0.0, max_values)
         B -= max_values
@@ -1743,8 +1763,8 @@ class HiddenStateInferenceLayer(layers.Layer):
                 # should be based on the joint and marginal posterior
                 # rather than the gradient.
                 #
-                # This is accounted for in the updating the variable
-                # in inference.optimizers.MovingAverageOptimizer.
+                # This is accounted for when updating the variable
+                # in inference.optimizers.ExponentialMovingAverageOptimizer
                 phi_interim = self._trans_prob_update(gamma, xi)
                 return None, [phi_interim]
 

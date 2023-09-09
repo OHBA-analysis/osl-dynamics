@@ -29,7 +29,7 @@ from osl_dynamics.inference.layers import (
     DiagonalMatricesLayer,
     VectorsLayer,
     StaticLossScalingFactorLayer,
-    HiddenStateInferenceLayer,
+    HiddenMarkovStateInferenceLayer,
     SeparateLogLikelihoodLayer,
     SumLogLikelihoodLossLayer,
 )
@@ -96,7 +96,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     learning_rate : float
         Learning rate.
     lr_decay : float
-        Decay for learning rate.
+        Decay for learning rate. Default is 0.1.
         We use :code:`lr_new = lr_old * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
@@ -508,10 +508,11 @@ def _model_structure(config):
     ll = ll_layer([data, mu, D, None])
 
     # Hidden state inference
-    hidden_state_inference_layer = HiddenStateInferenceLayer(
+    hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
         config.n_states,
         config.initial_trans_prob,
         config.learn_trans_prob,
+        use_stationary_distribution=False,
         name="hid_state_inf",
     )
 

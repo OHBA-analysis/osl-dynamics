@@ -975,9 +975,9 @@ class Data:
         batch_size : int
             Number sequences in each mini-batch which is used to train the
             model.
-        shuffle : bool
+        shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float
+        validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
@@ -1125,9 +1125,9 @@ class Data:
             Length of the segement of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
-        shuffle : bool
+        shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float
+        validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?

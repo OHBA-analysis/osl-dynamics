@@ -65,7 +65,7 @@ class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
 
     def _resource_apply_dense(self, grad, var, **kwargs):
         if "hid_state_inf_kernel" in var.name:
-            # This is a HiddenStateInferenceLayer, use a moving
+            # This is a HiddenMarkovStateInferenceLayer, use a moving
             # average to update the transition probability matrix
             updated_var = self.ema_optimizer._resource_apply_dense(grad, var)
         else:

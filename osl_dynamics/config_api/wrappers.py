@@ -162,7 +162,7 @@ def train_hmm(
 
     if save_inf_params:
         # Get the inferred parameters
-        alpha = model.get_alpha(data, remove_edge_effects=True)
+        alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
 
         # Save inferred parameters
@@ -303,7 +303,7 @@ def train_dynemo(
         os.makedirs(inf_params_dir, exist_ok=True)
 
         # Get the inferred parameters
-        alpha = model.get_alpha(data, remove_edge_effects=True)
+        alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
 
         # Save inferred parameters
