@@ -83,6 +83,7 @@ def train_hmm(
 
     - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+      This directory is only created if :code:`save_inf_params=True`.
 
     Parameters
     ----------
@@ -95,8 +96,8 @@ def train_hmm(
         .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
         #osl_dynamics.models.hmm.Config>`_. Defaults to::
 
-            {'sequence_length': 200,
-             'batch_size': 128,
+            {'sequence_length': 2000,
+             'batch_size': 32,
              'learning_rate': 0.01,
              'lr_decay': 0.1,
              'n_epochs': 20}.
@@ -120,15 +121,13 @@ def train_hmm(
 
     # Directories
     model_dir = output_dir + "/model"
-    inf_params_dir = output_dir + "/inf_params"
-    os.makedirs(inf_params_dir, exist_ok=True)
 
     # Create the model object
     _logger.info("Building model")
     default_config_kwargs = {
         "n_channels": data.n_channels,
-        "sequence_length": 200,
-        "batch_size": 128,
+        "sequence_length": 2000,
+        "batch_size": 32,
         "learning_rate": 0.01,
         "lr_decay": 0.1,
         "n_epochs": 20,
@@ -161,6 +160,10 @@ def train_hmm(
     save(f"{model_dir}/history.pkl", history)
 
     if save_inf_params:
+        # Make output directory
+        inf_params_dir = output_dir + "/inf_params"
+        os.makedirs(inf_params_dir, exist_ok=True)
+
         # Get the inferred parameters
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
