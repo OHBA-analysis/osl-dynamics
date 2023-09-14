@@ -3,16 +3,12 @@
 """
 
 import logging
-import warnings
 from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import backend, layers, utils, initializers
-from numba.core.errors import NumbaWarning
-from tqdm.auto import trange
+from tensorflow.keras import layers, initializers
 
-import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
     LearnableTensorLayer,
     VectorsLayer,
@@ -39,8 +35,6 @@ from osl_dynamics.models.inf_mod_base import (
 )
 
 _logger = logging.getLogger("osl-dynamics")
-
-warnings.filterwarnings("ignore", category=NumbaWarning)
 
 
 @dataclass
