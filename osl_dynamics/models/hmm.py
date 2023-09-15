@@ -94,8 +94,9 @@ class Config(BaseModelConfig):
     learning_rate : float
         Learning rate.
     lr_decay : float
-        Decay for learning rate. Default is 0.1.
-        We use :code:`lr_new = lr_old * exp(-lr_decay * epoch)`.
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
+        This only affects the observation model updates.
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,

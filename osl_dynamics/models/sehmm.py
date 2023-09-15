@@ -113,8 +113,8 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     learning_rate : float
         Learning rate.
     lr_decay : float
-        Decay for learning rate. Default is 0.1.
-        We use :code:`lr_new = lr_old * exp(-lr_decay * epoch)`.
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
