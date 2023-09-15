@@ -14,6 +14,7 @@ from scipy.special import xlogy, logsumexp
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
+from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils.misc import replace_argument
 
@@ -974,6 +975,11 @@ class MarkovStateInferenceModelBase(ModelBase):
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
         learnable_tensor_layer = hidden_state_inference_layer.layers[0]
         learnable_tensor_layer.tensor.assign(trans_prob.astype(np.float32))
+
+        if update_initializer:
+            learnable_tensor_layer.tensor_initializer = WeightInitializer(
+                trans_prob.astype(np.float32)
+            )
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
