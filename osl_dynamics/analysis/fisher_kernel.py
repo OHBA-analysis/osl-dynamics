@@ -97,9 +97,14 @@ class FisherKernel:
             # Loop over data for each subject
             for inputs in subject_data:
                 if self.model.config.model_name == "HMM":
-                    d_initial_distribution, d_trans_prob = self._d_HMM(inputs)
+                    x = inputs["data"]
+                    gamma, xi = self.model.get_posterior(x)
+                    d_initial_distribution, d_trans_prob = self._d_HMM(gamma, xi)
                     d_model["d_initial_distribution"].append(d_initial_distribution)
                     d_model["d_trans_prob"].append(d_trans_prob)
+                    inputs = np.concatenate(
+                        [x, gamma.reshape(x.shape[0], x.shape[1], -1)], axis=2
+                    )
 
                 gradients = self._get_tf_gradients(inputs)
 
@@ -125,15 +130,18 @@ class FisherKernel:
 
         return kernel_matrix
 
-    def _d_HMM(self, inputs):
+    def _d_HMM(self, gamma, xi):
         """Get the derivative of free energy with respect to
         transition probability, initial distribution of HMM.
 
         Parameters
         ----------
-        inputs : tf.data.Dataset
-            Model inputs.
-
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data.
+            Shape is (batch_size*sequence_length, n_states).
+        xi : np.ndarray
+            Joint posterior distribution of hidden states given the data.
+            Shape is (batch_size*sequence_length-1, n_states*n_states).
         Returns
         -------
         d_initial_distribution : np.ndarray
@@ -143,17 +151,19 @@ class FisherKernel:
             Derivative of free energy with respect to the transition
             probability. Shape is (n_states, n_states).
         """
-        initial_distribution = self.model.get_initial_distribution()
+        initial_distribution = self.model.state_probs_t0
         initial_distribution = np.maximum(initial_distribution, 1e-6)
         initial_distribution /= np.sum(initial_distribution)
 
-        trans_prob = self.model.get_trans_prob()
+        trans_prob = self.model.trans_prob
+        n_states = trans_prob.shape[0]
+        xi = np.reshape(xi, (xi.shape[0], n_states, n_states), order="F")
+
         trans_prob = np.maximum(trans_prob, 1e-6)
         trans_prob /= np.sum(trans_prob, axis=1, keepdims=True)
 
-        ll_loss, gamma, xi = self.model.model(inputs)
-        d_initial_distribution = np.mean(gamma[:, 0, :] / initial_distribution, axis=0)
-        d_trans_prob = np.mean(np.sum(xi, axis=1) / trans_prob, axis=0)
+        d_initial_distribution = gamma[0] / initial_distribution
+        d_trans_prob = np.sum(xi, axis=0) / trans_prob
         return d_initial_distribution, d_trans_prob
 
     def _get_tf_gradients(self, inputs):
