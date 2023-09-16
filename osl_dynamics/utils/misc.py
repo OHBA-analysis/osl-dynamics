@@ -216,7 +216,15 @@ def array_to_memmap(filename, array):
     memmap : np.memmap
         Memory map.
     """
+    path = Path(filename)
+    if path.exists():
+        # Delete npy file
+        path.unlink()
+
+    # Save array
     np.save(filename, array)
+
+    # Load as a memmap
     return np.load(filename, mmap_mode="r+")
 
 
