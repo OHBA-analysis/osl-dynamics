@@ -277,7 +277,7 @@ class Model(DyNeMo):
         # Loop over subjects
         subject_means = []
         subject_covariances = []
-        for data in training_data.subjects:
+        for data in training_data.arrays:
             # Sample a state time course from an HMM
             trans_prob = (
                 np.ones((self.config.n_states, self.config.n_states))
