@@ -49,6 +49,9 @@ training_data = data.Data(sim.time_series)
 model = Model(config)
 model.summary()
 
+# Use regularizer for the observation model
+model.set_regularizers(training_data)
+
 # Train model
 history = model.fit(training_data)
 

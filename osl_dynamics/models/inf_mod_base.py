@@ -8,9 +8,13 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import utils
+from scipy.special import xlogy, logsumexp
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.inference import callbacks, initializers
+from osl_dynamics.simulation import HMM
+from osl_dynamics.inference import callbacks, optimizers
+from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils.misc import replace_argument
 
@@ -395,7 +399,7 @@ class VariationalInferenceModelBase(ModelBase):
         keep : list of str, optional
             Layer names to NOT reset.
         """
-        initializers.reinitialize_model_weights(self.model, keep)
+        super().reset_weights(keep=keep)
         self.reset_kl_annealing_factor()
 
     def predict(self, *args, **kwargs):
@@ -748,3 +752,631 @@ class VariationalInferenceModelBase(ModelBase):
             / n_sequences
         )
         return bic
+
+
+@dataclass
+class MarkovStateInferenceModelConfig:
+    """Settings needed for inferring a Markov chain for hidden states."""
+
+    # Transition probability matrix
+    initial_trans_prob: np.ndarray = None
+    learn_trans_prob: bool = True
+    trans_prob_update_delay: float = 5  # alpha
+    trans_prob_update_forget: float = 0.7  # beta
+
+    def validate_trans_prob_parameters(self):
+        if self.initial_trans_prob is not None:
+            if (
+                not isinstance(self.initial_trans_prob, np.ndarray)
+                or self.initial_trans_prob.ndim != 2
+            ):
+                raise ValueError("initial_trans_prob must be a 2D numpy array.")
+
+            if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
+                raise ValueError("rows of initial_trans_prob must sum to one.")
+
+
+class MarkovStateInferenceModelBase(ModelBase):
+    """Base class for a Markov chain hidden state inference model."""
+
+    def fit(self, *args, lr_decay=None, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments for :code:`ModelBase.fit()`.
+        lr_decay : float, optional
+            Learning rate decay.
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`ModelBase.fit()`.
+
+        Returns
+        -------
+        history : history
+            The training history.
+        """
+        # Callback for a learning rate decay
+        if lr_decay is None:
+            lr_decay = self.config.lr_decay
+
+        def lr_scheduler(epoch, lr):
+            return self.config.learning_rate * np.exp(-lr_decay * epoch)
+
+        lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
+        args, kwargs = replace_argument(
+            self.model.fit,
+            "callbacks",
+            [lr_callback],
+            args,
+            kwargs,
+            append=True,
+        )
+
+        # Callback for updating the the decay rate used in the
+        # EMA update of the transition probability matrix
+        trans_prob_decay_callback = callbacks.EMADecayCallback(
+            delay=self.config.trans_prob_update_delay,
+            forget=self.config.trans_prob_update_forget,
+            n_epochs=self.config.n_epochs,
+        )
+
+        # Update arguments to pass to the fit method
+        args, kwargs = replace_argument(
+            self.model.fit,
+            "callbacks",
+            [trans_prob_decay_callback],
+            args,
+            kwargs,
+            append=True,
+        )
+
+        return super().fit(*args, **kwargs)
+
+    def compile(self, optimizer=None):
+        """Compile the model.
+
+        Parameters
+        ----------
+        optimizer : str or tf.keras.optimizers.Optimizer
+            Optimizer to use when compiling.
+        """
+
+        # Moving average optimizer for the transition probability matrix
+        decay = (
+            1 + self.config.trans_prob_update_delay
+        ) ** -self.config.trans_prob_update_forget
+        ema_optimizer = optimizers.ExponentialMovingAverage(decay)
+
+        # Optimizer for all other trainable parameters
+        base_optimizer = tf.keras.optimizers.get(
+            {
+                "class_name": self.config.optimizer.lower(),
+                "config": {
+                    "learning_rate": self.config.learning_rate,
+                },
+            }
+        )
+
+        # Combine into a single optimizer for the model
+        optimizer = optimizers.MarkovStateModelOptimizer(
+            ema_optimizer,
+            base_optimizer,
+            learning_rate=self.config.learning_rate,
+        )
+
+        # Compile
+        self.model.compile(optimizer)
+
+    def predict(self, *args, **kwargs):
+        """Wrapper for the standard keras predict method.
+
+        Returns
+        -------
+        predictions : dict
+            Dictionary with labels for each prediction.
+        """
+        predictions = self.model.predict(*args, **kwargs)
+        if self.config.model_name == "SE-HMM":
+            names = ["ll_loss", "kl_loss", "gamma", "xi"]
+        else:
+            names = ["ll_loss", "gamma", "xi"]
+        return dict(zip(names, predictions))
+
+    def get_alpha(
+        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
+    ):
+        """Get state probabilities.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each subject.
+        concatenate : bool, optional
+            Should we concatenate alpha for each subject?
+        remove_edge_effects : bool, optional
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping :code:`alpha` and
+            disregarding the :code:`alpha` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
+
+        Returns
+        -------
+        alpha : list or np.ndarray
+            State probabilities with shape (n_subjects, n_samples, n_states)
+            or (n_samples, n_states).
+        """
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
+
+        _logger.info("Getting alpha")
+        alpha = []
+        for ds in dataset:
+            predictions = self.predict(ds, **kwargs)
+            alpha_ = predictions["gamma"]
+            if remove_edge_effects:
+                trim = step_size // 2  # throw away 25%
+                alpha_ = (
+                    [alpha_[0, :-trim]]
+                    + list(alpha_[1:-1, trim:-trim])
+                    + [alpha_[-1, trim:]]
+                )
+            alpha.append(np.concatenate(alpha_))
+
+        if concatenate or len(alpha) == 1:
+            alpha = np.concatenate(alpha)
+
+        return alpha
+
+    def get_trans_prob(self):
+        """Get the transition probability matrix.
+
+        Returns
+        -------
+        trans_prob : np.ndarray
+            Transition probability matrix. Shape is (n_states, n_states).
+        """
+        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
+        return hidden_state_inference_layer.get_trans_prob().numpy()
+
+    def get_initial_distribution(self):
+        """Get the initial distribution.
+
+        Returns
+        -------
+        initial_distribution : np.ndarray
+            Initial distribution. Shape is (n_states,).
+        """
+        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
+        return hidden_state_inference_layer.get_stationary_distribution().numpy()
+
+    def set_trans_prob(self, trans_prob, update_initializer=True):
+        """Set the transition probability matrix.
+
+        Parameters
+        ----------
+        trans_prob : np.ndarray
+            Transition probability matrix. Shape must be (n_states, n_states).
+            Rows (axis=1) must sum to one.
+        """
+        # Validation
+        if not isinstance(trans_prob, np.ndarray) or trans_prob.ndim != 2:
+            raise ValueError("trans_prob must be a 2D numpy array.")
+
+        if not all(np.isclose(np.sum(trans_prob, axis=1), 1)):
+            raise ValueError("rows of trans_prob must sum to one.")
+
+        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
+        learnable_tensor_layer = hidden_state_inference_layer.layers[0]
+        learnable_tensor_layer.tensor.assign(trans_prob.astype(np.float32))
+
+        if update_initializer:
+            learnable_tensor_layer.tensor_initializer = WeightInitializer(
+                trans_prob.astype(np.float32)
+            )
+
+    def random_subset_initialization(
+        self, training_data, n_epochs, n_init, take, **kwargs
+    ):
+        """Random subset initialization.
+
+        The model is trained for a few epochs with different random subsets
+        of the training dataset. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float
+            Fraction of total batches to take.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            _logger.info(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        _logger.info("Random subset initialization")
+
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_dataset)
+        n_batches = max(round(n_total_batches * take), 1)
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            _logger.info(f"Initialization {n}")
+            self.reset()
+
+            training_dataset = self.make_dataset(
+                training_data, shuffle=True, concatenate=True
+            )
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+
+            try:
+                history = self.fit(
+                    training_data_subset,
+                    epochs=n_epochs,
+                    **kwargs,
+                )
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(e)
+                _logger.warning("Training failed! Skipping initialization.")
+                continue
+
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            raise ValueError("No valid initializations were found.")
+
+        _logger.info(f"Using initialization {best_initialization}")
+        self.set_weights(best_weights)
+
+        return best_history
+
+    def random_state_time_course_initialization(
+        self, training_data, n_epochs, n_init, take=1, **kwargs
+    ):
+        """Random state time course initialization.
+
+        The model is trained for a few epochs with a sampled state time course
+        initialization. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float, optional
+            Fraction of total batches to take.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            _logger.info(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        _logger.info("Random state time course initialization")
+
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+
+        # Calculate the number of batches to use
+        n_total_batches = dtf.get_n_batches(training_dataset)
+        n_batches = max(round(n_total_batches * take), 1)
+        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            _logger.info(f"Initialization {n}")
+            self.reset()
+
+            training_dataset = self.make_dataset(
+                training_data, shuffle=True, concatenate=True
+            )
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+
+            self.set_random_state_time_course_initialization(training_data_subset)
+            try:
+                history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(e)
+                _logger.warning("Training failed! Skipping initialization.")
+                continue
+
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            raise ValueError("No valid initializations were found.")
+
+        _logger.info(f"Using initialization {best_initialization}")
+        self.set_weights(best_weights)
+
+        return best_history
+
+    def set_random_state_time_course_initialization(self, training_data):
+        """Sets the initial means/covariances based on a random state time
+        course.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Training data.
+        """
+        _logger.info("Setting random means and covariances")
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(training_data, concatenate=True)
+
+        # Mean and covariance for each state
+        means = np.zeros(
+            [self.config.n_states, self.config.n_channels], dtype=np.float32
+        )
+        covariances = np.zeros(
+            [self.config.n_states, self.config.n_channels, self.config.n_channels],
+            dtype=np.float32,
+        )
+
+        for batch in training_dataset:
+            # Concatenate all the sequences in this batch
+            data = np.concatenate(batch["data"])
+
+            # Sample a state time course using the initial transition
+            # probability matrix
+            stc = self.sample_state_time_course(data.shape[0])
+
+            # Calculate the mean/covariance for each state for this batch
+            m = []
+            C = []
+            for j in range(self.config.n_states):
+                x = data[stc[:, j] == 1]
+                mu_j = np.mean(x, axis=0)
+                sigma_j = np.cov(x, rowvar=False)
+                m.append(mu_j)
+                C.append(sigma_j)
+            means += m
+            covariances += C
+
+        # Calculate the average from the running total
+        n_batches = dtf.get_n_batches(training_dataset)
+        means /= n_batches
+        covariances /= n_batches
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(covariances, update_initializer=True)
+
+    def sample_state_time_course(self, n_samples):
+        """Sample a state time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        stc : np.ndarray
+            State time course with shape (n_samples, n_states).
+        """
+        trans_prob = self.get_trans_prob()
+        sim = HMM(trans_prob)
+        stc = sim.generate_states(n_samples)
+        return stc
+
+    def free_energy(self, dataset, **kwargs):
+        """Get the variational free energy of HMM-based models.
+
+        This calculates:
+
+        .. math::
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] \
+                          ds_{1:T}
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the free energy for.
+
+        Returns
+        -------
+        free_energy : float
+            Variational free energy.
+        """
+
+        # Helper functions
+        def _get_posterior_entropy(gamma, xi):
+            # E = int q(s_1:T) log q(s_1:T) ds_1:T
+            #   = sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log q(s_t,s_{t+1}) ds_t ds_{t+1}
+            #     - sum_{t=2}^{T-1} int q(s_t) log q(s_t) ds_t
+
+            # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
+            # log(q(s_t, s_t+1)) ds_t ds_t+1
+            first_term = xlogy(xi, xi)
+            first_term = np.sum(first_term, axis=(1, 2))
+            first_term = np.mean(first_term)
+
+            # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
+            second_term = xlogy(gamma, gamma)[:, 1:-1, :]
+            second_term = np.sum(second_term, axis=(1, 2))
+            second_term = np.mean(second_term)
+            return first_term - second_term
+
+        def _get_posterior_expected_prior(gamma, xi):
+            # P = int q(s_1:T) log p(s_1:T) ds
+            #   = int q(s_1) log p(s_1) ds_1
+            #     + sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log p(s_{t+1}|s_t) ds_t ds_{t+1}
+
+            initial_distribution = self.get_initial_distribution()
+            trans_prob = self.get_trans_prob()
+
+            # first_term = int q(s_1) log p(s_1) ds_1
+            first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
+            first_term = np.sum(first_term, axis=1)
+            first_term = np.mean(first_term)
+
+            # remaining_terms =
+            # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
+            remaining_terms = xlogy(xi, trans_prob[None, None, ...])
+            remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
+            remaining_terms = np.mean(remaining_terms)
+
+            return first_term + remaining_terms
+
+        dataset = self.make_dataset(dataset, concatenate=True)
+        predictions = self.predict(dataset, **kwargs)
+        ll_loss = np.mean(predictions["ll_loss"])
+        entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
+        prior = _get_posterior_expected_prior(predictions["gamma"], predictions["xi"])
+        free_energy = ll_loss + entropy - prior
+        if self.config.model_name == "SE-HMM":
+            kl_loss = np.mean(predictions["kl_loss"])
+            free_energy += kl_loss
+        return free_energy
+
+    def evidence(self, dataset):
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the model evidence on.
+
+        Returns
+        -------
+        evidence : float
+            Model evidence.
+        """
+
+        # Helper functions
+        def _evidence_predict_step(log_smoothing_distribution):
+            # Predict step for calculating the evidence
+            # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
+            # log_smoothing_distribution.shape = (batch_size, n_states)
+            log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
+            log_smoothing_distribution = np.expand_dims(
+                log_smoothing_distribution,
+                axis=-1,
+            )
+            log_prediction_distribution = logsumexp(
+                log_trans_prob + log_smoothing_distribution, axis=-2
+            )
+            return log_prediction_distribution
+
+        def _evidence_update_step(data, log_prediction_distribution):
+            # Update step for calculating the evidence
+            # p(s_t=j|x_{1:t}) = p(x_t|s_t=j) p(s_t=j|x_{1:t-1}) / p(x_t|x_{1:t-1})
+            # p(x_t|x_{1:t-1}) = sum_i p(x_t|s_t=i) p(s_t=i|x_{1:t-1})
+            # data.shape = (batch_size, n_channels)
+            # log_prediction_distribution.shape = (batch_size, n_states)
+
+            # Get the log-likelihood
+            means, covs = self.get_means_covariances()
+            ll_layer = self.model.get_layer("ll")
+            log_likelihood = ll_layer([data, means, covs])
+
+            log_smoothing_distribution = log_likelihood + log_prediction_distribution
+            predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
+
+            # Normalise the log smoothing distribution
+            log_smoothing_distribution -= np.expand_dims(
+                predictive_log_likelihood,
+                axis=-1,
+            )
+            return log_smoothing_distribution, predictive_log_likelihood
+
+        _logger.info("Getting model evidence")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
+
+        evidence = 0
+        for n, data in enumerate(dataset):
+            x = data["data"]
+            print("Batch {}/{}".format(n + 1, n_batches))
+            pb_i = utils.Progbar(self.config.sequence_length)
+            batch_size = tf.shape(x)[0]
+            batch_evidence = np.zeros(batch_size, dtype=np.float32)
+            for t in range(self.config.sequence_length):
+                # Prediction step
+                if t == 0:
+                    initial_distribution = self.get_initial_distribution()
+                    log_prediction_distribution = np.broadcast_to(
+                        np.expand_dims(initial_distribution, axis=0),
+                        (batch_size, self.config.n_states),
+                    )
+                else:
+                    log_prediction_distribution = _evidence_predict_step(
+                        log_smoothing_distribution
+                    )
+
+                # Update step
+                (
+                    log_smoothing_distribution,
+                    predictive_log_likelihood,
+                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
+
+                # Update the batch evidence
+                batch_evidence += predictive_log_likelihood
+                pb_i.add(1)
+            evidence += np.mean(batch_evidence)
+
+        return evidence / n_batches

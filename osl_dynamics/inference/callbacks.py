@@ -166,6 +166,47 @@ class KLAnnealingCallback(callbacks.Callback):
         kl_loss_layer.annealing_factor.assign(new_value)
 
 
+class EMADecayCallback(callbacks.Callback):
+    """Callback to update the decay rate in an Exponential Moving Average optimizer.
+
+    :code:`decay = (100 * epoch / n_epochs + 1 + delay) ** -forget`
+
+    Parameters
+    ----------
+    delay : float
+    forget : float
+    """
+
+    def __init__(self, delay, forget, n_epochs):
+        super().__init__()
+        self.delay = delay
+        self.forget = forget
+        self.n_epochs = n_epochs
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict, optional
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+
+        # Calculate new value
+        new_value = (100 * epoch / self.n_epochs + 1 + self.delay) ** -self.forget
+
+        # Print new value during training
+        logs["rho"] = new_value
+
+        # Update the decay parameter in the optimizer
+        # Here we are assuming a MarkovStateModelOptimizer is being used
+        ema_optimizer = self.model.optimizer.ema_optimizer
+        ema_optimizer.decay = new_value
+
+
 class SaveBestCallback(callbacks.ModelCheckpoint):
     """Callback to save the best model.
 

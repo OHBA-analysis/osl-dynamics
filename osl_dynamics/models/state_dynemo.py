@@ -111,6 +111,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     gradient_clip : float
         Value to clip gradients by. This is the :code:`clipnorm` argument
         passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
@@ -274,7 +277,7 @@ class Model(DyNeMo):
         # Loop over subjects
         subject_means = []
         subject_covariances = []
-        for data in training_data.subjects:
+        for data in training_data.arrays:
             # Sample a state time course from an HMM
             trans_prob = (
                 np.ones((self.config.n_states, self.config.n_states))

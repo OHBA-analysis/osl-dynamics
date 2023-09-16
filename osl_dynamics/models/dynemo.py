@@ -141,6 +141,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     gradient_clip : float
         Value to clip gradients by. This is the :code:`clipnorm` argument
         passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.

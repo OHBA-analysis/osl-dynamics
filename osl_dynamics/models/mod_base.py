@@ -41,7 +41,7 @@ class BaseModelConfig:
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
-    lr_decay: float = 0.0
+    lr_decay: float = 0.1
     gradient_clip: float = None
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"
@@ -261,9 +261,9 @@ class ModelBase:
         with self.config.strategy.scope():
             return self.model.load_weights(filepath)
 
-    def reset_weights(self):
+    def reset_weights(self, keep=None):
         """Resets trainable variables in the model to their initial value."""
-        initializers.reinitialize_model_weights(self.model)
+        initializers.reinitialize_model_weights(self.model, keep=keep)
 
     def reset(self):
         """Reset the model as if you've built a new model."""

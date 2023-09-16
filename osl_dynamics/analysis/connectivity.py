@@ -794,7 +794,11 @@ def save(
     parcellation = Parcellation(parcellation_file)
 
     # Select the component we're plotting
-    conn_map = np.copy(connectivity_map[component])
+    conn_map = connectivity_map[component]
+
+    # Fill diagonal with zeros to help with the colorbar limits
+    for c in conn_map:
+        np.fill_diagonal(c, 0)
 
     # Default plotting settings
     default_plot_kwargs = {"node_size": 10, "node_color": "black"}

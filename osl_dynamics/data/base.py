@@ -934,16 +934,16 @@ class Data:
 
         return trimmed_time_series
 
-    def count_sequences(self, sequence_length, step_size):
+    def count_sequences(self, sequence_length, step_size=None):
         """Count sequences.
 
         Parameters
         ----------
         sequence_length : int
             Length of the segement of data to feed into the model.
-        step_size : int
+        step_size : int, optional
             The number of samples by which to move the sliding window between
-            sequences.
+            sequences. Defaults to :code:`sequence_length`.
 
         Returns
         -------
@@ -975,9 +975,9 @@ class Data:
         batch_size : int
             Number sequences in each mini-batch which is used to train the
             model.
-        shuffle : bool
+        shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float
+        validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
@@ -997,7 +997,7 @@ class Data:
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
-        n_sequences = self.count_sequences(self.sequence_length, self.step_size)
+        n_sequences = self.count_sequences(self.sequence_length)
 
         datasets = []
         for i in range(self.n_arrays):
@@ -1125,9 +1125,9 @@ class Data:
             Length of the segement of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
-        shuffle : bool
+        shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float
+        validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
@@ -1152,7 +1152,7 @@ class Data:
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
-        n_sequences = self.count_sequences(self.sequence_length, self.step_size)
+        n_sequences = self.count_sequences(self.sequence_length)
 
         # TFRecords we need to save
         tfrecord_filenames = []

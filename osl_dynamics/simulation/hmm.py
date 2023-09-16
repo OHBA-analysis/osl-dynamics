@@ -56,9 +56,8 @@ class HMM:
             # We allow a small error (1e-12) because of rounding errors
             row_sums = trans_prob.sum(axis=1)
             col_sums = trans_prob.sum(axis=0)
-            ones = np.ones(trans_prob.shape[0])
-            if np.any(abs(row_sums - ones) > 1e-12):
-                if np.all(abs(col_sums - ones) < 1e-12):
+            if not all(np.isclose(row_sums, 1)):
+                if all(np.isclose(col_sums, 1)):
                     trans_prob = trans_prob.T
                     warnings.warn(
                         "Rows of trans_prob matrix must sum to 1. Transpose taken.",

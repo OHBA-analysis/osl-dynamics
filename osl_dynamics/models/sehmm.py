@@ -3,18 +3,13 @@
 """
 
 import logging
-import warnings
 from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import backend, layers, utils, initializers
-from numba.core.errors import NumbaWarning
-from tqdm.auto import trange
+from tensorflow.keras import layers, initializers
 
-import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
-    CategoricalLogLikelihoodLossLayer,
     LearnableTensorLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
@@ -28,17 +23,22 @@ from osl_dynamics.inference.layers import (
     KLLossLayer,
     MultiLayerPerceptronLayer,
     StaticLossScalingFactorLayer,
+    HiddenMarkovStateInferenceLayer,
+    SeparateLogLikelihoodLayer,
+    SumLogLikelihoodLossLayer,
 )
-from osl_dynamics.models.hmm import Config as HMMConfig, Model as HMMModel
 from osl_dynamics.models import obs_mod
+from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.models.inf_mod_base import (
+    MarkovStateInferenceModelConfig,
+    MarkovStateInferenceModelBase,
+)
 
 _logger = logging.getLogger("osl-dynamics")
 
-warnings.filterwarnings("ignore", category=NumbaWarning)
-
 
 @dataclass
-class Config(HMMConfig):
+class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     """Settings for Subject Embedding HMM.
 
     Parameters
@@ -95,29 +95,26 @@ class Config(HMMConfig):
         Initialisation for transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
-    state_probs_t0: np.ndarray
-        State probabilities at :code:`time=0`. Not trainable.
-    batch_size : int
-        Mini-batch size.
-    learning_rate : float
-        Learning rate.
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
         where :code:`rho = (100 * epoch / n_epochs + 1 +
-        trans_prob_update_delay) ** -trans_prob_update_forget`. This is the
-        delay parameter.
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the delay parameter.
     trans_prob_update_forget : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
         where :code:`rho = (100 * epoch / n_epochs + 1 +
-        trans_prob_update_delay) ** -trans_prob_update_forget`. This is the
-        forget parameter.
-    observation_update_decay : float
-        Decay rate for the learning rate of the observation model.
-        We update the learning rate (:code:`lr`) as
-        :code:`lr = config.learning_rate * exp(-observation_update_decay *
-        epoch)`.
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the forget parameter.
+
+    batch_size : int
+        Mini-batch size.
+    learning_rate : float
+        Learning rate.
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -145,6 +142,15 @@ class Config(HMMConfig):
     subject_embeddings_dim: int = None
     mode_embeddings_dim: int = None
 
+    # Observation model parameters
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
+
     dev_n_layers: int = 0
     dev_n_units: int = None
     dev_normalization: str = None
@@ -160,9 +166,22 @@ class Config(HMMConfig):
     n_kl_annealing_epochs: int = None
 
     def __post_init__(self):
-        super().__post_init__()
+        self.validate_observation_model_parameters()
+        self.validate_trans_prob_parameters()
+        self.validate_dimension_parameters()
+        self.validate_training_parameters()
         self.validate_subject_embedding_parameters()
         self.validate_kl_annealing_parameters()
+
+    def validate_observation_model_parameters(self):
+        if self.learn_means is None or self.learn_covariances is None:
+            raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
 
     def validate_subject_embedding_parameters(self):
         if (
@@ -210,7 +229,7 @@ class Config(HMMConfig):
                 )
 
 
-class Model(HMMModel):
+class Model(MarkovStateInferenceModelBase):
     """Subject Embedding HMM class.
 
     Parameters
@@ -224,162 +243,22 @@ class Model(HMMModel):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-        self.rho = 1
-        self.set_trans_prob(self.config.initial_trans_prob)
-        self.set_state_probs_t0(self.config.state_probs_t0)
-
-    def fit(self, dataset, epochs=None, use_tqdm=False, **kwargs):
-        """Fit model to a dataset.
-
-        Iterates between:
-
-        - Baum-Welch updates of latent variable time courses and transition
-          probability matrix.
-        - TensorFlow updates of observation model parameters.
+    def reset_weights(self, keep=None):
+        """Reset the model weights.
 
         Parameters
         ----------
-        dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        epochs : int, optional
-            Number of epochs.
-        kwargs : keyword arguments, optional
-            Keyword arguments for the TensorFlow observation model training.
-            These keywords arguments will be passed to :code:`self.model.fit()`.
-
-        Returns
-        -------
-        history : dict
-            Dictionary with history of the loss and learning rates (:code:`lr`
-            and :code:`rho`).
+        keep : list of str, optional
+            Layer names to NOT reset.
         """
-        if epochs is None:
-            epochs = self.config.n_epochs
+        super().reset_weights(keep=keep)
+        self.reset_kl_annealing_factor()
 
-        # Make a TensorFlow dataset
-        dataset = self.make_dataset(
-            dataset,
-            shuffle=True,
-            concatenate=True,
-        )
-
-        # Set static loss scaling factor
-        self.set_static_loss_scaling_factor(dataset)
-
-        # Training curves
-        history = {"loss": [], "rho": [], "lr": []}
-
-        # Loop through epochs
-        if use_tqdm:
-            _range = trange(epochs)
-        else:
-            _range = range(epochs)
-        for n in _range:
-            # Setup a progress bar for this epoch
-            if not use_tqdm:
-                print("Epoch {}/{}".format(n + 1, epochs))
-                pb_i = utils.Progbar(dtf.get_n_batches(dataset))
-
-            # Update rho
-            self._update_rho(n)
-
-            # Set learning rate for the observation model
-            lr = self.config.learning_rate * np.exp(
-                -self.config.observation_update_decay * n
-            )
-            backend.set_value(self.model.optimizer.lr, lr)
-
-            # Loop through batches
-            loss = []
-            for data in dataset:
-                x = data["data"]
-                array_id = data["array_id"]
-
-                # Update state probabilities
-                gamma, xi = self._get_state_probs(x, array_id)
-
-                # Update transition probability matrix
-                if self.config.learn_trans_prob:
-                    self._update_trans_prob(gamma, xi)
-
-                # Reshape gamma: (batch_size*sequence_length, n_states)
-                # -> (batch_size, sequence_length, n_states)
-                gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
-
-                # Update observation model parameters
-                x_gamma_and_array_id = np.concatenate(
-                    [x, gamma, np.expand_dims(array_id, -1)], axis=2
-                )
-                h = self.model.fit(
-                    x_gamma_and_array_id,
-                    epochs=1,
-                    verbose=0,
-                    **kwargs,
-                )
-
-                # Get the new loss
-                l = h.history["loss"][0]
-                if np.isnan(l):
-                    _logger.error("Training failed!")
-                    return
-                loss.append(l)
-
-                # Update progress bar
-                if use_tqdm:
-                    _range.set_postfix(rho=self.rho, lr=lr, loss=l)
-                else:
-                    pb_i.add(
-                        1,
-                        values=[("rho", self.rho), ("lr", lr), ("loss", l)],
-                    )
-
-            history["loss"].append(np.mean(loss))
-            history["rho"].append(self.rho)
-            history["lr"].append(lr)
-
-            # Update KL annealing factor
-            if self.config.do_kl_annealing:
-                self._update_kl_annealing_factor(n)
-
-        if use_tqdm:
-            _range.close()
-
-        return history
-
-    def _update_kl_annealing_factor(self, epoch, n_cycles=1):
-        """Update the KL annealing factor."""
-        n_epochs_one_cycle = self.config.n_kl_annealing_epochs // n_cycles
-        if epoch < self.config.n_kl_annealing_epochs:
-            epoch = epoch % n_epochs_one_cycle
-            if self.config.kl_annealing_curve == "tanh":
-                new_value = (
-                    0.5
-                    * np.tanh(
-                        self.config.kl_annealing_sharpness
-                        * (epoch - 0.5 * n_epochs_one_cycle)
-                        / n_epochs_one_cycle
-                    )
-                    + 0.5
-                )
-            elif self.config.kl_annealing_curve == "linear":
-                new_value = epoch / n_epochs_one_cycle
-        else:
-            new_value = 1.0
-
-        kl_loss_layer = self.model.get_layer("kl_loss")
-        kl_loss_layer.annealing_factor.assign(new_value)
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+    def reset_kl_annealing_factor(self):
+        """Reset the KL annealing factor."""
+        if self.config.do_kl_annealing:
+            kl_loss_layer = self.model.get_layer("kl_loss")
+            kl_loss_layer.annealing_factor.assign(0.0)
 
     def get_group_means(self):
         """Get the group level mode means.
@@ -602,156 +481,6 @@ class Model(HMMModel):
                 layer_name="group_covs",
             )
 
-    def free_energy(self, dataset):
-        """Get the variational free energy.
-
-        This calculates:
-
-        .. math::
-            \mathcal{F} = \int q(s_{1:T}) \log \left[ \
-                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right]
-                          ds_{1:T}
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Dataset to evaluate the free energy for.
-
-        Returns
-        -------
-        free_energy : float
-            Variational free energy.
-        """
-        _logger.info("Getting free energy")
-
-        # Convert to a TensorFlow dataset if not already
-        dataset = self.make_dataset(
-            dataset,
-            concatenate=True,
-        )
-
-        # Calculate variational free energy for each batch
-        free_energy = []
-        for data in dataset:
-            x = data["data"]
-            array_id = data["array_id"]
-            batch_size = x.shape[0]
-
-            # Get the marginal and join posterior to calculate the free energy
-            gamma, xi = self._get_state_probs(x, array_id)
-
-            # Calculate the free energy:
-            #
-            # F = int q(s) log[q(s) / p(x, s)] ds
-            #   = int q(s) log[q(s) / p(x | s) p(s)] ds
-            #   = - int q(s) log p(x | s) ds    [log_likelihood]
-            #     + int q(s) log q(s) ds        [entropy]
-            #     - int q(s) log p(s) ds        [prior]
-
-            log_likelihood = self._get_posterior_expected_log_likelihood(
-                x, gamma, array_id
-            )
-            entropy = self._get_posterior_entropy(gamma, xi)
-            prior = self._get_posterior_expected_prior(gamma, xi)
-
-            # Average free energy for a sequence in this batch
-            seq_fe = (-log_likelihood + entropy - prior) / batch_size
-            free_energy.append(seq_fe)
-
-        # Return average over batches
-        return np.mean(free_energy)
-
-    def evidence(self, dataset):
-        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Dataset to evaluate the model evidence on.
-
-        Returns
-        -------
-        evidence : float
-            Model evidence.
-        """
-        _logger.info("Getting model evidence")
-        dataset = self.make_dataset(
-            dataset,
-            concatenate=True,
-        )
-        n_batches = dtf.get_n_batches(dataset)
-
-        evidence = 0
-        for n, data in enumerate(dataset):
-            x = data["data"]
-            array_id = data["array_id"]
-            print("Batch {}/{}".format(n + 1, n_batches))
-            pb_i = utils.Progbar(self.config.sequence_length)
-            batch_size = tf.shape(x)[0]
-            batch_evidence = np.zeros((batch_size))
-            for t in range(self.config.sequence_length):
-                # Prediction step
-                if t == 0:
-                    initial_distribution = self.get_stationary_distribution()
-                    log_prediction_distribution = np.broadcast_to(
-                        np.expand_dims(initial_distribution, axis=0),
-                        (batch_size, self.config.n_states),
-                    )
-                else:
-                    log_prediction_distribution = self._evidence_predict_step(
-                        log_smoothing_distribution
-                    )
-
-                # Update step
-                (
-                    log_smoothing_distribution,
-                    predictive_log_likelihood,
-                ) = self._evidence_update_step(
-                    x[:, t, :], log_prediction_distribution, array_id[:, t]
-                )
-
-                # Update the batch evidence
-                batch_evidence += predictive_log_likelihood
-                pb_i.add(1)
-            evidence += np.mean(batch_evidence)
-
-        return evidence / n_batches
-
-    def get_alpha(self, dataset, concatenate=False):
-        """Get state probabilities.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each
-            subject.
-        concatenate : bool, optional
-            Should we concatenate alpha for each subject?
-
-        Returns
-        -------
-        alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
-            or (n_samples, n_states).
-        """
-        dataset = self.make_dataset(dataset)
-
-        _logger.info("Getting alpha")
-        alpha = []
-        for ds in dataset:
-            gamma = []
-            for data in ds:
-                x = data["data"]
-                array_id = data["array_id"]
-                g, _ = self._get_state_probs(x, array_id)
-                gamma.append(g)
-            alpha.append(np.concatenate(gamma).astype(np.float32))
-
-        if concatenate or len(alpha) == 1:
-            alpha = np.concatenate(alpha)
-
-        return alpha
-
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
@@ -784,14 +513,14 @@ class Model(HMMModel):
 
 def _model_structure(config):
     # Inputs
-    inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels + config.n_states + 1),
-        name="input",
+    data = layers.Input(
+        shape=(config.sequence_length, config.n_channels),
+        name="data",
     )
-    data, gamma, array_id = tf.split(
-        inputs, [config.n_channels, config.n_states, 1], axis=2
+    array_id = layers.Input(
+        shape=(config.sequence_length,),
+        name="array_id",
     )
-    array_id = tf.squeeze(array_id, axis=2)
 
     # Static loss scaling factor
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -1046,12 +775,25 @@ def _model_structure(config):
     # and get the conditional likelihood
 
     # Layer definitions
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-        config.n_states, config.covariances_epsilon, name="ll_loss"
+    ll_layer = SeparateLogLikelihoodLayer(
+        config.n_states, config.covariances_epsilon, name="ll"
     )
 
     # Data flow
-    ll_loss = ll_loss_layer([data, mu, D, gamma, array_id])
+    ll = ll_layer([data, mu, D, array_id])
+
+    # Hidden state inference
+    hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
+        config.n_states,
+        config.initial_trans_prob,
+        config.learn_trans_prob,
+        name="hid_state_inf",
+    )
+    gamma, xi = hidden_state_inference_layer(ll)
+
+    # Loss
+    ll_loss_layer = SumLogLikelihoodLossLayer(name="ll_loss")
+    ll_loss = ll_loss_layer([ll, gamma])
 
     # ---------
     # KL losses
@@ -1154,7 +896,7 @@ def _model_structure(config):
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
     return tf.keras.Model(
-        inputs=inputs,
-        outputs=[ll_loss, kl_loss],
+        inputs=[data, array_id],
+        outputs=[ll_loss, kl_loss, gamma, xi],
         name="SE-HMM",
     )
