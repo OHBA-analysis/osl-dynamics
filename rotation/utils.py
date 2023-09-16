@@ -454,6 +454,11 @@ def heatmap_reorder_matrix(matrix:np.ndarray,plot_dir:str,plot_statistics:str,in
     Returns
     -------
     """
+
+    # When plotting, change the model name from MAGE to mDynemo
+    if model_name == 'MAGE':
+        model_name = 'mDynemo'
+
     # Set up the figure and axis
     plt.figure(figsize=(8, 6))
     sns.set(font_scale=1.2)  # Adjust font size for labels

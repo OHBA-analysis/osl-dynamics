@@ -526,6 +526,10 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     -------
 
     """
+
+    # When plotting, change the model name from MAGE to mDynemo
+    if model_name == 'MAGE':
+        model_name = 'mDynemo'
     means = np.load(f'{save_dir}state_means.npy')
     stds = np.load(f'{save_dir}state_stds.npy')
     corrs = np.load(f'{save_dir}state_correlations.npy')
@@ -534,7 +538,7 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     fig, ax = plt.subplots(figsize=(10,6))
     boxplot = ax.boxplot(means.T,vert=True)
     ax.set_xticklabels([f'{i+1}'for i in range(n_states)],fontsize=13)
-    ax.set_yticklabels(fontsize=13)
+    ax.tick_params(axis='y', labelsize=13)
     ax.set_xlabel('State',fontsize=15)
     ax.set_ylabel(r'$\mu$',fontsize=15)
     plt.tight_layout()
@@ -547,7 +551,7 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     fig, ax = plt.subplots(figsize=(10, 6))
     boxplot = ax.boxplot(stds.T, vert=True)
     ax.set_xticklabels([f'{i + 1}' for i in range(n_states)],fontsize=13)
-    ax.set_yticklabels(fontsize=13)
+    ax.tick_params(axis='y', labelsize=13)
     ax.set_xlabel('State', fontsize=15)
     ax.set_ylabel(r'$\sigma$',fontsize=15)
     plt.tight_layout()
@@ -650,6 +654,9 @@ def plot_distance(dist_dir:str,plot_dir:str,model:str,n_channels:int,n_states:in
     Returns
     -------
     """
+    # When plotting, change the model name from MAGE to mDynemo
+    if model == 'MAGE':
+        model = 'mDynemo'
     measures = ['cor','cov']
     # Remark by swimming 8th Aug 2023
     # Correct implementations are Riemannian distance and Fisher z-transformed correlation
@@ -772,6 +779,11 @@ def compute_plot_distance_regularisation(save_dir:str,dist_dir:str, plot_dir:str
     -------
 
     """
+
+    # When plotting, change the model name from MAGE to mDynemo
+    if model == 'MAGE':
+        model = 'mDynemo'
+
     eps_values = [0,1e-8,1e-7,1e-6,1e-5]
     distances = {}
     correlations = np.load(f'{save_dir}state_correlations.npy')
@@ -1083,6 +1095,10 @@ def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_sta
     """
 
     # Create a bar plot
+
+    # When plotting, change the model name from MAGE to mDynemo
+    if model_name == 'MAGE':
+        model_name = 'mDynemo'
     plt.figure(figsize=(10, 6))
 
     bar_width = 0.15
