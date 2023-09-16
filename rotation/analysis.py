@@ -537,12 +537,12 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     # means box plot
     fig, ax = plt.subplots(figsize=(10,6))
     boxplot = ax.boxplot(means.T,vert=True)
-    ax.set_xticklabels([f'{i+1}'for i in range(n_states)],fontsize=13)
-    ax.tick_params(axis='y', labelsize=13)
-    ax.set_xlabel('State',fontsize=15)
-    ax.set_ylabel(r'$\mu$',fontsize=15)
+    ax.set_xticklabels([f'{i+1}'for i in range(n_states)],fontsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+    ax.set_xlabel('State',fontsize=17)
+    ax.set_ylabel(r'$\mu$',fontsize=17)
     plt.tight_layout()
-    plt.suptitle(f'Mean, {model_name}_ICA_{n_channels}_state_{n_states}',fontsize=20)
+    plt.suptitle(f'Mean, {model_name}_ICA_{n_channels}_state_{n_states}',fontsize=22)
     plt.savefig(f'{plot_dir}plot_state_means.jpg')
     plt.savefig(f'{plot_dir}plot_state_means.pdf')
     plt.close()
@@ -550,12 +550,12 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
     # stds box plot
     fig, ax = plt.subplots(figsize=(10, 6))
     boxplot = ax.boxplot(stds.T, vert=True)
-    ax.set_xticklabels([f'{i + 1}' for i in range(n_states)],fontsize=13)
-    ax.tick_params(axis='y', labelsize=13)
-    ax.set_xlabel('State', fontsize=15)
-    ax.set_ylabel(r'$\sigma$',fontsize=15)
+    ax.set_xticklabels([f'{i + 1}' for i in range(n_states)],fontsize=14)
+    ax.tick_params(axis='y', labelsize=14)
+    ax.set_xlabel('State', fontsize=17)
+    ax.set_ylabel(r'$\sigma$',fontsize=17)
     plt.tight_layout()
-    plt.suptitle(f'Standard deviation, {model_name}_ICA_{n_channels}_state_{n_states}', fontsize=20)
+    plt.suptitle(f'Standard deviation, {model_name}_ICA_{n_channels}_state_{n_states}', fontsize=22)
     plt.savefig(f'{plot_dir}plot_state_stds.jpg')
     plt.savefig(f'{plot_dir}plot_state_stds.pdf')
     plt.close()
@@ -585,10 +585,10 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
         cax = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
 
         # Set subplot title
-        ax.set_title(f'Correlation Matrix {i + 1}')
+        ax.set_title(f'FC {i + 1}',fontsize=13)
     # Add a colorbar to show the correlation values
     cbar = fig.colorbar(cax, ax=axes, fraction=0.05, pad=0.04)
-    cbar.set_label('Correlation')
+    cbar.set_label('Correlation',fontsize=15)
     # Adjust spacing between subplots
     #plt.tight_layout()
     plt.savefig(f'{plot_dir}plot_state_correlations.jpg')
