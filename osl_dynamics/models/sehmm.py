@@ -890,7 +890,7 @@ def _model_structure(config):
 
     # Total KL loss
     # Layer definitions
-    kl_loss_layer = KLLossLayer(do_annealing=True, name="kl_loss")
+    kl_loss_layer = KLLossLayer(do_annealing=config.do_kl_annealing, name="kl_loss")
 
     # Data flow
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
