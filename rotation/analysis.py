@@ -441,6 +441,8 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
             FCs_fisher_z_transformed_correlation, distance=False)
 
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
+    if not os.path.exists(reproduce_analysis_dir):
+        os.makedirs(reproduce_analysis_dir)
     split_strategy = '1'
     np.save(f'{reproduce_analysis_dir}FCs_fisher_correlation_split_{split_strategy}.npy',
             FCs_fisher_z_transformed_correlation)
@@ -1125,6 +1127,16 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
     # Create directory
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
+
+    # Compare the reproducibility across all models
+    for model in models:
+        mean_correlation = {}
+        FC_correlation = {}
+        if model != 'SWC':
+            FC_distance = {}
+        for N_channel in list_channels:
+            for N_state in list_states:
+                FC_correlation = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/')
 
     # Compare the free energy and model evidence across all methods
     for model in models:
