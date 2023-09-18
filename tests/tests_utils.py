@@ -151,6 +151,23 @@ def test_twopair_riemannian_distance():
     matrices_2 = np.stack([corr_1,corr_3])
     answer = np.array([[0.0,np.log(2)],[np.log(2),sqrt(2) * np.log(2)]])
     npt.assert_almost_equal(twopair_riemannian_distance(matrices_1,matrices_2),answer,decimal=6)
+
+def test_twopair_fisher_z_transformed_correlation():
+    from rotation.utils import twopair_fisher_z_transformed_correlation
+    x1, x2, x3 = -0.2,0.5,0.3
+    y1, y2, y3 = 0.7,-0.1,0.4
+
+    def fisher_z_inverse(x):
+        return (np.exp(2 * x) - 1) /  (np.exp(2 * x) + 1)
+
+    answer = np.corrcoef(np.array([[x1,x2,x3],[y1,y2,y3]]))
+
+
+    matrices = np.array([[[0.0,x1,x2],[x1,0.0,x3],[x2,x3,0.0]],
+                         [[0.0,y1,y2],[y1,0.0,y3],[y2,y3,0.0]]])
+    matrices = fisher_z_inverse(matrices) + np.eye(3)
+
+    npt.assert_almost_equal(twopair_fisher_z_transformed_correlation(matrices,matrices),answer,decimal=6)
 def test_hungarian_pair():
     from rotation.utils import hungarian_pair
     # When distance is true

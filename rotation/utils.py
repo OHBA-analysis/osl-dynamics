@@ -359,7 +359,7 @@ def twopair_vector_correlation(vectors_1:np.ndarray,vectors_2:np.ndarray)->np.nd
     ----------
     matrices_1: (M*N), M is the number of vectors,
      N is the vector length
-    marices_2: M is the number of vectors,
+    marices_2: (M*N) M is the number of vectors,
      N is the vector length
 
     Returns
@@ -378,7 +378,7 @@ def twopair_vector_correlation(vectors_1:np.ndarray,vectors_2:np.ndarray)->np.nd
             correlations[i, j] = correlation
     return correlations
 
-def twopair_riemannian_distance(matrices_1:np.ndarray,matrices_2:np.ndarray,eps_value:list=[0,1e-9,1e-8,1e-7,1e-6,1e-5],threshold:float=1e-3):
+def twopair_riemannian_distance(matrices_1:np.ndarray,matrices_2:np.ndarray,eps_value:list=[0,1e-9,1e-8,1e-7,1e-6,1e-5],threshold:float=1e-3)->np.ndarray:
     """
     Compute the Riemannian distance between two sets of matrices
     Parameters
@@ -388,6 +388,7 @@ def twopair_riemannian_distance(matrices_1:np.ndarray,matrices_2:np.ndarray,eps_
     eps: (list) regularisation factor
     threshold: (float) Threshold to apply when there are negative eigenvalues. Must be positive.
     Returns
+    riemannian_distances: (M*M) two pair riemannian distance
     -------
     """
     M1,N1,P1 = matrices_1.shape
@@ -414,6 +415,31 @@ def twopair_riemannian_distance(matrices_1:np.ndarray,matrices_2:np.ndarray,eps_
             warnings.warn(f'Calculation of Riemannian distance failed for eps={eps}')
 
     raise ValueError('Riemannian distance failed for all eps values!')
+
+def twopair_fisher_z_transformed_correlation(matrices_1:np.ndarray,matrices_2:np.ndarray)->np.ndarray:
+    """
+    Compute the Fisher_z_transformed correlation between two sets of matrices
+    Parameters
+    ----------
+    matrices_1:  (np.ndarray) M*N*N, M is the number of matrices,N*N is the matrix size
+    matrices_2:  (np.ndarray) M*N*N, M is the number of matrices,N*N is the matrix size
+
+    Returns
+    fisher_z_transformed_correlation: (M*M) two pair fisher_z_correlation
+    -------
+    """
+    N1 = len(matrices_1)
+    N2 = len(matrices_2)
+    assert N1 == N2
+    fisher_z_transformed_correlation = np.eye(N1)
+    for i in trange(N1, desc='Compute twopair Fisher-z transformated correlation'):
+        for j in range(N1):
+            fisher_z_transformed_correlation[i][j] = fisher_z_correlation(
+                matrices_1[i], matrices_2[j]
+            )
+
+    return fisher_z_transformed_correlation
+
 
 def hungarian_pair(matrix:np.ndarray,distance:bool=False):
     """

@@ -1074,6 +1074,8 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
                     free_energy[f'ICA_{N_channel}_state_{N_state}'] = metrics['free_energy']
                     #evidence[f'ICA_{N_channel}_state_{N_state}'] = metrics['evidence']
 
+
+
         group_comparison_plot(free_energy,model,list_channels,list_states,'free_energy',save_dir)
         #group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
 
