@@ -426,12 +426,12 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
 
             if not os.path.exists(f'{save_dir}split_1_first_half/'):
                 os.makedirs(f'{save_dir}split_1_first_half/')
-            K_means_clustering(old_dir,f'{save_dir}split_1_first_half',file_name,n_states,n_channels,measure,split_index=random_index)
+            K_means_clustering(old_dir,f'{save_dir}split_1_first_half/',file_name,n_states,n_channels,measure,split_index=random_index)
 
             if not os.path.exists(f'{save_dir}split_1_second_half/'):
                 os.makedirs(f'{save_dir}split_1_second_half/')
             random_index_C = list(set(np.arange(len(swc))) - set(random_index))
-            K_means_clustering(old_dir,f'{save_dir}split_1_second_half',file_name,n_states,n_channels,measure,split_index=random_index_C)
+            K_means_clustering(old_dir,f'{save_dir}split_1_second_half/',file_name,n_states,n_channels,measure,split_index=random_index_C)
 
 
 
