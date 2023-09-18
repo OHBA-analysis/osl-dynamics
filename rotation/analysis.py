@@ -433,7 +433,25 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
             random_index_C = list(set(np.arange(len(swc))) - set(random_index))
             K_means_clustering(old_dir,f'{save_dir}split_1_second_half/',file_name,n_states,n_channels,measure,split_index=random_index_C)
 
+    # Reproducibility analysis
+    correlations_1 = np.load(f'{save_dir}split_1_first_half/state_correlations.npy')
+    correlations_2 = np.load(f'{save_dir}split_1_second_half/state_correlations.npy')
+    FCs_fisher_z_transformed_correlation = twopair_fisher_z_transformed_correlation(correlations_1, correlations_2)
+    row_column_indices_FCs_Fisher, FCs_correlation_reorder_fisher = hungarian_pair(
+            FCs_fisher_z_transformed_correlation, distance=False)
 
+    reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
+    split_strategy = '1'
+    np.save(f'{reproduce_analysis_dir}FCs_fisher_correlation_split_{split_strategy}.npy',
+            FCs_fisher_z_transformed_correlation)
+    with open(f'{reproduce_analysis_dir}FCs_row_column_indices_Fisher_split_{split_strategy}.json', 'w') as json_file:
+        json.dump(row_column_indices_FCs_Fisher, json_file)
+    np.save(f'{reproduce_analysis_dir}FCs_fisher_correlation_reorder_split_{split_strategy}.npy',
+            FCs_correlation_reorder_fisher)
+
+    heatmap_reorder_matrix(FCs_correlation_reorder_fisher, reproduce_analysis_dir,
+                           'FCs_fisher_z_correlation', row_column_indices_FCs_Fisher,
+                           'SWC', n_channels, n_states, split_strategy)
 
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
