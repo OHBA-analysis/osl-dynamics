@@ -1,4 +1,5 @@
 import os
+import random
 import json
 import warnings
 import pickle
@@ -412,39 +413,27 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
     measures = ['cor','cov']
     file_name = {'cor':'state_correlations',
                  'cov':'state_covariances'}
-    if not os.path.isfile(f'{save_dir}state_stds.npy'):
+
+    if not os.path.isfile(f'{save_dir}split_1_second_half/state_stds.npy'):
         for measure in measures:
-            swc = np.load(f'{old_dir}/{measure}_swc.npy')
-            swc = np.concatenate(swc)
+            K_means_clustering(old_dir,save_dir,file_name,n_states,n_channels,measure)
 
-            # Initiate the K-means class
-            kmeans = KMeans(n_clusters=n_states, verbose=0)
+            # Split half and implement K_means again
+            random_seed = 42
+            random.seed(random_seed)
+            swc = np.load(f'{old_dir}cor_swc.npy')
+            random_index = random.sample(range(len(swc)), int(len(swc) / 2))
 
-            # Get indices that correspond to an upper triangle of a matrix
-            # (not including the diagonal)
-            i, j = np.triu_indices(n_channels, k=1)
+            if not os.path.exists(f'{save_dir}split_1_first_half/'):
+                os.makedirs(f'{save_dir}split_1_first_half/')
+            K_means_clustering(old_dir,f'{save_dir}split_1_first_half',file_name,n_states,n_channels,measure,split_index=random_index)
 
-            # Now let's convert the sliding window connectivity matrices to a series of vectors
-            swc_vectors = swc[:, i, j]
+            if not os.path.exists(f'{save_dir}split_1_second_half/'):
+                os.makedirs(f'{save_dir}split_1_second_half/')
+            random_index_C = list(set(np.arange(len(swc))) - set(random_index))
+            K_means_clustering(old_dir,f'{save_dir}split_1_second_half',file_name,n_states,n_channels,measure,split_index=random_index_C)
 
-            # Check the shape of swc vectors
-            print(f'SWC vectors shape: {swc_vectors.shape}')
 
-            # Fitting
-            kmeans.fit(swc_vectors)  # should take a few seconds
-
-            centroids = kmeans.cluster_centers_
-            print(f'centroids shape: {centroids.shape}')
-
-            # Convert from a vector to a connectivity matrix
-            kmean_networks = np.empty([n_states, n_channels, n_channels])
-            kmean_networks[:, i, j] = centroids
-            kmean_networks[:, j, i] = centroids
-            np.save(f'{save_dir}{file_name[measure]}.npy',kmean_networks)
-
-            if measure == 'cov':
-                stds,_ = cov2stdcor(kmean_networks)
-                np.save(f'{save_dir}state_stds.npy',stds)
 
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
@@ -461,6 +450,62 @@ def SWC_analysis(save_dir,old_dir,n_channels,n_states):
                       n_states=n_states
                       )
 
+def K_means_clustering(old_dir:str,save_dir:str,file_name:dict,n_states:int,n_channels:int,measure:str,split_index=None):
+    """
+    Use K_means algorithm to cluster the correlations/covariances from SWC
+    Parameters
+    ----------
+    old_dir: (str) the directory to where the original correlations/covariances are saved
+    save_dir: (str) the directory to save the centroids
+    file_name: (dict) the file name dictionary
+    n_states: (int) number of states
+    n_channels: (int) number of channels
+    measure: (str) 'cor' or 'cov'
+    split_index: (list) the index to split the data, if is None, then do not split
+    Returns
+    -------
+
+    """
+
+    # Fix the random seed
+
+    swc = np.load(f'{old_dir}/{measure}_swc.npy')
+
+    if split_index is not None:
+        swc = swc[split_index,:,:,:]
+
+
+
+    swc = np.concatenate(swc)
+
+    # Initiate the K-means class
+    kmeans = KMeans(n_clusters=n_states, verbose=0)
+
+    # Get indices that correspond to an upper triangle of a matrix
+    # (not including the diagonal)
+    i, j = np.triu_indices(n_channels, k=1)
+
+    # Now let's convert the sliding window connectivity matrices to a series of vectors
+    swc_vectors = swc[:, i, j]
+
+    # Check the shape of swc vectors
+    print(f'SWC vectors shape: {swc_vectors.shape}')
+
+    # Fitting
+    kmeans.fit(swc_vectors)  # should take a few seconds
+
+    centroids = kmeans.cluster_centers_
+    print(f'centroids shape: {centroids.shape}')
+
+    # Convert from a vector to a connectivity matrix
+    kmean_networks = np.empty([n_states, n_channels, n_channels])
+    kmean_networks[:, i, j] = centroids
+    kmean_networks[:, j, i] = centroids
+    np.save(f'{save_dir}{file_name[measure]}.npy', kmean_networks)
+
+    if measure == 'cov':
+        stds, _ = cov2stdcor(kmean_networks)
+        np.save(f'{save_dir}state_stds.npy', stds)
 def extract_state_statistics(save_dir:str,model_name:str):
     from osl_dynamics.models import load
     model = load(save_dir)
