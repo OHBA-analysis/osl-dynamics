@@ -1136,7 +1136,21 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
             FC_distance = {}
         for N_channel in list_channels:
             for N_state in list_states:
-                FC_correlation = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/')
+                data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_fisher_correlation_reorder_split_1.npy')
+                FC_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
+
+                if model!= 'SWC':
+                    data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_1.npy')
+                    mean_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
+                    data = np.load(
+                        f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_1.npy')
+                    FC_distance[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
+        group_comparison_plot(FC_correlation, model, list_channels, list_states, 'Fisher_z_transformed_correlation', save_dir)
+        if model != 'SWC':
+            group_comparison_plot(FC_distance, model, list_channels, list_states, 'Riemannian_distance',
+                                  save_dir)
+            group_comparison_plot(mean_correlation, model, list_channels, list_states, 'mean_correlation',
+                                  save_dir)
 
     # Compare the free energy and model evidence across all methods
     for model in models:
@@ -1150,8 +1164,7 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
                     free_energy[f'ICA_{N_channel}_state_{N_state}'] = metrics['free_energy']
                     #evidence[f'ICA_{N_channel}_state_{N_state}'] = metrics['evidence']
 
-
-
+        group_comparison_plot(free_energy, model, list_channels, list_states, 'free_energy', save_dir)
         group_comparison_plot(free_energy,model,list_channels,list_states,'free_energy',save_dir)
         #group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
 
