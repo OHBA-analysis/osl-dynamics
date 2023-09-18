@@ -969,7 +969,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             Initial distribution. Shape is (n_states,).
         """
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_stationary_distribution().numpy()
+        return hidden_state_inference_layer.initial_state_probs.numpy()
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
