@@ -11,6 +11,7 @@ from osl_dynamics.models import (
     sedynemo,
     state_dynemo,
     hmm,
+    sehmm,
 )
 from osl_dynamics.utils.misc import NumpyLoader
 
@@ -22,6 +23,7 @@ models = {
     "SE-DyNeMo": sedynemo.Model,
     "State-DyNeMo": state_dynemo.Model,
     "HMM": hmm.Model,
+    "SE-HMM": sehmm.Model,
 }
 
 
