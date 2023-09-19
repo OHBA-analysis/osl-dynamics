@@ -779,13 +779,15 @@ class MarkovStateInferenceModelConfig:
 class MarkovStateInferenceModelBase(ModelBase):
     """Base class for a Markov chain hidden state inference model."""
 
-    def fit(self, *args, lr_decay=None, **kwargs):
+    def fit(self, *args, kl_annealing_callback=None, lr_decay=None, **kwargs):
         """Wrapper for the standard keras fit method.
 
         Parameters
         ----------
         *args : arguments
             Arguments for :code:`ModelBase.fit()`.
+        kl_annealing_callback : bool, optional
+            Should we update the KL annealing factor during training?
         lr_decay : float, optional
             Learning rate decay.
         **kwargs : keyword arguments, optional
@@ -800,18 +802,13 @@ class MarkovStateInferenceModelBase(ModelBase):
         if lr_decay is None:
             lr_decay = self.config.lr_decay
 
+        if kl_annealing_callback is None:
+            kl_annealing_callback = self.config.do_kl_annealing
+
         def lr_scheduler(epoch, lr):
             return self.config.learning_rate * np.exp(-lr_decay * epoch)
 
         lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-        args, kwargs = replace_argument(
-            self.model.fit,
-            "callbacks",
-            [lr_callback],
-            args,
-            kwargs,
-            append=True,
-        )
 
         # Callback for updating the the decay rate used in the
         # EMA update of the transition probability matrix
@@ -825,11 +822,29 @@ class MarkovStateInferenceModelBase(ModelBase):
         args, kwargs = replace_argument(
             self.model.fit,
             "callbacks",
-            [trans_prob_decay_callback],
+            [lr_callback, trans_prob_decay_callback],
             args,
             kwargs,
             append=True,
         )
+
+        # KL annealing
+        if kl_annealing_callback:
+            kl_annealing_callback = callbacks.KLAnnealingCallback(
+                curve=self.config.kl_annealing_curve,
+                annealing_sharpness=self.config.kl_annealing_sharpness,
+                n_annealing_epochs=self.config.n_kl_annealing_epochs,
+            )
+
+            # Update arguments to pass to the fit method
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "callbacks",
+                [kl_annealing_callback],
+                args,
+                kwargs,
+                append=True,
+            )
 
         return super().fit(*args, **kwargs)
 

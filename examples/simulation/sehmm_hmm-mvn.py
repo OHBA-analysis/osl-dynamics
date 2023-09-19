@@ -7,7 +7,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from osl_dynamics import data, simulation
-from osl_dynamics.inference import metrics, modes, tf_ops, callbacks
+from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.sehmm import Config, Model
 from osl_dynamics.utils import plotting
 
@@ -76,17 +76,9 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-kl_annealing_callback = callbacks.KLAnnealingCallback(
-    curve=config.kl_annealing_curve,
-    annealing_sharpness=config.kl_annealing_sharpness,
-    n_annealing_epochs=config.n_kl_annealing_epochs,
-)
-
-model.random_state_time_course_initialization(
-    training_data, n_epochs=3, n_init=5, callbacks=[kl_annealing_callback]
-)
+model.random_state_time_course_initialization(training_data, n_epochs=3, n_init=5)
 # Train model
-history = model.fit(training_data, callbacks=[kl_annealing_callback])
+history = model.fit(training_data)
 
 # Loss
 plotting.plot_line(
