@@ -1636,8 +1636,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             )
         ]
 
-        # Small error for improving the numerical stability of
-        # the log-likelihood
+        # Small error for improving the numerical stability
         self.eps = sys.float_info.epsilon
 
         # Initial state probabilities
@@ -1764,7 +1763,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         @tf.custom_gradient
         def posterior(log_B):
-            # Calculate marginal (gamma) and joint (xi) posterior
+            # Calculate log of marginal (gamma) and joint (xi) posterior
             log_gamma, log_xi = self._baum_welch(log_B)
 
             # Calculate gradient for the transition probability matrix
