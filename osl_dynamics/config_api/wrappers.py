@@ -315,6 +315,45 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
+def get_inf_params(data, output_dir):
+    """Get inferred alphas.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+
+    This function will create the following directory:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    # Make output directory
+    inf_params_dir = output_dir + "/inf_params"
+    os.makedirs(inf_params_dir, exist_ok=True)
+
+    #  Load model
+    from osl_dynamics.models import load
+
+    model_dir = output_dir + "/model"
+    model = load(model_dir)
+
+    # Get the inferred parameters
+    alpha = model.get_alpha(data)
+    means, covs = model.get_means_covariances()
+
+    # Save inferred parameters
+    save(f"{inf_params_dir}/alp.pkl", alpha)
+    save(f"{inf_params_dir}/means.npy", means)
+    save(f"{inf_params_dir}/covs.npy", covs)
+
+
 def plot_tde_covariances(data, output_dir):
     """Plot inferred covariance of the time-delay embedded data.
 
