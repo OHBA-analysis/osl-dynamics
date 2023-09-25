@@ -1643,9 +1643,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         # Initial state probabilities
         self.use_stationary_distribution = use_stationary_distribution
         if not use_stationary_distribution:
-            self.initial_state_probs = (
-                tf.ones(self.n_states, dtype=tf.float32) / self.n_states
-            )
+            self.initial_state_probs = tf.ones(self.n_states) / self.n_states
 
     def get_stationary_distribution(self):
         trans_prob = self.get_trans_prob()
@@ -1697,10 +1695,13 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         else:
             Pi_0 = self.initial_state_probs
 
+        P = tf.cast(P, self.compute_dtype)
+        Pi_0 = tf.cast(Pi_0, self.compute_dtype)
+
         # Temporary variables used in the calculation
-        alpha = tf.zeros_like(B)
-        beta = tf.zeros_like(B)
-        scale = tf.zeros((batch_size, sequence_length))
+        alpha = tf.zeros_like(B, dtype=self.compute_dtype)
+        beta = tf.zeros_like(B, dtype=self.compute_dtype)
+        scale = tf.zeros((batch_size, sequence_length), dtype=self.compute_dtype)
 
         # Forward pass
         for i in range(sequence_length):
@@ -1745,7 +1746,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         # Renormalise the log-likelihood for numerical stability
         max_values = tf.reduce_max(B, axis=-1, keepdims=True)
-        max_values = tf.where(max_values > 0, 0.0, max_values)
+        max_values = tf.minimum(max_values, 0.0)
+        # max_values = tf.where(max_values > 0, 0.0, max_values)
         B -= max_values
 
         # log-likelihood -> likelihood

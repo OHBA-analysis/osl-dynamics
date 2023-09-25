@@ -23,6 +23,7 @@ class ExponentialMovingAverage(optimizer_v2.OptimizerV2):
     @tf.function
     def _resource_apply_dense(self, grad, var):
         # grad should be the new value for var
+        grad = tf.cast(grad, var.dtype)
         return var.assign((1.0 - self.decay) * var + self.decay * grad)
 
 

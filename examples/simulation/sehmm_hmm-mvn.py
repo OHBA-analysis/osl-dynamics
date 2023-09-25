@@ -38,11 +38,7 @@ config = Config(
     learning_rate=1e-2,
     lr_decay=0.1,
     n_epochs=30,
-    learn_trans_prob=True,
-    do_kl_annealing=True,
-    kl_annealing_curve="tanh",
-    kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=15,
+    learn_trans_prob=False,
 )
 
 # Simulate data

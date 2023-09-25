@@ -787,6 +787,7 @@ def _model_structure(config):
         config.n_states,
         config.initial_trans_prob,
         config.learn_trans_prob,
+        dtype="float64",
         name="hid_state_inf",
     )
     gamma, xi = hidden_state_inference_layer(ll)
