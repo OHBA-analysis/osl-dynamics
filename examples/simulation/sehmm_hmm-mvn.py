@@ -34,11 +34,11 @@ config = Config(
     dev_regularizer_factor=10,
     learn_means=False,
     learn_covariances=True,
-    batch_size=64,
+    batch_size=128,
     learning_rate=1e-2,
-    lr_decay=0.1,
-    n_epochs=30,
-    learn_trans_prob=False,
+    lr_decay=0.05,
+    n_epochs=60,
+    learn_trans_prob=True,
 )
 
 # Simulate data
@@ -49,7 +49,7 @@ sim = simulation.MSubj_HMM_MVN(
     subject_covariances="random",
     n_states=config.n_states,
     n_channels=config.n_channels,
-    n_covariances_act=2,
+    n_covariances_act=5,
     n_subjects=config.n_subjects,
     n_subject_embedding_dim=config.subject_embeddings_dim,
     n_mode_embedding_dim=config.mode_embeddings_dim,
