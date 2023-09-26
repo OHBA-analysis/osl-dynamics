@@ -1,5 +1,6 @@
 sphinx==5.3.0
 pydata-sphinx-theme==0.13.3
-sphinx_gallery
-sphinx-autoapi
+sphinx_gallery==0.14.0
+sphinx-autoapi==2.1.1
 urllib3==1.26.15
+astroid==2.15.7
