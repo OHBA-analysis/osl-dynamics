@@ -315,6 +315,88 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
+def train_sehmm(
+    data,
+    output_dir,
+    config_kwargs,
+    init_kwargs=None,
+    fit_kwargs=None,
+    save_inf_params=True,
+):
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    from osl_dynamics.models import sehmm
+
+    init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
+
+    # Directories
+    model_dir = output_dir + "/model"
+
+    # Create the model object
+    _logger.info("Building model")
+    default_config_kwargs = {
+        "n_channels": data.n_channels,
+        "n_subjects": data.n_arrays,
+        "sequence_length": 200,
+        "mode_embeddings_dim": 2,
+        "subject_embeddings_dim": 2,
+        "dev_n_layers": 5,
+        "dev_n_units": 32,
+        "dev_activation": "tanh",
+        "dev_normalization": "layer",
+        "dev_regularizer": "l1",
+        "dev_regularizer_factor": 0.1,
+        "batch_size": 64,
+        "learning_rate": 0.01,
+        "lr_decay": 0.1,
+        "n_epochs": 20,
+    }
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+    config = sehmm.Config(**config_kwargs)
+    model = sehmm.Model(config)
+    model.summary()
+
+    # Initialisation
+    default_init_kwargs = {"n_init": 5, "n_epochs": 2}
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+    init_history = model.random_state_time_course_initialization(
+        data,
+        **init_kwargs,
+    )
+
+    # Training
+    history = model.fit(data, **fit_kwargs)
+
+    # Get the variational free energy
+    history["free_energy"] = model.free_energy(data)
+
+    # Save trained model
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
+    save(f"{model_dir}/init_history.pkl", init_history)
+    save(f"{model_dir}/history.pkl", history)
+
+    if save_inf_params:
+        # Make output directory
+        inf_params_dir = output_dir + "/inf_params"
+        os.makedirs(inf_params_dir, exist_ok=True)
+
+        # Get the inferred parameters
+        alpha = model.get_alpha(data)
+        means, covs = model.get_subject_means_covariances()
+        subject_embeddings = model.get_subject_embeddings()
+
+        # Save inferred parameters
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/subject_embeddings.npy", subject_embeddings)
+
+
 def get_inf_params(data, output_dir):
     """Get inferred alphas.
 
