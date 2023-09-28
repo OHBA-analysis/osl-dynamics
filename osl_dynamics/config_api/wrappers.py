@@ -323,6 +323,60 @@ def train_sehmm(
     fit_kwargs=None,
     save_inf_params=True,
 ):
+    """ Train a `Subject embedding Hidden Markov Model <https://osl-dynamics.\
+    readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html>`_.
+    
+    This function will:
+
+    1. Build an :code:`sehmm.Model` object.
+    2. Initialize the parameters of the model using
+        :code:`Model.random_state_time_course_initialization`.
+    3. Perform full training.
+    4. Save the inferred parameters (state probabilities, means,
+        covariances and subject embeddings) if :code:`save_inf_params=True`.
+    
+    This function will create two directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+        This directory is only created if :code:`save_inf_params=True`.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Keyword arguments to pass to `sehmm.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html\
+        #osl_dynamics.models.sehmm.Config>`_. Defaults to::
+
+            {
+                'sequence_length': 200,
+                'mode_embeddings_dim': 2,
+                'subject_embeddings_dim': 2,
+                'dev_n_layers': 5,
+                'dev_n_units': 32,
+                'dev_activation': 'tanh',
+                'dev_normalization': 'layer',
+                'dev_regularizer': 'l1',
+                'dev_regularizer_factor': 0.1,
+                'batch_size': 64,
+                'learning_rate': 0.01,
+                'lr_decay': 0.1,
+                'n_epochs': 20,
+            }.
+    init_kwargs : dict, optional
+        Keyword arguments to pass to
+        :code:`Model.random_state_time_course_initialization`. Defaults to::
+
+            {'n_init': 5, 'n_epochs': 2}.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`. No defaults.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
+    """
     if data is None:
         raise ValueError("data must be passed.")
 
