@@ -27,11 +27,17 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     If you have GPU resources you may need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions.
 
-    If you are using an Apple computer with an M1/M2 chip, you will need to use the following instead:
+    If you are using an Apple Mac, you will need to use the following instead:
 
     ::
 
         pip install tensorflow-macos==2.9.1
+
+    If pip can not find the package, then you can try installing TensorFlow with conda:
+
+    ::
+
+        conda install tensorflow=2.9.1
 
     After you have installed TensorFlow, install the tensorflow-probability addon with:
 
