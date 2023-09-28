@@ -802,9 +802,6 @@ class MarkovStateInferenceModelBase(ModelBase):
         if lr_decay is None:
             lr_decay = self.config.lr_decay
 
-        if kl_annealing_callback is None:
-            kl_annealing_callback = self.config.do_kl_annealing
-
         def lr_scheduler(epoch, lr):
             return self.config.learning_rate * np.exp(-lr_decay * epoch)
 
@@ -827,24 +824,6 @@ class MarkovStateInferenceModelBase(ModelBase):
             kwargs,
             append=True,
         )
-
-        # KL annealing
-        if kl_annealing_callback:
-            kl_annealing_callback = callbacks.KLAnnealingCallback(
-                curve=self.config.kl_annealing_curve,
-                annealing_sharpness=self.config.kl_annealing_sharpness,
-                n_annealing_epochs=self.config.n_kl_annealing_epochs,
-            )
-
-            # Update arguments to pass to the fit method
-            args, kwargs = replace_argument(
-                self.model.fit,
-                "callbacks",
-                [kl_annealing_callback],
-                args,
-                kwargs,
-                append=True,
-            )
 
         return super().fit(*args, **kwargs)
 

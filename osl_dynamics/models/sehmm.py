@@ -29,10 +29,12 @@ from osl_dynamics.inference.layers import (
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.inference import callbacks
 from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
+from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -242,6 +244,47 @@ class Model(MarkovStateInferenceModelBase):
     def build_model(self):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
+
+    def fit(self, *args, kl_annealing_callback=None, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments for :code:`MarkovStateInferenceModelBase.fit()`.
+        kl_annealing_callback : bool, optional
+            Should we update the KL annealing factor during training?
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`MarkovStateInferenceModelBase.fit()`.
+
+        Returns
+        -------
+        history : history
+            The training history.
+        """
+        # Callback for KL annealing
+        if kl_annealing_callback is None:
+            kl_annealing_callback = self.config.do_kl_annealing
+
+        # KL annealing
+        if kl_annealing_callback:
+            kl_annealing_callback = callbacks.KLAnnealingCallback(
+                curve=self.config.kl_annealing_curve,
+                annealing_sharpness=self.config.kl_annealing_sharpness,
+                n_annealing_epochs=self.config.n_kl_annealing_epochs,
+            )
+
+            # Update arguments to pass to the fit method
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "callbacks",
+                [kl_annealing_callback],
+                args,
+                kwargs,
+                append=True,
+            )
+
+        return super().fit(*args, **kwargs)
 
     def reset_weights(self, keep=None):
         """Reset the model weights.
@@ -787,6 +830,7 @@ def _model_structure(config):
         config.n_states,
         config.initial_trans_prob,
         config.learn_trans_prob,
+        dtype="float64",
         name="hid_state_inf",
     )
     gamma, xi = hidden_state_inference_layer(ll)
