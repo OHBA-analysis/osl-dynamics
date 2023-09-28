@@ -278,10 +278,14 @@ def save(
     component=0,
     subtract_mean=False,
     mean_weights=None,
-    asymmetric_data=False,
+    asymmetric_data=None,
     plot_kwargs=None,
 ):
     """Saves power maps.
+
+    This function is a wrapper for `nilearn.plotting.plot_img_on_surf
+    <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
+    .plot_img_on_surf.html>`_.
 
     Parameters
     ----------
@@ -306,10 +310,18 @@ def save(
     mean_weights: np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
-    asymmetric_data : bool, optional
-        If :code:`True`, the power map is scaled to the range :code:`[-1, 1]`
-        before plotting. The colorbar is rescaled to show the correct values.
-        Useful for plotting maps of statistics such as lifetimes.
+    asymmetric_data : bool or dict, optional
+        By default `nilearn.plotting.plot_img_on_surf
+        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
+        .plot_img_on_surf.html>`_ with produce a plot with a symmetric colorbar
+        centred around zero. This argument can be used to specify an asymmetric
+        colorbar. If :code:`True`, the power map is scaled to the range
+        :code:`[-1, 1]` before plotting. The colorbar's limits are changed to
+        show the correct values during plotting. Alternatively, a dict can be
+        passed containing a :code:`vmin` or :code:`vmax` key or both to specify
+        the limits of the colorbar by hand, e.g.
+        :code:`asymmetric_data={'vmin': 0, 'vmax': 1}`. The data is
+        appropriately scaled to match the colorbar.
     plot_kwargs : dict, optional
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
@@ -362,6 +374,14 @@ def save(
         parcellation_file, files.parcellation.directory
     )
 
+    if asymmetric_data is None:
+        asymmetric_data = False
+    elif isinstance(asymmetric_data, dict):
+        # See if colorbar limits were passed
+        vmin = asymmetric_data.pop("vmin", None)
+        vmax = asymmetric_data.pop("vmax", None)
+        asymmetric_data = True
+
     if plot_kwargs is None:
         plot_kwargs = {}
 
@@ -397,14 +417,30 @@ def save(
     power_map = power_map[component]
 
     if asymmetric_data:
-        # Scale power map to be between -1 and 1
-        original_mins = power_map.min(axis=-1)
-        original_maxs = power_map.max(axis=-1)
+        # Get limits and replace values exceeding the limits
+        if vmin is None:
+            original_mins = power_map.min(axis=-1)
+        else:
+            original_mins = [vmin] * n_modes
+            if np.any(power_map < vmin):
+                _logger.warn(f"values less than {vmin} will be set to {vmin}")
+            power_map[power_map < vmin] = vmin
+        if vmax is None:
+            original_maxs = power_map.max(axis=-1)
+        else:
+            original_maxs = [vmax] * n_modes
+            if np.any(power_map > vmax):
+                _logger.warn(f"values greater than {vmax} will be set to {vmax}")
+            power_map[power_map > vmax] = vmax
+
+        # Rescale power map to be between -1 and 1
         for p, min_, max_ in zip(power_map, original_mins, original_maxs):
             p -= min_
             p /= max_ - min_
             p *= 2
             p -= 1
+
+        plot_kwargs["vmax"] = 1
 
     # Calculate power map grid for each mode
     power_map = [
@@ -610,7 +646,7 @@ def multi_save(
         plot_kwargs=plot_kwargs,
     )
 
-    # Save the subject lebel power maps
+    # Save the subject level power maps
     n_subjects = subject_power_map.shape[0]
     if subjects is None:
         subjects = np.arange(n_subjects)
