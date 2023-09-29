@@ -88,15 +88,16 @@ class Config(BaseModelConfig):
         Should we make the transition probability matrix trainable?
     state_probs_t0: np.ndarray
         State probabilities at :code:`time=0`. Not trainable.
+    observation_update_decay : float
+        Decay rate for the learning rate of the observation model.
+        We update the learning rate (:code:`lr`) as
+        :code:`lr = config.learning_rate * exp(-observation_update_decay *
+        epoch)`.
 
     batch_size : int
         Mini-batch size.
     learning_rate : float
         Learning rate.
-    lr_decay : float
-        Decay for learning rate. Default is 0.1. We use
-        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
-        This only affects the observation model updates.
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
@@ -138,6 +139,7 @@ class Config(BaseModelConfig):
     # Learning rate schedule parameters
     trans_prob_update_delay: float = 5  # alpha
     trans_prob_update_forget: float = 0.7  # beta
+    observation_update_decay: float = 0.1
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
@@ -241,7 +243,9 @@ class Model(ModelBase):
             self._update_rho(n)
 
             # Set learning rate for the observation model
-            lr = self.config.learning_rate * np.exp(-self.config.lr_decay * n)
+            lr = self.config.learning_rate * np.exp(
+                -self.config.observation_update_decay * n
+            )
             backend.set_value(self.model.optimizer.lr, lr)
 
             # Loop over batches
