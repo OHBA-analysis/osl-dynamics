@@ -401,7 +401,7 @@ def train_sehmm(
         "dev_activation": "tanh",
         "dev_normalization": "layer",
         "dev_regularizer": "l1",
-        "dev_regularizer_factor": 0.1,
+        "dev_regularizer_factor": 10,
         "batch_size": 64,
         "learning_rate": 0.01,
         "lr_decay": 0.1,
