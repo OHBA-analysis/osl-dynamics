@@ -17,7 +17,6 @@ The core development team is:
 * Evan Roberts <evan.roberts@kellogg.ox.ac.uk>
 * Rukuang Huang <rukuang.huang@jesus.ox.ac.uk>
 * Hongyu Qian <hongyu.qian@queens.ox.ac.uk>
-* Miguel Farinha <miguel.farinha@balliol.ox.ac.uk>
 * SungJun Cho <sungjun.cho@hertford.ox.ac.uk>
 * Mats van Es <mats.vanes@psych.ox.ac.uk>
 * Mark Woolrich <mark.woolrich@ohba.ox.ac.uk>

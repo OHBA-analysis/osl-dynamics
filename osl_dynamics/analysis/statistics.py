@@ -231,11 +231,6 @@ def group_diff_max_stat_perm(
         assignments,
     )
 
-    # Calculate group difference
-    group1_mean = np.mean(data[assignments == 1], axis=0)
-    group2_mean = np.mean(data[assignments == 2], axis=0)
-    group_diff = group1_mean - group2_mean
-
     # Create GLM Dataset
     data = glm.data.TrialGLMData(
         data=data,
@@ -290,5 +285,8 @@ def group_diff_max_stat_perm(
         copes = abs(model.copes[0])
         percentiles = stats.percentileofscore(null_dist, copes)
     pvalues = 1 - percentiles / 100
+
+    # Get group differences
+    group_diff = model.copes[0]
 
     return group_diff, pvalues
