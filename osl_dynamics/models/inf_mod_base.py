@@ -1277,6 +1277,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             return first_term + remaining_terms
 
         dataset = self.make_dataset(dataset, concatenate=True)
+        _logger.info("Getting free energy")
         predictions = self.predict(dataset, **kwargs)
         ll_loss = np.mean(predictions["ll_loss"])
         entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])

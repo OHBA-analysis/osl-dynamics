@@ -413,6 +413,9 @@ def train_sehmm(
     model = sehmm.Model(config)
     model.summary()
 
+    # Set regularisers
+    model.set_regularizers(data)
+
     # Initialisation
     default_init_kwargs = {"n_init": 5, "n_epochs": 2}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
