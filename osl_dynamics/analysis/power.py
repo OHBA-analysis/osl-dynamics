@@ -375,6 +375,8 @@ def save(
     )
 
     if asymmetric_data is None:
+        vmin = None
+        vmax = None
         asymmetric_data = False
     elif isinstance(asymmetric_data, dict):
         # See if colorbar limits were passed
