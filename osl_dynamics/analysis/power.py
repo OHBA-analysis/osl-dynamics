@@ -374,13 +374,15 @@ def save(
         parcellation_file, files.parcellation.directory
     )
 
-    if asymmetric_data is None:
-        asymmetric_data = False
-    elif isinstance(asymmetric_data, dict):
+    asymmetric_data = asymmetric_data or False
+    if isinstance(asymmetric_data, dict):
         # See if colorbar limits were passed
         vmin = asymmetric_data.pop("vmin", None)
         vmax = asymmetric_data.pop("vmax", None)
         asymmetric_data = True
+    else:
+        vmin = None
+        vmax = None
 
     if plot_kwargs is None:
         plot_kwargs = {}
