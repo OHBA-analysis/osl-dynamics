@@ -284,7 +284,7 @@ def group_diff_max_stat_perm(
         print("Using copes as metric")
         copes = abs(model.copes[0])
         percentiles = stats.percentileofscore(null_dist, copes)
-    pvalues = 1 - percentiles / 100
+    pvalues = (1 - percentiles / 100) * 2
 
     # Get group differences
     group_diff = model.copes[0]
