@@ -718,6 +718,15 @@ def save(
 ):
     """Save connectivity maps.
 
+    This function is a wrapper for:
+
+    - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable\
+      /modules/generated/nilearn.plotting.plot_connectome.html>`_ if
+      :code:`glassbrain=False`.
+    - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable\
+      /modules/generated/nilearn.plotting.view_connectome.html>`_ if
+      :code:`glassbrain=True`.
+
     Parameters
     ----------
     connectivity_map : np.ndarray
@@ -726,8 +735,9 @@ def save(
     parcellation_file : str
         Name of parcellation file used.
     filename : str, optional
-        Output filename. If :code:`None` is passed then the image is shown
-        on screen.
+        Output filename. If :code:`None` is passed then the image is
+        shown on screen. Must have extension :code:`.png`, :code:`.pdf`,
+        :code:`.svg` or :code:`.html`.
     component : int, optional
         Spectral component to save.
     threshold : float or np.ndarray, optional
@@ -737,17 +747,9 @@ def save(
         (n_modes,).
     glassbrain : bool, optional
         Sholud we create a 3D glass brain plot (as an interactive HTML file)
-        or a 2D image plot (as a :code:`png`, :code:`pdf`, :code:`svg`, etc.
-        file).
+        or a 2D image.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to the nilearn plotting function:
-
-        - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable\
-          /modules/generated/nilearn.plotting.plot_connectome.html>`_ if
-          :code:`glassbrain=False`.
-        - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable\
-          /modules/generated/nilearn.plotting.view_connectome.html>`_ if
-          :code:`glassbrain=True`.
+        Keyword arguments to pass to the nilearn plotting function.
 
     Examples
     --------
