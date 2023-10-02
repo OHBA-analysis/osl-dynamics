@@ -948,7 +948,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             Initial distribution. Shape is (n_states,).
         """
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_stationary_distribution().numpy()
+        return hidden_state_inference_layer.initial_state_probs
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
@@ -1276,17 +1276,23 @@ class MarkovStateInferenceModelBase(ModelBase):
 
             return first_term + remaining_terms
 
-        dataset = self.make_dataset(dataset, concatenate=True)
+        dataset = self.make_dataset(dataset, concatenate=False)
         _logger.info("Getting free energy")
-        predictions = self.predict(dataset, **kwargs)
-        ll_loss = np.mean(predictions["ll_loss"])
-        entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
-        prior = _get_posterior_expected_prior(predictions["gamma"], predictions["xi"])
-        free_energy = ll_loss + entropy - prior
-        if self.config.model_name == "SE-HMM":
-            kl_loss = np.mean(predictions["kl_loss"])
-            free_energy += kl_loss
-        return free_energy
+        free_energy = []
+        for ds in dataset:
+            predictions = self.predict(ds, **kwargs)
+            ll_loss = np.mean(predictions["ll_loss"])
+            entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
+            prior = _get_posterior_expected_prior(
+                predictions["gamma"], predictions["xi"]
+            )
+            fe = ll_loss + entropy - prior
+            if self.config.model_name == "SE-HMM":
+                kl_loss = np.mean(predictions["kl_loss"])
+                fe += kl_loss
+            free_energy.append(fe)
+
+        return np.mean(free_energy)
 
     def evidence(self, dataset):
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.

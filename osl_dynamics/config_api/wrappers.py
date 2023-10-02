@@ -361,7 +361,7 @@ def train_sehmm(
                 'dev_activation': 'tanh',
                 'dev_normalization': 'layer',
                 'dev_regularizer': 'l1',
-                'dev_regularizer_factor': 0.1,
+                'dev_regularizer_factor': 10,
                 'batch_size': 64,
                 'learning_rate': 0.01,
                 'lr_decay': 0.1,
@@ -428,12 +428,13 @@ def train_sehmm(
     # Training
     history = model.fit(data, **fit_kwargs)
 
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
+
     # Get the variational free energy
     history["free_energy"] = model.free_energy(data)
 
     # Save trained model
-    _logger.info(f"Saving model to: {model_dir}")
-    model.save(model_dir)
     save(f"{model_dir}/init_history.pkl", init_history)
     save(f"{model_dir}/history.pkl", history)
 
