@@ -17,6 +17,24 @@ from yaml.constructor import ConstructorError
 _logger = logging.getLogger("osl-dynamics")
 
 
+def nextpow2(x):
+    """Next power of 2.
+
+    Parameters
+    ----------
+    x : int
+        Any integer.
+
+    Returns
+    -------
+    res : int
+        The smallest power of two that is greater than or equal to the absolute
+        value of x.
+    """
+    res = np.ceil(np.log2(x))
+    return res.astype("int")
+
+
 def leading_zeros(number, largest_number):
     """Pad a number with leading zeros.
 
