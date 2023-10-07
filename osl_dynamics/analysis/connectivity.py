@@ -707,25 +707,64 @@ def separate_edges(conn_map):
     return pos_conn_map, neg_conn_map
 
 
+def spectral_reordering(corr_mat):
+    """Spectral re-ordering for correlation matrices.
+
+    Parameters
+    ----------
+    corr_mat : np.ndarray
+        Correlation matrix. Shape must be (n_channels, n_channels).
+
+    Returns
+    -------
+    reorder_corr_mat : np.ndarray
+        Re-ordered correlation matrix. Shape is (n_channels, n_channels).
+    order : np.ndarray
+        New ordering. Shape is (n_channels,).
+    """
+    # Add one to make all entries postive
+    C = corr_mat + 1
+
+    # Compute Q
+    Q = -C
+    np.fill_diagonal(Q, 0)
+    Q -= np.sum(Q, axis=0)
+
+    # Compute t
+    t = np.diag(1.0 / np.sqrt(np.sum(C, axis=0)))
+
+    # Compute D
+    D = np.dot(np.dot(t, Q), t)
+
+    # Eigevalue decomposition
+    D, W = np.linalg.eig(D)
+    v = W[:, 1]
+
+    # Scale v
+    v = np.dot(t, v)
+
+    # Find permutations
+    order = np.argsort(v)
+
+    # Reorder
+    reorder_corr_mat = corr_mat[order, :][:, order]
+
+    return reorder_corr_mat, order
+
+
 def save(
     connectivity_map,
     parcellation_file,
     filename=None,
     component=None,
     threshold=0,
-    glassbrain=False,
     plot_kwargs=None,
 ):
-    """Save connectivity maps.
+    """Save connectivity maps as image files.
 
-    This function is a wrapper for:
-
-    - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable\
-      /modules/generated/nilearn.plotting.plot_connectome.html>`_ if
-      :code:`glassbrain=False`.
-    - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable\
-      /modules/generated/nilearn.plotting.view_connectome.html>`_ if
-      :code:`glassbrain=True`.
+    This function is a wrapper for `nilearn.plotting.plot_connectome \
+    <https://nilearn.github.io/stable/modules/generated/nilearn\
+    .plotting.plot_connectome.html>`_.
 
     Parameters
     ----------
@@ -736,8 +775,8 @@ def save(
         Name of parcellation file used.
     filename : str, optional
         Output filename. If :code:`None` is passed then the image is
-        shown on screen. Must have extension :code:`.png`, :code:`.pdf`,
-        :code:`.svg` or :code:`.html`.
+        shown on screen. Must have extension :code:`.png`, :code:`.pdf`
+        or :code:`.svg`.
     component : int, optional
         Spectral component to save.
     threshold : float or np.ndarray, optional
@@ -745,9 +784,6 @@ def save(
         and 1. If a :code:`float` is passed the same threshold is used for all
         modes. Otherwise, threshold should be a numpy array of shape
         (n_modes,).
-    glassbrain : bool, optional
-        Sholud we create a 3D glass brain plot (as an interactive HTML file)
-        or a 2D image.
     plot_kwargs : dict, optional
         Keyword arguments to pass to the nilearn plotting function.
 
@@ -765,12 +801,6 @@ def save(
     """
 
     # Validation
-    if filename is not None:
-        if glassbrain and Path(filename).suffix != ".html":
-            raise ValueError(
-                "If glassbrain=True then filename must have a .html extension."
-            )
-
     connectivity_map = np.copy(connectivity_map)
     error_message = (
         "Dimensionality of connectivity_map must be 3 or 4, "
@@ -819,28 +849,6 @@ def save(
                 fn=Path(filename), i=i, w=len(str(n_modes))
             )
 
-        if glassbrain:
-            # The colour bar range is determined by the max value in the matrix
-            # we zero the diagonal so it's not included
-            np.fill_diagonal(conn_map[i], val=0)
-
-            # Plot thick lines for the connections
-            if "linewidth" not in kwargs:
-                kwargs["linewidth"] = 12
-
-            # Plot maps
-            connectome = plotting.view_connectome(
-                conn_map[i],
-                parcellation.roi_centers(),
-                edge_threshold=f"{threshold[i] * 100}%",
-                **kwargs,
-            )
-            if filename is not None:
-                connectome.save_as_html(output_file)
-            else:
-                return connectome
-
-        else:
             # If all connections are zero don't add a colourbar
             kwargs["colorbar"] = np.any(
                 conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
@@ -856,46 +864,106 @@ def save(
             )
 
 
-def spectral_reordering(corr_mat):
-    """Spectral re-ordering for correlation matrices.
+def save_interactive(
+    connectivity_map,
+    parcellation_file,
+    filename=None,
+    component=None,
+    threshold=0,
+    plot_kwargs=None,
+):
+    """Save connectivity maps as interactive HTML plots.
+
+    This function is a wrapper for `nilearn.plotting.view_connectome \
+    <https://nilearn.github.io/stable/modules/generated/nilearn\
+    .plotting.view_connectome.html>`_
 
     Parameters
     ----------
-    corr_mat : np.ndarray
-        Correlation matrix. Shape must be (n_channels, n_channels).
-
-    Returns
-    -------
-    reorder_corr_mat : np.ndarray
-        Re-ordered correlation matrix. Shape is (n_channels, n_channels).
-    order : np.ndarray
-        New ordering. Shape is (n_channels,).
+    connectivity_map : np.ndarray
+        Matrices containing connectivity strengths to plot. Shape must be
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+    parcellation_file : str
+        Name of parcellation file used.
+    filename : str, optional
+        Output filename. If :code:`None` is passed then the image is
+        shown on screen. Must have extension :code:`.html`.
+    component : int, optional
+        Spectral component to save.
+    threshold : float or np.ndarray, optional
+        Threshold to determine which connectivity to show. Should be between 0
+        and 1. If a :code:`float` is passed the same threshold is used for all
+        modes. Otherwise, threshold should be a numpy array of shape
+        (n_modes,).
+    plot_kwargs : dict, optional
+        Keyword arguments to pass to the nilearn plotting function.
     """
-    # Add one to make all entries postive
-    C = corr_mat + 1
 
-    # Compute Q
-    Q = -C
-    np.fill_diagonal(Q, 0)
-    Q -= np.sum(Q, axis=0)
+    # Validation
+    connectivity_map = np.copy(connectivity_map)
+    error_message = (
+        "Dimensionality of connectivity_map must be 3 or 4, "
+        + f"got ndim={connectivity_map.ndim}."
+    )
+    connectivity_map = array_ops.validate(
+        connectivity_map,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message=error_message,
+    )
 
-    # Compute t
-    t = np.diag(1.0 / np.sqrt(np.sum(C, axis=0)))
+    if isinstance(threshold, float) or isinstance(threshold, int):
+        threshold = np.array([threshold] * connectivity_map.shape[1])
 
-    # Compute D
-    D = np.dot(np.dot(t, Q), t)
+    if np.any(threshold > 1) or np.any(threshold < 0):
+        raise ValueError("threshold must be between 0 and 1.")
 
-    # Eigevalue decomposition
-    D, W = np.linalg.eig(D)
-    v = W[:, 1]
+    if component is None:
+        component = 0
 
-    # Scale v
-    v = np.dot(t, v)
+    # Load parcellation file
+    parcellation = Parcellation(parcellation_file)
 
-    # Find permutations
-    order = np.argsort(v)
+    # Select the component we're plotting
+    conn_map = connectivity_map[component]
 
-    # Reorder
-    reorder_corr_mat = corr_mat[order, :][:, order]
+    # Fill diagonal with zeros to help with the colorbar limits
+    for c in conn_map:
+        np.fill_diagonal(c, 0)
 
-    return reorder_corr_mat, order
+    # Default plotting settings
+    default_plot_kwargs = {"node_size": 10, "node_color": "black"}
+
+    # Loop through each connectivity map
+    n_modes = conn_map.shape[0]
+    for i in trange(n_modes, desc="Saving images"):
+        # Overwrite keyword arguments if passed
+        kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+        # Output filename
+        if filename is None:
+            output_file = None
+        else:
+            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                fn=Path(filename), i=i, w=len(str(n_modes))
+            )
+
+        # The colour bar range is determined by the max value in the matrix
+        # we zero the diagonal so it's not included
+        np.fill_diagonal(conn_map[i], val=0)
+
+        # Plot thick lines for the connections
+        if "linewidth" not in kwargs:
+            kwargs["linewidth"] = 12
+
+        # Plot maps
+        connectome = plotting.view_connectome(
+            conn_map[i],
+            parcellation.roi_centers(),
+            edge_threshold=f"{threshold[i] * 100}%",
+            **kwargs,
+        )
+        if filename is not None:
+            connectome.save_as_html(output_file)
+        else:
+            return connectome

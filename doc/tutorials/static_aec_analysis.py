@@ -198,18 +198,15 @@ connectivity.save(
 )
 
 #%%
-# Note, we can also plot an AEC network as a 3D glass brain plot using the `glassbrain` argument.
+# Note, we can also plot an AEC network as a 3D glass brain plot using the `connectivity.save_interactive` method.
 
 # Display the network
-connectivity.save(
+connectivity.save_interactive(
     thres_group_aec,
     parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
-    glassbrain=True,
 )
 
 #%%
-# When we pass `glassbrain=True`, `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ becomes a wrapper for the nilearn function `view_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.view_connectome.html>`_. We can use the `plot_kwargs` argument to pass extra arguments to nilearn's function.
-#
 # We can see from the above plot averaging over a large group gives us a cleaner network.  This is simply due to the data being noisy which makes estimating networks hard. Averaging over subjects helps remove this noise. In the group average network we can see the strongest connections are in posterior regions as expected.
 #
 # Data-driven thresholding
@@ -258,10 +255,9 @@ print("Percentile:", percentile)
 thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
 
 # Display the network
-connectivity.save(
+connectivity.save_interactive(
     thres_group_aec,
     parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
-    glassbrain=True,
     plot_kwargs={"edge_cmap": "Reds", "symmetric_cmap": False},
 )
 
@@ -280,10 +276,9 @@ print("Percentile:", percentile)
 thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
 
 # Display the network
-connectivity.save(
+connectivity.save_interactive(
     thres_group_aec,
     parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
-    glassbrain=True,
     plot_kwargs={"edge_cmap": "Reds", "symmetric_cmap": False},
 )
 
