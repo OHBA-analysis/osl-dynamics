@@ -177,7 +177,7 @@ def multitaper_spectra(
         ):
             raise ValueError(
                 f"data is type {type(data)} and alpha is type "
-                + f"{type(alpha)}. They must both be lists or numpy arrays."
+                f"{type(alpha)}. They must both be lists or numpy arrays."
             )
 
         if isinstance(data, list):
@@ -186,8 +186,8 @@ def multitaper_spectra(
             if len(data) != len(alpha):
                 raise ValueError(
                     "A different number of subjects has been passed for "
-                    + f"data and alpha: len(data)={len(data)}, "
-                    + f"len(alpha)={len(alpha)}."
+                    f"data and alpha: len(data)={len(data)}, "
+                    f"len(alpha)={len(alpha)}."
                 )
 
             # Check the number of samples in data and alpha
@@ -227,7 +227,10 @@ def multitaper_spectra(
     state_time_course = [modes.argmax_time_courses(a) for a in alpha]
 
     # Helper function for calculating a multitaper spectrum
+    # for a single subject
     def _mt(data, stc):
+        # data and stc are numpy arrays with shape (n_samples, n_channels)
+
         # Reshape data into non-overlapping windows
         n_windows = data.shape[0] // window_length
         data = data[: n_windows * window_length]
@@ -279,6 +282,16 @@ def multitaper_spectra(
                 p = np.mean(p, axis=0)
                 psd.append(p)
             psd = np.array(psd, dtype=np.float32)
+
+        # Rescale PSDs to account for the number of time points
+        # each state was active
+        fo = np.sum(stc, axis=(0, 1)) / (n_windows * window_length)
+        for psd_, fo_ in zip(psd, fo):
+            psd_ /= fo_
+
+        if calc_coh:
+            return f, psd, coh
+        else:
             return f, psd
 
     if len(data) == 1:
