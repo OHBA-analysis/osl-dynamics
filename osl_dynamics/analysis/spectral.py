@@ -265,7 +265,6 @@ def welch_spectra(
             psd = np.array(psd, dtype=np.complex64)
             coh = coherence_spectra(psd)
             psd = psd[:, range(psd.shape[1]), range(psd.shape[2])].real
-            return f, psd, coh
 
         else:
             # Calculate PSDs
@@ -509,7 +508,6 @@ def multitaper_spectra(
             psd = np.array(psd, dtype=np.complex64)
             coh = coherence_spectra(psd)
             psd = psd[:, range(psd.shape[1]), range(psd.shape[2])].real
-            return f, psd, coh
 
         else:
             # Calculate multitaper PSDs
