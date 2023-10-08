@@ -18,10 +18,11 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
     Parameters
     ----------
     X : np.ndarray
-        2D matrix. Regressors.
+        Regressors, should be a 2D array (n_targets, n_regressors).
     y : np.ndarray
-        2D matrix. Targets. If a higher dimension array is passed, the extra
-        dimensions are concatenated.
+        Targets. Should be a 2D array: (n_targets, n_features).
+        If a higher dimension array is passed, the extra dimensions
+        are concatenated.
     fit_intercept : bool
         Should we fit an intercept?
     normalize : bool, optional
@@ -32,10 +33,11 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
     Returns
     -------
     coefs : np.ndarray
-        2D or higher dimension array. Regression coefficients.
+        Regression coefficients. 2D array or higher dimensionality:
+        (n_regressors, n_features).
     intercept : np.ndarray
-        1D or higher dimension array. Regression intercept.
-        Returned if :code:`fit_intercept=True`.
+        Regression intercept. 1D array or higher dimensionality:
+        (n_features,). Returned if :code:`fit_intercept=True`.
     """
     if log_message:
         _logger.info("Fitting linear regression")

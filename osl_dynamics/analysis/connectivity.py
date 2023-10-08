@@ -180,8 +180,10 @@ def covariance_from_spectra(
             if frequency_range is None:
                 c = np.sum(csd, axis=-1)
             else:
-                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
-                c = np.sum(csd[..., f_min:f_max], axis=-1)
+                [min_arg, max_arg] = get_frequency_args_range(
+                    frequencies, frequency_range
+                )
+                c = np.sum(csd[..., min_arg:max_arg], axis=-1)
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         covar.append(c)
@@ -265,8 +267,10 @@ def mean_coherence_from_spectra(
             if frequency_range is None:
                 coh = np.mean(coh, axis=-1)
             else:
-                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
-                coh = np.mean(coh[..., f_min:f_max], axis=-1)
+                [min_arg, max_arg] = get_frequency_args_range(
+                    frequencies, frequency_range
+                )
+                coh = np.mean(coh[..., min_arg:max_arg], axis=-1)
 
         coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
         c.append(coh)

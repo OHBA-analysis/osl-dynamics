@@ -88,19 +88,19 @@ def welch_spectra(
         :code:`window_length // 2`.
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    return_weights : bool, optional
-        Should we return the weights for subject-specific spectra?
-        This is useful for calculating a group average.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
     calc_coh : bool, optional
         Should we also return the coherence spectra?
-    n_jobs : int, optional
-        Number of parallel jobs.
+    return_weights : bool, optional
+        Should we return the weights for subject-specific spectra?
+        This is useful for calculating a group average.
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
         dimensions of length 1.
+    n_jobs : int, optional
+        Number of parallel jobs.
 
     Returns
     -------
@@ -124,25 +124,25 @@ def welch_spectra(
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
-        return_weights=return_weights,
         standardize=standardize,
         calc_coh=calc_coh,
-        n_jobs=n_jobs,
+        return_weights=return_weights,
         keepdims=keepdims,
+        n_jobs=n_jobs,
     )
 
 
 def multitaper_spectra(
     data,
     sampling_frequency,
-    time_half_bandwidth,
     window_length=None,
+    time_half_bandwidth=None,
     frequency_range=None,
-    return_weights=False,
     standardize=True,
     calc_coh=True,
-    n_jobs=1,
+    return_weights=False,
     keepdims=False,
+    n_jobs=1,
 ):
     """Calculate multitaper spectra.
 
@@ -158,70 +158,25 @@ def multitaper_spectra(
         n_channels) or (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
-    time_half_bandwidth : float
-        Parameter to control the resolution of the spectra.
     window_length : int, optional
         Length of the data segement to use to calculate the multitaper.
+    time_half_bandwidth : float, optional
+        Parameter to control the resolution of the spectra.
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    return_weights : bool, optional
-        Should we return the weights for subject-specific PSDs?
-        Useful for calculating the group average PSD.
     standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
     calc_coh : bool, optional
         Should we also return the coherence spectra?
-    n_jobs : int, optional
-        Number of parallel jobs.
-    keepdims : bool, optional
-        Should we enforce a (n_subject, n_states, ...) array is returned for
-        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions
-        of length 1.
-
-    Returns
-    -------
-    frequencies : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
-    coherences : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    weights : np.ndarray
-        Weighting for subject-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_subjects,).
-    Parameters
-    ----------
-    data : np.ndarray or list
-        Time series data. Must have shape (n_subjects, n_samples,
-        n_channels) or (n_samples, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    time_half_bandwidth : float
-        Parameter to control the resolution of the spectra.
-    alpha : np.ndarray or list, optional
-        Inferred state time course. Must have shape (n_subjects,
-        n_samples, n_states) or (n_samples, n_states).
-    window_length : int, optional
-        Length of the data segement to use to calculate the multitaper.
-    frequency_range : list, optional
-        Minimum and maximum frequency to keep.
     return_weights : bool, optional
         Should we return the weights for subject-specific PSDs?
         Useful for calculating the group average PSD.
-    standardize : bool, optional
-        Should we standardize the data before calculating the multitaper?
-    calc_coh : bool, optional
-        Should we also return the coherence spectra?
-    n_jobs : int, optional
-        Number of parallel jobs.
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions
         of length 1.
+    n_jobs : int, optional
+        Number of parallel jobs.
 
     Returns
     -------
@@ -242,12 +197,12 @@ def multitaper_spectra(
     return spectral.multitaper_spectra(
         data=data,
         sampling_frequency=sampling_frequency,
-        time_half_bandwidth=time_half_bandwidth,
         window_length=window_length,
+        time_half_bandwidth=time_half_bandwidth,
         frequency_range=frequency_range,
-        return_weights=return_weights,
         standardize=standardize,
         calc_coh=calc_coh,
-        n_jobs=n_jobs,
+        return_weights=return_weights,
         keepdims=keepdims,
+        n_jobs=n_jobs,
     )
