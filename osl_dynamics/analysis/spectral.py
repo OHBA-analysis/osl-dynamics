@@ -14,6 +14,7 @@ from pqdm.threads import pqdm
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
+from osl_dynamics.inference import modes
 from osl_dynamics.utils.misc import nextpow2
 
 _logger = logging.getLogger("osl-dynamics")
@@ -130,8 +131,8 @@ def multitaper_spectra(
     sampling_frequency : float
         Sampling frequency in Hz.
     alpha : np.ndarray or list, optional
-        Inferred state time course. Must have shape (n_subjects,
-        n_samples, n_states) or (n_samples, n_states).
+        Inferred state probability time course. Must have shape
+        (n_subjects, n_samples, n_states) or (n_samples, n_states).
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
     window_length : int, optional
@@ -222,21 +223,24 @@ def multitaper_spectra(
     if standardize:
         data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
+    # Calculate state time course (Viterbi path) from probabilities
+    state_time_course = [modes.argmax_time_courses(a) for a in alpha]
+
     # Helper function for calculating a multitaper spectrum
-    def _mt(data, alpha):
+    def _mt(data, stc):
         # Reshape data into non-overlapping windows
         n_windows = data.shape[0] // window_length
         data = data[: n_windows * window_length]
         data = data.reshape(n_windows, window_length, -1)
-        alpha = alpha[: n_windows * window_length]
-        alpha = alpha.reshape(n_windows, window_length, -1)
+        stc = stc[: n_windows * window_length]
+        stc = stc.reshape(n_windows, window_length, -1)
 
         if calc_coh:
             # Calculate cross multitaper PSDs
             psd = []
-            for state in range(alpha.shape[-1]):
-                state_alpha = alpha[..., state][..., np.newaxis]
-                X = np.swapaxes(data * state_alpha, 1, 2)
+            for i in range(stc.shape[-1]):
+                X = data * stc[:, i, np.newaxis]
+                X = np.swapaxes(X, 1, 2)
                 mt = mne.time_frequency.csd_array_multitaper(
                     X=X,
                     sfreq=sampling_frequency,
@@ -246,7 +250,8 @@ def multitaper_spectra(
                     bandwidth=time_half_bandwidth,
                     verbose=False,
                 )
-                p = np.moveaxis([mt.get_data(f) for f in mt.frequencies], 0, -1)
+                p = [mt.get_data(f) for f in mt.frequencies]
+                p = np.moveaxis(p, 0, -1)
                 psd.append(p)
 
             # Unpack PSDs and calculate coherence
@@ -259,9 +264,9 @@ def multitaper_spectra(
         else:
             # Calculate multitaper PSDs
             psd = []
-            for state in range(alpha.shape[-1]):
-                state_alpha = alpha[..., state][..., np.newaxis]
-                x = np.swapaxes(data * state_alpha, 1, 2)
+            for i in range(stc.shape[-1]):
+                x = data * stc[..., i, np.newaxis]
+                x = np.swapaxes(x, 1, 2)
                 p, f = mne.time_frequency.psd_array_multitaper(
                     x=x,
                     sfreq=sampling_frequency,
@@ -271,9 +276,8 @@ def multitaper_spectra(
                     normalization="full",
                     verbose=False,
                 )
-                psd.append(np.mean(p, axis=0))
-
-            # Unpack PSDs
+                p = np.mean(p, axis=0)
+                psd.append(p)
             psd = np.array(psd, dtype=np.float32)
             return f, psd
 
@@ -281,20 +285,20 @@ def multitaper_spectra(
         # We only have one subject so we don't need to parallelise
         # the calculation
         _logger.info("Calculating spectra")
-        results = [_mt(data[0], alpha[0])]
+        results = [_mt(data[0], state_time_course[0])]
 
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
         for n in range(len(data)):
             _logger.info(f"Calculating spectra {n}")
-            results.append(_mt(data[n], alpha[n]))
+            results.append(_mt(data[n], state_time_course[n]))
 
     else:
         # Calculate spectra in parallel
         _logger.info("Calculating spectra")
         results = pqdm(
-            zip(data, alpha),
+            zip(data, state_time_course),
             _mt,
             n_jobs=n_jobs,
             argument_type="args",
