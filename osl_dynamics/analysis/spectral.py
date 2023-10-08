@@ -609,6 +609,7 @@ def regression_spectra(
     calc_coh=True,
     return_weights=False,
     return_coef_int=False,
+    rescale_coef=True,
     keepdims=False,
     n_jobs=1,
 ):
@@ -644,6 +645,12 @@ def regression_spectra(
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
         separately for the PSDs?
+    rescale_coef : bool, optional
+        Should we rescale the regression coefficients to reflect the maximum
+        value in each regressor? If :code:`True`, we interpret the regression
+        coefficients at the maximum power deviation from the mean. If
+        :code:`False`, we interpret the regression coefficients as the per unit
+        change in power spectra. By default we do rescale.
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions
@@ -884,8 +891,10 @@ def regression_spectra(
             log_message=False,
         )
 
-        # Rescale the regression coefficients
-        coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
+        if rescale_psd:
+            # Rescale the regression coefficients to reflect the maximum
+            # deviation from the mean
+            coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
 
         return t, f, coefs, intercept
 
