@@ -155,17 +155,17 @@ def welch_spectra(
 
     Returns
     -------
-    frequencies : np.ndarray
+    f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
+    psd : np.ndarray
         Power spectra for each subject and state. Shape is (n_subjects,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
-    coherences : np.ndarray
+    coh : np.ndarray
         Coherences for each state. Shape is (n_subjects, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    weights : np.ndarray
+    w : np.ndarray
         Weighting for subject-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_subjects,).
     """
@@ -400,17 +400,17 @@ def multitaper_spectra(
 
     Returns
     -------
-    frequencies : np.ndarray
+    f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
+    psd : np.ndarray
         Power spectra for each subject and state. Shape is (n_subjects,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
-    coherences : np.ndarray
+    coh : np.ndarray
         Coherences for each state. Shape is (n_subjects, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    weights : np.ndarray
+    w : np.ndarray
         Weighting for subject-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_subjects,).
     """
@@ -986,37 +986,33 @@ def regression_spectra(
         return f, psd, coh
 
 
-def coherence_spectra(power_spectra, log_message=False):
+def coherence_spectra(cpsd):
     """Calculates coherences from (cross) power spectral densities.
 
     Parameters
     ----------
-    power_spectra : np.ndarray
-        Power spectra. Shape is (n_modes, n_channels, n_channels, n_freq).
-    log_message : bool, optional
-        Should we log a message to screen?
+    cpsd : np.ndarray
+        Cross power spectra.
+        Shape is (n_modes, n_channels, n_channels, n_freq).
 
     Returns
     -------
-    coherences : np.ndarray
+    coh : np.ndarray
         Coherence spectra for each mode.
         Shape is (n_modes, n_channels, n_channels, n_freq).
     """
-    n_modes, n_channels, n_channels, n_freq = power_spectra.shape
+    n_modes, n_channels, n_channels, n_freq = cpsd.shape
 
-    if log_message:
-        _logger.info("Calculating coherences")
-
-    coherences = np.empty([n_modes, n_channels, n_channels, n_freq])
+    coh = np.empty([n_modes, n_channels, n_channels, n_freq])
     for i in range(n_modes):
         for j in range(n_channels):
             for k in range(n_channels):
-                coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
-                    power_spectra[i, j, j].real * power_spectra[i, k, k].real
+                coh[i, j, k] = abs(cpsd[i, j, k]) / np.sqrt(
+                    cpsd[i, j, j].real * cpsd[i, k, k].real
                 )
 
     # Zero nan values
-    return np.nan_to_num(coherences)
+    return np.nan_to_num(coh)
 
 
 def decompose_spectra(
@@ -1208,13 +1204,13 @@ def autocorr_to_spectra(
 
     Returns
     -------
-    frequencies : np.ndarray
+    f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
+    psd : np.ndarray
         Power (or cross) spectra calculated for each mode. Shape is
         (n_channels, n_channels, n_freq) or (n_modes, n_channels, n_channels,
         n_freq).
-    coherences : np.ndarray
+    coh : np.ndarray
         Coherences calculated for each mode. Shape is (n_channels, n_channels,
         n_freq) or (n_modes, n_channels, n_channels, n_freq).
     """
@@ -1239,27 +1235,27 @@ def autocorr_to_spectra(
     nfft = max(nfft, 2 ** nextpow2(n_lags))
 
     # Calculate the argments to keep for the given frequency range
-    frequencies = np.arange(
+    f = np.arange(
         0,
         sampling_frequency / 2,
         sampling_frequency / nfft,
     )
-    [min_arg, max_arg] = get_frequency_args_range(frequencies, frequency_range)
-    frequencies = frequencies[min_arg:max_arg]
+    [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+    f = f[min_arg:max_arg]
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
-    p = np.fft.fft(autocorr_func, nfft)
-    p = p[..., min_arg:max_arg]
-    power_spectra = abs(psd)
+    psd = np.fft.fft(autocorr_func, nfft)
+    psd = psd[..., min_arg:max_arg]
+    psd = abs(psd)
 
     # Normalise the power spectra
-    power_spectra /= nfft**2
+    psd /= nfft**2
 
     # Coherences for each mode
-    coherences = coherence_spectra(power_spectra)
+    coh = coherence_spectra(psd)
 
-    return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
+    return f, np.squeeze(psd), np.squeeze(coh)
 
 
 def get_frequency_args_range(frequencies, frequency_range):

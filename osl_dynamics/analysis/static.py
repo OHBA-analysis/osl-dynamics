@@ -15,7 +15,6 @@ This module is used in the following tutorials:
 import logging
 
 import numpy as np
-from pqdm.processes import pqdm
 
 from osl_dynamics.analysis import spectral
 
@@ -104,17 +103,17 @@ def welch_spectra(
 
     Returns
     -------
-    frequencies : np.ndarray
+    f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
+    psd : np.ndarray
         Power spectra for each subject and state. Shape is (n_subjects,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
-    coherences : np.ndarray
+    coh : np.ndarray
         Coherences for each state. Shape is (n_subjects, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    weights : np.ndarray
+    w : np.ndarray
         Weighting for subject-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_subjects,).
     """
@@ -180,17 +179,17 @@ def multitaper_spectra(
 
     Returns
     -------
-    frequencies : np.ndarray
+    f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
+    psd : np.ndarray
         Power spectra for each subject and state. Shape is (n_subjects,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
-    coherences : np.ndarray
+    coh : np.ndarray
         Coherences for each state. Shape is (n_subjects, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    weights : np.ndarray
+    w : np.ndarray
         Weighting for subject-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_subjects,).
     """

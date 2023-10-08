@@ -103,21 +103,21 @@ def sliding_window_connectivity(
 
 
 def covariance_from_spectra(
-    frequencies,
-    power_spectra,
+    f,
+    cpsd,
     components=None,
     frequency_range=None,
 ):
-    """Calculates covariance from power spectra.
+    """Calculates covariance from cross power spectra.
 
     Parameters
     ----------
-    frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if :code:`frequency_range`
+    f : np.ndarray
+        Frequency axis of the spectra. Only used if :code:`frequency_range`
         is given. Shape must be (n_freq,).
-    power_spectra : np.ndarray
-        Power/cross spectra for each channel.
-        Shape must be (n_modes, n_channels, n_channels, n_freq).
+    cpsd : np.ndarray
+        Cross power spectra. Shape must be
+        (n_modes, n_channels, n_channels, n_freq).
     components : np.ndarray, optional
         Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list, optional
@@ -138,8 +138,8 @@ def covariance_from_spectra(
         + "(n_subjects, n_modes, n_channels, n_channels, n_freq) "
         + "array must be passed."
     )
-    power_spectra = array_ops.validate(
-        power_spectra,
+    cpsd = array_ops.validate(
+        cpsd,
         correct_dimensionality=5,
         allow_dimensions=[3, 4],
         error_message=error_message,
@@ -150,13 +150,13 @@ def covariance_from_spectra(
             "Only one of the arguments components or frequency range can be passed."
         )
 
-    if frequency_range is not None and frequencies is None:
+    if frequency_range is not None and f is None:
         raise ValueError(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
+    n_subjects, n_modes, n_channels, n_channels, n_freq = cpsd.shape
     if components is None:
         n_components = 1
     else:
@@ -166,7 +166,7 @@ def covariance_from_spectra(
     covar = []
     for i in range(n_subjects):
         # Cross spectral densities
-        csd = power_spectra[i].reshape(-1, n_freq)
+        csd = cpsd[i].reshape(-1, n_freq)
         csd = abs(csd)
 
         if components is not None:
@@ -180,9 +180,7 @@ def covariance_from_spectra(
             if frequency_range is None:
                 c = np.sum(csd, axis=-1)
             else:
-                [min_arg, max_arg] = get_frequency_args_range(
-                    frequencies, frequency_range
-                )
+                [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
                 c = np.sum(csd[..., min_arg:max_arg], axis=-1)
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
@@ -192,8 +190,8 @@ def covariance_from_spectra(
 
 
 def mean_coherence_from_spectra(
-    frequencies,
-    coherence,
+    f,
+    coh,
     components=None,
     frequency_range=None,
 ):
@@ -201,10 +199,10 @@ def mean_coherence_from_spectra(
 
     Parameters
     ----------
-    frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if :code:`frequency_range` is
+    f : np.ndarray
+        Frequency axis of the spectra. Only used if :code:`frequency_range` is
         given. Shape must be (n_freq,).
-    coherence : np.ndarray
+    coh : np.ndarray
         Coherence for each channel. Shape must be (n_modes, n_channels,
         n_channels, n_freq).
     components : np.ndarray, optional
@@ -214,7 +212,7 @@ def mean_coherence_from_spectra(
 
     Returns
     -------
-    coh : np.ndarray
+    mean_coh : np.ndarray
         Mean coherence over a frequency band for each component of each mode.
         Shape is (n_components, n_modes, n_channels, n_channels) or
         (n_modes, n_channels, n_channels) or (n_channels, n_channels).
@@ -226,8 +224,8 @@ def mean_coherence_from_spectra(
         + "or 4D numpy array (n_modes, n_channels, n_channels, "
         + "n_freq) must be passed for spectra."
     )
-    coherence = array_ops.validate(
-        coherence,
+    coh = array_ops.validate(
+        coh,
         correct_dimensionality=5,
         allow_dimensions=[3, 4],
         error_message=error_message,
@@ -238,44 +236,42 @@ def mean_coherence_from_spectra(
             "Only one of the arguments components or frequency range can be passed."
         )
 
-    if frequency_range is not None and frequencies is None:
+    if frequency_range is not None and f is None:
         raise ValueError(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_freq = coherence.shape
+    n_subjects, n_modes, n_channels, n_channels, n_freq = coh.shape
     if components is None:
         n_components = 1
     else:
         n_components = components.shape[0]
 
-    # Calculate connectivity for each subject
-    c = []
+    # Calculate mean coherence for each subject
+    mean_coh = []
     for i in range(n_subjects):
         # Concatenate over modes
-        coh = coherence[i].reshape(-1, n_freq)
+        c = coh[i].reshape(-1, n_freq)
 
         if components is not None:
             # Coherence for each spectral component
-            coh = components @ coh.T
+            c = components @ c.T
             for j in range(n_components):
-                coh[j] /= np.sum(components[j])
+                c[j] /= np.sum(components[j])
 
         else:
             # Mean over the given frequency range
             if frequency_range is None:
-                coh = np.mean(coh, axis=-1)
+                c = np.mean(c, axis=-1)
             else:
-                [min_arg, max_arg] = get_frequency_args_range(
-                    frequencies, frequency_range
-                )
-                coh = np.mean(coh[..., min_arg:max_arg], axis=-1)
+                [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+                c = np.mean(c[..., min_arg:max_arg], axis=-1)
 
-        coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
-        c.append(coh)
+        c = c.reshape(n_components, n_modes, n_channels, n_channels)
+        mean_coh.append(c)
 
-    return np.squeeze(c)
+    return np.squeeze(mean_coh)
 
 
 def mean_connections(conn_map):
