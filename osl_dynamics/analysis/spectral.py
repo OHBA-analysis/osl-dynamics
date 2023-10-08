@@ -7,7 +7,6 @@ import logging
 import mne
 import numpy as np
 from scipy import signal
-from scipy.signal.windows import hann
 from sklearn.decomposition import non_negative_factorization
 from tqdm.auto import trange
 from pqdm.threads import pqdm
@@ -106,6 +105,254 @@ def wavelet(
     wt = abs(wt)
 
     return t, f, wt
+
+
+def welch_spectra(
+    data,
+    sampling_frequency,
+    alpha=None,
+    window_length=None,
+    step_size=None,
+    frequency_range=None,
+    return_weights=False,
+    standardize=True,
+    calc_coh=True,
+    n_jobs=1,
+    keepdims=False,
+):
+    """Calculates spectra for inferred states using Welch's method.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Time series data. Must have shape (n_subjects, n_samples,
+        n_channels) or (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    alpha : np.ndarray or list, optional
+        Inferred state probability time course. Must have shape
+        (n_subjects, n_samples, n_states) or (n_samples, n_states).
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window. If None, we use
+        :code:`window_length // 2`.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    return_weights : bool, optional
+        Should we return the weights for subject-specific spectra?
+        This is useful for calculating a group average.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
+    n_jobs : int, optional
+        Number of parallel jobs.
+    keepdims : bool, optional
+        Should we enforce a (n_subject, n_states, ...) array is returned
+        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
+        dimensions of length 1.
+
+    Returns
+    -------
+    frequencies : np.ndarray
+        Frequencies of the power spectra and coherences. Shape is (n_freq,).
+    power_spectra : np.ndarray
+        Power spectra for each subject and state. Shape is (n_subjects,
+        n_states, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
+    coherences : np.ndarray
+        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+    weights : np.ndarray
+        Weighting for subject-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_subjects,).
+    """
+
+    # Validation
+    if alpha is not None:
+        if (isinstance(data, list) != isinstance(alpha, list)) or (
+            isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
+        ):
+            raise ValueError(
+                f"data is type {type(data)} and alpha is type "
+                f"{type(alpha)}. They must both be lists or numpy arrays."
+            )
+
+        if isinstance(data, list):
+            # Check data and state time course for the same number of subjects
+            # has been passed
+            if len(data) != len(alpha):
+                raise ValueError(
+                    "A different number of subjects has been passed for "
+                    f"data and alpha: len(data)={len(data)}, "
+                    f"len(alpha)={len(alpha)}."
+                )
+
+            # Check the number of samples in data and alpha
+            for i in range(len(alpha)):
+                if alpha[i].shape[0] != data[i].shape[0]:
+                    raise ValueError(
+                        "items in data and alpha must have the same shape."
+                    )
+
+    else:
+        # Create a dummy state time course
+        if isinstance(data, list):
+            alpha = [np.ones([d.shape[0], 1], dtype=np.float32) for d in data]
+        else:
+            alpha = np.ones([data.shape[0], 1], dtype=np.float32)
+
+    if isinstance(data, np.ndarray):
+        if alpha.shape[0] != data.shape[0]:
+            raise ValueError("data and alpha must have the same shape.")
+
+        if data.ndim == 2:
+            data = [data]
+            alpha = [alpha]
+
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
+
+    if step_size is None:
+        step_size = window_length // 2
+    step_size = int(step_size)
+
+    if frequency_range is None:
+        frequency_range = [0, sampling_frequency / 2]
+
+    # Standardise before calculating spectra
+    if standardize:
+        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
+
+    # Calculate state time course (Viterbi path) from probabilities
+    state_time_course = [modes.argmax_time_courses(a) for a in alpha]
+
+    # Helper function for calculating a spectrum for a single subject
+    def _welch(data, stc):
+        # data and stc are numpy arrays with shape (n_samples, n_channels)
+
+        if calc_coh:
+            psd = []
+            for i in range(stc.shape[-1]):
+                # Create overlapping windows
+                X = data * stc[..., i, np.newaxis]
+                X = np.lib.stride_tricks.sliding_window_view(X, window_length, axis=0)
+                X = np.copy(X[::step_size])
+
+                # Calculate cross PSDs
+                #
+                # Note, mne.time_frequency.csd_array_fourier will call
+                # mne.time_frequency.csd._csd_fourier which will by default
+                # apply np.hanning (i.e. a Hann window) to the data.
+                welch = mne.time_frequency.csd_array_fourier(
+                    X=X,
+                    sfreq=sampling_frequency,
+                    fmin=frequency_range[0] - 1e-6,
+                    fmax=frequency_range[1] + 1e-6,
+                    n_fft=window_length,
+                    verbose=False,
+                )
+                p = [welch.get_data(f) for f in welch.frequencies]
+                p = np.moveaxis(p, 0, -1)
+                psd.append(p)
+
+            # Unpack PSDs and calculate coherence
+            f = welch.frequencies
+            psd = np.array(psd, dtype=np.complex64)
+            coh = coherence_spectra(psd)
+            psd = psd[:, range(psd.shape[1]), range(psd.shape[2])].real
+            return f, psd, coh
+
+        else:
+            # Calculate PSDs
+            psd = []
+            for i in range(stc.shape[-1]):
+                x = data * stc[..., i, np.newaxis]
+                p, f = mne.time_frequency.psd_array_welch(
+                    x=x.T,
+                    sfreq=sampling_frequency,
+                    fmin=frequency_range[0] - 1e-6,
+                    fmax=frequency_range[1] + 1e-6,
+                    window="hann",
+                    n_overlap=window_length - step_size,
+                    n_fft=window_length,
+                    verbose=False,
+                )
+                psd.append(p)
+            psd = np.array(psd, dtype=np.float32)
+
+        # Rescale PSDs to account for the number of time points
+        # each state was active
+        fo = np.sum(stc, axis=0) / stc.shape[0]
+        for psd_, fo_ in zip(psd, fo):
+            psd_ /= fo_
+
+        if calc_coh:
+            return f, psd, coh
+        else:
+            return f, psd
+
+    if len(data) == 1:
+        # We only have one subject so we don't need to parallelise
+        # the calculation
+        _logger.info("Calculating spectra")
+        results = [_welch(data[0], state_time_course[0])]
+
+    elif n_jobs == 1:
+        # We have multiple subjects but we're running in serial
+        results = []
+        for n in range(len(data)):
+            _logger.info(f"Calculating spectra {n}")
+            results.append(_welch(data[n], state_time_course[n]))
+
+    else:
+        # Calculate spectra in parallel
+        _logger.info("Calculating spectra")
+        results = pqdm(
+            zip(data, state_time_course),
+            _welch,
+            n_jobs=n_jobs,
+            argument_type="args",
+        )
+
+    # Unpack the results
+    if calc_coh:
+        psd = []
+        coh = []
+        for result in results:
+            f, p, c = result
+            psd.append(p)
+            coh.append(c)
+    else:
+        psd = []
+        for result in results:
+            f, p = result
+            psd.append(p)
+
+    if not keepdims:
+        # Remove any axes that are of length 1
+        psd = np.squeeze(psd)
+        if calc_coh:
+            coh = np.squeeze(coh)
+
+    # Weights for calculating a group-average spectrum
+    n_samples = [d.shape[0] for d in data]
+    w = np.array(n_samples) / np.sum(n_samples)
+
+    if calc_coh:
+        if return_weights:
+            return f, psd, coh, w
+        else:
+            return f, psd, coh
+    else:
+        if return_weights:
+            return f, psd, w
+        else:
+            return f, psd
 
 
 def multitaper_spectra(
@@ -497,7 +744,7 @@ def window_mean(data, window_length, step_size=1, n_sub_windows=1):
     ]
 
     # Window to apply to the data
-    window = hann(window_length // n_sub_windows)
+    window = signal.windows.hann(window_length // n_sub_windows)
 
     # Indices of time points to calculate a periodogram for
     time_indices = range(0, n_samples, step_size)
