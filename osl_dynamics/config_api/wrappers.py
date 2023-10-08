@@ -636,8 +636,6 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
         .multitaper_spectra>`_. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
-             'time_half_bandwidth': 4,
-             'n_tapers': 7,
              'keepdims': True}
     nnmf_components : int, optional
         Number of non-negative matrix factorization (NNMF) components to fit to
@@ -648,8 +646,6 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
 
     default_kwargs = {
         "sampling_frequency": data.sampling_frequency,
-        "time_half_bandwidth": 4,
-        "n_tapers": 7,
         "keepdims": True,
     }
     kwargs = override_dict_defaults(default_kwargs, kwargs)
@@ -679,7 +675,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     # Calculate multitaper
     from osl_dynamics.analysis import spectral
 
-    spectra = spectral.multitaper_spectra(data, alpha, **kwargs)
+    spectra = spectral.multitaper_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
     return_weights = kwargs.pop("return_weights", False)
@@ -798,7 +794,7 @@ def regression_spectra(data, output_dir, kwargs):
     # Calculate regression spectra
     from osl_dynamics.analysis import spectral
 
-    spectra = spectral.regression_spectra(data, alpha, **kwargs)
+    spectra = spectral.regression_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
     return_weights = kwargs.pop("return_weights", False)
