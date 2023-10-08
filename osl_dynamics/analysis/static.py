@@ -54,6 +54,84 @@ def functional_connectivity(data, conn_type="corr"):
     return np.squeeze(fc)
 
 
+def welch_spectra(
+    data,
+    sampling_frequency,
+    window_length=None,
+    step_size=None,
+    frequency_range=None,
+    return_weights=False,
+    standardize=True,
+    calc_coh=True,
+    n_jobs=1,
+    keepdims=False,
+):
+    """Calculate spectra using Welch's method.
+
+    Wrapper for `spectral.welch_specta <https://osl-dynamics.readthedocs\
+    .io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html\
+    #osl_dynamics.analysis.spectral.welch_spectra>`_ assuming only one
+    state is active for all time points.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Time series data. Must have shape (n_subjects, n_samples,
+        n_channels) or (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window. If None, we use
+        :code:`window_length // 2`.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    return_weights : bool, optional
+        Should we return the weights for subject-specific spectra?
+        This is useful for calculating a group average.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
+    n_jobs : int, optional
+        Number of parallel jobs.
+    keepdims : bool, optional
+        Should we enforce a (n_subject, n_states, ...) array is returned
+        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
+        dimensions of length 1.
+
+    Returns
+    -------
+    frequencies : np.ndarray
+        Frequencies of the power spectra and coherences. Shape is (n_freq,).
+    power_spectra : np.ndarray
+        Power spectra for each subject and state. Shape is (n_subjects,
+        n_states, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
+    coherences : np.ndarray
+        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+    weights : np.ndarray
+        Weighting for subject-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_subjects,).
+    """
+    return spectral.welch_spectra(
+        data=data,
+        sampling_frequency=sampling_frequency,
+        window_length=window_length,
+        step_size=step_size,
+        frequency_range=frequency_range,
+        return_weights=return_weights,
+        standardize=standardize,
+        calc_coh=calc_coh,
+        n_jobs=n_jobs,
+        keepdims=keepdims,
+    )
+
+
 def multitaper_spectra(
     data,
     sampling_frequency,
@@ -70,7 +148,8 @@ def multitaper_spectra(
 
     Wrapper for `spectral.multitaper_specta <https://osl-dynamics.readthedocs\
     .io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html\
-    #osl_dynamics.analysis.spectral.multitaper_spectra>`_
+    #osl_dynamics.analysis.spectral.multitaper_spectra>`_ assuming only one
+    state is active for all time points.
 
     Parameters
     ----------
