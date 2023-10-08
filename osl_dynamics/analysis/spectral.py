@@ -238,7 +238,7 @@ def welch_spectra(
             psd = []
             for i in range(stc.shape[-1]):
                 # Create overlapping windows
-                X = data * stc[..., i, np.newaxis]
+                X = data * stc[..., i][..., np.newaxis]
                 X = np.lib.stride_tricks.sliding_window_view(X, window_length, axis=0)
                 X = np.copy(X[::step_size])
 
@@ -269,7 +269,7 @@ def welch_spectra(
             # Calculate PSDs
             psd = []
             for i in range(stc.shape[-1]):
-                x = data * stc[..., i, np.newaxis]
+                x = data * stc[..., i][..., np.newaxis]
                 p, f = mne.time_frequency.psd_array_welch(
                     x=x.T,
                     sfreq=sampling_frequency,
@@ -487,7 +487,7 @@ def multitaper_spectra(
             # Calculate cross multitaper PSDs
             psd = []
             for i in range(stc.shape[-1]):
-                X = data * stc[:, i, np.newaxis]
+                X = data * stc[..., i][..., np.newaxis]
                 X = np.swapaxes(X, 1, 2)
                 mt = mne.time_frequency.csd_array_multitaper(
                     X=X,
@@ -512,7 +512,7 @@ def multitaper_spectra(
             # Calculate multitaper PSDs
             psd = []
             for i in range(stc.shape[-1]):
-                x = data * stc[..., i, np.newaxis]
+                x = data * stc[..., i][..., np.newaxis]
                 x = np.swapaxes(x, 1, 2)
                 p, f = mne.time_frequency.psd_array_multitaper(
                     x=x,
