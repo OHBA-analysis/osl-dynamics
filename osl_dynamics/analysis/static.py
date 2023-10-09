@@ -135,7 +135,8 @@ def multitaper_spectra(
     data,
     sampling_frequency,
     window_length=None,
-    time_half_bandwidth=None,
+    time_half_bandwidth=4,
+    n_tapers=7,
     frequency_range=None,
     standardize=True,
     calc_coh=True,
@@ -161,6 +162,8 @@ def multitaper_spectra(
         Length of the data segement to use to calculate the multitaper.
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     standardize : bool, optional
@@ -198,6 +201,7 @@ def multitaper_spectra(
         sampling_frequency=sampling_frequency,
         window_length=window_length,
         time_half_bandwidth=time_half_bandwidth,
+        n_tapers=n_tapers,
         frequency_range=frequency_range,
         standardize=standardize,
         calc_coh=calc_coh,

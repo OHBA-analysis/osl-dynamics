@@ -232,7 +232,7 @@ def welch_spectrogram(
                 # Calculate cross spectra for the sub-window
                 X = np.fft.fft(x_sub_window, nfft)
                 X = X[..., min_arg:max_arg]
-                XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
+                XY = np.conj(X)[:, np.newaxis, :] * X[np.newaxis, :, :]
                 XY_sub_window[k] = XY[m, n]
 
             # Average the cross spectra for each sub-window
@@ -267,7 +267,7 @@ def welch_spectrogram(
                 # Calculate PSD for the sub-window
                 X = np.fft.fft(x_sub_window, nfft)
                 X = X[..., min_arg:max_arg]
-                XX_sub_window[k] = np.real(X * np.conj(X))
+                XX_sub_window[k] = np.real(np.conj(X) * X)
 
             # Average the cross spectra for each sub-window
             P[i] = np.mean(XX_sub_window, axis=0)
@@ -510,12 +510,201 @@ def welch_spectra(
             return f, psd
 
 
+def multitaper_spectrogram(
+    data,
+    sampling_frequency,
+    window_length=None,
+    step_size=None,
+    frequency_range=None,
+    calc_cpsd=True,
+    n_sub_windows=1,
+    time_half_bandwidth=4,
+    n_tapers=7,
+):
+    """Calculates a spectogram (time-varying power spectral density) using
+    a multitaper.
+
+    Steps:
+
+    1. Segment data into overlapping windows.
+    2. Multiply each window by a number of tapering functions.
+    3. Calculate a periodogram for each tapered window.
+    4. Average over tapers.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate the spectrogram for.
+        Shape must be (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    window_length : int, optional
+        Number of data points to use when calculating the periodogram.
+        Defaults to :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length // 2`.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    calc_cpsd : bool, optional
+        Should we calculate cross spectra?
+    n_sub_windows : int, optional
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        :code:`n_sub_windows`.
+    time_half_bandwidth : float, optional
+        Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
+
+    Returns
+    -------
+    t : np.ndarray
+        Time axis.
+    f : np.ndarray
+        Frequency axis.
+    P : np.ndarray
+        Spectrogram. 3D numpy array with shape (time, channels *
+        (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
+        it is (time, channels, freq).
+    """
+    n_samples = data.shape[0]
+    n_channels = data.shape[1]
+
+    # Validation
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
+
+    if step_size is None:
+        step_size = window_length // 2
+    step_size = int(step_size)
+
+    # First pad the data so we have enough data points to estimate the
+    # periodogram for time points at the start/end of the data
+    data = np.pad(data, window_length // 2)[
+        :, window_length // 2 : window_length // 2 + n_channels
+    ]
+
+    # Tapering windows to apply to the data before calculating the
+    # Fourier transform
+    tapers = signal.windows.dpss(
+        window_length,
+        NW=time_half_bandwidth,
+        Kmax=n_tapers,
+    )
+
+    # Number of data points in the FFT
+    nfft = window_length // n_sub_windows
+
+    # Time and frequency axis
+    t = np.arange(n_samples) / sampling_frequency
+    f = np.arange(nfft // 2) * sampling_frequency / nfft
+
+    # Only keep a particular frequency range
+    [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+    f = f[min_arg:max_arg]
+
+    # Number of frequency bins
+    n_freq = max_arg - min_arg
+
+    # Indices of an upper triangle of an n_channels by n_channels array
+    m, n = np.triu_indices(n_channels)
+
+    # Indices of time points to calculate a periodogram for
+    time_indices = range(0, n_samples, step_size)
+    n_windows = n_samples // step_size
+
+    if calc_cpsd:
+        # Calculate cross PSDs for each segment of the data
+        P = np.empty(
+            [n_windows, n_channels * (n_channels + 1) // 2, n_freq],
+            dtype=np.complex64,
+        )
+        XY_sub_window = np.empty(
+            [n_sub_windows, n_channels * (n_channels + 1) // 2, n_freq],
+            dtype=np.complex64,
+        )
+        for i in range(n_windows):
+            # Data in the window
+            j = time_indices[i]
+            x_window = data[j : j + window_length].T
+
+            for k in range(n_sub_windows):
+                # Data in the sub-window
+                x_sub_window = x_window[
+                    :,
+                    k
+                    * window_length
+                    // n_sub_windows : (k + 1)
+                    * window_length
+                    // n_sub_windows,
+                ]
+
+                # Apply tapers
+                x_sub_window = x_sub_window[np.newaxis, :, :] * tapers[:, np.newaxis, :]
+
+                # Fourier transform
+                X = np.fft.fft(x_sub_window, nfft)
+                X = X[..., min_arg:max_arg]
+
+                # Calculate cross spectra for the sub-window
+                XY = np.conj(X)[:, :, np.newaxis, :] * X[:, np.newaxis, :, :]
+                XY_sub_window[k] = np.mean(XY[:, m, n], axis=0)
+
+            # Average the cross spectra for each sub-window
+            P[i] = np.mean(XY_sub_window, axis=0)
+
+    else:
+        # Calculate PSDs for each segment of the data
+        P = np.empty([n_windows, n_channels, n_freq], dtype=np.float32)
+        XX_sub_window = np.empty(
+            [n_sub_windows, n_channels, n_freq],
+            dtype=np.float32,
+        )
+        for i in range(n_windows):
+            # Data in the window
+            j = time_indices[i]
+            x_window = data[j : j + window_length].T
+
+            for k in range(n_sub_windows):
+                # Data in the sub-window
+                x_sub_window = x_window[
+                    :,
+                    k
+                    * window_length
+                    // n_sub_windows : (k + 1)
+                    * window_length
+                    // n_sub_windows,
+                ]
+
+                # Apply tapers
+                x_sub_window = x_sub_window[np.newaxis, :, :] * tapers[:, np.newaxis, :]
+
+                # Fourier transform
+                X = np.fft.fft(x_sub_window, nfft)
+                X = X[..., min_arg:max_arg]
+
+                # Calculate spectra for the sub-window
+                XX = np.real(np.conj(X) * X)
+                XX_sub_window[k] = np.mean(XX, axis=0)
+
+            # Average the spectra for each sub-window
+            P[i] = np.mean(XX_sub_window, axis=0)
+
+    # Scaling for the multitapers
+    P *= 2 / sampling_frequency
+
+    return t, f, P
+
+
 def multitaper_spectra(
     data,
     sampling_frequency,
     alpha=None,
     window_length=None,
-    time_half_bandwidth=None,
+    time_half_bandwidth=4,
+    n_tapers=7,
     frequency_range=None,
     standardize=True,
     calc_coh=True,
@@ -539,6 +728,8 @@ def multitaper_spectra(
         Length of the data segment to use to calculate spectra.
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     standardize : bool, optional
@@ -618,6 +809,8 @@ def multitaper_spectra(
         window_length = 2 * sampling_frequency
     window_length = int(window_length)
 
+    step_size = window_length
+
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
@@ -633,60 +826,48 @@ def multitaper_spectra(
     def _mt(data, stc):
         # data and stc are numpy arrays with shape (n_samples, n_channels)
 
-        # Reshape data into non-overlapping windows
-        n_windows = data.shape[0] // window_length
-        data = data[: n_windows * window_length]
-        data = data.reshape(n_windows, window_length, -1)
-        stc = stc[: n_windows * window_length]
-        stc = stc.reshape(n_windows, window_length, -1)
+        psd = []
+        coh = []
+        for i in range(stc.shape[-1]):
+            # Calculate spectrogram for this state's data
+            x = data * stc[..., i][..., np.newaxis]
+            _, f, p = multitaper_spectrogram(
+                data=x,
+                sampling_frequency=sampling_frequency,
+                window_length=window_length,
+                step_size=step_size,
+                frequency_range=frequency_range,
+                calc_cpsd=calc_coh,
+                time_half_bandwidth=time_half_bandwidth,
+                n_tapers=n_tapers,
+            )
 
-        if calc_coh:
-            # Calculate cross multitaper PSDs
-            psd = []
-            for i in range(stc.shape[-1]):
-                X = data * stc[..., i][..., np.newaxis]
-                X = np.swapaxes(X, 1, 2)
-                mt = mne.time_frequency.csd_array_multitaper(
-                    X=X,
-                    sfreq=sampling_frequency,
-                    fmin=frequency_range[0] - 1e-6,
-                    fmax=frequency_range[1] + 1e-6,
-                    n_fft=window_length,
-                    bandwidth=time_half_bandwidth,
-                    verbose=False,
+            # Average over the time dimension
+            p = np.mean(p, axis=0)
+
+            if calc_coh:
+                # Create a channels by channels matrix for cross PSDs
+                n_channels = data.shape[-1]
+                n_freq = p.shape[-1]
+                cpsd = np.empty(
+                    [n_channels, n_channels, n_freq],
+                    dtype=np.complex64,
                 )
-                p = [mt.get_data(f) for f in mt.frequencies]
-                p = np.moveaxis(p, 0, -1)
-                psd.append(p)
+                m, n = np.triu_indices(n_channels)
+                cpsd[m, n] = p
+                cpsd[n, m] = p
 
-            # Unpack PSDs and calculate coherence
-            f = mt.frequencies
-            psd = np.array(psd, dtype=np.complex64)
-            coh = coherence_spectra(psd, keepdims=True)
-            psd = psd[:, range(psd.shape[1]), range(psd.shape[2])].real
+                # Unpack PSDs
+                psd.append(cpsd[range(n_channels), range(n_channels)].real)
 
-        else:
-            # Calculate multitaper PSDs
-            psd = []
-            for i in range(stc.shape[-1]):
-                x = data * stc[..., i][..., np.newaxis]
-                x = np.swapaxes(x, 1, 2)
-                p, f = mne.time_frequency.psd_array_multitaper(
-                    x=x,
-                    sfreq=sampling_frequency,
-                    fmin=frequency_range[0] - 1e-6,
-                    fmax=frequency_range[1] + 1e-6,
-                    bandwidth=time_half_bandwidth,
-                    normalization="full",
-                    verbose=False,
-                )
-                p = np.mean(p, axis=0)
+                # Calculate coherence
+                coh.append(coherence_spectra(cpsd))
+            else:
                 psd.append(p)
-            psd = np.array(psd, dtype=np.float32)
 
         # Rescale PSDs to account for the number of time points
         # each state was active
-        fo = np.sum(stc, axis=(0, 1)) / (n_windows * window_length)
+        fo = np.sum(stc, axis=0) / stc.shape[0]
         for psd_, fo_ in zip(psd, fo):
             psd_ /= fo_
 
