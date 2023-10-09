@@ -280,7 +280,7 @@ def welch_spectrogram(
 
 def welch(
     data,
-    samlping_frequency,
+    sampling_frequency,
     alpha=None,
     window_length=None,
     step_size=None,
@@ -331,10 +331,17 @@ def welch(
         Only returned is :code:`calc_coh=True`.
     """
     if alpha is None:
-        alpha = np.ones([data.shape[0], 1], dtype=np.float32)
+        stc = np.ones([data.shape[0], 1], dtype=np.float32)
     else:
         # Calculate state time course (Viterbi path) from probabilities
-        alpha = modes.argmax_time_courses(alpha)
+        stc = modes.argmax_time_courses(alpha)
+
+    # Indices for the upper triangle of a channels by channels matrix
+    m, n = np.triu_indices(n_channels)
+
+    # Standardise before calculating spectra
+    if standardize:
+        data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
     psd = []
     coh = []
@@ -347,7 +354,7 @@ def welch(
             window_length=window_length,
             step_size=step_size,
             frequency_range=frequency_range,
-            calc_coh=calc_coh,
+            calc_cpsd=calc_coh,
         )
 
         # Average over the time dimension
@@ -361,7 +368,6 @@ def welch(
                 [n_channels, n_channels, n_freq],
                 dtype=np.complex64,
             )
-            m, n = np.triu_indices(n_channels)
             cpsd[m, n] = p
             cpsd[n, m] = p
 
@@ -375,11 +381,12 @@ def welch(
 
     # Rescale PSDs to account for the number of time points
     # each state was active
-    fo = np.sum(stc, axis=0) / stc.shape[0]
+    fo = modes.fractional_occupancies(stc)
     for psd_, fo_ in zip(psd, fo):
         psd_ /= fo_
 
     if not keepdims:
+        # Squeeze any axes of length 1
         psd = np.squeeze(psd)
         if calc_coh:
             coh = np.squeeze(coh)
@@ -488,7 +495,7 @@ def welch_spectra(
         alpha = np.array([None] * len(data))
 
     if isinstance(data, np.ndarray):
-        if alpha.shape[0] != data.shape[0]:
+        if alpha is not None and alpha.shape[0] != data.shape[0]:
             raise ValueError("data and alpha must have the same shape.")
 
         if data.ndim == 2:
@@ -506,23 +513,21 @@ def welch_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Standardise before calculating spectra
-    if standardize:
-        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
-
-    # Create arguments to pass to the main function that calculates spectra
+    # Create keyword arguments to pass to the main function
+    # that calculates spectra
     kwargs = []
     for d, a in zip(data, alpha):
         kwargs.append(
             {
                 "data": d,
-                "alpha": a,
                 "sampling_frequency": sampling_frequency,
+                "alpha": a,
                 "window_length": window_length,
                 "step_size": step_size,
                 "frequency_range": frequency_range,
                 "standardize": standardize,
                 "calc_coh": calc_coh,
+                "keepdims": True,
             }
         )
 
@@ -531,14 +536,14 @@ def welch_spectra(
         # We only have one subject so we don't need to parallelise
         # the calculation
         _logger.info("Calculating spectra")
-        results = [welch(*kwargs[0])]
+        results = [welch(**kwargs[0])]
 
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
         for i, kws in enumerate(kwargs):
             _logger.info(f"Calculating spectra {i}")
-            results.append(welch(*kws))
+            results.append(welch(**kws))
     else:
         # Calculate spectra in parallel
         _logger.info("Calculating spectra")
@@ -768,11 +773,136 @@ def multitaper_spectrogram(
     return t, f, P
 
 
+def multitaper(
+    data,
+    sampling_frequency,
+    alpha=None,
+    window_length=None,
+    step_size=None,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=None,
+    standardize=True,
+    calc_coh=True,
+    keepdims=False,
+):
+    """Calculate a multitaper.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Time series data. Must have shape (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    alpha : np.ndarray or list, optional
+        Inferred state probability time course.
+        Must have shape (n_samples, n_states).
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length // 2`.
+    time_half_bandwidth : float, optional
+        Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we calculate the coherence between channels?
+    keepdims : bool, optional
+        Should we squeeze any axes of length 1?
+
+    Returns
+    -------
+    f : np.ndarray
+        Frequencies of the power spectra and coherences.
+        Shape is (n_freq,).
+    psd : np.ndarray
+        Power spectra. Shape is (..., n_channels, n_freq).
+    coh : np.ndarray
+        Coherences spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+        Only returned is :code:`calc_coh=True`.
+    """
+    if alpha is None:
+        stc = np.ones([data.shape[0], 1], dtype=np.float32)
+    else:
+        # Calculate state time course (Viterbi path) from probabilities
+        stc = modes.argmax_time_courses(alpha)
+
+    # Indices for the upper triangle of a channels by channels matrix
+    m, n = np.triu_indices(n_channels)
+
+    # Standardise before calculating spectra
+    if standardize:
+        data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
+
+    psd = []
+    coh = []
+    for i in range(stc.shape[-1]):
+        # Calculate spectrogram for this state's data
+        x = data * stc[..., i][..., np.newaxis]
+        _, f, p = multitaper_spectrogram(
+            data=x,
+            sampling_frequency=sampling_frequency,
+            window_length=window_length,
+            step_size=step_size,
+            frequency_range=frequency_range,
+            calc_cpsd=calc_coh,
+            time_half_bandwidth=time_half_bandwidth,
+            n_tapers=n_tapers,
+        )
+
+        # Average over the time dimension
+        p = np.mean(p, axis=0)
+
+        if calc_coh:
+            # Create a channels by channels matrix for cross PSDs
+            n_channels = data.shape[-1]
+            n_freq = p.shape[-1]
+            cpsd = np.empty(
+                [n_channels, n_channels, n_freq],
+                dtype=np.complex64,
+            )
+            cpsd[m, n] = p
+            cpsd[n, m] = p
+
+            # Unpack PSDs
+            psd.append(cpsd[range(n_channels), range(n_channels)].real)
+
+            # Calculate coherence
+            coh.append(coherence_spectra(cpsd))
+        else:
+            psd.append(p)
+
+    # Rescale PSDs to account for the number of time points
+    # each state was active
+    fo = np.sum(stc, axis=0) / stc.shape[0]
+    for psd_, fo_ in zip(psd, fo):
+        psd_ /= fo_
+
+    if not keepdims:
+        # Squeeze any axes of length 1
+        psd = np.squeeze(psd)
+        if calc_coh:
+            coh = np.squeeze(coh)
+
+    if calc_coh:
+        return f, psd, coh
+    else:
+        return f, psd
+
+
 def multitaper_spectra(
     data,
     sampling_frequency,
     alpha=None,
     window_length=None,
+    step_size=None,
     time_half_bandwidth=4,
     n_tapers=7,
     frequency_range=None,
@@ -796,6 +926,9 @@ def multitaper_spectra(
         (n_subjects, n_samples, n_states) or (n_samples, n_states).
     window_length : int, optional
         Length of the data segment to use to calculate spectra.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length`.
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
     n_tapers : int, optional
@@ -860,15 +993,11 @@ def multitaper_spectra(
                         "items in data and alpha must have the same shape."
                     )
 
-    else:
-        # Create a dummy state time course
-        if isinstance(data, list):
-            alpha = [np.ones([d.shape[0], 1], dtype=np.float32) for d in data]
-        else:
-            alpha = np.ones([data.shape[0], 1], dtype=np.float32)
+    elif isinstance(data, list):
+        alpha = np.array([None] * len(data))
 
     if isinstance(data, np.ndarray):
-        if alpha.shape[0] != data.shape[0]:
+        if alpha is not None and alpha.shape[0] != data.shape[0]:
             raise ValueError("data and alpha must have the same shape.")
 
         if data.ndim == 2:
@@ -879,94 +1008,55 @@ def multitaper_spectra(
         window_length = 2 * sampling_frequency
     window_length = int(window_length)
 
-    step_size = window_length
+    if step_size is None:
+        step_size = window_length
+    step_size = int(step_size)
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
-    # Standardise before calculating the multitaper
-    if standardize:
-        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
+    # Create keyword arguments to pass to the main function
+    # that calculates spectra
+    kwargs = []
+    for d, a in zip(data, alpha):
+        kwargs.append(
+            {
+                "data": d,
+                "sampling_frequency": sampling_frequency,
+                "alpha": a,
+                "window_length": window_length,
+                "step_size": step_size,
+                "time_half_bandwidth": time_half_bandwidth,
+                "n_tapers": n_tapers,
+                "frequency_range": frequency_range,
+                "standardize": standardize,
+                "calc_coh": calc_coh,
+                "keepdims": True,
+            }
+        )
 
-    # Calculate state time course (Viterbi path) from probabilities
-    state_time_course = [modes.argmax_time_courses(a) for a in alpha]
-
-    # Helper function for calculating a multitaper spectrum
-    # for a single subject
-    def _mt(data, stc):
-        # data and stc are numpy arrays with shape (n_samples, n_channels)
-
-        psd = []
-        coh = []
-        for i in range(stc.shape[-1]):
-            # Calculate spectrogram for this state's data
-            x = data * stc[..., i][..., np.newaxis]
-            _, f, p = multitaper_spectrogram(
-                data=x,
-                sampling_frequency=sampling_frequency,
-                window_length=window_length,
-                step_size=step_size,
-                frequency_range=frequency_range,
-                calc_cpsd=calc_coh,
-                time_half_bandwidth=time_half_bandwidth,
-                n_tapers=n_tapers,
-            )
-
-            # Average over the time dimension
-            p = np.mean(p, axis=0)
-
-            if calc_coh:
-                # Create a channels by channels matrix for cross PSDs
-                n_channels = data.shape[-1]
-                n_freq = p.shape[-1]
-                cpsd = np.empty(
-                    [n_channels, n_channels, n_freq],
-                    dtype=np.complex64,
-                )
-                m, n = np.triu_indices(n_channels)
-                cpsd[m, n] = p
-                cpsd[n, m] = p
-
-                # Unpack PSDs
-                psd.append(cpsd[range(n_channels), range(n_channels)].real)
-
-                # Calculate coherence
-                coh.append(coherence_spectra(cpsd))
-            else:
-                psd.append(p)
-
-        # Rescale PSDs to account for the number of time points
-        # each state was active
-        fo = np.sum(stc, axis=0) / stc.shape[0]
-        for psd_, fo_ in zip(psd, fo):
-            psd_ /= fo_
-
-        if calc_coh:
-            return f, psd, coh
-        else:
-            return f, psd
-
+    # Main calculation of spectra
     if len(data) == 1:
         # We only have one subject so we don't need to parallelise
         # the calculation
         _logger.info("Calculating spectra")
-        results = [_mt(data[0], state_time_course[0])]
+        results = [multitaper(**kargs[0])]
 
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
-        for n in range(len(data)):
-            _logger.info(f"Calculating spectra {n}")
-            results.append(_mt(data[n], state_time_course[n]))
+        for i, kws in enumerate(kwargs):
+            _logger.info(f"Calculating spectra {i}")
+            results.append(multitaper(**kws))
 
     else:
         # Calculate spectra in parallel
         _logger.info("Calculating spectra")
         results = pqdm(
-            zip(data, state_time_course),
-            _mt,
+            kwargs,
+            multitaper,
             n_jobs=n_jobs,
-            argument_type="args",
+            argument_type="kwargs",
         )
 
     # Unpack the results
