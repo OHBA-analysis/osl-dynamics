@@ -61,7 +61,7 @@ def welch_spectra(
     frequency_range=None,
     return_weights=False,
     standardize=True,
-    calc_coh=True,
+    calc_coh=False,
     n_jobs=1,
     keepdims=False,
 ):
@@ -139,7 +139,7 @@ def multitaper_spectra(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
-    calc_coh=True,
+    calc_coh=False,
     return_weights=False,
     keepdims=False,
     n_jobs=1,

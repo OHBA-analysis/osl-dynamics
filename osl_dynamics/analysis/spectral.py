@@ -1223,7 +1223,7 @@ def _welch_spectrogram(
             P[i] = np.mean(XX_sub_window, axis=0)
 
     # Scaling for the periodograms (we use the same scaling as SciPy)
-    P *= 2 / (sampling_frequency * np.sum(window**2))
+    P /= (sampling_frequency * np.sum(window**2))
 
     return t, f, P
 
@@ -1287,6 +1287,7 @@ def _welch(
         stc = modes.argmax_time_courses(alpha)
 
     # Indices for the upper triangle of a channels by channels matrix
+    n_channels = data.shape[-1]
     m, n = np.triu_indices(n_channels)
 
     # Standardise before calculating spectra
@@ -1312,7 +1313,6 @@ def _welch(
 
         if calc_coh:
             # Create a channels by channels matrix for cross PSDs
-            n_channels = data.shape[-1]
             n_freq = p.shape[-1]
             cpsd = np.empty(
                 [n_channels, n_channels, n_freq],
@@ -1331,7 +1331,7 @@ def _welch(
 
     # Rescale PSDs to account for the number of time points
     # each state was active
-    fo = modes.fractional_occupancies(stc)
+    fo = np.sum(stc, axis=0) / stc.shape[0]
     for psd_, fo_ in zip(psd, fo):
         psd_ /= fo_
 
@@ -1530,7 +1530,7 @@ def _multitaper_spectrogram(
             P[i] = np.mean(XX_sub_window, axis=0)
 
     # Scaling for the multitapers
-    P *= 2 / sampling_frequency
+    P /= sampling_frequency
 
     return t, f, P
 
