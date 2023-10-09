@@ -122,7 +122,8 @@ def spectrogram(
     2. Multiply each window by a Hann tapering function.
     3. Calculate a periodogram for each window.
 
-    We use the same scaling as the :code:`scale="density"` in SciPy.
+    We use the same scaling for the power spectra as SciPy (i.e. when
+    you use :code:`scipy.signal.periodogram(..., scaling="density")`).
 
     Parameters
     ----------
@@ -290,6 +291,9 @@ def welch_spectra(
     n_jobs=1,
 ):
     """Calculates spectra for inferred states using Welch's method.
+
+    The scaling the power spectra calculated by this function matches
+    SciPy (:code:`scipy.signal.welch`).
 
     Parameters
     ----------
