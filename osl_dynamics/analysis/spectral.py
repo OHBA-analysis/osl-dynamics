@@ -114,7 +114,8 @@ def welch_spectrogram(
     calc_cpsd=True,
     n_sub_windows=1,
 ):
-    """Calculates a spectogram (time-varying power spectral density).
+    """Calculates a spectogram (time-varying power spectral density)
+    using Welch's method.
 
     Steps:
 
@@ -596,8 +597,8 @@ def multitaper_spectrogram(
     time_half_bandwidth=4,
     n_tapers=7,
 ):
-    """Calculates a spectogram (time-varying power spectral density) using
-    a multitaper.
+    """Calculates a spectogram (time-varying power spectral density)
+    using a multitaper.
 
     Steps:
 
@@ -828,8 +829,11 @@ def multitaper(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
+    n_samples = data.shape[0]
+    n_channels = data.shape[-1]
+
     if alpha is None:
-        stc = np.ones([data.shape[0], 1], dtype=np.float32)
+        stc = np.ones([n_samples, 1], dtype=np.float32)
     else:
         # Calculate state time course (Viterbi path) from probabilities
         stc = modes.argmax_time_courses(alpha)
@@ -1040,7 +1044,7 @@ def multitaper_spectra(
         # We only have one subject so we don't need to parallelise
         # the calculation
         _logger.info("Calculating spectra")
-        results = [multitaper(**kargs[0])]
+        results = [multitaper(**kwargs[0])]
 
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
@@ -1095,6 +1099,90 @@ def multitaper_spectra(
             return f, psd
 
 
+def _single_regression_spectra(
+    data,
+    alpha,
+    sampling_frequency,
+    window_length,
+    step_size,
+    frequency_range,
+    calc_coh,
+    n_sub_windows,
+    rescale_coefs,
+):
+    """Calculate regression spectra for a single subject."""
+
+    def _window_mean(alpha):
+        n_samples = alpha.shape[0]
+        n_modes = alpha.shape[1]
+
+        # Pad alphas
+        alpha = np.pad(alpha, window_length // 2)[
+            :, window_length // 2 : window_length // 2 + n_modes
+        ]
+
+        # Window to apply to alpha
+        window = signal.get_window("hann", window_length // n_sub_windows)
+
+        # Indices of time points to calculate a periodogram for
+        time_indices = range(0, n_samples, step_size)
+        n_windows = n_samples // step_size
+
+        # Array to hold mean of alpha multiplied by the windowing function
+        a = np.empty([n_windows, n_modes], dtype=np.float32)
+        for i in range(n_windows):
+            # Alpha in the window
+            j = time_indices[i]
+            a_window = alpha[j : j + window_length]
+
+            # Calculate alpha for the sub-window by taking the mean
+            # over time after applying the windowing function
+            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+            for k in range(n_sub_windows):
+                a_sub_window[k] = np.mean(
+                    a_window[
+                        k
+                        * window_length
+                        // n_sub_windows : (k + 1)
+                        * window_length
+                        // n_sub_windows
+                    ]
+                    * window[..., np.newaxis],
+                    axis=0,
+                )
+
+            # Average alpha for each sub-window
+            a[i] = np.mean(a_sub_window, axis=0)
+
+        return a
+
+    # Calculate mode-specific spectra for a single subject
+    t, f, p = welch_spectrogram(
+        data=data,
+        sampling_frequency=sampling_frequency,
+        window_length=window_length,
+        step_size=step_size,
+        frequency_range=frequency_range,
+        calc_cpsd=calc_coh,
+        n_sub_windows=n_sub_windows,
+    )
+    a = _window_mean(alpha)
+    coefs, intercept = regression.linear(
+        a,
+        p,
+        fit_intercept=True,
+        normalize=True,
+        log_message=False,
+    )
+
+    if rescale_coefs:
+        # Rescale the regression coefficients to reflect the maximum
+        # deviation from the mean
+        coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
+
+    return t, f, coefs, intercept
+
+
 def regression_spectra(
     data,
     alpha,
@@ -1107,7 +1195,7 @@ def regression_spectra(
     calc_coh=True,
     return_weights=False,
     return_coef_int=False,
-    rescale_coef=True,
+    rescale_coefs=True,
     keepdims=False,
     n_jobs=1,
 ):
@@ -1147,7 +1235,7 @@ def regression_spectra(
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
         separately for the PSDs?
-    rescale_coef : bool, optional
+    rescale_coefs : bool, optional
         Should we rescale the regression coefficients to reflect the maximum
         value in each regressor? If :code:`True`, we interpret the regression
         coefficients at the maximum power deviation from the mean. If
@@ -1224,99 +1312,45 @@ def regression_spectra(
     if standardize:
         data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
-    def _window_mean(alpha):
-        n_samples = alpha.shape[0]
-        n_modes = alpha.shape[1]
-
-        # Pad alphas
-        alpha = np.pad(alpha, window_length // 2)[
-            :, window_length // 2 : window_length // 2 + n_modes
-        ]
-
-        # Window to apply to alpha
-        window = signal.get_window("hann", window_length // n_sub_windows)
-
-        # Indices of time points to calculate a periodogram for
-        time_indices = range(0, n_samples, step_size)
-        n_windows = n_samples // step_size
-
-        # Array to hold mean of alpha multiplied by the windowing function
-        a = np.empty([n_windows, n_modes], dtype=np.float32)
-        for i in range(n_windows):
-            # Alpha in the window
-            j = time_indices[i]
-            a_window = alpha[j : j + window_length]
-
-            # Calculate alpha for the sub-window by taking the mean
-            # over time after applying the windowing function
-            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
-            for k in range(n_sub_windows):
-                a_sub_window[k] = np.mean(
-                    a_window[
-                        k
-                        * window_length
-                        // n_sub_windows : (k + 1)
-                        * window_length
-                        // n_sub_windows
-                    ]
-                    * window[..., np.newaxis],
-                    axis=0,
-                )
-
-            # Average alpha for each sub-window
-            a[i] = np.mean(a_sub_window, axis=0)
-
-        return a
-
-    def _single_regression_spectra(data, alpha):
-        # data and alpha are numpy arrays with shape (n_samples, n_channels)
-
-        # Calculate mode-specific spectra for a single subject
-        t, f, p = welch_spectrogram(
-            data=data,
-            sampling_frequency=sampling_frequency,
-            window_length=window_length,
-            step_size=step_size,
-            frequency_range=frequency_range,
-            calc_cpsd=calc_coh,
-            n_sub_windows=n_sub_windows,
-        )
-        a = _window_mean(alpha)
-        coefs, intercept = regression.linear(
-            a,
-            p,
-            fit_intercept=True,
-            normalize=True,
-            log_message=False,
+    # Create keyword arguments to pass to the main function
+    # that calculates spectra
+    kwargs = []
+    for d, a in zip(data, alpha):
+        kwargs.append(
+            {
+                "data": d,
+                "alpha": a,
+                "sampling_frequency": sampling_frequency,
+                "window_length": window_length,
+                "step_size": step_size,
+                "frequency_range": frequency_range,
+                "calc_coh": calc_coh,
+                "n_sub_windows": n_sub_windows,
+                "rescale_coefs": rescale_coefs,
+            }
         )
 
-        if rescale_coef:
-            # Rescale the regression coefficients to reflect the maximum
-            # deviation from the mean
-            coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
-
-        return t, f, coefs, intercept
-
+    # Main calculation of spectra
     if len(data) == 1:
         # We only have one subject so we don't need to parallelise the
         # calculation
         _logger.info("Calculating spectra")
-        results = [_single_regression_spectra(data[0], alpha[0])]
+        results = [_single_regression_spectra(**kwargs[0])]
 
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
-        for n in range(len(data)):
-            _logger.info(f"Calculating spectra {n}")
-            results.append(_single_regression_spectra(data[n], alpha[n]))
+        for i, kws in enumerate(kwargs):
+            _logger.info(f"Calculating spectra {i}")
+            results.append(_single_regression_spectra(**kws))
     else:
         # Calculate a time-varying PSD and regress to get the mode PSDs
         _logger.info("Calculating spectra")
         results = pqdm(
-            zip(data, alpha),
+            kwargs,
             _single_regression_spectra,
             n_jobs=n_jobs,
-            argument_type="args",
+            argument_type="kwargs",
         )
 
     # Unpack results
