@@ -503,7 +503,6 @@ def regression_spectra(
     calc_coh=True,
     return_weights=False,
     return_coef_int=False,
-    rescale_coefs=True,
     keepdims=False,
     n_jobs=1,
 ):
@@ -543,12 +542,6 @@ def regression_spectra(
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
         separately for the PSDs?
-    rescale_coefs : bool, optional
-        Should we rescale the regression coefficients to reflect the maximum
-        value in each regressor? If :code:`True`, we interpret the regression
-        coefficients at the maximum power deviation from the mean. If
-        :code:`False`, we interpret the regression coefficients as the per unit
-        change in power spectra. By default we do rescale.
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions
@@ -634,7 +627,6 @@ def regression_spectra(
                 "frequency_range": frequency_range,
                 "calc_coh": calc_coh,
                 "n_sub_windows": n_sub_windows,
-                "rescale_coefs": rescale_coefs,
             }
         )
 
@@ -1182,7 +1174,7 @@ def _welch_spectrogram(
                 # Calculate cross spectra for the sub-window
                 X = np.fft.fft(x_sub_window, nfft)
                 X = X[..., min_arg:max_arg]
-                XY = np.conj(X)[:, np.newaxis, :] * X[np.newaxis, :, :]
+                XY = np.conj(X)[np.newaxis, :, :] * X[:, np.newaxis, :]
                 XY_sub_window[k] = XY[m, n]
 
             # Average the cross spectra for each sub-window
@@ -1223,7 +1215,7 @@ def _welch_spectrogram(
             P[i] = np.mean(XX_sub_window, axis=0)
 
     # Scaling for the periodograms (we use the same scaling as SciPy)
-    P /= (sampling_frequency * np.sum(window**2))
+    P /= sampling_frequency * np.sum(window**2)
 
     return t, f, P
 
@@ -1671,16 +1663,15 @@ def _regress_welch_spectrogram(
     n_sub_windows,
     frequency_range,
     calc_coh,
-    rescale_coefs,
 ):
     """Calculate regression spectra for a single subject.
 
     Parameters
     ----------
-    data : np.ndarray or list
-        Data to calculate a spectrogram for. Shape must be
-        (n_subjects, n_samples, n_channels) or (n_samples, n_channels).
-    alpha : np.ndarray or list
+    data : np.ndarray
+        Data to calculate a spectrogram for.
+        Shape must be (n_samples, n_channels).
+    alpha : np.ndarray
         Inferred mode mixing factors. Shape must be (n_samples, n_modes).
     sampling_frequency : float
         Sampling_frequency in Hz.
@@ -1696,12 +1687,6 @@ def _regress_welch_spectrogram(
         Minimum and maximum frequency to keep.
     calc_coh : bool, optional
         Should we also return the coherence spectra?
-    rescale_coefs : bool, optional
-        Should we rescale the regression coefficients to reflect the maximum
-        value in each regressor? If :code:`True`, we interpret the regression
-        coefficients at the maximum power deviation from the mean. If
-        :code:`False`, we interpret the regression coefficients as the per unit
-        change in power spectra. By default we do rescale.
 
     Returns
     -------
@@ -1775,10 +1760,5 @@ def _regress_welch_spectrogram(
         normalize=True,
         log_message=False,
     )
-
-    if rescale_coefs:
-        # Rescale the regression coefficients to reflect the maximum
-        # deviation from the mean
-        coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
 
     return f, coefs, intercept
