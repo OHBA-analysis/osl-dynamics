@@ -1197,7 +1197,7 @@ def _welch_spectrogram(
     window = signal.get_window("hann", (window_length // n_sub_windows))
 
     # Number of data points in the FFT
-    nfft = window_length // n_sub_windows
+    nfft = max(256, 2 ** nextpow2(window_length // n_sub_windows))
 
     # Time and frequency axis
     t = np.arange(n_samples) / sampling_frequency
@@ -1290,7 +1290,7 @@ def _welch_spectrogram(
             P[i] = np.mean(XX_sub_window, axis=0)
 
     # Scaling for the periodograms (we use the same scaling as SciPy)
-    P /= sampling_frequency * np.sum(window**2)
+    P *= 2 / (sampling_frequency * np.sum(window**2))
 
     return t, f, P
 
@@ -1597,7 +1597,7 @@ def _multitaper_spectrogram(
             P[i] = np.mean(XX_sub_window, axis=0)
 
     # Scaling for the multitapers
-    P /= sampling_frequency
+    P *= 2 / sampling_frequency
 
     return t, f, P
 
