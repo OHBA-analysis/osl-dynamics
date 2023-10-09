@@ -625,7 +625,7 @@ def regression_spectra(
                 "window_length": window_length,
                 "step_size": step_size,
                 "frequency_range": frequency_range,
-                "calc_coh": calc_coh,
+                "calc_cpsd": calc_coh,
                 "n_sub_windows": n_sub_windows,
             }
         )
@@ -1662,7 +1662,7 @@ def _regress_welch_spectrogram(
     step_size,
     n_sub_windows,
     frequency_range,
-    calc_coh,
+    calc_cpsd,
 ):
     """Calculate regression spectra for a single subject.
 
@@ -1685,74 +1685,31 @@ def _regress_welch_spectrogram(
         :code:`n_sub_windows`.
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
-    calc_coh : bool, optional
-        Should we also return the coherence spectra?
+    calc_cpsd : bool, optional
+        Should we calculate the cross spectra?
 
     Returns
     -------
     f : np.ndarray
         Frequency axis. Shape is (n_freq).
     coefs : np.ndarray
-        Regression coefficients. Shape is (n_modes, n_channels, n_freq).
+        Regression coefficients. Shape is
+        (n_modes, n_channels * (n_channels + 1) / 2, n_freq) if
+        :code:`calc_cpsd=True`, otherwise it is (n_modes, n_channels, n_freq).
     intercept : np.ndarray
-        Intercept. Shape is (n_channels, n_freq).
+        Intercept. Shape is (n_channels, n_freq) if :code:`calc_cpsd=True`,
+        otherwise it is :code:`(n_channels * (n_channels + 1) / 2, n_freq)`.
     """
-
-    def _window_mean(alpha):
-        n_samples = alpha.shape[0]
-        n_modes = alpha.shape[1]
-
-        # Pad alphas
-        alpha = np.pad(alpha, window_length // 2)[
-            :, window_length // 2 : window_length // 2 + n_modes
-        ]
-
-        # Window to apply to alpha
-        window = signal.get_window("hann", window_length // n_sub_windows)
-
-        # Indices of time points to calculate a periodogram for
-        time_indices = range(0, n_samples, step_size)
-        n_windows = n_samples // step_size
-
-        # Array to hold mean of alpha multiplied by the windowing function
-        a = np.empty([n_windows, n_modes], dtype=np.float32)
-        for i in range(n_windows):
-            # Alpha in the window
-            j = time_indices[i]
-            a_window = alpha[j : j + window_length]
-
-            # Calculate alpha for the sub-window by taking the mean
-            # over time after applying the windowing function
-            a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
-            for k in range(n_sub_windows):
-                a_sub_window[k] = np.mean(
-                    a_window[
-                        k
-                        * window_length
-                        // n_sub_windows : (k + 1)
-                        * window_length
-                        // n_sub_windows
-                    ]
-                    * window[..., np.newaxis],
-                    axis=0,
-                )
-
-            # Average alpha for each sub-window
-            a[i] = np.mean(a_sub_window, axis=0)
-
-        return a
-
-    # Calculate mode-specific spectra for a single subject
     _, f, p = _welch_spectrogram(
         data=data,
         sampling_frequency=sampling_frequency,
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
-        calc_cpsd=calc_coh,
+        calc_cpsd=calc_cpsd,
         n_sub_windows=n_sub_windows,
     )
-    a = _window_mean(alpha)
+    a = _window_mean(alpha, "hann", window_length, step_size, n_sub_windows)
     coefs, intercept = regression.linear(
         a,
         p,
@@ -1760,5 +1717,70 @@ def _regress_welch_spectrogram(
         normalize=True,
         log_message=False,
     )
-
     return f, coefs, intercept
+
+
+def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
+    """Applies a windowing function to a time series and takes the mean.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series data. Shape is (n_samples, n_modes).
+    window : str
+        Name of the windowing function.
+    window_length : int
+        Number of data points in a window.
+    step_size : int, optional
+        Step size for shifting the window.
+    n_sub_windows : int, optional
+        Should we split the window into a set of sub-windows and
+        average each sub-window.
+
+    Returns
+    -------
+    a : np.ndarray
+        Mean for each window.
+    """
+    n_samples = alpha.shape[0]
+    n_modes = alpha.shape[1]
+
+    # Pad alphas
+    alpha = np.pad(alpha, window_length // 2)[
+        :, window_length // 2 : window_length // 2 + n_modes
+    ]
+
+    # Window to apply to alpha
+    window = signal.get_window(window, window_length // n_sub_windows)
+
+    # Indices of time points to calculate a periodogram for
+    time_indices = range(0, n_samples, step_size)
+    n_windows = n_samples // step_size
+
+    # Array to hold mean of alpha multiplied by the windowing function
+    a = np.empty([n_windows, n_modes], dtype=np.float32)
+    for i in range(n_windows):
+        # Alpha in the window
+        j = time_indices[i]
+        a_window = alpha[j : j + window_length]
+
+        # Calculate alpha for the sub-window by taking the mean
+        # over time after applying the windowing function
+        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+        for k in range(n_sub_windows):
+            a_sub_window[k] = np.mean(
+                a_window[
+                    k
+                    * window_length
+                    // n_sub_windows : (k + 1)
+                    * window_length
+                    // n_sub_windows
+                ]
+                * window[..., np.newaxis],
+                axis=0,
+            )
+
+        # Average alpha for each sub-window
+        a[i] = np.mean(a_sub_window, axis=0)
+
+    return a
