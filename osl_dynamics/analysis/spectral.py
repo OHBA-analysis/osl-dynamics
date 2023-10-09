@@ -138,7 +138,7 @@ def welch_spectra(
         If None, we use :code:`2 * sampling_frequency`.
     step_size : int, optional
         Step size for shifting the window.
-        Defaults to :code:`window_length // 2`.
+        Defaults to :code:`window_length // 2` (50% overlap).
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     standardize : bool, optional
@@ -151,7 +151,7 @@ def welch_spectra(
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
-        dimensions of length 1.
+        dimension of length 1.
     n_jobs : int, optional
         Number of parallel jobs.
 
@@ -324,7 +324,7 @@ def multitaper_spectra(
         Length of the data segment to use to calculate spectra.
     step_size : int, optional
         Step size for shifting the window.
-        Defaults to :code:`window_length`.
+        Defaults to :code:`window_length` (no overlap).
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
     n_tapers : int, optional
@@ -341,7 +341,7 @@ def multitaper_spectra(
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
-        dimensions of length 1.
+        dimension of length 1.
     n_jobs : int, optional
         Number of parallel jobs.
 
@@ -523,7 +523,7 @@ def regression_spectra(
     sampling_frequency : float
         Sampling_frequency in Hz.
     window_length : int
-        Number samples to use in the window to calculate a PSD.
+        Number samples to use in the window to calculate a spectrum.
     step_size : int
         Step size for shifting the window.
     n_sub_windows : int, optional
@@ -537,14 +537,14 @@ def regression_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for subject-specific PSDs?
-        Useful for calculating the group average PSD.
+        Should we return the weights for subject-specific spectra?
+        Useful for calculating the group average spectra.
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
-        separately for the PSDs?
+        separately for the mode PSDs?
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
-        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions
+        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
         of length 1.
     n_jobs : int, optional
         Number of parallel jobs.
@@ -825,9 +825,7 @@ def coherence_spectra(cpsd, keepdims=False):
     Returns
     -------
     coh : np.ndarray
-        Coherence spectra.
-        Shape is (n_channels, n_channels, n_freq) or
-        (n_modes, n_channels, n_channels, n_freq).
+        Coherence spectra. Shape is (..., n_channels, n_channels, n_freq).
     """
     error_message = (
         "cpsd must be a numpy array with shape "
@@ -869,12 +867,7 @@ def decompose_spectra(
     random_state=None,
     verbose=0,
 ):
-    """Performs spectral decomposition using coherences.
-
-    Uses non-negative matrix factorization to decompose spectra.
-    Follows the same procedure as the MATLAB function `HMM-MAR/spectral\
-    /spectdecompose.m <https://github.com/OHBA-analysis/HMM-MAR/blob/master\
-    /spectral/spectdecompose.m>`_.
+    """Uses non-negative matrix factorization to decompose spectra.
 
     Parameters
     ----------
@@ -1161,7 +1154,7 @@ def _welch_spectrogram(
         Defaults to :code:`2 * sampling_frequency`.
     step_size : int, optional
         Step size for shifting the window.
-        Defaults to :code:`window_length // 2`.
+        Defaults to :code:`window_length // 2` (50% overlap).
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     calc_cpsd : bool, optional
@@ -1332,7 +1325,7 @@ def _welch(
         If None, we use :code:`2 * sampling_frequency`.
     step_size : int, optional
         Step size for shifting the window.
-        Defaults to :code:`window_length // 2`.
+        Defaults to :code:`window_length // 2` (50% overlap).
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     standardize : bool, optional
@@ -1454,7 +1447,7 @@ def _multitaper_spectrogram(
         Defaults to :code:`2 * sampling_frequency`.
     step_size : int, optional
         Step size for shifting the window.
-        Defaults to :code:`window_length // 2`.
+        Defaults to :code:`window_length` (no overlap).
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     calc_cpsd : bool, optional
@@ -1488,7 +1481,7 @@ def _multitaper_spectrogram(
     window_length = int(window_length)
 
     if step_size is None:
-        step_size = window_length // 2
+        step_size = window_length
     step_size = int(step_size)
 
     # First pad the data so we have enough data points to estimate the
@@ -1638,7 +1631,7 @@ def _multitaper(
         If None, we use :code:`2 * sampling_frequency`.
     step_size : int, optional
         Step size for shifting the window.
-        Defaults to :code:`window_length // 2`.
+        Defaults to :code:`window_length` (no overlap).
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
     n_tapers : int, optional
@@ -1773,14 +1766,14 @@ def _regress_welch_spectrogram(
     Returns
     -------
     f : np.ndarray
-        Frequency axis. Shape is (n_freq).
+        Frequency axis. Shape is (n_freq,).
     coefs : np.ndarray
         Regression coefficients. Shape is
         (n_modes, n_channels * (n_channels + 1) / 2, n_freq) if
         :code:`calc_cpsd=True`, otherwise it is (n_modes, n_channels, n_freq).
     intercept : np.ndarray
-        Intercept. Shape is (n_channels, n_freq) if :code:`calc_cpsd=True`,
-        otherwise it is :code:`(n_channels * (n_channels + 1) / 2, n_freq)`.
+        Intercept. Shape is (n_channels * (n_channels + 1) / 2, n_freq)
+        if :code:`calc_cpsd=True`, otherwise it is (n_channels, n_freq).
     """
     _, f, p = _welch_spectrogram(
         data=data,
@@ -1813,9 +1806,9 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
         Name of the windowing function.
     window_length : int
         Number of data points in a window.
-    step_size : int, optional
+    step_size : int
         Step size for shifting the window.
-    n_sub_windows : int, optional
+    n_sub_windows : int
         Should we split the window into a set of sub-windows and
         average each sub-window.
 

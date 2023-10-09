@@ -62,8 +62,8 @@ def welch_spectra(
     return_weights=False,
     standardize=True,
     calc_coh=False,
-    n_jobs=1,
     keepdims=False,
+    n_jobs=1,
 ):
     """Calculate spectra using Welch's method.
 
@@ -97,7 +97,7 @@ def welch_spectra(
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
-        dimensions of length 1.
+        dimension of length 1.
     n_jobs : int, optional
         Number of parallel jobs.
 
@@ -175,7 +175,7 @@ def multitaper_spectra(
         Useful for calculating the group average PSD.
     keepdims : bool, optional
         Should we enforce a (n_subject, n_states, ...) array is returned for
-        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimensions
+        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
         of length 1.
     n_jobs : int, optional
         Number of parallel jobs.
