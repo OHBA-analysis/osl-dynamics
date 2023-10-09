@@ -39,7 +39,7 @@ def wavelet(
     sampling_frequency : float
         Sampling frequency in Hz.
     w : float, optional
-        :code:`w` parameter to pass to `scipy.signal.morlet2 
+        :code:`w` parameter to pass to `scipy.signal.morlet2
         <https://docs.scipy.org/doc/scipy/reference/generated\
         /scipy.signal.morlet2.html>`_.
     standardize : bool, optional
@@ -1104,14 +1104,14 @@ def get_frequency_args_range(frequencies, frequency_range):
     Parameters
     ----------
     frequencies : np.ndarray
-        Frequency axis.
+        1D numpy array containing a Frequency axis.
     frequency_range : list of len 2
-        Min/max frequency.
+        Minimum and maximum frequency.
 
     Returns
     -------
     args_range : list of len 2
-        Min/max index.
+        Indices for minimum and maximum frequency.
     """
     f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
     f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
@@ -1307,6 +1307,11 @@ def _welch(
     keepdims=False,
 ):
     """Calculate a (cross) power spectrum using Welch's method.
+
+    This function first calculates a spectrogram using
+    `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
+    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
+    .spectral._welch_spectrogram>`_ then takes the time average.
 
     The scaling for the power spectra calculated by this function
     matches SciPy (:code:`scipy.signal.welch`).
@@ -1617,6 +1622,11 @@ def _multitaper(
 ):
     """Calculate a multitaper.
 
+    This function first calculates a spectrogram using
+    `_multitaper_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
+    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
+    .spectral._multitaper_spectrogram>`_ then takes the time average.
+
     Parameters
     ----------
     data : np.ndarray
@@ -1800,7 +1810,7 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
 
     Parameters
     ----------
-    data : np.ndarray
+    alpha : np.ndarray
         Time series data. Shape is (n_samples, n_modes).
     window : str
         Name of the windowing function.
@@ -1809,12 +1819,12 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
     step_size : int
         Step size for shifting the window.
     n_sub_windows : int
-        Should we split the window into a set of sub-windows and
-        average each sub-window.
+        We split the window into a number of sub-windows and average
+        across all sub-windows. This is the number of sub-windows.
 
     Returns
     -------
-    a : np.ndarray
+    mean_window_alpha : np.ndarray
         Mean for each window.
     """
     n_samples = alpha.shape[0]
@@ -1833,7 +1843,7 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
     n_windows = n_samples // step_size
 
     # Array to hold mean of alpha multiplied by the windowing function
-    a = np.empty([n_windows, n_modes], dtype=np.float32)
+    mean_window_alpha = np.empty([n_windows, n_modes], dtype=np.float32)
     for i in range(n_windows):
         # Alpha in the window
         j = time_indices[i]
@@ -1856,6 +1866,6 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
             )
 
         # Average alpha for each sub-window
-        a[i] = np.mean(a_sub_window, axis=0)
+        mean_window_alpha[i] = np.mean(a_sub_window, axis=0)
 
-    return a
+    return mean_window_alpha
