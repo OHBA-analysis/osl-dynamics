@@ -105,7 +105,7 @@ def wavelet(
     return t, f, wt
 
 
-def spectrogram(
+def welch_spectrogram(
     data,
     sampling_frequency,
     window_length=None,
@@ -408,7 +408,7 @@ def welch_spectra(
         for i in range(stc.shape[-1]):
             # Calculate spectrogram for this state's data
             x = data * stc[..., i][..., np.newaxis]
-            _, f, p = spectrogram(
+            _, f, p = welch_spectrogram(
                 data=x,
                 sampling_frequency=sampling_frequency,
                 window_length=window_length,
@@ -772,9 +772,9 @@ def regression_spectra(
 ):
     """Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
-    We use `spectrogram <https://osl-dynamics.readthedocs.io/en\
+    We use `welch_spectrogram <https://osl-dynamics.readthedocs.io/en\
     /latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics\
-    .analysis.spectral.spectrogram>`_ to calculate the spectrogram.
+    .analysis.spectral.welch_spectrogram>`_ to calculate the spectrogram.
 
     Parameters
     ----------
@@ -931,7 +931,7 @@ def regression_spectra(
         # data and alpha are numpy arrays with shape (n_samples, n_channels)
 
         # Calculate mode-specific spectra for a single subject
-        t, f, p = spectrogram(
+        t, f, p = welch_spectrogram(
             data=data,
             sampling_frequency=sampling_frequency,
             window_length=window_length,
