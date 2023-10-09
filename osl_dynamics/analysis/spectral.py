@@ -297,11 +297,11 @@ def welch(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray
         Time series data. Must have shape (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
-    alpha : np.ndarray or list, optional
+    alpha : np.ndarray, optional
         Inferred state probability time course.
         Must have shape (n_samples, n_states).
     window_length : int, optional
@@ -791,11 +791,11 @@ def multitaper(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray
         Time series data. Must have shape (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
-    alpha : np.ndarray or list, optional
+    alpha : np.ndarray, optional
         Inferred state probability time course.
         Must have shape (n_samples, n_states).
     window_length : int, optional
@@ -1105,12 +1105,50 @@ def regress_welch_spectrogram(
     sampling_frequency,
     window_length,
     step_size,
+    n_sub_windows,
     frequency_range,
     calc_coh,
-    n_sub_windows,
     rescale_coefs,
 ):
-    """Calculate regression spectra for a single subject."""
+    """Calculate regression spectra for a single subject.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Data to calculate a spectrogram for. Shape must be
+        (n_subjects, n_samples, n_channels) or (n_samples, n_channels).
+    alpha : np.ndarray or list
+        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
+    sampling_frequency : float
+        Sampling_frequency in Hz.
+    window_length : int
+        Number samples to use in the window to calculate a PSD.
+    step_size : int
+        Step size for shifting the window.
+    n_sub_windows : int, optional
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        :code:`n_sub_windows`.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
+    rescale_coefs : bool, optional
+        Should we rescale the regression coefficients to reflect the maximum
+        value in each regressor? If :code:`True`, we interpret the regression
+        coefficients at the maximum power deviation from the mean. If
+        :code:`False`, we interpret the regression coefficients as the per unit
+        change in power spectra. By default we do rescale.
+
+    Returns
+    -------
+    f : np.ndarray
+        Frequency axis. Shape is (n_freq).
+    coefs : np.ndarray
+        Regression coefficients. Shape is (n_modes, n_channels, n_freq).
+    intercept : np.ndarray
+        Intercept. Shape is (n_channels, n_freq).
+    """
 
     def _window_mean(alpha):
         n_samples = alpha.shape[0]
@@ -1157,7 +1195,7 @@ def regress_welch_spectrogram(
         return a
 
     # Calculate mode-specific spectra for a single subject
-    t, f, p = welch_spectrogram(
+    _, f, p = welch_spectrogram(
         data=data,
         sampling_frequency=sampling_frequency,
         window_length=window_length,
@@ -1180,7 +1218,7 @@ def regress_welch_spectrogram(
         # deviation from the mean
         coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
 
-    return t, f, coefs, intercept
+    return f, coefs, intercept
 
 
 def regression_spectra(
@@ -1356,7 +1394,7 @@ def regression_spectra(
     # Unpack results
     Pj = []
     for result in results:
-        t, f, coefs, intercept = result
+        f, coefs, intercept = result
         Pj.append([coefs, [intercept] * coefs.shape[0]])
     Pj = np.array(Pj)
 
