@@ -644,8 +644,16 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     if data is None:
         raise ValueError("data must be passed.")
 
+    sampling_frequency = kwargs.pop("sampling_frequency", None)
+    if sampling_frequency is None and data.sampling_frequency is None:
+        raise ValueError(
+            "sampling_frequency must be passed or specified in the Data object."
+        )
+    else:
+        sampling_frequency = data.sampling_frequency
+
     default_kwargs = {
-        "sampling_frequency": data.sampling_frequency,
+        "sampling_frequency": sampling_frequency,
         "keepdims": True,
     }
     kwargs = override_dict_defaults(default_kwargs, kwargs)
@@ -756,9 +764,14 @@ def regression_spectra(data, output_dir, kwargs):
     if data is None:
         raise ValueError("data must be passed.")
 
-    sampling_frequency = (
-        kwargs.pop("sampling_frequency", None) or data.sampling_frequency
-    )
+    sampling_frequency = kwargs.pop("sampling_frequency", None)
+    if sampling_frequency is None and data.sampling_frequency is None:
+        raise ValueError(
+            "sampling_frequency must be passed or specified in the Data object."
+        )
+    else:
+        sampling_frequency = data.sampling_frequency
+
     default_kwargs = {
         "sampling_frequency": sampling_frequency,
         "window_length": int(4 * sampling_frequency),
