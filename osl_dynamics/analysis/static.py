@@ -67,7 +67,7 @@ def welch_spectra(
 ):
     """Calculate spectra using Welch's method.
 
-    Wrapper for `spectral.welch_specta <https://osl-dynamics.readthedocs\
+    Wrapper for `spectral.welch_spectra <https://osl-dynamics.readthedocs\
     .io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html\
     #osl_dynamics.analysis.spectral.welch_spectra>`_ assuming only one
     state is active for all time points.
@@ -146,7 +146,7 @@ def multitaper_spectra(
 ):
     """Calculate multitaper spectra.
 
-    Wrapper for `spectral.multitaper_specta <https://osl-dynamics.readthedocs\
+    Wrapper for `spectral.multitaper_spectra <https://osl-dynamics.readthedocs\
     .io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html\
     #osl_dynamics.analysis.spectral.multitaper_spectra>`_ assuming only one
     state is active for all time points.
