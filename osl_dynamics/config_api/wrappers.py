@@ -243,7 +243,6 @@ def train_dynemo(
     if data is None:
         raise ValueError("data must be passed.")
 
-    import tensorflow as tf
     from osl_dynamics.models import dynemo
 
     # Directories
@@ -867,7 +866,8 @@ def plot_group_ae_networks(
 
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
-             'parcellation_file': data.parcellation_file}
+             'parcellation_file': data.parcellation_file,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -917,7 +917,12 @@ def plot_group_ae_networks(
         "filename": f"{networks_dir}/mean_.png",
         "mask_file": mask_file,
         "parcellation_file": parcellation_file,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -992,7 +997,8 @@ def plot_group_tde_hmm_networks(
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1080,7 +1086,12 @@ def plot_group_tde_hmm_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -1171,7 +1182,8 @@ def plot_group_nnmf_tde_hmm_networks(
              'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1272,7 +1284,12 @@ def plot_group_nnmf_tde_hmm_networks(
         "component": component,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -1354,7 +1371,8 @@ def plot_group_tde_dynemo_networks(
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1445,7 +1463,12 @@ def plot_group_tde_dynemo_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
