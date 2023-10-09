@@ -292,8 +292,8 @@ def welch_spectra(
 ):
     """Calculates spectra for inferred states using Welch's method.
 
-    The scaling the power spectra calculated by this function matches
-    SciPy (:code:`scipy.signal.welch`).
+    The scaling for the power spectra calculated by this function
+    matches SciPy (:code:`scipy.signal.welch`).
 
     Parameters
     ----------
