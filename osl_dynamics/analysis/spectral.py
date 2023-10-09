@@ -1099,7 +1099,7 @@ def multitaper_spectra(
             return f, psd
 
 
-def _single_regression_spectra(
+def regress_welch_spectrogram(
     data,
     alpha,
     sampling_frequency,
@@ -1335,20 +1335,20 @@ def regression_spectra(
         # We only have one subject so we don't need to parallelise the
         # calculation
         _logger.info("Calculating spectra")
-        results = [_single_regression_spectra(**kwargs[0])]
+        results = [regress_welch_spectrogram(**kwargs[0])]
 
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
         for i, kws in enumerate(kwargs):
             _logger.info(f"Calculating spectra {i}")
-            results.append(_single_regression_spectra(**kws))
+            results.append(regress_welch_spectrogram(**kws))
     else:
         # Calculate a time-varying PSD and regress to get the mode PSDs
         _logger.info("Calculating spectra")
         results = pqdm(
             kwargs,
-            _single_regression_spectra,
+            regress_welch_spectrogram,
             n_jobs=n_jobs,
             argument_type="kwargs",
         )
