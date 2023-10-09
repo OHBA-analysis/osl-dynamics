@@ -109,9 +109,9 @@ def spectrogram(
     data,
     sampling_frequency,
     window_length=None,
+    step_size=None,
     frequency_range=None,
     calc_cpsd=True,
-    step_size=1,
     n_sub_windows=1,
 ):
     """Calculates a spectogram (time-varying power spectral density).
@@ -134,12 +134,13 @@ def spectrogram(
     window_length : int, optional
         Number of data points to use when calculating the periodogram.
         Defaults to :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length // 2`.
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     calc_cpsd : bool, optional
         Should we calculate cross spectra?
-    step_size : int, optional
-        Step size for shifting the window.
     n_sub_windows : int, optional
         We split the window into a number of sub-windows and average the
         spectra for each sub-window. window_length must be divisible by
@@ -158,6 +159,15 @@ def spectrogram(
     """
     n_samples = data.shape[0]
     n_channels = data.shape[1]
+
+    # Validation
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
+
+    if step_size is None:
+        step_size = window_length // 2
+    step_size = int(step_size)
 
     # First pad the data so we have enough data points to estimate the
     # periodogram for time points at the start/end of the data
@@ -398,9 +408,9 @@ def welch_spectra(
                 data=x,
                 sampling_frequency=sampling_frequency,
                 window_length=window_length,
+                step_size=step_size,
                 frequency_range=frequency_range,
                 calc_cpsd=calc_coh,
-                step_size=step_size,
             )
 
             # Average over the time dimension
@@ -921,6 +931,7 @@ def regression_spectra(
             data=data,
             sampling_frequency=sampling_frequency,
             window_length=window_length,
+            step_size=step_size,
             frequency_range=frequency_range,
             calc_cpsd=calc_coh,
             n_sub_windows=n_sub_windows,
@@ -934,7 +945,7 @@ def regression_spectra(
             log_message=False,
         )
 
-        if rescale_psd:
+        if rescale_coef:
             # Rescale the regression coefficients to reflect the maximum
             # deviation from the mean
             coefs *= np.max(a, axis=0)[:, np.newaxis, np.newaxis]
