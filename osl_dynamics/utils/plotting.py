@@ -846,6 +846,7 @@ def plot_violin(
     y_label=None,
     title=None,
     fig_kwargs=None,
+    sns_kwargs=None,
     ax=None,
     filename=None,
 ):
@@ -865,6 +866,8 @@ def plot_violin(
         Figure title.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
+    sns_kwargs : dict, optional
+        Arguments to pass to :code:`sns.violinplot()`.
     ax : matplotlib.axes.axes, optional
         Axis object to plot on.
     filename : str, optional
@@ -902,6 +905,9 @@ def plot_violin(
     default_fig_kwargs = {"figsize": (7, 4)}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
+    if sns_kwargs is None:
+        sns_kwargs = {}
+
     # Create a pandas DataFrame
     # Pad the data with NaNs to make sure all columns have the same length
     max_len = max([d.size for d in data])
@@ -922,7 +928,7 @@ def plot_violin(
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot violins
-    sns.violinplot(df, ax=ax)
+    sns.violinplot(df, ax=ax, **sns_kwargs)
 
     # Set title and axis labels
     ax.set_title(title)

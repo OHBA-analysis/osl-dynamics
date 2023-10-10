@@ -1635,7 +1635,11 @@ def calc_gmm_alpha(data, output_dir, kwargs=None):
 
 
 def plot_hmm_network_summary_stats(
-    data, output_dir, use_gmm_alpha=False, sampling_frequency=None
+    data,
+    output_dir,
+    use_gmm_alpha=False,
+    sampling_frequency=None,
+    sns_kwargs=None,
 ):
     """Plot HMM summary statistics for networks as violin plots.
 
@@ -1673,6 +1677,8 @@ def plot_hmm_network_summary_stats(
     sampling_frequency : float, optional
         Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
+    sns_kwargs : dict, optional
+        Arguments to pass to :code:`sns.violinplot()`.
     """
     if sampling_frequency is None:
         if data is None or data.sampling_frequency is None:
@@ -1730,6 +1736,7 @@ def plot_hmm_network_summary_stats(
         x_label="State",
         y_label="Fractional Occupancy",
         filename=f"{summary_stats_dir}/fo.png",
+        sns_kwargs=sns_kwargs,
     )
     plotting.plot_violin(
         lt.T,
@@ -1737,6 +1744,7 @@ def plot_hmm_network_summary_stats(
         x_label="State",
         y_label="Mean Lifetime (s)",
         filename=f"{summary_stats_dir}/lt.png",
+        sns_kwargs=sns_kwargs,
     )
     plotting.plot_violin(
         intv.T,
@@ -1744,6 +1752,7 @@ def plot_hmm_network_summary_stats(
         x_label="State",
         y_label="Mean Interval (s)",
         filename=f"{summary_stats_dir}/intv.png",
+        sns_kwargs=sns_kwargs,
     )
     plotting.plot_violin(
         sr.T,
@@ -1751,6 +1760,7 @@ def plot_hmm_network_summary_stats(
         x_label="State",
         y_label="Switching rate (Hz)",
         filename=f"{summary_stats_dir}/sr.png",
+        sns_kwargs=sns_kwargs,
     )
 
 
