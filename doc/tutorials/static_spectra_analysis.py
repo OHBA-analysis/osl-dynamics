@@ -67,7 +67,7 @@ ts = data.time_series()
 #
 # Calculate power spectra
 # ***********************
-# Using the data we just loaded, we want to calculate the power spectra for each channel (ROI) for each subject. We will use the `osl-dynamics.analysis.static.power_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.power_spectra>`_ function to do this. This function implements Welch's methods for calculating power spectra.
+# Using the data we just loaded, we want to calculate the power spectra for each channel (ROI) for each subject. We will use the `osl-dynamics.analysis.static.welch_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.welch_spectra>`_ function to do this. This function implements Welch's methods for calculating power spectra.
 #
 # To use this function we need to specify at least two arguments:
 #
@@ -80,7 +80,7 @@ ts = data.time_series()
 
 from osl_dynamics.analysis import static
 
-f, psd = static.power_spectra(
+f, psd = static.welch_spectra(
     data=ts,
     sampling_frequency=250,
     window_length=500,
@@ -88,7 +88,7 @@ f, psd = static.power_spectra(
 )
 
 #%%
-# `osl-dynamics.analysis.static.power_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.power_spectra>`_ returns two numpy arrays: `f`, which is the frequency axis of the power spectra in Hz, and `p`, which contains the power spectra.
+# `osl-dynamics.analysis.static.welch_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.welch_spectra>`_ returns two numpy arrays: `f`, which is the frequency axis of the power spectra in Hz, and `p`, which contains the power spectra.
 #
 # Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convinent to save the `f` and `p` numpy arrays so we can load them later (instead of calculating them again). Let's save the spectra.
 
@@ -201,7 +201,7 @@ group_ts = np.concatenate(ts)
 print(group_ts.shape)
 
 # Calculate the static power spectra
-f, group_psd1 = static.power_spectra(
+f, group_psd1 = static.welch_spectra(
     data=group_ts,
     sampling_frequency=250,
     window_length=500,
@@ -210,7 +210,7 @@ f, group_psd1 = static.power_spectra(
 print(group_psd1.shape)
 
 #%%
-# We see `static.power_spectra` now returns a 2D numpy array containing the power spectrum at each ROI. Let's plot the group-level power spectrum averaged over channels.
+# We see `static.welch_spectra` now returns a 2D numpy array containing the power spectrum at each ROI. Let's plot the group-level power spectrum averaged over channels.
 
 # Average over channels
 group_psd1_mean = np.mean(group_psd1, axis=0)

@@ -243,7 +243,6 @@ def train_dynemo(
     if data is None:
         raise ValueError("data must be passed.")
 
-    import tensorflow as tf
     from osl_dynamics.models import dynemo
 
     # Directories
@@ -636,8 +635,6 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
         .multitaper_spectra>`_. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
-             'time_half_bandwidth': 4,
-             'n_tapers': 7,
              'keepdims': True}
     nnmf_components : int, optional
         Number of non-negative matrix factorization (NNMF) components to fit to
@@ -646,10 +643,16 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     if data is None:
         raise ValueError("data must be passed.")
 
+    sampling_frequency = kwargs.pop("sampling_frequency", None)
+    if sampling_frequency is None and data.sampling_frequency is None:
+        raise ValueError(
+            "sampling_frequency must be passed or specified in the Data object."
+        )
+    else:
+        sampling_frequency = data.sampling_frequency
+
     default_kwargs = {
-        "sampling_frequency": data.sampling_frequency,
-        "time_half_bandwidth": 4,
-        "n_tapers": 7,
+        "sampling_frequency": sampling_frequency,
         "keepdims": True,
     }
     kwargs = override_dict_defaults(default_kwargs, kwargs)
@@ -679,7 +682,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     # Calculate multitaper
     from osl_dynamics.analysis import spectral
 
-    spectra = spectral.multitaper_spectra(data, alpha, **kwargs)
+    spectra = spectral.multitaper_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
     return_weights = kwargs.pop("return_weights", False)
@@ -760,9 +763,14 @@ def regression_spectra(data, output_dir, kwargs):
     if data is None:
         raise ValueError("data must be passed.")
 
-    sampling_frequency = (
-        kwargs.pop("sampling_frequency", None) or data.sampling_frequency
-    )
+    sampling_frequency = kwargs.pop("sampling_frequency", None)
+    if sampling_frequency is None and data.sampling_frequency is None:
+        raise ValueError(
+            "sampling_frequency must be passed or specified in the Data object."
+        )
+    else:
+        sampling_frequency = data.sampling_frequency
+
     default_kwargs = {
         "sampling_frequency": sampling_frequency,
         "window_length": int(4 * sampling_frequency),
@@ -798,7 +806,7 @@ def regression_spectra(data, output_dir, kwargs):
     # Calculate regression spectra
     from osl_dynamics.analysis import spectral
 
-    spectra = spectral.regression_spectra(data, alpha, **kwargs)
+    spectra = spectral.regression_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
     return_weights = kwargs.pop("return_weights", False)
@@ -858,7 +866,8 @@ def plot_group_ae_networks(
 
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
-             'parcellation_file': data.parcellation_file}
+             'parcellation_file': data.parcellation_file,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -908,7 +917,12 @@ def plot_group_ae_networks(
         "filename": f"{networks_dir}/mean_.png",
         "mask_file": mask_file,
         "parcellation_file": parcellation_file,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -983,7 +997,8 @@ def plot_group_tde_hmm_networks(
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1071,7 +1086,12 @@ def plot_group_tde_hmm_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -1162,7 +1182,8 @@ def plot_group_nnmf_tde_hmm_networks(
              'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1263,7 +1284,12 @@ def plot_group_nnmf_tde_hmm_networks(
         "component": component,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -1345,7 +1371,8 @@ def plot_group_tde_dynemo_networks(
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1436,7 +1463,12 @@ def plot_group_tde_dynemo_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )

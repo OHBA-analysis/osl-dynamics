@@ -74,7 +74,7 @@ import numpy as np
 from osl_dynamics.analysis import static
 
 # Calculate power spectra
-f, psd = static.power_spectra(
+f, psd = static.welch_spectra(
     data=ts,
     sampling_frequency=250,
     window_length=500,

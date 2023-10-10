@@ -38,7 +38,7 @@ data = Data(
 )
 
 # Calculate static power spectra
-f, psd, coh = static.power_spectra(
+f, psd, coh = static.welch_spectra(
     data=data.time_series(),
     window_length=data.sampling_frequency * 2,
     sampling_frequency=data.sampling_frequency,

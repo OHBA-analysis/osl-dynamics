@@ -18,7 +18,7 @@ data = Data(
 ts = data.time_series()
 
 # Calculate static power spectra
-f, p = static.power_spectra(
+f, p = static.welch_spectra(
     data=ts,
     window_length=500,
     sampling_frequency=250,

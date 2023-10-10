@@ -77,7 +77,7 @@ data = Data(sf_files)
 ts = data.time_series()
 
 # Calculate spectra
-f, psd = static.power_spectra(
+f, psd = static.welch_spectra(
     data=ts,
     window_length=500,
     sampling_frequency=sampling_frequency,
