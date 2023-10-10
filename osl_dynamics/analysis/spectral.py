@@ -1117,8 +1117,7 @@ def get_frequency_args_range(frequencies, frequency_range):
     f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
     if f_max_arg <= f_min_arg:
         raise ValueError("Cannot select requested frequency range.")
-    args_range = [f_min_arg, f_max_arg + 1]
-    return args_range
+    return [f_min_arg, f_max_arg]
 
 
 def _welch_spectrogram(

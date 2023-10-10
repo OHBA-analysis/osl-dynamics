@@ -94,6 +94,7 @@ def variance_from_spectra(
     psd,
     components=None,
     frequency_range=None,
+    method="mean",
 ):
     """Calculates variance from power spectra.
 
@@ -109,6 +110,10 @@ def variance_from_spectra(
         Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list, optional
         Frequency range in Hz to integrate the PSD over. Default is full range.
+    method : str
+        Should take the sum of the PSD over the frequency range
+        (:code:`method="sum"`) or take the average value of the PSD
+        (:code:`method="mean"`).
 
     Returns
     -------
@@ -164,6 +169,9 @@ def variance_from_spectra(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
+    if method not in ["mean", "sum"]:
+        raise ValueError("method should be 'mean' or 'sum'.")
+
     # Number of spectral components
     if components is None:
         n_components = 1
@@ -195,10 +203,16 @@ def variance_from_spectra(
         else:
             # Integrate over the given frequency range
             if frequency_range is None:
-                p = np.sum(psd, axis=-1)
+                if method == "sum":
+                    p = np.sum(psd, axis=-1)
+                else:
+                    p = np.mean(psd, axis=-1)
             else:
                 [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-                p = np.sum(psd[..., min_arg:max_arg], axis=-1)
+                if method == "sum":
+                    p = np.sum(psd[..., min_arg:max_arg], axis=-1)
+                else:
+                    p = np.mean(psd[..., min_arg:max_arg], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
         var.append(p)

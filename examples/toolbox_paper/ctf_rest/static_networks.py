@@ -33,8 +33,9 @@ os.makedirs(output_dir, exist_ok=True)
 
 # Load source data
 data = Data(
-    "/well/woolrich/projects/toolbox_paper/ctf_rest/training_data/networks",
+    "training_data/networks",
     sampling_frequency=250,
+    n_jobs=4,
 )
 
 # Calculate static power spectra
@@ -44,6 +45,7 @@ f, psd, coh = static.welch_spectra(
     sampling_frequency=data.sampling_frequency,
     standardize=True,
     calc_coh=True,
+    n_jobs=4,
 )
 
 # Calculate power maps for different frequency bands
@@ -61,7 +63,11 @@ power.save(
     mean_pow_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={"views": ["lateral"], "vmax": mean_pow_map.max()},
+    plot_kwargs={
+        "views": ["lateral"],
+        "symmetric_cbar": True,
+        "vmax": mean_pow_map.max(),  # puts all plots on the same scale
+    },
     filename=f"{output_dir}/pow_.png",
 )
 
@@ -82,14 +88,18 @@ connectivity.save(
     mean_coh_net,
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     threshold=0.95,
-    plot_kwargs={"edge_cmap": "Reds", "edge_vmin": 0, "edge_vmax": mean_coh_net.max()},
+    plot_kwargs={
+        "edge_cmap": "Reds",
+        "edge_vmin": 0,
+        "edge_vmax": mean_coh_net.max(),
+    },
     filename=f"{output_dir}/coh_.png",
 )
 
 # Calculate AEC networks for different frequency bands
 aec = []
 for l, h in [(1, 4), (4, 7), (7, 13), (13, 30)]:
-    data.filter(low_freq=l, high_freq=h)
+    data.filter(low_freq=l, high_freq=h, use_raw=True)
     data.amplitude_envelope()
     data.standardize()
     aec.append(static.functional_connectivity(data.time_series()))
@@ -104,7 +114,11 @@ connectivity.save(
     mean_aec,
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     threshold=0.95,
-    plot_kwargs={"edge_cmap": "Reds", "edge_vmin": 0, "edge_vmax": mean_aec.max()},
+    plot_kwargs={
+        "edge_cmap": "Reds",
+        "edge_vmin": 0,
+        "edge_vmax": mean_aec.max(),
+    },
     filename=f"{output_dir}/aec_.png",
 )
 
@@ -120,27 +134,30 @@ for i, a in enumerate(age):
 pow_diff, pvalues = statistics.group_diff_max_stat_perm(
     pow_map, assignments, n_perm=1000, n_jobs=4
 )  # pow_diff is group 1 (old) minus group 2 (young)
-pvalues[pvalues > 0.05] = 0.2
 
 # Plot significant power map differences
 power.save(
     pow_diff,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={"views": ["lateral"]},
+    plot_kwargs={
+        "views": ["lateral"],
+        "symmetric_cbar": True,
+    },
     filename=f"{output_dir}/pow_diff_.png",
 )
 power.save(
     pvalues,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    asymmetric_data=True,
-        plot_kwargs={
+    plot_kwargs={
         "views": ["lateral"],
         "cmap": "hot_r",
         "bg_on_data": 1,
         "darkness": 0.6,
-        "alpha": 1
+        "alpha": 1,
+        "vmin": 0,
+        "vmax": 0.1,
     },
     filename=f"{output_dir}/pow_diff_pvalues_.png",
 )
