@@ -1197,7 +1197,7 @@ def _welch_spectrogram(
     window = signal.get_window("hann", (window_length // n_sub_windows))
 
     # Number of data points in the FFT
-    nfft = max(256, 2 ** nextpow2(window_length // n_sub_windows))
+    nfft = max(256, window_length)
 
     # Time and frequency axis
     t = np.arange(n_samples) / sampling_frequency
