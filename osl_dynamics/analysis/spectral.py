@@ -8,6 +8,7 @@ import numpy as np
 from scipy import signal
 from sklearn.decomposition import non_negative_factorization
 from pqdm.processes import pqdm
+from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
@@ -249,9 +250,8 @@ def welch_spectra(
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
-        for i, kws in enumerate(kwargs):
-            _logger.info(f"Calculating spectra {i}")
-            results.append(_welch(**kws))
+        for i in trange(len(data), desc="Calculating spectra"):
+            results.append(_welch(**kwargs[i]))
 
     else:
         # Calculate spectra in parallel
@@ -442,9 +442,8 @@ def multitaper_spectra(
     elif n_jobs == 1:
         # We have multiple subjects but we're running in serial
         results = []
-        for i, kws in enumerate(kwargs):
-            _logger.info(f"Calculating spectra {i}")
-            results.append(_multitaper(**kws))
+        for i in trange(len(data), desc="Calculating spectra"):
+            results.append(_multitaper(**kwargs[i]))
 
     else:
         # Calculate spectra in parallel
