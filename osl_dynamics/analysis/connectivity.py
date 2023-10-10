@@ -769,7 +769,8 @@ def save(
     Parameters
     ----------
     connectivity_map : np.ndarray
-        Matrices containing connectivity strengths to plot. Shape must be
+        Matrices containing connectivity strengths to plot.
+        Shape must be (n_components, n_modes, n_channels, n_channels),
         (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     parcellation_file : str
         Name of parcellation file used.
@@ -881,7 +882,8 @@ def save_interactive(
     Parameters
     ----------
     connectivity_map : np.ndarray
-        Matrices containing connectivity strengths to plot. Shape must be
+        Matrices containing connectivity strengths to plot.
+        Shape must be (n_components, n_modes, n_channels, n_channels),
         (n_modes, n_channels, n_channels) or (n_channels, n_channels).
     parcellation_file : str
         Name of parcellation file used.
