@@ -99,7 +99,6 @@ def train_hmm(
             {'sequence_length': 2000,
              'batch_size': 32,
              'learning_rate': 0.01,
-             'lr_decay': 0.1,
              'n_epochs': 20}.
     init_kwargs : dict, optional
         Keyword arguments to pass to
@@ -129,7 +128,6 @@ def train_hmm(
         "sequence_length": 2000,
         "batch_size": 32,
         "learning_rate": 0.01,
-        "lr_decay": 0.1,
         "n_epochs": 20,
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)

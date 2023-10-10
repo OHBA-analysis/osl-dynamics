@@ -252,6 +252,7 @@ def welch_spectra(
         for i, kws in enumerate(kwargs):
             _logger.info(f"Calculating spectra {i}")
             results.append(_welch(**kws))
+
     else:
         # Calculate spectra in parallel
         _logger.info("Calculating spectra")
