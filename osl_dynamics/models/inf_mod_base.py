@@ -10,6 +10,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import utils
 from scipy.special import xlogy, logsumexp
+from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
@@ -461,10 +462,17 @@ class VariationalInferenceModelBase(ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
 
-        _logger.info("Getting theta")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting theta")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting theta")
+
         theta = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
             theta_ = predictions["theta"]
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
@@ -518,11 +526,18 @@ class VariationalInferenceModelBase(ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
 
-        _logger.info("Getting mode logits")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting mode logits")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting mode logits")
+
         mean_theta = []
         fc_theta = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
             mean_theta_ = predictions["mean_theta"]
             fc_theta_ = predictions["fc_theta"]
             if remove_edge_effects:
@@ -586,10 +601,17 @@ class VariationalInferenceModelBase(ModelBase):
         dataset = self.make_dataset(dataset, step_size=step_size)
         alpha_layer = self.model.get_layer("alpha")
 
-        _logger.info("Getting alpha")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting alpha")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting alpha")
+
         alpha = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
             theta = predictions["theta"]
             alpha_ = alpha_layer(theta)
             if remove_edge_effects:
@@ -646,11 +668,18 @@ class VariationalInferenceModelBase(ModelBase):
         alpha_layer = self.model.get_layer("alpha")
         gamma_layer = self.model.get_layer("gamma")
 
-        _logger.info("Getting mode time courses")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting mode time courses")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting mode time courses")
+
         alpha = []
         gamma = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
             mean_theta = predictions["mean_theta"]
             fc_theta = predictions["fc_theta"]
             alpha_ = alpha_layer(mean_theta)
@@ -909,10 +938,17 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
 
-        _logger.info("Getting alpha")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting alpha")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting alpha")
+
         alpha = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
             alpha_ = predictions["gamma"]
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%

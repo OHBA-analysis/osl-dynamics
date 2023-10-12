@@ -1206,11 +1206,17 @@ class Model(ModelBase):
         """
         dataset = self.make_dataset(dataset)
 
-        _logger.info("Getting alpha")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting alpha")
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting alpha")
+
         alpha = []
-        for ds in dataset:
+        for i in iterator:
             gamma = []
-            for data in ds:
+            for data in dataset[i]:
                 x = data["data"]
                 g, _ = self.get_posterior(x)
                 gamma.append(g)
