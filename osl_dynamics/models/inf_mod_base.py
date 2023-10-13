@@ -808,15 +808,13 @@ class MarkovStateInferenceModelConfig:
 class MarkovStateInferenceModelBase(ModelBase):
     """Base class for a Markov chain hidden state inference model."""
 
-    def fit(self, *args, kl_annealing_callback=None, lr_decay=None, **kwargs):
+    def fit(self, *args, lr_decay=None, **kwargs):
         """Wrapper for the standard keras fit method.
 
         Parameters
         ----------
         *args : arguments
             Arguments for :code:`ModelBase.fit()`.
-        kl_annealing_callback : bool, optional
-            Should we update the KL annealing factor during training?
         lr_decay : float, optional
             Learning rate decay.
         **kwargs : keyword arguments, optional

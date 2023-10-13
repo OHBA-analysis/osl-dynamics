@@ -15,7 +15,6 @@ from osl_dynamics.utils import plotting
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
-tf_ops.select_gpu(0)
 tf_ops.gpu_growth()
 
 # Settings
