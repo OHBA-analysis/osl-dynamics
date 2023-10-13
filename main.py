@@ -118,7 +118,7 @@ if __name__ == '__main__':
     # sys.argv[2] == 'split': split the data in half to test reproducibility
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
-    list_states = [30,40,50,60,70]
+    list_states = [4,8,12,16,20]
 
     index = int(sys.argv[1]) - 1
     #index = 91
