@@ -118,7 +118,7 @@ if __name__ == '__main__':
     # sys.argv[2] == 'split': split the data in half to test reproducibility
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
-    list_states = [4,8,12,16,20]
+    list_states = [30,40,50,60,70]
 
     index = int(sys.argv[1]) - 1
     #index = 91
@@ -148,9 +148,9 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
-        save_dir = f'./results_202309/{model}_ICA_{n_channels}'
+        save_dir = f'./results_202310/{model}_ICA_{n_channels}'
     else:
-        save_dir = f'./results_202309/{model}_ICA_{n_channels}_state_{n_states}'
+        save_dir = f'./results_202310/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
