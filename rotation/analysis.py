@@ -123,6 +123,20 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         plt.savefig(f'{plot_dir}mintv_violin.pdf')
         plt.close()
 
+    # Plot the convergence of loss function
+    if not os.path.isfile(f'{plot_dir}loss_history.pdf'):
+        loss_history = np.load(f'{plot_dir}/loss_history.npy')
+        epochs = np.arange(1, len(loss_history) + 1)
+
+        # Plotting the loss history
+        plt.plot(epochs, loss_history)
+        plt.xlabel('Epochs',fontsize=15)
+        plt.ylabel('Loss',fontsize=15)
+        plt.title('Training Loss Over Epochs',fontsize=20)
+        plt.savefig(f'{plot_dir}loss_history.jpg')
+        plt.savefig(f'{plot_dir}loss_history.pdf')
+        plt.close()
+
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
     if not os.path.isfile(f'{save_dir}tpm_partition.pkl'):
