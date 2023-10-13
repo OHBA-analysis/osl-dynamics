@@ -112,8 +112,8 @@ def variance_from_spectra(
         Frequency range in Hz to integrate the PSD over. Default is full range.
     method : str
         Should take the sum of the PSD over the frequency range
-        (:code:`method="sum"`) or take the average value of the PSD
-        (:code:`method="mean"`).
+        (:code:`method="sum"`), the integral of the PSD (:code:`"integral"`),
+        or take the average value of the PSD (:code:`method="mean"`).
 
     Returns
     -------
@@ -169,8 +169,8 @@ def variance_from_spectra(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
-    if method not in ["mean", "sum"]:
-        raise ValueError("method should be 'mean' or 'sum'.")
+    if method not in ["mean", "sum", "integral"]:
+        raise ValueError("method should be 'mean', 'sum' or 'integral'.")
 
     # Number of spectral components
     if components is None:
@@ -205,6 +205,9 @@ def variance_from_spectra(
             if frequency_range is None:
                 if method == "sum":
                     p = np.sum(psd, axis=-1)
+                elif method == "integral":
+                    df = frequencies[1] - frequencies[0]
+                    p = np.sum(psd * df, axis=-1)
                 else:
                     p = np.mean(psd, axis=-1)
             else:
@@ -213,6 +216,9 @@ def variance_from_spectra(
                 )
                 if method == "sum":
                     p = np.sum(psd[..., min_arg:max_arg], axis=-1)
+                elif method == "integral":
+                    df = frequencies[1] - frequencies[0]
+                    p = np.sum(psd[..., min_arg:max_arg] * df, axis=-1)
                 else:
                     p = np.mean(psd[..., min_arg:max_arg], axis=-1)
 
