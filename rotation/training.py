@@ -31,7 +31,6 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False):
     model.save(save_dir)
 
     loss_history = history["loss"]
-
     np.save(f'{save_dir}/loss_history.npy',np.array(loss_history))
 
     
@@ -76,6 +75,9 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir,compute_state=False):
     # Full training
     history = model.fit(dataset)
     model.save(save_dir)
+
+    loss_history = history["loss"]
+    np.save(f'{save_dir}/loss_history.npy', np.array(loss_history))
     
     # Compute state
     if compute_state:
@@ -118,6 +120,9 @@ def MAGE_training(dataset, n_modes, n_channels, save_dir, compute_state=False):
     # Full training
     history = model.fit(dataset)
     model.save(save_dir)
+
+    loss_history = history["loss"]
+    np.save(f'{save_dir}/loss_history.npy', np.array(loss_history))
 
     # Compute state
     if compute_state:

@@ -125,17 +125,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     # Plot the convergence of loss function
     if not os.path.isfile(f'{plot_dir}loss_history.pdf'):
-        loss_history = np.load(f'{plot_dir}/loss_history.npy')
-        epochs = np.arange(1, len(loss_history) + 1)
-
-        # Plotting the loss history
-        plt.plot(epochs, loss_history)
-        plt.xlabel('Epochs',fontsize=15)
-        plt.ylabel('Loss',fontsize=15)
-        plt.title('Training Loss Over Epochs',fontsize=20)
-        plt.savefig(f'{plot_dir}loss_history.jpg')
-        plt.savefig(f'{plot_dir}loss_history.pdf')
-        plt.close()
+        plot_loss_history(save_dir,plot_dir)
 
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
@@ -264,6 +254,11 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
 
+    # Plot the convergence of loss function
+    if not os.path.isfile(f'{plot_dir}loss_history.pdf'):
+        plot_loss_history(save_dir, plot_dir)
+
+
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
         pickle.dump(alpha, open(f'{save_dir}alpha.pkl', "wb"))
@@ -354,6 +349,10 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     plot_dir = f'{save_dir}plot/'
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
+
+    # Plot the convergence of loss function
+    if not os.path.isfile(f'{plot_dir}loss_history.pdf'):
+        plot_loss_history(save_dir, plot_dir)
 
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
@@ -1335,4 +1334,31 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
                            'FCs_fisher_z_correlation', row_column_indices_FCs_Fisher,
                            model_name, n_channels, n_states, split_strategy)
 
+def plot_loss_history(save_dir:str,plot_dir:str):
+    """
+    Plot the history of loss function.
+    The figures should include original training, repeat_1,2,3,4
+    Parameters
+    ----------
+    save_dir: the directory where the trained model is saved.
+    plot_dir: where to plot the results
 
+    Returns
+    -------
+
+    """
+    loss_history = np.load(f'{save_dir}/loss_history.npy')
+    epochs = np.arange(1, len(loss_history) + 1)
+    plt.plot(epochs, loss_history)
+    for i in range(1,5):
+        loss_history = np.load(f'{save_dir}/repeat_{i}/loss_history.npy')
+        plt.plot(epochs, loss_history)
+
+        # Plotting the loss history
+
+    plt.xlabel('Epochs',fontsize=15)
+    plt.ylabel('Loss',fontsize=15)
+    plt.title('Training Loss Over Epochs',fontsize=20)
+    plt.savefig(f'{plot_dir}loss_history.jpg')
+    plt.savefig(f'{plot_dir}loss_history.pdf')
+    plt.close()

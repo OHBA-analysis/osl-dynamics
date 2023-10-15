@@ -52,13 +52,13 @@ if __name__ == '__main__':
 
     # index = 120 represent comparison analysis.
     if index == 120:
-        save_dir = './results_202309/comparison/'
-        result_dir = './results_202309/'
+        save_dir = './results_202310/comparison/'
+        result_dir = './results_202310/'
         comparison_analysis(models,list_channels,list_states,result_dir,save_dir)
 
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 
-    save_dir = f'./results_202309/{model}_ICA_{n_channels}_state_{n_states}/'
+    save_dir = f'./results_202310/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
     
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     print(f'The model: {model}')
 
     if model == 'SWC':
-        old_dir = f'./results_202309/{model}_ICA_{n_channels}/'
+        old_dir = f'./results_202310/{model}_ICA_{n_channels}/'
         SWC_analysis(save_dir,old_dir,n_channels,n_states)
     else:
         # Work on Jalapeno
