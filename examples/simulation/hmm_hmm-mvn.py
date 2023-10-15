@@ -1,21 +1,46 @@
 """Example script for running HMM inference on simulated HMM-MVN data.
 
+This script should take less than a couple minutes to run and
+achieve a dice coefficient of ~0.99.
 """
 
+print("Importing packages")
+
 import os
+import pickle
 import numpy as np
-from osl_dynamics import data, simulation
-from osl_dynamics.inference import metrics, modes, tf_ops
+
+from osl_dynamics.simulation import HMM_MVN
+from osl_dynamics.data import Data
 from osl_dynamics.models.hmm import Config, Model
-from osl_dynamics.utils import plotting
+from osl_dynamics.inference import modes, metrics
 
-# Directory for plots
-os.makedirs("figures", exist_ok=True)
+# Create directory for results
+results_dir = "results"
+os.makedirs(results_dir, exist_ok=True)
 
-# GPU settings
-tf_ops.gpu_growth()
+#%% Simulate data
 
-# Settings
+print("Simulating data")
+sim = HMM_MVN(
+    n_samples=25600,
+    n_states=5,
+    n_channels=11,
+    trans_prob="sequence",
+    stay_prob=0.9,
+    means="zero",
+    covariances="random",
+    random_seed=123,
+)
+
+# Create Data object for training
+data = Data(sim.time_series)
+
+# Prepare data
+data.standardize()
+
+#%% Build model
+
 config = Config(
     n_states=5,
     n_channels=11,
@@ -24,79 +49,78 @@ config = Config(
     learn_covariances=True,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=30,
-    learn_trans_prob=True,
+    n_epochs=20,
 )
 
-# Simulate data
-print("Simulating data")
-sim = simulation.HMM_MVN(
-    n_samples=25600,
-    n_states=config.n_states,
-    n_channels=config.n_channels,
-    trans_prob="sequence",
-    stay_prob=0.9,
-    means="zero",
-    covariances="random",
-    random_seed=123,
-)
-sim.standardize()
-
-# Create training dataset
-training_data = data.Data(sim.time_series)
-
-# Build model
 model = Model(config)
 model.summary()
 
-# Use regularizer for the observation model
-model.set_regularizers(training_data)
+#%% Train model
 
-# Train model
-history = model.fit(training_data)
+# Initialization
+init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
 
-# Loss
-plotting.plot_line(
-    [range(1, len(history["loss"]) + 1)],
-    [history["loss"]],
-    x_label="Epoch",
-    y_label="Loss",
-    filename="figures/loss.png",
-)
+# Full training
+history = model.fit(data)
+
+# Save model
+model_dir = f"{results_dir}/model"
+model.save(model_dir)
 
 # Calculate the free energy
-free_energy = model.free_energy(training_data)
-print("Free energy:", free_energy)
+free_energy = model.free_energy(data)
+history["free_energy"] = free_energy
 
-# Get inferred parameters
-inf_stc = model.get_alpha(training_data)
-inf_means, inf_covs = model.get_means_covariances()
-inf_tp = model.get_trans_prob()
+# Save training history and free energy
+pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 
-# Re-order with respect to the simulation
-sim_stc = sim.mode_time_course
-_, order = modes.match_modes(sim_stc, inf_stc, return_order=True)
-inf_stc = inf_stc[:, order]
-inf_covs = inf_covs[order]
-inf_tp = inf_tp[np.ix_(order, order)]
+#%% Get inferred parameters
 
-plotting.plot_alpha(
-    sim_stc,
-    inf_stc,
-    n_samples=2000,
-    y_labels=["Ground Truth", "Inferred"],
-    filename="figures/stc.png",
-)
+# Inferred state probabilities
+alp = model.get_alpha(data)
 
-plotting.plot_matrices(
-    sim.covariances, main_title="Ground Truth", filename="figures/sim_covs.png"
-)
-plotting.plot_matrices(inf_covs, main_title="Inferred", filename="figures/inf_covs.png")
+# Observation model parameters
+means, covs = model.get_means_covariances()
 
-plotting.plot_matrices(inf_tp[np.newaxis, ...], filename="figures/trans_prob.png")
+# Save
+inf_params_dir = f"{results_dir}/inf_params"
+os.makedirs(inf_params_dir, exist_ok=True)
 
-# Compare the inferred mode time course to the ground truth
-print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
+pickle.dump(alp, open(f"{inf_params_dir}/alp.pkl", "wb"))
+np.save(f"{inf_params_dir}/means.npy", means)
+np.save(f"{inf_params_dir}/covs.npy", covs)
 
-print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc))
+#%% Calculate summary statistics
+
+# Viterbi path
+stc = modes.argmax_time_courses(alp)
+
+# Calculate summary statistics
+fo = modes.fractional_occupancies(stc)
+lt = modes.mean_lifetimes(stc)
+intv = modes.mean_intervals(stc)
+sr = modes.switching_rates(stc)
+
+# Save
+summary_stats_dir = f"{results_dir}/summary_stats"
+os.makedirs(summary_stats_dir, exist_ok=True)
+
+np.save(f"{summary_stats_dir}/fo.npy", fo)
+np.save(f"{summary_stats_dir}/lt.npy", lt)
+np.save(f"{summary_stats_dir}/intv.npy", intv)
+np.save(f"{summary_stats_dir}/sr.npy", sr)
+
+#%% Compare inferred parameters to ground truth simulation
+
+# Re-order simulated state time courses to match inferred
+inf_stc, sim_stc = modes.match_modes(stc, sim.state_time_course)
+
+# Calculate dice coefficient
+dice = metrics.dice_coefficient(inf_stc, sim_stc)
+
+print("Dice coefficient:", dice)
+
+#%% Delete temporary directory
+
+data.delete_dir()
