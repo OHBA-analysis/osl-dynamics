@@ -413,6 +413,9 @@ def train_sehmm(
     # Set regularisers
     model.set_regularizers(data)
 
+    # Set deviation initializer
+    model.set_dev_parameters_initializer(data)
+
     # Initialisation
     default_init_kwargs = {"n_init": 5, "n_epochs": 2}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
