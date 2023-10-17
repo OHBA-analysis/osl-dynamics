@@ -94,7 +94,7 @@ def autocorr_from_tde_cov(
 def raw_covariances(
     mode_covariances,
     n_embeddings,
-    pca_components,
+    pca_components=None,
     zero_lag=False,
 ):
     """Covariance matrix of the raw channels.
@@ -108,11 +108,11 @@ def raw_covariances(
         Mode covariance matrices.
     n_embeddings : int
         Number of embeddings applied to the training data.
-    pca_components : np.ndarray
+    pca_components : np.ndarray, optional
         PCA components used for dimensionality reduction.
     zero_lag : bool, optional
-        Should we return just the zero-lag elements? Otherwise, we return
-        the mean over time lags.
+        Should we return just the zero-lag elements?
+        Otherwise, we return the mean over time lags.
 
     Returns
     -------
@@ -133,7 +133,10 @@ def raw_covariances(
     )
 
     # Get covariance of time embedded data
-    te_covs = reverse_pca(mode_covariances, pca_components)
+    if pca_components is not None:
+        te_covs = reverse_pca(mode_covariances, pca_components)
+    else:
+        te_covs = mode_covariances
 
     if zero_lag:
         # Return the zero-lag elements only

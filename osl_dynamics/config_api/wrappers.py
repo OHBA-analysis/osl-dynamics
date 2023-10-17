@@ -452,7 +452,7 @@ def train_sehmm(
         save(f"{inf_params_dir}/subject_embeddings.npy", subject_embeddings)
 
 
-def get_inf_params(data, output_dir):
+def get_inf_params(data, output_dir, observation_model_only=False):
     """Get inferred alphas.
 
     This function expects a model has already been trained and the following
@@ -470,6 +470,8 @@ def get_inf_params(data, output_dir):
         Data object.
     output_dir : str
         Path to output directory.
+    observation_model_only : bool, optional
+        We we only want to get the observation model parameters?
     """
     # Make output directory
     inf_params_dir = output_dir + "/inf_params"
@@ -481,14 +483,128 @@ def get_inf_params(data, output_dir):
     model_dir = output_dir + "/model"
     model = load(model_dir)
 
-    # Get the inferred parameters
-    alpha = model.get_alpha(data)
-    means, covs = model.get_means_covariances()
+    if observation_model_only:
+        # Get the inferred parameters
+        means, covs = model.get_means_covariances()
 
-    # Save inferred parameters
-    save(f"{inf_params_dir}/alp.pkl", alpha)
-    save(f"{inf_params_dir}/means.npy", means)
-    save(f"{inf_params_dir}/covs.npy", covs)
+        # Save
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+    else:
+        # Get the inferred parameters
+        alpha = model.get_alpha(data)
+        means, covs = model.get_means_covariances()
+
+        # Save
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+
+
+def plot_power_maps_from_covariances(
+    data,
+    output_dir,
+    mask_file=None,
+    parcellation_file=None,
+    power_save_kwargs=None,
+):
+    """Plot power maps calculated directly from the inferred covariances.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will output files called :code:`covs_.png` which contain
+    plots of the power map of each state/mode taken directly from the inferred
+    covariance matrices. The files will be saved to
+    :code:`<output_dir>/inf_params`.
+
+    This function also expects the data to be prepared in the same script
+    that this wrapper is called from.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
+        we use :code:`data.mask_file`.
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
+        :code:`None`, we use :code:`data.parcellation_file`.
+    power_save_kwargs : dict, optional
+        Keyword arguments to pass to `analysis.power.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Defaults to::
+
+            {'filename': '<inf_params_dir>/covs_.png',
+             'mask_file': data.mask_file,
+             'parcellation_file': data.parcellation_file,
+             'plot_kwargs': {'symmetric_cbar': True}}
+    """
+    # Validation
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+
+    if mask_file is None:
+        if data is None or data.mask_file is None:
+            raise ValueError(
+                "mask_file must be passed or specified in the Data object."
+            )
+        else:
+            mask_file = data.mask_file
+
+    if parcellation_file is None:
+        if data is None or data.parcellation_file is None:
+            raise ValueError(
+                "parcellation_file must be passed or specified in the Data object."
+            )
+        else:
+            parcellation_file = data.parcellation_file
+
+    if hasattr(data, "n_embeddings"):
+        n_embeddings = data.n_embeddings
+    else:
+        n_embeddings = 1
+
+    if hasattr(data, "pca_components"):
+        pca_components = data.pca_components
+    else:
+        pca_components = None
+
+    # Directories
+    inf_params_dir = f"{output_dir}/inf_params"
+
+    # Load inferred covariances
+    covs = load(f"{inf_params_dir}/covs.npy")
+
+    # Reverse the effects of preparing the data
+    from osl_dynamics.analysis import modes
+
+    covs = modes.raw_covariances(covs, n_embeddings, pca_components)
+
+    # Save
+    from osl_dynamics.analysis import power
+
+    default_power_save_kwargs = {
+        "filename": f"{inf_params_dir}/covs_.png",
+        "mask_file": mask_file,
+        "parcellation_file": parcellation_file,
+        "plot_kwargs": {"symmetric_cbar": True},
+    }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
+        )
+    power_save_kwargs = override_dict_defaults(
+        default_power_save_kwargs, power_save_kwargs
+    )
+    _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
+    power.save(covs, **power_save_kwargs)
 
 
 def plot_tde_covariances(data, output_dir):
@@ -919,7 +1035,8 @@ def plot_group_ae_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
@@ -1088,7 +1205,8 @@ def plot_group_tde_hmm_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
@@ -1286,7 +1404,8 @@ def plot_group_nnmf_tde_hmm_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
@@ -1465,7 +1584,8 @@ def plot_group_tde_dynemo_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"], power_save_kwargs["plot_kwargs"]
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
