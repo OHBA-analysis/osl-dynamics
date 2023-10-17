@@ -82,6 +82,9 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
+# Set dev parameters initializer
+model.set_dev_parameters_initializer(training_data)
+
 model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=0.4)
 
 print("Training model")
@@ -106,6 +109,8 @@ print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
 # Plot the simulated and inferred subject embeddings with group labels
 sim_subject_embeddings = sim.subject_embeddings
 inf_subject_embeddings = model.get_subject_embeddings()
+inf_subject_embeddings -= np.mean(inf_subject_embeddings, axis=0)
+inf_subject_embeddings /= np.std(inf_subject_embeddings, axis=0)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))

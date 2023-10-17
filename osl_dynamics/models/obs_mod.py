@@ -5,11 +5,15 @@
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow_probability import bijectors as tfb
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import regularizers
-from osl_dynamics.inference.initializers import WeightInitializer
+from osl_dynamics.inference.initializers import (
+    WeightInitializer,
+    RandomWeightInitializer,
+)
 
 
 def get_observation_model_parameter(model, layer_name):
@@ -83,6 +87,70 @@ def set_observation_model_parameter(
 
     if update_initializer:
         learnable_tensor_layer.tensor_initializer = WeightInitializer(obs_parameter)
+
+
+def set_dev_parameters_initializer(
+    model, training_dataset, learn_means, learn_covariances
+):
+    """Set the deviance parameters initializer based on training data.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model.model
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+    training_dataset : osl_dynamics.data.Data
+        The training dataset.
+    learn_means : bool
+        Whether the mean is learnt.
+    learn_covariances : bool
+        Whether the covariances are learnt.
+    """
+    time_series = training_dataset.time_series()
+    n_channels = training_dataset.n_channels
+    if isinstance(time_series, np.ndarray):
+        time_series = [time_series]
+    if learn_means:
+        static_means = np.array([np.mean(t, axis=0) for t in time_series])
+        static_means_dev = np.abs(static_means - np.mean(static_means, axis=0))
+        static_means_dev_mean = np.mean(static_means_dev, axis=1)
+        static_means_dev_var = np.var(static_means_dev, axis=1)
+
+        means_alpha = tfp.math.softplus_inverse(
+            np.square(static_means_dev_mean) / static_means_dev_var
+        )[..., None, None]
+        means_beta = tfp.math.softplus_inverse(
+            static_means_dev_mean / static_means_dev_var
+        )[..., None, None]
+
+        means_alpha_layer = model.get_layer("means_dev_mag_inf_alpha_input")
+        means_beta_layer = model.get_layer("means_dev_mag_inf_beta_input")
+
+        means_alpha_layer.tensor_initializer = RandomWeightInitializer(means_alpha, 0.1)
+        means_beta_layer.tensor_initializer = RandomWeightInitializer(means_beta, 0.1)
+
+    if learn_covariances:
+        static_cov = np.array([np.cov(t, rowvar=False) for t in time_series])
+        static_cov_chol = np.linalg.cholesky(static_cov)[
+            :,
+            np.tril_indices(n_channels)[0],
+            np.tril_indices(n_channels)[1],
+        ]
+        static_cov_chol_dev = np.abs(static_cov_chol - np.mean(static_cov_chol, axis=0))
+        static_cov_chol_dev_mean = np.mean(static_cov_chol_dev, axis=1)
+        static_cov_chol_dev_var = np.var(static_cov_chol_dev, axis=1)
+
+        covs_alpha = tfp.math.softplus_inverse(
+            np.square(static_cov_chol_dev_mean) / static_cov_chol_dev_var
+        )[..., None, None]
+        covs_beta = tfp.math.softplus_inverse(
+            static_cov_chol_dev_mean / static_cov_chol_dev_var
+        )[..., None, None]
+
+        covs_alpha_layer = model.get_layer("covs_dev_mag_inf_alpha_input")
+        covs_beta_layer = model.get_layer("covs_dev_mag_inf_beta_input")
+
+        covs_alpha_layer.tensor_initializer = RandomWeightInitializer(covs_alpha, 0.1)
+        covs_beta_layer.tensor_initializer = RandomWeightInitializer(covs_beta, 0.1)
 
 
 def set_means_regularizer(model, training_dataset, layer_name="means"):
@@ -457,17 +525,17 @@ def get_dev_map(model, map, subject_embeddings=None):
         subject_embeddings,
     )
     if map == "means":
-        dev_map_input_layer = model.get_layer("means_dev_map_input")
+        dev_decoder_layer = model.get_layer("means_dev_decoder")
         dev_map_layer = model.get_layer("means_dev_map")
         norm_dev_map_layer = model.get_layer("norm_means_dev_map")
     elif map == "covs":
-        dev_map_input_layer = model.get_layer("covs_dev_map_input")
+        dev_decoder_layer = model.get_layer("covs_dev_decoder")
         dev_map_layer = model.get_layer("covs_dev_map")
         norm_dev_map_layer = model.get_layer("norm_covs_dev_map")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    dev_map_input = dev_map_input_layer(concat_embeddings)
-    dev_map = dev_map_layer(dev_map_input)
+    dev_decoder = dev_decoder_layer(concat_embeddings)
+    dev_map = dev_map_layer(dev_decoder)
     norm_dev_map = norm_dev_map_layer(dev_map)
     return norm_dev_map.numpy()
 

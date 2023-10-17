@@ -31,6 +31,28 @@ class WeightInitializer(Initializer):
         return self.initial_value
 
 
+class RandomWeightInitializer(Initializer):
+    """Initialize weights to given value with random noise added.
+
+    Parameters
+    ----------
+    initial_value : np.ndarray
+        Value to initialise weights to. Note, the shape is not checked.
+    std : float
+        Standard deviation of the noise to add.
+    """
+
+    def __init__(self, initial_value, std):
+        self.initial_value = tf.cast(initial_value, tf.float32)
+        self.std = std
+
+    def __call__(self, shape, dtype=None):
+        e = initializers.TruncatedNormal(mean=0.0, stddev=self.std).__call__(
+            shape=shape, dtype=tf.float32
+        )
+        return self.initial_value + e
+
+
 class IdentityCholeskyInitializer(Initializer):
     """Initialize weights to a flattened cholesky factor of identity
     matrices."""

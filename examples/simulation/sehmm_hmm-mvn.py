@@ -33,11 +33,15 @@ config = Config(
     dev_regularizer_factor=10,
     learn_means=False,
     learn_covariances=True,
-    batch_size=128,
-    learning_rate=1e-2,
+    batch_size=64,
+    learning_rate=0.005,
     lr_decay=0.05,
-    n_epochs=60,
+    n_epochs=40,
     learn_trans_prob=True,
+    do_kl_annealing=True,
+    kl_annealing_curve="tanh",
+    kl_annealing_sharpness=10,
+    n_kl_annealing_epochs=20,
 )
 
 # Simulate data
@@ -71,7 +75,12 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-model.random_state_time_course_initialization(training_data, n_epochs=3, n_init=5)
+# Set dev parameters initializer
+model.set_dev_parameters_initializer(training_data)
+
+model.random_state_time_course_initialization(
+    training_data, n_epochs=3, n_init=5, take=1
+)
 # Train model
 history = model.fit(training_data)
 
@@ -112,7 +121,9 @@ print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc
 
 
 sim_subject_embeddings = sim.subject_embeddings
-subject_embeddings = model.get_subject_embeddings()
+inf_subject_embeddings = model.get_subject_embeddings()
+inf_subject_embeddings -= np.mean(inf_subject_embeddings, axis=0)
+inf_subject_embeddings /= np.std(inf_subject_embeddings, axis=0)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
@@ -129,8 +140,8 @@ plotting.plot_scatter(
 )
 
 plotting.plot_scatter(
-    [subject_embeddings[group_mask, 0] for group_mask in group_masks],
-    [subject_embeddings[group_mask, 1] for group_mask in group_masks],
+    [inf_subject_embeddings[group_mask, 0] for group_mask in group_masks],
+    [inf_subject_embeddings[group_mask, 1] for group_mask in group_masks],
     x_label="dim_1",
     y_label="dim_2",
     annotate=[
