@@ -2097,6 +2097,7 @@ def plot_summary_stats_group_diff(
         y=name,
         hue="Group",
         split=True,
+        inner=None,
         ax=ax,
     )
 

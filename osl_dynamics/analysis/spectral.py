@@ -792,6 +792,7 @@ def rescale_regression_coefs(
     for i, a in enumerate(alpha):
         alpha[i] = _window_mean(
             a,
+            "hann",
             window_length,
             step_size=step_size,
             n_sub_windows=n_sub_windows,
