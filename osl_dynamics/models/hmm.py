@@ -29,11 +29,12 @@ import tensorflow_probability as tfp
 from tensorflow.keras import backend, layers, utils
 from numba.core.errors import NumbaWarning
 from scipy.special import logsumexp, xlogy
-from tqdm.auto import trange
+from tqdm.auto import tqdm, trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
 from osl_dynamics.inference.layers import (
+    add_epsilon,
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
@@ -1361,28 +1362,19 @@ class Model(ModelBase):
 
         return alpha, np.array(means), np.array(covariances)
 
-    def dual_estimation(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
-    ):
+    def dual_estimation(self, training_data, alpha=None):
         """Dual estimation to get subject-specific observation model parameters.
 
         Here, we estimate the state means and covariances for individual
-        subjects with the rest of the model held fixed at the best parameters
-        (posterior distribution and transition probability) estimated at the
-        group-level.
+        subjects with the posterior distribution of the states held fixed.
 
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
             Training data.
-        n_epochs : int, optional
-            Number of epochs to train for. Defaults to the value in the
-            :code:`config` used to create the model.
-        learning_rate : float, optional
-            Learning rate. Defaults to the value in the :code:`config`
-            used to create the model.
-        store_dir : str, optional
-            Directory to temporarily store the model in.
+        alpha : list of np.ndarray, optional
+            Posterior distribution of the states. Shape is
+            (n_subjects, n_samples, n_states).
 
         Returns
         -------
@@ -1392,59 +1384,53 @@ class Model(ModelBase):
             Subject specific covariances.
             Shape is (n_subjects, n_states, n_channels, n_channels).
         """
-        # Save group-level model parameters
-        os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/weights.h5")
+        _logger.info("Dual estimation")
+        means, covariances = [], []
 
-        # Temporarily change hyperparameters
-        original_n_epochs = self.config.n_epochs
-        original_learning_rate = self.config.learning_rate
-        self.config.n_epochs = n_epochs or self.config.n_epochs
-        self.config.learning_rate = learning_rate or self.config.learning_rate
+        # First get the posterior distribution of the states
+        if alpha is None:
+            alpha = self.get_alpha(training_data, concatenate=False)
 
-        # Reset the optimiser
-        self.compile()
+        time_series_data = training_data.time_series(concatenate=False)
+        if isinstance(alpha, np.ndarray):
+            alpha = [alpha]
+        if isinstance(time_series_data, np.ndarray):
+            time_series_data = [time_series_data]
+        if len(alpha) != len(time_series_data):
+            raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
 
-        # Create a TensorFlow Dataset
-        dataset = self.make_dataset(
-            training_data,
-            shuffle=True,
-            concatenate=False,
-        )
+        for a, x in tqdm(
+            zip(alpha, time_series_data),
+            desc="Dual estimation",
+            total=training_data.n_arrays,
+        ):
+            sum_gamma = np.sum(a, axis=0)
+            if self.config.learn_means:
+                subject_means = (
+                    np.sum(x[:, None, :] * a[:, :, None], axis=0) / sum_gamma[:, None]
+                )
+            else:
+                subject_means = self.get_means()
 
-        # Perform dual estimation
-        means = []
-        covariances = []
-        for subject in trange(training_data.n_arrays, desc="Dual estimation"):
-            # Train on this subject's data
-            ds = dataset[subject]
-            for _ in range(self.config.n_epochs):
-                # Loop over batches
-                for data in ds:
-                    x = data["data"]
+            if self.config.learn_covariances:
+                diff = x[:, None, :] - subject_means[None, :, :]
+                subject_covariances = (
+                    np.sum(
+                        diff[:, :, :, None] @ diff[:, :, None, :] * a[:, :, None, None],
+                        axis=0,
+                    )
+                    / sum_gamma[:, None, None]
+                )
+                subject_covariances += self.config.covariances_epsilon * np.eye(
+                    self.config.n_channels
+                )
+            else:
+                subject_covariances = self.get_covariances()
 
-                    # Get the inferred alpha for each subject
-                    gamma, _ = self.get_posterior(x)
-                    gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
-                    x_and_gamma = np.concatenate([x, gamma], axis=2)
+            means.append(subject_means)
+            covariances.append(subject_covariances)
 
-                    # Train observation model
-                    self.model.fit(x_and_gamma, epochs=1, verbose=0)
-
-            # Get the means and covariances estimated for this subject
-            m, c = self.get_means_covariances()
-            means.append(m)
-            covariances.append(c)
-
-            # Reset back to group-level model parameters
-            self.load_weights(f"{store_dir}/weights.h5")
-            self.compile()
-
-        # Reset hyperparameters
-        self.config.n_epochs = original_n_epochs
-        self.config.learning_rate = original_learning_rate
-
-        return np.array(means), np.array(covariances)
+        return np.squeeze(means), np.squeeze(covariances)
 
     def save_weights(self, filepath):
         """Save all model weights.
