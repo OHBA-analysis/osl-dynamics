@@ -48,6 +48,7 @@ if __name__ == '__main__':
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
     list_states = [4,8,12,16,20]
+    #list_states = [25,30,35,40,45]
     index = int(sys.argv[1]) - 1
 
     # index = 120 represent comparison analysis.
@@ -89,4 +90,3 @@ if __name__ == '__main__':
             raise ValueError('The model name is incorrect!')
 
 
-    
