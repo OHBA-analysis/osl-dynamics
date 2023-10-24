@@ -1371,7 +1371,7 @@ class Model(ModelBase):
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
-            Training data.
+            Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
             (n_subjects, n_samples, n_states).
@@ -1385,24 +1385,38 @@ class Model(ModelBase):
             Shape is (n_subjects, n_states, n_channels, n_channels).
         """
         _logger.info("Dual estimation")
-        means, covariances = [], []
 
-        # First get the posterior distribution of the states
         if alpha is None:
+            # Get the posterior
             alpha = self.get_alpha(training_data, concatenate=False)
 
-        time_series_data = training_data.time_series(concatenate=False)
+        # Get the subject-specific data
+        data = training_data.trim_time_series(
+            sequence_length=self.config.sequence_length,
+            concatenate=False,
+        )
+
+        # Validation
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
-        if isinstance(time_series_data, np.ndarray):
-            time_series_data = [time_series_data]
-        if len(alpha) != len(time_series_data):
+
+        if len(alpha) != len(data):
             raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
 
+        for a, x in zip(alpha, data):
+            if a.shape[0] != x.shape[0]:
+                raise ValueError(
+                    "alpha and training_data must have the same number of samples."
+                    + "Check if training_data has been prepared properly."
+                )
+
+        # Calculate subject-specific means and covariances
+        means = []
+        covariances = []
         for a, x in tqdm(
-            zip(alpha, time_series_data),
+            zip(alpha, data),
             desc="Dual estimation",
-            total=training_data.n_arrays,
+            total=len(alpha),
         ):
             sum_gamma = np.sum(a, axis=0)
             if self.config.learn_means:
