@@ -29,7 +29,8 @@ import tensorflow_probability as tfp
 from tensorflow.keras import backend, layers, utils
 from numba.core.errors import NumbaWarning
 from scipy.special import logsumexp, xlogy
-from tqdm.auto import tqdm, trange
+from tqdm.auto import trange
+from pqdm.threads import pqdm
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
@@ -1362,7 +1363,7 @@ class Model(ModelBase):
 
         return alpha, np.array(means), np.array(covariances)
 
-    def dual_estimation(self, training_data, alpha=None):
+    def dual_estimation(self, training_data, alpha=None, n_jobs=1):
         """Dual estimation to get subject-specific observation model parameters.
 
         Here, we estimate the state means and covariances for individual
@@ -1375,6 +1376,8 @@ class Model(ModelBase):
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
             (n_subjects, n_samples, n_states).
+        n_jobs : int, optional
+            Number of jobs to run in parallel.
 
         Returns
         -------
@@ -1384,8 +1387,6 @@ class Model(ModelBase):
             Subject specific covariances.
             Shape is (n_subjects, n_states, n_channels, n_channels).
         """
-        _logger.info("Dual estimation")
-
         if alpha is None:
             # Get the posterior
             alpha = self.get_alpha(training_data, concatenate=False)
@@ -1403,21 +1404,8 @@ class Model(ModelBase):
         if len(alpha) != len(data):
             raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
 
-        for a, x in zip(alpha, data):
-            if a.shape[0] != x.shape[0]:
-                raise ValueError(
-                    "alpha and training_data must have the same number of samples."
-                    + "Check if training_data has been prepared properly."
-                )
-
-        # Calculate subject-specific means and covariances
-        means = []
-        covariances = []
-        for a, x in tqdm(
-            zip(alpha, data),
-            desc="Dual estimation",
-            total=len(alpha),
-        ):
+        # Helper function for dual estimation for a single subject
+        def _single_dual_estimation(a, x):
             sum_gamma = np.sum(a, axis=0)
             if self.config.learn_means:
                 subject_means = (
@@ -1441,8 +1429,43 @@ class Model(ModelBase):
             else:
                 subject_covariances = self.get_covariances()
 
-            means.append(subject_means)
-            covariances.append(subject_covariances)
+            return subject_means, subject_covariances
+
+        # Setup keyword arguments to pass to the helper function
+        kwargs = []
+        for a, x in zip(alpha, data):
+            if a.shape[0] != x.shape[0]:
+                raise ValueError(
+                    "alpha and training_data must have the same number of samples. "
+                    "Check if training_data has been prepared properly."
+                )
+            kwargs.append({"a": a, "x": x})
+
+        if len(data) == 1:
+            _logger.info("Dual estimation")
+            results = [_single_dual_estimation(**kwargs[0])]
+
+        elif n_jobs == 1:
+            results = []
+            for i in trange(len(data), desc="Dual estimation"):
+                results.append(_single_dual_estimation(**kwargs[i]))
+
+        else:
+            _logger.info("Dual estimation")
+            results = pqdm(
+                kwargs,
+                _single_dual_estimation,
+                argument_type="kwargs",
+                n_jobs=n_jobs,
+            )
+
+        # Unpack the results
+        means = []
+        covariances = []
+        for result in results:
+            m, c = result
+            means.append(m)
+            covariances.append(c)
 
         return np.squeeze(means), np.squeeze(covariances)
 
