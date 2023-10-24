@@ -14,7 +14,7 @@ from sys import argv
 if len(argv) != 2:
     print("Please pass the run id, e.g. python tde_hmm_bursts.py 1")
     exit()
-id = argv[1]
+id = int(argv[1])
 
 import os
 import pickle
@@ -109,6 +109,8 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
         filename=f"{plots_dir}/amp_env_delta_theta.png",
     )
 
+
+# Full pipeline
 config = """
     load_data:
         inputs: training_data/bursts
@@ -133,8 +135,9 @@ config = """
     plot_burst_summary_stats: {}
 """
 
+# Run analysis
 run_pipeline(
     config,
-    output_dir=f"results/run{id}",
+    output_dir=f"results/run{id:02d}",
     extra_funcs=[plot_wavelet, plot_amplitude_envelopes_and_alpha],
 )

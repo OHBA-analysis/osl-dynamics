@@ -438,10 +438,6 @@ class Model(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-
-            training_dataset = self.make_dataset(
-                training_data, shuffle=True, concatenate=True
-            )
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             self.set_random_state_time_course_initialization(training_data_subset)

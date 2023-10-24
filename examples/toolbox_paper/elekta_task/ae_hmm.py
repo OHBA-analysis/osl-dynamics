@@ -14,7 +14,7 @@ from sys import argv
 if len(argv) != 2:
     print("Please pass the run id, e.g. python ae_hmm.py 1")
     exit()
-id = argv[1]
+id = int(argv[1])
 
 import mne
 import pickle
@@ -23,6 +23,7 @@ from glob import glob
 
 from osl_dynamics import run_pipeline
 from osl_dynamics.analysis import statistics
+from osl_dynamics.data import Data
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting
 
@@ -31,7 +32,7 @@ def epoch_state_time_course(stc, tmin=-0.1, tmax=1.5):
     """Get subject-specific evoked responses in the state occupancies."""
 
     # Parcellated data files
-    parc_files = sorted(glob("src/*/sflip_parc-raw.fif"))
+    parc_files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
 
     # Epoch the state time courses
     event_id = {
@@ -71,8 +72,6 @@ def epoch_state_time_course(stc, tmin=-0.1, tmax=1.5):
     for e_ in epochs_:
         epochs.append(np.mean(e_, axis=0).T)
     epochs = np.array(epochs)
-    epochs = epochs.reshape(19, 6, 401, 8)
-    epochs = np.mean(epochs, axis=1)  # average over runs
 
     # Baseline correct
     epochs -= np.mean(
@@ -92,7 +91,7 @@ def plot_evoked_response(data, output_dir, n_perm, metric, significance_level):
     plots_dir = f"{output_dir}/alphas"
 
     # Get inferred state time course
-    alp = pickle.load(open(inf_params_dir + "/alp.pkl", "rb"))
+    alp = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
     stc = modes.argmax_time_courses(alp)
 
     # Epoch and do stats
@@ -109,24 +108,30 @@ def plot_evoked_response(data, output_dir, n_perm, metric, significance_level):
         significance_level=significance_level,
         labels=[f"State {i + 1}" for i in range(epochs.shape[-1])],
         x_label="Time (s)",
-        y_label="State Activation",
-        filename=plots_dir + "/epoched_stc.png",
+        y_label="State Probability",
+        filename=f"{plots_dir}/epoched_stc.png",
     )
 
 
+# Load data
+data = Data(
+    inputs=sorted(glob("data/src/*/sflip_parc-raw.fif")),
+    picks="misc",
+    reject_by_annotation="omit",
+    sampling_frequency=250,
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    store_dir=f"tmp_{id:02d}",
+    n_jobs=8,
+)
+data.prepare({
+    "amplitude_envelope": {},
+    "moving_average": {"n_window": 5},
+    "standardize": {},
+})
+
 # Full pipeline
 config = """
-    load_data:
-        inputs: training_data
-        kwargs:
-            sampling_frequency: 250
-            mask_file: MNI152_T1_8mm_brain.nii.gz
-            parcellation_file: fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz
-            n_jobs: 16
-        prepare:
-            amplitude_envelope: {}
-            moving_average: {n_window: 5}
-            standardize: {}
     train_hmm:
         config_kwargs:
             n_states: 8
@@ -146,4 +151,9 @@ config = """
 """
 
 # Run analysis
-run_pipeline(config, output_dir=f"results/run{id}", extra_funcs=[plot_evoked_response])
+run_pipeline(
+    config,
+    data=data,
+    output_dir=f"results/run{id:02d}",
+    extra_funcs=[plot_evoked_response],
+)
