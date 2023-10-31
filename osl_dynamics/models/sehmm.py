@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow.keras import layers, initializers
 
 from osl_dynamics.inference.layers import (
@@ -30,6 +31,7 @@ from osl_dynamics.inference.layers import (
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.inference import callbacks
+import osl_dynamics.inference.initializers as osld_initializers
 from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
@@ -92,6 +94,8 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
         This will be scaled by the amount of data.
+    initial_dev : dict
+        Initialisation for dev posterior parameters.
 
     initial_trans_prob : np.ndarray
         Initialisation for transition probability matrix.
@@ -160,6 +164,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     dev_dropout: float = 0.0
     dev_regularizer: str = None
     dev_regularizer_factor: float = 0.0
+    initial_dev: dict = None
 
     # KL annealing parameters
     do_kl_annealing: bool = False
@@ -184,6 +189,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
                 self.covariances_epsilon = 1e-6
             else:
                 self.covariances_epsilon = 0.0
+
+        if self.initial_dev is None:
+            self.initial_dev = dict()
 
     def validate_subject_embedding_parameters(self):
         if (
@@ -524,6 +532,22 @@ class Model(MarkovStateInferenceModelBase):
                 layer_name="group_covs",
             )
 
+    def set_dev_parameters_initializer(self, training_dataset):
+        """Set the deviance parameters initializer based on training data.
+
+        Parameters
+        ----------
+        training_dataset : osl_dynamics.data.Data
+            The training dataset.
+        """
+        obs_mod.set_dev_parameters_initializer(
+            self.model,
+            training_dataset,
+            self.config.learn_means,
+            self.config.learn_covariances,
+        )
+        self.reset()
+
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
@@ -620,8 +644,7 @@ def _model_structure(config):
         means_concat_embeddings_layer = ConcatEmbeddingsLayer(
             name="means_concat_embeddings",
         )
-
-        means_dev_map_input_layer = MultiLayerPerceptronLayer(
+        means_dev_decoder_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
             config.dev_normalization,
@@ -629,20 +652,23 @@ def _model_structure(config):
             config.dev_dropout,
             config.dev_regularizer,
             config.dev_regularizer_factor,
-            name="means_dev_map_input",
+            name="means_dev_decoder",
         )
         means_dev_map_layer = layers.Dense(
             config.n_channels,
             name="means_dev_map",
         )
         norm_means_dev_map_layer = layers.LayerNormalization(
-            axis=-1, name="norm_means_dev_map"
+            axis=-1, scale=False, name="norm_means_dev_map"
         )
 
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_means,
-            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("means_alpha", 0.0)),
+                0.1,
+            ),
             name="means_dev_mag_inf_alpha_input",
         )
         means_dev_mag_inf_alpha_layer = layers.Activation(
@@ -651,14 +677,17 @@ def _model_structure(config):
         means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_means,
-            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 5.0)),
+                0.1,
+            ),
             name="means_dev_mag_inf_beta_input",
         )
         means_dev_mag_inf_beta_layer = layers.Activation(
             "softplus", name="means_dev_mag_inf_beta"
         )
         means_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, name="means_dev_mag"
+            config.covariances_epsilon, config.do_kl_annealing, name="means_dev_mag"
         )
 
         means_dev_layer = layers.Multiply(name="means_dev")
@@ -672,11 +701,11 @@ def _model_structure(config):
         )
 
         # Get the mean deviation maps (no global magnitude information)
-        means_dev_map_input = means_dev_map_input_layer(
+        means_dev_decoder = means_dev_decoder_layer(
             means_concat_embeddings,
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
-        means_dev_map = means_dev_map_layer(means_dev_map_input)
+        means_dev_map = means_dev_map_layer(means_dev_decoder)
         norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
 
         # Get the deviation magnitudes (scale deviation maps globally)
@@ -715,7 +744,7 @@ def _model_structure(config):
             name="covs_concat_embeddings",
         )
 
-        covs_dev_map_input_layer = MultiLayerPerceptronLayer(
+        covs_dev_decoder_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
             config.dev_normalization,
@@ -723,20 +752,23 @@ def _model_structure(config):
             config.dev_dropout,
             config.dev_regularizer,
             config.dev_regularizer_factor,
-            name="covs_dev_map_input",
+            name="covs_dev_decoder",
         )
         covs_dev_map_layer = layers.Dense(
             config.n_channels * (config.n_channels + 1) // 2,
             name="covs_dev_map",
         )
         norm_covs_dev_map_layer = layers.LayerNormalization(
-            axis=-1, name="norm_covs_dev_map"
+            axis=-1, scale=False, name="norm_covs_dev_map"
         )
 
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("covs_alpha", 0.0)),
+                0.1,
+            ),
             name="covs_dev_mag_inf_alpha_input",
         )
         covs_dev_mag_inf_alpha_layer = layers.Activation(
@@ -745,14 +777,17 @@ def _model_structure(config):
         covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 5.0)),
+                0.1,
+            ),
             name="covs_dev_mag_inf_beta_input",
         )
         covs_dev_mag_inf_beta_layer = layers.Activation(
             "softplus", name="covs_dev_mag_inf_beta"
         )
         covs_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, name="covs_dev_mag"
+            config.covariances_epsilon, config.do_kl_annealing, name="covs_dev_mag"
         )
         covs_dev_layer = layers.Multiply(name="covs_dev")
 
@@ -767,11 +802,11 @@ def _model_structure(config):
         )
 
         # Get the covariance deviation maps (no global magnitude information)
-        covs_dev_map_input = covs_dev_map_input_layer(
+        covs_dev_decoder = covs_dev_decoder_layer(
             covs_concat_embeddings,
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
-        covs_dev_map = covs_dev_map_layer(covs_dev_map_input)
+        covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
         norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
 
         # Get the deviation magnitudes (scale deviation maps globally)
@@ -845,16 +880,6 @@ def _model_structure(config):
     # For the observation model (static KL loss)
     if config.learn_means:
         # Layer definitions
-        means_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            config.dev_regularizer,
-            config.dev_regularizer_factor,
-            name="means_dev_mag_mod_beta_input",
-        )
         means_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
@@ -866,13 +891,7 @@ def _model_structure(config):
         )
 
         # Data flow
-        means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
-            means_concat_embeddings,
-            static_loss_scaling_factor=static_loss_scaling_factor,
-        )
-        means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(
-            means_dev_mag_mod_beta_input
-        )
+        means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
             [
                 data,
@@ -891,16 +910,6 @@ def _model_structure(config):
 
     if config.learn_covariances:
         # Layer definitions
-        covs_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            config.dev_regularizer,
-            config.dev_regularizer_factor,
-            name="covs_dev_mag_mod_beta_input",
-        )
         covs_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
@@ -912,12 +921,8 @@ def _model_structure(config):
         )
 
         # Data flow
-        covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
-            covs_concat_embeddings,
-            static_loss_scaling_factor=static_loss_scaling_factor,
-        )
         covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
-            covs_dev_mag_mod_beta_input,
+            covs_dev_decoder,
         )
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
             [

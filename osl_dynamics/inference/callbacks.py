@@ -165,6 +165,15 @@ class KLAnnealingCallback(callbacks.Callback):
         kl_loss_layer = self.model.get_layer("kl_loss")
         kl_loss_layer.annealing_factor.assign(new_value)
 
+        # Annealing factor for gamma sampling
+        if "means_dev_mag" in self.model.layers:
+            means_dev_mag_layer = self.model.get_layer("means_dev_mag")
+            means_dev_mag_layer.annealing_factor.assign(new_value)
+
+        if "covs_dev_mag" in self.model.layers:
+            covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
+            covs_dev_mag_layer.annealing_factor.assign(new_value)
+
 
 class EMADecayCallback(callbacks.Callback):
     """Callback to update the decay rate in an Exponential Moving Average optimizer.
