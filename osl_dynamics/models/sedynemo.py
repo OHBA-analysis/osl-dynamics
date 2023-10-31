@@ -661,7 +661,7 @@ def _model_structure(config):
         )
 
         norm_means_dev_map_layer = layers.LayerNormalization(
-            axis=-1, name="norm_means_dev_map"
+            axis=-1, scale=False, name="norm_means_dev_map"
         )
 
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
@@ -680,7 +680,7 @@ def _model_structure(config):
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 10.0)),
+                tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 5.0)),
                 0.1,
             ),
             name="means_dev_mag_inf_beta_input",
@@ -689,7 +689,7 @@ def _model_structure(config):
             "softplus", name="means_dev_mag_inf_beta"
         )
         means_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, name="means_dev_mag"
+            config.covariances_epsilon, config.do_kl_annealing, name="means_dev_mag"
         )
 
         means_dev_layer = layers.Multiply(name="means_dev")
@@ -760,7 +760,7 @@ def _model_structure(config):
             config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_map"
         )
         norm_covs_dev_map_layer = layers.LayerNormalization(
-            axis=-1, name="norm_covs_dev_map"
+            axis=-1, scale=False, name="norm_covs_dev_map"
         )
 
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
@@ -779,7 +779,7 @@ def _model_structure(config):
             shape=(config.n_subjects, config.n_modes, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 10.0)),
+                tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 5.0)),
                 0.1,
             ),
             name="covs_dev_mag_inf_beta_input",
@@ -788,7 +788,7 @@ def _model_structure(config):
             "softplus", name="covs_dev_mag_inf_beta"
         )
         covs_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, name="covs_dev_mag"
+            config.covariances_epsilon, config.do_kl_annealing, name="covs_dev_mag"
         )
         covs_dev_layer = layers.Multiply(name="covs_dev")
 
