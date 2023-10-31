@@ -113,7 +113,7 @@ def set_dev_parameters_initializer(
         static_means = np.array([np.mean(t, axis=0) for t in time_series])
         static_means_dev = np.abs(static_means - np.mean(static_means, axis=0))
         static_means_dev_mean = np.mean(static_means_dev, axis=1)
-        static_means_dev_var = np.var(static_means_dev, axis=1)
+        static_means_dev_var = static_means_dev_mean / 5
 
         means_alpha = tfp.math.softplus_inverse(
             np.square(static_means_dev_mean) / static_means_dev_var
@@ -137,7 +137,7 @@ def set_dev_parameters_initializer(
         ]
         static_cov_chol_dev = np.abs(static_cov_chol - np.mean(static_cov_chol, axis=0))
         static_cov_chol_dev_mean = np.mean(static_cov_chol_dev, axis=1)
-        static_cov_chol_dev_var = np.var(static_cov_chol_dev, axis=1)
+        static_cov_chol_dev_var = static_cov_chol_dev_mean / 5
 
         covs_alpha = tfp.math.softplus_inverse(
             np.square(static_cov_chol_dev_mean) / static_cov_chol_dev_var

@@ -316,6 +316,7 @@ def train_sehmm(
     data,
     output_dir,
     config_kwargs,
+    hmm_config_kwargs=None,
     init_kwargs=None,
     fit_kwargs=None,
     save_inf_params=True,
@@ -325,8 +326,12 @@ def train_sehmm(
     
     This function will:
 
-    1. Build an :code:`sehmm.Model` object.
-    2. Initialize the parameters of the model using
+    1. Build an :code:`hmm.Model` object.
+    2. Initialize the parameters of the HMM model using
+        :code:`Model.random_state_time_course_initialization`.
+    3. Build an :code:`sehmm.Model` object.
+    4. Initialize the parameters of the SE-HMM model using pretrained HMM.
+    2. Initialize the parameters of the SE-HMM model using
         :code:`Model.random_state_time_course_initialization`.
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means,
@@ -352,23 +357,38 @@ def train_sehmm(
             {
                 'sequence_length': 200,
                 'mode_embeddings_dim': 2,
-                'subject_embeddings_dim': 2,
                 'dev_n_layers': 5,
                 'dev_n_units': 32,
                 'dev_activation': 'tanh',
                 'dev_normalization': 'layer',
                 'dev_regularizer': 'l1',
                 'dev_regularizer_factor': 10,
-                'batch_size': 64,
-                'learning_rate': 0.01,
+                'batch_size': 128,
+                'learning_rate': 0.005,
                 'lr_decay': 0.1,
-                'n_epochs': 20,
+                'n_epochs': 30,
+                'do_kl_annealing': True,
+                'kl_annealing_curve': 'tanh',
+                'kl_annealing_sharpness': 10,
+                'n_kl_annealing_epochs': 15,
+            }.
+    hmm_config_kwargs : dict, optional
+        Keyword arguments to pass to `hmm.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
+        #osl_dynamics.models.hmm.Config>`_. Defaults to::
+
+            {
+                'sequence_length': 200,
+                'batch_size': 128,
+                'learning_rate': 0.01,
+                'n_epochs': 5,
+                'lr_decay': 0.1,
             }.
     init_kwargs : dict, optional
         Keyword arguments to pass to
         :code:`Model.random_state_time_course_initialization`. Defaults to::
 
-            {'n_init': 5, 'n_epochs': 2}.
+            {'n_init': 10, 'n_epochs': 2}.
     fit_kwargs : dict, optional
         Keyword arguments to pass to the :code:`Model.fit`. No defaults.
     save_inf_params : bool, optional
@@ -377,7 +397,7 @@ def train_sehmm(
     if data is None:
         raise ValueError("data must be passed.")
 
-    from osl_dynamics.models import sehmm
+    from osl_dynamics.models import hmm, sehmm
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs
@@ -385,28 +405,66 @@ def train_sehmm(
     # Directories
     model_dir = output_dir + "/model"
 
-    # Create the model object
     _logger.info("Building model")
+    # Initialise configs
+
+    # HMM config
+    default_hmm_config_kwargs = {
+        "n_channels": data.n_channels,
+        "sequence_length": 200,
+        "batch_size": 128,
+        "learning_rate": 0.01,
+        "n_epochs": 5,
+        "lr_decay": 0.1,
+    }
+    hmm_config_kwargs = override_dict_defaults(
+        default_hmm_config_kwargs, hmm_config_kwargs
+    )
+    # SE-HMM config
     default_config_kwargs = {
         "n_channels": data.n_channels,
         "n_subjects": data.n_arrays,
         "sequence_length": 200,
         "mode_embeddings_dim": 2,
-        "subject_embeddings_dim": 2,
         "dev_n_layers": 5,
         "dev_n_units": 32,
         "dev_activation": "tanh",
         "dev_normalization": "layer",
         "dev_regularizer": "l1",
         "dev_regularizer_factor": 10,
-        "batch_size": 64,
-        "learning_rate": 0.01,
+        "batch_size": 128,
+        "learning_rate": 0.005,
         "lr_decay": 0.1,
-        "n_epochs": 20,
+        "n_epochs": 30,
+        "do_kl_annealing": True,
+        "kl_annealing_curve": "tanh",
+        "kl_annealing_sharpness": 10,
+        "n_kl_annealing_epochs": 15,
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+
+    default_init_kwargs = {"n_init": 10, "n_epochs": 2}
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
+
+    # Initialise with HMM
+    hmm_config_kwargs["n_states"] = config_kwargs["n_states"]
+    hmm_config_kwargs["learn_means"] = config_kwargs["learn_means"]
+    hmm_config_kwargs["learn_covariances"] = config_kwargs["learn_covariances"]
+
+    _logger.info(f"Using hmm_config_kwargs: {hmm_config_kwargs}")
+    hmm_config = hmm.Config(**hmm_config_kwargs)
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+
+    init_model = hmm.Model(hmm_config)
+    init_model.set_regularizers(data)
+    init_model.random_state_time_course_initialization(data, **init_kwargs)
+
+    # Initialise and train SE-HMM
     _logger.info(f"Using config_kwargs: {config_kwargs}")
     config = sehmm.Config(**config_kwargs)
+    config.initial_covariances = init_model.get_covariances()
+    config.initial_trans_prob = init_model.get_trans_prob()
+
     model = sehmm.Model(config)
     model.summary()
 
@@ -416,9 +474,6 @@ def train_sehmm(
     # Set deviation initializer
     model.set_dev_parameters_initializer(data)
 
-    # Initialisation
-    default_init_kwargs = {"n_init": 5, "n_epochs": 2}
-    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
     init_history = model.random_state_time_course_initialization(
         data,

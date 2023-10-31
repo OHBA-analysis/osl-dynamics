@@ -236,9 +236,13 @@ class SampleGammaDistributionLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, **kwargs):
+    def __init__(self, epsilon, do_annealing, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
+        if do_annealing:
+            self.annealing_factor = tf.Variable(0.0, trainable=False)
+        else:
+            self.annealing_factor = tf.Variable(1.0, trainable=False)
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
@@ -246,13 +250,19 @@ class SampleGammaDistributionLayer(layers.Layer):
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
         if training:
-            N = tfp.distributions.Gamma(
-                concentration=alpha, rate=beta, allow_nan_stats=False
-            )
-            return N.sample()
-        else:
-            mode = (alpha - 1) / beta
-            return tf.maximum(mode, 0)
+            output = alpha / beta
+            if self.annealing_factor > 0:
+                N = tfp.distributions.Gamma(
+                    concentration=alpha,
+                    rate=beta,
+                    allow_nan_stats=False,
+                )
+                output = (
+                    1 - self.annealing_factor
+                ) * output + self.annealing_factor * N.sample()
+            return output
+
+        return alpha / beta
 
 
 class SampleNormalDistributionLayer(layers.Layer):
