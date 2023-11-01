@@ -1,5 +1,7 @@
 """Mask files.
 
+- MNI152_T1_1mm_brain.nii.gz
+- MNI152_T1_2mm_brain.nii.gz
 - MNI152_T1_8mm_brain.nii.gz
 - ft_8mm_brain_mask.nii.gz
 """

@@ -908,27 +908,15 @@ def plot_violin(
     if sns_kwargs is None:
         sns_kwargs = {}
 
-    # Create a pandas DataFrame
-    # Pad the data with NaNs to make sure all columns have the same length
-    max_len = max([d.size for d in data])
-    data_dict = {
-        k: np.pad(
-            v,
-            pad_width=(0, max_len - v.size),
-            mode="constant",
-            constant_values=np.nan,
-        )
-        for k, v in zip(x, data)
-    }
-    df = pd.DataFrame(data_dict)
-
     # Create figure
     create_fig = ax is None
     if create_fig:
         fig, ax = create_figure(**fig_kwargs)
 
     # Plot violins
-    sns.violinplot(df, ax=ax, **sns_kwargs)
+    x = np.concatenate([[x_] * len(y) for x_, y in zip(x, data)])
+    y = data.flatten()
+    ax = sns.violinplot(x=x, y=y, ax=ax, **sns_kwargs)
 
     # Set title and axis labels
     ax.set_title(title)
