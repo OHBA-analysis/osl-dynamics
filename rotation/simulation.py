@@ -20,5 +20,8 @@ def HMM_single_subject_simulation(save_dir:str, n_scans:int, n_states:int, n_sam
             covariances=covariances,
             random_seed=42,
         )
-    time_series.append(sim.time_series)
-    np.savetxt(f'{save_dir}10001,txt',time_series)
+        print('Format of sim.time_series')
+        print(sim.time_series.shape)
+        raise ValueError('for test only!')
+        time_series.append(sim.time_series)
+    #np.savetxt(f'{save_dir}10001.txt',time_series)
