@@ -3,7 +3,6 @@
 """
 
 from osl_dynamics.simulation.base import Simulation
-from osl_dynamics.simulation.sin import SingleSine
 from osl_dynamics.simulation.mar import MAR
 from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSubj_MVN
 from osl_dynamics.simulation.hmm import (
@@ -12,7 +11,6 @@ from osl_dynamics.simulation.hmm import (
     HMM_MVN,
     MDyn_HMM_MVN,
     HierarchicalHMM_MVN,
-    HMM_Sine,
     MSubj_HMM_MVN,
 )
 from osl_dynamics.simulation.hsmm import HSMM, HSMM_MVN, MixedHSMM_MVN

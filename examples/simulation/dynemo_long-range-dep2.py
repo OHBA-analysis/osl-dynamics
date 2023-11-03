@@ -91,7 +91,7 @@ sim = HierarchicalHMM_MVN(
 sim.standardize()
 training_data = Data(sim.time_series)
 
-plotting.plot_mode_lifetimes(sim.top_level_stc, filename="figures/sim_top_lt.png")
+plotting.plot_state_lifetimes(sim.top_level_stc, filename="figures/sim_top_lt.png")
 
 # Mean lifetime of top level HMM states
 mlt, _ = modes.lifetime_statistics(sim.top_level_stc)

@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import regularizers
 import tensorflow_probability as tfp
+
 from osl_dynamics.inference.layers import add_epsilon
 
 tfb = tfp.bijectors
@@ -23,18 +24,17 @@ class InverseWishart(regularizers.Regularizer):
         Shape must be (n_channels, n_channels).
     epsilon : float
         Error added to the diagonal of the covariances.
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, nu, psi, epsilon, n_batches, **kwargs):
+    def __init__(self, nu, psi, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.psi = psi
         self.epsilon = epsilon
-        self.n_batches = n_batches
         self.n_channels = psi.shape[-1]
-        self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
+        self.bijector = tfb.Chain(
+            [tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()],
+        )
 
         # Validation
         if not self.nu > self.n_channels - 1:
@@ -72,20 +72,16 @@ class MultivariateNormal(regularizers.Regularizer):
     Parameters
     ----------
     mu : np.ndarray
-        1D numpy array of the mean of the prior.
-        Shape must be (n_channels,).
+        1D array of the mean of the prior. Shape must be (n_channels,).
     sigma : np.ndarray
-        2D numpy array of covariance matrix of the prior.
+        2D array of covariance matrix of the prior.
         Shape must be (n_channels, n_channels).
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, n_batches, **kwargs):
+    def __init__(self, mu, sigma, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
-        self.n_batches = n_batches
 
         # Validation
         if self.mu.ndim != 1:
@@ -101,7 +97,8 @@ class MultivariateNormal(regularizers.Regularizer):
             np.linalg.cholesky(self.sigma)
         except:
             raise ValueError(
-                "Cholesky decomposition of sigma failed. sigma must be positive definite."
+                "Cholesky decomposition of sigma failed. "
+                + "sigma must be positive definite."
             )
 
         self.inv_sigma = tf.linalg.inv(self.sigma)
@@ -113,7 +110,8 @@ class MultivariateNormal(regularizers.Regularizer):
             tf.matmul(
                 tf.expand_dims(vectors, -2),
                 tf.matmul(
-                    tf.expand_dims(self.inv_sigma, 0), tf.expand_dims(vectors, -1)
+                    tf.expand_dims(self.inv_sigma, 0),
+                    tf.expand_dims(vectors, -1),
                 ),
             )
         )
@@ -123,10 +121,6 @@ class MultivariateNormal(regularizers.Regularizer):
 class MarginalInverseWishart(regularizers.Regularizer):
     """Inverse Wishart regularizer on correlaton matrices.
 
-    It is assumed that the scale matrix of the inverse Wishart distribution
-    is diagonal. Hence the marginal distribution on the correlation matrix is
-    independent of the scale matrix.
-
     Parameters
     ----------
     nu : int
@@ -135,16 +129,19 @@ class MarginalInverseWishart(regularizers.Regularizer):
         Error added to the correlations.
     n_channels : int
         Number of channels of the correlation matrices.
-    n_batches : int
-        Number of batches in the data.
+
+    Note
+    ----
+    It is assumed that the scale matrix of the inverse Wishart distribution
+    is diagonal. Hence, the marginal distribution on the correlation matrix is
+    independent of the scale matrix.
     """
 
-    def __init__(self, nu, epsilon, n_channels, n_batches, **kwargs):
+    def __init__(self, nu, epsilon, n_channels, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.epsilon = epsilon
         self.n_channels = n_channels
-        self.n_batches = n_batches
         self.bijector = tfb.Chain(
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
@@ -166,28 +163,24 @@ class MarginalInverseWishart(regularizers.Regularizer):
 
 
 class LogNormal(regularizers.Regularizer):
-    """Log normal regularizer on the standard deviations.
+    """Log-Normal regularizer on the standard deviations.
 
     Parameters
     ----------
     mu : np.ndarray
-        Mu parameters of the log normal distribution.
-        Shape is (n_channels,).
+        Mu parameters of the log normal distribution. Shape is (n_channels,).
     sigma : np.ndarray
         Sigma parameters of the log normal distribution.
         Shape is (n_channels,). All entries must be positive.
     epsilon : float
         Error added to the standard deviations.
-    n_batches : int
-        Number of batches in the data.
     """
 
-    def __init__(self, mu, sigma, epsilon, n_batches, **kwargs):
+    def __init__(self, mu, sigma, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
         self.epsilon = epsilon
-        self.n_batches = n_batches
         self.bijector = tfb.Softplus()
 
         # Validation

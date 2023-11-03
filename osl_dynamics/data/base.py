@@ -5,17 +5,15 @@
 import logging
 import pathlib
 import pickle
-import warnings
-from functools import partial
-from os import path
+from contextlib import contextmanager
 from shutil import rmtree
+from os import path
 
 import numpy as np
 from pqdm.threads import pqdm
-from scipy import signal
 from tqdm.auto import tqdm
 
-from osl_dynamics.data import processing, rw, tf
+from osl_dynamics.data import processing, rw, tf as dtf
 from osl_dynamics.utils import misc
 
 _logger = logging.getLogger("osl-dynamics")
@@ -24,74 +22,71 @@ _logger = logging.getLogger("osl-dynamics")
 class Data:
     """Data Class.
 
-    The Data class enables the input and processing of data. When given a list of
-    files, it produces a set of numpy memory maps which contain their raw data.
-    It also provides methods for batching data and creating TensorFlow Datasets.
+    The Data class enables the input and processing of data. When given a list
+    of files, it produces a set of numpy memory maps which contain their raw
+    data. It also provides methods for batching data and creating TensorFlow
+    Datasets.
 
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
-        - A path to a directory containing .npy files.
-          Each .npy file should be a subject or session.
-        - A list of paths to .npy, .mat or .fif files. Each file should be a subject
-          or session. If a .fif file is passed is must end with 'raw.fif' or 'epo.fif'.
+        - A path to a directory containing :code:`.npy` files. Each
+          :code:`.npy` file should be a subject or session.
+        - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files.
+          Each file should be a subject or session. If a :code:`.fif` file is
+          passed is must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
         - A numpy array. The array will be treated as continuous data from the
           same subject.
-        - A list of numpy arrays. Each numpy array should be the data for a subject
-          or session.
+        - A list of numpy arrays. Each numpy array should be the data for a
+          subject or session.
 
-        The data files or numpy arrays should be in the format (n_samples, n_channels).
-        If your data is in (n_channels, n_samples) format, use time_axis_first=False.
-    data_field : str
-        If a MATLAB (.mat) file is passed, this is the field that corresponds to the
-        time series data. By default we read the field 'X'. If a numpy (.npy) file is
-        passed, this is ignored. This argument is optional.
-    picks : str or list of str
-        If a fif file is passed we load the data using the MNE object's get_data()
-        method. We pass this argument to the get_data() method. See the
-        `MNE docs <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw.get_data>`_
-        for further details. This argument is optional. By default picks=None retrieves
+        The data files or numpy arrays should be in the format (n_samples,
+        n_channels). If your data is in (n_channels, n_samples) format, use
+        :code:`time_axis_first=False`.
+    data_field : str, optional
+        If a MATLAB (:code:`.mat`) file is passed, this is the field that
+        corresponds to the time series data. By default we read the field
+        :code:`'X'`. If a numpy (:code:`.npy`) or fif (:code:`.fif`) file is
+        passed, this is ignored.
+    picks : str or list of str, optional
+        Only used if a fif file is passed. We load the data using the
+        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io\
+        .Raw.html#mne.io.Raw.get_data>`_ method. We pass this argument to the
+        :code:`Raw.get_data` method. By default :code:`picks=None` retrieves
         all channel types.
-    reject_by_annotation : str
-        If a fif file is passed we load the data using the MNE object's get_data()
-        method. If the fif file contains a mne.Raw object, we pass this argument to
-        the get_data() method. This argument is optional. By default
-        reject_by_annotation=None retrieves all time points. Use
-        reject_by_annotation="omit" to remove segments marked as bad.
-    sampling_frequency : float
-        Sampling frequency of the data in Hz. This argument is optional.
-    mask_file : str
-        Path to mask file used to source reconstruct the data. This argument is
-        optional.
-    parcellation_file : str
-        Path to parcellation file used to source reconstruct the data. This argument
-        is optional.
-    store_dir : str
+    reject_by_annotation : str, optional
+        Only used if a fif file is passed. We load the data using the
+        `mne.io.Raw.get_data <https://mne.tools/stable/generated/mne.io\
+        .Raw.html#mne.io.Raw.get_data>`_ method. We pass this argument to the
+        :code:`Raw.get_data` method. By default
+        :code:`reject_by_annotation=None` retrieves all time points. Use
+        :code:`reject_by_annotation="omit"` to remove segments marked as bad.
+    sampling_frequency : float, optional
+        Sampling frequency of the data in Hz.
+    mask_file : str, optional
+        Path to mask file used to source reconstruct the data.
+    parcellation_file : str, optional
+        Path to parcellation file used to source reconstruct the data.
+    store_dir : str, optional
         We don't read all the data into memory. Instead we create store them on
-        disk and create memmaps (unless load_memmaps=False is passed).
-        This is the directory to save memmaps to. Default is ./tmp.
-        This argument is optional.
-    n_embeddings : int
-        Number of time-delay embeddings that have already been appleid to the data.
-        This argument is optional. It is useful to pass this argument if the data has
-        already been prepared.
-    n_window : int
-        Length of sliding window that has already been applied to the data. This
-        argument is optional. It is useful to pass this argument if the data has
-        already been prepared.
-    amplitude_envelope : bool
-        Is the data we're loading amplitude envelope data? This argument is optional.
-        It is useful to pass this argument if the data has already been prepared.
-    time_axis_first : bool
-        Is the input data of shape (n_samples, n_channels)? Default is True.
-        If your data is in format (n_channels, n_samples), use
-        time_axis_first=False. This argument is optional.
-    load_memmaps: bool
-        Should we load the data as memory maps (memmaps)? If False, we will load data
-        into memory rather than storing it on disk. By default we will keep the data
-        on disk and use memmaps. This argument is optional.
-    n_jobs : int
-        Number of processes to load the data in parallel. This argument is optional.
+        disk and create memmaps (unless :code:`load_memmaps=False` is passed).
+        This is the directory to save memmaps to. Default is :code:`./tmp`.
+    time_axis_first : bool, optional
+        Is the input data of shape (n_samples, n_channels)? Default is
+        :code:`True`. If your data is in format (n_channels, n_samples), use
+        :code:`time_axis_first=False`.
+    load_memmaps : bool, optional
+        Should we load the data as memory maps (memmaps)? If :code:`False`, we
+        will load data into memory rather than storing it on disk. By default
+        we will keep the data on disk and use memmaps.
+    buffer_size : int, optional
+        Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
+        to less random shuffling but will be quicker. Default is 100000.
+    use_tfrecord : bool, optional
+        Should we save the data as a TensorFlow Record? This is recommended for
+        training on large datasets. Default is :code:`False`.
+    n_jobs : int, optional
+        Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
     """
 
@@ -105,11 +100,10 @@ class Data:
         mask_file=None,
         parcellation_file=None,
         store_dir="tmp",
-        n_embeddings=None,
-        n_window=None,
-        amplitude_envelope=None,
         time_axis_first=True,
         load_memmaps=True,
+        buffer_size=100000,
+        use_tfrecord=False,
         n_jobs=1,
     ):
         self._identifier = id(self)
@@ -119,14 +113,11 @@ class Data:
         self.sampling_frequency = sampling_frequency
         self.mask_file = mask_file
         self.parcellation_file = parcellation_file
-        self.n_embeddings = n_embeddings
-        self.n_window = n_window
-        self.amplitude_envelope = amplitude_envelope
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
+        self.buffer_size = buffer_size
+        self.use_tfrecord = use_tfrecord
         self.n_jobs = n_jobs
-        self.prepared = False
-        self.prepared_data_filenames = []
 
         # Validate inputs
         self.inputs = rw.validate_inputs(inputs)
@@ -139,29 +130,42 @@ class Data:
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
         # Load and validate the raw data
-        self.raw_data_memmaps, self.raw_data_filenames = self.load_raw_data()
+        self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
         self.validate_data()
 
-        # Get data prepration attributes if the raw data has been prepared
+        self.n_raw_data_channels = self.raw_data_arrays[0].shape[-1]
+
+        # Get data preparation attributes if there's a pickle file in the
+        # input directory
         if not isinstance(inputs, list):
             self.load_preparation(inputs)
 
-        self.n_raw_data_channels = self.raw_data_memmaps[0].shape[-1]
+        # Store raw data in the arrays attribute
+        self.arrays = self.raw_data_arrays
 
-        # Use raw data for the subject data
-        self.subjects = self.raw_data_memmaps
+        # Create filenames for prepared data memmaps
+        prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
+            width=len(str(self.n_arrays)), identifier=self._identifier
+        )
+        self.prepared_data_filenames = [
+            str(self.store_dir / prepared_data_pattern.format(i=i))
+            for i in range(self.n_arrays)
+        ]
+
+        # Arrays to keep when making TensorFlow Datasets
+        self.keep = list(range(self.n_arrays))
 
     def __iter__(self):
-        return iter(self.subjects)
+        return iter(self.arrays)
 
     def __getitem__(self, item):
-        return self.subjects[item]
+        return self.arrays[item]
 
     def __str__(self):
         info = [
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
-            f"n_subjects: {self.n_subjects}",
+            f"n_arrays: {self.n_arrays}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
         ]
@@ -170,25 +174,49 @@ class Data:
     @property
     def raw_data(self):
         """Return raw data as a list of arrays."""
-        return self.raw_data_memmaps
+        return self.raw_data_arrays
 
     @property
     def n_channels(self):
         """Number of channels in the data files."""
-        return self.subjects[0].shape[-1]
+        return self.arrays[0].shape[-1]
 
     @property
     def n_samples(self):
-        """Number of samples for each subject."""
-        return sum([subject.shape[-2] for subject in self.subjects])
+        """Number of samples for each array."""
+        return sum([array.shape[-2] for array in self.arrays])
 
     @property
-    def n_subjects(self):
-        """Number of subjects."""
-        return len(self.subjects)
+    def n_arrays(self):
+        """Number of arrays."""
+        return len(self.arrays)
+
+    @contextmanager
+    def set_keep(self, keep):
+        """Context manager to temporarily set the kept arrays.
+
+        Parameters
+        ----------
+        keep : int or list of int
+            Indices to keep in the Data.arrays list.
+        """
+        # Store the current kept arrays
+        current_keep = self.keep
+        try:
+            # validation
+            if isinstance(keep, int):
+                keep = [keep]
+            if not isinstance(keep, list):
+                raise ValueError("keep must be a list of indices or a single index.")
+
+            # Set the new kept arrays
+            self.keep = keep
+            yield
+        finally:
+            self.keep = current_keep
 
     def set_sampling_frequency(self, sampling_frequency):
-        """Sets the sampling_frequency attribute.
+        """Sets the :code:`sampling_frequency` attribute.
 
         Parameters
         ----------
@@ -197,61 +225,44 @@ class Data:
         """
         self.sampling_frequency = sampling_frequency
 
-    def time_series(self, prepared=True, concatenate=False):
-        """Time series data for all subjects.
+    def set_buffer_size(self, buffer_size):
+        """Set the :code:`buffer_size` attribute.
 
         Parameters
         ----------
-        prepared : bool
+        buffer_size : int
+            Buffer size for shuffling a TensorFlow Dataset. Smaller values will
+            lead to less random shuffling but will be quicker.
+        """
+        self.buffer_size = buffer_size
+
+    def time_series(self, prepared=True, concatenate=False):
+        """Time series data for all arrays.
+
+        Parameters
+        ----------
+        prepared : bool, optional
             Should we return the latest data after we have prepared it or
             the original data we loaded into the Data object?
-        concatenate : bool
-            Should we return the time series for each subject concatenated?
+        concatenate : bool, optional
+            Should we return the time series for each array concatenated?
 
         Returns
         -------
         ts : list or np.ndarray
-            Time series data for each subject.
+            Time series data for each array.
         """
         # What data should we return?
         if prepared:
-            memmaps = self.subjects
+            arrays = self.arrays
         else:
-            memmaps = self.raw_data_memmaps
+            arrays = self.raw_data_arrays
 
         # Should we return one long time series?
-        if concatenate or self.n_subjects == 1:
-            return np.concatenate(memmaps)
+        if concatenate or self.n_arrays == 1:
+            return np.concatenate(arrays)
         else:
-            return memmaps
-
-    def delete_dir(self):
-        """Deletes store_dir."""
-        if self.store_dir.exists():
-            rmtree(self.store_dir)
-
-    def load_preparation(self, inputs):
-        """Loads a pickle file containing preparation settings.
-
-        Parameters
-        ----------
-        inputs : str
-            Path to directory containing the pickle file with preparation settings.
-        """
-        if path.isdir(inputs):
-            for file in rw.list_dir(inputs):
-                if "preparation.pkl" in file:
-                    preparation = pickle.load(open(inputs + "/preparation.pkl", "rb"))
-                    self.amplitude_envelope = preparation["amplitude_envelope"]
-                    self.low_freq = preparation["low_freq"]
-                    self.high_freq = preparation["high_freq"]
-                    self.n_window = preparation["n_window"]
-                    self.n_embeddings = preparation["n_embeddings"]
-                    self.n_te_channels = preparation["n_te_channels"]
-                    self.n_pca_components = preparation["n_pca_components"]
-                    self.pca_components = preparation["pca_components"]
-                    self.whiten = preparation["whiten"]
-                    self.prepared = True
+            return arrays
 
     def load_raw_data(self):
         """Import data into a list of memory maps.
@@ -270,15 +281,29 @@ class Data:
             str(self.store_dir / raw_data_pattern.format(i=i))
             for i in range(len(self.inputs))
         ]
-        # self.raw_data_filenames is not used if self.inputs is a list of strings,
-        # where the strings are paths to .npy files
+        # self.raw_data_filenames is not used if self.inputs is a list of
+        # strings, where the strings are paths to .npy files
+
+        # Function to save a single memory map
+        def _make_memmap(raw_data, mmap_location):
+            if not self.load_memmaps:  # do not load into the memory maps
+                mmap_location = None
+            raw_data_mmap = rw.load_data(
+                raw_data,
+                self.data_field,
+                self.picks,
+                self.reject_by_annotation,
+                mmap_location,
+                mmap_mode="r",
+            )
+            if not self.time_axis_first:
+                raw_data_mmap = raw_data_mmap.T
+            return raw_data_mmap
 
         # Load data
-        partial_make_memmap = partial(self.make_memmap)
-        args = zip(self.inputs, raw_data_filenames)
         memmaps = pqdm(
-            args,
-            partial_make_memmap,
+            array=zip(self.inputs, raw_data_filenames),
+            function=_make_memmap,
             n_jobs=self.n_jobs,
             desc="Loading files",
             argument_type="args",
@@ -287,360 +312,193 @@ class Data:
 
         return memmaps, raw_data_filenames
 
-    def make_memmap(self, raw_data, mmap_location):
-        """Make a memory map for a single file.
-
-        Parameters
-        ----------
-        raw_data : str
-            Path to file.
-        mmap_location : str
-            Path to save memory map to.
-
-        Returns
-        -------
-        raw_data_mmap: np.memmap
-            Memory map of the raw data.
-        """
-        if not self.load_memmaps:  # do not load into the memory maps
-            mmap_location = None
-        raw_data_mmap = rw.load_data(
-            raw_data,
-            self.data_field,
-            self.picks,
-            self.reject_by_annotation,
-            mmap_location,
-            mmap_mode="r",
-        )
-        if not self.time_axis_first:
-            raw_data_mmap = raw_data_mmap.T
-        return raw_data_mmap
-
-    def save(self, output_dir="."):
-        """Saves data to numpy files.
-
-        Parameters
-        ----------
-        output_dir : str
-            Path to save data files to. Default is the current working directory.
-        """
-        output_dir = pathlib.Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Save time series data
-        for i, subject_data in enumerate(tqdm(self.subjects, desc="Saving data")):
-            padded_number = misc.leading_zeros(i, self.n_subjects)
-            np.save(f"{output_dir}/subject{padded_number}.npy", subject_data)
-
-        # Save preparation info if .prepared has been called
-        if self.prepared:
-            preparation = {
-                "amplitude_envelope": self.amplitude_envelope,
-                "low_freq": self.low_freq,
-                "high_freq": self.high_freq,
-                "n_window": self.n_window,
-                "n_embeddings": self.n_embeddings,
-                "n_te_channels": self.n_te_channels,
-                "n_pca_components": self.n_pca_components,
-                "pca_components": self.pca_components,
-                "whiten": self.whiten,
-            }
-            pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
-
     def validate_data(self):
         """Validate data files."""
-        n_channels = [memmap.shape[-1] for memmap in self.raw_data_memmaps]
+        n_channels = [array.shape[-1] for array in self.raw_data_arrays]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def filter(self, low_freq=None, high_freq=None):
-        """Filter the raw data.
+    def filter(self, low_freq=None, high_freq=None, use_raw=False):
+        """Filter the data.
+
+        This is an in-place operation.
 
         Parameters
         ----------
-        low_freq : float
-            Frequency in Hz for a high pass filter.
-        high_freq : float
-            Frequency in Hz for a low pass filter.
-        """
-        if (
-            low_freq is not None or high_freq is not None
-        ) and self.sampling_frequency is None:
-            raise ValueError(
-                "Data.sampling_frequency must be set if we are filtering the data. "
-                + "Use Data.set_sampling_frequency() or pass "
-                + "Data(..., sampling_frequency=...) when creating the Data object."
-            )
-
-        # Save settings
-        self.amplitude_envelope = False
-        self.low_freq = low_freq
-        self.high_freq = high_freq
-        self.n_window = 1
-        self.n_embeddings = 1
-        self.n_te_channels = self.n_raw_data_channels
-        self.n_pca_components = None
-        self.pca_components = None
-        self.whiten = None
-
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
-
-        # Prepare the data
-        for raw_data_memmap, prepared_data_file in zip(
-            tqdm(self.raw_data_memmaps, desc="Filtering data"),
-            self.prepared_data_filenames,
-        ):
-            # Filtering
-            prepared_data = processing.temporal_filter(
-                raw_data_memmap, low_freq, high_freq, self.sampling_frequency
-            )
-
-            if self.load_memmaps:
-                # Save the prepared data as a memmap
-                prepared_data_memmap = misc.array_to_memmap(
-                    prepared_data_file, prepared_data
-                )
-            else:
-                prepared_data_memmap = prepared_data
-            self.prepared_data_memmaps.append(prepared_data_memmap)
-
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
-
-        self.prepared = True
-
-    def prepare(
-        self,
-        amplitude_envelope=False,
-        low_freq=None,
-        high_freq=None,
-        n_window=1,
-        n_embeddings=1,
-        n_pca_components=None,
-        pca_components=None,
-        whiten=False,
-    ):
-        """Prepares data to train the model with.
-
-        If amplitude_envelope=True, first we filter the data then
-        calculate a Hilbert transform and take the absolute value.
-        We then apply a sliding window moving average. Finally, we
-        standardize the data.
-
-        Otherwise, we standardize the data, perform time-delay embedding,
-        then PCA, then whiten. Finally, the data is standardized again.
-
-        If no arguments are passed, the data is just standardized.
-
-        Parameters
-        ----------
-        amplitude_envelope : bool
-            Should we prepare amplitude envelope data?
-        low_freq : float
-            Frequency in Hz for a high pass filter.
-            Only used if amplitude_envelope=True.
-        high_freq : float
-            Frequency in Hz for a low pass filter.
-            Only used if amplitude_envelope=True.
-        n_window : int
-            Number of data points in a sliding window to apply to the amplitude
-            envelope data. Only used if amplitude_envelope=True.
-        n_embeddings : int
-            Number of data points to embed the data.
-            Only used if amplitude_envelope=False.
-        n_pca_components : int
-            Number of PCA components to keep. Default is no PCA.
-            Only used if amplitude_envelope=False.
-        pca_components : np.ndarray
-            PCA components to apply if they have already been calculated.
-            Only used if amplitude_envelope=False.
-        whiten : bool
-            Should we whiten the PCA'ed data?
-            Only used if amplitude_envelope=False.
-        """
-        if self.prepared:
-            warnings.warn(
-                "Previously prepared data will be overwritten.", RuntimeWarning
-            )
-
-        # Prepare data (either amplitude envelope or time-delay embedded)
-        if amplitude_envelope:
-            self.prepare_amp_env(low_freq, high_freq, n_window)
-        else:
-            self.prepare_tde(n_embeddings, n_pca_components, pca_components, whiten)
-
-    def prepare_amp_env(self, low_freq=None, high_freq=None, n_window=1):
-        """Prepare amplitude envelope data.
-
-        Parameters
-        ----------
-        low_freq : float
-            Frequency in Hz for a high pass filter.
-        high_freq : float
-            Frequency in Hz for a low pass filter.
-        n_window : int
-            Number of data points in a sliding window to apply to the amplitude
-            envelope data.
-        """
-
-        # Validation
-        if (
-            low_freq is not None or high_freq is not None
-        ) and self.sampling_frequency is None:
-            raise ValueError(
-                "Data.sampling_frequency must be set if we are filtering the data. "
-                + "Use Data.set_sampling_frequency() or pass "
-                + "Data(..., sampling_frequency=...) when creating the Data object."
-            )
-
-        if n_window % 2 == 0:
-            raise ValueError("n_window must be an odd number.")
-
-        # Save settings
-        self.amplitude_envelope = True
-        self.low_freq = low_freq
-        self.high_freq = high_freq
-        self.n_window = n_window
-        self.n_embeddings = 1
-        self.n_te_channels = self.n_raw_data_channels
-        self.n_pca_components = None
-        self.pca_components = None
-        self.whiten = None
-
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
-
-        # Prepare the data
-        prepare_args = zip(
-            self.raw_data_memmaps,
-            self.prepared_data_filenames,
-        )
-
-        prepared_data_memmaps = pqdm(
-            prepare_args,
-            self.apply_amp_env,
-            desc="Preparing data",
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=len(self.raw_data_memmaps),
-        )
-        self.prepared_data_memmaps.extend(prepared_data_memmaps)
-
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
-
-        self.prepared = True
-
-    def apply_amp_env(self, raw_data_memmap, prepared_data_file):
-        """Applies filtering, a Hilbert transform and standardization to raw data.
-
-        Parameters
-        ----------
-        raw_data_memmap : np.memmap or np.ndarray
-            Raw data.
-        prepared_data_file : str
-            Name of memory map file to save prepared data to.
-            Can be None if we are not using memory maps.
+        low_freq : float, optional
+            Frequency in Hz for a high pass filter. If :code:`None`, no high
+            pass filtering is applied.
+        high_freq : float, optional
+            Frequency in Hz for a low pass filter. If :code:`None`, no low pass
+            filtering is applied.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
-        prepared_data_memmap : np.memmap or np.ndarray
-            Prepared data.
+        data : osl_dynamics.data.Data
+            The modified Data object.
         """
-        # Filtering
-        prepared_data = processing.temporal_filter(
-            raw_data_memmap, self.low_freq, self.high_freq, self.sampling_frequency
-        )
+        if low_freq is None and high_freq is None:
+            _logger.warning("No filtering applied.")
+            return
 
-        # Hilbert transform
-        prepared_data = np.abs(signal.hilbert(prepared_data, axis=0))
-
-        # Moving average filter
-        prepared_data = np.array(
-            [
-                np.convolve(
-                    prepared_data[:, i],
-                    np.ones(self.n_window) / self.n_window,
-                    mode="valid",
-                )
-                for i in range(prepared_data.shape[1])
-            ],
-        ).T
-
-        # Finally, we standardise
-        prepared_data = processing.standardize(prepared_data, create_copy=False)
-
-        # Make sure data is float32
-        prepared_data = prepared_data.astype(np.float32)
-
-        if self.load_memmaps:
-            # Save the prepared data as a memmap
-            prepared_data_memmap = misc.array_to_memmap(
-                prepared_data_file, prepared_data
+        if self.sampling_frequency is None:
+            raise ValueError(
+                "Data.sampling_frequency must be set if we are filtering the "
+                "data. Use Data.set_sampling_frequency() or pass "
+                "Data(..., sampling_frequency=...) when creating the Data "
+                "object."
             )
-        else:
-            prepared_data_memmap = prepared_data
-        return prepared_data_memmap
 
-    def prepare_tde(
-        self,
-        n_embeddings=1,
-        n_pca_components=None,
-        pca_components=None,
-        whiten=False,
-    ):
-        """Prepares time-delay embedded data to train the model with.
+        self.low_freq = low_freq
+        self.high_freq = high_freq
+
+        # Function to apply filtering to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.temporal_filter(
+                array, low_freq, high_freq, self.sampling_frequency
+            )
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="Filtering",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
+    def downsample(self, freq, use_raw=False):
+        """Downsample the data.
+
+        This is an in-place operation.
 
         Parameters
         ----------
-        n_embeddings : int
-            Number of data points to embed the data.
-        n_pca_components : int
-            Number of PCA components to keep. Default is no PCA.
-        pca_components : np.ndarray
-            PCA components to apply if they have already been calculated.
-        whiten : bool
-            Should we whiten the PCA'ed data?
-        """
+        freq : float
+            Frequency in Hz to downsample to.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
 
-        if n_pca_components is not None and pca_components is not None:
-            raise ValueError("Please only pass n_pca_components or pca_components.")
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        if self.sampling_frequency is None:
+            raise ValueError(
+                "Data.sampling_frequency must be set if we are filtering the "
+                "data. Use Data.set_sampling_frequency() or pass "
+                "Data(..., sampling_frequency=...) when creating the Data "
+                "object."
+            )
+
+        if use_raw and hasattr(self, "original_sampling_frequency"):
+            sampling_frequency = self.original_sampling_frequency
+        else:
+            sampling_frequency = self.sampling_frequency
+
+        # Function to apply downsampling to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.downsample(array, freq, sampling_frequency)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="Downsampling",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        # Update sampling_frequency attributes
+        self.original_sampling_frequency = self.sampling_frequency
+        self.sampling_frequency = freq
+
+        return self
+
+    def pca(
+        self,
+        n_pca_components=None,
+        pca_components=None,
+        whiten=False,
+        use_raw=False,
+    ):
+        """Principal component analysis (PCA).
+
+        This function will first standardize the data then perform PCA.
+        This is an in-place operation.
+
+        Parameters
+        ----------
+        n_pca_components : int, optional
+            Number of PCA components to keep. If :code:`None`, then
+            :code:`pca_components` should be passed.
+        pca_components : np.ndarray, optional
+            PCA components to apply if they have already been calculated.
+            If :code:`None`, then :code:`n_pca_components` should be passed.
+        whiten : bool, optional
+            Should we whiten the PCA'ed data?
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        if (n_pca_components is None and pca_components is None) or (
+            n_pca_components is not None and pca_components is not None
+        ):
+            raise ValueError("Please pass either n_pca_components or pca_components.")
 
         if pca_components is not None and not isinstance(pca_components, np.ndarray):
             raise ValueError("pca_components must be a numpy array.")
 
-        # Save settings
-        self.amplitude_envelope = False
-        self.low_freq = None
-        self.high_freq = None
-        self.n_window = 1
-        self.n_embeddings = n_embeddings
-        self.n_te_channels = self.n_raw_data_channels * n_embeddings
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
         self.whiten = whiten
 
-        # Create filenames for memmaps (i.e. self.prepared_data_filenames)
-        self.prepare_memmap_filenames()
+        # What data should we apply PCA to?
+        arrays = self.raw_data_arrays if use_raw else self.arrays
 
-        # Principle component analysis (PCA)
-        # NOTE: the approach used here only works for zero mean data
+        # Calculate PCA
         if n_pca_components is not None:
-            # Calculate the PCA components by performing SVD on the covariance
-            # of the data
-            covariance = np.zeros([self.n_te_channels, self.n_te_channels])
-            for raw_data_memmap in tqdm(
-                self.raw_data_memmaps, desc="Calculating PCA components"
-            ):
-                # Standardise and time embed the data
-                std_data = processing.standardize(raw_data_memmap)
-                te_std_data = processing.time_embed(std_data, n_embeddings)
+            # Calculate covariance of the data
+            n_channels = arrays[0].shape[-1]
+            covariance = np.zeros([n_channels, n_channels])
+            for array in tqdm(arrays, desc="Calculating PCA components"):
+                std_data = processing.standardize(array)
+                covariance += np.transpose(std_data) @ std_data
 
-                # Calculate the covariance of the entire dataset
-                covariance += np.transpose(te_std_data) @ te_std_data
-
-            # Use SVD to calculate PCA components
+            # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
             explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
@@ -650,87 +508,352 @@ class Data:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
 
-        prepare_args = zip(
-            self.raw_data_memmaps,
-            self.prepared_data_filenames,
-        )
+        # Function to apply PCA to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.standardize(array)
+            array = array @ self.pca_components
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
-        prepared_data_memmaps = pqdm(
-            prepare_args,
-            self.apply_tde_pca,
-            desc="Preparing data",
+        # Apply PCA in parallel
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=len(self.raw_data_memmaps),
+            total=self.n_arrays,
         )
-        self.prepared_data_memmaps.extend(prepared_data_memmaps)
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
-        # Update subjects to return the prepared data
-        self.subjects = self.prepared_data_memmaps
+        return self
 
-        self.prepared = True
+    def tde(self, n_embeddings, use_raw=False):
+        """Time-delay embedding (TDE).
 
-    def apply_tde_pca(self, raw_data_memmap, prepared_data_file):
-        """Applies time-delay embeddings, principal component analysis and
-        standardization to raw data.
+        This is an in-place operation.
 
         Parameters
         ----------
-        raw_data_memmap : np.memmap or np.ndarray
-            Raw data.
-        prepared_data_file : str
-            Name of memory map file to save prepared data to.
-            Can be None if we are not using memory maps.
+        n_embeddings : int
+            Number of data points to embed the data.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
 
         Returns
         -------
-        prepared_data_memmap : np.memmap or np.ndarray
-            Prepared data.
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        self.n_embeddings = n_embeddings
+        self.n_te_channels = self.n_raw_data_channels * n_embeddings
+
+        # Function to apply TDE to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.time_embed(array, n_embeddings)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Apply TDE in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="TDE",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
+    def tde_pca(
+        self,
+        n_embeddings,
+        n_pca_components=None,
+        pca_components=None,
+        whiten=False,
+        use_raw=False,
+    ):
+        """Time-delay embedding (TDE) and principal component analysis (PCA).
+
+        This function will first standardize the data, then perform TDE then
+        PCA. It is useful to do both operations in a single methods because
+        it avoids having to save the time-embedded data. This is an in-place
+        operation.
+
+        Parameters
+        ----------
+        n_embeddings : int
+            Number of data points to embed the data.
+        n_pca_components : int, optional
+            Number of PCA components to keep. If :code:`None`, then
+            :code:`pca_components` should be passed.
+        pca_components : np.ndarray, optional
+            PCA components to apply if they have already been calculated.
+            If :code:`None`, then :code:`n_pca_components` should be passed.
+        whiten : bool, optional
+            Should we whiten the PCA'ed data?
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        if (n_pca_components is None and pca_components is None) or (
+            n_pca_components is not None and pca_components is not None
+        ):
+            raise ValueError("Please pass either n_pca_components or pca_components.")
+
+        if pca_components is not None and not isinstance(pca_components, np.ndarray):
+            raise ValueError("pca_components must be a numpy array.")
+
+        self.n_embeddings = n_embeddings
+        self.n_pca_components = n_pca_components
+        self.pca_components = pca_components
+        self.whiten = whiten
+
+        # What data should we use?
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        self.n_te_channels = arrays[0].shape[-1] * n_embeddings
+
+        # Calculate PCA on TDE data
+        if n_pca_components is not None:
+            # Calculate covariance of the data
+            covariance = np.zeros([self.n_te_channels, self.n_te_channels])
+            for array in tqdm(arrays, desc="Calculating PCA components"):
+                std_data = processing.standardize(array)
+                te_std_data = processing.time_embed(std_data, n_embeddings)
+                covariance += np.transpose(te_std_data) @ te_std_data
+
+            # Use SVD on the covariance to calculate PCA components
+            u, s, vh = np.linalg.svd(covariance)
+            u = u[:, :n_pca_components].astype(np.float32)
+            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            s = s[:n_pca_components].astype(np.float32)
+            if whiten:
+                u = u @ np.diag(1.0 / np.sqrt(s))
+            self.pca_components = u
+
+        # Function to apply TDE-PCA to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.standardize(array)
+            array = processing.time_embed(array, n_embeddings)
+            array = array @ self.pca_components
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Apply TDE and PCA in parallel
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="TDE-PCA",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
+    def amplitude_envelope(self, use_raw=False):
+        """Calculate the amplitude envelope.
+
+        This is an in-place operation.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
         """
 
-        # Standardise and time embed the data
-        std_data = processing.standardize(raw_data_memmap)
-        te_std_data = processing.time_embed(std_data, self.n_embeddings)
+        # Function to calculate amplitude envelope for a single array
+        def _apply(array, prepared_data_file):
+            array = processing.amplitude_envelope(array)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
-        # Apply PCA to get the prepared data
-        if self.pca_components is not None:
-            prepared_data = te_std_data @ self.pca_components
-
-        # Otherwise, the time embedded data is the prepared data
-        else:
-            prepared_data = te_std_data
-
-        # Finally, we standardise
-        prepared_data = processing.standardize(prepared_data, create_copy=False)
-
-        if self.load_memmaps:
-            # Save the prepared data as a memmap
-            prepared_data_memmap = misc.array_to_memmap(
-                prepared_data_file, prepared_data
-            )
-        else:
-            prepared_data_memmap = prepared_data
-
-        return prepared_data_memmap
-
-    def prepare_memmap_filenames(self):
-        prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(self.n_subjects)), identifier=self._identifier
+        # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="Amplitude envelope",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
         )
-        self.prepared_data_filenames = [
-            str(self.store_dir / prepared_data_pattern.format(i=i))
-            for i in range(self.n_subjects)
-        ]
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
 
-        self.prepared_data_memmaps = []
+        return self
+
+    def moving_average(self, n_window, use_raw=False):
+        """Calculate a moving average.
+
+        This is an in-place operation.
+
+        Parameters
+        ----------
+        n_window : int
+            Number of data points in the sliding window. Must be odd.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        self.n_window = n_window
+
+        # Function to apply sliding window to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.moving_average(array, n_window)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Prepare the data in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="Sliding window",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
+    def standardize(self, use_raw=False):
+        """Standardize (z-transform) the data.
+
+        This is an in-place operation.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+        """
+
+        # Function to apply standardisation to a single array
+        def _apply(array):
+            return processing.standardize(array, create_copy=False)
+
+        # Apply standardisation to each array in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        self.arrays = pqdm(
+            array=zip(arrays),
+            function=_apply,
+            desc="Standardize",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
+    def prepare(self, methods):
+        """Prepare data.
+
+        Wrapper for calling a series of data preparation methods. Any method in
+        Data can be called.
+
+        Parameters
+        ----------
+        methods : dict
+            Each key is the name of a method to call. Each value is a
+            :code:`dict` containing keyword arguments to pass to the method.
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+
+        Examples
+        --------
+        TDE-PCA data preparation::
+
+            methods = {
+                "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+                "standardize": {},
+            }
+            data.prepare(methods)
+
+        Amplitude envelope data preparation::
+
+            methods = {
+                "filter": {"low_freq": 1, "high_freq": 45},
+                "amplitude_envelope": {},
+                "moving_average": {"n_window": 5},
+                "standardize": {},
+            }
+            data.prepare(methods)
+        """
+        for method_name, kwargs in methods.items():
+            method = getattr(self, method_name)
+            method(**kwargs)
+
+        return self
 
     def trim_time_series(
         self,
         sequence_length=None,
-        n_embeddings=1,
-        n_window=1,
+        n_embeddings=None,
+        n_window=None,
         prepared=True,
         concatenate=False,
+        verbose=False,
     ):
         """Trims the data time series.
 
@@ -740,75 +863,98 @@ class Data:
 
         Parameters
         ----------
-        sequence_length : int
+        sequence_length : int, optional
             Length of the segement of data to feed into the model.
-        n_embeddings : int
-            Number of data points used to embed the data.
-        n_window : int
+            Can be pass to trim the time points that are lost when separating
+            into sequences.
+        n_embeddings : int, optional
+            Number of data points used to embed the data. If :code:`None`,
+            then we use :code:`Data.n_embeddings` (if it exists).
+        n_window : int, optional
             Number of data points the sliding window applied to the data.
-        prepared : bool
+            If :code:`None`, then we use :code:`Data.n_window` (if it exists).
+        prepared : bool, optional
             Should we return the prepared data? If not we return the raw data.
-        concatenate : bool
-            Should we concatenate the data for each subject?
+        concatenate : bool, optional
+            Should we concatenate the data for each array?
+        verbose : bool, optional
+            Should we print the number of data points we're removing?
 
         Returns
         -------
         list of np.ndarray
-            Trimed time series for each subject.
+            Trimed time series for each array.
         """
-        if self.n_embeddings is None and self.n_window is None:
-            # Data has not been prepared so we can't trim the prepared data
-            prepared = False
-
-        if not prepared:
-            # We're trimming the raw data, how many data points do we
-            # need to remove due to time embedding or moving average?
-            if self.amplitude_envelope:
-                n_remove = self.n_window or n_window
-            else:
-                n_remove = self.n_embeddings or n_embeddings
+        # How many time points from the start/end of the time series should
+        # we remove?
+        n_remove = 0
+        if n_embeddings is None:
+            if hasattr(self, "n_embeddings"):
+                n_remove += self.n_embeddings // 2
         else:
-            n_remove = 1
+            n_remove += n_embeddings // 2
+        if n_window is None:
+            if hasattr(self, "n_window"):
+                n_remove += self.n_window // 2
+        else:
+            n_remove += n_window // 2
+        if verbose:
+            _logger.info(
+                f"Removing {n_remove} data points from the start and end"
+                + " of each array due to time embedding/sliding window."
+            )
 
         # What data should we trim?
         if prepared:
-            memmaps = self.subjects
+            arrays = self.arrays
         else:
-            memmaps = self.raw_data_memmaps
+            arrays = self.raw_data_arrays
 
         trimmed_time_series = []
-        for memmap in memmaps:
-            # Remove data points lost to time embedding
-            if n_remove != 1:
-                memmap = memmap[n_remove // 2 : -(n_remove // 2)]
+        for i, array in enumerate(arrays):
+            # Remove data points lost to time embedding or sliding window
+            if n_remove != 0:
+                array = array[n_remove:-n_remove]
 
             # Remove data points lost to separating into sequences
             if sequence_length is not None:
-                n_sequences = memmap.shape[0] // sequence_length
-                memmap = memmap[: n_sequences * sequence_length]
+                n_sequences = array.shape[0] // sequence_length
+                n_keep = n_sequences * sequence_length
+                if verbose:
+                    _logger.info(
+                        f"Removing {array.shape[0] - n_keep} data points"
+                        + f" from the end of array {i} due to sequencing."
+                    )
+                array = array[:n_keep]
 
-            trimmed_time_series.append(memmap)
+            trimmed_time_series.append(array)
 
         if concatenate or len(trimmed_time_series) == 1:
             trimmed_time_series = np.concatenate(trimmed_time_series)
 
         return trimmed_time_series
 
-    def count_batches(self, sequence_length):
-        """Count batches.
+    def count_sequences(self, sequence_length, step_size=None):
+        """Count sequences.
 
         Parameters
         ----------
         sequence_length : int
             Length of the segement of data to feed into the model.
+        step_size : int, optional
+            The number of samples by which to move the sliding window between
+            sequences. Defaults to :code:`sequence_length`.
 
         Returns
         -------
         n : np.ndarray
-            Number of batches for each subject's data.
+            Number of sequences for each array's data.
         """
         return np.array(
-            [tf.n_batches(memmap, sequence_length) for memmap in self.subjects]
+            [
+                dtf.get_n_sequences(array, sequence_length, step_size)
+                for array in self.arrays
+            ]
         )
 
     def dataset(
@@ -817,135 +963,85 @@ class Data:
         batch_size,
         shuffle=True,
         validation_split=None,
-        alpha=None,
-        gamma=None,
-        n_alpha_embeddings=1,
         concatenate=True,
-        subj_id=False,
         step_size=None,
     ):
-        """Create a tensorflow dataset for training or evaluation.
+        """Create a Tensorflow Dataset for training or evaluation.
 
         Parameters
         ----------
         sequence_length : int
             Length of the segement of data to feed into the model.
         batch_size : int
-            Number sequences in each mini-batch which is used to train the model.
-        shuffle : bool
+            Number sequences in each mini-batch which is used to train the
+            model.
+        shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float
+        validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
-        alpha : list of np.ndarray
-            List of mode mixing factors for each subject.
-            If passed, we create a dataset that includes alpha at each time point.
-            Optional. Such a dataset is used to train an observation model.
-        gamma : list of np.ndarray
-            List of mode mixing factors for the functional connectivity.
-            Optional. Used with a multi-dynamic model when training the observation
-            model only.
-        n_alpha_embeddings : int
-            Number of embeddings used when inferring alpha. Optional. Only should be
-            used if passing alpha (or gamma).
-        concatenate : bool
-            Should we concatenate the datasets for each subject? Optional, default
-            is True.
-        subj_id : bool
-            Should we include the subject id in the dataset? Optional, default is
-            False. This argument can be used to prepare datasets for subject-specific
-            models.
-        step_size : int
-            Number of samples to slide the sequence across the dataset. Optional.
+        concatenate : bool, optional
+            Should we concatenate the datasets for each array?
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
             Default is no overlap.
 
         Returns
         -------
-        tensorflow.data.Dataset or Tuple
-            Dataset for training or evaluating the model along with the validation
-            set if validation_split was passed.
+        dataset : tf.data.Dataset or tuple
+            Dataset for training or evaluating the model along with the
+            validation set if :code:`validation_split` was passed.
         """
-        self.n_batches = self.count_batches(sequence_length)
+        import tensorflow as tf  # moved here to avoid slow imports
+
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
-        n_embeddings = self.n_embeddings or 1
 
-        # Dataset for learning alpha and the observation model
-        if alpha is None:
-            subject_datasets = []
-            for i in range(self.n_subjects):
-                subject = self.subjects[i]
-                if subj_id:
-                    subject_tracker = np.zeros(subject.shape[0], dtype=np.float32) + i
-                    dataset = tf.create_dataset(
-                        {"data": subject, "subj_id": subject_tracker},
-                        self.sequence_length,
-                        self.step_size,
-                    )
-                else:
-                    dataset = tf.create_dataset(
-                        {"data": subject}, self.sequence_length, self.step_size
-                    )
-                subject_datasets.append(dataset)
+        n_sequences = self.count_sequences(self.sequence_length)
 
-        # Dataset for learning the observation model
-        else:
-            if not isinstance(alpha, list):
-                raise ValueError("alpha must be a list of numpy arrays.")
+        datasets = []
+        for i in range(self.n_arrays):
+            if i not in self.keep:
+                # We don't want to include this file in the dataset
+                continue
 
-            subject_datasets = []
-            for i in range(self.n_subjects):
-                if n_embeddings > n_alpha_embeddings:
-                    # We remove data points in alpha that are not in the new time
-                    # embedded data
-                    alp = alpha[i][(n_embeddings - n_alpha_embeddings) // 2 :]
-                    if gamma is not None:
-                        gam = gamma[i][(n_embeddings - n_alpha_embeddings) // 2 :]
-                    subject = self.subjects[i][: alp.shape[0]]
+            # Get time series data and ensure an integer multiple of sequence
+            # length
+            array = self.arrays[i][: n_sequences[i] * sequence_length]
 
-                else:
-                    # We remove the data points that are not in alpha
-                    alp = alpha[i]
-                    if gamma is not None:
-                        gam = gamma[i]
-                    subject = self.subjects[i][
-                        (n_alpha_embeddings - n_embeddings) // 2 : alp.shape[0]
-                    ]
+            # Dataset with the time series data and ID
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            data = {"data": array, "array_id": array_tracker}
 
-                # Create dataset
-                input_data = {"data": subject, "alpha": alp}
-                if gamma is not None:
-                    input_data["gamma"] = gam
-                if subj_id:
-                    input_data["subj_id"] = (
-                        np.zeros(subject.shape[0], dtype=np.float32) + i
-                    )
-                dataset = tf.create_dataset(
-                    input_data, self.sequence_length, self.step_size
-                )
-                subject_datasets.append(dataset)
+            # Create dataset
+            dataset = dtf.create_dataset(
+                data,
+                self.sequence_length,
+                self.step_size,
+            )
+            datasets.append(dataset)
 
-        # Create a dataset from all the subjects concatenated
+        # Create a dataset from all the arrays concatenated
         if concatenate:
-            full_dataset = tf.concatenate_datasets(subject_datasets, shuffle=False)
+            full_dataset = dtf.concatenate_datasets(datasets)
 
             if shuffle:
                 # Shuffle sequences
-                full_dataset = full_dataset.shuffle(100000)
+                full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(batch_size)
+                full_dataset = full_dataset.batch(self.batch_size)
 
                 # Shuffle mini-batches
-                full_dataset = full_dataset.shuffle(100000)
+                full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(batch_size)
+                full_dataset = full_dataset.batch(self.batch_size)
 
             if validation_split is None:
                 # Return the full dataset
-                return full_dataset.prefetch(-1)
+                return full_dataset.prefetch(tf.data.AUTOTUNE)
 
             else:
                 # Calculate how many batches should be in the training dataset
@@ -957,34 +1053,37 @@ class Data:
                 validation_dataset = full_dataset.skip(training_dataset_size)
                 _logger.info(
                     f"{len(training_dataset)} batches in training dataset, "
-                    + f"{len(validation_dataset)} batches in the validation dataset."
+                    + f"{len(validation_dataset)} batches in the validation "
+                    + "dataset."
                 )
 
-                return training_dataset.prefetch(-1), validation_dataset.prefetch(-1)
+                return training_dataset.prefetch(
+                    tf.data.AUTOTUNE
+                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
 
-        # Otherwise create a dataset for each subject separately
+        # Otherwise create a dataset for each array separately
         else:
             full_datasets = []
-            for ds in subject_datasets:
+            for ds in datasets:
                 if shuffle:
                     # Shuffle sequences
-                    ds = ds.shuffle(100000)
+                    ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
-                ds = ds.batch(batch_size)
+                ds = ds.batch(self.batch_size)
 
                 if shuffle:
                     # Shuffle batches
-                    ds = ds.shuffle(100000)
+                    ds = ds.shuffle(self.buffer_size)
 
-                full_datasets.append(ds.prefetch(-1))
+                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
             if validation_split is None:
-                # Return the full dataset for each subject
+                # Return the full dataset for each array
                 return full_datasets
 
             else:
-                # Split the dataset for each subject separately
+                # Split the dataset for each array separately
                 training_datasets = []
                 validation_datasets = []
                 for i in range(len(full_datasets)):
@@ -994,7 +1093,7 @@ class Data:
                         (1.0 - validation_split) * dataset_size
                     )
 
-                    # Split this subject's dataset
+                    # Split this array's dataset
                     training_datasets.append(
                         full_datasets[i].take(training_dataset_size)
                     )
@@ -1002,8 +1101,310 @@ class Data:
                         full_datasets[i].skip(training_dataset_size)
                     )
                     _logger.info(
-                        f"Subject {i}: "
+                        f"Array {i}: "
                         + f"{len(training_datasets[i])} batches in training dataset, "
-                        + f"{len(validation_datasets[i])} batches in the validation dataset."
+                        + f"{len(validation_datasets[i])} batches in the validation "
+                        + "dataset."
                     )
                 return training_datasets, validation_datasets
+
+    def tfrecord_dataset(
+        self,
+        sequence_length,
+        batch_size,
+        shuffle=True,
+        validation_split=None,
+        concatenate=True,
+        step_size=None,
+    ):
+        """Create a TFRecord Dataset for training or evaluation.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+        shuffle : bool, optional
+            Should we shuffle sequences (within a batch) and batches.
+        validation_split : float, optional
+            Ratio to split the dataset into a training and validation set.
+        concatenate : bool, optional
+            Should we concatenate the datasets for each array?
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
+            Default is no overlap.
+
+        Returns
+        -------
+        dataset : tf.data.Dataset
+            Dataset for training or evaluating the model.
+        """
+        import tensorflow as tf  # moved here to avoid slow imports
+
+        tfrecord_paths = (
+            f"{self.store_dir}"
+            "/dataset_{array:0{v}d}-of-{n_array:0{v}d}"
+            f".{self._identifier}.tfrecord"
+        )
+
+        self.sequence_length = sequence_length
+        self.batch_size = batch_size
+        self.step_size = step_size or sequence_length
+
+        n_sequences = self.count_sequences(self.sequence_length)
+
+        # TFRecords we need to save
+        tfrecord_filenames = []
+        tfrecords_to_save = []
+        for i in self.keep:
+            filepath = tfrecord_paths.format(
+                array=i,
+                n_array=self.n_arrays - 1,
+                v=len(str(self.n_arrays - 1)),
+            )
+            tfrecord_filenames.append(filepath)
+            if not path.exists(filepath):
+                tfrecords_to_save.append((i, filepath))
+
+        # Function for saving a single TFRecord
+        def _save_tfrecord(i, filepath):
+            # Get time series data and ensure an integer multiple of
+            # sequence length
+            array = self.arrays[i][: n_sequences[i] * sequence_length]
+
+            # Create a dataset with the time series data and ID
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            data = {"data": array, "array_id": array_tracker}
+
+            # Save the dataset
+            dtf.save_tfrecord(
+                data,
+                self.sequence_length,
+                self.step_size,
+                filepath,
+            )
+
+        # Save TFRecords
+        if len(tfrecords_to_save) > 0:
+            pqdm(
+                array=tfrecords_to_save,
+                function=_save_tfrecord,
+                n_jobs=self.n_jobs,
+                desc="Creating TFRecord datasets",
+                argument_type="args",
+                total=len(tfrecords_to_save),
+            )
+
+        # Helper function for parsing training examples
+        def _parse_example(example):
+            feature_names = ["data", "array_id"]
+            feature_description = {
+                name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
+            }
+            parsed_example = tf.io.parse_single_example(
+                example,
+                feature_description,
+            )
+            return {
+                name: tf.io.parse_tensor(tensor, tf.float32)
+                for name, tensor in parsed_example.items()
+            }
+
+        # Create the TFRecord dataset
+        if concatenate:
+            tfrecord_filenames = tf.data.Dataset.from_tensor_slices(tfrecord_filenames)
+
+            if shuffle:
+                # First shuffle the shards
+                tfrecord_filenames = tfrecord_filenames.shuffle(len(tfrecord_filenames))
+
+                # Create the TFRecord dataset
+                full_dataset = tfrecord_filenames.interleave(
+                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
+                )
+
+                # Parse the examples
+                full_dataset = full_dataset.map(_parse_example)
+
+                # Shuffle sequences
+                full_dataset = full_dataset.shuffle(self.buffer_size)
+
+                # Group into batches
+                full_dataset = full_dataset.batch(self.batch_size)
+
+                # Shuffle batches
+                full_dataset = full_dataset.shuffle(self.buffer_size)
+
+            else:
+                # Create the TFRecord dataset
+                full_dataset = tfrecord_filenames.interleave(
+                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
+                )
+
+                # Parse the examples
+                full_dataset = full_dataset.map(_parse_example)
+
+                # Group into batches
+                full_dataset = full_dataset.batch(self.batch_size)
+
+            if validation_split is None:
+                # Return the dataset
+                return full_dataset.prefetch(tf.data.AUTOTUNE)
+
+            else:
+                # Calculate how many batches should be in the training dataset
+                dataset_size = dtf.get_n_batches(full_dataset)
+                training_dataset_size = round((1.0 - validation_split) * dataset_size)
+
+                # Split the dataset into training and validation datasets
+                training_dataset = full_dataset.take(training_dataset_size)
+                validation_dataset = full_dataset.skip(training_dataset_size)
+                _logger.info(
+                    f"{training_dataset_size} batches in training dataset, "
+                    + f"{dataset_size - training_dataset_size} batches in the validation "
+                    + "dataset."
+                )
+                return training_dataset.prefetch(
+                    tf.data.AUTOTUNE
+                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
+
+        # Otherwise create a dataset for each array separately
+        else:
+            full_datasets = []
+            for filename in tfrecord_filenames:
+                ds = tf.data.TFRecordDataset(filename)
+
+                # Parse the examples
+                ds = ds.map(_parse_example)
+
+                if shuffle:
+                    # Shuffle sequences
+                    ds = ds.shuffle(self.buffer_size)
+
+                # Group into batches
+                ds = ds.batch(self.batch_size)
+
+                if shuffle:
+                    # Shuffle batches
+                    ds = ds.shuffle(self.buffer_size)
+
+                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
+
+            if validation_split is None:
+                # Return the full dataset for each array
+                return full_datasets
+
+            else:
+                # Split the dataset for each array separately
+                training_datasets = []
+                validation_datasets = []
+                for i, ds in enumerate(full_datasets):
+                    # Calculate how many batches should be in the training dataset
+                    dataset_size = dtf.get_n_batches(ds)
+                    training_dataset_size = round(
+                        (1.0 - validation_split) * dataset_size
+                    )
+
+                    # Split the dataset into training and validation datasets
+                    training_datasets.append(ds.take(training_dataset_size))
+                    validation_datasets.append(ds.skip(training_dataset_size))
+                    _logger.info(
+                        f"Array {i}: "
+                        + f"{training_dataset_size} batches in training dataset, "
+                        + f"{dataset_size - training_dataset_size} batches in the validation "
+                        + "dataset."
+                    )
+
+                return training_datasets, validation_datasets
+
+    def save_preparation(self, output_dir="."):
+        """Save a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Default is the current working
+            directory.
+        """
+        attributes = list(self.__dict__.keys())
+        dont_keep = [
+            "_identifier",
+            "data_field",
+            "picks",
+            "reject_by_annotation",
+            "sampling_frequency",
+            "mask_file",
+            "parcellation_file",
+            "time_axis_first",
+            "load_memmaps",
+            "buffer_size",
+            "n_jobs",
+            "prepared_data_filenames",
+            "inputs",
+            "store_dir",
+            "raw_data_arrays",
+            "raw_data_filenames",
+            "n_raw_data_channels",
+            "arrays",
+            "keep",
+            "use_tfrecord",
+        ]
+        for item in dont_keep:
+            if item in attributes:
+                attributes.remove(item)
+        preparation = {a: getattr(self, a) for a in attributes}
+        pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
+
+    def load_preparation(self, inputs):
+        """Loads a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        inputs : str
+            Path to directory containing the pickle file with preparation
+            settings.
+        """
+        if path.isdir(inputs):
+            for file in rw.list_dir(inputs):
+                if "preparation.pkl" in file:
+                    preparation = pickle.load(open(f"{inputs}/preparation.pkl", "rb"))
+                    for attr, value in preparation.items():
+                        setattr(self, attr, value)
+                    break
+
+    def save(self, output_dir="."):
+        """Saves (prepared) data to numpy files.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Default is the current working
+            directory.
+        """
+        # Create output directory
+        output_dir = pathlib.Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Function to save a single array
+        def _save(i, arr):
+            padded_number = misc.leading_zeros(i, self.n_arrays)
+            np.save(f"{output_dir}/array{padded_number}.npy", arr)
+
+        # Save arrays in parallel
+        pqdm(
+            enumerate(self.arrays),
+            _save,
+            desc="Saving data",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_arrays,
+        )
+
+        # Save preparation settings
+        self.save_preparation(output_dir)
+
+    def delete_dir(self):
+        """Deletes :code:`store_dir`."""
+        if self.store_dir.exists():
+            rmtree(self.store_dir)

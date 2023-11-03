@@ -1,8 +1,21 @@
 """Hidden Markov Model (HMM).
 
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
+/hmm.html>`_ for a description of this model.
+
+See Also
+--------
+- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
+  electrophysiological data". `Neuroimage 126, 81-95 (2016)
+  <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
+- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in
+  rest and task". `Neuroimage 180, 646-656 (2018)
+  <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
+- `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
 import logging
+import os
 import os.path as op
 import sys
 import warnings
@@ -13,22 +26,26 @@ import numba
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow.keras import backend, layers, utils
 from numba.core.errors import NumbaWarning
 from scipy.special import logsumexp, xlogy
-from tensorflow.keras import backend, layers, utils
 from tqdm.auto import trange
+from pqdm.threads import pqdm
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
 from osl_dynamics.inference.layers import (
+    add_epsilon,
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
     VectorsLayer,
+    StaticLossScalingFactorLayer,
 )
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.simulation import HMM
+from osl_dynamics.utils.misc import set_logging_level
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -51,6 +68,7 @@ class Config(BaseModelConfig):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
+
     learn_means : bool
         Should we make the mean vectors for each state trainable?
     learn_covariances : bool
@@ -58,39 +76,45 @@ class Config(BaseModelConfig):
     initial_means : np.ndarray
         Initialisation for state means.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. If diagonal_covariances=True
-        and full matrices are passed, the diagonal is extracted.
+        Initialisation for state covariances. If
+        :code:`diagonal_covariances=True` and full matrices are passed,
+        the diagonal is extracted.
     diagonal_covariances : bool
         Should we learn diagonal covariances?
     covariances_epsilon : float
         Error added to state covariances for numerical stability.
+
     initial_trans_prob : np.ndarray
-        Initialisation for trans prob matrix
+        Initialisation for the transition probability matrix.
     learn_trans_prob : bool
-        Should we make the trans prob matrix trainable?
+        Should we make the transition probability matrix trainable?
     state_probs_t0: np.ndarray
-        State probabilities at time=0. Not trainable.
+        State probabilities at :code:`time=0`. Not trainable.
+    observation_update_decay : float
+        Decay rate for the learning rate of the observation model.
+        We update the learning rate (:code:`lr`) as
+        :code:`lr = config.learning_rate * exp(-observation_update_decay *
+        epoch)`.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float
         Learning rate.
     trans_prob_update_delay : float
         We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the delay parameter.
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the delay parameter.
     trans_prob_update_forget : float
         We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the forget parameter.
-    observation_update_decay : float
-        Decay rate for the learning rate of the observation model.
-        We update the learning rate (lr) as
-        lr = config.learning_rate * exp(-observation_update_decay * epoch).
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the forget parameter.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
+    optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
     multi_gpu : bool
         Should be use multiple GPUs for training?
@@ -121,6 +145,7 @@ class Config(BaseModelConfig):
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
+        self.validate_trans_prob_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
@@ -133,6 +158,17 @@ class Config(BaseModelConfig):
                 self.covariances_epsilon = 1e-6
             else:
                 self.covariances_epsilon = 0.0
+
+    def validate_trans_prob_parameters(self):
+        if self.initial_trans_prob is not None:
+            if (
+                not isinstance(self.initial_trans_prob, np.ndarray)
+                or self.initial_trans_prob.ndim != 2
+            ):
+                raise ValueError("initial_trans_prob must be a 2D numpy array.")
+
+            if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
+                raise ValueError("rows of initial_trans_prob must sum to one.")
 
 
 class Model(ModelBase):
@@ -153,7 +189,7 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, use_tqdm=False, **kwargs):
+    def fit(self, dataset, epochs=None, use_tqdm=False, verbose=1, **kwargs):
         """Fit model to a dataset.
 
         Iterates between:
@@ -164,24 +200,32 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
-        epochs : int
+        epochs : int, optional
             Number of epochs.
-        kwargs : keyword arguments
+        use_tqdm : bool, optional
+            Should we use :code:`tqdm` to display a progress bar?
+        verbose : int, optional
+            Verbosity level. :code:`0=silent`.
+        kwargs : keyword arguments, optional
             Keyword arguments for the TensorFlow observation model training.
-            These keywords arguments will be passed to self.model.fit().
+            These keywords arguments will be passed to :code:`self.model.fit()`.
 
         Returns
         -------
         history : dict
-            Dictionary with history of the loss and learning rates (lr and rho).
+            Dictionary with history of the loss and learning rates (:code:`lr`
+            and :code:`rho`).
         """
         if epochs is None:
             epochs = self.config.n_epochs
 
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
+
+        # Set static loss scaling factor
+        self.set_static_loss_scaling_factor(dataset)
 
         # Training curves
         history = {"loss": [], "rho": [], "lr": []}
@@ -193,9 +237,9 @@ class Model(ModelBase):
             _range = range(epochs)
         for n in _range:
             # Setup a progress bar for this epoch
-            if not use_tqdm:
+            if verbose > 0 and not use_tqdm:
                 print("Epoch {}/{}".format(n + 1, epochs))
-                pb_i = utils.Progbar(len(dataset))
+                pb_i = utils.Progbar(dtf.get_n_batches(dataset))
 
             # Update rho
             self._update_rho(n)
@@ -212,11 +256,11 @@ class Model(ModelBase):
                 x = data["data"]
 
                 # Update state probabilities
-                gamma, xi = self._get_state_probs(x)
+                gamma, xi = self.get_posterior(x)
 
                 # Update transition probability matrix
                 if self.config.learn_trans_prob:
-                    self._update_trans_prob(gamma, xi)
+                    self.update_trans_prob(gamma, xi)
 
                 # Reshape gamma: (batch_size*sequence_length, n_states)
                 # -> (batch_size, sequence_length, n_states)
@@ -233,11 +277,15 @@ class Model(ModelBase):
                     return
                 loss.append(l)
 
-                # Update progress bar
-                if use_tqdm:
-                    _range.set_postfix(rho=self.rho, lr=lr, loss=l)
-                else:
-                    pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
+                if verbose > 0:
+                    # Update progress bar
+                    if use_tqdm:
+                        _range.set_postfix(rho=self.rho, lr=lr, loss=l)
+                    else:
+                        pb_i.add(
+                            1,
+                            values=[("rho", self.rho), ("lr", lr), ("loss", l)],
+                        )
 
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
@@ -247,6 +295,18 @@ class Model(ModelBase):
             _range.close()
 
         return history
+
+    def set_static_loss_scaling_factor(self, dataset):
+        """Set the :code:`n_batches` attribute of the
+        :code:`"static_loss_scaling_factor"` layer.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset
+            TensorFlow dataset.
+        """
+        n_batches = dtf.get_n_batches(dataset)
+        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -258,7 +318,7 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
@@ -266,7 +326,7 @@ class Model(ModelBase):
             Number of initializations.
         take : float
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -283,11 +343,16 @@ class Model(ModelBase):
 
         _logger.info("Random subset initialization")
 
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
         # Make a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, concatenate=True)
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_data)
+        n_total_batches = dtf.get_n_batches(training_dataset)
         n_batches = max(round(n_total_batches * take), 1)
         _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
@@ -296,7 +361,12 @@ class Model(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_data.shuffle(100000).take(n_batches)
+
+            training_dataset = self.make_dataset(
+                training_data, shuffle=True, concatenate=True
+            )
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -305,8 +375,7 @@ class Model(ModelBase):
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                best_weights = self.get_weights()
-                best_trans_prob = self.trans_prob
+                best_weights, best_trans_prob = self.get_weights()
 
         if best_loss == np.Inf:
             _logger.error("Initialization failed")
@@ -327,15 +396,15 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
         n_init : int
             Number of initializations.
-        take : float
+        take : float, optional
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -352,8 +421,13 @@ class Model(ModelBase):
 
         _logger.info("Random state time course initialization")
 
+        # Get the buffer size
+        buffer_size = getattr(training_data, "buffer_size", 100000)
+
         # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
 
         # Calculate the number of batches to use
         n_total_batches = dtf.get_n_batches(training_dataset)
@@ -365,7 +439,8 @@ class Model(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(100000).take(n_batches)
+            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+
             self.set_random_state_time_course_initialization(training_data_subset)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
@@ -375,8 +450,7 @@ class Model(ModelBase):
                 best_initialization = n
                 best_loss = loss
                 best_history = history
-                best_weights = self.get_weights()
-                best_trans_prob = self.trans_prob
+                best_weights, best_trans_prob = self.get_weights()
 
         if best_loss == np.Inf:
             _logger.error("Initialization failed")
@@ -387,38 +461,31 @@ class Model(ModelBase):
 
         return best_history
 
-    def _get_state_probs(self, x, subj_id=None):
-        """Get state probabilities.
+    def get_posterior(self, x):
+        """Get marginal and joint posterior.
 
         Parameters
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-        subj_id : np.ndarray
-            Subject ID. Shape is (batch_size, sequence_length).
-            Only used in osl_dynamics.models.sehmm.
 
         Returns
         -------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
         """
-
-        # Use Baum-Welch algorithm to calculate gamma, xi
-        B = self._get_likelihood(x, subj_id)
+        B = self.get_likelihood(x)
         Pi_0 = self.state_probs_t0
         P = self.trans_prob
-
-        gamma, xi = self._baum_welch(B, Pi_0, P)
-
-        return gamma, xi
+        return self.baum_welch(B, Pi_0, P)
 
     @numba.jit
-    def _baum_welch(self, B, Pi_0, P):
+    def baum_welch(self, B, Pi_0, P):
         """Hidden state inference using the Baum-Welch algorithm.
 
         Parameters
@@ -434,11 +501,12 @@ class Model(ModelBase):
         Returns
         -------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (n_samples, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (n_samples, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (n_samples-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is (n_samples-1,
+            n_states*n_states).
         """
         n_samples = B.shape[1]
         n_states = B.shape[0]
@@ -475,16 +543,13 @@ class Model(ModelBase):
 
         return gamma, xi
 
-    def _get_likelihood(self, x, subj_id=None):
-        """Get the likelihood, p(x_t | s_t).
+    def get_likelihood(self, x):
+        """Get the likelihood, :math:`p(x_t | s_t)`.
 
         Parameters
         ----------
         x : np.ndarray
             Observed data. Shape is (batch_size, sequence_length, n_channels).
-        subj_id : np.ndarray
-            Subject ID. Shape is (batch_size, sequence_length).
-            Only used in for osl_dynamics.models.sehmm
 
         Returns
         -------
@@ -492,15 +557,8 @@ class Model(ModelBase):
             Likelihood. Shape is (n_states, batch_size*sequence_length).
         """
         # Get the current observation model parameters
-        if subj_id is None:
-            means, covs = self.get_means_covariances()
-            n_states = means.shape[0]
-        else:
-            means, covs = self.get_subject_means_covariances()
-            n_states = means.shape[1]
-            subj_id = tf.cast(subj_id, tf.int32)
-            means = tf.gather(means, subj_id)
-            covs = tf.gather(covs, subj_id)
+        means, covs = self.get_means_covariances()
+        n_states = means.shape[0]
 
         batch_size = x.shape[0]
         sequence_length = x.shape[1]
@@ -509,16 +567,19 @@ class Model(ModelBase):
         # observed data
         log_likelihood = np.empty([n_states, batch_size, sequence_length])
         for state in range(n_states):
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=tf.gather(means, state, axis=-2),
-                scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
-                allow_nan_stats=False,
+            mvn = tf.stop_gradient(
+                tfp.distributions.MultivariateNormalTriL(
+                    loc=tf.gather(means, state, axis=-2),
+                    scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
+                    allow_nan_stats=False,
+                )
             )
             log_likelihood[state] = mvn.log_prob(x)
         log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
 
-        # We add a constant to the log-likelihood for time points where all states
-        # have a negative log-likelihood. This is critical for numerical stability.
+        # We add a constant to the log-likelihood for time points where all
+        # states have a negative log-likelihood. This is critical for numerical
+        # stability.
         time_points_with_all_states_negative = np.all(log_likelihood < 0, axis=0)
         if np.any(time_points_with_all_states_negative):
             log_likelihood[:, time_points_with_all_states_negative] -= np.max(
@@ -528,20 +589,21 @@ class Model(ModelBase):
         # Return the likelihood
         return np.exp(log_likelihood)
 
-    def _update_trans_prob(self, gamma, xi):
+    def update_trans_prob(self, gamma, xi):
         """Update transition probability matrix.
 
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
         """
-        # Calculate the new transition probability matrix using the posterior from
-        # the Baum-Welch algorithm:
+        # Calculate the new transition probability matrix using the posterior
+        # from the Baum-Welch algorithm:
         #
         # p(s_t+1 | s_t) = E{q(s_t, s_t+1)} / E{q(s_t)}
         #                = sum^{T-1}_{t=1} xi(t, t+1) / sum^{T-1}_{t=1} gamma(t)
@@ -551,7 +613,8 @@ class Model(ModelBase):
             self.config.n_states, self.config.n_states
         ).T / np.sum(gamma[:-1], axis=0).reshape(self.config.n_states, 1)
 
-        # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the paper:
+        # We use stochastic updates on trans_prob as per Eqs. (1) and (2) in the
+        # paper:
         # https://www.sciencedirect.com/science/article/pii/S1053811917305487
         self.trans_prob = (1 - self.rho) * self.trans_prob + self.rho * phi_interim
 
@@ -571,7 +634,7 @@ class Model(ModelBase):
             -self.config.trans_prob_update_forget,
         )
 
-    def _get_posterior_entropy(self, gamma, xi):
+    def get_posterior_entropy(self, gamma, xi):
         """Posterior entropy.
 
         Calculate the entropy of the posterior distribution:
@@ -579,23 +642,28 @@ class Model(ModelBase):
         .. math::
             E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
 
-              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \displaystyle\sum_{t=2}^{T-1} \int q(s_t) \log q(s_t) ds_t
+              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \
+                 \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \
+                 \displaystyle\sum_{t=2}^{T-1} \
+                 \int q(s_t) \log q(s_t) ds_t
 
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
 
         Returns
         -------
         entropy : float
             Entropy.
         """
-        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1) log(q(s_t, s_t+1)) ds_t ds_t+1
+        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
+        # log(q(s_t, s_t+1)) ds_t ds_t+1
         first_term = np.sum(xlogy(xi, xi))
 
         # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
@@ -603,7 +671,7 @@ class Model(ModelBase):
 
         return first_term - second_term
 
-    def _get_posterior_expected_log_likelihood(self, x, gamma, subj_id=None):
+    def get_posterior_expected_log_likelihood(self, x, gamma):
         """Expected log-likelihood.
 
         Calculates the expected log-likelihood with respect to the posterior
@@ -619,11 +687,8 @@ class Model(ModelBase):
         x : np.ndarray
             Data. Shape is (batch_size, sequence_length, n_channels).
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
-        subj_id : np.ndarray
-            Subject ID. Shape is (batch_size, sequence_length).
-            Only used in osl_dynamics.models.sehmm
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
 
         Returns
         -------
@@ -631,10 +696,10 @@ class Model(ModelBase):
             Posterior expected log-likelihood.
         """
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
-        log_likelihood = self._get_log_likelihood(x, subj_id)
-        return tf.reduce_sum(log_likelihood * gamma)
+        log_likelihood = self.get_log_likelihood(x)
+        return tf.stop_gradient(tf.reduce_sum(log_likelihood * gamma))
 
-    def _get_posterior_expected_prior(self, gamma, xi):
+    def get_posterior_expected_prior(self, gamma, xi):
         """Posterior expected prior.
 
         Calculates the expected prior probability of states with respect to the
@@ -643,16 +708,18 @@ class Model(ModelBase):
         .. math::
             P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
 
-              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
+              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \
+                 \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
 
         Parameters
         ----------
         gamma : np.ndarray
-            Marginal posterior distribution of hidden states given the data, q(s_t).
-            Shape is (batch_size*sequence_length, n_states).
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
         xi : np.ndarray
-            Joint posterior distribution of hidden states at two consecutive time points,
-            q(s_t, s_t+1). Shape is (batch_size*sequence_length-1, n_states*n_states).
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size*sequence_length-1, n_states*n_states).
 
         Returns
         -------
@@ -679,88 +746,87 @@ class Model(ModelBase):
         """Predict step for calculating the evidence.
 
         .. math::
-            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i) p(s_{t-1} = i | x_{1:t-1})
+            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i)\
+                                                     p(s_{t-1} = i | x_{1:t-1})
 
         Parameters
         ----------
         log_smoothing_distribution : np.ndarray
-            log p(s_t-1 | x_1:t-1). Shape is (batch_size, n_states).
+            :math:`\log p(s_{t-1} | x_{1:t-1})`.
+            Shape is (batch_size, n_states).
 
         Returns
         -------
         log_prediction_distribution : np.ndarray
-            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
+            :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
         """
         log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
-        log_smoothing_distribution = np.expand_dims(log_smoothing_distribution, -1)
+        log_smoothing_distribution = np.expand_dims(
+            log_smoothing_distribution,
+            axis=-1,
+        )
         log_prediction_distribution = logsumexp(
             log_trans_prob + log_smoothing_distribution, -2
         )
         return log_prediction_distribution
 
-    def _get_log_likelihood(self, data, subj_id=None):
-        """Get the log-likelihood of data, log p(x_t | s_t).
+    def get_log_likelihood(self, data):
+        """Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
 
         Parameters
         ----------
         data : np.ndarray
             Data. Shape is (batch_size, ..., n_channels).
-        subj_id : np.ndarray
-            Subject ID. Shape is (batch_size, ...).
-            Only used in osl_dynamics.models.sehmm
 
         Returns
         -------
         log_likelihood : np.ndarray
             Log-likelihood. Shape is (batch_size, ..., n_states)
         """
-        if subj_id is None:
-            means, covs = self.get_means_covariances()
-        else:
-            means, covs = self.get_subject_means_covariances()
-            subj_id = tf.cast(subj_id, tf.int32)
-            means = tf.gather(means, subj_id)
-            covs = tf.gather(covs, subj_id)
-
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=means,
-            scale_tril=tf.linalg.cholesky(covs),
-            allow_nan_stats=False,
+        means, covs = self.get_means_covariances()
+        mvn = tf.stop_gradient(
+            tfp.distributions.MultivariateNormalTriL(
+                loc=means,
+                scale_tril=tf.linalg.cholesky(covs),
+                allow_nan_stats=False,
+            )
         )
         log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
         return log_likelihood.numpy()
 
-    def _evidence_update_step(self, data, log_prediction_distribution, subj_id=None):
+    def _evidence_update_step(self, data, log_prediction_distribution):
         """Update step for calculating the evidence.
 
         .. math::
-            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
+            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) \
+                                    p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
 
-            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) p(s_t = i | x_{1:t-1})
+            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) \
+                                                      p(s_t = i | x_{1:t-1})
 
         Parameters
         ----------
         data : np.ndarray
             Data for the update step. Shape is (batch_size, n_channels).
         log_prediction_distribution : np.ndarray
-            log p(s_t | x_1:t-1). Shape is (batch_size, n_states).
-        subj_id : np.ndarray
-            Subject ID. Shape is (batch_size,).
-            Only used in osl_dynamics.models.sehmm
+            :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
 
         Returns
         -------
         log_smoothing_distribution : np.ndarray
-            log p(s_t | x_1:t). Shape is (batch_size, n_states).
+            :math:`\log p(s_t | x_{1:t})`. Shape is (batch_size, n_states).
         predictive_log_likelihood : np.ndarray
-            log p(x_t | x_1:t-1). Shape is (batch_size).
+            :math:`\log p(x_t | x_{1:t-1})`. Shape is (batch_size,).
         """
-        log_likelihood = self._get_log_likelihood(data, subj_id)
+        log_likelihood = self.get_log_likelihood(data)
         log_smoothing_distribution = log_likelihood + log_prediction_distribution
         predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
 
         # Normalise the log smoothing distribution
-        log_smoothing_distribution -= np.expand_dims(predictive_log_likelihood, -1)
+        log_smoothing_distribution -= np.expand_dims(
+            predictive_log_likelihood,
+            axis=-1,
+        )
         return log_smoothing_distribution, predictive_log_likelihood
 
     def get_stationary_distribution(self):
@@ -806,18 +872,30 @@ class Model(ModelBase):
         """
         return self.trans_prob
 
+    def get_means(self):
+        """Get the state means.
+
+        Returns
+        -------
+        means : np.ndarray
+            State means. Shape is (n_states, n_channels).
+        """
+        return obs_mod.get_observation_model_parameter(self.model, "means")
+
     def get_covariances(self):
-        """Get the covariances of each state.
+        """Get the state covariances.
 
         Returns
         -------
         covariances : np.ndarray
             State covariances. Shape is (n_states, n_channels, n_channels).
         """
-        return dynemo_obs.get_covariances(self.model)
+        return obs_mod.get_observation_model_parameter(self.model, "covs")
 
     def get_means_covariances(self):
-        """Get the means and covariances of each state.
+        """Get the state means and covariances.
+
+        This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
@@ -826,37 +904,67 @@ class Model(ModelBase):
         covariances : np.ndarray
             State covariances.
         """
-        return dynemo_obs.get_means_covariances(self.model)
+        return self.get_means(), self.get_covariances()
+
+    def get_observation_model_parameters(self):
+        """Wrapper for :code:`get_means_covariances`."""
+        return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
-        """Set the means of each state.
+        """Set the state means.
 
         Parameters
         ----------
         means : np.ndarray
-            State covariances.
-        update_initializer : bool
-            Do we want to use the passed means when we re-initialize
-            the model?
+            State means. Shape is (n_states, n_channels).
+        update_initializer : bool, optional
+            Do we want to use the passed means when we re-initialize the model?
         """
-        dynemo_obs.set_means(self.model, means, update_initializer)
+        obs_mod.set_observation_model_parameter(
+            self.model,
+            means,
+            layer_name="means",
+            update_initializer=update_initializer,
+        )
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each state.
+        """Set the state covariances.
 
         Parameters
         ----------
         covariances : np.ndarray
-            State covariances.
-        update_initializer : bool
+            State covariances. Shape is (n_states, n_channels, n_channels).
+        update_initializer : bool, optional
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             covariances,
-            self.config.diagonal_covariances,
-            update_initializer,
+            layer_name="covs",
+            update_initializer=update_initializer,
+            diagonal_covariances=self.config.diagonal_covariances,
+        )
+
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """This is a wrapper for :code:`set_means` and
+        :code:`set_covariances`."""
+        self.set_means(means, update_initializer=update_initializer)
+        self.set_covariances(covariances, update_initializer=update_initializer)
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for :code:`set_means_covariances`."""
+        self.set_means_covariances(
+            observation_model_parameters[0],
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def set_trans_prob(self, trans_prob):
@@ -890,11 +998,12 @@ class Model(ModelBase):
         self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time course.
+        """Sets the initial means/covariances based on a random state time
+        course.
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training data.
         """
         _logger.info("Setting random means and covariances")
@@ -947,24 +1056,26 @@ class Model(ModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
-        normal prior is applied to the diagonal of the covariances matrices with mu=0,
-        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
-        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
+        :code:`config.diagonal_covariances=True`, a log normal prior is applied
+        to the diagonal of the covariances matrices with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior is
+        applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        and :code:`psi=diag(1/range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
@@ -977,11 +1088,13 @@ class Model(ModelBase):
         This calculates:
 
         .. math::
-            \mathcal{F} = \int q(s_{1:T}) \log \left[ \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
+            \mathcal{F} = \int q(s_{1:T}) \log \left[ \
+                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] \
+                          ds_{1:T}
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the free energy for.
 
         Returns
@@ -1001,7 +1114,7 @@ class Model(ModelBase):
             batch_size = x.shape[0]
 
             # Get the marginal and join posterior to calculate the free energy
-            gamma, xi = self._get_state_probs(x)
+            gamma, xi = self.get_posterior(x)
 
             # Calculate the free energy:
             #
@@ -1011,9 +1124,9 @@ class Model(ModelBase):
             #     + int q(s) log q(s) ds        [entropy]
             #     - int q(s) log p(s) ds        [prior]
 
-            log_likelihood = self._get_posterior_expected_log_likelihood(x, gamma)
-            entropy = self._get_posterior_entropy(gamma, xi)
-            prior = self._get_posterior_expected_prior(gamma, xi)
+            log_likelihood = self.get_posterior_expected_log_likelihood(x, gamma)
+            entropy = self.get_posterior_entropy(gamma, xi)
+            prior = self.get_posterior_expected_prior(gamma, xi)
 
             # Average free energy for a sequence in this batch
             seq_fe = (-log_likelihood + entropy - prior) / batch_size
@@ -1023,11 +1136,11 @@ class Model(ModelBase):
         return np.mean(free_energy)
 
     def evidence(self, dataset):
-        """Calculate the model evidence, p(x), of HMM on a dataset.
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the model evidence on.
 
         Returns
@@ -1077,9 +1190,10 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each subject.
+        concatenate : bool, optional
             Should we concatenate alpha for each subject?
 
         Returns
@@ -1090,13 +1204,19 @@ class Model(ModelBase):
         """
         dataset = self.make_dataset(dataset)
 
-        _logger.info("Getting alpha")
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting alpha")
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting alpha")
+
         alpha = []
-        for ds in dataset:
+        for i in iterator:
             gamma = []
-            for data in ds:
+            for data in dataset[i]:
                 x = data["data"]
-                g, _ = self._get_state_probs(x)
+                g, _ = self.get_posterior(x)
                 gamma.append(g)
             alpha.append(np.concatenate(gamma).astype(np.float32))
 
@@ -1134,8 +1254,9 @@ class Model(ModelBase):
         ----------
         dataset : osl_dynamics.data.Data
             Dataset to calculate the BIC for.
-        loss_type : str
-            Which loss to use for the BIC. Can be "free_energy" or "evidence".
+        loss_type : str, optional
+            Which loss to use for the BIC. Can be :code:`"free_energy"`
+            or :code:`"evidence"`.
 
         Returns
         -------
@@ -1162,26 +1283,187 @@ class Model(ModelBase):
         )
         return bic
 
-    def get_training_time_series(self, training_data, prepared=True, concatenate=False):
-        """Get the time series used for training from a Data object.
+    def subject_fine_tuning(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
+        """Fine tuning the model for each subject.
+
+        Here, we estimate the posterior distribution (state probabilities)
+        and observation model using the data from a single subject with the
+        group-level transition probability matrix held fixed.
 
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
-            Data object.
-        prepared : bool
-            Should we return the prepared data? If not, we return the raw data.
-        concatenate : bool
-            Should we concatenate the data for each subject?
+            Training dataset.
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
+            Directory to temporarily store the model in.
 
         Returns
         -------
-        training_data : np.ndarray or list
-            Training data time series.
+        alpha : list of np.ndarray
+            Subject specific mixing coefficients.
+            Each element has shape (n_samples, n_modes).
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
         """
-        return training_data.trim_time_series(
-            self.config.sequence_length, prepared=prepared, concatenate=concatenate
+        # Save group-level model parameters
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Temporarily change hyperparameters
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+        original_learn_trans_prob = self.config.learn_trans_prob
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+        self.config.learn_trans_prob = False
+
+        # Reset the optimiser
+        self.compile()
+
+        # Fine tune the model for each subject
+        alpha = []
+        means = []
+        covariances = []
+        with set_logging_level(_logger, logging.WARNING):
+            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
+                # Train on this subject
+                with training_data.set_keep(subject):
+                    self.fit(training_data, verbose=0)
+                    a = self.get_alpha(training_data, concatenate=True)
+
+                # Get the inferred parameters
+                m, c = self.get_means_covariances()
+                alpha.append(a)
+                means.append(m)
+                covariances.append(c)
+
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+        self.config.learn_trans_prob = original_learn_trans_prob
+
+        return alpha, np.array(means), np.array(covariances)
+
+    def dual_estimation(self, training_data, alpha=None, n_jobs=1):
+        """Dual estimation to get subject-specific observation model parameters.
+
+        Here, we estimate the state means and covariances for individual
+        subjects with the posterior distribution of the states held fixed.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Prepared training data object.
+        alpha : list of np.ndarray, optional
+            Posterior distribution of the states. Shape is
+            (n_subjects, n_samples, n_states).
+        n_jobs : int, optional
+            Number of jobs to run in parallel.
+
+        Returns
+        -------
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_states, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
+        """
+        if alpha is None:
+            # Get the posterior
+            alpha = self.get_alpha(training_data, concatenate=False)
+
+        # Get the subject-specific data
+        data = training_data.trim_time_series(
+            sequence_length=self.config.sequence_length,
+            concatenate=False,
         )
+
+        # Validation
+        if isinstance(alpha, np.ndarray):
+            alpha = [alpha]
+
+        if len(alpha) != len(data):
+            raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
+
+        # Helper function for dual estimation for a single subject
+        def _single_dual_estimation(a, x):
+            sum_gamma = np.sum(a, axis=0)
+            if self.config.learn_means:
+                subject_means = (
+                    np.sum(x[:, None, :] * a[:, :, None], axis=0) / sum_gamma[:, None]
+                )
+            else:
+                subject_means = self.get_means()
+
+            if self.config.learn_covariances:
+                diff = x[:, None, :] - subject_means[None, :, :]
+                subject_covariances = (
+                    np.sum(
+                        diff[:, :, :, None] @ diff[:, :, None, :] * a[:, :, None, None],
+                        axis=0,
+                    )
+                    / sum_gamma[:, None, None]
+                )
+                subject_covariances += self.config.covariances_epsilon * np.eye(
+                    self.config.n_channels
+                )
+            else:
+                subject_covariances = self.get_covariances()
+
+            return subject_means, subject_covariances
+
+        # Setup keyword arguments to pass to the helper function
+        kwargs = []
+        for a, x in zip(alpha, data):
+            if a.shape[0] != x.shape[0]:
+                raise ValueError(
+                    "alpha and training_data must have the same number of samples. "
+                    "Check if training_data has been prepared properly."
+                )
+            kwargs.append({"a": a, "x": x})
+
+        if len(data) == 1:
+            _logger.info("Dual estimation")
+            results = [_single_dual_estimation(**kwargs[0])]
+
+        elif n_jobs == 1:
+            results = []
+            for i in trange(len(data), desc="Dual estimation"):
+                results.append(_single_dual_estimation(**kwargs[i]))
+
+        else:
+            _logger.info("Dual estimation")
+            results = pqdm(
+                kwargs,
+                _single_dual_estimation,
+                argument_type="kwargs",
+                n_jobs=n_jobs,
+            )
+
+        # Unpack the results
+        means = []
+        covariances = []
+        for result in results:
+            m, c = result
+            means.append(m)
+            covariances.append(c)
+
+        return np.squeeze(means), np.squeeze(covariances)
 
     def save_weights(self, filepath):
         """Save all model weights.
@@ -1192,7 +1474,10 @@ class Model(ModelBase):
             Location to save model weights to.
         """
         self.model.save_weights(filepath)
-        np.save(op.join(str(Path(filepath).parent), "trans_prob.npy"), self.trans_prob)
+        np.save(
+            op.join(str(Path(filepath).parent), "trans_prob.npy"),
+            self.trans_prob,
+        )
 
     def load_weights(self, filepath):
         """Load all model parameters.
@@ -1202,8 +1487,22 @@ class Model(ModelBase):
         filepath : str
             Location to load model weights from.
         """
-        self.trans_prob = np.load(op.join(str(Path(filepath).parent), "trans_prob.npy"))
+        self.trans_prob = np.load(
+            op.join(str(Path(filepath).parent), "trans_prob.npy"),
+        )
         return self.model.load_weights(filepath)
+
+    def get_weights(self):
+        """Get model parameter weights.
+
+        Returns
+        -------
+        weights : tensorflow weights
+            TensorFlow weights for the observation model.
+        trans_prob : np.ndarray
+            Transition probability matrix.
+        """
+        return self.model.get_weights(), self.trans_prob
 
     def set_weights(self, weights, trans_prob):
         """Set model parameter weights.
@@ -1231,6 +1530,12 @@ def _model_structure(config):
         name="inputs",
     )
     data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
+
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Definition of layers
     means_layer = VectorsLayer(
@@ -1266,8 +1571,12 @@ def _model_structure(config):
     )
 
     # Data flow
-    mu = means_layer(data)  # data not used
-    D = covs_layer(data)  # data not used
+    mu = means_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # data not used
+    D = covs_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # data not used
     ll_loss = ll_loss_layer([data, mu, D, gamma, None])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM-Obs")
+    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")

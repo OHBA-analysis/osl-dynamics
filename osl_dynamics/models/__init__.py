@@ -5,29 +5,25 @@ import yaml
 
 from osl_dynamics.models import (
     dynemo,
-    dynemo_obs,
     mage,
     sage,
     mdynemo,
-    mdynemo_obs,
     sedynemo,
-    sedynemo_obs,
     state_dynemo,
     hmm,
+    sehmm,
 )
 from osl_dynamics.utils.misc import NumpyLoader
 
 models = {
     "DyNeMo": dynemo.Model,
-    "DyNeMo-Obs": dynemo_obs.Model,
     "MAGE": mage.Model,
     "SAGE": sage.Model,
     "M-DyNeMo": mdynemo.Model,
-    "M-DyNeMo-Obs": mdynemo_obs.Model,
     "SE-DyNeMo": sedynemo.Model,
-    "SE-DyNeMo-Obs": sedynemo_obs.Model,
     "State-DyNeMo": state_dynemo.Model,
     "HMM": hmm.Model,
+    "SE-HMM": sehmm.Model,
 }
 
 

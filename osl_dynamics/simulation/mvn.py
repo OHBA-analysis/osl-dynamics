@@ -3,6 +3,7 @@
 """
 
 import numpy as np
+
 from osl_dynamics import array_ops
 
 
@@ -11,21 +12,21 @@ class MVN:
 
     Parameters
     ----------
-    n_channels : int
-        Number of channels.
-    n_modes : int
-        Number of modes.
     means : np.ndarray or str
         Mean vector for each mode, shape should be (n_modes, n_channels).
-        Either a numpy array or 'zero' or 'random'.
+        Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be (n_modes,
-        n_channels, n_channels). Either a numpy array or 'random'.
-    n_covariances_act : int
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
+    n_modes : int, optional
+        Number of modes.
+    n_channels : int, optional
+        Number of channels.
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for the random number generator.
     """
 
@@ -42,7 +43,6 @@ class MVN:
         self._rng = np.random.default_rng(random_seed)
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
-        self.instantaneous_covs = None
 
         # Both the means and covariances were passed as numpy arrays
         if isinstance(means, np.ndarray) and isinstance(covariances, np.ndarray):
@@ -80,7 +80,7 @@ class MVN:
             if n_modes is None or n_channels is None:
                 raise ValueError(
                     "If we are generating and means and covariances, "
-                    + "n_modes and n_channels must be passed."
+                    "n_modes and n_channels must be passed."
                 )
             self.n_modes = n_modes
             self.n_channels = n_channels
@@ -94,7 +94,11 @@ class MVN:
         if option == "zero":
             means = np.zeros([self.n_modes, self.n_channels])
         elif option == "random":
-            means = self._rng.normal(mu, sigma, size=[self.n_modes, self.n_channels])
+            means = self._rng.normal(
+                mu,
+                sigma,
+                size=[self.n_modes, self.n_channels],
+            )
         else:
             raise ValueError("means must be a np.array or 'zero' or 'random'.")
         return means
@@ -112,7 +116,11 @@ class MVN:
                 n_active_channels = max(1, 2 * self.n_channels // self.n_modes)
                 for i in range(self.n_modes):
                     active_channels = np.unique(
-                        self._rng.integers(0, self.n_channels, size=n_active_channels)
+                        self._rng.integers(
+                            0,
+                            self.n_channels,
+                            size=n_active_channels,
+                        )
                     )
                     W[i, active_channels] += (
                         activation_strength_multipliers[j]
@@ -133,24 +141,35 @@ class MVN:
         return covariances
 
     def simulate_data(self, state_time_course):
+        """Simulate time series data.
+
+        Parameters
+        ----------
+        state_time_course : np.ndarray
+            2D array containing state activations.
+            Shape must be (n_samples, n_states).
+
+        Returns
+        -------
+        data : np.ndarray
+            Time series data. Shape is (n_samples, n_channels).
+        """
         n_samples = state_time_course.shape[0]
 
         # Initialise array to hold data
         data = np.zeros((n_samples, self.n_channels))
-        self.instantaneous_covs = np.zeros(
-            [n_samples, self.n_channels, self.n_channels]
-        )
 
         # Loop through all unique combinations of modes
         for alpha in np.unique(state_time_course, axis=0):
             # Mean and covariance for this combination of modes
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
-            sigma = np.sum(self.covariances * alpha[:, np.newaxis, np.newaxis], axis=0)
+            sigma = np.sum(
+                self.covariances * alpha[:, np.newaxis, np.newaxis],
+                axis=0,
+            )
 
-            self.instantaneous_covs[np.all(state_time_course == alpha, axis=1)] = sigma
-
-            # Generate data for the time points that this combination of modes is
-            # active
+            # Generate data for the time points that this combination of
+            # modes is active
             data[
                 np.all(state_time_course == alpha, axis=1)
             ] = self._rng.multivariate_normal(
@@ -164,6 +183,36 @@ class MVN:
 
         return data.astype(np.float32)
 
+    def get_instantaneous_covariances(self, state_time_course):
+        """Get the ground truth covariance at each time point.
+
+        Parameters
+        ----------
+        state_time_course : np.ndarray
+            2D array containing state activations.
+            Shape must be (n_samples, n_states).
+
+        Returns
+        -------
+        inst_covs : np.ndarray
+            Instantaneous covariances.
+            Shape is (n_samples, n_channels, n_channels).
+        """
+        # Initialise an array to hold the data
+        n_samples = state_time_course.shape[0]
+        inst_covs = np.empty([n_samples, self.n_channels, self.n_channels])
+
+        # Loop through all unique combinations of modes
+        for alpha in np.unique(state_time_course, axis=0):
+            # Covariance for this combination of modes
+            sigma = np.sum(
+                self.covariances * alpha[:, np.newaxis, np.newaxis],
+                axis=0,
+            )
+            inst_covs[np.all(state_time_course == alpha, axis=1)] = sigma
+
+        return inst_covs.astype(np.float32)
+
 
 class MDyn_MVN(MVN):
     """Class that generates data from a multivariate normal distribution.
@@ -174,19 +223,19 @@ class MDyn_MVN(MVN):
     ----------
     means : np.ndarray or str
         Mean vector for each mode, shape should be (n_modes, n_channels).
-        Either a numpy array or 'zero' or 'random'.
+        Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be (n_modes,
-        n_channels, n_channels). Either a numpy array or 'random'.
-    n_modes : int
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_covariances_act : int
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for the random number generator.
     """
 
@@ -220,12 +269,13 @@ class MDyn_MVN(MVN):
         Parameters
         ----------
         state_time_courses : np.ndarray
-            It contains 2 different time courses for mean+standard deviations
-            and functional connectiivty. Shape is (2, n_samples, n_modes).
+            Should contain two time courses: one for the mean and standard
+            deviations and another for functional connectiivty. Shape is
+            (2, n_samples, n_modes).
 
         Returns
         -------
-        np.ndarray
+        data : np.ndarray
             Simulated data. Shape is (n_samples, n_channels).
         """
         # Reshape state_time_courses so that the multi-time-scale dimension
@@ -237,9 +287,6 @@ class MDyn_MVN(MVN):
 
         # Initialise array to hold data
         data = np.zeros([n_samples, self.n_channels])
-        self.instantaneous_covs = np.zeros(
-            [n_samples, self.n_channels, self.n_channels]
-        )
 
         # Loop through all unique combinations of states
         for time_courses in np.unique(state_time_courses, axis=0):
@@ -254,10 +301,6 @@ class MDyn_MVN(MVN):
 
             # Calculate covariance matrix from the standard deviation and FC
             sigma = G @ F @ G
-
-            self.instantaneous_covs[
-                np.all(state_time_courses == time_courses, axis=(1, 2))
-            ] = sigma
 
             # Generate data for the time points that this combination of states
             # is active
@@ -276,40 +319,87 @@ class MDyn_MVN(MVN):
 
         return data.astype(np.float32)
 
+    def get_instantaneous_covariances(self, state_time_courses):
+        """Get the ground truth covariance at each time point.
+
+        Parameters
+        ----------
+        state_time_courses : np.ndarray
+            Should contain two time courses: one for the mean and standard
+            deviations and another for functional connectiivty. Shape is
+            (2, n_samples, n_modes).
+
+        Returns
+        -------
+        inst_covs : np.ndarray
+            Instantaneous covariances.
+            Shape is (n_samples, n_channels, n_channels).
+        """
+        # Reshape state_time_courses so that the multi-time-scale dimension
+        # is last
+        state_time_courses = np.rollaxis(state_time_courses, 0, 3)
+
+        # Number of samples to simulate
+        n_samples = state_time_courses.shape[0]
+
+        # Initialise an array to hold data
+        inst_covs = np.empty([n_samples, self.n_channels, self.n_channels])
+
+        # Loop through all unique combinations of states
+        for time_courses in np.unique(state_time_courses, axis=0):
+            # Extract the different time courses
+            alpha = time_courses[:, 0]
+            gamma = time_courses[:, 1]
+
+            # Mean, standard deviation, FC for this combination of time courses
+            G = np.diag(np.sum(self.stds * alpha[:, np.newaxis], axis=0))
+            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+
+            # Calculate covariance matrix from the standard deviation and FC
+            sigma = G @ F @ G
+
+            inst_covs[np.all(state_time_courses == time_courses, axis=(1, 2))] = sigma
+
+        return inst_covs.astype(np.float32)
+
 
 class MSubj_MVN(MVN):
-    """Class that generates data from a multivariate normal distribution for multiple subjects.
+    """Class that generates data from a multivariate normal distribution for
+    multiple subjects.
 
     Parameters
     ----------
     subject_means : np.ndarray or str
         Subject mean vector for each mode for each subject, shape should be
-        (n_subjects, n_modes, n_channels). Either a numpy array or 'zero' or 'random'.
+        (n_subjects, n_modes, n_channels). Either a numpy array or
+        :code:`'zero'` or :code:`'random'`.
     subject_covariances : np.ndarray or str
-        Subject covariance matrix for each mode for each subject, shape should be
-        (n_subjects, n_modes, n_channels, n_channels). Either a numpy array or 'random'.
-    n_modes : int
+        Subject covariance matrix for each mode for each subject, shape should
+        be (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
+        or :code:`'random'`.
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_covariances_act : int
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-
-    n_subjects : int
+    n_subjects : int, optional
         Number of subjects.
-    n_subject_embedding_dim : int
+    n_subject_embedding_dim : int, optional
         Dimension of subject embeddings.
-    n_mode_embedding_dim : int
+    n_mode_embedding_dim : int, optional
         Dimension of mode embeddings.
-    subject_embedding_scale : float
-        Standard deviation when generating subject embeddings with a normal distribution.
-    n_groups : int
+    subject_embedding_scale : float, optional
+        Standard deviation when generating subject embeddings with a normal
+        distribution.
+    n_groups : int, optional
         Number of groups of subjects when generating subject embeddings.
-    between_group_scale : float
-        Standard deviation when generating centroids of groups of subject embeddings.
-    observation_error : float
+    between_group_scale : float, optional
+        Standard deviation when generating centroids of groups of subject
+        embeddings.
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for the random number generator.
     """
 
@@ -332,7 +422,6 @@ class MSubj_MVN(MVN):
         self._rng = np.random.default_rng(random_seed)
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
-        self.instantaneous_covs = None
         self.n_subject_embedding_dim = n_subject_embedding_dim
         self.n_mode_embedding_dim = n_mode_embedding_dim
         self.subject_embedding_scale = subject_embedding_scale
@@ -350,19 +439,22 @@ class MSubj_MVN(MVN):
             if subject_covariances.ndim != 4:
                 raise ValueError(
                     "subject_covariances must have shape "
-                    + "(n_subjects, n_modes, n_channels, n_channels)."
+                    "(n_subjects, n_modes, n_channels, n_channels)."
                 )
             if subject_means.shape[0] != subject_covariances.shape[0]:
                 raise ValueError(
-                    "subject_means and subject_covariances have a different number of subjects."
+                    "subject_means and subject_covariances have a different  "
+                    "number of subjects."
                 )
             if subject_means.shape[1] != subject_covariances.shape[1]:
                 raise ValueError(
-                    "subject_means and subject_covariances have a different number of modes."
+                    "subject_means and subject_covariances have a different "
+                    "number of modes."
                 )
             if subject_means.shape[2] != subject_covariances.shape[2]:
                 raise ValueError(
-                    "subject_means and subject_covariances have a different number of channels."
+                    "subject_means and subject_covariances have a different "
+                    "number of channels."
                 )
             self.n_subjects = subject_means.shape[0]
             self.n_modes = subject_means.shape[1]
@@ -421,7 +513,7 @@ class MSubj_MVN(MVN):
             if n_subjects is None or n_modes is None or n_channels is None:
                 raise ValueError(
                     "If we are generating subject means and covariances, "
-                    + "n_subjects, n_modes, n_channels must be passed."
+                    "n_subjects, n_modes, n_channels must be passed."
                 )
 
             self.n_subjects = n_subjects
@@ -440,23 +532,27 @@ class MSubj_MVN(MVN):
     def validate_subject_embedding_parameters(self):
         if self.n_subject_embedding_dim is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass 'n_subject_embedding_dim'!"
+                "Subject means or covariances not passed, please pass "
+                "'n_subject_embedding_dim'."
             )
         if self.n_mode_embedding_dim is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass 'n_mode_embedding_dim'!"
+                "Subject means or covariances not passed, please pass "
+                "'n_mode_embedding_dim'."
             )
         if self.subject_embedding_scale is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass 'subject_embedding_scale'!"
+                "Subject means or covariances not passed, please pass "
+                "'subject_embedding_scale'."
             )
         if self.n_groups is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass 'n_groups'!"
+                "Subject means or covariances not passed, please pass 'n_groups'."
             )
         if self.between_group_scale is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass 'between_group_scale'!"
+                "Subject means or covariances not passed, please pass "
+                "'between_group_scale'."
             )
 
     def create_subject_embeddings(self):
@@ -480,7 +576,10 @@ class MSubj_MVN(MVN):
         self.subject_embeddings = subject_embeddings
 
     def create_linear_transform(self, input_dim, output_dim, scale=0.1):
-        linear_transform = self._rng.normal(scale=scale, size=(output_dim, input_dim))
+        linear_transform = self._rng.normal(
+            scale=scale,
+            size=(output_dim, input_dim),
+        )
         return linear_transform / np.sqrt(
             np.sum(np.square(linear_transform), axis=-1, keepdims=True)
         )
@@ -552,7 +651,8 @@ class MSubj_MVN(MVN):
             ),
         )
         self.covariances_concat_embeddings = np.concatenate(
-            [concat_subject_embeddings, concat_covarainces_mode_embeddings], axis=-1
+            [concat_subject_embeddings, concat_covarainces_mode_embeddings],
+            axis=-1,
         )
         covariances_linear_transform = self.create_linear_transform(
             self.n_subject_embedding_dim + self.n_mode_embedding_dim,
@@ -594,7 +694,8 @@ class MSubj_MVN(MVN):
             subject_cholesky_covariances, (0, 1, 3, 2)
         )
 
-        # A small value to add to the diagonal to ensure the covariances are invertible
+        # A small value to add to the diagonal to ensure the covariances
+        # are invertible
         subject_covariances += eps * np.eye(self.n_channels)
 
         return subject_covariances
@@ -614,11 +715,9 @@ class MSubj_MVN(MVN):
         data : np.ndarray
             Simulated data. Shape is (n_samples, n_channels).
         """
-        n_samples = mode_time_course.shape[0]
-
         # Initialise array to hold data
+        n_samples = mode_time_course.shape[0]
         data = np.zeros((n_samples, self.n_channels))
-        instantaneous_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
 
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
@@ -628,9 +727,8 @@ class MSubj_MVN(MVN):
                 self.subject_covariances[subject] * alpha[:, None, None], axis=0
             )
 
-            instantaneous_covs[np.all(mode_time_course == alpha, axis=1)] = sigma
-
-            # Generate data for the time points that this combination of modes is active
+            # Generate data for the time points that this combination of
+            # modes is active
             data[
                 np.all(mode_time_course == alpha, axis=1)
             ] = self._rng.multivariate_normal(
@@ -639,11 +737,64 @@ class MSubj_MVN(MVN):
                 size=np.count_nonzero(np.all(mode_time_course == alpha, axis=1)),
             )
 
-        self.instantaneous_covs.append(instantaneous_covs)
         # Add an error to the data at all time points
         data += self._rng.normal(scale=self.observation_error, size=data.shape)
 
         return data.astype(np.float32)
+
+    def get_subject_instantaneous_covariances(self, subject, mode_time_course):
+        """Get ground truth covariances at each time point for a particular subject.
+
+        Parameters
+        ----------
+        subject : int
+            Subject number.
+        mode_time_course : np.ndarray
+            Mode time course. Shape is (n_samples, n_modes).
+
+        Returns
+        -------
+        inst_covs : np.ndarray
+            Instantaneous covariances for a subject.
+            Shape is (n_samples, n_channels, n_channels).
+        """
+        # Initialise array to hold data
+        n_samples = mode_time_course.shape[0]
+        inst_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
+
+        # Loop through all unique combinations of modes
+        for alpha in np.unique(mode_time_course, axis=0):
+            # Covariance for this combination of modes
+            sigma = np.sum(
+                self.subject_covariances[subject] * alpha[:, None, None], axis=0
+            )
+            inst_covs[np.all(mode_time_course == alpha, axis=1)] = sigma
+
+        return inst_covs.astype(np.float32)
+
+    def get_instantaneous_covariances(self, mode_time_courses):
+        """Get ground truth covariance at each time point for each subject.
+
+        Parameters
+        ----------
+        mode_time_courses : np.ndarray
+            Mode time courses.
+            Shape is (n_subjects, n_samples, n_modes).
+
+        Returns
+        -------
+        inst_covs : np.ndarray
+            Instantaneous covariances.
+            Shape is (n_subjects, n_samples, n_channels, n_channels).
+        """
+        inst_covs = []
+        for subject in range(self.n_subjects):
+            inst_covs.append(
+                self.get_subject_instantaneous_covariances(
+                    subject, mode_time_courses[subject]
+                )
+            )
+        return np.array(inst_covs)
 
     def simulate_multi_subject_data(self, mode_time_courses):
         """Simulates data.
@@ -651,17 +802,16 @@ class MSubj_MVN(MVN):
         Parameters
         ----------
         mode_time_courses : np.ndarray
-            It contains n_subjects time courses. Shape is (n_subjects, n_samples, n_modes).
+            It contains n_subjects time courses.
+            Shape is (n_subjects, n_samples, n_modes).
 
         Returns
         -------
-        np.ndarray
-            Simulated data for subjects. Shape is (n_subjects, n_samples, n_channels).
+        data : np.ndarray
+            Simulated data for subjects.
+            Shape is (n_subjects, n_samples, n_channels).
         """
         data = []
-        self.instantaneous_covs = []
         for subject in range(self.n_subjects):
             data.append(self.simulate_subject_data(subject, mode_time_courses[subject]))
-
-        self.instantaneous_covs = np.array(self.instantaneous_covs)
         return np.array(data)

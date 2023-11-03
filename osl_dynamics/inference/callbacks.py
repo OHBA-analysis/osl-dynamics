@@ -4,51 +4,53 @@
 
 import numpy as np
 from tensorflow import tanh
-from tensorflow.python.keras import callbacks
+from tensorflow.keras import callbacks
+
 from osl_dynamics import inference
 
 
 class DiceCoefficientCallback(callbacks.Callback):
-    """Callback to calculate a dice coefficient during training.
+    """Callback to calculate a Dice coefficient during training.
 
     Parameters
     ----------
-    prediction_dataset : tensorflow.data.Dataset
+    prediction_dataset : tf.data.Dataset
         Dataset to use to calculate outputs of the model.
-    ground_truth_mode_time_course : np.ndarray
-        2D or 3D numpy array containing the ground truth mode time
-        course of the training data.
-    mode_names : list of str
-        Names for the mode time courses.
+    ground_truth_time_course : np.ndarray
+        2D or 3D numpy array containing the ground truth state/mode time
+        course of the training data. Shape must be (n_time_courses, n_samples,
+        n_modes) or (n_samples, n_modes).
+    names : list of str, optional
+        Names for the time courses. Shape must be (n_time_courses,).
     """
 
     def __init__(
         self,
         prediction_dataset,
-        ground_truth_mode_time_course,
-        mode_names=None,
+        ground_truth_time_course,
+        names=None,
     ):
         super().__init__()
         self.prediction_dataset = prediction_dataset
-        if ground_truth_mode_time_course.ndim == 2:
+        if ground_truth_time_course.ndim == 2:
             # We're training a single time scale model
             self.n_time_courses = 1
-            self.gtmtc = ground_truth_mode_time_course[np.newaxis, ...]
-        elif ground_truth_mode_time_course.ndim == 3:
+            self.gttc = ground_truth_time_course[np.newaxis, ...]
+        elif ground_truth_time_course.ndim == 3:
             # We're training a multi-time-scale model
-            self.n_time_courses = ground_truth_mode_time_course.shape[0]
-            self.gtmtc = ground_truth_mode_time_course
+            self.n_time_courses = ground_truth_time_course.shape[0]
+            self.gttc = ground_truth_time_course
         else:
             raise ValueError(
-                "A 2D or 3D numpy array must be pass for ground_truth_mode_time_course."
+                "A 2D or 3D numpy array must be pass for ground_truth_time_course."
             )
-        if mode_names is not None:
-            if len(mode_names) != self.n_time_courses:
+        if names is not None:
+            if len(names) != self.n_time_courses:
                 raise ValueError(
-                    "Mismatch between the number of mode_names and time courses."
+                    "Mismatch between the number of names and time courses."
                 )
-        self.mode_names = mode_names
-        self.n_modes = ground_truth_mode_time_course.shape[-1]
+        self.names = names
+        self.n_modes = ground_truth_time_course.shape[-1]
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -57,7 +59,7 @@ class DiceCoefficientCallback(callbacks.Callback):
         ---------
         epochs : int
             Integer, index of epoch.
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
@@ -70,14 +72,15 @@ class DiceCoefficientCallback(callbacks.Callback):
                 "Mismatch between number of ground truth and predicted time courses."
             )
 
-        # For each time course calculate the dice with respect to the ground truth
+        # For each time course calculate the dice with respect to the
+        # ground truth
         dices = []
         for i in range(self.n_time_courses):
             pmtc = inference.modes.argmax_time_courses(
                 tc[i], concatenate=True, n_modes=self.n_modes
             )
-            pmtc, gtmtc = inference.modes.match_modes(pmtc, self.gtmtc[i])
-            dice = inference.metrics.dice_coefficient(pmtc, gtmtc)
+            pmtc, gttc = inference.modes.match_modes(pmtc, self.gttc[i])
+            dice = inference.metrics.dice_coefficient(pmtc, gttc)
             dices.append(dice)
 
         # Add dice to the training history and print to screen
@@ -85,8 +88,8 @@ class DiceCoefficientCallback(callbacks.Callback):
             logs["dice"] = dices[0]
         else:
             for i in range(self.n_time_courses):
-                if self.mode_names is not None:
-                    key = "dice_" + self.mode_names[i]
+                if self.names is not None:
+                    key = "dice_" + self.names[i]
                 else:
                     key = "dice" + str(i)
                 logs[key] = dices[i]
@@ -95,18 +98,19 @@ class DiceCoefficientCallback(callbacks.Callback):
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
-    This callback assumes there is a keras layer named 'kl_loss' in the model.
+    This callback assumes there is a keras layer named :code:`'kl_loss'`
+    in the model.
 
     Parameters
     ----------
     curve : str
-        Shape of the annealing curve. Either 'linear' or 'tanh'.
+        Shape of the annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     annealing_sharpness : float
         Parameter to control the shape of the annealing curve.
     n_annealing_epochs : int
         Number of epochs to apply annealing.
-    n_cycles : int
-        Number of times to perform KL annealing with n_annealing_epochs.
+    n_cycles : int, optional
+        Number of times to perform KL annealing with :code:`n_annealing_epochs`.
     """
 
     def __init__(
@@ -133,7 +137,7 @@ class KLAnnealingCallback(callbacks.Callback):
         ---------
         epochs : int
             Integer, index of epoch.
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
@@ -160,6 +164,56 @@ class KLAnnealingCallback(callbacks.Callback):
         # Update the annealing factor in the layer that calculates the KL loss
         kl_loss_layer = self.model.get_layer("kl_loss")
         kl_loss_layer.annealing_factor.assign(new_value)
+
+        # Annealing factor for gamma sampling
+        if "means_dev_mag" in self.model.layers:
+            means_dev_mag_layer = self.model.get_layer("means_dev_mag")
+            means_dev_mag_layer.annealing_factor.assign(new_value)
+
+        if "covs_dev_mag" in self.model.layers:
+            covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
+            covs_dev_mag_layer.annealing_factor.assign(new_value)
+
+
+class EMADecayCallback(callbacks.Callback):
+    """Callback to update the decay rate in an Exponential Moving Average optimizer.
+
+    :code:`decay = (100 * epoch / n_epochs + 1 + delay) ** -forget`
+
+    Parameters
+    ----------
+    delay : float
+    forget : float
+    """
+
+    def __init__(self, delay, forget, n_epochs):
+        super().__init__()
+        self.delay = delay
+        self.forget = forget
+        self.n_epochs = n_epochs
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict, optional
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+
+        # Calculate new value
+        new_value = (100 * epoch / self.n_epochs + 1 + self.delay) ** -self.forget
+
+        # Print new value during training
+        logs["rho"] = new_value
+
+        # Update the decay parameter in the optimizer
+        # Here we are assuming a MarkovStateModelOptimizer is being used
+        ema_optimizer = self.model.optimizer.ema_optimizer
+        ema_optimizer.decay = new_value
 
 
 class SaveBestCallback(callbacks.ModelCheckpoint):
@@ -194,21 +248,21 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         ---------
         epochs : int
             Integer, index of epoch.
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
         self.epochs_since_last_save += 1
         if epoch >= self.save_best_after:
             if self.save_freq == "epoch":
-                self._save_model(epoch=epoch, logs=logs)
+                self._save_model(epoch=epoch, logs=logs, batch=None)
 
     def on_train_end(self, logs=None):
         """Action to perform at the end of training.
 
         Parameters
         ----------
-        logs : dict
+        logs : dict, optional
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """

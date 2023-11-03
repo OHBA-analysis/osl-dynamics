@@ -4,7 +4,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -22,6 +21,7 @@ from osl_dynamics.inference.layers import (
     SampleOneHotCategoricalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
+    StaticLossScalingFactorLayer,
 )
 from osl_dynamics.models.dynemo import Model as DyNeMo
 from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
@@ -47,32 +47,34 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
@@ -98,10 +100,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
@@ -109,13 +111,16 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
+        Value to clip gradients by. This is the :code:`clipnorm` argument
+        passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -125,19 +130,19 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_name: str = "State-DyNeMo"
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_rnn: str = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
-    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_normalization: str = None
     inference_activation: str = None
     inference_dropout: float = 0.0
     inference_regularizer: str = None
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_rnn: str = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
-    model_normalization: Literal[None, "batch", "layer"] = None
+    model_normalization: str = None
     model_activation: str = None
     model_dropout: float = 0.0
     model_regularizer: str = None
@@ -199,15 +204,15 @@ class Model(DyNeMo):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
         n_epochs : int
             Number of epochs to train the model.
         n_init : int
             Number of initializations.
-        take : float
+        take : float, optional
             Fraction of total batches to take.
-        kwargs : keyword arguments
+        kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
         Returns
@@ -217,8 +222,7 @@ class Model(DyNeMo):
         """
         if n_init is None or n_init == 0:
             _logger.warning(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 
@@ -261,7 +265,8 @@ class Model(DyNeMo):
         return best_history
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time course.
+        """Sets the initial means/covariances based on a random state time
+        course.
 
         Parameters
         ----------
@@ -272,7 +277,7 @@ class Model(DyNeMo):
         # Loop over subjects
         subject_means = []
         subject_covariances = []
-        for data in training_data.subjects:
+        for data in training_data.arrays:
             # Sample a state time course from an HMM
             trans_prob = (
                 np.ones((self.config.n_states, self.config.n_states))
@@ -310,7 +315,16 @@ class Model(DyNeMo):
 
 def _model_structure(config):
     # Layer for input
-    data = layers.Input(shape=(config.sequence_length, config.n_channels), name="data")
+    data = layers.Input(
+        shape=(config.sequence_length, config.n_channels),
+        name="data",
+    )
+
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Inference RNN:
     # - q(state_t) = softmax(theta_t), where theta_t is a set of logits
@@ -370,8 +384,12 @@ def _model_structure(config):
         config.n_states, config.covariances_epsilon, name="ll_loss"
     )
 
-    mu = means_layer(data)  # data not used
-    D = covs_layer(data)  # data not used
+    mu = means_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # data not used
+    D = covs_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # data not used
     ll_loss = ll_loss_layer([data, mu, D, alpha, None])
 
     # Model RNN:

@@ -3,174 +3,862 @@
 """
 
 import logging
-import warnings
 
 import numpy as np
-from pqdm.processes import pqdm
-from scipy.signal.windows import dpss, hann
+from scipy import signal
 from sklearn.decomposition import non_negative_factorization
+from pqdm.processes import pqdm
 from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
+from osl_dynamics.inference import modes
+from osl_dynamics.utils.misc import nextpow2
 
 _logger = logging.getLogger("osl-dynamics")
 
 
-def nextpow2(x):
-    """Next power of 2.
+def wavelet(
+    data,
+    sampling_frequency,
+    w=5,
+    standardize=True,
+    time_range=None,
+    frequency_range=None,
+    df=0.5,
+):
+    """Calculate a wavelet transform.
 
-    Parameters
-    ----------
-    x : int
-        Any integer.
-
-    Returns
-    -------
-    res : int
-        The smallest power of two that is greater than or equal to the absolute
-        value of x.
-    """
-    res = np.ceil(np.log2(x))
-    return res.astype("int")
-
-
-def get_state_time_series(data, alpha):
-    """Calculate a time series for each state.
-
-    Time series calculated as the raw time series (of preprocessed data) multiplied
-    by the state probability or time course.
+    This function uses a `scipy.signal.morlet2 <https://docs.scipy.org/doc\
+    /scipy/reference/generated/scipy.signal.morlet2.html>`_ window to calculate
+    the wavelet transform.
 
     Parameters
     ----------
     data : np.ndarray
-        Raw data time series with shape (n_samples, n_channels).
-    alpha : np.ndarray
-        Mode mixing factors alpha_t with shape (n_samples, n_states).
+        1D time series data. Shape must be (n_samples,).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    w : float, optional
+        :code:`w` parameter to pass to `scipy.signal.morlet2
+        <https://docs.scipy.org/doc/scipy/reference/generated\
+        /scipy.signal.morlet2.html>`_.
+    standardize : bool, optional
+        Should we standardize the data before calculating the wavelet?
+    time_range : list, optional
+        Start time and end time to plot in seconds.
+        Default is the full time axis of the data.
+    frequency_range : list of length 2, optional
+        Start and end frequency to plot in Hz.
+        Default is :code:`[1, sampling_frequency / 2]`.
+    df : float, optional
+        Frequency resolution in Hz.
 
     Returns
     -------
-    state_time_series : np.ndarray
-        Time series for each state. Shape is (n_states, n_samples, n_channels).
-
+    t : np.ndarray
+        1D numpy array for the time axis.
+    f : np.ndarray
+        1D numpy array for the frequency axis.
+    wt : np.ndarray
+        2D numpy array (frequency, time) containing the wavelet transform.
     """
-    # Make sure the data and state time courses have the same length
-    if data.shape[0] != alpha.shape[0]:
-        raise ValueError(
-            "data and alpha have different lengths:"
-            + f"data.shape[0]={data.shape[0]},"
-            + f"alpha.shape[0]={alpha.shape[0]}"
-        )
+    # Validation
+    if np.array(data).ndim != 1:
+        raise ValueError("data must be a 1D numpy array.")
 
-    # Number of samples, channels and states
-    n_samples = data.shape[0]
-    n_channels = data.shape[1]
-    n_states = alpha.shape[1]
+    if time_range is None:
+        time_range = [0, data.shape[0] / sampling_frequency]
+    if time_range[0] is None:
+        time_range[0] = 0
+    if time_range[1] is None:
+        time_range[1] = data.shape[0] / sampling_frequency
 
-    # Get the corresponding time series for when a state is on
-    state_time_series = np.empty([n_states, n_samples, n_channels], dtype=np.float32)
-    for i in range(n_states):
-        state_time_series[i] = data * alpha[:, i, np.newaxis]
+    if frequency_range is None:
+        frequency_range = [1, sampling_frequency / 2]
+    if frequency_range[0] is None:
+        frequency_range[0] = 1
+    if frequency_range[1] is None:
+        frequency_range[1] = sampling_frequency / 2
 
-    return state_time_series
+    # Standardize the data
+    if standardize:
+        data = (data - np.mean(data)) / np.std(data)
+
+    # Keep selected time points
+    start_index = int(time_range[0] * sampling_frequency)
+    end_index = int(time_range[1] * sampling_frequency)
+    data = data[start_index:end_index]
+
+    # Time axis (s)
+    t = np.arange(time_range[0], time_range[1], 1 / sampling_frequency)
+
+    # Frequency axis (Hz)
+    f = np.arange(frequency_range[0], frequency_range[1], df)
+
+    # Calculate the width for each Morlet window based on the frequency
+    widths = w * sampling_frequency / (2 * f * np.pi)
+
+    # Calculate wavelet transform
+    wt = signal.cwt(data=data, wavelet=signal.morlet2, widths=widths, w=w)
+    wt = abs(wt)
+
+    return t, f, wt
 
 
-def window_mean(data, window_length, step_size=1, n_sub_windows=1):
-    """Applies a windowing function to a time series and takes the mean.
+def welch_spectra(
+    data,
+    sampling_frequency,
+    alpha=None,
+    window_length=None,
+    step_size=None,
+    frequency_range=None,
+    standardize=True,
+    calc_coh=True,
+    return_weights=False,
+    keepdims=False,
+    n_jobs=1,
+):
+    """Calculates spectra for inferred states using Welch's method.
+
+    The scaling for the power spectra calculated by this function
+    matches SciPy (:code:`scipy.signal.welch`).
 
     Parameters
     ----------
-    data : np.ndarray
-        Time series data. Shape is (n_samples, n_modes).
-    window_length : int
-        Number of data points in a window.
-    step_size : int
+    data : np.ndarray or list
+        Time series data. Must have shape (n_subjects, n_samples,
+        n_channels) or (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    alpha : np.ndarray or list, optional
+        Inferred state probability time course. Must have shape
+        (n_subjects, n_samples, n_states) or (n_samples, n_states).
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
+    step_size : int, optional
         Step size for shifting the window.
-    n_sub_windows : int
-        Should we split the window into a set of sub-windows and average each sub-window.
+        Defaults to :code:`window_length // 2` (50% overlap).
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
+    return_weights : bool, optional
+        Should we return the weights for subject-specific spectra?
+        This is useful for calculating a group average.
+    keepdims : bool, optional
+        Should we enforce a (n_subject, n_states, ...) array is returned
+        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
+        dimension of length 1.
+    n_jobs : int, optional
+        Number of parallel jobs.
 
     Returns
     -------
-    a : np.ndarray
-        Mean for each window.
+    f : np.ndarray
+        Frequencies of the power spectra and coherences. Shape is (n_freq,).
+    psd : np.ndarray
+        Power spectra for each subject and state. Shape is (n_subjects,
+        n_states, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
+    coh : np.ndarray
+        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+    w : np.ndarray
+        Weighting for subject-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_subjects,).
     """
 
-    # Number of samples and modes
-    n_samples = data.shape[0]
-    n_modes = data.shape[1]
-
-    # First pad the data
-    data = np.pad(data, window_length // 2)[
-        :, window_length // 2 : window_length // 2 + n_modes
-    ]
-
-    # Window to apply to the data
-    window = hann(window_length // n_sub_windows)
-
-    # Indices of time points to calculate a periodogram for
-    time_indices = range(0, n_samples, step_size)
-    n_windows = n_samples // step_size
-
-    # Array to hold mean of data multiplied by the windowing function
-    a = np.empty([n_windows, n_modes], dtype=np.float32)
-    for i in range(n_windows):
-        # Alpha in the window
-        j = time_indices[i]
-        a_window = data[j : j + window_length]
-
-        # Calculate data for the sub-window by taking the mean
-        # over time after applying the windowing function
-        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
-        for k in range(n_sub_windows):
-            a_sub_window[k] = np.mean(
-                a_window[
-                    k
-                    * window_length
-                    // n_sub_windows : (k + 1)
-                    * window_length
-                    // n_sub_windows
-                ]
-                * window[..., np.newaxis],
-                axis=0,
+    # Validation
+    if alpha is not None:
+        if (isinstance(data, list) != isinstance(alpha, list)) or (
+            isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
+        ):
+            raise ValueError(
+                f"data is type {type(data)} and alpha is type "
+                f"{type(alpha)}. They must both be lists or numpy arrays."
             )
 
-        # Average data for each sub-window
-        a[i] = np.mean(a_sub_window, axis=0)
+        if isinstance(data, list):
+            # Check data and state time course for the same number of subjects
+            # has been passed
+            if len(data) != len(alpha):
+                raise ValueError(
+                    "A different number of subjects has been passed for "
+                    f"data and alpha: len(data)={len(data)}, "
+                    f"len(alpha)={len(alpha)}."
+                )
 
-    return a
+            # Check the number of samples in data and alpha
+            for i in range(len(alpha)):
+                if alpha[i].shape[0] != data[i].shape[0]:
+                    raise ValueError(
+                        "items in data and alpha must have the same shape."
+                    )
+
+    elif isinstance(data, list):
+        alpha = np.array([None] * len(data))
+
+    if isinstance(data, np.ndarray):
+        if alpha is not None and alpha.shape[0] != data.shape[0]:
+            raise ValueError("data and alpha must have the same shape.")
+
+        if data.ndim == 2:
+            data = [data]
+            alpha = [alpha]
+
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
+
+    if step_size is None:
+        step_size = window_length // 2
+    step_size = int(step_size)
+
+    if frequency_range is None:
+        frequency_range = [0, sampling_frequency / 2]
+
+    # Create keyword arguments to pass to the main function
+    # that calculates spectra
+    kwargs = []
+    for d, a in zip(data, alpha):
+        kwargs.append(
+            {
+                "data": d,
+                "sampling_frequency": sampling_frequency,
+                "alpha": a,
+                "window_length": window_length,
+                "step_size": step_size,
+                "frequency_range": frequency_range,
+                "standardize": standardize,
+                "calc_coh": calc_coh,
+                "keepdims": True,
+            }
+        )
+
+    # Main calculation of spectra
+    if len(data) == 1:
+        # We only have one subject so we don't need to parallelise
+        # the calculation
+        _logger.info("Calculating spectra")
+        results = [_welch(**kwargs[0])]
+
+    elif n_jobs == 1:
+        # We have multiple subjects but we're running in serial
+        results = []
+        for i in trange(len(data), desc="Calculating spectra"):
+            results.append(_welch(**kwargs[i]))
+
+    else:
+        # Calculate spectra in parallel
+        _logger.info("Calculating spectra")
+        results = pqdm(kwargs, _welch, n_jobs=n_jobs, argument_type="kwargs")
+
+    # Unpack the results
+    if calc_coh:
+        psd = []
+        coh = []
+        for result in results:
+            f, p, c = result
+            psd.append(p)
+            coh.append(c)
+    else:
+        psd = []
+        for result in results:
+            f, p = result
+            psd.append(p)
+
+    if not keepdims:
+        # Remove any axes that are of length 1
+        psd = np.squeeze(psd)
+        if calc_coh:
+            coh = np.squeeze(coh)
+
+    # Weights for calculating a group-average spectrum
+    n_samples = [d.shape[0] for d in data]
+    w = np.array(n_samples) / np.sum(n_samples)
+
+    if calc_coh:
+        if return_weights:
+            return f, psd, coh, w
+        else:
+            return f, psd, coh
+    else:
+        if return_weights:
+            return f, psd, w
+        else:
+            return f, psd
 
 
-def coherence_spectra(power_spectra, log_message=False):
-    """Calculates coherences from (cross) power spectral densities.
+def multitaper_spectra(
+    data,
+    sampling_frequency,
+    alpha=None,
+    window_length=None,
+    step_size=None,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=None,
+    standardize=True,
+    calc_coh=True,
+    return_weights=False,
+    keepdims=False,
+    n_jobs=1,
+):
+    """Calculates spectra for inferred states using a multitaper.
 
     Parameters
     ----------
-    power_spectra : np.ndarray
-        Power spectra. Shape is (n_modes, n_channels, n_channels, n_freq).
-    log_message : bool
-        Should we log a message to screen?
+    data : np.ndarray or list
+        Time series data. Must have shape (n_subjects, n_samples,
+        n_channels) or (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    alpha : np.ndarray or list, optional
+        Inferred state probability time course. Must have shape
+        (n_subjects, n_samples, n_states) or (n_samples, n_states).
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length` (no overlap).
+    time_half_bandwidth : float, optional
+        Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
+    return_weights : bool, optional
+        Should we return the weights for subject-specific spectra?
+        This is useful for calculating a group average.
+    keepdims : bool, optional
+        Should we enforce a (n_subject, n_states, ...) array is returned
+        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
+        dimension of length 1.
+    n_jobs : int, optional
+        Number of parallel jobs.
 
     Returns
     -------
-    coherences : np.ndarray
-        Coherence spectra for each mode.
-        Shape is (n_modes, n_channels, n_channels, n_freq).
+    f : np.ndarray
+        Frequencies of the power spectra and coherences. Shape is (n_freq,).
+    psd : np.ndarray
+        Power spectra for each subject and state. Shape is (n_subjects,
+        n_states, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
+    coh : np.ndarray
+        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+    w : np.ndarray
+        Weighting for subject-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_subjects,).
     """
-    n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
-    if log_message:
-        _logger.info("Calculating coherences")
+    # Validation
+    if alpha is not None:
+        if (isinstance(data, list) != isinstance(alpha, list)) or (
+            isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
+        ):
+            raise ValueError(
+                f"data is type {type(data)} and alpha is type "
+                f"{type(alpha)}. They must both be lists or numpy arrays."
+            )
 
-    coherences = np.empty([n_modes, n_channels, n_channels, n_freq])
+        if isinstance(data, list):
+            # Check data and state time course for the same number of subjects
+            # has been passed
+            if len(data) != len(alpha):
+                raise ValueError(
+                    "A different number of subjects has been passed for "
+                    f"data and alpha: len(data)={len(data)}, "
+                    f"len(alpha)={len(alpha)}."
+                )
+
+            # Check the number of samples in data and alpha
+            for i in range(len(alpha)):
+                if alpha[i].shape[0] != data[i].shape[0]:
+                    raise ValueError(
+                        "items in data and alpha must have the same shape."
+                    )
+
+    elif isinstance(data, list):
+        alpha = np.array([None] * len(data))
+
+    if isinstance(data, np.ndarray):
+        if alpha is not None and alpha.shape[0] != data.shape[0]:
+            raise ValueError("data and alpha must have the same shape.")
+
+        if data.ndim == 2:
+            data = [data]
+            alpha = [alpha]
+
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
+
+    if step_size is None:
+        step_size = window_length
+    step_size = int(step_size)
+
+    if frequency_range is None:
+        frequency_range = [0, sampling_frequency / 2]
+
+    # Create keyword arguments to pass to the main function
+    # that calculates spectra
+    kwargs = []
+    for d, a in zip(data, alpha):
+        kwargs.append(
+            {
+                "data": d,
+                "sampling_frequency": sampling_frequency,
+                "alpha": a,
+                "window_length": window_length,
+                "step_size": step_size,
+                "time_half_bandwidth": time_half_bandwidth,
+                "n_tapers": n_tapers,
+                "frequency_range": frequency_range,
+                "standardize": standardize,
+                "calc_coh": calc_coh,
+                "keepdims": True,
+            }
+        )
+
+    # Main calculation of spectra
+    if len(data) == 1:
+        # We only have one subject so we don't need to parallelise
+        # the calculation
+        _logger.info("Calculating spectra")
+        results = [_multitaper(**kwargs[0])]
+
+    elif n_jobs == 1:
+        # We have multiple subjects but we're running in serial
+        results = []
+        for i in trange(len(data), desc="Calculating spectra"):
+            results.append(_multitaper(**kwargs[i]))
+
+    else:
+        # Calculate spectra in parallel
+        _logger.info("Calculating spectra")
+        results = pqdm(
+            kwargs,
+            _multitaper,
+            n_jobs=n_jobs,
+            argument_type="kwargs",
+        )
+
+    # Unpack the results
+    if calc_coh:
+        psd = []
+        coh = []
+        for result in results:
+            f, p, c = result
+            psd.append(p)
+            coh.append(c)
+    else:
+        psd = []
+        for result in results:
+            f, p = result
+            psd.append(p)
+
+    if not keepdims:
+        # Remove any axes that are of length 1
+        psd = np.squeeze(psd)
+        if calc_coh:
+            coh = np.squeeze(coh)
+
+    # Weights for calculating a group-average spectrum
+    n_samples = [d.shape[0] for d in data]
+    w = np.array(n_samples) / np.sum(n_samples)
+
+    if calc_coh:
+        if return_weights:
+            return f, psd, coh, w
+        else:
+            return f, psd, coh
+    else:
+        if return_weights:
+            return f, psd, w
+        else:
+            return f, psd
+
+
+def regression_spectra(
+    data,
+    alpha,
+    sampling_frequency,
+    window_length,
+    step_size,
+    n_sub_windows=1,
+    frequency_range=None,
+    standardize=True,
+    calc_coh=True,
+    return_weights=False,
+    return_coef_int=False,
+    keepdims=False,
+    n_jobs=1,
+):
+    """Calculates mode-specific spectra by regressing a spectrogram with alpha.
+
+    We use `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en\
+    /latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics\
+    .analysis.spectral._welch_spectrogram>`_ to calculate the spectrogram.
+
+    Parameters
+    ----------
+    data : np.ndarray or list
+        Data to calculate a spectrogram for. Shape must be
+        (n_subjects, n_samples, n_channels) or (n_samples, n_channels).
+    alpha : np.ndarray or list
+        Inferred mode mixing factors. Shape must be
+        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
+    sampling_frequency : float
+        Sampling_frequency in Hz.
+    window_length : int
+        Number samples to use in the window to calculate a spectrum.
+    step_size : int
+        Step size for shifting the window.
+    n_sub_windows : int, optional
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        :code:`n_sub_windows`.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectrogram?
+    calc_coh : bool, optional
+        Should we also return the coherence spectra?
+    return_weights : bool, optional
+        Should we return the weights for subject-specific spectra?
+        Useful for calculating the group average spectra.
+    return_coef_int : bool, optional
+        Should we return the regression coefficients and intercept
+        separately for the mode PSDs?
+    keepdims : bool, optional
+        Should we enforce a (n_subject, n_states, ...) array is returned for
+        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
+        of length 1.
+    n_jobs : int, optional
+        Number of parallel jobs.
+
+    Returns
+    -------
+    f : np.ndarray
+        Frequency axis. Shape is (n_freq).
+    psd : np.ndarray
+        Mode PSDs. A numpy array with shape (n_subjects, 2, n_modes, n_channels,
+        n_freq) where :code:`axis=1` is the coefficients/intercept if
+        :code:`return_coef_int=True`, otherwise shape is (n_subjects, n_modes,
+        n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
+    coh : np.ndarray
+        Mode coherences. Shape is (n_subjects, n_modes, n_channels, n_channels,
+        n_freq). Any axis of length 1 is removed if :code:`keepdims=False`.
+    w : np.ndarray
+        Weight for each subject-specific PSD. Shape is (n_subjects,).
+        Only returned if :code:`return_weights=True`.
+    """
+
+    # Validation
+    if (isinstance(data, list) != isinstance(alpha, list)) or (
+        isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
+    ):
+        raise ValueError(
+            f"data is type {type(data)} and alpha is type "
+            f"{type(alpha)}. They must both be lists or numpy arrays."
+        )
+
+    if isinstance(data, list):
+        # Check data and state time course for the same number of subjects
+        # has been passed
+        if len(data) != len(alpha):
+            raise ValueError(
+                "A different number of subjects has been passed for "
+                f"data and alpha: len(data)={len(data)}, "
+                f"len(alpha)={len(alpha)}."
+            )
+
+        # Check the number of samples in data and alpha
+        for i in range(len(alpha)):
+            if alpha[i].shape[0] != data[i].shape[0]:
+                raise ValueError("items in data and alpha must have the same shape.")
+
+    if isinstance(data, np.ndarray):
+        if alpha.shape[0] != data.shape[0]:
+            raise ValueError("data and alpha must have the same shape.")
+
+        if data.ndim == 2:
+            data = [data]
+            alpha = [alpha]
+
+    # Ensure data and alpha are float32
+    data = [d.astype(np.float32) for d in data]
+    alpha = [a.astype(np.float32) for a in alpha]
+
+    if frequency_range is None:
+        frequency_range = [0, sampling_frequency / 2]
+
+    if window_length % n_sub_windows != 0:
+        raise ValueError("window_length must be divisible by n_sub_windows.")
+
+    # Standardise before calculating the spectrogram
+    if standardize:
+        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
+
+    # Create keyword arguments to pass to the main function
+    # that calculates spectra
+    kwargs = []
+    for d, a in zip(data, alpha):
+        kwargs.append(
+            {
+                "data": d,
+                "alpha": a,
+                "sampling_frequency": sampling_frequency,
+                "window_length": window_length,
+                "step_size": step_size,
+                "frequency_range": frequency_range,
+                "calc_cpsd": calc_coh,
+                "n_sub_windows": n_sub_windows,
+            }
+        )
+
+    # Main calculation of spectra
+    if len(data) == 1:
+        # We only have one subject so we don't need to parallelise the
+        # calculation
+        _logger.info("Calculating spectra")
+        results = [_regress_welch_spectrogram(**kwargs[0])]
+
+    elif n_jobs == 1:
+        # We have multiple subjects but we're running in serial
+        results = []
+        for i, kws in enumerate(kwargs):
+            _logger.info(f"Calculating spectra {i}")
+            results.append(_regress_welch_spectrogram(**kws))
+    else:
+        # Calculate a time-varying PSD and regress to get the mode PSDs
+        _logger.info("Calculating spectra")
+        results = pqdm(
+            kwargs,
+            _regress_welch_spectrogram,
+            n_jobs=n_jobs,
+            argument_type="kwargs",
+        )
+
+    # Unpack results
+    Pj = []
+    for result in results:
+        f, coefs, intercept = result
+        Pj.append([coefs, [intercept] * coefs.shape[0]])
+    Pj = np.array(Pj)
+
+    # Weights for calculating a group-average spectrum
+    n_samples = [d.shape[0] for d in data]
+    w = np.array(n_samples) / np.sum(n_samples)
+
+    if not calc_coh:
+        if not return_coef_int:
+            # Sum coefficients and intercept
+            Pj = np.sum(Pj, axis=1)
+
+        if return_weights:
+            return f, np.squeeze(Pj), w
+        else:
+            return f, np.squeeze(Pj)
+
+    # Number of channels and freqency bins
+    n_channels = data[0].shape[1]
+    n_modes = alpha[0].shape[1]
+    n_freq = Pj.shape[-1]
+
+    # Indices of the upper triangle of an n_channels by n_channels array
+    m, n = np.triu_indices(n_channels)
+
+    # Number of subjects
+    n_subjects = len(data)
+
+    # Create a n_channels by n_channels array
+    P = np.empty(
+        [n_subjects, 2, n_modes, n_channels, n_channels, n_freq],
+        dtype=np.complex64,
+    )
+    for i in range(n_subjects):
+        for j in range(2):  # j=0 is the coefficients and j=1 is the intercepts
+            P[i, j][:, m, n] = Pj[i, j]
+            P[i, j][:, n, m] = np.conj(Pj[i, j])
+
+    # PSDs and coherences for each mode
+    psd = np.empty(
+        [n_subjects, 2, n_modes, n_channels, n_freq],
+        dtype=np.float32,
+    )
+    coh = np.empty(
+        [n_subjects, n_modes, n_channels, n_channels, n_freq],
+        dtype=np.float32,
+    )
+    for i in range(n_subjects):
+        # PSDs
+        p = P[i, :, :, range(n_channels), range(n_channels)].real
+        psd[i] = np.rollaxis(p, axis=0, start=3)
+
+        # Coherences
+        p = np.sum(P[i], axis=0)  # sum coefs and intercept
+        coh[i] = coherence_spectra(p, keepdims=True)
+
+    if not return_coef_int:
+        # Sum coefficients and intercept
+        psd = np.sum(psd, axis=1)
+
+    if not keepdims:
+        # Remove any axes that are of length 1
+        psd = np.squeeze(psd)
+        coh = np.squeeze(coh)
+
+    if return_weights:
+        return f, psd, coh, w
+    else:
+        return f, psd, coh
+
+
+def rescale_regression_coefs(
+    psd,
+    alpha,
+    window_length,
+    step_size,
+    n_sub_windows=1,
+):
+    """Rescales regression coefficients with maximum regressor values.
+
+    Parameters
+    ----------
+    psd : np.ndarray
+        Mode PSDs. Shape must be (n_subjects, 2, n_modes, n_channels, n_freq).
+    alpha : np.ndarray or list
+        Inferred mode mixing coefficients. Shape must be (n_subjects, n_samples,
+        n_modes) or (n_samples, n_modes).
+    window_length : int
+        Number samples used as the window to calcualte a PSD.
+    step_size : int
+        Step size used for shifting the window.
+    n_sub_windows : int, optional
+        Number of sub-windows used to average the spectra. :code:`window_length`
+        must be divisible by :code:`n_sub_windows`.
+
+    Returns
+    -------
+    psd : np.ndarray
+        Mode PSDs rescaled with maximum regressor values.
+        Shape is identical to the input.
+    """
+
+    # Validation
+    if psd.ndim == 4:
+        psd = psd[np.newaxis, ...]
+
+    if psd.ndim != 5:
+        raise ValueError(
+            "psd must have shape (n_subjects, 2, n_modes, n_channels, n_freqs)."
+        )
+
+    if isinstance(alpha, np.ndarray):
+        alpha = [alpha]
+
+    if len(psd) != len(alpha):
+        raise ValueError(
+            "A different number of subjects has been passed for "
+            f"psd and alpha: len(psd)={len(psd)}, "
+            f"len(alpha)={len(alpha)}."
+        )
+
+    for i in range(len(alpha)):
+        if alpha[i].shape[1] != psd[i].shape[1]:
+            raise ValueError("psd and alpha must have same number of modes.")
+
+    # Prevent in-place operation
+    psd = psd.copy()
+
+    # Number of subjects
+    n_subjects = len(alpha)
+
+    # Window alphas to match the windowing of STFT
+    for i, a in enumerate(alpha):
+        alpha[i] = _window_mean(
+            a,
+            "hann",
+            window_length,
+            step_size=step_size,
+            n_sub_windows=n_sub_windows,
+        )
+
+    # Normalize the alphas
+    alpha = [(a - np.mean(a, axis=0)) / np.std(a, axis=0) for a in alpha]
+
+    # Get maximum regressor values
+    max_alpha = [np.max(a, axis=0) for a in alpha]
+
+    # Rescale the regression coefficients
+    for n in range(n_subjects):
+        psd[n, 0] *= np.expand_dims(max_alpha[n], axis=(1, 2))
+
+    return psd
+
+
+def coherence_spectra(cpsd, keepdims=False):
+    """Calculates coherences from cross power spectral densities.
+
+    Parameters
+    ----------
+    cpsd : np.ndarray
+        Cross power spectra.
+        Shape is (n_channels, n_channels, n_freq) or
+        (n_modes, n_channels, n_channels, n_freq).
+    keepdims: bool, optional
+        Should we squeeze any axis of length 1?
+
+    Returns
+    -------
+    coh : np.ndarray
+        Coherence spectra. Shape is (..., n_channels, n_channels, n_freq).
+    """
+    error_message = (
+        "cpsd must be a numpy array with shape "
+        "(n_channels, n_channels, n_freq) or "
+        "(n_modes, n_channels, n_channels, n_freq)."
+    )
+    cpsd = array_ops.validate(
+        cpsd,
+        correct_dimensionality=4,
+        allow_dimensions=[3],
+        error_message=error_message,
+    )
+
+    n_modes, n_channels, n_channels, n_freq = cpsd.shape
+    coh = np.empty(
+        [n_modes, n_channels, n_channels, n_freq],
+        dtype=np.float32,
+    )
     for i in range(n_modes):
         for j in range(n_channels):
             for k in range(n_channels):
-                coherences[i, j, k] = abs(power_spectra[i, j, k]) / np.sqrt(
-                    power_spectra[i, j, j].real * power_spectra[i, k, k].real
+                coh[i, j, k] = abs(cpsd[i, j, k]) / np.sqrt(
+                    cpsd[i, j, j].real * cpsd[i, k, k].real
                 )
 
     # Zero nan values
-    return np.nan_to_num(coherences)
+    coh = np.nan_to_num(coh)
+
+    if not keepdims:
+        coh = np.squeeze(coh)
+
+    return coh
 
 
 def decompose_spectra(
@@ -180,23 +868,24 @@ def decompose_spectra(
     random_state=None,
     verbose=0,
 ):
-    """Performs spectral decomposition using coherences.
-
-    Uses non-negative matrix factorization to decompose spectra.
-    Follows the same procedure as the OSL function HMM-MAR/spectral/spectdecompose.m
+    """Uses non-negative matrix factorization to decompose spectra.
 
     Parameters
     ----------
     coherences : np.ndarray
         Coherences spectra.
+        Shape must be (..., n_channels, n_channels, n_freq,).
     n_components : int
         Number of spectral components to fit.
-    max_iter : int
-        Maximum number of iterations in sklearn's non_negative_factorization.
-    random_state : int
+    max_iter : int, optional
+        Maximum number of iterations in
+        `sklearn.decomposion.non_negative_factorization
+        <https://scikit-learn.org/stable/modules/generated/sklearn\
+        .decomposition.non_negative_factorization.html>`_.
+    random_state : int, optional
         Seed for the random number generator.
-    verbose : int
-        Show verbose? (1) yes, (0) no.
+    verbose : int, optional
+        Show verbose? (:code:`1`) yes, (:code:`0`) no.
 
     Returns
     -------
@@ -208,9 +897,9 @@ def decompose_spectra(
     # Validation
     error_message = (
         "coherences must be a numpy array with shape "
-        + "(n_channels, n_channels, n_freq), "
-        + "(n_modes, n_channels, n_channels, n_freq) or "
-        + "(n_subjects, n_modes, n_channels, n_channels, n_freq)."
+        "(n_channels, n_channels, n_freq), "
+        "(n_modes, n_channels, n_channels, n_freq) or "
+        "(n_subjects, n_modes, n_channels, n_channels, n_freq)."
     )
     coherences = array_ops.validate(
         coherences,
@@ -222,10 +911,12 @@ def decompose_spectra(
     # Number of subjects, modes, channels and frequency bins
     n_subjects, n_modes, n_channels, n_channels, n_freq = coherences.shape
 
-    # Indices of the upper triangle of the [n_channels, n_channels, n_freq] sub-array
+    # Indices of the upper triangle of the
+    # [n_channels, n_channels, n_freq] sub-array
     i, j = np.triu_indices(n_channels, 1)
 
-    # Concatenate coherences for each subject and mode and only keep the upper triangle
+    # Concatenate coherences for each subject and mode
+    # and only keep the upper triangle
     coherences = coherences[:, :, i, j].reshape(-1, n_freq)
 
     # Perform non-negative matrix factorisation
@@ -245,68 +936,6 @@ def decompose_spectra(
     return components
 
 
-def fourier_transform(
-    data,
-    nfft,
-    args_range=None,
-    one_side=False,
-):
-    """Calculates a Fast Fourier Transform (FFT).
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data with shape (n_samples, n_channels) to FFT.
-    nfft : int
-        Number of points in the FFT.
-    args_range : list
-        Minimum and maximum indices of the FFT to keep.
-    one_side : bool
-        Should we return a one-sided FFT?
-
-    Returns
-    -------
-    X : np.ndarray
-        FFT data.
-    """
-
-    # Calculate the FFT
-    X = np.fft.fft(data, nfft)
-
-    # Only keep the postive frequency side
-    if one_side:
-        X = X[..., : X.shape[-1] // 2]
-
-    # Only keep the desired frequency range
-    if args_range is not None:
-        X = X[..., args_range[0] : args_range[1]]
-
-    return X
-
-
-def get_frequency_args_range(frequencies, frequency_range):
-    """Get min/max indices of a range in a frequency axis.
-
-    Parameters
-    ----------
-    frequencies : np.ndarray
-        Frequency axis.
-    frequency_range : list of len 2
-        Min/max frequency.
-
-    Returns
-    -------
-    args_range : list of len 2
-        Min/max index.
-    """
-    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
-    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
-    if f_max_arg <= f_min_arg:
-        raise ValueError("Cannot select requested frequency range.")
-    args_range = [f_min_arg, f_max_arg + 1]
-    return args_range
-
-
 def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     """Calculates cross power spectral densities from MAR model parameters.
 
@@ -319,9 +948,10 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
         MAR covariances. Shape must be (n_modes, n_channels, n_channels) or
         (n_channels, n_channels).
     sampling_frequency : float
-        Sampling frequency in Hertz.
-    n_freq : int
-        Number of frequency bins in the cross power spectral density to calculate.
+        Sampling frequency in Hz.
+    n_freq : int, optional
+        Number of frequency bins in the cross power spectral density to
+        calculate.
 
     Returns
     -------
@@ -339,8 +969,8 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
             covs = np.diag(covs)
     error_message = (
         "covs must be a numpy array with shape "
-        + "(n_modes, n_channels, n_channels), "
-        + "(n_channels, n_channels) or (n_channels,)."
+        "(n_modes, n_channels, n_channels), "
+        "(n_channels, n_channels) or (n_channels,)."
     )
     covs = array_ops.validate(
         covs,
@@ -350,8 +980,8 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     )
     error_message = (
         "coeffs must be a numpy array with shape "
-        + "(n_modes, n_lags, n_channels, n_channels), "
-        + "(n_lags, n_channels, n_channels)."
+        "(n_modes, n_lags, n_channels, n_channels), "
+        "(n_lags, n_channels, n_channels)."
     )
     coeffs = array_ops.validate(
         coeffs,
@@ -385,8 +1015,8 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
     return f, np.squeeze(P)
 
 
-def mode_covariance_spectra(
-    autocorrelation_function,
+def autocorr_to_spectra(
+    autocorr_func,
     sampling_frequency,
     nfft=64,
     frequency_range=None,
@@ -394,812 +1024,145 @@ def mode_covariance_spectra(
     """Calculates spectra from the autocorrelation function.
 
     The power spectrum of each mode is calculated as the Fourier transform of
-    the auto-correlation function. Coherences are calculated from the power spectra.
+    the auto-correlation function. Coherences are calculated from the power
+    spectra.
 
     Parameters
     ----------
-    autocorrelation_function : np.ndarray
-        Mode autocorrelation functions.
-        Shape must be (n_modes, n_channels, n_channels, n_acf).
+    autocorr_func : np.ndarray
+        Autocorrelation functions. Shape must be (n_channels, n_channels,
+        n_lags) or (n_modes, n_channels, n_channels, n_lags).
     sampling_frequency : float
-        Frequency at which the data was sampled (Hz).
-    nfft : int
-        Number of data points in the FFT. The auto-correlation function will only
-        have 2 * (n_embeddings + 2) - 1 data points. We pad the auto-correlation
-        function with zeros to have nfft data points if the number of data points
-        in the auto-correlation function is less than nfft. Default is 64.
-    frequency_range : list
+        Sampling frequency in Hz.
+    nfft : int, optional
+        Number of data points in the FFT. The auto-correlation function will
+        only have :code:`2 * (n_embeddings + 2) - 1` data points. We pad the
+        auto-correlation function with zeros to have :code:`nfft` data points
+        if the number of data points in the auto-correlation function is less
+        than :code:`nfft`.
+    frequency_range : list, optional
         Minimum and maximum frequency to keep (Hz).
 
     Returns
     -------
-    frequencies : np.ndarray
+    f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
-        Power (or cross) spectra calculated for each mode. Shape is (n_modes,
-        n_channels, n_channels, n_freq).
-    coherences : np.ndarray
-        Coherences calculated for each mode. Shape is (n_modes, n_channels,
-        n_channels, n_freq).
+    psd : np.ndarray
+        Power (or cross) spectra calculated for each mode. Shape is
+        (n_channels, n_channels, n_freq) or (n_modes, n_channels, n_channels,
+        n_freq).
+    coh : np.ndarray
+        Coherences calculated for each mode. Shape is (n_channels, n_channels,
+        n_freq) or (n_modes, n_channels, n_channels, n_freq).
     """
-    _logger.info("Calculating power spectra")
-
     # Validation
+    error_message = (
+        "autocorrelation_functions must be of shape (n_channels, n_channels, "
+        "n_lags) or (n_modes, n_channels, n_channels, n_lags)."
+    )
+    autocorr_func = array_ops.validate(
+        autocorr_func,
+        correct_dimensionality=4,
+        allow_dimensions=[3],
+        error_message=error_message,
+    )
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
+    _logger.info("Calculating power spectra")
+
     # Number of data points in the autocorrelation function and FFT
-    n_acf = autocorrelation_function.shape[-1]
-    nfft = max(nfft, 2 ** nextpow2(n_acf))
+    n_lags = autocorr_func.shape[-1]
+    nfft = max(nfft, 2 ** nextpow2(n_lags))
 
     # Calculate the argments to keep for the given frequency range
-    frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    args_range = get_frequency_args_range(frequencies, frequency_range)
-    frequencies = frequencies[args_range[0] : args_range[1]]
+    f = np.arange(
+        0,
+        sampling_frequency / 2,
+        sampling_frequency / nfft,
+    )
+    [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+    f = f[min_arg:max_arg]
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
-    power_spectra = abs(fourier_transform(autocorrelation_function, nfft, args_range))
+    psd = np.fft.fft(autocorr_func, nfft)
+    psd = psd[..., min_arg:max_arg]
+    psd = abs(psd)
 
     # Normalise the power spectra
-    power_spectra /= nfft**2
+    psd /= nfft**2
 
     # Coherences for each mode
-    coherences = coherence_spectra(power_spectra)
+    coh = coherence_spectra(psd, keepdims=True)
 
-    return frequencies, np.squeeze(power_spectra), np.squeeze(coherences)
+    return f, np.squeeze(psd), np.squeeze(coh)
 
 
-def multitaper(
-    data,
-    sampling_frequency,
-    nfft=None,
-    tapers=None,
-    time_half_bandwidth=None,
-    n_tapers=None,
-    args_range=None,
-):
-    """Calculates a power (or cross) spectral density using the multitaper method.
+def get_frequency_args_range(frequencies, frequency_range):
+    """Get min/max indices of a range in a frequency axis.
 
     Parameters
     ----------
-    data : np.ndarray
-        Data with shape (n_samples, n_channels) to calculate a multitaper for.
-    sampling_frequency : float
-        Frequency used to sample the data (Hz).
-    nfft : int
-        Number of points in the FFT.
-    tapers : np.ndarray
-        Taper functions.
-    time_half_bandwidth : float
-        Parameter to control the resolution of the multitaper.
-    n_tapers : int
-        Number of tapers.
-    args_range : list
-        Minimum and maximum indices of the multitaper to keep.
-
-    Returns
-    -------
-    P : np.ndarray
-        Power (or cross) spectral density with shape (n_channels, n_channels, n_freq).
-    """
-
-    # Transpose the data so that it is [n_channels, n_samples]
-    data = np.transpose(data)
-
-    # Number of channels and length of each signal
-    n_channels, n_samples = data.shape
-
-    # Number of FFT data points to calculate
-    if nfft is None:
-        nfft = max(256, 2 ** nextpow2(n_samples))
-
-    # If tapers are not passed we generate them here
-    if tapers is None:
-        # Check the time half width bandwidth and number of tapers has been passed
-        if time_half_bandwidth is None or n_tapers is None:
-            raise ValueError("time_half_bandwidth and n_tapers must be passed.")
-
-        # Calculate tapers
-        tapers = dpss(n_samples, NW=time_half_bandwidth, Kmax=n_tapers)
-        tapers *= np.sqrt(sampling_frequency)
-
-    else:
-        # Get number of tapers from the tapers passed
-        n_tapers = len(tapers)
-
-    # Multiply the data by the tapers
-    data = data[np.newaxis, :, :] * tapers[:, np.newaxis, :]
-
-    # Calculate the FFT, X, which has shape [n_tapers, n_channels, n_freq]
-    X = fourier_transform(data, nfft, args_range)
-    X /= sampling_frequency
-
-    # Number of frequency bins in the FFT
-    n_freq = X.shape[-1]
-
-    # Calculate the periodogram with each taper
-    P = np.zeros([n_channels, n_channels, n_freq], dtype=np.complex64)
-    for i in range(n_tapers):
-        for j in range(n_channels):
-            for k in range(j, n_channels):
-                P[j, k] += np.conjugate(X[i, j]) * X[i, k]
-                if i == n_tapers - 1 and k != j:
-                    P[k, j] = np.conjugate(P[j, k])
-
-    return P
-
-
-def single_multitaper_spectra(
-    data,
-    alpha,
-    tapers,
-    n_freq,
-    sampling_frequency,
-    nfft,
-    args_range,
-    parallel,
-):
-    """Calculate a multitaper spectrum for a single subject.
-
-    Parameters
-    ----------
-    data : np.ndarray or list
-        Raw time series data. Must have shape (n_samples, n_channels).
-    alpha : np.ndarray or list
-        Inferred state mixing factors. Must have shape (n_samples, n_states).
-    tapers : np.ndarray
-        Tapers for apply to each data segments.
-        Shape must be (n_tapers, segment_length).
-    n_freq : int
-        Number of frequency bins.
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    nfft : int
-        Number of data points to use in the FFT.
-    args_range : list
-        Minimum and maximum indices of the multitaper to keep.
-    parallel : bool
-        Is this function being called in parallel? Only affects whether
-        a progress bar is displayed or not.
-
-    Returns
-    -------
-    p : np.ndarray
-        Power spectra. Shape is (n_states, n_channels, n_freq).
-    c : np.ndarray
-        Coherence spectra. Shape is (n_states, n_channels, n_channels, n_freq).
-    """
-
-    # Use the state time course to get a time series for each state
-    state_time_series = get_state_time_series(data, alpha)
-
-    # Number of subjects, states, samples and channels
-    n_states, n_samples, n_channels = state_time_series.shape
-
-    # Number of tapers and segment length
-    n_tapers, segment_length = tapers.shape
-
-    # We will calculate the spectrum for several non-overlapping segments
-    # of the time series and return the average over these segments.
-
-    # Number of segments in the time series
-    n_segments = round(n_samples / segment_length)
-
-    # Power spectra for each state
-    p = np.zeros([n_states, n_channels, n_channels, n_freq], dtype=np.complex64)
-    for i in range(n_states):
-        if parallel:
-            iterator = range(n_segments)
-        else:
-            iterator = trange(n_segments, desc=f"Mode {i}")
-
-        for j in iterator:
-            # Time series for state i and segment j
-            time_series_segment = state_time_series[
-                i, j * segment_length : (j + 1) * segment_length
-            ]
-
-            # If we're missing samples we pad with zeros either side of the data
-            if time_series_segment.shape[0] != segment_length:
-                n_zeros = segment_length - time_series_segment.shape[0]
-                n_padding = round(n_zeros / 2)
-                time_series_segment = np.pad(time_series_segment, n_padding)[
-                    :segment_length, n_padding:-n_padding
-                ]
-                if time_series_segment.shape[0] == segment_length - 1:
-                    time_series_segment = np.append(
-                        time_series_segment,
-                        np.zeros([1, time_series_segment.shape[1]], dtype=np.float32),
-                        axis=0,
-                    )
-
-            # Calculate the power (and cross) spectrum using the multitaper method
-            p[i] += multitaper(
-                time_series_segment,
-                sampling_frequency,
-                nfft=nfft,
-                tapers=tapers,
-                args_range=args_range,
-            )
-
-    # Normalise the power spectra
-    # NOTE: We should be normalising using sum alpha instead of sum
-    # alpha^2, but this makes a small difference, so we left it like
-    # this for consistency with the HMM-MAR toolbox.
-    sum_alpha = np.sum(alpha**2, axis=0)[..., np.newaxis, np.newaxis, np.newaxis]
-    p *= n_samples / (sum_alpha * n_tapers * n_segments)
-
-    # Coherences for each state
-    c = coherence_spectra(p, log_message=False)
-
-    # Only need to keep the diagonal of the power spectra matrix
-    p = p[:, range(n_channels), range(n_channels)].real
-
-    return p, c
-
-
-def multitaper_spectra(
-    data,
-    alpha,
-    sampling_frequency,
-    time_half_bandwidth,
-    n_tapers,
-    segment_length=None,
-    frequency_range=None,
-    return_weights=False,
-    standardize=True,
-    n_jobs=1,
-    keepdims=False,
-):
-    """Calculates spectra for inferred states using a multitaper.
-
-    This includes power and coherence spectra.
-    Follows the same procedure as the OSL function HMM-MAR/spectral/hmmspectamt.m
-
-    Parameters
-    ----------
-    data : np.ndarray or list
-        Raw time series data. Must have shape (n_subjects, n_samples, n_channels)
-        or (n_samples, n_channels).
-    alpha : np.ndarray or list
-        Inferred state time course. Must have shape (n_subjects, n_samples, n_states)
-        or (n_samples, n_states).
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    time_half_bandwidth : float
-        Parameter to control the resolution of the spectra.
-    n_tapers : int
-        Number of tapers to use when calculating the multitaper.
-    segment_length : int
-        Length of the data segement to use to calculate the multitaper.
-    frequency_range : list
-        Minimum and maximum frequency to keep.
-    return_weights : bool
-        Should we return the weights for subject-specific PSDs?
-        Useful for calculating the group average PSD.
-    standardize : bool
-        Should we standardize the data before calculating the multitaper?
-    n_jobs : int
-        Number of parallel jobs.
-    keepdims : bool
-        Should we enforce a (n_subject, n_states, ...) array is returned for
-        psd and coh? If False, we remove any dimensions of length 1.
-
-    Returns
-    -------
     frequencies : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    power_spectra : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
-    coherences : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
-    weights : np.ndarray
-        Weight for each subject-specific PSD. Only returned if return_weights=True.
-        Shape is (n_subjects,).
+        1D numpy array containing a Frequency axis.
+    frequency_range : list of len 2
+        Minimum and maximum frequency.
+
+    Returns
+    -------
+    args_range : list of len 2
+        Indices for minimum and maximum frequency.
     """
-
-    # Validation
-    if (isinstance(data, list) != isinstance(alpha, list)) or (
-        isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
-    ):
-        raise ValueError(
-            f"data is type {type(data)} and alpha is type "
-            + f"{type(alpha)}. They must both be lists or numpy arrays."
-        )
-
-    if isinstance(data, list):
-        # Check data and state time course for the same number of subjects
-        # has been passed
-        if len(data) != len(alpha):
-            raise ValueError(
-                "A different number of subjects has been passed for "
-                + f"data and alpha: len(data)={len(data)}, "
-                + f"len(alpha)={len(alpha)}."
-            )
-
-        # Check the number of samples in data and alpha
-        for i in range(len(alpha)):
-            if alpha[i].shape[0] != data[i].shape[0]:
-                raise ValueError("items in data and alpha must have the same shape.")
-
-    if isinstance(data, np.ndarray):
-        if alpha.shape[0] != data.shape[0]:
-            raise ValueError("data and alpha must have the same shape.")
-
-        if data.ndim == 2:
-            data = [data]
-            alpha = [alpha]
-
-    if segment_length is None:
-        segment_length = 2 * sampling_frequency
-
-    elif segment_length != 2 * sampling_frequency:
-        warnings.warn(
-            "segment_length is recommended to be 2 * sampling_frequency.",
-            RuntimeWarning,
-        )
-
-    segment_length = int(segment_length)
-
-    if frequency_range is None:
-        frequency_range = [0, sampling_frequency / 2]
-
-    # Number of subjects
-    n_subjects = len(data)
-
-    # Number of FFT data points to calculate
-    nfft = max(256, 2 ** nextpow2(segment_length))
-
-    # Calculate the argments to keep for the given frequency range
-    frequencies = np.arange(0, sampling_frequency / 2, sampling_frequency / nfft)
-    args_range = get_frequency_args_range(frequencies, frequency_range)
-    frequencies = frequencies[args_range[0] : args_range[1]]
-
-    # Number of frequency bins
-    n_freq = args_range[1] - args_range[0]
-
-    # Standardise before calculating the multitaper
-    if standardize:
-        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
-
-    # Calculate tapers so we can estimate spectra with the multitaper method
-    tapers = dpss(segment_length, NW=time_half_bandwidth, Kmax=n_tapers)
-    tapers *= np.sqrt(sampling_frequency)
-
-    if n_subjects == 1:
-        # We only have one subject so we don't need to parallelise the
-        # calculation
-        _logger.info("Calculating spectra:")
-        results = single_multitaper_spectra(
-            data[0],
-            alpha[0],
-            tapers,
-            n_freq,
-            sampling_frequency,
-            nfft,
-            args_range,
-            parallel=False,
-        )
-        results = [results]
-
-    elif n_jobs == 1:
-        # We have multiple subjects but we're running in serial
-        results = []
-        for n in range(n_subjects):
-            _logger.info(f"Subject {n}:")
-            results.append(
-                single_multitaper_spectra(
-                    data[n],
-                    alpha[n],
-                    tapers,
-                    n_freq,
-                    sampling_frequency,
-                    nfft,
-                    args_range,
-                    parallel=False,
-                )
-            )
-
-    else:
-        # Create arguments to pass to single_multitaper_spectra, which will
-        # calculate spectra for each subject in parallel
-        args = []
-        for n in range(n_subjects):
-            args.append(
-                [
-                    data[n],
-                    alpha[n],
-                    tapers,
-                    n_freq,
-                    sampling_frequency,
-                    nfft,
-                    args_range,
-                    True,
-                ]
-            )
-
-        # Calculate spectra in parallel
-        _logger.info("Calculating spectra:")
-        results = pqdm(
-            args,
-            single_multitaper_spectra,
-            n_jobs=n_jobs,
-            argument_type="args",
-        )
-
-    # Unpack the results
-    power_spectra = []
-    coherences = []
-    for result in results:
-        p, c = result
-        power_spectra.append(p)
-        coherences.append(c)
-
-    # Weights for calculating the group average PSD
-    n_samples = [d.shape[0] for d in data]
-    weights = np.array(n_samples) / np.sum(n_samples)
-
-    if not keepdims:
-        # Remove any axes that are of length 1
-        power_spectra = np.squeeze(power_spectra)
-        coherences = np.squeeze(coherences)
-
-    if return_weights:
-        return frequencies, power_spectra, coherences, weights
-    else:
-        return frequencies, power_spectra, coherences
+    f_min_arg = np.argwhere(frequencies >= frequency_range[0])[0, 0]
+    f_max_arg = np.argwhere(frequencies <= frequency_range[1])[-1, 0]
+    if f_max_arg <= f_min_arg:
+        raise ValueError("Cannot select requested frequency range.")
+    return [f_min_arg, f_max_arg]
 
 
-def single_regression_spectra(
+def _welch_spectrogram(
     data,
-    alpha,
-    window_length,
     sampling_frequency,
-    frequency_range,
-    calc_cpsd,
-    step_size,
-    n_sub_windows,
-    parallel,
-):
-    """Calculate cross-spectra for a single subject using the regression method.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
-    alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
-    window_length : int
-        Number of data points to use when calculating the periodogram.
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    calc_cpsd : bool
-        Should we calculate cross spectra?
-    step_size : int
-        Step size for shifting the window.
-    n_sub_windows : int
-        Should we split the window into a set of sub-windows and average the
-        spectra for each sub-window.
-    parallel : bool
-        Is this function being called in parallel? Only affects whether
-        a progress bar is displayed or not.
-
-    Returns
-    -------
-    t : np.ndarray
-        Time axis.
-    f : np.ndarray
-        Frequency axis.
-    coefs : np.ndarray
-        Regression coefficients.
-    intercept : np.ndarray
-        Regression intercept.
-    """
-    log_message = not parallel
-    t, f, p = spectrogram(
-        data,
-        window_length,
-        sampling_frequency,
-        frequency_range,
-        calc_cpsd=calc_cpsd,
-        step_size=step_size,
-        n_sub_windows=n_sub_windows,
-        print_progress_bar=log_message,
-    )
-    a = window_mean(
-        alpha,
-        window_length,
-        step_size=step_size,
-        n_sub_windows=n_sub_windows,
-    )
-    coefs, intercept = regression.linear(
-        a,
-        p,
-        fit_intercept=True,
-        normalize=True,
-        log_message=log_message,
-    )
-    return t, f, coefs, intercept
-
-
-def regression_spectra(
-    data,
-    alpha,
-    window_length,
-    sampling_frequency=1.0,
-    frequency_range=None,
-    n_embeddings=None,
-    psd_only=False,
-    step_size=1,
-    n_sub_windows=1,
-    return_weights=False,
-    return_coef_int=False,
-    standardize=True,
-    n_jobs=1,
-    keepdims=False,
-):
-    """Calculates the PSD of each mode by regressing a time-varying PSD with alpha.
-
-    Parameters
-    ----------
-    data : np.ndarray or list
-        Data to calculate a time-varying PSD for. Shape must be (n_subjects,
-        n_samples, n_channels) or (n_samples, n_channels).
-    alpha : np.ndarray
-        Inferred mode mixing factors. Shape must be (n_subjects, n_samples,
-        n_modes) or (n_samples, n_modes).
-    window_length : int
-        Number samples to use in the window to calculate a PSD.
-    sampling_frequency : float
-        Sampling_frequency in Hz.
-    frequency_range : list
-        Minimum and maximum frequency to keep.
-    n_embeddings : int
-        Number of time embeddings applied when inferring alpha.
-    psd_only : bool
-        Should we only calculate the PSD?
-    step_size : int
-        Step size for shifting the window.
-    n_sub_windows : int
-        We split the window into a number of sub-windows and average the
-        spectra for each sub-window. window_length must be divisible by
-        n_sub_windows.
-    return_weights : bool
-        Should we return the weights for subject-specific PSDs?
-        Useful for calculating the group average PSD.
-    return_coef_int : bool
-        Should we return the regression coefficients and intercept
-        separately for the PSDs?
-    standardize : bool
-        Should we standardize the data before calculating the spectrogram?
-    n_jobs : int
-        Number of parallel jobs.
-    keepdims : bool
-        Should we enforce a (n_subject, n_states, ...) array is returned for
-        psd and coh? If False, we remove any dimensions of length 1.
-
-    Returns
-    -------
-    f : np.ndarray
-        Frequency axis. Shape is (n_freq).
-    psd : np.ndarray
-        Mode PSDs. A numpy array with shape (n_subjects, 2, n_modes, n_channels, n_freq)
-        where axis=1 is the coefficients/intercept if return_coef_int=True, otherwise
-        shape is (n_subjects, n_modes, n_channels, n_freq). Any axis of length 1 is
-        removed if :code:`keepdims=False`.
-    coh : np.ndarray
-        Mode coherences. Shape is (n_subjects, n_modes, n_channels, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
-    w : np.ndarray
-        Weight for each subject-specific PSD. Shape is (n_subjects).
-        Only returned if return_weights=True.
-    """
-
-    # Validation
-    if isinstance(data, list):
-        if not isinstance(alpha, list):
-            raise ValueError(
-                "data and alpha must both be lists or both be numpy arrays."
-            )
-
-    if isinstance(data, np.ndarray):
-        if not isinstance(alpha, np.ndarray):
-            raise ValueError(
-                "data and alpha must both be lists or both be numpy arrays."
-            )
-        if data.ndim == 2:
-            data = [data]
-            alpha = [alpha]
-
-    if frequency_range is None:
-        frequency_range = [0, sampling_frequency / 2]
-
-    if window_length % n_sub_windows != 0:
-        raise ValueError("window_length must be divisible by n_sub_windows.")
-
-    # Do we calculate cross spectral densities?
-    calc_cpsd = not psd_only
-
-    # Number of subjects
-    n_subjects = len(data)
-
-    # Standardise before calculating the spectrogram
-    if standardize:
-        data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
-
-    # Remove data points not in alpha due to time embedding the training data
-    if n_embeddings is not None:
-        data = [d[n_embeddings // 2 : -(n_embeddings // 2)] for d in data]
-
-    # Remove the data points lost due to separating into sequences
-    data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
-
-    if n_subjects == 1:
-        # We only have one subject so we don't need to parallelise the
-        # calculation
-        results = single_regression_spectra(
-            data[0],
-            alpha[0],
-            window_length,
-            sampling_frequency,
-            frequency_range,
-            calc_cpsd,
-            step_size,
-            n_sub_windows,
-            parallel=False,
-        )
-        results = [results]
-
-    elif n_jobs == 1:
-        # We have multiple subjects but we're running in serial
-        results = []
-        for n in range(n_subjects):
-            _logger.info(f"Subject {n}:")
-            results.append(
-                single_regression_spectra(
-                    data[n],
-                    alpha[n],
-                    window_length,
-                    sampling_frequency,
-                    frequency_range,
-                    calc_cpsd,
-                    step_size,
-                    n_sub_windows,
-                    parallel=False,
-                )
-            )
-    else:
-        # Create arguments to pass to single_regression_spectra, which will
-        # calculate spectra for each subject in parallel
-        args = []
-        for n in range(n_subjects):
-            args.append(
-                [
-                    data[n],
-                    alpha[n],
-                    window_length,
-                    sampling_frequency,
-                    frequency_range,
-                    calc_cpsd,
-                    step_size,
-                    n_sub_windows,
-                    True,
-                ]
-            )
-
-        # Calculate a time-varying PSD and regress to get the mode PSDs
-        _logger.info("Calculating spectra")
-        results = pqdm(
-            args,
-            single_regression_spectra,
-            n_jobs=n_jobs,
-            argument_type="args",
-        )
-
-    # Unpack results
-    Pj = []
-    for result in results:
-        t, f, coefs, intercept = result
-        Pj.append([coefs, [intercept] * coefs.shape[0]])
-    Pj = np.array(Pj)
-
-    # Weights for calculating the group average PSD
-    n_samples = [d.shape[0] for d in data]
-    weights = np.array(n_samples) / np.sum(n_samples)
-
-    if psd_only:
-        if not return_coef_int:
-            # Sum coefficients and intercept
-            Pj = np.sum(Pj, axis=1)
-
-        if return_weights:
-            return f, np.squeeze(Pj), weights
-        else:
-            return f, np.squeeze(Pj)
-
-    # Number of channels and freqency bins
-    n_channels = data[0].shape[1]
-    n_modes = alpha[0].shape[1]
-    n_freq = Pj.shape[-1]
-
-    # Indices of the upper triangle of an n_channels by n_channels array
-    m, n = np.triu_indices(n_channels)
-
-    # Create a n_channels by n_channels array
-    P = np.empty(
-        [n_subjects, 2, n_modes, n_channels, n_channels, n_freq], dtype=np.complex64
-    )
-    for i in range(n_subjects):
-        for j in range(2):  # j=0 is the coefficients and j=1 is the intercepts
-            P[i, j][:, m, n] = Pj[i, j]
-            P[i, j][:, n, m] = np.conj(Pj[i, j])
-
-    # PSDs and coherences for each mode
-    psd = np.empty([n_subjects, 2, n_modes, n_channels, n_freq], dtype=np.float32)
-    coh = np.empty(
-        [n_subjects, n_modes, n_channels, n_channels, n_freq], dtype=np.float32
-    )
-    for i in range(n_subjects):
-        # PSDs
-        p = P[i, :, :, range(n_channels), range(n_channels)].real
-        psd[i] = np.rollaxis(p, axis=0, start=3)
-
-        # Coherences
-        p = np.sum(P[i], axis=0)  # sum coefs and intercept
-        coh[i] = coherence_spectra(p, log_message=False)
-
-    if not return_coef_int:
-        # Sum coefficients and intercept
-        psd = np.sum(psd, axis=1)
-
-    if not keepdims:
-        # Remove any axes that are of length 1
-        psd = np.squeeze(psd)
-        coh = np.squeeze(coh)
-
-    if return_weights:
-        return f, psd, coh, weights
-    else:
-        return f, psd, coh
-
-
-def spectrogram(
-    data,
-    window_length,
-    sampling_frequency=1.0,
+    window_length=None,
+    step_size=None,
     frequency_range=None,
     calc_cpsd=True,
-    step_size=1,
     n_sub_windows=1,
-    print_progress_bar=True,
 ):
-    """Calculates a spectogram.
+    """Calculates a spectogram (time-varying power spectral density)
+    using Welch's method.
 
-    The data is segmented into overlapping windows which are then used to calculate
-    a periodogram.
+    Steps:
+
+    1. Segment data into overlapping windows.
+    2. Multiply each window by a Hann tapering function.
+    3. Calculate a periodogram for each window.
+
+    We use the same scaling for the power spectra as SciPy (i.e. when
+    you use :code:`scipy.signal.periodogram(..., scaling="density")`).
 
     Parameters
     ----------
     data : np.ndarray
-        Data to calculate the spectrogram for. Shape must be (n_samples, n_channels).
-    window_length : int
-        Number of data points to use when calculating the periodogram.
+        Data to calculate the spectrogram for.
+        Shape must be (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
-    calc_cpsd : bool
-        Should we calculate cross spectra?
-    step_size : int
+    window_length : int, optional
+        Number of data points to use when calculating the periodogram.
+        Defaults to :code:`2 * sampling_frequency`.
+    step_size : int, optional
         Step size for shifting the window.
-    n_sub_windows : int
-        Should we split the window into a set of sub-windows and average the
-        spectra for each sub-window.
-    print_progress_bar : bool
-        Should we print a progress bar?
+        Defaults to :code:`window_length // 2` (50% overlap).
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    calc_cpsd : bool, optional
+        Should we calculate cross spectra?
+    n_sub_windows : int, optional
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        :code:`n_sub_windows`.
 
     Returns
     -------
@@ -1208,57 +1171,63 @@ def spectrogram(
     f : np.ndarray
         Frequency axis.
     P : np.ndarray
-        Spectrogram.
+        Spectrogram. 3D numpy array with shape (time, channels *
+        (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
+        it is (time, channels, freq).
     """
-
-    # Number of samples, channels and modes
     n_samples = data.shape[0]
     n_channels = data.shape[1]
 
-    # First pad the data so we have enough data points to estimate the periodogram
-    # for time points at the start/end of the data
+    # Validation
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
+
+    if step_size is None:
+        step_size = window_length // 2
+    step_size = int(step_size)
+
+    # First pad the data so we have enough data points to estimate the
+    # periodogram for time points at the start/end of the data
     data = np.pad(data, window_length // 2)[
         :, window_length // 2 : window_length // 2 + n_channels
     ]
 
     # Window to apply to the data before calculating the Fourier transform
-    window = hann(window_length // n_sub_windows)
+    window = signal.get_window("hann", (window_length // n_sub_windows))
 
     # Number of data points in the FFT
-    nfft = max(256, 2 ** nextpow2(window_length // n_sub_windows))
+    nfft = max(256, window_length // n_sub_windows)
 
     # Time and frequency axis
     t = np.arange(n_samples) / sampling_frequency
     f = np.arange(nfft // 2) * sampling_frequency / nfft
 
     # Only keep a particular frequency range
-    args_range = get_frequency_args_range(f, frequency_range)
-    f = f[args_range[0] : args_range[1]]
+    [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+    f = f[min_arg:max_arg]
 
     # Number of frequency bins
-    n_freq = args_range[1] - args_range[0]
+    n_freq = max_arg - min_arg
 
     # Indices of an upper triangle of an n_channels by n_channels array
     m, n = np.triu_indices(n_channels)
 
     # Indices of time points to calculate a periodogram for
     time_indices = range(0, n_samples, step_size)
-    n_psds = n_samples // step_size
+    n_windows = n_samples // step_size
 
     if calc_cpsd:
         # Calculate cross periodograms for each segment of the data
         P = np.empty(
-            [n_psds, n_channels * (n_channels + 1) // 2, n_freq], dtype=np.complex64
+            [n_windows, n_channels * (n_channels + 1) // 2, n_freq],
+            dtype=np.complex64,
         )
         XY_sub_window = np.empty(
             [n_sub_windows, n_channels * (n_channels + 1) // 2, n_freq],
             dtype=np.complex64,
         )
-        if print_progress_bar:
-            iterator = trange(n_psds, desc="Calculating spectrogram")
-        else:
-            iterator = range(n_psds)
-        for i in iterator:
+        for i in range(n_windows):
             # Data in the window
             j = time_indices[i]
             x_window = data[j : j + window_length].T
@@ -1278,8 +1247,9 @@ def spectrogram(
                 )
 
                 # Calculate cross spectra for the sub-window
-                X = fourier_transform(x_sub_window, nfft, args_range)
-                XY = X[:, np.newaxis, :] * np.conj(X)[np.newaxis, :, :]
+                X = np.fft.fft(x_sub_window, nfft)
+                X = X[..., min_arg:max_arg]
+                XY = np.conj(X)[np.newaxis, :, :] * X[:, np.newaxis, :]
                 XY_sub_window[k] = XY[m, n]
 
             # Average the cross spectra for each sub-window
@@ -1287,13 +1257,12 @@ def spectrogram(
 
     else:
         # Calculate the periodogram for each segment of the data
-        P = np.empty([n_psds, n_channels, n_freq], dtype=np.float32)
-        XX_sub_window = np.empty([n_sub_windows, n_channels, n_freq], dtype=np.float32)
-        if print_progress_bar:
-            iterator = trange(n_psds, desc="Calculating spectrogram")
-        else:
-            iterator = range(n_psds)
-        for i in iterator:
+        P = np.empty([n_windows, n_channels, n_freq], dtype=np.float32)
+        XX_sub_window = np.empty(
+            [n_sub_windows, n_channels, n_freq],
+            dtype=np.float32,
+        )
+        for i in range(n_windows):
             # Data in the window
             j = time_indices[i]
             x_window = data[j : j + window_length].T
@@ -1313,86 +1282,590 @@ def spectrogram(
                 )
 
                 # Calculate PSD for the sub-window
-                X = fourier_transform(x_sub_window, nfft, args_range)
-                XX_sub_window[k] = np.real(X * np.conj(X))
+                X = np.fft.fft(x_sub_window, nfft)
+                X = X[..., min_arg:max_arg]
+                XX_sub_window[k] = np.real(np.conj(X) * X)
 
             # Average the cross spectra for each sub-window
             P[i] = np.mean(XX_sub_window, axis=0)
 
-    # Scaling for the periodograms
-    P /= sampling_frequency * np.sum(window**2)
+    # Scaling for the periodograms (we use the same scaling as SciPy)
+    P *= 2 / (sampling_frequency * np.sum(window**2))
 
     return t, f, P
 
 
-def rescale_regression_coefs(psd, alpha, window_length, step_size=1, n_sub_windows=1):
-    """Rescales regression coefficients with maximum regressor values.
+def _welch(
+    data,
+    sampling_frequency,
+    alpha=None,
+    window_length=None,
+    step_size=None,
+    frequency_range=None,
+    standardize=True,
+    calc_coh=False,
+    keepdims=False,
+):
+    """Calculate a (cross) power spectrum using Welch's method.
+
+    This function first calculates a spectrogram using
+    `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
+    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
+    .spectral._welch_spectrogram>`_ then takes the time average.
+
+    The scaling for the power spectra calculated by this function
+    matches SciPy (:code:`scipy.signal.welch`).
 
     Parameters
     ----------
-    psd : np.ndarray
-        Mode PSDs. Shape must be (n_subjects, 2, n_modes, n_channels, n_freq)
-    alpha : np.ndarray or list
-        Inferred mode mixing factors. Shape must be (n_subjects, n_samples,
-        n_modes) or (n_samples, n_modes).
-    window_length : int
-        Number samples used as the window to calcualte a PSD.
-    step_size : int
-        Step size used for shifting the window.
-    n_sub_windows : int
-        Number of sub-windows used to average the spectra. window_length
-        must be divisible by n_sub_windows.
+    data : np.ndarray
+        Time series data. Must have shape (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    alpha : np.ndarray, optional
+        Inferred state probability time course.
+        Must have shape (n_samples, n_states).
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length // 2` (50% overlap).
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we calculate the coherence between channels?
+    keepdims : bool, optional
+        Should we squeeze any axes of length 1?
 
     Returns
     -------
+    f : np.ndarray
+        Frequencies of the power spectra and coherences.
+        Shape is (n_freq,).
     psd : np.ndarray
-        Mode PSDs, rescaled with maximum regressor values.
-        Shape is identical to the input.
+        Power spectra. Shape is (..., n_channels, n_freq).
+    coh : np.ndarray
+        Coherences spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+        Only returned is :code:`calc_coh=True`.
     """
+    if alpha is None:
+        stc = np.ones([data.shape[0], 1], dtype=np.float32)
+    else:
+        # Calculate state time course (Viterbi path) from probabilities
+        stc = modes.argmax_time_courses(alpha)
+
+    # Indices for the upper triangle of a channels by channels matrix
+    n_channels = data.shape[-1]
+    m, n = np.triu_indices(n_channels)
+
+    # Standardise before calculating spectra
+    if standardize:
+        data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
+
+    psd = []
+    coh = []
+    for i in range(stc.shape[-1]):
+        # Calculate spectrogram for this state's data
+        x = data * stc[..., i][..., np.newaxis]
+        _, f, p = _welch_spectrogram(
+            data=x,
+            sampling_frequency=sampling_frequency,
+            window_length=window_length,
+            step_size=step_size,
+            frequency_range=frequency_range,
+            calc_cpsd=calc_coh,
+        )
+
+        # Average over the time dimension
+        p = np.mean(p, axis=0)
+
+        if calc_coh:
+            # Create a channels by channels matrix for cross PSDs
+            n_freq = p.shape[-1]
+            cpsd = np.empty(
+                [n_channels, n_channels, n_freq],
+                dtype=np.complex64,
+            )
+            cpsd[m, n] = p
+            cpsd[n, m] = p
+
+            # Unpack PSDs
+            psd.append(cpsd[range(n_channels), range(n_channels)].real)
+
+            # Calculate coherence
+            coh.append(coherence_spectra(cpsd))
+        else:
+            psd.append(p)
+
+    # Rescale PSDs to account for the number of time points
+    # each state was active
+    fo = np.sum(stc, axis=0) / stc.shape[0]
+    for psd_, fo_ in zip(psd, fo):
+        psd_ /= fo_
+
+    if not keepdims:
+        # Squeeze any axes of length 1
+        psd = np.squeeze(psd)
+        if calc_coh:
+            coh = np.squeeze(coh)
+
+    if calc_coh:
+        return f, psd, coh
+    else:
+        return f, psd
+
+
+def _multitaper_spectrogram(
+    data,
+    sampling_frequency,
+    window_length=None,
+    step_size=None,
+    frequency_range=None,
+    calc_cpsd=True,
+    n_sub_windows=1,
+    time_half_bandwidth=4,
+    n_tapers=7,
+):
+    """Calculates a spectogram (time-varying power spectral density)
+    using a multitaper.
+
+    Steps:
+
+    1. Segment data into overlapping windows.
+    2. Multiply each window by a number of tapering functions.
+    3. Calculate a periodogram for each tapered window.
+    4. Average over tapers.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate the spectrogram for.
+        Shape must be (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    window_length : int, optional
+        Number of data points to use when calculating the periodogram.
+        Defaults to :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length` (no overlap).
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    calc_cpsd : bool, optional
+        Should we calculate cross spectra?
+    n_sub_windows : int, optional
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        :code:`n_sub_windows`.
+    time_half_bandwidth : float, optional
+        Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
+
+    Returns
+    -------
+    t : np.ndarray
+        Time axis.
+    f : np.ndarray
+        Frequency axis.
+    P : np.ndarray
+        Spectrogram. 3D numpy array with shape (time, channels *
+        (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
+        it is (time, channels, freq).
+    """
+    n_samples = data.shape[0]
+    n_channels = data.shape[1]
 
     # Validation
-    if psd.ndim == 4:
-        psd = psd[np.newaxis, ...]
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    window_length = int(window_length)
 
-    if psd.ndim != 5:
-        raise ValueError(
-            "psd must have shape (n_subjects, 2, n_modes, n_channels, n_freqs)."
+    if step_size is None:
+        step_size = window_length
+    step_size = int(step_size)
+
+    # First pad the data so we have enough data points to estimate the
+    # periodogram for time points at the start/end of the data
+    data = np.pad(data, window_length // 2)[
+        :, window_length // 2 : window_length // 2 + n_channels
+    ]
+
+    # Tapering windows to apply to the data before calculating the
+    # Fourier transform
+    tapers = signal.windows.dpss(
+        window_length,
+        NW=time_half_bandwidth,
+        Kmax=n_tapers,
+    )
+
+    # Number of data points in the FFT
+    nfft = window_length // n_sub_windows
+
+    # Time and frequency axis
+    t = np.arange(n_samples) / sampling_frequency
+    f = np.arange(nfft // 2) * sampling_frequency / nfft
+
+    # Only keep a particular frequency range
+    [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+    f = f[min_arg:max_arg]
+
+    # Number of frequency bins
+    n_freq = max_arg - min_arg
+
+    # Indices of an upper triangle of an n_channels by n_channels array
+    m, n = np.triu_indices(n_channels)
+
+    # Indices of time points to calculate a periodogram for
+    time_indices = range(0, n_samples, step_size)
+    n_windows = n_samples // step_size
+
+    if calc_cpsd:
+        # Calculate cross PSDs for each segment of the data
+        P = np.empty(
+            [n_windows, n_channels * (n_channels + 1) // 2, n_freq],
+            dtype=np.complex64,
+        )
+        XY_sub_window = np.empty(
+            [n_sub_windows, n_channels * (n_channels + 1) // 2, n_freq],
+            dtype=np.complex64,
+        )
+        for i in range(n_windows):
+            # Data in the window
+            j = time_indices[i]
+            x_window = data[j : j + window_length].T
+
+            for k in range(n_sub_windows):
+                # Data in the sub-window
+                x_sub_window = x_window[
+                    :,
+                    k
+                    * window_length
+                    // n_sub_windows : (k + 1)
+                    * window_length
+                    // n_sub_windows,
+                ]
+
+                # Apply tapers
+                x_sub_window = x_sub_window[np.newaxis, :, :] * tapers[:, np.newaxis, :]
+
+                # Fourier transform
+                X = np.fft.fft(x_sub_window, nfft)
+                X = X[..., min_arg:max_arg]
+
+                # Calculate cross spectra for the sub-window
+                XY = np.conj(X)[:, :, np.newaxis, :] * X[:, np.newaxis, :, :]
+                XY_sub_window[k] = np.mean(XY[:, m, n], axis=0)
+
+            # Average the cross spectra for each sub-window
+            P[i] = np.mean(XY_sub_window, axis=0)
+
+    else:
+        # Calculate PSDs for each segment of the data
+        P = np.empty([n_windows, n_channels, n_freq], dtype=np.float32)
+        XX_sub_window = np.empty(
+            [n_sub_windows, n_channels, n_freq],
+            dtype=np.float32,
+        )
+        for i in range(n_windows):
+            # Data in the window
+            j = time_indices[i]
+            x_window = data[j : j + window_length].T
+
+            for k in range(n_sub_windows):
+                # Data in the sub-window
+                x_sub_window = x_window[
+                    :,
+                    k
+                    * window_length
+                    // n_sub_windows : (k + 1)
+                    * window_length
+                    // n_sub_windows,
+                ]
+
+                # Apply tapers
+                x_sub_window = x_sub_window[np.newaxis, :, :] * tapers[:, np.newaxis, :]
+
+                # Fourier transform
+                X = np.fft.fft(x_sub_window, nfft)
+                X = X[..., min_arg:max_arg]
+
+                # Calculate spectra for the sub-window
+                XX = np.real(np.conj(X) * X)
+                XX_sub_window[k] = np.mean(XX, axis=0)
+
+            # Average the spectra for each sub-window
+            P[i] = np.mean(XX_sub_window, axis=0)
+
+    # Scaling for the multitapers
+    P *= 2 / sampling_frequency
+
+    return t, f, P
+
+
+def _multitaper(
+    data,
+    sampling_frequency,
+    alpha=None,
+    window_length=None,
+    step_size=None,
+    time_half_bandwidth=4,
+    n_tapers=7,
+    frequency_range=None,
+    standardize=True,
+    calc_coh=True,
+    keepdims=False,
+):
+    """Calculate a multitaper.
+
+    This function first calculates a spectrogram using
+    `_multitaper_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
+    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
+    .spectral._multitaper_spectrogram>`_ then takes the time average.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series data. Must have shape (n_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    alpha : np.ndarray, optional
+        Inferred state probability time course.
+        Must have shape (n_samples, n_states).
+    window_length : int, optional
+        Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
+    step_size : int, optional
+        Step size for shifting the window.
+        Defaults to :code:`window_length` (no overlap).
+    time_half_bandwidth : float, optional
+        Parameter to control the resolution of the spectra.
+    n_tapers : int, optional
+        Number of tapers.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    standardize : bool, optional
+        Should we standardize the data before calculating the spectra?
+    calc_coh : bool, optional
+        Should we calculate the coherence between channels?
+    keepdims : bool, optional
+        Should we squeeze any axes of length 1?
+
+    Returns
+    -------
+    f : np.ndarray
+        Frequencies of the power spectra and coherences.
+        Shape is (n_freq,).
+    psd : np.ndarray
+        Power spectra. Shape is (..., n_channels, n_freq).
+    coh : np.ndarray
+        Coherences spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+        Only returned is :code:`calc_coh=True`.
+    """
+    n_samples = data.shape[0]
+    n_channels = data.shape[-1]
+
+    if alpha is None:
+        stc = np.ones([n_samples, 1], dtype=np.float32)
+    else:
+        # Calculate state time course (Viterbi path) from probabilities
+        stc = modes.argmax_time_courses(alpha)
+
+    # Indices for the upper triangle of a channels by channels matrix
+    m, n = np.triu_indices(n_channels)
+
+    # Standardise before calculating spectra
+    if standardize:
+        data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
+
+    psd = []
+    coh = []
+    for i in range(stc.shape[-1]):
+        # Calculate spectrogram for this state's data
+        x = data * stc[..., i][..., np.newaxis]
+        _, f, p = _multitaper_spectrogram(
+            data=x,
+            sampling_frequency=sampling_frequency,
+            window_length=window_length,
+            step_size=step_size,
+            frequency_range=frequency_range,
+            calc_cpsd=calc_coh,
+            time_half_bandwidth=time_half_bandwidth,
+            n_tapers=n_tapers,
         )
 
-    if isinstance(alpha, np.ndarray):
-        alpha = [alpha]
+        # Average over the time dimension
+        p = np.mean(p, axis=0)
 
-    if len(psd) != len(alpha):
-        raise ValueError(
-            "A different number of subjects has been passed for "
-            + f"psd and alpha: len(psd)={len(psd)}, "
-            + f"len(alpha)={len(alpha)}."
-        )
+        if calc_coh:
+            # Create a channels by channels matrix for cross PSDs
+            n_channels = data.shape[-1]
+            n_freq = p.shape[-1]
+            cpsd = np.empty(
+                [n_channels, n_channels, n_freq],
+                dtype=np.complex64,
+            )
+            cpsd[m, n] = p
+            cpsd[n, m] = p
 
-    for i in range(len(alpha)):
-        if alpha[i].shape[1] != psd[i].shape[1]:
-            raise ValueError("psd and alpha must have same number of modes.")
+            # Unpack PSDs
+            psd.append(cpsd[range(n_channels), range(n_channels)].real)
 
-    # Prevent in-place operation
-    psd = psd.copy()
+            # Calculate coherence
+            coh.append(coherence_spectra(cpsd))
+        else:
+            psd.append(p)
 
-    # Number of subjects
-    n_subjects = len(alpha)
+    # Rescale PSDs to account for the number of time points
+    # each state was active
+    fo = np.sum(stc, axis=0) / stc.shape[0]
+    for psd_, fo_ in zip(psd, fo):
+        psd_ /= fo_
 
-    # Window alphas to match the windowing of STFT
-    for i, a in enumerate(alpha):
-        alpha[i] = window_mean(
-            a, window_length, step_size=step_size, n_sub_windows=n_sub_windows
-        )
+    if not keepdims:
+        # Squeeze any axes of length 1
+        psd = np.squeeze(psd)
+        if calc_coh:
+            coh = np.squeeze(coh)
 
-    # Normalize the alphas
-    alpha = [(a - np.mean(a, axis=0)) / np.std(a, axis=0) for a in alpha]
+    if calc_coh:
+        return f, psd, coh
+    else:
+        return f, psd
 
-    # Get maximum regressor values
-    max_alpha = [np.max(a, axis=0) for a in alpha]
 
-    # Rescale the regression coefficients
-    for n in range(n_subjects):
-        psd[n, 0] *= np.expand_dims(max_alpha[n], axis=(1, 2))
+def _regress_welch_spectrogram(
+    data,
+    alpha,
+    sampling_frequency,
+    window_length,
+    step_size,
+    n_sub_windows,
+    frequency_range,
+    calc_cpsd,
+):
+    """Calculate regression spectra for a single subject.
 
-    return psd
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to calculate a spectrogram for.
+        Shape must be (n_samples, n_channels).
+    alpha : np.ndarray
+        Inferred mode mixing factors. Shape must be (n_samples, n_modes).
+    sampling_frequency : float
+        Sampling_frequency in Hz.
+    window_length : int
+        Number samples to use in the window to calculate a PSD.
+    step_size : int
+        Step size for shifting the window.
+    n_sub_windows : int, optional
+        We split the window into a number of sub-windows and average the
+        spectra for each sub-window. window_length must be divisible by
+        :code:`n_sub_windows`.
+    frequency_range : list, optional
+        Minimum and maximum frequency to keep.
+    calc_cpsd : bool, optional
+        Should we calculate the cross spectra?
+
+    Returns
+    -------
+    f : np.ndarray
+        Frequency axis. Shape is (n_freq,).
+    coefs : np.ndarray
+        Regression coefficients. Shape is
+        (n_modes, n_channels * (n_channels + 1) / 2, n_freq) if
+        :code:`calc_cpsd=True`, otherwise it is (n_modes, n_channels, n_freq).
+    intercept : np.ndarray
+        Intercept. Shape is (n_channels * (n_channels + 1) / 2, n_freq)
+        if :code:`calc_cpsd=True`, otherwise it is (n_channels, n_freq).
+    """
+    _, f, p = _welch_spectrogram(
+        data=data,
+        sampling_frequency=sampling_frequency,
+        window_length=window_length,
+        step_size=step_size,
+        frequency_range=frequency_range,
+        calc_cpsd=calc_cpsd,
+        n_sub_windows=n_sub_windows,
+    )
+    a = _window_mean(alpha, "hann", window_length, step_size, n_sub_windows)
+    coefs, intercept = regression.linear(
+        a,
+        p,
+        fit_intercept=True,
+        normalize=True,
+        log_message=False,
+    )
+    return f, coefs, intercept
+
+
+def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
+    """Applies a windowing function to a time series and takes the mean.
+
+    Parameters
+    ----------
+    alpha : np.ndarray
+        Time series data. Shape is (n_samples, n_modes).
+    window : str
+        Name of the windowing function.
+    window_length : int
+        Number of data points in a window.
+    step_size : int
+        Step size for shifting the window.
+    n_sub_windows : int
+        We split the window into a number of sub-windows and average
+        across all sub-windows. This is the number of sub-windows.
+
+    Returns
+    -------
+    mean_window_alpha : np.ndarray
+        Mean for each window.
+    """
+    n_samples = alpha.shape[0]
+    n_modes = alpha.shape[1]
+
+    # Pad alphas
+    alpha = np.pad(alpha, window_length // 2)[
+        :, window_length // 2 : window_length // 2 + n_modes
+    ]
+
+    # Window to apply to alpha
+    window = signal.get_window(window, window_length // n_sub_windows)
+
+    # Indices of time points to calculate a periodogram for
+    time_indices = range(0, n_samples, step_size)
+    n_windows = n_samples // step_size
+
+    # Array to hold mean of alpha multiplied by the windowing function
+    mean_window_alpha = np.empty([n_windows, n_modes], dtype=np.float32)
+    for i in range(n_windows):
+        # Alpha in the window
+        j = time_indices[i]
+        a_window = alpha[j : j + window_length]
+
+        # Calculate alpha for the sub-window by taking the mean
+        # over time after applying the windowing function
+        a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
+        for k in range(n_sub_windows):
+            a_sub_window[k] = np.mean(
+                a_window[
+                    k
+                    * window_length
+                    // n_sub_windows : (k + 1)
+                    * window_length
+                    // n_sub_windows
+                ]
+                * window[..., np.newaxis],
+                axis=0,
+            )
+
+        # Average alpha for each sub-window
+        mean_window_alpha[i] = np.mean(a_sub_window, axis=0)
+
+    return mean_window_alpha

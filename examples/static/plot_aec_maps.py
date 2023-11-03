@@ -21,7 +21,12 @@ data = Data(
 )
 
 # Use prepare data to compute AE
-data.prepare(low_freq=8, high_freq=12, amplitude_envelope=True)
+methods = {
+    "filter": {"low_freq": 8, "high_freq": 12},
+    "amplitude_envelope": {},
+    "standardize": {},
+}
+data.prepare(methods)
 ts = data.time_series()
 
 # Calculate functional connectivity using AEC

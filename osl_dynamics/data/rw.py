@@ -3,15 +3,12 @@
 """
 
 import logging
-import warnings
 from os import listdir, path
 
 import mne
 import mat73
 import numpy as np
 import scipy.io
-
-from osl_dynamics.data import spm
 
 _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
@@ -86,9 +83,9 @@ def list_dir(path, keep_ext=None):
     ----------
     path : str
         Directory to list.
-    keep_ext : str or list
-        Extensions of files to include in the returned list. Default
-        is to include add files.
+    keep_ext : str or list, optional
+        Extensions of files to include in the returned list.
+        Default is to include all files.
 
     Returns
     -------
@@ -118,24 +115,31 @@ def load_data(
 ):
     """Loads time series data.
 
-    Checks the data shape is time by channels and that the data is float32.
+    Checks the data shape is time by channels and that the data is
+    :code:`float32`.
 
     Parameters
     ----------
     data : numpy.ndarray or str or list
-        An array or path to a .npy, .mat, .txt or .fif file containing the data.
-    data_field : str
+        An array or path to a :code:`.npy`, :code:`.mat`, :code:`.txt` or
+        :code:`.fif` file containing the data.
+    data_field : str, optional
         If a MATLAB filename is passed, this is the field that corresponds to
         the data.
-    picks : str or list of str
-        Argument passed to mne.Raw.get_data() or mne.Epochs.get_data().
+    picks : str or list of str, optional
+        Argument passed to `mne.io.Raw.get_data
+        <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw\
+        .get_data>`_ or `mne.Epochs.get_data <https://mne.tools/stable\
+        /generated/mne.Epochs.html#mne.Epochs.get_data>`_.
         Only used if a fif file is passed.
-    reject_by_annotation : str
-        Argument passed to mne.Raw.get_data(). Only used if a fif file is passed.
-    mmap_location : str
+    reject_by_annotation : str, optional
+        Argument passed to `mne.io.Raw.get_data <https://mne.tools/stable\
+        /generated/mne.io.Raw.html#mne.io.Raw.get_data>`_.
+        Only used if a fif file is passed.
+    mmap_location : str, optional
         Filename to save the data as a numpy memory map.
-    mmap_mode : str
-        Mode to load memory maps in. Default is 'r+'.
+    mmap_mode : str, optional
+        Mode to load memory maps in. Default is :code:`'r+'`.
 
     Returns
     -------
@@ -214,17 +218,21 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
     Parameters
     ----------
     filename : str
-        Path to fif file. Must end with 'raw.fif' or 'epo.fif'.
-    picks : str or list of str
-        Argument passed to mne.Raw.get_data() or mne.Epochs.get_data().
-    reject_by_annotation : str
-        Argument passed to mne.Raw.get_data() if filename contains 'raw.fif'.
+        Path to fif file. Must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
+    picks : str or list of str, optional
+        Argument passed to `mne.io.Raw.get_data
+        <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw\
+        .get_data>`_ or `mne.Epochs.get_data <https://mne.tools/stable\
+        /generated/mne.Epochs.html#mne.Epochs.get_data>`_.
+    reject_by_annotation : str, optional
+        Argument passed to `mne.io.Raw.get_data <https://mne.tools/stable\
+        /generated/mne.io.Raw.html#mne.io.Raw.get_data>`_.
 
     Returns
     -------
     data : np.ndarray
         Time series data in format (n_samples, n_channels).
-        If an mne.Epochs fif file is pass ('epo.fif') the we
+        If an :code:`mne.Epochs` fif file is pass (:code:`'epo.fif'`) the we
         concatenate the epochs in the first axis.
     """
     if "raw.fif" in filename:
@@ -239,12 +247,12 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
         data = epochs.get_data(picks=picks)
         data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
     else:
-        raise ValueError(f"a fif file must end with 'raw.fif' or 'epo.fif'.")
+        raise ValueError("a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
 
 
-def load_matlab(filename, field, ignored_keys=None):
-    """Loads a MATLAB or SPM file.
+def load_matlab(filename, field):
+    """Loads a MATLAB file.
 
     Parameters
     ----------
@@ -252,31 +260,16 @@ def load_matlab(filename, field, ignored_keys=None):
         Filename of MATLAB file to read.
     field : str
         Field that corresponds to the data.
-    ignored_keys :  list of str
-        Keys in the MATLAB file to ignore.
 
     Returns
     -------
     data : np.ndarray
-        Data in the MATLAB/SPM file.
+        Data in the MATLAB file.
     """
-    # Load file
     mat = loadmat(filename, return_dict=True)
-
-    # Get data
-    if "D" in mat:
-        warnings.warn(
-            "Assuming that key 'D' corresponds to an SPM MEEG object.", RuntimeWarning
-        )
-        D = spm.SPM(filename)
-        data = D.data
-    else:
-        try:
-            data = mat[field]
-        except KeyError:
-            raise KeyError(f"field '{field}' missing from MATLAB file.")
-
-    return data
+    if field not in mat:
+        raise KeyError(f"field '{field}' missing from MATLAB file.")
+    return mat[field]
 
 
 def loadmat(filename, return_dict=False):
@@ -286,10 +279,10 @@ def loadmat(filename, return_dict=False):
     ----------
     filename : str
         Filename of MATLAB file to read.
-    return_dict : bool
-        If there's only one field should we return a dictionary.
+    return_dict : bool, optional
+        If there's only one field should we still return a :code:`dict`?
         Default is to return a numpy array if there is only one field.
-        If there are multiple fields, a dictionary is always returned.
+        If there are multiple fields, a :code:`dict` is always returned.
 
     Returns
     -------

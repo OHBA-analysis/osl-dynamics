@@ -27,7 +27,7 @@ class MixedSine:
         Frequency of each sinusoid.
     sampling_frequency : float
         Sampling frequency.
-    random_seed : int
+    random_seed : int, optional
         Seed used for the random number generator, which is used to sample
         an initial phase for each sinusoid.
     """
@@ -42,7 +42,7 @@ class MixedSine:
         random_seed=None,
     ):
         if len(relative_activation) != n_modes:
-            raise ValueError("n_modes relative_activation must be passed.")
+            raise ValueError("len(relative_activation) does not match len(n_modes).")
 
         if len(amplitudes) != n_modes:
             raise ValueError("n_modes amplitudes must be passed.")
@@ -64,7 +64,9 @@ class MixedSine:
         # Generator mode time courses
         self.logits = np.empty([n_samples, self.n_modes], dtype=np.float32)
         t = np.arange(
-            0, n_samples / self.sampling_frequency, 1.0 / self.sampling_frequency
+            0,
+            n_samples / self.sampling_frequency,
+            1.0 / self.sampling_frequency,
         )
         for i in range(self.n_modes):
             self.logits[:, i] = self.relative_activation[i] + self.amplitudes[
@@ -78,7 +80,8 @@ class MixedSine:
 
 
 class MixedSine_MVN(Simulation):
-    """Simulates sinusoidal alphas with a multivariable normal observation model.
+    """Simulates sinusoidal alphas with a multivariable normal observation
+    model.
 
     Parameters
     ----------
@@ -88,28 +91,28 @@ class MixedSine_MVN(Simulation):
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
         operation. This argument can use use to change the relative values
-        of each mode time course.
+        of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
-        Amplitude of each sinusoid.
+        Amplitude of each sinusoid. Shape must be (n_modes,).
     frequencies : np.ndarray or list
-        Frequency of each sinusoid.
+        Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
     means : np.ndarray or str
         Mean vector for each mode, shape should be (n_modes, n_channels).
-        Either a numpy array or 'zero' or 'random'.
+        Either a numpy array or :code:`'zero'` or :code:`'random'`.
     covariances : np.ndarray or str
-        Covariance matrix for each mode, shape should be (n_modes,
-        n_channels, n_channels). Either a numpy array or 'random'.
-    n_covariances_act : int
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for random number generator.
     """
 
@@ -166,6 +169,15 @@ class MixedSine_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
+    def standardize(self):
+        mu = np.mean(self.time_series, axis=0).astype(np.float64)
+        sigma = np.std(self.time_series, axis=0).astype(np.float64)
+        super().standardize()
+        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
+            np.newaxis, ...
+        ]
+        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+
 
 class MSubj_MixedSine_MVN(Simulation):
     """Simulates sinusoidal alphas with a multivariable normal observation model
@@ -179,40 +191,43 @@ class MSubj_MixedSine_MVN(Simulation):
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
         operation. This argument can use use to change the relative values
-        of each mode time course.
+        of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
-        Amplitude of each sinusoid.
+        Amplitude of each sinusoid. Shape must be (n_modes,).
     frequencies : np.ndarray or list
-        Frequency of each sinusoid.
+        Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
     subject_means : np.ndarray or str
-        Subject mean vector for each state, shape should be (n_subjects, n_states, n_channels).
-        Either a numpy array or 'zero' or 'random'.
+        Subject mean vector for each mode, shape should be (n_subjects, n_modes,
+        n_channels). Either a numpy array or :code:`'zero'` or
+        :code:`'random'`.
     subject_covariances : np.ndarray or str
-        Subject covariance matrix for each state, shape should be
-        (n_subjects, n_states, n_channels, n_channels). Either a numpy array or 'random'.
-    n_covariances_act : int
+        Subject covariance matrix for each mode, shape should be
+        (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
+        or :code:`'random'`.
+    n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_modes : int
+    n_modes : int, optional
         Number of modes.
-    n_channels : int
+    n_channels : int, optional
         Number of channels.
-    n_subjects : int
+    n_subjects : int, optional
         Number of subjects.
-    n_subject_embedding_dim : int
+    n_subject_embedding_dim : int, optional
         Number of dimensions for subject embedding.
-    n_mode_embedding_dim : int
+    n_mode_embedding_dim : int, optional
         Number of dimensions for mode embedding.
-    subject_embedding_scale : float
+    subject_embedding_scale : float, optional
         Scale of variability between subject observation parameters.
-    n_groups : int
-        Number of groups of subjects when subject means or covariances are 'random'.
-    between_group_scale : float
+    n_groups : int, optional
+        Number of groups of subjects when subject means or covariances are
+        :code:`'random'`.
+    between_group_scale : float, optional
         Scale of variability between groups.
-    observation_error : float
+    observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int
+    random_seed : int, optional
         Seed for random number generator.
     """
 
@@ -296,8 +311,6 @@ class MSubj_MixedSine_MVN(Simulation):
             self.obs_mod.subject_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
         self.obs_mod.subject_covariances /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
-        )
-        self.obs_mod.instantaneous_covs /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :], 1
+            standard_deviations[:, :, None] @ standard_deviations[:, None, :],
+            axis=1,
         )

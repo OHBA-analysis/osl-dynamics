@@ -1,20 +1,16 @@
 """Subject Embedding HMM.
+
 """
 
 import logging
-import warnings
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from numba.core.errors import NumbaWarning
-from tensorflow.keras import backend, layers, utils, initializers
-from tqdm.auto import trange
+import tensorflow_probability as tfp
+from tensorflow.keras import layers, initializers
 
-import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
-    CategoricalLogLikelihoodLossLayer,
     LearnableTensorLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
@@ -27,17 +23,26 @@ from osl_dynamics.inference.layers import (
     StaticKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
+    StaticLossScalingFactorLayer,
+    HiddenMarkovStateInferenceLayer,
+    SeparateLogLikelihoodLayer,
+    SumLogLikelihoodLossLayer,
 )
-from osl_dynamics.models.hmm import Config as HMMConfig, Model as HMMModel
-from osl_dynamics.models import dynemo_obs, sedynemo_obs
+from osl_dynamics.models import obs_mod
+from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.inference import callbacks
+import osl_dynamics.inference.initializers as osld_initializers
+from osl_dynamics.models.inf_mod_base import (
+    MarkovStateInferenceModelConfig,
+    MarkovStateInferenceModelBase,
+)
+from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
 
-warnings.filterwarnings("ignore", category=NumbaWarning)
-
 
 @dataclass
-class Config(HMMConfig):
+class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     """Settings for Subject Embedding HMM.
 
     Parameters
@@ -78,10 +83,10 @@ class Config(HMMConfig):
         Number of units for the MLP for deviations.
     dev_normalization : str
         Type of normalization for the MLP for deviations.
-        Either None, 'batch' or 'layer'.
+        Either :code:`None`, :code:`'batch'` or :code:`'layer'`.
     dev_activation : str
         Type of activation to use for the MLP for deviations.
-        E.g. 'relu', 'sigmoid', 'tanh', etc.
+        E.g. :code:`'relu'`, :code:`'sigmoid'`, :code:`'tanh'`, etc.
     dev_dropout : float
         Dropout rate for the MLP for deviations.
     dev_regularizer : str
@@ -89,34 +94,36 @@ class Config(HMMConfig):
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
         This will be scaled by the amount of data.
+    initial_dev : dict
+        Initialisation for dev posterior parameters.
 
     initial_trans_prob : np.ndarray
-        Initialisation for trans prob matrix
+        Initialisation for transition probability matrix.
     learn_trans_prob : bool
-        Should we make the trans prob matrix trainable?
-    state_probs_t0: np.ndarray
-        State probabilities at time=0. Not trainable.
+        Should we make the transition probability matrix trainable?
+    trans_prob_update_delay : float
+        We update the transition probability matrix as
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the delay parameter.
+    trans_prob_update_forget : float
+        We update the transition probability matrix as
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the forget parameter.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float
         Learning rate.
-    trans_prob_update_delay : float
-        We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the delay parameter.
-    trans_prob_update_forget : float
-        We update the transition probability matrix as
-        trans_prob = (1-rho) * trans_prob + rho * trans_prob_update,
-        where rho = (100 * epoch / n_epochs + 1 + trans_prob_update_delay)
-        ** -trans_prob_update_forget. This is the forget parameter.
-    observation_update_decay : float
-        Decay rate for the learning rate of the observation model.
-        We update the learning rate (lr) as
-        lr = config.learning_rate * exp(-observation_update_decay * epoch).
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
+    optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
     multi_gpu : bool
         Should be use multiple GPUs for training?
@@ -126,10 +133,10 @@ class Config(HMMConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
     """
@@ -141,6 +148,15 @@ class Config(HMMConfig):
     subject_embeddings_dim: int = None
     mode_embeddings_dim: int = None
 
+    # Observation model parameters
+    learn_means: bool = None
+    learn_covariances: bool = None
+    initial_means: np.ndarray = None
+    initial_covariances: np.ndarray = None
+    covariances_epsilon: float = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
+
     dev_n_layers: int = 0
     dev_n_units: int = None
     dev_normalization: str = None
@@ -148,17 +164,34 @@ class Config(HMMConfig):
     dev_dropout: float = 0.0
     dev_regularizer: str = None
     dev_regularizer_factor: float = 0.0
+    initial_dev: dict = None
 
     # KL annealing parameters
     do_kl_annealing: bool = False
-    kl_annealing_curve: Literal["linear", "tanh"] = None
+    kl_annealing_curve: str = None
     kl_annealing_sharpness: float = None
     n_kl_annealing_epochs: int = None
 
     def __post_init__(self):
-        super().__post_init__()
+        self.validate_observation_model_parameters()
+        self.validate_trans_prob_parameters()
+        self.validate_dimension_parameters()
+        self.validate_training_parameters()
         self.validate_subject_embedding_parameters()
         self.validate_kl_annealing_parameters()
+
+    def validate_observation_model_parameters(self):
+        if self.learn_means is None or self.learn_covariances is None:
+            raise ValueError("learn_means and learn_covariances must be passed.")
+
+        if self.covariances_epsilon is None:
+            if self.learn_covariances:
+                self.covariances_epsilon = 1e-6
+            else:
+                self.covariances_epsilon = 0.0
+
+        if self.initial_dev is None:
+            self.initial_dev = dict()
 
     def validate_subject_embedding_parameters(self):
         if (
@@ -188,7 +221,7 @@ class Config(HMMConfig):
                 if self.kl_annealing_sharpness is None:
                     raise ValueError(
                         "kl_annealing_sharpness must be passed if "
-                        + "kl_annealing_curve='tanh'."
+                        "kl_annealing_curve='tanh'."
                     )
 
                 if self.kl_annealing_sharpness < 0:
@@ -197,7 +230,7 @@ class Config(HMMConfig):
             if self.n_kl_annealing_epochs is None:
                 raise ValueError(
                     "If we are performing KL annealing, "
-                    + "n_kl_annealing_epochs must be passed."
+                    "n_kl_annealing_epochs must be passed."
                 )
 
             if self.n_kl_annealing_epochs < 1:
@@ -206,7 +239,7 @@ class Config(HMMConfig):
                 )
 
 
-class Model(HMMModel):
+class Model(MarkovStateInferenceModelBase):
     """Subject Embedding HMM class.
 
     Parameters
@@ -220,249 +253,147 @@ class Model(HMMModel):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
-        self.rho = 1
-        self.set_trans_prob(self.config.initial_trans_prob)
-        self.set_state_probs_t0(self.config.state_probs_t0)
-
-    def fit(self, dataset, epochs=None, use_tqdm=False, **kwargs):
-        """Fit model to a dataset.
-
-        Iterates between:
-
-        - Baum-Welch updates of latent variable time courses and transition
-          probability matrix.
-        - TensorFlow updates of observation model parameters.
+    def fit(self, *args, kl_annealing_callback=None, **kwargs):
+        """Wrapper for the standard keras fit method.
 
         Parameters
         ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        epochs : int
-            Number of epochs.
-        kwargs : keyword arguments
-            Keyword arguments for the TensorFlow observation model training.
-            These keywords arguments will be passed to self.model.fit().
+        *args : arguments
+            Arguments for :code:`MarkovStateInferenceModelBase.fit()`.
+        kl_annealing_callback : bool, optional
+            Should we update the KL annealing factor during training?
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`MarkovStateInferenceModelBase.fit()`.
 
         Returns
         -------
-        history : dict
-            Dictionary with history of the loss and learning rates (lr and rho).
+        history : history
+            The training history.
         """
-        if epochs is None:
-            epochs = self.config.n_epochs
+        # Callback for KL annealing
+        if kl_annealing_callback is None:
+            kl_annealing_callback = self.config.do_kl_annealing
 
-        # Set the scalings
-        self.set_dev_mlp_reg_scaling(dataset)
-        self.set_bayesian_kl_scaling(dataset)
-
-        # Make a TensorFlow dataset
-        dataset = self.make_dataset(
-            dataset, shuffle=True, concatenate=True, subj_id=True
-        )
-
-        # Training curves
-        history = {"loss": [], "rho": [], "lr": []}
-
-        # Loop through epochs
-        if use_tqdm:
-            _range = trange(epochs)
-        else:
-            _range = range(epochs)
-        for n in _range:
-            # Setup a progress bar for this epoch
-            if not use_tqdm:
-                print("Epoch {}/{}".format(n + 1, epochs))
-                pb_i = utils.Progbar(len(dataset))
-
-            # Update rho
-            self._update_rho(n)
-
-            # Set learning rate for the observation model
-            lr = self.config.learning_rate * np.exp(
-                -self.config.observation_update_decay * n
+        # KL annealing
+        if kl_annealing_callback:
+            kl_annealing_callback = callbacks.KLAnnealingCallback(
+                curve=self.config.kl_annealing_curve,
+                annealing_sharpness=self.config.kl_annealing_sharpness,
+                n_annealing_epochs=self.config.n_kl_annealing_epochs,
             )
-            backend.set_value(self.model.optimizer.lr, lr)
 
-            # Loop through batches
-            loss = []
-            for data in dataset:
-                x = data["data"]
-                subj_id = data["subj_id"]
+            # Update arguments to pass to the fit method
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "callbacks",
+                [kl_annealing_callback],
+                args,
+                kwargs,
+                append=True,
+            )
 
-                # Update state probabilities
-                gamma, xi = self._get_state_probs(x, subj_id)
+        return super().fit(*args, **kwargs)
 
-                # Update transition probability matrix
-                if self.config.learn_trans_prob:
-                    self._update_trans_prob(gamma, xi)
-
-                # Reshape gamma: (batch_size*sequence_length, n_states)
-                # -> (batch_size, sequence_length, n_states)
-                gamma = gamma.reshape(x.shape[0], x.shape[1], -1)
-
-                # Update observation model parameters
-                x_gamma_and_subj_id = np.concatenate(
-                    [x, gamma, np.expand_dims(subj_id, -1)], axis=2
-                )
-                h = self.model.fit(x_gamma_and_subj_id, epochs=1, verbose=0, **kwargs)
-
-                # Get the new loss
-                l = h.history["loss"][0]
-                if np.isnan(l):
-                    _logger.error("Training failed!")
-                    return
-                loss.append(l)
-
-                # Update progress bar
-                if use_tqdm:
-                    _range.set_postfix(rho=self.rho, lr=lr, loss=l)
-                else:
-                    pb_i.add(1, values=[("rho", self.rho), ("lr", lr), ("loss", l)])
-
-            history["loss"].append(np.mean(loss))
-            history["rho"].append(self.rho)
-            history["lr"].append(lr)
-
-            # Update KL annealing factor
-            if self.config.do_kl_annealing:
-                self._update_kl_annealing_factor(n)
-
-        if use_tqdm:
-            _range.close()
-
-        return history
-
-    def _update_kl_annealing_factor(self, epoch, n_cycles=1):
-        """Update the KL annealing factor."""
-        n_epochs_one_cycle = self.config.n_kl_annealing_epochs // n_cycles
-        if epoch < self.config.n_kl_annealing_epochs:
-            epoch = epoch % n_epochs_one_cycle
-            if self.config.kl_annealing_curve == "tanh":
-                new_value = (
-                    0.5
-                    * np.tanh(
-                        self.config.kl_annealing_sharpness
-                        * (epoch - 0.5 * n_epochs_one_cycle)
-                        / n_epochs_one_cycle
-                    )
-                    + 0.5
-                )
-            elif self.config.kl_annealing_curve == "linear":
-                new_value = epoch / n_epochs_one_cycle
-        else:
-            new_value = 1.0
-
-        kl_loss_layer = self.model.get_layer("kl_loss")
-        kl_loss_layer.annealing_factor.assign(new_value)
-
-    def random_subset_initialization(
-        self, training_data, n_epochs, n_init, take, **kwargs
-    ):
-        """Random subset initialization.
-
-        The model is trained for a few epochs with different random subsets
-        of the training dataset. The model with the best free energy is kept.
+    def reset_weights(self, keep=None):
+        """Reset the model weights.
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Dataset to use for training.
-        n_epochs : int
-            Number of epochs to train the model.
-        n_init : int
-            Number of initializations.
-        take : float
-            Fraction of total batches to take.
-        kwargs : keyword arguments
-            Keyword arguments for the fit method.
+        keep : list of str, optional
+            Layer names to NOT reset.
+        """
+        super().reset_weights(keep=keep)
+        self.reset_kl_annealing_factor()
+
+    def reset_kl_annealing_factor(self):
+        """Reset the KL annealing factor."""
+        if self.config.do_kl_annealing:
+            kl_loss_layer = self.model.get_layer("kl_loss")
+            kl_loss_layer.annealing_factor.assign(0.0)
+
+    def get_group_means(self):
+        """Get the group level mode means.
 
         Returns
         -------
-        history : history
-            The training history of the best initialization.
+        means : np.ndarray
+            Group means. Shape is (n_modes, n_channels).
         """
-        # Make a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, concatenate=True, subj_id=True)
-
-        return super().random_subset_initialization(
-            training_data, n_epochs, n_init, take, **kwargs
+        return obs_mod.get_observation_model_parameter(
+            self.model,
+            "group_means",
         )
 
-    def random_state_time_course_initialization(
-        self, training_data, n_epochs, n_init, take=1, **kwargs
-    ):
-        """Random state time course initialization.
-
-        The model is trained for a few epochs with a sampled state time course
-        initialization. The model with the best free energy is kept.
-
-        Parameters
-        ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Dataset to use for training.
-        n_epochs : int
-            Number of epochs to train the model.
-        n_init : int
-            Number of initializations.
-        take : float
-            Fraction of total batches to take.
-        kwargs : keyword arguments
-            Keyword arguments for the fit method.
-
-        Returns
-        -------
-        history : history
-            The training history of the best initialization.
-        """
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, concatenate=True, subj_id=True
-        )
-
-        return super().random_state_time_course_initialization(
-            training_dataset, n_epochs, n_init, take, **kwargs
-        )
+    def get_means(self):
+        """Wrapper for :code:`get_group_means`."""
+        return self.get_group_means()
 
     def get_group_covariances(self):
-        """Get the covariances of each state.
+        """Get the group level mode covariances.
 
         Returns
         -------
         covariances : np.ndarray
-            State covariances. Shape is (n_states, n_channels, n_channels).
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)[1]
+        return obs_mod.get_observation_model_parameter(self.model, "group_covs")
+
+    def get_covariances(self):
+        """Wrapper for :code:`get_group_covariances`."""
+        return self.get_group_covariances()
 
     def get_group_means_covariances(self):
-        """Get the means and covariances of each state.
+        """Get the group level mode means and covariances.
+
+        This is a wrapper for :code:`get_group_means` and
+        :code:`get_group_covariances`.
 
         Returns
         -------
-        means : np.ndarary
-            Group level state means.
+        means : np.ndarray
+            Group means. Shape is (n_modes, n_channels).
         covariances : np.ndarray
-            Group level state covariances.
+            Group covariances. Shape is (n_modes, n_channels, n_channels).
         """
-        return sedynemo_obs.get_group_means_covariances(self.model)
+        return self.get_group_means(), self.get_group_covariances()
 
-    def get_subject_means_covariances(self, subject_embeddings=None, n_neighbours=2):
+    def get_means_covariances(self):
+        """Wrapper for :code:`get_group_means_covariances`."""
+        return self.get_group_means_covariances()
+
+    def get_group_observation_model_parameters(self):
+        """Wrapper for get_group_means_covariances."""
+        return self.get_group_means_covariances()
+
+    def get_observation_model_parameters(self):
+        """Wrapper for :code:`get_group_observation_model_parameters`."""
+        return self.get_group_observation_model_parameters()
+
+    def get_subject_means_covariances(
+        self,
+        subject_embeddings=None,
+        n_neighbours=2,
+    ):
         """Get the subject means and covariances.
 
         Parameters
         ----------
-        subject_embeddings : np.ndarray
-            Input embedding vectors for subjects. Shape is (n_subjects, subject_embeddings_dim).
-        n_neighbours : int
-            Number of nearest neighbours. Ignored if subject_embedding=None.
+        subject_embeddings : np.ndarray, optional
+            Input embedding vectors for subjects.
+            Shape is (n_subjects, subject_embeddings_dim).
+        n_neighbours : int, optional
+            Number of nearest neighbours. Ignored if
+            :code:`subject_embedding=None`.
 
         Returns
         -------
         means : np.ndarray
             Subject means. Shape is (n_subjects, n_states, n_channels).
         covs : np.ndarray
-            Subject covariances. Shape is (n_subjects, n_states, n_channels, n_channels).
+            Subject covariances.
+            Shape is (n_subjects, n_states, n_channels, n_channels).
         """
-        return sedynemo_obs.get_subject_means_covariances(
+        return obs_mod.get_subject_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
@@ -471,7 +402,7 @@ class Model(HMMModel):
         )
 
     def get_subject_embeddings(self):
-        """Get the subject embedding vectors
+        """Get the subject embedding vectors.
 
         Returns
         -------
@@ -479,250 +410,143 @@ class Model(HMMModel):
             Embedding vectors for subjects.
             Shape is (n_subjects, subject_embedding_dim).
         """
-        return sedynemo_obs.get_subject_embeddings(self.model)
+        return obs_mod.get_subject_embeddings(self.model)
 
     def set_group_means(self, group_means, update_initializer=True):
-        """Set the group means of each state.
+        """Set the group means of each mode.
 
         Parameters
         ----------
         group_means : np.ndarray
-            State covariances.
-        update_initializer : bool
-            Do we want to use the passed means when we re-initialize
+            Group level mode means. Shape is (n_modes, n_channels).
+        update_initializer : bool, optional
+            Do we want to use the passed group means when we re-initialize
             the model?
         """
-        dynemo_obs.set_means(
-            self.model, group_means, update_initializer, layer_name="group_means"
+        obs_mod.set_observation_model_parameter(
+            self.model,
+            group_means,
+            layer_name="group_means",
+            update_initializer=update_initializer,
         )
 
     def set_group_covariances(self, group_covariances, update_initializer=True):
-        """Set the group covariances of each state.
+        """Set the group covariances of each mode.
 
         Parameters
         ----------
         group_covariances : np.ndarray
-            State covariances.
-        update_initializer : bool
-            Do we want to use the passed covariances when we re-initialize
+            Group level mode covariances.
+            Shape is (n_modes, n_channels, n_channels).
+        update_initializer : bool, optional
+            Do we want to use the passed group covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             group_covariances,
-            update_initializer=update_initializer,
             layer_name="group_covs",
+            update_initializer=update_initializer,
+        )
+
+    def set_group_means_covariances(
+        self, group_means, group_covariances, update_initializer=True
+    ):
+        """Wrapper for :code:`set_group_means` and
+        :code:`set_group_covariances`."""
+        self.set_group_means(
+            group_means,
+            update_initializer=update_initializer,
+        )
+        self.set_group_covariances(
+            group_covariances,
+            update_initializer=update_initializer,
+        )
+
+    def set_group_observation_model_parameters(
+        self, group_observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for :code:`set_group_means_covariances`."""
+        self.set_group_means_covariances(
+            group_observation_model_parameters[0],
+            group_observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def set_means(self, means, update_initializer=True):
-        """Wrapper of set_group_means."""
+        """Wrapper for :code:`set_group_means`."""
         self.set_group_means(means, update_initializer)
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Wrapper of set_group_covariances."""
+        """Wrapper for :code:`set_group_covariances`."""
         self.set_group_covariances(covariances, update_initializer)
+
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """Wrapper for :code:`set_group_means_covariances`."""
+        self.set_group_means_covariances(means, covariances, update_initializer)
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for :code:`set_group_observation_model_parameters`."""
+        self.set_group_observation_model_parameters(
+            observation_model_parameters, update_initializer
+        )
 
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
-        normal prior is applied to the diagonal of the covariances matrices with mu=0,
-        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
-        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
+        :code:`config.diagonal_covariances=True`, a log normal prior is applied
+        to the diagonal of the covariances matrices with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior is
+        applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        and :code:`psi=diag(1/range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+        training_dataset = self.make_dataset(
+            training_dataset,
+            concatenate=True,
+        )
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(
+            obs_mod.set_means_regularizer(
                 self.model, training_dataset, layer_name="group_means"
             )
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
                 layer_name="group_covs",
             )
 
-    def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior and prior.
+    def set_dev_parameters_initializer(self, training_dataset):
+        """Set the deviance parameters initializer based on training data.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
+        training_dataset : osl_dynamics.data.Data
+            The training dataset.
         """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(training_dataset)
-        learn_means = self.config.learn_means
-        learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_bayesian_kl_scaling(
-            self.model, n_batches, learn_means, learn_covariances
+        obs_mod.set_dev_parameters_initializer(
+            self.model,
+            training_dataset,
+            self.config.learn_means,
+            self.config.learn_covariances,
         )
-
-    def set_dev_mlp_reg_scaling(self, training_dataset):
-        """Set the correct scaling for the deviation MLP regularization.
-
-        Parameters
-        ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(training_dataset)
-        learn_means = self.config.learn_means
-        learn_covariances = self.config.learn_covariances
-        sedynemo_obs.set_dev_mlp_reg_scaling(
-            self.model, n_batches, learn_means, learn_covariances
-        )
-
-    def free_energy(self, dataset):
-        """Get the variational free energy.
-
-        This calculates:
-
-        .. math::
-            \mathcal{F} = \int q(s_{1:T}) \log \left[ \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] ds_{1:T}
-
-        Parameters
-        ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Dataset to evaluate the free energy for.
-
-        Returns
-        -------
-        free_energy : float
-            Variational free energy.
-        """
-        _logger.info("Getting free energy")
-
-        # Convert to a TensorFlow dataset if not already
-        dataset = self.make_dataset(dataset, concatenate=True, subj_id=True)
-
-        # Calculate variational free energy for each batch
-        free_energy = []
-        for data in dataset:
-            x = data["data"]
-            subj_id = data["subj_id"]
-            batch_size = x.shape[0]
-
-            # Get the marginal and join posterior to calculate the free energy
-            gamma, xi = self._get_state_probs(x, subj_id)
-
-            # Calculate the free energy:
-            #
-            # F = int q(s) log[q(s) / p(x, s)] ds
-            #   = int q(s) log[q(s) / p(x | s) p(s)] ds
-            #   = - int q(s) log p(x | s) ds    [log_likelihood]
-            #     + int q(s) log q(s) ds        [entropy]
-            #     - int q(s) log p(s) ds        [prior]
-
-            log_likelihood = self._get_posterior_expected_log_likelihood(
-                x, gamma, subj_id
-            )
-            entropy = self._get_posterior_entropy(gamma, xi)
-            prior = self._get_posterior_expected_prior(gamma, xi)
-
-            # Average free energy for a sequence in this batch
-            seq_fe = (-log_likelihood + entropy - prior) / batch_size
-            free_energy.append(seq_fe)
-
-        # Return average over batches
-        return np.mean(free_energy)
-
-    def evidence(self, dataset):
-        """Calculate the model evidence, p(x), of HMM on a dataset.
-
-        Parameters
-        ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Dataset to evaluate the model evidence on.
-
-        Returns
-        -------
-        evidence : float
-            Model evidence.
-        """
-        _logger.info("Getting model evidence")
-        dataset = self.make_dataset(dataset, concatenate=True, subj_id=True)
-        n_batches = dtf.get_n_batches(dataset)
-
-        evidence = 0
-        for n, data in enumerate(dataset):
-            x = data["data"]
-            subj_id = data["subj_id"]
-            print("Batch {}/{}".format(n + 1, n_batches))
-            pb_i = utils.Progbar(self.config.sequence_length)
-            batch_size = tf.shape(x)[0]
-            batch_evidence = np.zeros((batch_size))
-            for t in range(self.config.sequence_length):
-                # Prediction step
-                if t == 0:
-                    initial_distribution = self.get_stationary_distribution()
-                    log_prediction_distribution = np.broadcast_to(
-                        np.expand_dims(initial_distribution, axis=0),
-                        (batch_size, self.config.n_states),
-                    )
-                else:
-                    log_prediction_distribution = self._evidence_predict_step(
-                        log_smoothing_distribution
-                    )
-
-                # Update step
-                (
-                    log_smoothing_distribution,
-                    predictive_log_likelihood,
-                ) = self._evidence_update_step(
-                    x[:, t, :], log_prediction_distribution, subj_id[:, t]
-                )
-
-                # Update the batch evidence
-                batch_evidence += predictive_log_likelihood
-                pb_i.add(1)
-            evidence += np.mean(batch_evidence)
-
-        return evidence / n_batches
-
-    def get_alpha(self, dataset, concatenate=False):
-        """Get state probabilities.
-
-        Parameters
-        ----------
-        dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
-            Prediction dataset. This can be a list of datasets, one for each subject.
-        concatenate : bool
-            Should we concatenate alpha for each subject?
-
-        Returns
-        -------
-        alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
-            or (n_samples, n_states).
-        """
-        dataset = self.make_dataset(dataset, subj_id=True)
-
-        _logger.info("Getting alpha")
-        alpha = []
-        for ds in dataset:
-            gamma = []
-            for data in ds:
-                x = data["data"]
-                subj_id = data["subj_id"]
-                g, _ = self._get_state_probs(x, subj_id)
-                gamma.append(g)
-            alpha.append(np.concatenate(gamma).astype(np.float32))
-
-        if concatenate or len(alpha) == 1:
-            alpha = np.concatenate(alpha)
-
-        return alpha
+        self.reset()
 
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
@@ -756,19 +580,27 @@ class Model(HMMModel):
 
 def _model_structure(config):
     # Inputs
-    inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels + config.n_states + 1),
-        name="input",
+    data = layers.Input(
+        shape=(config.sequence_length, config.n_channels),
+        name="data",
     )
-    data, gamma, subj_id = tf.split(
-        inputs, [config.n_channels, config.n_states, 1], axis=2
+    array_id = layers.Input(
+        shape=(config.sequence_length,),
+        name="array_id",
     )
-    subj_id = tf.squeeze(subj_id, axis=2)
+
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Subject embedding layers
     subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
     subject_embeddings_layer = layers.Embedding(
-        config.n_subjects, config.subject_embeddings_dim, name="subject_embeddings"
+        config.n_subjects,
+        config.subject_embeddings_dim,
+        name="subject_embeddings",
     )
 
     # Group level observation model parameters
@@ -793,8 +625,12 @@ def _model_structure(config):
     subjects = subjects_layer(data)
     subject_embeddings = subject_embeddings_layer(subjects)
 
-    group_mu = group_means_layer(data)
-    group_D = group_covs_layer(data)
+    group_mu = group_means_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )
+    group_D = group_covs_layer(
+        data, static_loss_scaling_factor=static_loss_scaling_factor
+    )
 
     # ---------------
     # Mean deviations
@@ -808,8 +644,7 @@ def _model_structure(config):
         means_concat_embeddings_layer = ConcatEmbeddingsLayer(
             name="means_concat_embeddings",
         )
-
-        means_dev_map_input_layer = MultiLayerPerceptronLayer(
+        means_dev_decoder_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
             config.dev_normalization,
@@ -817,17 +652,23 @@ def _model_structure(config):
             config.dev_dropout,
             config.dev_regularizer,
             config.dev_regularizer_factor,
-            name="means_dev_map_input",
+            name="means_dev_decoder",
         )
-        means_dev_map_layer = layers.Dense(config.n_channels, name="means_dev_map")
+        means_dev_map_layer = layers.Dense(
+            config.n_channels,
+            name="means_dev_map",
+        )
         norm_means_dev_map_layer = layers.LayerNormalization(
-            axis=-1, name="norm_means_dev_map"
+            axis=-1, scale=False, name="norm_means_dev_map"
         )
 
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_means,
-            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("means_alpha", 0.0)),
+                0.1,
+            ),
             name="means_dev_mag_inf_alpha_input",
         )
         means_dev_mag_inf_alpha_layer = layers.Activation(
@@ -836,14 +677,17 @@ def _model_structure(config):
         means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_means,
-            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 5.0)),
+                0.1,
+            ),
             name="means_dev_mag_inf_beta_input",
         )
         means_dev_mag_inf_beta_layer = layers.Activation(
             "softplus", name="means_dev_mag_inf_beta"
         )
         means_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, name="means_dev_mag"
+            config.covariances_epsilon, config.do_kl_annealing, name="means_dev_mag"
         )
 
         means_dev_layer = layers.Multiply(name="means_dev")
@@ -857,13 +701,18 @@ def _model_structure(config):
         )
 
         # Get the mean deviation maps (no global magnitude information)
-        means_dev_map_input = means_dev_map_input_layer([data, means_concat_embeddings])
-        means_dev_map = means_dev_map_layer(means_dev_map_input)
+        means_dev_decoder = means_dev_decoder_layer(
+            means_concat_embeddings,
+            static_loss_scaling_factor=static_loss_scaling_factor,
+        )
+        means_dev_map = means_dev_map_layer(means_dev_decoder)
         norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
 
         # Get the deviation magnitudes (scale deviation maps globally)
 
-        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
+        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(
+            data,
+        )
         means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
             means_dev_mag_inf_alpha_input
         )
@@ -895,7 +744,7 @@ def _model_structure(config):
             name="covs_concat_embeddings",
         )
 
-        covs_dev_map_input_layer = MultiLayerPerceptronLayer(
+        covs_dev_decoder_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
             config.dev_normalization,
@@ -903,19 +752,23 @@ def _model_structure(config):
             config.dev_dropout,
             config.dev_regularizer,
             config.dev_regularizer_factor,
-            name="covs_dev_map_input",
+            name="covs_dev_decoder",
         )
         covs_dev_map_layer = layers.Dense(
-            config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_map"
+            config.n_channels * (config.n_channels + 1) // 2,
+            name="covs_dev_map",
         )
         norm_covs_dev_map_layer = layers.LayerNormalization(
-            axis=-1, name="norm_covs_dev_map"
+            axis=-1, scale=False, name="norm_covs_dev_map"
         )
 
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=20, stddev=10),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("covs_alpha", 0.0)),
+                0.1,
+            ),
             name="covs_dev_mag_inf_alpha_input",
         )
         covs_dev_mag_inf_alpha_layer = layers.Activation(
@@ -924,14 +777,17 @@ def _model_structure(config):
         covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
             shape=(config.n_subjects, config.n_states, 1),
             learn=config.learn_covariances,
-            initializer=initializers.TruncatedNormal(mean=100, stddev=20),
+            initializer=osld_initializers.RandomWeightInitializer(
+                tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 5.0)),
+                0.1,
+            ),
             name="covs_dev_mag_inf_beta_input",
         )
         covs_dev_mag_inf_beta_layer = layers.Activation(
             "softplus", name="covs_dev_mag_inf_beta"
         )
         covs_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, name="covs_dev_mag"
+            config.covariances_epsilon, config.do_kl_annealing, name="covs_dev_mag"
         )
         covs_dev_layer = layers.Multiply(name="covs_dev")
 
@@ -946,8 +802,11 @@ def _model_structure(config):
         )
 
         # Get the covariance deviation maps (no global magnitude information)
-        covs_dev_map_input = covs_dev_map_input_layer([data, covs_concat_embeddings])
-        covs_dev_map = covs_dev_map_layer(covs_dev_map_input)
+        covs_dev_decoder = covs_dev_decoder_layer(
+            covs_concat_embeddings,
+            static_loss_scaling_factor=static_loss_scaling_factor,
+        )
+        covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
         norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
 
         # Get the deviation magnitudes (scale deviation maps globally)
@@ -956,7 +815,9 @@ def _model_structure(config):
             covs_dev_mag_inf_alpha_input
         )
         covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
-        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
+        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(
+            covs_dev_mag_inf_beta_input,
+        )
         covs_dev_mag = covs_dev_mag_layer(
             [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta]
         )
@@ -992,12 +853,26 @@ def _model_structure(config):
     # and get the conditional likelihood
 
     # Layer definitions
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-        config.n_states, config.covariances_epsilon, name="ll_loss"
+    ll_layer = SeparateLogLikelihoodLayer(
+        config.n_states, config.covariances_epsilon, name="ll"
     )
 
     # Data flow
-    ll_loss = ll_loss_layer([data, mu, D, gamma, subj_id])
+    ll = ll_layer([data, mu, D, array_id])
+
+    # Hidden state inference
+    hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
+        config.n_states,
+        config.initial_trans_prob,
+        config.learn_trans_prob,
+        dtype="float64",
+        name="hid_state_inf",
+    )
+    gamma, xi = hidden_state_inference_layer(ll)
+
+    # Loss
+    ll_loss_layer = SumLogLikelihoodLossLayer(name="ll_loss")
+    ll_loss = ll_loss_layer([ll, gamma])
 
     # ---------
     # KL losses
@@ -1005,16 +880,6 @@ def _model_structure(config):
     # For the observation model (static KL loss)
     if config.learn_means:
         # Layer definitions
-        means_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            config.dev_regularizer,
-            config.dev_regularizer_factor,
-            name="means_dev_mag_mod_beta_input",
-        )
         means_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
@@ -1026,36 +891,25 @@ def _model_structure(config):
         )
 
         # Data flow
-        means_dev_mag_mod_beta_input = means_dev_mag_mod_beta_input_layer(
-            [data, means_concat_embeddings]
-        )
-        means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(
-            means_dev_mag_mod_beta_input
-        )
+        means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
             [
                 data,
                 means_dev_mag_inf_alpha,
                 means_dev_mag_inf_beta,
                 means_dev_mag_mod_beta,
-            ]
+            ],
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
-        means_dev_mag_kl_loss_layer = ZeroLayer((), name="means_dev_mag_kl_loss")
+        means_dev_mag_kl_loss_layer = ZeroLayer(
+            (),
+            name="means_dev_mag_kl_loss",
+        )
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
 
     if config.learn_covariances:
         # Layer definitions
-        covs_dev_mag_mod_beta_input_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            config.dev_regularizer,
-            config.dev_regularizer_factor,
-            name="covs_dev_mag_mod_beta_input",
-        )
         covs_dev_mag_mod_beta_layer = layers.Dense(
             1,
             activation="softplus",
@@ -1067,17 +921,17 @@ def _model_structure(config):
         )
 
         # Data flow
-        covs_dev_mag_mod_beta_input = covs_dev_mag_mod_beta_input_layer(
-            [data, covs_concat_embeddings]
+        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+            covs_dev_decoder,
         )
-        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_mag_mod_beta_input)
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
             [
                 data,
                 covs_dev_mag_inf_alpha,
                 covs_dev_mag_inf_beta,
                 covs_dev_mag_mod_beta,
-            ]
+            ],
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
         covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
@@ -1085,9 +939,13 @@ def _model_structure(config):
 
     # Total KL loss
     # Layer definitions
-    kl_loss_layer = KLLossLayer(do_annealing=True, name="kl_loss")
+    kl_loss_layer = KLLossLayer(do_annealing=config.do_kl_annealing, name="kl_loss")
 
     # Data flow
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss, kl_loss], name="SE-HMM-Obs")
+    return tf.keras.Model(
+        inputs=[data, array_id],
+        outputs=[ll_loss, kl_loss, gamma, xi],
+        name="SE-HMM",
+    )

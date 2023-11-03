@@ -1,5 +1,15 @@
 """Functions to perform statistical significance testing.
 
+Note
+----
+This module is used in the following tutorials:
+
+- `Static Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/static_power_analysis.html>`_
+- `HMM Summary Statistics Analysis <https://osl-dynamics.readthedocs.io/en\
+  /latest/tutorials_build/hmm_summary_stats_analysis.html>`_.
+- `HMM Evoked Response Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/hmm_evoked_response_analysis.html>`_
 """
 
 import logging
@@ -63,7 +73,7 @@ def _check_glm_data(data, covariates, assignments=None):
 
 
 def evoked_response_max_stat_perm(
-    data, n_perm, covariates={}, metric="copes", n_jobs=1
+    data, n_perm, covariates=None, metric="copes", n_jobs=1
 ):
     """Statistical significant testing for evoked responses.
 
@@ -74,29 +84,36 @@ def evoked_response_max_stat_perm(
     Parameters
     ----------
     data : np.ndarray
-        Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape (n_subjects, n_samples, n_modes).
+        Baseline corrected evoked responses. This will be the target data for
+        the GLM. Must be shape (n_subjects, n_samples, ...).
     n_perm : int
         Number of permutations.
-    covariates : dict
-        Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
-    metric : str
-        Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
-    n_jobs : int
+    covariates : dict, optional
+        Covariates (extra regressors) to add to the GLM fit. These will be
+        z-transformed. Must be of shape (n_subjects,).
+    metric : str, optional
+        Metric to use to build the null distribution. Can be :code:`'tstats'` or
+        :code:`'copes'`.
+    n_jobs : int, optional
         Number of processes to run in parallel.
 
     Returns
     -------
     pvalues : np.ndarray
-        P-values for the evoked response. Shape is (n_subjects, n_samples, n_modes).
+        P-values for the evoked response. Shape is (n_subjects, n_samples, ...).
     """
-    if metric not in ["tstats", "copes"]:
-        raise ValueError("metric must be 'tstats' or 'copes'.")
+    if covariates is None:
+        covariates = {}
 
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
-    if data.ndim != 3:
-        raise ValueError("data must be (n_subjects, n_samples, n_modes).")
+
+    ndim = data.ndim
+    if ndim < 3:
+        raise ValueError("data must be 3D or greater.")
+
+    if metric not in ["tstats", "copes"]:
+        raise ValueError("metric must be 'tstats' or 'copes'.")
 
     data, covariates = _check_glm_data(data, covariates)
 
@@ -104,19 +121,27 @@ def evoked_response_max_stat_perm(
     data = glm.data.TrialGLMData(
         data=data,
         **covariates,
-        dim_labels=["subjects", "samples", "channels"],
+        dim_labels=["subjects", "time"] + [f"features {i}" for i in range(1, ndim - 1)],
     )
 
     # Create design matrix
     DC = glm.design.DesignConfig()
     for name in covariates:
-        DC.add_regressor(name=name, rtype="Parametric", datainfo=name, preproc="z")
+        DC.add_regressor(
+            name=name,
+            rtype="Parametric",
+            datainfo=name,
+            preproc="z",
+        )
     DC.add_regressor(name="Mean", rtype="Constant")
     DC.add_contrast(name="Mean", values=[1] + [0] * len(covariates))
     design = DC.design_from_datainfo(data.info)
 
     # Fit model and get t-statistics
     model = glm.fit.OLSModel(design, data)
+
+    # Pool over all dimensions over than subjects
+    pooled_dims = tuple(range(1, ndim))
 
     # Run permutations and get null distribution
     perm = glm.permutations.MaxStatPermutation(
@@ -126,7 +151,7 @@ def evoked_response_max_stat_perm(
         nperms=n_perm,
         metric=metric,
         tail=0,  # two-sided test
-        pooled_dims=(1, 2),  # pool over samples and modes dimension
+        pooled_dims=pooled_dims,
         nprocesses=n_jobs,
     )
     null_dist = perm.nulls
@@ -152,7 +177,7 @@ def evoked_response_max_stat_perm(
 
 
 def group_diff_max_stat_perm(
-    data, assignments, n_perm, covariates={}, metric="tstats", n_jobs=1
+    data, assignments, n_perm, covariates=None, metric="tstats", n_jobs=1
 ):
     """Statistical significant testing for the difference between two groups.
 
@@ -163,19 +188,21 @@ def group_diff_max_stat_perm(
     Parameters
     ----------
     data : np.ndarray
-        Baseline corrected evoked responses. This will be the target data for the GLM.
-        Must be shape (n_subjects, features1, features2, ...).
+        Baseline corrected evoked responses. This will be the target data for
+        the GLM. Must be shape (n_subjects, features1, features2, ...).
     assignments : np.ndarray
         1D numpy array containing group assignments. A value of 1 indicates
         Group1 and a value of 2 indicates Group2. Note, we test the contrast
-        abs(Group1 - Group2) > 0.
+        :code:`abs(Group1 - Group2) > 0`.
     n_perm : int
         Number of permutations.
-    covariates : dict
-        Covariates (extra regressors) to add to the GLM fit. These will be z-transformed.
-    metric : str
-        Metric to use to build the null distribution. Can be 'tstats' or 'copes'.
-    n_jobs : int
+    covariates : dict, optional
+        Covariates (extra regressors) to add to the GLM fit. These will be
+        z-transformed. Must be of shape (n_subjects,).
+    metric : str, optional
+        Metric to use to build the null distribution. Can be :code:`'tstats'` or
+        :code:`'copes'`.
+    n_jobs : int, optional
         Number of processes to run in parallel.
 
     Returns
@@ -185,8 +212,12 @@ def group_diff_max_stat_perm(
     pvalues : np.ndarray
         P-values for the features. Shape is (features1, features2, ...).
     """
+    if covariates is None:
+        covariates = {}
+
     if not isinstance(data, np.ndarray):
         raise ValueError("data must be a numpy array.")
+
     ndim = data.ndim
     if ndim == 1:
         raise ValueError("data must be 2D or greater.")
@@ -194,12 +225,11 @@ def group_diff_max_stat_perm(
     if metric not in ["tstats", "copes"]:
         raise ValueError("metric must be 'tstats' or 'copes'.")
 
-    data, covariates, assignments = _check_glm_data(data, covariates, assignments)
-
-    # Calculate group difference
-    group1_mean = np.mean(data[assignments == 1], axis=0)
-    group2_mean = np.mean(data[assignments == 2], axis=0)
-    group_diff = group1_mean - group2_mean
+    data, covariates, assignments = _check_glm_data(
+        data,
+        covariates,
+        assignments,
+    )
 
     # Create GLM Dataset
     data = glm.data.TrialGLMData(
@@ -214,7 +244,12 @@ def group_diff_max_stat_perm(
     DC.add_regressor(name="Group1", rtype="Categorical", codes=1)
     DC.add_regressor(name="Group2", rtype="Categorical", codes=2)
     for name in covariates:
-        DC.add_regressor(name=name, rtype="Parametric", datainfo=name, preproc="z")
+        DC.add_regressor(
+            name=name,
+            rtype="Parametric",
+            datainfo=name,
+            preproc="z",
+        )
     DC.add_contrast(name="GroupDiff", values=[1, -1] + [0] * len(covariates))
     design = DC.design_from_datainfo(data.info)
 
@@ -250,5 +285,8 @@ def group_diff_max_stat_perm(
         copes = abs(model.copes[0])
         percentiles = stats.percentileofscore(null_dist, copes)
     pvalues = 1 - percentiles / 100
+
+    # Get group differences
+    group_diff = model.copes[0]
 
     return group_diff, pvalues

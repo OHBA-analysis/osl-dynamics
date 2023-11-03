@@ -4,6 +4,13 @@ osl-dynamics
 
 See the read the docs page for a description of this project: `https://osl-dynamics.readthedocs.io <https://osl-dynamics.readthedocs.io>`_.
 
+Citation
+========
+
+If you find this toolbox useful, please cite:
+
+    **Gohil C., et al., 2023. osl-dynamics: A toolbox for modelling fast dynamic brain activity. bioRxiv doi: https://doi.org/10.1101/2023.08.07.549346.**
+
 Installation
 ============
 
@@ -17,7 +24,7 @@ Here, we describe how to install osl-dynamics from source. We recommend using th
     conda activate osld
     pip install -e .
 
-If you're using a Mac then use the ``envs/mac.yml`` file to create the conda environment instead of ``envs/linux.yml``. Note, the conda environments use ``pip`` to install TensorFlow, you may need to load/install additional libraries (such as CUDA/cuDNN) if you have GPU support.
+Note, if you have a Mac you may want to use the ``envs/mac.yml`` environment file instead.
 
 Developers might want to clone the repo using SSH instead of HTTPS:
 
@@ -39,7 +46,8 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
 
     conda activate osl
     cd osl-dynamics
-    pip install tensorflow
+    pip install tensorflow==2.9.1
+    pip install tensorflow-probability==0.17
     pip install -e .
 
 Documentation
@@ -77,13 +85,14 @@ A couple packages are needed to build and upload a project to PyPI, these can be
 
 The following steps can be used to release a new version:
 
-#. Update the version number on line 5 of ``setup.cfg``.
+#. Update the version on line 5 of ``setup.cfg`` by removing ``dev`` from the version number.
 #. Commit the updated setup.cfg to the ``main`` branch of the GitHub repo.
 #. Delete any old distributions that have been built (if there are any): ``rm -r dist``.
 #. Build a distribution in the osl-dynamics root directory with ``python -m build``. This will create a new directory called ``dist``.
 #. Test the build by installing in a test conda environment with ``cd dist; pip install <build>.whl``.
 #. Upload the distribution to PyPI with ``twine upload dist/*``. You will need to enter the username and password that you used to register with `https://pypi.org <https://pypi.org>`_.
 #. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage.
+#. Change the version to ``X.Y.devZ`` in ``setup.cfg`` and commit the new dev version to ``main``.
 
 The uploaded distribution will then be available to be installed with:
 

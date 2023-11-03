@@ -5,6 +5,8 @@ Welcome to the osl-dynamics documentation!
 
 The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics. New users may find the :doc:`FAQ <faq>` useful.
 
+**New users are encouraged to have a look at the config API interface:** `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_.
+
 Models
 ------
 
@@ -12,7 +14,6 @@ Various models are implemented in osl-dynamics. Finalised models that have been 
 
 - :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 - :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
-- :doc:`Multi-Dynamic Adversarial Generator Encoder (MAGE) <models/mage>`.
 
 Tutorials
 ---------
@@ -46,8 +47,9 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/dynemo_mixing_coef_analysis`.
 - :doc:`tutorials_build/dynemo_plotting_networks`.
 
-**Other**:
-
-- :doc:`tutorials_build/statistical_significance_testing`.
-
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
+
+Workshops
+---------
+
+- `2023 OHBA Software Library (OSL) workshop <https://osf.io/zxb6c/>`_.

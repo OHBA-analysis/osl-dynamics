@@ -1,4 +1,5 @@
-"""Functions to use Connectome Workbench.
+"""Functions to use `Connectome Workbench <https://www.humanconnectome.org\
+/software/connectome-workbench>`_.
 
 """
 
@@ -49,13 +50,14 @@ def render(
     ----------
     nii : str
         Path to nii image file.
-    save_dir : str
+    save_dir : str, optional
         Path to save rendered surface plots.
-    interptype : str
-        Interpolation type. Default is 'trilinear'.
-    gui : bool
-        Should we display the rendered plots in workbench? Default is True.
-    image_name : str
+    interptype : str, optional
+        Interpolation type. Default is :code:`'trilinear'`.
+    gui : bool, optional
+        Should we display the rendered plots in workbench?
+        Default is :code:`True`.
+    image_name : str, optional
         Filename of image to save.
     """
     nii = pathlib.Path(nii)
@@ -81,15 +83,33 @@ def render(
     output_right = stem_right.with_suffix(".func.gii")
     output_left = stem_left.with_suffix(".func.gii")
 
-    volume_to_surface(nii, surf=surf_right, output=output_right, interptype=interptype)
+    volume_to_surface(
+        nii,
+        surf=surf_right,
+        output=output_right,
+        interptype=interptype,
+    )
 
-    volume_to_surface(nii, surf=surf_left, output=output_left, interptype=interptype)
+    volume_to_surface(
+        nii,
+        surf=surf_left,
+        output=output_left,
+        interptype=interptype,
+    )
 
     cifti_right = stem_right.with_suffix(".dtseries.nii")
     cifti_left = stem_left.with_suffix(".dtseries.nii")
 
-    dense_timeseries(cifti=cifti_right, output=output_right, left_or_right="right")
-    dense_timeseries(cifti=cifti_left, output=output_left, left_or_right="left")
+    dense_timeseries(
+        cifti=cifti_right,
+        output=output_right,
+        left_or_right="right",
+    )
+    dense_timeseries(
+        cifti=cifti_left,
+        output=output_left,
+        left_or_right="left",
+    )
 
     temp_scene = str(save_dir) + "/temp_scene.scene"
 

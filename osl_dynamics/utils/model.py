@@ -6,7 +6,8 @@ import re
 
 
 def tex_escape(text):
-    """Escape characters which require control sequences in text for use in LaTeX.
+    """Escape characters which require control sequences in text for use
+    in LaTeX.
 
     Parameters
     ----------
@@ -51,11 +52,11 @@ class Table:
         List of strings for the table headers.
     """
 
-    def __init__(self, headers: list):
+    def __init__(self, headers):
         self.headers = headers
         self.rows = []
 
-    def __iadd__(self, other: list):
+    def __iadd__(self, other):
         """Add a row to the table.
 
         Parameters
@@ -85,7 +86,6 @@ class HTMLTable(Table):
         The table headers.
     rows : list of list of str
         The table rows.
-
     """
 
     outer = "<table>\n{headers}\n{content}\n</table>"
@@ -100,11 +100,6 @@ class HTMLTable(Table):
         ----------
         item : str
             The string to append to the cell.
-
-        Returns
-        -------
-        None
-
         """
         self.rows[-1][-1] = "\n".join([self.rows[-1][-1], item])
 
@@ -113,13 +108,13 @@ class HTMLTable(Table):
 
         Parameters
         ----------
-        items : list
-            A list of strings to be added to the HTML table
+        items : list of str
+            A list of :code:`str` to be added to the HTML table.
 
         Returns
         -------
         html : str
-            The HTML table row
+            The HTML table row.
         """
         data = "".join([self.td.format(item) for item in items])
         return self.tr.format(data)
@@ -138,16 +133,10 @@ class HTMLTable(Table):
     def output(self):
         """Create the full HTML for the table.
 
-        Parameters
-        ----------
-        self : Table
-            The Table object.
-
         Returns
         -------
-        str
+        html : str
             The HTML for the table.
-
         """
         headers = self.html_headers()
         rows = "\n".join([self.html_row(row) for row in self.rows])
@@ -161,7 +150,7 @@ class HTMLTable(Table):
         Returns
         -------
         html : str
-            HTML representation of the current object
+            HTML representation of the current object.
         """
         return self.output()
 
@@ -175,7 +164,13 @@ class LatexTable(Table):
         The table headers.
     rows : list of list of str
         The table rows.
-
+    vertical_lines : bool, optional
+        Whether to draw vertical lines, by default :code:`True`.
+    horizontal_lines : bool, optional
+        Whether to draw horizontal lines, by default :code:`True`.
+    header_lines : bool, optional
+        Whether to draw horizontal lines above the header,
+        by default :code:`True`.
     """
 
     outer = "".join(
@@ -190,41 +185,30 @@ class LatexTable(Table):
     )
 
     def __init__(
-        self, headers, *, vertical_lines=True, horizontal_lines=True, header_lines=True
+        self,
+        headers,
+        *,
+        vertical_lines=True,
+        horizontal_lines=True,
+        header_lines=True,
     ):
-        """
-        Parameters
-        ----------
-        headers : list
-            List of header strings.
-        vertical_lines : bool, optional
-            Whether to draw vertical lines, by default True
-        horizontal_lines : bool, optional
-            Whether to draw horizontal lines, by default True
-        header_lines : bool, optional
-            Whether to draw horizontal lines above the header, by default True
-        """
         super().__init__(headers)
         self.vertical_lines = vertical_lines
         self.horizontal_lines = horizontal_lines
 
     def escape(self):
-        """Escape special characters in headers and rows
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
-        """
+        """Escape special characters in headers and rows."""
         self.headers = [tex_escape(header) for header in self.headers]
         self.rows = [[tex_escape(item) for item in row] for row in self.rows]
 
     def append_last(self, item):
-        """Append an item on the last row of the table"""
+        """Append an item on the last row of the table.
+
+        Parameters
+        ----------
+        item : any
+            Item to append.
+        """
         self.rows.append(["", "", "", item])
 
     @staticmethod
@@ -245,11 +229,6 @@ class LatexTable(Table):
 
     def output(self):
         """Format the table into LaTeX code.
-
-        Parameters
-        ----------
-        self : Table
-            A Table object.
 
         Returns
         -------
@@ -276,12 +255,11 @@ class LatexTable(Table):
         )
 
     def _repr_latex_(self):
-        r"""Returns the LaTeX representation of the object.
+        """Returns the LaTeX representation of the object.
 
         Returns
         -------
         latex : str
             The LaTeX representation of the object.
-
         """
         return self.output()

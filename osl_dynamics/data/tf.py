@@ -5,62 +5,49 @@
 import numpy as np
 
 
-def n_batches(arr, sequence_length, step_size=None):
-    """Calculate the number of batches an array will be split into.
+def get_n_sequences(arr, sequence_length, step_size=None):
+    """Calculate the number of sequences an array will be split into.
 
     Parameters
     ----------
-    arr : numpy.ndarray
+    arr : np.ndarray
         Time series data.
     sequence_length : int
         Length of sequences which the data will be segmented in to.
-    step_size : int
-        The number of samples by which to move the sliding window between sequences.
+    step_size : int, optional
+        The number of samples by which to move the sliding window between
+        sequences.
 
     Returns
     -------
     n : int
-        Number of batches.
+        Number of sequences.
     """
     step_size = step_size or sequence_length
-    final_slice_start = arr.shape[0] - sequence_length + 1
-    index = np.arange(0, final_slice_start, step_size)[:, None] + np.arange(
-        sequence_length
-    )
-    return len(index)
+    n_samples = (arr.shape[0] // sequence_length) * sequence_length
+    return n_samples // step_size
 
 
-def concatenate_datasets(datasets, shuffle=True):
+def concatenate_datasets(datasets):
     """Concatenates a list of TensorFlow datasets.
 
     Parameters
     ----------
     datasets : list
         List of TensorFlow datasets.
-    Shuffle : bool
-        Should we shuffle the final concatenated dataset?
 
     Returns
     -------
-    full_dataset : tensorflow.data.Dataset
+    full_dataset : tf.data.Dataset
         Concatenated dataset.
     """
-
     full_dataset = datasets[0]
     for ds in datasets[1:]:
         full_dataset = full_dataset.concatenate(ds)
-
-    if shuffle:
-        full_dataset = full_dataset.shuffle(100000)
-
     return full_dataset
 
 
-def create_dataset(
-    data,
-    sequence_length,
-    step_size,
-):
+def create_dataset(data, sequence_length, step_size):
     """Creates a TensorFlow dataset of batched time series data.
 
     Parameters
@@ -75,7 +62,7 @@ def create_dataset(
 
     Returns
     -------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
     """
     from tensorflow.data import Dataset  # moved here to avoid slow imports
@@ -88,7 +75,11 @@ def create_dataset(
     # Create an overlapping single model input dataset
     elif len(data) == 1:
         dataset = Dataset.from_tensor_slices(list(data.values())[0])
-        dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
+        dataset = dataset.window(
+            sequence_length,
+            step_size,
+            drop_remainder=True,
+        )
         dataset = dataset.flat_map(
             lambda window: window.batch(sequence_length, drop_remainder=True)
         )
@@ -109,11 +100,58 @@ def create_dataset(
 
         dataset = tuple([Dataset.from_tensor_slices(v) for v in data.values()])
         dataset = Dataset.zip(dataset)
-        dataset = dataset.window(sequence_length, step_size, drop_remainder=True)
+        dataset = dataset.window(
+            sequence_length,
+            step_size,
+            drop_remainder=True,
+        )
         dataset = dataset.flat_map(batch_windows)
         dataset = dataset.map(tuple_to_dict)
 
     return dataset
+
+
+def save_tfrecord(data, sequence_length, step_size, filepath):
+    """Save dataset to a TFRecord file.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing data to batch. Keys correspond to the input name
+        for the model and the value is the data.
+    sequence_length : int
+        Sequence length to batch the data.
+    step_size : int
+        Number of samples to slide the sequence across the data.
+    filepath : str
+        Path to save the TFRecord file.
+    """
+    import tensorflow as tf  # moved here to avoid slow imports
+    from tensorflow.train import Feature, Features, Example, BytesList
+
+    dataset = create_dataset(data, sequence_length, step_size)
+
+    # Helper function to serialize a sequence to a tensorflow example
+    # byte string
+    def _make_example(sequence):
+        # Note this function assumes all features are tf tensors
+        # and can be converted to bytes
+        features = Features(
+            feature={
+                k: Feature(
+                    bytes_list=BytesList(
+                        value=[tf.io.serialize_tensor(v).numpy()],
+                    )
+                )
+                for k, v in sequence.items()
+            }
+        )
+        return Example(features=features).SerializeToString()
+
+    # Serialize each sequence and write to a TFRecord file
+    with tf.io.TFRecordWriter(filepath) as writer:
+        for sequence in dataset:
+            writer.write(_make_example(sequence))
 
 
 def get_range(dataset):
@@ -121,7 +159,7 @@ def get_range(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
@@ -147,7 +185,7 @@ def get_n_channels(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
@@ -167,7 +205,7 @@ def get_n_batches(dataset):
 
     Parameters
     ----------
-    dataset : tensorflow.data.Dataset
+    dataset : tf.data.Dataset
         TensorFlow dataset.
 
     Returns
@@ -175,4 +213,22 @@ def get_n_batches(dataset):
     n_batches : int
         Number of batches.
     """
-    return dataset.cardinality().numpy()
+    import tensorflow as tf  # avoid slow imports
+
+    if isinstance(dataset, list):
+        if len(dataset) == 1:
+            dataset = dataset[0]
+        else:
+            dataset = concatenate_datasets(dataset)
+
+    if not isinstance(dataset, tf.data.Dataset):
+        raise ValueError("dataset must be a TensorFlow dataset or a list of datasets")
+
+    # Count number of batches
+    cardinality = dataset.cardinality()
+    if cardinality == tf.data.UNKNOWN_CARDINALITY:
+        for i, _ in enumerate(dataset):
+            pass
+        return i + 1
+
+    return cardinality.numpy()

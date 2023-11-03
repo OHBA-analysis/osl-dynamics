@@ -1,5 +1,17 @@
 """Functions to calculate and plot network connectivity.
 
+Note
+----
+This module is used in the following tutorials:
+
+- `Static AEC Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/static_aec_analysis.html>`_.
+- `Sliding Window Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/sliding_window_analysis.html>`_.
+- `HMM Coherence Analysis <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/hmm_coherence_analysis.html>`_.
+- `DyNeMo Plotting Networks <https://osl-dynamics.readthedocs.io/en/latest\
+  /tutorials_build/dynemo_plotting_networks.html>`_.
 """
 
 from pathlib import Path
@@ -32,15 +44,16 @@ def sliding_window_connectivity(
         or (n_samples, n_channels).
     window_length : int
         Window length in samples.
-    step_size : int
+    step_size : int, optional
         Number of samples to slide the window along the time series.
-        If None is passed, then a 50% overlap is used.
-    conn_type : str
+        If :code:`None`, then :code:`step_size=window_length // 2`.
+    conn_type : str, optional
         Metric to use to calculate pairwise connectivity in the network.
-        Should "corr" for Pearson correlation or "cov" for covariance.
-    concatenate : bool
-        Should we concatenate the sliding window connectivities from each subject
-        into one big time series?
+        Should use :code:`"corr"` for Pearson correlation or :code:`"cov"`
+        for covariance.
+    concatenate : bool, optional
+        Should we concatenate the sliding window connectivities from each
+        subject into one big time series?
 
     Returns
     -------
@@ -90,24 +103,26 @@ def sliding_window_connectivity(
 
 
 def covariance_from_spectra(
-    frequencies,
-    power_spectra,
+    f,
+    cpsd,
     components=None,
     frequency_range=None,
 ):
-    """Calculates variance from power spectra.
+    """Calculates covariance from cross power spectra.
 
     Parameters
     ----------
-    frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if frequency_range is given.
-    power_spectra : np.ndarray
-        Power/cross spectra for each channel. Shape is (n_modes, n_channels,
-        n_channels, n_freq).
-    components : np.ndarray
-        Spectral components. Shape is (n_components, n_freq).
-    frequency_range : list
-        Frequency range to integrate the PSD over (Hz). Default is full range.
+    f : np.ndarray
+        Frequency axis of the spectra. Only used if :code:`frequency_range`
+        is given. Shape must be (n_freq,).
+    cpsd : np.ndarray
+        Cross power spectra. Shape must be
+        (n_modes, n_channels, n_channels, n_freq).
+    components : np.ndarray, optional
+        Spectral components. Shape must be (n_components, n_freq).
+    frequency_range : list, optional
+        Frequency range to integrate the PSD over (Hz).
+        Default is the full range.
 
     Returns
     -------
@@ -123,8 +138,8 @@ def covariance_from_spectra(
         + "(n_subjects, n_modes, n_channels, n_channels, n_freq) "
         + "array must be passed."
     )
-    power_spectra = array_ops.validate(
-        power_spectra,
+    cpsd = array_ops.validate(
+        cpsd,
         correct_dimensionality=5,
         allow_dimensions=[3, 4],
         error_message=error_message,
@@ -135,13 +150,13 @@ def covariance_from_spectra(
             "Only one of the arguments components or frequency range can be passed."
         )
 
-    if frequency_range is not None and frequencies is None:
+    if frequency_range is not None and f is None:
         raise ValueError(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
+    n_subjects, n_modes, n_channels, n_channels, n_freq = cpsd.shape
     if components is None:
         n_components = 1
     else:
@@ -151,7 +166,7 @@ def covariance_from_spectra(
     covar = []
     for i in range(n_subjects):
         # Cross spectral densities
-        csd = power_spectra[i].reshape(-1, n_freq)
+        csd = cpsd[i].reshape(-1, n_freq)
         csd = abs(csd)
 
         if components is not None:
@@ -165,8 +180,8 @@ def covariance_from_spectra(
             if frequency_range is None:
                 c = np.sum(csd, axis=-1)
             else:
-                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
-                c = np.sum(csd[..., f_min:f_max], axis=-1)
+                [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+                c = np.sum(csd[..., min_arg:max_arg], axis=-1)
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         covar.append(c)
@@ -175,8 +190,8 @@ def covariance_from_spectra(
 
 
 def mean_coherence_from_spectra(
-    frequencies,
-    coherence,
+    f,
+    coh,
     components=None,
     frequency_range=None,
 ):
@@ -184,19 +199,20 @@ def mean_coherence_from_spectra(
 
     Parameters
     ----------
-    frequencies : np.ndarray
-        Frequency axis of the PSDs. Only used if frequency_range is given.
-    coherence : np.ndarray
-        Coherence for each channel. Shape is (n_modes, n_channels,
+    f : np.ndarray
+        Frequency axis of the spectra. Only used if :code:`frequency_range` is
+        given. Shape must be (n_freq,).
+    coh : np.ndarray
+        Coherence for each channel. Shape must be (n_modes, n_channels,
         n_channels, n_freq).
-    components : np.ndarray
-        Spectral components. Shape is (n_components, n_freq).
-    frequency_range : list
+    components : np.ndarray, optional
+        Spectral components. Shape must be (n_components, n_freq).
+    frequency_range : list, optional
         Frequency range to integrate the PSD over (Hz).
 
     Returns
     -------
-    coh : np.ndarray
+    mean_coh : np.ndarray
         Mean coherence over a frequency band for each component of each mode.
         Shape is (n_components, n_modes, n_channels, n_channels) or
         (n_modes, n_channels, n_channels) or (n_channels, n_channels).
@@ -208,8 +224,8 @@ def mean_coherence_from_spectra(
         + "or 4D numpy array (n_modes, n_channels, n_channels, "
         + "n_freq) must be passed for spectra."
     )
-    coherence = array_ops.validate(
-        coherence,
+    coh = array_ops.validate(
+        coh,
         correct_dimensionality=5,
         allow_dimensions=[3, 4],
         error_message=error_message,
@@ -220,42 +236,42 @@ def mean_coherence_from_spectra(
             "Only one of the arguments components or frequency range can be passed."
         )
 
-    if frequency_range is not None and frequencies is None:
+    if frequency_range is not None and f is None:
         raise ValueError(
             "If frequency_range is passed, frequenices must also be passed."
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_freq = coherence.shape
+    n_subjects, n_modes, n_channels, n_channels, n_freq = coh.shape
     if components is None:
         n_components = 1
     else:
         n_components = components.shape[0]
 
-    # Calculate connectivity for each subject
-    c = []
+    # Calculate mean coherence for each subject
+    mean_coh = []
     for i in range(n_subjects):
         # Concatenate over modes
-        coh = coherence[i].reshape(-1, n_freq)
+        c = coh[i].reshape(-1, n_freq)
 
         if components is not None:
             # Coherence for each spectral component
-            coh = components @ coh.T
+            c = components @ c.T
             for j in range(n_components):
-                coh[j] /= np.sum(components[j])
+                c[j] /= np.sum(components[j])
 
         else:
             # Mean over the given frequency range
             if frequency_range is None:
-                coh = np.mean(coh, axis=-1)
+                c = np.mean(c, axis=-1)
             else:
-                [f_min, f_max] = get_frequency_args_range(frequencies, frequency_range)
-                coh = np.mean(coh[..., f_min:f_max], axis=-1)
+                [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
+                c = np.mean(c[..., min_arg:max_arg], axis=-1)
 
-        coh = coh.reshape(n_components, n_modes, n_channels, n_channels)
-        c.append(coh)
+        c = c.reshape(n_components, n_modes, n_channels, n_channels)
+        mean_coh.append(c)
 
-    return np.squeeze(c)
+    return np.squeeze(mean_coh)
 
 
 def mean_connections(conn_map):
@@ -274,27 +290,33 @@ def mean_connections(conn_map):
     return np.mean(conn_map, axis=-1)
 
 
-def eigenvectors(conn_map, n_eigenvectors=1, absolute_value=False, as_network=False):
+def eigenvectors(
+    conn_map,
+    n_eigenvectors=1,
+    absolute_value=False,
+    as_network=False,
+):
     """Calculate eigenvectors of a connectivity matrix.
 
     Parameters
     ----------
     conn_map : np.ndarray
         Connectivity matrix. Shape must be (..., n_channels, n_channels).
-    n_eigenvectors : int
+    n_eigenvectors : int, optional
         Number of eigenvectors to include.
-    absolute_value : bool
+    absolute_value : bool, optional
         Should we take the absolute value of the connectivity matrix before
         calculating the eigen decomposition?
-    as_network : bool
+    as_network : bool, optional
         Should we return a matrix?
 
     Returns
     -------
     eigenvectors : np.ndarray.
         Eigenvectors. Shape is (n_eigenvectors, ..., n_channels, n_channels)
-        if as_network=True, otherwise it is (n_eigenvectors, ..., n_channels).
-        If n_eigenvectors=1, the first dimension is removed.
+        if :code:`as_network=True`, otherwise it is
+        (n_eigenvectors, ..., n_channels). If :code:`n_eigenvectors=1`,
+        the first dimension is removed.
     """
     if absolute_value:
         # Take absolute value
@@ -328,56 +350,65 @@ def gmm_threshold(
     keep_positive_only=False,
     one_component_percentile=0,
     n_sigma=0,
-    sklearn_kwargs={},
+    sklearn_kwargs=None,
     show=False,
     filename=None,
-    plot_kwargs={},
+    plot_kwargs=None,
 ):
     """Threshold a connectivity matrix using the GMM method.
 
-    Wrapper for connectivity.fit_gmm() and connectivity.threshold().
+    Wrapper for combining `connectivity.fit_gmm <https://osl-dynamics\
+    .readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity\
+    /index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_ and
+    `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest\
+    /autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics\
+    .analysis.connectivity.threshold>`_.
 
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity matrix. Shape must be (n_components, n_modes, n_channels,
-        n_channels) or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
-    subtract_mean : bool
+        Connectivity matrix. Shape must be (n_components, n_modes,
+        n_channels, n_channels) or (n_modes, n_channels, n_channels)
+        or (n_channels, n_channels).
+    subtract_mean : bool, optional
         Should we subtract the mean over modes before fitting a GMM?
-    mean_weights: np.ndarray
-        Numpy array with weightings for each mode/state to use to calculate the mean.
-        Default is equal weighting.
-    standardize : bool
+    mean_weights: np.ndarray, optional
+        Numpy array with weightings for each mode/state to use to calculate
+        the mean. Default is equal weighting.
+    standardize : bool, optional
         Should we standardize the input to the GMM?
-    p_value : float
-        Used to determine a threshold. We ensure the data points assigned
-        to the 'on' component have a probability of less than p_value of
+    p_value : float, optional
+        Used to determine a threshold. We ensure the data points assigned to
+        the 'on' component have a probability of less than :code:`p_value` of
         belonging to the 'off' component.
-    keep_positive_only : bool
+    keep_positive_only : bool, optional
         Should we only keep positive values to fit a GMM to?
-    one_component_percentile : float
-        Percentile threshold if only one component is found.
-        Should be a between 0 and 100. E.g. for the 95th percentile,
-        one_component_percentile=95.
-    n_sigma : float
-        Number of standard deviations of the 'off' component the mean
-        of the 'on' component must be for the fit to be considered to
-        have two components.
-    sklearn_kwargs : dict
+    one_component_percentile : float, optional
+        Percentile threshold if only one component is found. Should be a
+        between 0 and 100. E.g. for the 95th percentile,
+        :code:`one_component_percentile=95`.
+    n_sigma : float, optional
+        Number of standard deviations of the 'off' component the mean of the
+        'on' component must be for the fit to be considered to have two
+        components.
+    sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
-        sklearn.mixture.BayesianGaussianMixture().
-    show : bool
-        Should we show the GMM fit to the distribution of conn_map.
-    filename : str
+        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
+        /modules/generated/sklearn.mixture.GaussianMixture.html>`_.
+    show : bool, optional
+        Should we show the GMM fit to the distribution of :code:`conn_map`.
+    filename : str, optional
         Filename to save fit to.
-    plot_kwargs : dict
-        Dictionary of keyword arguments to pass to
-        osl_dynamics.utils.plotting.plot_gmm().
+    plot_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
 
     Returns
     -------
     conn_map : np.ndarray
-        Thresholded connectivity matrix.
+        Thresholded connectivity matrix. The shape is the same as the original
+        :code:`conn_map`.
     """
     percentile = fit_gmm(
         conn_map,
@@ -406,51 +437,53 @@ def fit_gmm(
     keep_positive_only=False,
     one_component_percentile=0,
     n_sigma=0,
-    sklearn_kwargs={},
+    sklearn_kwargs=None,
     show=False,
     filename=None,
-    plot_kwargs={},
+    plot_kwargs=None,
 ):
-    """Fit a two component Gaussian mixture model to connections to identify a
-    threshold.
+    """Fit a two component GMM to connections to identify a threshold.
 
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity map. Shape must be (n_components, n_modes, n_channels, n_channels)
-        or (n_modes, n_channels, n_channels) or (n_channels, n_channels).
-    subtract_mean : bool
+        Connectivity map. Shape must be (n_components, n_modes, n_channels,
+        n_channels) or (n_modes, n_channels, n_channels) or (n_channels,
+        n_channels).
+    subtract_mean : bool, optional
         Should we subtract the mean over modes before fitting a GMM?
-    mean_weights: np.ndarray
-        Numpy array with weightings for each mode/state to use to calculate the mean.
-        Default is equal weighting.
-    standardize : bool
+    mean_weights: np.ndarray, optional
+        Numpy array with weightings for each mode/state to use to calculate
+        the mean. Default is equal weighting.
+    standardize : bool, optional
         Should we standardize the input to the GMM?
-    p_value : float
-        Used to determine a threshold. We ensure the data points assigned
-        to the 'on' component have a probability of less than p_value of
+    p_value : float, optional
+        Used to determine a threshold. We ensure the data points assigned to
+        the 'on' component have a probability of less than :code:`p_value` of
         belonging to the 'off' component.
-    keep_positive_only : bool
+    keep_positive_only : bool, optional
         Should we only keep positive values to fit a GMM to?
-    one_component_percentile : float
-        Percentile threshold if only one component is found.
-        Should be a between 0 and 100. E.g. for the 95th percentile,
-        one_component_percentile=95.
-    n_sigma : float
-        Number of standard deviations of the 'off' component the mean
-        of the 'on' component must be for the fit to be considered to
-        have two components.
-    sklearn_kwargs : dict
+    one_component_percentile : float, optional
+        Percentile threshold if only one component is found. Should be a
+        between 0 and 100. E.g. for the 95th percentile,
+        :code:`one_component_percentile=95`.
+    n_sigma : float, optional
+        Number of standard deviations of the 'off' component the mean of the
+        'on' component must be for the fit to be considered to have two
+        components.
+    sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
-        sklearn.mixture.GaussianMixture(). Default is
-        {"max_iter": 5000, "n_init": 10}.
-    show : bool
-        Should we show the GMM fit to the distribution of conn_map.
-    filename : str
+        `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
+        /modules/generated/sklearn.mixture.GaussianMixture.html>`_
+        Default is :code:`{"max_iter": 5000, "n_init": 10}`.
+    show : bool, optional
+        Should we show the GMM fit to the distribution of :code:`conn_map`.
+    filename : str, optional
         Filename to save fit to.
-    plot_kwargs : dict
-        Dictionary of keyword arguments to pass to
-        osl_dynamics.utils.plotting.plot_gmm().
+    plot_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
 
     Returns
     -------
@@ -466,6 +499,8 @@ def fit_gmm(
         + "or (n_channels, n_channels).",
     )
 
+    if sklearn_kwargs is None:
+        sklearn_kwargs = {}
     default_sklearn_kwargs = {"max_iter": 5000, "n_init": 10}
     sklearn_kwargs = override_dict_defaults(default_sklearn_kwargs, sklearn_kwargs)
 
@@ -545,25 +580,24 @@ def threshold(
     Parameters
     ---------
     conn_map : np.ndarray
-        Connectivity matrix to threshold.
-        Can be (n_components, n_modes, n_channels, n_channels),
-        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+        Connectivity matrix to threshold. Shape must be (n_components, n_modes,
+        n_channels, n_channels), (n_modes, n_channels, n_channels) or
+        (n_channels, n_channels).
     percentile : float or np.ndarray
         Percentile to threshold with. Should be between 0 and 100.
-        Can be a numpy array of shape (n_components, n_modes), (n_modes,)
-        or a float.
-    subtract_mean : bool
-        Should we subtract the mean over modes before thresholding?
-        The thresholding is only done to identify edges, the values returned in
-        conn_map are not mean subtracted.
-    mean_weights : np.ndarray
+        Shape must be (n_components, n_modes), (n_modes,) or a float.
+    subtract_mean : bool, optional
+        Should we subtract the mean over modes before thresholding? The
+        thresholding is only done to identify edges, the values returned in
+        :code:`conn_map` are not mean subtracted.
+    mean_weights : np.ndarray, optional
         Weights when calculating the mean over modes.
-    absolute_value : bool
-        Should we take the absolute value before thresholding?
-        The thresholding is only done to identify edges, the values returned in
-        conn_map are not absolute values. If subtract_mean=True, the mean is
+    absolute_value : bool, optional
+        Should we take the absolute value before thresholding? The thresholding
+        is only done to identify edges, the values returned in :code:`conn_map`
+        are not absolute values. If :code:`subtract_mean=True`, the mean is
         subtracted before the absolute value.
-    return_edges : bool
+    return_edges : bool, optional
         Should we return a boolean array for whether edges are above the
         threshold?
 
@@ -571,7 +605,8 @@ def threshold(
     -------
     conn_map : np.ndarray
         Connectivity matrix with connections below the threshold set to zero.
-        Or a boolean array if return_edges=True.
+        Or a boolean array if :code:`return_edges=True`. Shape is the same as
+        the original :code:`conn_map`.
     """
     # Validation
     conn_map = array_ops.validate(
@@ -621,7 +656,10 @@ def threshold(
     m, n = np.triu_indices(n_channels, k=1)
 
     # Which edges are greater than the threshold?
-    edges = np.empty([n_components, n_modes, n_channels, n_channels], dtype=bool)
+    edges = np.empty(
+        [n_components, n_modes, n_channels, n_channels],
+        dtype=bool,
+    )
     for i in range(n_components):
         for j in range(n_modes):
             if c_is_symmetric[i, j]:
@@ -651,14 +689,16 @@ def separate_edges(conn_map):
     Parameters
     ----------
     conn_map : np.ndarray
-        Connectivity map.
+        Connectivity map. Any shape.
 
     Returns
     -------
     pos_conn_map : np.ndarray
-        Connectivity map with positive edges.
+        Connectivity map with positive edges. Shape is the same as
+        :code:`conn_map`.
     neg_conn_map : np.ndarray
-        Connectivity map with negative edges.
+        Connectivity map with negative edges. Shape is the same as
+        :code:`conn_map`.
     """
     pos_conn_map = conn_map.copy()
     neg_conn_map = conn_map.copy()
@@ -667,155 +707,20 @@ def separate_edges(conn_map):
     return pos_conn_map, neg_conn_map
 
 
-def save(
-    connectivity_map,
-    parcellation_file,
-    filename=None,
-    component=None,
-    threshold=0,
-    glassbrain=False,
-    plot_kwargs=None,
-):
-    """Save connectivity maps.
-
-    Parameters
-    ----------
-    connectivity_map : np.ndarray
-        Matrices containing connectivity strengths to plot.
-        Shape must be (n_modes, n_channels, n_channels) or (n_channels, n_channels).
-    parcellation_file : str
-        Name of parcellation file used.
-    filename : str
-        Output filename.
-        Optional, if None is passed then the image is shown on screen.
-    component : int
-        Spectral component to save.
-    threshold : float or np.ndarray
-        Threshold to determine which connectivity to show. Should be between 0 and 1.
-        If a float is passed the same threshold is used for all modes. Otherwise,
-        threshold should be a numpy array of shape (n_modes,).
-    glassbrain : bool
-        Sholud we create a 3D glass brain plot (as an interactive HTML file)
-        or a 2D image plot (as a png, pdf, svg, etc. file).
-    plot_kwargs : dict
-        Keyword arguments to pass to the nilearn plotting function:
-
-        - `nilearn.plotting.plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ if glassbrain=False.
-        - `nilearn.plotting.view_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.view_connectome.html>`_ if glassbrain=True.
-
-        Example use::
-
-            connectivity.save(
-                ...,
-                plot_kwargs={
-                    "edge_cmap": "red_transparent_full_alpha_range",
-                    "display_mode": "lyrz",
-                },
-            )
-    """
-
-    # Validation
-    if filename is not None:
-        if glassbrain and Path(filename).suffix != ".html":
-            raise ValueError(
-                "If glassbrain=True then filename must have a .html extension."
-            )
-
-    connectivity_map = np.copy(connectivity_map)
-    error_message = (
-        "Dimensionality of connectivity_map must be 3 or 4, "
-        + f"got ndim={connectivity_map.ndim}."
-    )
-    connectivity_map = array_ops.validate(
-        connectivity_map,
-        correct_dimensionality=4,
-        allow_dimensions=[2, 3],
-        error_message=error_message,
-    )
-
-    if isinstance(threshold, float) or isinstance(threshold, int):
-        threshold = np.array([threshold] * connectivity_map.shape[1])
-
-    if np.any(threshold > 1) or np.any(threshold < 0):
-        raise ValueError("threshold must be between 0 and 1.")
-
-    if component is None:
-        component = 0
-
-    # Load parcellation file
-    parcellation = Parcellation(parcellation_file)
-
-    # Select the component we're plotting
-    conn_map = np.copy(connectivity_map[component])
-
-    # Default plotting settings
-    default_plot_kwargs = {"node_size": 10, "node_color": "black"}
-
-    # Loop through each connectivity map
-    n_modes = conn_map.shape[0]
-    for i in trange(n_modes, desc="Saving images"):
-        # Overwrite keyword arguments if passed
-        kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
-
-        # Output filename
-        if filename is None:
-            output_file = None
-        else:
-            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
-                fn=Path(filename), i=i, w=len(str(n_modes))
-            )
-
-        if glassbrain:
-            # The colour bar range is determined by the max value in the matrix
-            # we zero the diagonal so it's not included
-            np.fill_diagonal(conn_map[i], val=0)
-
-            # Plot thick lines for the connections
-            if "linewidth" not in kwargs:
-                kwargs["linewidth"] = 12
-
-            # Plot maps
-            connectome = plotting.view_connectome(
-                conn_map[i],
-                parcellation.roi_centers(),
-                edge_threshold=f"{threshold[i] * 100}%",
-                **kwargs,
-            )
-            if filename is not None:
-                connectome.save_as_html(output_file)
-            else:
-                return connectome
-
-        else:
-            # If all connections are zero don't add a colourbar
-            kwargs["colorbar"] = np.any(
-                conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
-            )
-
-            # Plot maps
-            plotting.plot_connectome(
-                conn_map[i],
-                parcellation.roi_centers(),
-                edge_threshold=f"{threshold[i] * 100}%",
-                output_file=output_file,
-                **kwargs,
-            )
-
-
 def spectral_reordering(corr_mat):
     """Spectral re-ordering for correlation matrices.
 
     Parameters
     ----------
     corr_mat : np.ndarray
-        Correlation matrix.
+        Correlation matrix. Shape must be (n_channels, n_channels).
 
     Returns
     -------
     reorder_corr_mat : np.ndarray
-        Re-ordered correlation matrix.
+        Re-ordered correlation matrix. Shape is (n_channels, n_channels).
     order : np.ndarray
-        New ordering.
+        New ordering. Shape is (n_channels,).
     """
     # Add one to make all entries postive
     C = corr_mat + 1
@@ -845,3 +750,222 @@ def spectral_reordering(corr_mat):
     reorder_corr_mat = corr_mat[order, :][:, order]
 
     return reorder_corr_mat, order
+
+
+def save(
+    connectivity_map,
+    parcellation_file,
+    filename=None,
+    component=None,
+    threshold=0,
+    plot_kwargs=None,
+):
+    """Save connectivity maps as image files.
+
+    This function is a wrapper for `nilearn.plotting.plot_connectome \
+    <https://nilearn.github.io/stable/modules/generated/nilearn\
+    .plotting.plot_connectome.html>`_.
+
+    Parameters
+    ----------
+    connectivity_map : np.ndarray
+        Matrices containing connectivity strengths to plot.
+        Shape must be (n_components, n_modes, n_channels, n_channels),
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+    parcellation_file : str
+        Name of parcellation file used.
+    filename : str, optional
+        Output filename. If :code:`None` is passed then the image is
+        shown on screen. Must have extension :code:`.png`, :code:`.pdf`
+        or :code:`.svg`.
+    component : int, optional
+        Spectral component to save.
+    threshold : float or np.ndarray, optional
+        Threshold to determine which connectivity to show. Should be between 0
+        and 1. If a :code:`float` is passed the same threshold is used for all
+        modes. Otherwise, threshold should be a numpy array of shape
+        (n_modes,).
+    plot_kwargs : dict, optional
+        Keyword arguments to pass to the nilearn plotting function.
+
+    Examples
+    --------
+    Change colormap and views::
+
+        connectivity.save(
+            ...,
+            plot_kwargs={
+                "edge_cmap": "red_transparent_full_alpha_range",
+                "display_mode": "lyrz",
+            },
+        )
+    """
+
+    # Validation
+    connectivity_map = np.copy(connectivity_map)
+    error_message = (
+        "Dimensionality of connectivity_map must be 3 or 4, "
+        + f"got ndim={connectivity_map.ndim}."
+    )
+    connectivity_map = array_ops.validate(
+        connectivity_map,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message=error_message,
+    )
+
+    if isinstance(threshold, float) or isinstance(threshold, int):
+        threshold = np.array([threshold] * connectivity_map.shape[1])
+
+    if np.any(threshold > 1) or np.any(threshold < 0):
+        raise ValueError("threshold must be between 0 and 1.")
+
+    if component is None:
+        component = 0
+
+    # Load parcellation file
+    parcellation = Parcellation(parcellation_file)
+
+    # Select the component we're plotting
+    conn_map = connectivity_map[component]
+
+    # Fill diagonal with zeros to help with the colorbar limits
+    for c in conn_map:
+        np.fill_diagonal(c, 0)
+
+    # Default plotting settings
+    default_plot_kwargs = {"node_size": 10, "node_color": "black"}
+
+    # Loop through each connectivity map
+    n_modes = conn_map.shape[0]
+    for i in trange(n_modes, desc="Saving images"):
+        # Overwrite keyword arguments if passed
+        kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+        # Output filename
+        if filename is None:
+            output_file = None
+        else:
+            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                fn=Path(filename), i=i, w=len(str(n_modes))
+            )
+
+            # If all connections are zero don't add a colourbar
+            kwargs["colorbar"] = np.any(
+                conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
+            )
+
+            # Plot maps
+            plotting.plot_connectome(
+                conn_map[i],
+                parcellation.roi_centers(),
+                edge_threshold=f"{threshold[i] * 100}%",
+                output_file=output_file,
+                **kwargs,
+            )
+
+
+def save_interactive(
+    connectivity_map,
+    parcellation_file,
+    filename=None,
+    component=None,
+    threshold=0,
+    plot_kwargs=None,
+):
+    """Save connectivity maps as interactive HTML plots.
+
+    This function is a wrapper for `nilearn.plotting.view_connectome \
+    <https://nilearn.github.io/stable/modules/generated/nilearn\
+    .plotting.view_connectome.html>`_
+
+    Parameters
+    ----------
+    connectivity_map : np.ndarray
+        Matrices containing connectivity strengths to plot.
+        Shape must be (n_components, n_modes, n_channels, n_channels),
+        (n_modes, n_channels, n_channels) or (n_channels, n_channels).
+    parcellation_file : str
+        Name of parcellation file used.
+    filename : str, optional
+        Output filename. If :code:`None` is passed then the image is
+        shown on screen. Must have extension :code:`.html`.
+    component : int, optional
+        Spectral component to save.
+    threshold : float or np.ndarray, optional
+        Threshold to determine which connectivity to show. Should be between 0
+        and 1. If a :code:`float` is passed the same threshold is used for all
+        modes. Otherwise, threshold should be a numpy array of shape
+        (n_modes,).
+    plot_kwargs : dict, optional
+        Keyword arguments to pass to the nilearn plotting function.
+    """
+
+    # Validation
+    connectivity_map = np.copy(connectivity_map)
+    error_message = (
+        "Dimensionality of connectivity_map must be 3 or 4, "
+        + f"got ndim={connectivity_map.ndim}."
+    )
+    connectivity_map = array_ops.validate(
+        connectivity_map,
+        correct_dimensionality=4,
+        allow_dimensions=[2, 3],
+        error_message=error_message,
+    )
+
+    if isinstance(threshold, float) or isinstance(threshold, int):
+        threshold = np.array([threshold] * connectivity_map.shape[1])
+
+    if np.any(threshold > 1) or np.any(threshold < 0):
+        raise ValueError("threshold must be between 0 and 1.")
+
+    if component is None:
+        component = 0
+
+    # Load parcellation file
+    parcellation = Parcellation(parcellation_file)
+
+    # Select the component we're plotting
+    conn_map = connectivity_map[component]
+
+    # Fill diagonal with zeros to help with the colorbar limits
+    for c in conn_map:
+        np.fill_diagonal(c, 0)
+
+    # Default plotting settings
+    default_plot_kwargs = {"node_size": 10, "node_color": "black"}
+
+    # Loop through each connectivity map
+    n_modes = conn_map.shape[0]
+    for i in trange(n_modes, desc="Saving images"):
+        # Overwrite keyword arguments if passed
+        kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+        # Output filename
+        if filename is None:
+            output_file = None
+        else:
+            output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
+                fn=Path(filename), i=i, w=len(str(n_modes))
+            )
+
+        # The colour bar range is determined by the max value in the matrix
+        # we zero the diagonal so it's not included
+        np.fill_diagonal(conn_map[i], val=0)
+
+        # Plot thick lines for the connections
+        if "linewidth" not in kwargs:
+            kwargs["linewidth"] = 12
+
+        # Plot maps
+        connectome = plotting.view_connectome(
+            conn_map[i],
+            parcellation.roi_centers(),
+            edge_threshold=f"{threshold[i] * 100}%",
+            **kwargs,
+        )
+        if filename is not None:
+            connectome.save_as_html(output_file)
+        else:
+            return connectome

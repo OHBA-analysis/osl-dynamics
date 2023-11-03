@@ -8,10 +8,11 @@ import re
 from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
+from contextlib import contextmanager
 
-import numpy as np
-import tensorflow
 import yaml
+import numpy as np
+import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
 from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -21,6 +22,7 @@ from tqdm.keras import TqdmCallback
 
 import osl_dynamics
 from osl_dynamics import data
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import callbacks, initializers
 from osl_dynamics.utils.misc import NumpyLoader, get_argument, replace_argument
 from osl_dynamics.utils.model import HTMLTable, LatexTable
@@ -39,9 +41,10 @@ class BaseModelConfig:
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
+    lr_decay: float = 0.1
     gradient_clip: float = None
     n_epochs: int = None
-    optimizer: tensorflow.keras.optimizers.Optimizer = "adam"
+    optimizer: tf.keras.optimizers.Optimizer = "adam"
     multi_gpu: bool = False
     strategy: str = None
 
@@ -66,6 +69,9 @@ class BaseModelConfig:
             raise ValueError("learning_rate must be passed.")
         elif self.learning_rate < 0:
             raise ValueError("learning_rate must be greater than zero.")
+
+        if self.lr_decay < 0:
+            raise ValueError("lr_decay must be non-negative.")
 
         # Strategy for distributed learning
         if self.multi_gpu:
@@ -113,7 +119,7 @@ class ModelBase:
         self.model = None
         with self.config.strategy.scope():
             self.build_model()
-        self.compile()
+            self.compile()
 
     # Allow access to the keras model attributes
     def __getattr__(self, attr):
@@ -129,7 +135,7 @@ class ModelBase:
 
         Parameters
         ----------
-        optimizer : str or tensorflow.keras.optimizers.Optimizer
+        optimizer : str or tf.keras.optimizers.Optimizer
             Optimizer to use when compiling.
         """
         if optimizer is None:
@@ -160,29 +166,29 @@ class ModelBase:
         Parameters
         ----------
         args : arguments
-            Arguments for keras.Model.fit().
-        use_tqdm : bool
-            Should we use a tqdm progress bar instead of the usual output from
-            tensorflow.
-        tqdm_class : TqdmCallback
-            Class for the tqdm progress bar.
-        save_best_after : int
-            Epoch number after which we should save the best model. The best model is
-            that which achieves the lowest loss.
-        save_filepath : str
+            Arguments for :code:`keras.Model.fit()`.
+        use_tqdm : bool, optional
+            Should we use a :code:`tqdm` progress bar instead of the usual
+            output from tensorflow.
+        tqdm_class : TqdmCallback, optional
+            Class for the :code:`tqdm` progress bar.
+        save_best_after : int, optional
+            Epoch number after which we should save the best model. The best
+            model is that which achieves the lowest loss.
+        save_filepath : str, optional
             Path to save the best model to.
-        additional_callbacks : list
+        additional_callbacks : list, optional
             List of keras callback objects.
-        kwargs : keyword arguments
-            Keyword arguments for keras.Model.fit()
+        kwargs : keyword arguments, optional
+            Keyword arguments for :code:`keras.Model.fit()`.
 
         Returns
         -------
         history : history
             The training history.
         """
-        # If a osl_dynamics.data.Data object has been passed for the x arguments,
-        # replace it with a tensorflow dataset
+        # If a osl_dynamics.data.Data object has been passed for the x
+        # arguments, replace it with a tensorflow dataset
         x = get_argument(self.model.fit, "x", args, kwargs)
         x = self.make_dataset(x, shuffle=True, concatenate=True)
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
@@ -229,7 +235,17 @@ class ModelBase:
             append=True,
         )
         if use_tqdm:
-            args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "verbose",
+                0,
+                args,
+                kwargs,
+            )
+
+        # Set the scaling factor for losses that are associated with static
+        # quantities
+        self.set_static_loss_scaling_factor(x)
 
         history = self.model.fit(*args, **kwargs)
         return history.history
@@ -245,33 +261,40 @@ class ModelBase:
         with self.config.strategy.scope():
             return self.model.load_weights(filepath)
 
-    def reset_weights(self):
+    def reset_weights(self, keep=None):
         """Resets trainable variables in the model to their initial value."""
-        initializers.reinitialize_model_weights(self.model)
+        initializers.reinitialize_model_weights(self.model, keep=keep)
 
     def reset(self):
         """Reset the model as if you've built a new model."""
         self.reset_weights()
         self.compile()
 
-    def make_dataset(self, inputs, shuffle=False, concatenate=False, subj_id=False):
+    def make_dataset(
+        self,
+        inputs,
+        shuffle=False,
+        concatenate=False,
+        step_size=None,
+    ):
         """Converts a Data object into a TensorFlow Dataset.
 
         Parameters
         ----------
-        inputs : osl_dynamics.data.Data
-            Data object. If a str or numpy array is passed this function will
-            convert it into a Data object.
-        shuffle : bool
+        inputs : osl_dynamics.data.Data or str or np.ndarray
+            Data object. If a :code:`str` or :np.ndarray: is passed this
+            function will first convert it into a Data object.
+        shuffle : bool, optional
             Should we shuffle the data?
-        concatenate : bool
+        concatenate : bool, optional
             Should we return a single TensorFlow Dataset or a list of Datasets.
-        subj_id : bool
-            Should we include the subject id in the dataset?
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
+            Default is no overlap.
 
         Returns
         -------
-        dataset : tensorflow.data.Dataset or list
+        dataset : tf.data.Dataset or list
             TensorFlow Dataset (or list of Datasets) that can be used for
             training/evaluating.
         """
@@ -282,13 +305,22 @@ class ModelBase:
         if isinstance(inputs, data.Data):
             # Data object -> list of Dataset if concatenate=False or
             # Data object -> Dataset if concatenate=True
-            outputs = inputs.dataset(
-                self.config.sequence_length,
-                self.config.batch_size,
-                shuffle=shuffle,
-                concatenate=concatenate,
-                subj_id=subj_id,
-            )
+            if inputs.use_tfrecord:
+                outputs = inputs.tfrecord_dataset(
+                    self.config.sequence_length,
+                    self.config.batch_size,
+                    shuffle=shuffle,
+                    concatenate=concatenate,
+                    step_size=step_size,
+                )
+            else:
+                outputs = inputs.dataset(
+                    self.config.sequence_length,
+                    self.config.batch_size,
+                    shuffle=shuffle,
+                    concatenate=concatenate,
+                    step_size=step_size,
+                )
         elif isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False
             outputs = [inputs]
@@ -297,16 +329,21 @@ class ModelBase:
 
         return outputs
 
-    def get_training_time_series(self, training_data, prepared=True, concatenate=False):
+    def get_training_time_series(
+        self,
+        training_data,
+        prepared=True,
+        concatenate=False,
+    ):
         """Get the time series used for training from a Data object.
 
         Parameters
         ----------
         training_data : osl_dynamics.data.Data
             Data object.
-        prepared : bool
+        prepared : bool, optional
             Should we return the prepared data? If not, we return the raw data.
-        concatenate : bool
+        concatenate : bool, optional
             Should we concatenate the data for each subject?
 
         Returns
@@ -315,14 +352,16 @@ class ModelBase:
             Training data time series.
         """
         return training_data.trim_time_series(
-            self.config.sequence_length, prepared=prepared, concatenate=concatenate
+            self.config.sequence_length,
+            prepared=prepared,
+            concatenate=concatenate,
         )
 
     def summary_string(self):
         """Return a summary of the model as a string.
 
-        This is a modified version of the keras.Model.summary() method which
-        makes the output easier to parse.
+        This is a modified version of the :code:`keras.Model.summary()` method
+        which makes the output easier to parse.
         """
         stringio = StringIO()
         self.model.summary(
@@ -336,7 +375,7 @@ class ModelBase:
         Parameters
         ----------
         renderer : str
-            Renderer to use. Either "html" or "latex".
+            Renderer to use. Either :code:`"html"` or :code:`"latex"`.
 
         Returns
         -------
@@ -397,7 +436,7 @@ class ModelBase:
         Parameters
         ----------
         dirname : str
-            Directory to save config.yml.
+            Directory to save :code:`config.yml`.
         """
         os.makedirs(dirname, exist_ok=True)
 
@@ -417,31 +456,96 @@ class ModelBase:
     def save(self, dirname):
         """Saves config object and weights of the model.
 
-        This is a wrapper for self.save_config and self.save_weights.
+        This is a wrapper for :code:`self.save_config` and
+        :code:`self.save_weights`.
 
         Parameters
         ----------
         dirname : str
-            Directory to save the config object and weights of the model.
+            Directory to save the :code:`config` object and weights of
+            the model.
         """
         self.save_config(dirname)
         self.save_weights(
             f"{dirname}/weights"
         )  # will use the keras method: self.model.save_weights()
 
+    def set_static_loss_scaling_factor(self, dataset):
+        """Set the :code:`n_batches` attribute of the
+        :code:`"static_loss_scaling_factor"` layer.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset
+            TensorFlow dataset.
+
+        Note
+        ----
+        This assumes every model has a layer called
+        :code:`"static_loss_scaling_factor"`, with an attribure called
+        :code:`"n_batches"`.
+        """
+        if "static_loss_scaling_factor" in [layer.name for layer in self.model.layers]:
+            n_batches = dtf.get_n_batches(dataset)
+            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+
+    @contextmanager
+    def set_trainable(self, layers, values):
+        """Context manager to temporarily set the :code:`trainable`
+        attribute of layers.
+
+        Parameters
+        ----------
+        layers : str or list of str
+            List of layers to set the :code:`trainable` attribute of.
+        values : bool or list of bool
+            Value to set the :code:`trainable` attribute of the layers to.
+        """
+        # Validation
+        if isinstance(layers, str):
+            layers = [layers]
+        if isinstance(values, bool):
+            values = [values] * len(layers)
+        if len(layers) != len(values):
+            raise ValueError(
+                "layers and trainable must be the same length, "
+                + f"but got {len(layers)} and {len(values)}."
+            )
+
+        available_layers = [layer.name for layer in self.layers]
+        for layer in layers:
+            if layer not in available_layers:
+                raise ValueError(
+                    f"No such layer: {layer}. "
+                    + f"Available layers are: {available_layers}."
+                )
+
+        original_values = [self.get_layer(layer).trainable for layer in layers]
+
+        try:
+            for layer, trainable in zip(layers, values):
+                self.get_layer(layer).trainable = trainable
+            self.compile()
+            yield
+        finally:
+            for layer, trainable in zip(layers, original_values):
+                self.get_layer(layer).trainable = trainable
+            self.compile()
+
     @staticmethod
     def load_config(dirname):
-        """Load a config object from a .yml file.
+        """Load a :code:`config` object from a :code:`.yml` file.
 
         Parameters
         ----------
         dirname : str
-            Directory to load config.yml from.
+            Directory to load :code:`config.yml` from.
 
         Returns
         -------
         config : dict
-            Dictionary containing values used to create the Config object.
+            Dictionary containing values used to create the :code:`config`
+            object.
         version : str
             Version used to train the model.
         """
@@ -470,12 +574,12 @@ class ModelBase:
 
     @classmethod
     def load(cls, dirname):
-        """Load model from dirname.
+        """Load model from :code:`dirname`.
 
         Parameters
         ----------
         dirname : str
-            Directory where config.yml and weights are stored.
+            Directory where :code:`config.yml` and weights are stored.
 
         Returns
         -------

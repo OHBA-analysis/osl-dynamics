@@ -5,9 +5,9 @@
 import logging
 import time
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, utils
 from tqdm.auto import trange
 
@@ -20,8 +20,9 @@ from osl_dynamics.inference.layers import (
     MixVectorsLayer,
     ModelRNNLayer,
     VectorsLayer,
+    StaticLossScalingFactorLayer,
 )
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 
 _logger = logging.getLogger("osl-dynamics")
@@ -40,50 +41,54 @@ class Config(BaseModelConfig):
     n_channels : int
         Number of channels.
     sequence_length : int
-        Length of sequence passed to the inference, generative and discriminator network.
+        Length of sequence passed to the inference, generative and
+        discriminator network.
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
         Regularizer.
 
     discriminator_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     discriminator_n_layers : int
         Number of layers.
     discriminator_n_units : int
         Number of units.
     discriminator_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'`
+        or :code:`'layer'`.
     discriminator_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     discriminator_dropout : float
         Dropout rate.
     discriminator_regularizer : str
@@ -99,6 +104,10 @@ class Config(BaseModelConfig):
         Initialisation for mode covariances.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for covariance matrices.
 
     batch_size : int
         Mini-batch size.
@@ -106,8 +115,8 @@ class Config(BaseModelConfig):
         Learning rate.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -117,28 +126,28 @@ class Config(BaseModelConfig):
     model_name: str = "SAGE"
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_rnn: str = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
-    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_normalization: str = None
     inference_activation: str = "elu"
     inference_dropout: float = 0.0
     inference_regularizer: str = None
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_rnn: str = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
-    model_normalization: Literal[None, "batch", "layer"] = None
+    model_normalization: str = None
     model_activation: str = "elu"
     model_dropout: float = 0.0
     model_regularizer: str = None
 
     # Descriminator network parameters
-    discriminator_rnn: Literal["gru", "lstm"] = "lstm"
+    discriminator_rnn: str = "lstm"
     discriminator_n_layers: int = 1
     discriminator_n_units: int = None
-    discriminator_normalization: Literal[None, "batch", "layer"] = None
+    discriminator_normalization: str = None
     discriminator_activation: str = "elu"
     discriminator_dropout: float = 0.0
     discriminator_regularizer: str = None
@@ -149,6 +158,8 @@ class Config(BaseModelConfig):
     initial_means: np.ndarray = None
     initial_covariances: np.ndarray = None
     covariances_epsilon: float = None
+    means_regularizer: tf.keras.regularizers.Regularizer = None
+    covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     def __post_init__(self):
         self.validate_dimension_parameters()
@@ -177,8 +188,8 @@ class Model(ModelBase):
     config_type = Config
 
     def build_model(self):
-        """Builds a keras model for the inference, generator and discriminator model
-        and the full SAGE model.
+        """Builds a keras model for the inference, generator and discriminator
+        model and the full SAGE model.
         """
         _logger.info("Build models")
         self.inference_model = _build_inference_model(self.config)
@@ -192,12 +203,17 @@ class Model(ModelBase):
         print()
 
         data = layers.Input(
-            shape=(self.config.sequence_length, self.config.n_channels), name="data"
+            shape=(self.config.sequence_length, self.config.n_channels),
+            name="data",
         )
         C_m, alpha_posterior = self.inference_model(data)
         alpha_prior = self.generator_model(alpha_posterior)
         discriminator_output_prior = self.discriminator_model(alpha_prior)
-        self.model = models.Model(data, [C_m, discriminator_output_prior], name="SAGE")
+        self.model = models.Model(
+            data,
+            [C_m, discriminator_output_prior],
+            name="SAGE",
+        )
         self.model.summary()
         print()
 
@@ -212,8 +228,8 @@ class Model(ModelBase):
         self.discriminator_model.trainable = False
 
         # Reconstruction (Likelihood) loss:
-        # The first loss corresponds to the likelihood - this tells us how well we
-        # are explaining our data according to the current estimate of the
+        # The first loss corresponds to the likelihood - this tells us how well
+        # we are explaining our data according to the current estimate of the
         # generative model, and is given by:
         # L = \sum_{t=1}^{T} log p(Y_t | \theta_t^m = \mu^{m,\theta}_t,
         #                                \theta_t^c = \mu^{c,\theta}_t)
@@ -223,9 +239,9 @@ class Model(ModelBase):
 
         # Regularization (Prior) Loss:
         # The second loss regularises the estimate of the latent, time-varying
-        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this penalises
-        # when the posterior estimates of [$\theta^m$, $\theta^c$] deviate from the
-        # prior:
+        # parameters [$\theta^m$, $\theta^c$] using an adaptive prior - this
+        # penalises when the posterior estimates of [$\theta^m$, $\theta^c$]
+        # deviate from the prior:
         # R = \sum_{t=1}^{T} [
         #     CrossEntropy(\mu^{m,\theta}_t|| \hat{\mu}^{m,\theta}_{t})
         #     + CrossEntropy(\mu^{c,\theta}_t || \hat{\mu}^{c,\theta}_{t})
@@ -249,23 +265,28 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
-        epochs : int
-            Number of epochs to train. Defaults to value in config if not passed.
-        verbose : int
+        epochs : int, optional
+            Number of epochs to train. Defaults to value in :code:`config`
+            if not passed.
+        verbose : int, optional
             Should we print a progress bar?
 
         Returns
         -------
         history : history
-            History of discriminator_loss and generator_loss.
+            History of :code:`discriminator_loss` and :code:`generator_loss`.
         """
         if epochs is None:
             epochs = self.config.n_epochs
 
         # Make sure training data is a TensorFlow Dataset
-        training_data = self.make_dataset(training_data, shuffle=True, concatenate=True)
+        training_data = self.make_dataset(
+            training_data,
+            shuffle=True,
+            concatenate=True,
+        )
 
         # Path to save the best model weights
         timestr = time.strftime("%Y%m%d-%H%M%S")  # current date-time
@@ -289,7 +310,10 @@ class Model(ModelBase):
                 alpha_prior = self.generator_model.predict_on_batch(alpha_posterior)
 
                 # Train discriminator, inference and generator model
-                discriminator_loss = train_discriminator(alpha_posterior, alpha_prior)
+                discriminator_loss = train_discriminator(
+                    alpha_posterior,
+                    alpha_prior,
+                )
                 generator_loss = self.model.train_on_batch(batch, [batch, real])
 
                 if verbose:
@@ -332,8 +356,10 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        inputs : tensorflow.data.Dataset or osl_dynamics.data.Data
+        inputs : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data.
+        concatenate : bool, optional
+            Should we concatenate the output?
 
         Returns
         -------
@@ -355,71 +381,131 @@ class Model(ModelBase):
 
         return outputs
 
+    def get_means(self):
+        """Get the mode means.
+
+        Returns
+        -------
+        means : np.ndarray
+            Mode means. Shape (n_modes, n_channels).
+        """
+        return obs_mod.get_observation_model_parameter(
+            self.inference_model,
+            "means",
+        )
+
     def get_covariances(self):
-        """Get the covariances of each mode.
+        """Get the mode covariances.
 
         Returns
         -------
         covariances : np.ndarary
-            Mode covariances.
+            Mode covariances. Shape (n_modes, n_channels, n_channels).
         """
-        return dynemo_obs.get_covariances(self.inference_model)
+        return obs_mod.get_observation_model_parameter(
+            self.inference_model,
+            "covs",
+        )
 
     def get_means_covariances(self):
-        """Get the means and covariances of each mode.
+        """Get the mode means and covariances.
+
+        This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
         means : np.ndarary
-            Mode means.
+            Mode means. Shape (n_modes, n_channels).
         covariances : np.ndarray
-            Mode covariances.
+            Mode covariances. Shape (n_modes, n_channels, n_channels).
         """
-        return dynemo_obs.get_means_covariances(self.inference_model)
+        return self.get_means(), self.get_covariances()
+
+    def get_observation_model_parameters(self):
+        """Wrapper for :code:`get_means_covariances`."""
+        return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
-        """Set the means of each mode.
+        """Set the mode means.
 
         Parameters
         ----------
         means : np.ndarray
-            Mode covariances.
-        update_initializer : bool
-            Do we want to use the passed means when we re-initialize
-            the model?
+            Mode means. Shape is (n_modes, n_channels).
+        update_initializer : bool, optional
+            Do we want to use the passed means when we re-initialize the model?
         """
-        dynemo_obs.set_means(self.inference_model, means, update_initializer)
+        obs_mod.set_observation_model_parameter(
+            self.inference_model,
+            means,
+            layer_name="means",
+            update_initializer=update_initializer,
+        )
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each mode.
+        """Set the mode covariances.
 
         Parameters
         ----------
         covariances : np.ndarray
-            Mode covariances.
-        update_initializer : bool
+            Mode covariances. Shape is (n_modes, n_channels, n_channels).
+        update_initializer : bool, optional
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
-            self.inference_model, covariances, update_initializer
+        obs_mod.set_observation_model_parameter(
+            self.inference_model,
+            covariances,
+            layer_name="covs",
+            update_initializer=update_initializer,
+            diagonal_covariances=self.config.diagonal_covariances,
+        )
+
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """This is a wrapper for :code:`set_means` and
+        :code:`set_covariances`."""
+        self.set_means(
+            means,
+            update_initializer=update_initializer,
+        )
+        self.set_covariances(
+            covariances,
+            update_initializer=update_initializer,
+        )
+
+    def set_observation_model_parameters(
+        self, observation_model_parameters, update_initializer=True
+    ):
+        """Wrapper for :code:`set_means_covariances`."""
+        self.set_means_covariances(
+            observation_model_parameters[0],
+            observation_model_parameters[1],
+            update_initializer=update_initializer,
         )
 
     def sample_alpha(self, alpha=None):
-        """Uses the generator to predict the prior alphas.
+        """Uses the generator to predict the prior, :code:`alpha`.
 
         Parameters
         ----------
-        alpha : np.ndarray
+        alpha : np.ndarray, optional
             Shape must be (n_samples, n_modes).
 
         Returns
         -------
         alpha : np.ndarray
-            Predicted alpha.
+            Predicted :code:`alpha`.
         """
         n_samples = np.shape(alpha)[0]
-        alpha_sampled = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
+        alpha_sampled = np.empty(
+            [n_samples, self.config.n_modes],
+            dtype=np.float32,
+        )
 
         for i in trange(
             n_samples - self.config.sequence_length,
@@ -445,6 +531,13 @@ def _build_inference_model(config):
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
     )
+
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
+
     data_drop_layer = layers.TimeDistributed(
         layers.Dropout(config.inference_dropout, name="inf_data_drop")
     )
@@ -469,8 +562,8 @@ def _build_inference_model(config):
     alpha = alpha_layer(theta)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each mode as the observation model.
+    # - We use a multivariate normal with a mean vector and covariance matrix
+    #   for each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
@@ -480,6 +573,7 @@ def _build_inference_model(config):
         config.n_channels,
         config.learn_means,
         config.initial_means,
+        config.means_regularizer,
         name="means",
     )
     covs_layer = CovarianceMatricesLayer(
@@ -488,6 +582,7 @@ def _build_inference_model(config):
         config.learn_covariances,
         config.initial_covariances,
         config.covariances_epsilon,
+        config.covariances_regularizer,
         name="covs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
@@ -495,8 +590,12 @@ def _build_inference_model(config):
     concat_means_covs_layer = ConcatVectorsMatricesLayer(name="concat_means_covs")
 
     # Data flow
-    mu = means_layer(inputs)  # inputs not used
-    D = covs_layer(inputs)  # inputs not used
+    mu = means_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
+    D = covs_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
     m = mix_means_layer([alpha, mu])
     C = mix_covs_layer([alpha, D])
     C_m = concat_means_covs_layer([m, C])
@@ -529,7 +628,8 @@ def _build_generator_model(config):
         name="gen_rnn",
     )
     prior_layer = layers.TimeDistributed(
-        layers.Dense(config.n_modes, activation="softmax"), name="gen_softmax_alpha"
+        layers.Dense(config.n_modes, activation="softmax"),
+        name="gen_softmax_alpha",
     )
 
     # Data flow
@@ -542,11 +642,18 @@ def _build_generator_model(config):
 
 def _build_discriminator_model(config):
     # Descriminator RNN:
-    #   D_theta^m_t = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t), zeta(mu^{m,theta}_t)],omega^m_d), \lambda_d^m))
-    #   D_theta^c_t = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t), zeta(mu^{c,theta}_t)],omega^c_d), \lambda_d^c))
+    #   D_theta^m_t = sigma(f(BLSTM([zeta(hat{mu}^{m,theta}_t),
+    #                                zeta(mu^{m,theta}_t)],omega^m_d),
+    #                         \lambda_d^m))
+    #   D_theta^c_t = sigma(f(BLSTM([zeta(hat{mu}^{c,theta}_t),
+    #                                zeta(mu^{c,theta}_t)],omega^c_d),
+    #                        \lambda_d^c))
 
     # Definition of layers
-    inputs = layers.Input(shape=(config.sequence_length, config.n_modes), name="data")
+    inputs = layers.Input(
+        shape=(config.sequence_length, config.n_modes),
+        name="data",
+    )
     drop_layer = layers.TimeDistributed(
         layers.Dropout(config.model_dropout, name="dis_data_drop")
     )

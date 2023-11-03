@@ -19,9 +19,6 @@ import logging
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops
 from osl_dynamics.utils.misc import load, override_dict_defaults, save
@@ -29,19 +26,23 @@ from osl_dynamics.utils.misc import load, override_dict_defaults, save
 _logger = logging.getLogger("osl-dynamics")
 
 
-def load_data(data_dir, data_kwargs={}, prepare_kwargs={}):
+def load_data(inputs, kwargs=None, prepare=None):
     """Load and prepare data.
 
     Parameters
     ----------
-    data_dir : str
-        Path to directory containing npy files.
-    data_kwargs: dict
-        Keyword arguments to pass to the Data class.
-        Useful keyword arguments to pass are the :code:`sampling_frequency`,
-        :code:`mask_file` and :code:`parcellation_file`.
-    prepare_kwargs : dict
-        Keyword arguments to pass to the prepare method.
+    inputs : str
+        Path to directory containing :code:`npy` files.
+    kwargs : dict, optional
+        Keyword arguments to pass to the `Data <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/data/index.html\
+        #osl_dynamics.data.Data>`_ class. Useful keyword arguments to pass are
+        :code:`sampling_frequency`, :code:`mask_file` and
+        :code:`parcellation_file`.
+    prepare : dict, optional
+        Methods dict to pass to the prepare method. See docstring for
+        `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+        /osl_dynamics/data/index.html#osl_dynamics.data.Data>`_.prepare.
 
     Returns
     -------
@@ -50,8 +51,11 @@ def load_data(data_dir, data_kwargs={}, prepare_kwargs={}):
     """
     from osl_dynamics.data import Data
 
-    data = Data(data_dir, **data_kwargs)
-    data.prepare(**prepare_kwargs)
+    kwargs = {} if kwargs is None else kwargs
+    prepare = {} if prepare is None else prepare
+
+    data = Data(inputs, **kwargs)
+    data.prepare(prepare)
     return data
 
 
@@ -59,11 +63,12 @@ def train_hmm(
     data,
     output_dir,
     config_kwargs,
-    init_kwargs={},
-    fit_kwargs={},
+    init_kwargs=None,
+    fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train a Hidden Markov Model.
+    """Train a `Hidden Markov Model <https://osl-dynamics.readthedocs.io/en\
+    /latest/autoapi/osl_dynamics/models/hmm/index.html>`_.
 
     This function will:
 
@@ -78,6 +83,7 @@ def train_hmm(
 
     - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+      This directory is only created if :code:`save_inf_params=True`.
 
     Parameters
     ----------
@@ -86,31 +92,34 @@ def train_hmm(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to hmm.Config. Defaults to::
+        Keyword arguments to pass to `hmm.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
+        #osl_dynamics.models.hmm.Config>`_. Defaults to::
 
             {'sequence_length': 2000,
              'batch_size': 32,
              'learning_rate': 0.01,
              'n_epochs': 20}.
-    init_kwargs : dict
-        Keyword arguments to pass to :code:`Model.random_state_time_course_initialization`.
-        Optional, defaults to::
+    init_kwargs : dict, optional
+        Keyword arguments to pass to
+        :code:`Model.random_state_time_course_initialization`. Defaults to::
 
             {'n_init': 3, 'n_epochs': 1}.
-    fit_kwargs : dict
-        Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
-    save_inf_params : bool
-        Should we save the inferred parameters? Optional, defaults to :code:`True`.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`. No defaults.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
     """
     if data is None:
         raise ValueError("data must be passed.")
 
     from osl_dynamics.models import hmm
 
+    init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
+
     # Directories
     model_dir = output_dir + "/model"
-    inf_params_dir = output_dir + "/inf_params"
-    os.makedirs(inf_params_dir, exist_ok=True)
 
     # Create the model object
     _logger.info("Building model")
@@ -131,7 +140,10 @@ def train_hmm(
     default_init_kwargs = {"n_init": 3, "n_epochs": 1}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_state_time_course_initialization(data, **init_kwargs)
+    init_history = model.random_state_time_course_initialization(
+        data,
+        **init_kwargs,
+    )
 
     # Training
     history = model.fit(data, **fit_kwargs)
@@ -146,6 +158,10 @@ def train_hmm(
     save(f"{model_dir}/history.pkl", history)
 
     if save_inf_params:
+        # Make output directory
+        inf_params_dir = output_dir + "/inf_params"
+        os.makedirs(inf_params_dir, exist_ok=True)
+
         # Get the inferred parameters
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
@@ -160,11 +176,12 @@ def train_dynemo(
     data,
     output_dir,
     config_kwargs,
-    init_kwargs={},
-    fit_kwargs={},
+    init_kwargs=None,
+    fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train DyNeMo.
+    """Train `DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+    /osl_dynamics/models/dynemo/index.html>`_.
 
     This function will:
 
@@ -172,8 +189,8 @@ def train_dynemo(
     2. Initialize the parameters of the model using
        :code:`Model.random_subset_initialization`.
     3. Perform full training.
-    4. Save the inferred parameters (mode mixing coefficients, means and covariances)
-       if :code:`save_inf_params=True`.
+    4. Save the inferred parameters (mode mixing coefficients, means and
+       covariances) if :code:`save_inf_params=True`.
 
     This function will create two directories:
 
@@ -187,8 +204,9 @@ def train_dynemo(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to dynemo.Config.
-        Defaults to::
+        Keyword arguments to pass to `dynemo.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo\
+        /index.html#osl_dynamics.models.dynemo.Config>`_. Defaults to::
 
             {'n_channels': data.n_channels.
              'sequence_length': 200,
@@ -204,17 +222,22 @@ def train_dynemo(
              'n_kl_annealing_epochs': 20,
              'batch_size': 128,
              'learning_rate': 0.01,
+             'lr_decay': 0.1,
              'n_epochs': 40}
-    init_kwargs : dict
+    init_kwargs : dict, optional
         Keyword arguments to pass to :code:`Model.random_subset_initialization`.
-        Optional, defaults to::
+        Defaults to::
 
-            {'n_init': 5, 'n_epochs': 1, 'take': 0.25}.
-    fit_kwargs : dict
-        Keyword arguments to pass to the :code:`Model.fit`. Optional, no defaults.
-    save_inf_params : bool
-        Should we save the inferred parameters? Optional, defaults to :code:`True`.
+            {'n_init': 5, 'n_epochs': 2, 'take': 1}.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
     """
+
+    init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
+
     if data is None:
         raise ValueError("data must be passed.")
 
@@ -241,6 +264,7 @@ def train_dynemo(
         "n_kl_annealing_epochs": 20,
         "batch_size": 128,
         "learning_rate": 0.01,
+        "lr_decay": 0.1,
         "n_epochs": 40,
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
@@ -249,11 +273,19 @@ def train_dynemo(
     model = dynemo.Model(config)
     model.summary()
 
+    # Set regularisers
+    model.set_regularizers(data)
+
     # Initialisation
-    default_init_kwargs = {"n_init": 5, "n_epochs": 1, "take": 0.25}
+    default_init_kwargs = {"n_init": 5, "n_epochs": 2, "take": 1}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
     init_history = model.random_subset_initialization(data, **init_kwargs)
+
+    # Keyword arguments for the fit method
+    default_fit_kwargs = {}
+    fit_kwargs = override_dict_defaults(default_fit_kwargs, fit_kwargs)
+    _logger.info(f"Using fit_kwargs: {fit_kwargs}")
 
     # Training
     history = model.fit(data, **fit_kwargs)
@@ -280,6 +312,430 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
+def train_sehmm(
+    data,
+    output_dir,
+    config_kwargs,
+    hmm_config_kwargs=None,
+    init_kwargs=None,
+    fit_kwargs=None,
+    save_inf_params=True,
+):
+    """ Train a `Subject embedding Hidden Markov Model <https://osl-dynamics.\
+    readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html>`_.
+    
+    This function will:
+
+    1. Build an :code:`hmm.Model` object.
+    2. Initialize the parameters of the HMM model using
+        :code:`Model.random_state_time_course_initialization`.
+    3. Build an :code:`sehmm.Model` object.
+    4. Initialize the parameters of the SE-HMM model using pretrained HMM.
+    2. Initialize the parameters of the SE-HMM model using
+        :code:`Model.random_state_time_course_initialization`.
+    3. Perform full training.
+    4. Save the inferred parameters (state probabilities, means,
+        covariances and subject embeddings) if :code:`save_inf_params=True`.
+    
+    This function will create two directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+        This directory is only created if :code:`save_inf_params=True`.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Keyword arguments to pass to `sehmm.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html\
+        #osl_dynamics.models.sehmm.Config>`_. Defaults to::
+
+            {
+                'sequence_length': 200,
+                'mode_embeddings_dim': 2,
+                'dev_n_layers': 5,
+                'dev_n_units': 32,
+                'dev_activation': 'tanh',
+                'dev_normalization': 'layer',
+                'dev_regularizer': 'l1',
+                'dev_regularizer_factor': 10,
+                'batch_size': 128,
+                'learning_rate': 0.005,
+                'lr_decay': 0.1,
+                'n_epochs': 30,
+                'do_kl_annealing': True,
+                'kl_annealing_curve': 'tanh',
+                'kl_annealing_sharpness': 10,
+                'n_kl_annealing_epochs': 15,
+            }.
+    hmm_config_kwargs : dict, optional
+        Keyword arguments to pass to `hmm.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
+        #osl_dynamics.models.hmm.Config>`_. Defaults to::
+
+            {
+                'sequence_length': 200,
+                'batch_size': 128,
+                'learning_rate': 0.01,
+                'n_epochs': 5,
+                'lr_decay': 0.1,
+            }.
+    init_kwargs : dict, optional
+        Keyword arguments to pass to
+        :code:`Model.random_state_time_course_initialization`. Defaults to::
+
+            {'n_init': 10, 'n_epochs': 2}.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`. No defaults.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    from osl_dynamics.models import hmm, sehmm
+
+    init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
+
+    # Directories
+    model_dir = output_dir + "/model"
+
+    _logger.info("Building model")
+    # Initialise configs
+
+    # HMM config
+    default_hmm_config_kwargs = {
+        "n_channels": data.n_channels,
+        "sequence_length": 200,
+        "batch_size": 128,
+        "learning_rate": 0.01,
+        "n_epochs": 5,
+        "lr_decay": 0.1,
+    }
+    hmm_config_kwargs = override_dict_defaults(
+        default_hmm_config_kwargs, hmm_config_kwargs
+    )
+    # SE-HMM config
+    default_config_kwargs = {
+        "n_channels": data.n_channels,
+        "n_subjects": data.n_arrays,
+        "sequence_length": 200,
+        "mode_embeddings_dim": 2,
+        "dev_n_layers": 5,
+        "dev_n_units": 32,
+        "dev_activation": "tanh",
+        "dev_normalization": "layer",
+        "dev_regularizer": "l1",
+        "dev_regularizer_factor": 10,
+        "batch_size": 128,
+        "learning_rate": 0.005,
+        "lr_decay": 0.1,
+        "n_epochs": 30,
+        "do_kl_annealing": True,
+        "kl_annealing_curve": "tanh",
+        "kl_annealing_sharpness": 10,
+        "n_kl_annealing_epochs": 15,
+    }
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+
+    default_init_kwargs = {"n_init": 10, "n_epochs": 2}
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
+
+    # Initialise with HMM
+    hmm_config_kwargs["n_states"] = config_kwargs["n_states"]
+    hmm_config_kwargs["learn_means"] = config_kwargs["learn_means"]
+    hmm_config_kwargs["learn_covariances"] = config_kwargs["learn_covariances"]
+
+    _logger.info(f"Using hmm_config_kwargs: {hmm_config_kwargs}")
+    hmm_config = hmm.Config(**hmm_config_kwargs)
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+
+    init_model = hmm.Model(hmm_config)
+    init_model.set_regularizers(data)
+    init_model.random_state_time_course_initialization(data, **init_kwargs)
+
+    # Initialise and train SE-HMM
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+    config = sehmm.Config(**config_kwargs)
+    config.initial_covariances = init_model.get_covariances()
+    config.initial_trans_prob = init_model.get_trans_prob()
+
+    model = sehmm.Model(config)
+    model.summary()
+
+    # Set regularisers
+    model.set_regularizers(data)
+
+    # Set deviation initializer
+    model.set_dev_parameters_initializer(data)
+
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+    init_history = model.random_state_time_course_initialization(
+        data,
+        **init_kwargs,
+    )
+
+    # Training
+    history = model.fit(data, **fit_kwargs)
+
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
+
+    # Get the variational free energy
+    history["free_energy"] = model.free_energy(data)
+
+    # Save trained model
+    save(f"{model_dir}/init_history.pkl", init_history)
+    save(f"{model_dir}/history.pkl", history)
+
+    if save_inf_params:
+        # Make output directory
+        inf_params_dir = output_dir + "/inf_params"
+        os.makedirs(inf_params_dir, exist_ok=True)
+
+        # Get the inferred parameters
+        alpha = model.get_alpha(data)
+        means, covs = model.get_subject_means_covariances()
+        subject_embeddings = model.get_subject_embeddings()
+
+        # Save inferred parameters
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/subject_embeddings.npy", subject_embeddings)
+
+
+def get_inf_params(data, output_dir, observation_model_only=False):
+    """Get inferred alphas.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+
+    This function will create the following directory:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    observation_model_only : bool, optional
+        We we only want to get the observation model parameters?
+    """
+    # Make output directory
+    inf_params_dir = output_dir + "/inf_params"
+    os.makedirs(inf_params_dir, exist_ok=True)
+
+    #  Load model
+    from osl_dynamics.models import load
+
+    model_dir = output_dir + "/model"
+    model = load(model_dir)
+
+    if observation_model_only:
+        # Get the inferred parameters
+        means, covs = model.get_means_covariances()
+
+        # Save
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+    else:
+        # Get the inferred parameters
+        alpha = model.get_alpha(data)
+        means, covs = model.get_means_covariances()
+
+        # Save
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+
+
+def plot_power_maps_from_covariances(
+    data,
+    output_dir,
+    mask_file=None,
+    parcellation_file=None,
+    power_save_kwargs=None,
+):
+    """Plot power maps calculated directly from the inferred covariances.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will output files called :code:`covs_.png` which contain
+    plots of the power map of each state/mode taken directly from the inferred
+    covariance matrices. The files will be saved to
+    :code:`<output_dir>/inf_params`.
+
+    This function also expects the data to be prepared in the same script
+    that this wrapper is called from.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
+        we use :code:`data.mask_file`.
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
+        :code:`None`, we use :code:`data.parcellation_file`.
+    power_save_kwargs : dict, optional
+        Keyword arguments to pass to `analysis.power.save
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Defaults to::
+
+            {'filename': '<inf_params_dir>/covs_.png',
+             'mask_file': data.mask_file,
+             'parcellation_file': data.parcellation_file,
+             'plot_kwargs': {'symmetric_cbar': True}}
+    """
+    # Validation
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+
+    if mask_file is None:
+        if data is None or data.mask_file is None:
+            raise ValueError(
+                "mask_file must be passed or specified in the Data object."
+            )
+        else:
+            mask_file = data.mask_file
+
+    if parcellation_file is None:
+        if data is None or data.parcellation_file is None:
+            raise ValueError(
+                "parcellation_file must be passed or specified in the Data object."
+            )
+        else:
+            parcellation_file = data.parcellation_file
+
+    if hasattr(data, "n_embeddings"):
+        n_embeddings = data.n_embeddings
+    else:
+        n_embeddings = 1
+
+    if hasattr(data, "pca_components"):
+        pca_components = data.pca_components
+    else:
+        pca_components = None
+
+    # Directories
+    inf_params_dir = f"{output_dir}/inf_params"
+
+    # Load inferred covariances
+    covs = load(f"{inf_params_dir}/covs.npy")
+
+    # Reverse the effects of preparing the data
+    from osl_dynamics.analysis import modes
+
+    covs = modes.raw_covariances(covs, n_embeddings, pca_components)
+
+    # Save
+    from osl_dynamics.analysis import power
+
+    default_power_save_kwargs = {
+        "filename": f"{inf_params_dir}/covs_.png",
+        "mask_file": mask_file,
+        "parcellation_file": parcellation_file,
+        "plot_kwargs": {"symmetric_cbar": True},
+    }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
+        )
+    power_save_kwargs = override_dict_defaults(
+        default_power_save_kwargs, power_save_kwargs
+    )
+    _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
+    power.save(covs, **power_save_kwargs)
+
+
+def plot_tde_covariances(data, output_dir):
+    """Plot inferred covariance of the time-delay embedded data.
+
+    This function expects a model has already been trained and the following
+    directory to exist:
+
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will output a :code:`tde_covs.png` file containing a plot of
+    the covariances in the :code:`<output_dir>/inf_params` directory.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    inf_params_dir = f"{output_dir}/inf_params"
+
+    covs = load(f"{inf_params_dir}/covs.npy")
+
+    if hasattr(data, "pca_components"):
+        if data.pca_components is not None:
+            from osl_dynamics.analysis import modes
+
+            covs = modes.reverse_pca(covs, data.pca_components)
+
+    from osl_dynamics.utils import plotting
+
+    plotting.plot_matrices(covs, filename=f"{inf_params_dir}/tde_covs.png")
+
+
+def plot_state_psds(data, output_dir):
+    """Plot state PSDs.
+
+    This function expects multitaper spectra to have already been calculated
+    and are in:
+
+    - :code:`<output_dir>/spectra`.
+
+    This function will output a file called :code:`psds.png` which contains
+    a plot of each state PSD.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    spectra_dir = f"{output_dir}/spectra"
+
+    f = load(f"{spectra_dir}/f.npy")
+    psd = load(f"{spectra_dir}/psd.npy")
+    psd = np.mean(psd, axis=(0, 2))  # average over subjects and channels
+    n_states = psd.shape[0]
+
+    from osl_dynamics.utils import plotting
+
+    plotting.plot_line(
+        [f] * n_states,
+        psd,
+        labels=[f"State {i + 1}" for i in range(n_states)],
+        x_label="Frequency (Hz)",
+        y_label="PSD (a.u.)",
+        x_range=[f[0], f[-1]],
+        filename=f"{spectra_dir}/psds.png",
+    )
+
+
 def calc_subject_ae_hmm_networks(data, output_dir):
     """Calculate subject-specific AE-HMM networks.
 
@@ -290,7 +746,8 @@ def calc_subject_ae_hmm_networks(data, output_dir):
 
     This function will create the following directory:
 
-    - :code:`<output_dir>/networks`, which contains the subject-specific networks.
+    - :code:`<output_dir>/networks`, which contains the subject-specific
+      networks.
 
     Parameters
     ----------
@@ -344,24 +801,30 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     output_dir : str
         Path to output directory.
     kwargs : dict
-        Keyword arguments to pass to osl_dynamics.analysis.spectral.multitaper_spectra.
-        Defaults to::
+        Keyword arguments to pass to `analysis.spectral.multitaper_spectra
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/spectral/index.html#osl_dynamics.analysis.spectral\
+        .multitaper_spectra>`_. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
-             'time_half_bandwidth': 4,
-             'n_tapers': 7,
              'keepdims': True}
-    nnmf_components : int
+    nnmf_components : int, optional
         Number of non-negative matrix factorization (NNMF) components to fit to
         the stacked subject-specific coherence spectra.
     """
     if data is None:
         raise ValueError("data must be passed.")
 
+    sampling_frequency = kwargs.pop("sampling_frequency", None)
+    if sampling_frequency is None and data.sampling_frequency is None:
+        raise ValueError(
+            "sampling_frequency must be passed or specified in the Data object."
+        )
+    else:
+        sampling_frequency = data.sampling_frequency
+
     default_kwargs = {
-        "sampling_frequency": data.sampling_frequency,
-        "time_half_bandwidth": 4,
-        "n_tapers": 7,
+        "sampling_frequency": sampling_frequency,
         "keepdims": True,
     }
     kwargs = override_dict_defaults(default_kwargs, kwargs)
@@ -391,7 +854,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     # Calculate multitaper
     from osl_dynamics.analysis import spectral
 
-    spectra = spectral.multitaper_spectra(data, alpha, **kwargs)
+    spectra = spectral.multitaper_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
     return_weights = kwargs.pop("return_weights", False)
@@ -429,6 +892,9 @@ def nnmf(data, output_dir, n_components):
     n_components : int
         Number of components to fit.
     """
+    from osl_dynamics.analysis import spectral
+
+    spectra_dir = output_dir + "/spectra"
     coh = load(f"{spectra_dir}/coh.npy")
     nnmf = spectral.decompose_spectra(coh, n_components=n_components)
     save(f"{spectra_dir}/nnmf_{n_components}.npy", nnmf)
@@ -454,8 +920,10 @@ def regression_spectra(data, output_dir, kwargs):
     output_dir : str
         Path to output directory.
     kwargs : dict
-        Keyword arguments to pass to osl_dynamics.analysis.spectral.multitaper_spectra.
-        Defaults to::
+        Keyword arguments to pass to `analysis.spectral.regress_spectra
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/spectral/index.html#osl_dynamics.analysis.spectral\
+        .regression_spectra>`_. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
              'window_length': 4 * sampling_frequency,
@@ -467,9 +935,14 @@ def regression_spectra(data, output_dir, kwargs):
     if data is None:
         raise ValueError("data must be passed.")
 
-    sampling_frequency = (
-        kwargs.pop("sampling_frequency", None) or data.sampling_frequency
-    )
+    sampling_frequency = kwargs.pop("sampling_frequency", None)
+    if sampling_frequency is None and data.sampling_frequency is None:
+        raise ValueError(
+            "sampling_frequency must be passed or specified in the Data object."
+        )
+    else:
+        sampling_frequency = data.sampling_frequency
+
     default_kwargs = {
         "sampling_frequency": sampling_frequency,
         "window_length": int(4 * sampling_frequency),
@@ -505,7 +978,7 @@ def regression_spectra(data, output_dir, kwargs):
     # Calculate regression spectra
     from osl_dynamics.analysis import spectral
 
-    spectra = spectral.regression_spectra(data, alpha, **kwargs)
+    spectra = spectral.regression_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
     return_weights = kwargs.pop("return_weights", False)
@@ -528,12 +1001,13 @@ def plot_group_ae_networks(
     mask_file=None,
     parcellation_file=None,
     aec_abs=True,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level amplitude envelope networks.
 
-    This function expects a model has been trained and the following directory to exist:
+    This function expects a model has been trained and the following directory
+    to exist:
 
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
@@ -547,32 +1021,38 @@ def plot_group_ae_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    aec_abs : bool
-        Should we take the absolute value of the amplitude envelope correlations?
-        Optional, defaults to :code:`True`.
-    power_save_kwargs : dict
+    aec_abs : bool, optional
+        Should we take the absolute value of the amplitude envelope
+        correlations?
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
 
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
-             'parcellation_file': data.parcellation_file}
-    conn_save_kwargs : dict
+             'parcellation_file': data.parcellation_file,
+             'plot_kwargs': {'symmetric_cbar': True}}
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
+        .save>`_. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/aec_.png',
              'threshold': 0.97}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -609,7 +1089,13 @@ def plot_group_ae_networks(
         "filename": f"{networks_dir}/mean_.png",
         "mask_file": mask_file,
         "parcellation_file": parcellation_file,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -638,8 +1124,8 @@ def plot_group_tde_hmm_networks(
     parcellation_file=None,
     frequency_range=None,
     percentile=97,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level TDE-HMM networks for a specified frequency band.
 
@@ -663,36 +1149,42 @@ def plot_group_tde_hmm_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    frequency_range : list
-        List of length 2 containing the minimum and maximum frequency to integrate
-        spectra over. Optional, defaults to the full frequency range.
-    percentile : float
+    frequency_range : list, optional
+        List of length 2 containing the minimum and maximum frequency to
+        integrate spectra over. Defaults to the full frequency range.
+    percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
 
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
-    conn_save_kwargs : dict
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
+        .save>`_. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -748,7 +1240,12 @@ def plot_group_tde_hmm_networks(
             y_label="PSD (a.u.)",
         )
         if frequency_range is not None:
-            ax.axvspan(frequency_range[0], frequency_range[1], alpha=0.25, color="gray")
+            ax.axvspan(
+                frequency_range[0],
+                frequency_range[1],
+                alpha=0.25,
+                color="gray",
+            )
         plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
 
     # Calculate power maps from the group-level PSDs
@@ -762,7 +1259,13 @@ def plot_group_tde_hmm_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -800,8 +1303,8 @@ def plot_group_nnmf_tde_hmm_networks(
     parcellation_file=None,
     component=0,
     percentile=97,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level TDE-HMM networks using a NNMF component to integrate
     the spectra.
@@ -829,39 +1332,46 @@ def plot_group_nnmf_tde_hmm_networks(
     nnmf_file : str
         Path relative to :code:`output_dir` for a npy file (with the output of
         `analysis.spectral.decompose_spectra
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_)
-        containing the NNMF components.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/spectral/index.html#osl_dynamics.analysis.spectral\
+        .decompose_spectra>`_) containing the NNMF components.
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    component : int
+    component : int, optional
         NNMF component to plot. Defaults to the first component.
-    percentile : float
+    percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
 
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
-    conn_save_kwargs : dict
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
+        .save>`_. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -948,7 +1458,13 @@ def plot_group_nnmf_tde_hmm_networks(
         "component": component,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -984,8 +1500,8 @@ def plot_group_tde_dynemo_networks(
     parcellation_file=None,
     frequency_range=None,
     percentile=97,
-    power_save_kwargs={},
-    conn_save_kwargs={},
+    power_save_kwargs=None,
+    conn_save_kwargs=None,
 ):
     """Plot group-level TDE-DyNeMo networks for a specified frequency band.
 
@@ -1009,36 +1525,42 @@ def plot_group_tde_dynemo_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str
-        Mask file used to preprocess the training data. Optional. If :code:`None`,
+    mask_file : str, optional
+        Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
-    parcellation_file : str
-        Parcellation file used to parcellate the training data. Optional. If
+    parcellation_file : str, optional
+        Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
-    frequency_range : list
-        List of length 2 containing the minimum and maximum frequency to integrate
-        spectra over. Optional, defaults to the full frequency range.
-    percentile : float
+    frequency_range : list, optional
+        List of length 2 containing the minimum and maximum frequency to
+        integrate spectra over. Defaults to the full frequency range.
+    percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict
+    plot_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
         Defaults to::
 
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True}
-    conn_save_kwargs : dict
+             'subtract_mean': True,
+             'plot_kwargs': {'symmetric_cbar': True}}
+    conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
-        Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
+        .save>`_. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
     """
+    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
+    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
+
     # Validation
     if mask_file is None:
         if data is None or data.mask_file is None:
@@ -1097,7 +1619,12 @@ def plot_group_tde_dynemo_networks(
             y_label="PSD (a.u.)",
         )
         if frequency_range is not None:
-            ax.axvspan(frequency_range[0], frequency_range[1], alpha=0.25, color="gray")
+            ax.axvspan(
+                frequency_range[0],
+                frequency_range[1],
+                alpha=0.25,
+                color="gray",
+            )
         plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
 
     # Calculate power maps from the group-level PSDs
@@ -1111,7 +1638,13 @@ def plot_group_tde_dynemo_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
+        "plot_kwargs": {"symmetric_cbar": True},
     }
+    if "plot_kwargs" in power_save_kwargs:
+        power_save_kwargs["plot_kwargs"] = override_dict_defaults(
+            default_power_save_kwargs["plot_kwargs"],
+            power_save_kwargs["plot_kwargs"],
+        )
     power_save_kwargs = override_dict_defaults(
         default_power_save_kwargs, power_save_kwargs
     )
@@ -1142,14 +1675,21 @@ def plot_group_tde_dynemo_networks(
 
 
 def plot_alpha(
-    data, output_dir, subject=0, normalize=False, sampling_frequency=None, kwargs={}
+    data,
+    output_dir,
+    subject=0,
+    normalize=False,
+    sampling_frequency=None,
+    kwargs=None,
 ):
     """Plot inferred alphas.
 
     This is a wrapper for `utils.plotting.plot_alpha
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
+    /plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
 
-    This function expects a model has been trained and the following directory to exist:
+    This function expects a model has been trained and the following directory
+    to exist:
 
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
@@ -1163,20 +1703,21 @@ def plot_alpha(
         Data object.
     output_dir : str
         Path to output directory.
-    subject : int
+    subject : int, optional
         Index for subject to plot. If 'all' is passed we create a separate plot
         for each subject.
-    normalize : bool
-        Should we also plot the alphas normalized using the trace of the inferred
-        covariance matrices? Optional. Useful if we are plotting the inferred alphas
-        from DyNeMo.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we see if it is
+    normalize : bool, optional
+        Should we also plot the alphas normalized using the trace of the
+        inferred covariance matrices? Useful if we are plotting the inferred
+        alphas from DyNeMo.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we see if it is
         present in :code:`data.sampling_frequency`.
-    kwargs : dict
+    kwargs : dict, optional
         Keyword arguments to pass to `utils.plotting.plot_alpha
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
-        Optional. Defaults to::
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+        Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
              'filename': '<output_dir>/alphas/alpha_<subject>.png'}
@@ -1217,7 +1758,7 @@ def plot_alpha(
 
         # Calculate normalised alphas
         covs = load(f"{inf_params_dir}/covs.npy")
-        norm_alp = modes.reweight_alphas(alp)
+        norm_alp = modes.reweight_alphas(alp, covs)
 
         # Plot
         if subject == "all":
@@ -1229,16 +1770,18 @@ def plot_alpha(
             plotting.plot_alpha(norm_alp[subject], **kwargs)
 
 
-def calc_gmm_alpha(data, output_dir, kwargs={}):
+def calc_gmm_alpha(data, output_dir, kwargs=None):
     """Binarize inferred alphas using a two-component GMM.
 
-    This function expects a model has been trained and the following directory to exist:
+    This function expects a model has been trained and the following directory
+    to exist:
 
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
     This function will create the following file:
 
-    - :code:`<output_dir>/inf_params/gmm_alp.pkl`, which contains the binarized alphas.
+    - :code:`<output_dir>/inf_params/gmm_alp.pkl`, which contains the binarized
+      alphas.
 
     Parameters
     ----------
@@ -1246,10 +1789,13 @@ def calc_gmm_alpha(data, output_dir, kwargs={}):
         Data object.
     output_dir : str
         Path to output directory.
-    kwargs : dict
+    kwargs : dict, optional
         Keyword arguments to pass to `inference.modes.gmm_time_courses
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_.
+        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+        /inference/modes/index.html#osl_dynamics.inference.modes\
+        .gmm_time_courses>`_.
     """
+    kwargs = {} if kwargs is None else kwargs
     inf_params_dir = output_dir + "/inf_params"
 
     # Load inferred alphas
@@ -1266,27 +1812,35 @@ def calc_gmm_alpha(data, output_dir, kwargs={}):
     save(f"{inf_params_dir}/gmm_alp.pkl", gmm_alp)
 
 
-def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency=None):
-    """Plot summary statistics as violin plots.
+def plot_hmm_network_summary_stats(
+    data,
+    output_dir,
+    use_gmm_alpha=False,
+    sampling_frequency=None,
+    sns_kwargs=None,
+):
+    """Plot HMM summary statistics for networks as violin plots.
 
-    This function will plot the distribution over subjects for the following summary
-    statistics:
+    This function will plot the distribution over subjects for the following
+    summary statistics:
 
     - Fractional occupancy.
     - Mean lifetime (s).
     - Mean interval (s).
     - Switching rate (Hz).
 
-    This function expects a model has been trained and the following directory to exist:
+    This function expects a model has been trained and the following directory
+    to exist:
 
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
     This function will create:
 
-    - :code:`<output_dir>/summary_stats`, which contains plots of the summary statistics.
+    - :code:`<output_dir>/summary_stats`, which contains plots of the summary
+      statistics.
 
-    The :code:`<output_dir>/summary_stats` directory will also contain numpy files
-    with the summary statistics.
+    The :code:`<output_dir>/summary_stats` directory will also contain numpy
+    files with the summary statistics.
 
     Parameters
     ----------
@@ -1294,13 +1848,15 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
         Data object.
     output_dir : str
         Path to output directory.
-    use_gmm_alpha : bool
+    use_gmm_alpha : bool, optional
         Should we use alphas binarised using a Gaussian mixture model?
-        This function assumes :code:`calc_gmm_alpha` has been called and the file
-        :code:`<output_dir>/inf_params/gmm_alp.pkl` exists.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we use
+        This function assumes :code:`calc_gmm_alpha` has been called and the
+        file :code:`<output_dir>/inf_params/gmm_alp.pkl` exists.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
+    sns_kwargs : dict, optional
+        Arguments to pass to :code:`sns.violinplot()`.
     """
     if sampling_frequency is None:
         if data is None or data.sampling_frequency is None:
@@ -1330,7 +1886,8 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
         alp = load(f"{inf_params_dir}/alp.pkl")
         if isinstance(alp, np.ndarray):
             raise ValueError(
-                "We must train on multiple subjects to plot the distribution of summary statistics."
+                "We must train on multiple subjects to plot the distribution "
+                "of summary statistics."
             )
         stc = modes.argmax_time_courses(alp)
 
@@ -1357,6 +1914,7 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
         x_label="State",
         y_label="Fractional Occupancy",
         filename=f"{summary_stats_dir}/fo.png",
+        sns_kwargs=sns_kwargs,
     )
     plotting.plot_violin(
         lt.T,
@@ -1364,6 +1922,7 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
         x_label="State",
         y_label="Mean Lifetime (s)",
         filename=f"{summary_stats_dir}/lt.png",
+        sns_kwargs=sns_kwargs,
     )
     plotting.plot_violin(
         intv.T,
@@ -1371,6 +1930,7 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
         x_label="State",
         y_label="Mean Interval (s)",
         filename=f"{summary_stats_dir}/intv.png",
+        sns_kwargs=sns_kwargs,
     )
     plotting.plot_violin(
         sr.T,
@@ -1378,6 +1938,99 @@ def plot_summary_stats(data, output_dir, use_gmm_alpha=False, sampling_frequency
         x_label="State",
         y_label="Switching rate (Hz)",
         filename=f"{summary_stats_dir}/sr.png",
+        sns_kwargs=sns_kwargs,
+    )
+
+
+def plot_dynemo_network_summary_stats(data, output_dir):
+    """Plot DyNeMo summary statistics for networks as violin plots.
+
+    This function will plot the distribution over subjects for the following
+    summary statistics:
+
+    - Mean (renormalised) mixing coefficients.
+    - Standard deviation of (renormalised) mixing coefficients.
+
+    This function expects a model has been trained and the following directories
+    to exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/summary_stats`, which contains plots of the summary
+      statistics.
+
+    The :code:`<output_dir>/summary_stats` directory will also contain numpy
+    files with the summary statistics.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    """
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+    summary_stats_dir = output_dir + "/summary_stats"
+    os.makedirs(summary_stats_dir, exist_ok=True)
+
+    # Load inferred parameters
+    alp = load(f"{inf_params_dir}/alp.pkl")
+    if isinstance(alp, np.ndarray):
+        raise ValueError(
+            "We must train on multiple subjects to plot the distribution "
+            "of summary statistics."
+        )
+
+    # Get the config used to create the model
+    from osl_dynamics.models.mod_base import ModelBase
+
+    config, _ = ModelBase.load_config(model_dir)
+
+    # Renormalise (only if we are learning covariances)
+    from osl_dynamics.inference import modes
+
+    if config["learn_covariances"]:
+        covs = load(f"{inf_params_dir}/covs.npy")
+        alp = modes.reweight_alphas(alp, covs)
+
+    # Calculate summary stats
+    alp_mean = np.array([np.mean(a, axis=0) for a in alp])
+    alp_std = np.array([np.std(a, axis=0) for a in alp])
+    alp_corr = np.array([np.corrcoef(a, rowvar=False) for a in alp])
+    for c in alp_corr:
+        np.fill_diagonal(c, 0)  # remove diagonal to see the off-diagonals better
+
+    # Save summary stats
+    save(f"{summary_stats_dir}/alp_mean.npy", alp_mean)
+    save(f"{summary_stats_dir}/alp_std.npy", alp_std)
+    save(f"{summary_stats_dir}/alp_corr.npy", alp_corr)
+
+    # Plot
+    from osl_dynamics.utils import plotting
+
+    n_modes = alp_mean.shape[1]
+    x = range(1, n_modes + 1)
+    plotting.plot_violin(
+        alp_mean.T,
+        x=x,
+        x_label="Mode",
+        y_label="Mean",
+        filename=f"{summary_stats_dir}/alp_mean.png",
+    )
+    plotting.plot_violin(
+        alp_std.T,
+        x=x,
+        x_label="Mode",
+        y_label="Standard Deviation",
+        filename=f"{summary_stats_dir}/alp_std.png",
+    )
+    plotting.plot_matrices(
+        np.mean(alp_corr, axis=0), filename=f"{summary_stats_dir}/alp_corr.png"
     )
 
 
@@ -1393,13 +2046,15 @@ def compare_groups_hmm_summary_stats(
 ):
     """Compare HMM summary statistics between two groups.
 
-    This function expects a model has been trained and the following directory to exist:
+    This function expects a model has been trained and the following directory
+    to exist:
 
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
     This function will create:
 
-    - :code:`<output_dir>/group_diff`, which contains the summary statistics and plots.
+    - :code:`<output_dir>/group_diff`, which contains the summary statistics
+      and plots.
 
     Parameters
     ----------
@@ -1409,13 +2064,13 @@ def compare_groups_hmm_summary_stats(
         Path to output directory.
     group2_indices : np.ndarray or list
         Indices indicating which subjects belong to the second group.
-    separate_tests : bool
+    separate_tests : bool, optional
         Should we perform a maximum statistic permutation test for each summary
         statistic separately?
-    covariates : str
-        Path to a pickle file containing a dict with covariances. Each item in the
-        dict must be the covariate name and value for each subject. The covariates
-        will be loaded with::
+    covariates : str, optional
+        Path to a pickle file containing a :code:`dict` with covariances. Each
+        item in the :code:`dict` must be the covariate name and value for each
+        subject. The covariates will be loaded with::
 
             from osl_dynamics.utils.misc import load
             covariates = load("/path/to/file.pkl")
@@ -1423,12 +2078,12 @@ def compare_groups_hmm_summary_stats(
         Example covariates::
 
             covariates = {"age": [...], "sex": [...]}
-    n_perm : int
+    n_perm : int, optional
         Number of permutations.
-    n_jobs : int
+    n_jobs : int, optional
         Number of jobs for parallel processing.
-    sampling_frequency : float
-        Sampling frequency in Hz. Optional. If :code:`None`, we use
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
     """
     if sampling_frequency is None:
@@ -1479,7 +2134,8 @@ def compare_groups_hmm_summary_stats(
     if separate_tests:
         pvalues = []
         for i in range(4):
-            # Calculate a statistical significance test for each summary stat separately
+            # Calculate a statistical significance test for each
+            # summary stat separately
             _, p = statistics.group_diff_max_stat_perm(
                 sum_stats[:, i],
                 assignments,
@@ -1492,9 +2148,14 @@ def compare_groups_hmm_summary_stats(
             save(f"{group_diff_dir}/{names[i]}_pvalues.npy", p)
         pvalues = np.array(pvalues)
     else:
-        # Calculate a statistical significance test for all summary stats concatenated
+        # Calculate a statistical significance test for all
+        # summary stats concatenated
         _, pvalues = statistics.group_diff_max_stat_perm(
-            sum_stats, assignments, n_perm=n_perm, covariates=covariates, n_jobs=n_jobs
+            sum_stats,
+            assignments,
+            n_perm=n_perm,
+            covariates=covariates,
+            n_jobs=n_jobs,
         )
         for i in range(4):
             _logger.info(
@@ -1519,3 +2180,116 @@ def compare_groups_hmm_summary_stats(
             assignments=assignments,
             filename=f"{group_diff_dir}/{names[i]}.png",
         )
+
+
+def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
+    """Plot burst summary statistics as violin plots.
+
+    This function will plot the distribution over subjects for the following
+    summary statistics:
+
+    - Mean lifetime (s).
+    - Mean interval (s).
+    - Burst count (Hz).
+    - Mean amplitude (a.u.).
+
+    This function expects a model has been trained and the following
+    directories to exist:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    This function will create:
+
+    - :code:`<output_dir>/summary_stats`, which contains plots of the summary
+      statistics.
+
+    The :code:`<output_dir>/summary_stats` directory will also contain numpy
+    files with the summary statistics.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object.
+    output_dir : str
+        Path to output directory.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If :code:`None`, we use
+        :code:`data.sampling_frequency`.
+    """
+    if sampling_frequency is None:
+        if data is None or data.sampling_frequency is None:
+            raise ValueError(
+                "sampling_frequency must be passed or specified in the Data object."
+            )
+        else:
+            sampling_frequency = data.sampling_frequency
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+    summary_stats_dir = output_dir + "/summary_stats"
+    os.makedirs(summary_stats_dir, exist_ok=True)
+
+    from osl_dynamics.inference import modes
+
+    # Load state time course
+    alp = load(f"{inf_params_dir}/alp.pkl")
+    stc = modes.argmax_time_courses(alp)
+
+    # Get the config used to create the model
+    from osl_dynamics.models.mod_base import ModelBase
+
+    model_config, _ = ModelBase.load_config(model_dir)
+
+    # Get unprepared data (i.e. the data before calling Data.prepare)
+    # We also trim the data to account for the data points lost to
+    # time embedding or applying a sliding window
+    data = data.trim_time_series(
+        sequence_length=model_config["sequence_length"], prepared=False
+    )
+
+    # Calculate summary stats
+    lt = modes.mean_lifetimes(stc, sampling_frequency)
+    intv = modes.mean_intervals(stc, sampling_frequency)
+    bc = modes.switching_rates(stc, sampling_frequency)
+    amp = modes.mean_amplitudes(stc, data)
+
+    # Save summary stats
+    save(f"{summary_stats_dir}/lt.npy", lt)
+    save(f"{summary_stats_dir}/intv.npy", intv)
+    save(f"{summary_stats_dir}/bc.npy", bc)
+    save(f"{summary_stats_dir}/amp.npy", amp)
+
+    from osl_dynamics.utils import plotting
+
+    # Plot
+    n_states = lt.shape[1]
+    plotting.plot_violin(
+        lt.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Mean Lifetime (s)",
+        filename=f"{summary_stats_dir}/fo.png",
+    )
+    plotting.plot_violin(
+        intv.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Mean Interval (s)",
+        filename=f"{summary_stats_dir}/intv.png",
+    )
+    plotting.plot_violin(
+        bc.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Burst Count (Hz)",
+        filename=f"{summary_stats_dir}/bc.png",
+    )
+    plotting.plot_violin(
+        amp.T,
+        x=range(1, n_states + 1),
+        x_label="State",
+        y_label="Mean Amplitude (a.u.)",
+        filename=f"{summary_stats_dir}/amp.png",
+    )

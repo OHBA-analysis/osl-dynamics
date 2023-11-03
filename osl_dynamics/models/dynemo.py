@@ -1,9 +1,23 @@
 """Dynamic Network Modes (DyNeMo).
 
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
+/dynemo.html>`_ for a description of this model.
+
+See Also
+--------
+- C. Gohil, et al., "Mixtures of large-scale functional brain network modes".
+  `Neuroimage 263, 119595 (2022) <https://www.sciencedirect.com/science\
+  /article/pii/S1053811922007108>`_.
+- Tutorials demonstrating DyNeMo's ability to learn `long-range temporal
+  structure <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
+  /dynemo_long_range_dep_simulation.html>`_ and a `soft mixture of modes
+  <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
+  /dynemo_soft_mix_simulation.html>`_.
 """
 
+import os
+import logging
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -24,13 +38,17 @@ from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
+    StaticLossScalingFactorLayer,
 )
-from osl_dynamics.models import dynemo_obs
+from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelBase,
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.utils.misc import set_logging_level
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -49,44 +67,46 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     inference_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     inference_n_layers : int
         Number of layers.
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'` or
+        :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     inference_dropout : float
         Dropout rate.
     inference_regularizer : str
         Regularizer.
 
     model_rnn : str
-        RNN to use, either 'gru' or 'lstm'.
+        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
         Number of layers.
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, 'batch' or 'layer'.
+        Type of normalization to use. Either None, :code:`'batch'` or
+        :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
-        E.g. 'relu', 'elu', etc.
+        E.g. :code:`'relu'`, :code:`'elu'`, etc.
     model_dropout : float
         Dropout rate.
     model_regularizer : str
         Regularizer.
 
     theta_normalization : str
-        Type of normalization to apply to the posterior samples, theta.
-        Either 'layer', 'batch' or None.
+        Type of normalization to apply to the posterior samples, :code:`theta`.
+        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     learn_alpha_temperature : bool
-        Should we learn the alpha temperature?
+        Should we learn :code:`alpha_temperature`?
     initial_alpha_temperature : float
-        Initial value for the alpha temperature.
+        Initial value for :code:`alpha_temperature`.
 
     learn_means : bool
         Should we make the mean vectors for each mode trainable?
@@ -95,8 +115,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for state covariances. If diagonal_covariances=True
-        and full matrices are passed, the diagonal is extracted.
+        Initialisation for state covariances.
+        If :code:`diagonal_covariances=True` and full matrices are passed,
+        the diagonal is extracted.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
     diagonal_covariances : bool
@@ -109,10 +130,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     do_kl_annealing : bool
         Should we use KL annealing during training?
     kl_annealing_curve : str
-        Type of KL annealing curve. Either 'linear' or 'tanh'.
+        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
     kl_annealing_sharpness : float
         Parameter to control the shape of the annealing curve if
-        kl_annealing_curve='tanh'.
+        :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
@@ -120,13 +141,16 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     gradient_clip : float
-        Value to clip gradients by. This is the clipnorm argument passed to
-        the Keras optimizer. Cannot be used if multi_gpu=True.
+        Value to clip gradients by. This is the :code:`clipnorm` argument
+        passed to the Keras optimizer. Cannot be used if :code:`multi_gpu=True`.
     n_epochs : int
         Number of training epochs.
-    optimizer : str or tensorflow.keras.optimizers.Optimizer
-        Optimizer to use. 'adam' is recommended.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use. :code:`'adam'` is recommended.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -136,19 +160,19 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_name: str = "DyNeMo"
 
     # Inference network parameters
-    inference_rnn: Literal["gru", "lstm"] = "lstm"
+    inference_rnn: str = "lstm"
     inference_n_layers: int = 1
     inference_n_units: int = None
-    inference_normalization: Literal[None, "batch", "layer"] = None
+    inference_normalization: str = None
     inference_activation: str = None
     inference_dropout: float = 0.0
     inference_regularizer: str = None
 
     # Model network parameters
-    model_rnn: Literal["gru", "lstm"] = "lstm"
+    model_rnn: str = "lstm"
     model_n_layers: int = 1
     model_n_units: int = None
-    model_normalization: Literal[None, "batch", "layer"] = None
+    model_normalization: str = None
     model_activation: str = None
     model_dropout: float = 0.0
     model_regularizer: str = None
@@ -203,18 +227,30 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def get_means(self):
+        """Get the mode means.
+
+        Returns
+        -------
+        means : np.ndarary
+            Mode means.
+        """
+        return obs_mod.get_observation_model_parameter(self.model, "means")
+
     def get_covariances(self):
-        """Get the covariances of each mode.
+        """Get the mode covariances.
 
         Returns
         -------
         covariances : np.ndarary
             Mode covariances.
         """
-        return dynemo_obs.get_covariances(self.model)
+        return obs_mod.get_observation_model_parameter(self.model, "covs")
 
     def get_means_covariances(self):
-        """Get the means and covariances of each mode.
+        """Get the mode means and covariances.
+
+        This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
@@ -223,52 +259,72 @@ class Model(VariationalInferenceModelBase):
         covariances : np.ndarray
             Mode covariances.
         """
-        return dynemo_obs.get_means_covariances(self.model)
+        return self.get_means(), self.get_covariances()
 
     def get_observation_model_parameters(self):
-        """Wrapper for get_means_covariances."""
+        """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
-        """Set the means of each mode.
+        """Set the mode means.
 
         Parameters
         ----------
         means : np.ndarray
-            Mode covariances.
+            Mode means. Shape is (n_modes, n_channels).
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model?
         """
-        dynemo_obs.set_means(self.model, means, update_initializer)
+        obs_mod.set_observation_model_parameter(
+            self.model,
+            means,
+            layer_name="means",
+            update_initializer=update_initializer,
+        )
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the covariances of each mode.
+        """Set the mode covariances.
 
         Parameters
         ----------
         covariances : np.ndarray
-            Mode covariances.
-        update_initializer : bool
+            Mode covariances. Shape is (n_modes, n_channels, n_channels).
+        update_initializer : bool, optional
             Do we want to use the passed covariances when we re-initialize
             the model?
         """
-        dynemo_obs.set_covariances(
+        obs_mod.set_observation_model_parameter(
             self.model,
             covariances,
-            self.config.diagonal_covariances,
-            update_initializer,
+            layer_name="covs",
+            update_initializer=update_initializer,
+            diagonal_covariances=self.config.diagonal_covariances,
+        )
+
+    def set_means_covariances(
+        self,
+        means,
+        covariances,
+        update_initializer=True,
+    ):
+        """This is a wrapper for :code:`set_means` and
+        :code:`set_covariances`."""
+        self.set_means(
+            means,
+            update_initializer=update_initializer,
+        )
+        self.set_covariances(
+            covariances,
+            update_initializer=update_initializer,
         )
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_means and set_covariances."""
-        self.set_means(
+        """Wrapper for :code:`set_means_covariances`."""
+        self.set_means_covariances(
             observation_model_parameters[0],
-            update_initializer=update_initializer,
-        )
-        self.set_covariances(
             observation_model_parameters[1],
             update_initializer=update_initializer,
         )
@@ -276,24 +332,26 @@ class Model(VariationalInferenceModelBase):
     def set_regularizers(self, training_dataset):
         """Set the means and covariances regularizer based on the training data.
 
-        A multivariate normal prior is applied to the mean vectors with mu = 0,
-        sigma=diag((range / 2)**2). If config.diagonal_covariances is True, a log
-        normal prior is applied to the diagonal of the covariances matrices with mu=0,
-        sigma=sqrt(log(2 * (range))), otherwise an inverse Wishart prior is applied
-        to the covariances matrices with nu=n_channels - 1 + 0.1 and psi=diag(1 / range).
+        A multivariate normal prior is applied to the mean vectors with
+        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
+        :code:`config.diagonal_covariances=True`, a log normal prior is
+        applied to the diagonal of the covariances matrices with :code:`mu=0`,
+        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior
+        is applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
+        and :code:`psi=diag(1/range)`.
 
         Parameters
         ----------
-        training_dataset : tensorflow.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
         if self.config.learn_means:
-            dynemo_obs.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset)
 
         if self.config.learn_covariances:
-            dynemo_obs.set_covariances_regularizer(
+            obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
@@ -301,15 +359,15 @@ class Model(VariationalInferenceModelBase):
             )
 
     def sample_alpha(self, n_samples, theta_norm=None):
-        """Uses the model RNN to sample mode mixing factors, alpha.
+        """Uses the model RNN to sample mode mixing factors, :code:`alpha`.
 
         Parameters
         ----------
         n_samples : int
             Number of samples to take.
-        theta_norm : np.ndarray
-            Normalized logits to initialise the sampling with. Shape must be
-            (sequence_length, n_modes).
+        theta_norm : np.ndarray, optional
+            Normalized logits to initialise the sampling with.
+            Shape must be (sequence_length, n_modes).
 
         Returns
         -------
@@ -341,14 +399,14 @@ class Model(VariationalInferenceModelBase):
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling mode time course"):
-            # If there are leading zeros we trim theta so that we don't pass the zeros
+            # If there are leading zeros we trim theta so that we don't pass
+            # the zeros
             trimmed_theta = theta_norm[~np.all(theta_norm == 0, axis=1)][
                 np.newaxis, :, :
             ]
 
-            # Predict the probability distribution function for theta one time step
-            # in the future,
-            # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
+            # Predict the probability distribution function for theta one time
+            # step in the future, p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta)
             mod_mu = mod_mu_layer(model_rnn)[0, -1]
             mod_sigma = mod_sigma_layer(model_rnn)[0, -1]
@@ -368,8 +426,8 @@ class Model(VariationalInferenceModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the model RNN weights and biases, mixing coefficients, mode
-        means and covariances.
+        This includes the model RNN weights and biases, mixing coefficients,
+        mode means and covariances.
 
         Returns
         -------
@@ -390,12 +448,176 @@ class Model(VariationalInferenceModelBase):
 
         return int(n_params)
 
+    def subject_fine_tuning(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
+        """Fine tuning the model for each subject.
+
+        Here, we train the inference RNN and observation model with the model
+        RNN fixed held fixed at the group-level.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
+            Directory to temporarily store the model in.
+
+        Returns
+        -------
+        alpha : list of np.ndarray
+            Subject specific mixing coefficients.
+            Each element has shape (n_samples, n_modes).
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        """
+        # Save the group level model
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Save original training hyperparameters
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+        original_do_kl_annealing = self.config.do_kl_annealing
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+        self.config.do_kl_annealing = False
+
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
+
+        # Fine tune on individual subjects
+        alpha = []
+        means = []
+        covariances = []
+        with self.set_trainable(fixed_layers, False), set_logging_level(
+            _logger, logging.WARNING
+        ):
+            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
+                # Train on this subject
+                with training_data.set_keep(subject):
+                    self.fit(training_data, verbose=0)
+                    a = self.get_alpha(
+                        training_data,
+                        concatenate=True,
+                        verbose=0,
+                    )
+
+                # Get inferred parameters
+                m, c = self.get_means_covariances()
+                alpha.append(a)
+                means.append(m)
+                covariances.append(c)
+
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+        self.config.do_kl_annealing = original_do_kl_annealing
+
+        return alpha, np.array(means), np.array(covariances)
+
+    def dual_estimation(
+        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+    ):
+        """Dual estimation to get the subject-specific observation model
+        parameters.
+
+        Here, we train the observation model parameters (mode means and
+        covariances) with the inference RNN and model RNN held fixed at
+        the group-level.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
+            Directory to temporarily store the model in.
+
+        Returns
+        -------
+        means : np.ndarray
+            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+        covariances : np.ndarray
+            Subject specific covariances.
+            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        """
+        # Save the group level model
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Save original training hyperparameters
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = [
+            "mod_rnn",
+            "mod_mu",
+            "mod_sigma",
+            "inf_rnn",
+            "inf_mu",
+            "inf_sigma",
+            "theta_norm",
+            "alpha",
+        ]
+
+        # Dual estimation on individual subjects
+        means = []
+        covariances = []
+        with self.set_trainable(fixed_layers, False):
+            for subject in trange(training_data.n_arrays, desc="Dual estimation"):
+                # Train on this subject
+                with training_data.set_keep(subject):
+                    self.fit(training_data, verbose=0)
+
+                # Get inferred parameters
+                m, c = self.get_means_covariances()
+                means.append(m)
+                covariances.append(c)
+
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+
+        return np.array(means), np.array(covariances)
+
 
 def _model_structure(config):
     # Layer for input
     inputs = layers.Input(
         shape=(config.sequence_length, config.n_channels), name="data"
     )
+
+    # Static loss scaling factor
+    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+        name="static_loss_scaling_factor"
+    )
+    static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
 
     # Inference RNN:
     # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
@@ -418,8 +640,14 @@ def _model_structure(config):
     inf_sigma_layer = layers.Dense(
         config.n_modes, activation="softplus", name="inf_sigma"
     )
-    theta_layer = SampleNormalDistributionLayer(config.theta_std_epsilon, name="theta")
-    theta_norm_layer = NormalizationLayer(config.theta_normalization, name="theta_norm")
+    theta_layer = SampleNormalDistributionLayer(
+        config.theta_std_epsilon,
+        name="theta",
+    )
+    theta_norm_layer = NormalizationLayer(
+        config.theta_normalization,
+        name="theta_norm",
+    )
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
         config.learn_alpha_temperature,
@@ -436,8 +664,8 @@ def _model_structure(config):
     alpha = alpha_layer(theta_norm)
 
     # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix for
-    #   each mode as the observation model.
+    # - We use a multivariate normal with a mean vector and covariance matrix
+    #   for each mode as the observation model.
     # - We calculate the likelihood of generating the training data with alpha
     #   and the observation model.
 
@@ -472,11 +700,18 @@ def _model_structure(config):
         )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(config.covariances_epsilon, name="ll_loss")
+    ll_loss_layer = LogLikelihoodLossLayer(
+        config.covariances_epsilon,
+        name="ll_loss",
+    )
 
     # Data flow
-    mu = means_layer(inputs)  # inputs not used
-    D = covs_layer(inputs)  # inputs not used
+    mu = means_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
+    D = covs_layer(
+        inputs, static_loss_scaling_factor=static_loss_scaling_factor
+    )  # inputs not used
     m = mix_means_layer([alpha, mu])
     C = mix_covs_layer([alpha, D])
     ll_loss = ll_loss_layer([inputs, m, C])
@@ -487,7 +722,10 @@ def _model_structure(config):
     #     - mod_sigma ~ softplus(RNN(theta_<t))
 
     # Definition of layers
-    theta_norm_drop_layer = layers.Dropout(config.model_dropout, name="theta_norm_drop")
+    theta_norm_drop_layer = layers.Dropout(
+        config.model_dropout,
+        name="theta_norm_drop",
+    )
     mod_rnn_layer = ModelRNNLayer(
         config.model_rnn,
         config.model_normalization,

@@ -21,7 +21,7 @@ data = Data(
 ts = data.time_series()
 
 # Calculate static power/coherence spectra
-f, psd, coh = static.power_spectra(
+f, psd, coh = static.welch_spectra(
     data=ts,
     window_length=500,
     sampling_frequency=250,

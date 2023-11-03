@@ -2,11 +2,14 @@
 
 """
 
+from copy import deepcopy
+
 import numpy as np
-import tensorflow_probability as tfp
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers, initializers
 from tensorflow.keras.initializers import Initializer
+
 from osl_dynamics import inference
 
 tfb = tfp.bijectors
@@ -17,9 +20,8 @@ class WeightInitializer(Initializer):
 
     Parameters
     ----------
-    initial_value : numpy.ndarray
-        Value to initialise weights to.
-        Note, the shape is not checked.
+    initial_value : np.ndarray
+        Value to initialise weights to. Note, the shape is not checked.
     """
 
     def __init__(self, initial_value):
@@ -29,8 +31,31 @@ class WeightInitializer(Initializer):
         return self.initial_value
 
 
+class RandomWeightInitializer(Initializer):
+    """Initialize weights to given value with random noise added.
+
+    Parameters
+    ----------
+    initial_value : np.ndarray
+        Value to initialise weights to. Note, the shape is not checked.
+    std : float
+        Standard deviation of the noise to add.
+    """
+
+    def __init__(self, initial_value, std):
+        self.initial_value = tf.cast(initial_value, tf.float32)
+        self.std = std
+
+    def __call__(self, shape, dtype=None):
+        e = initializers.TruncatedNormal(mean=0.0, stddev=self.std).__call__(
+            shape=shape, dtype=tf.float32
+        )
+        return self.initial_value + e
+
+
 class IdentityCholeskyInitializer(Initializer):
-    """Initialize weights to a flattened cholesky factor of identity matrices."""
+    """Initialize weights to a flattened cholesky factor of identity
+    matrices."""
 
     def __init__(self):
         # Bijector used to transform learnable vectors to covariance matrices
@@ -131,7 +156,7 @@ class CopyTensorInitializer(Initializer):
 
     Parameters
     ----------
-    tensor : tensorflow.Tensor
+    tensor : tf.Tensor
         Tensor to copy.
     """
 
@@ -145,14 +170,17 @@ class CopyTensorInitializer(Initializer):
 def reinitialize_layer_weights(layer):
     """Re-initializes the weights in a particular layer.
 
-    This function relies on each layer having an initializer attribute.
-    Therefore, you must specify a self.*_initializer attribute in custom
-    layers, otherwise this function will break.
-
     Parameters
     ----------
-    layer: tensorflow.keras.layers.Layer
+    layer: tf.keras.layers.Layer
         Layer to initialize weights for.
+
+    Note
+    ----
+    This function relies on each layer having an attribute for the initializer.
+    Standard TensorFlow layers have this. You must specify a
+    :code:`self.*_initializer` attribute in any custom layer, otherwise this
+    function will break.
     """
 
     # Get the initialisation container
@@ -183,8 +211,7 @@ def reinitialize_layer_weights(layer):
             #
             # We need to create a new initializer to get new
             # random values
-            new_initializer = initializer_type()
-            init_container.__dict__[key] = new_initializer
+            new_initializer = deepcopy(initializer)
 
         # Get the variable (i.e. weights) we want to re-initialize
         if key == "recurrent_initializer":
@@ -198,14 +225,14 @@ def reinitialize_layer_weights(layer):
 
 
 def reinitialize_model_weights(model, keep=None):
-    """Re-initialize the weights in the model.
+    """Re-initialize the weights in a model.
 
     Parameters
     ----------
-    model : tensorflow.keras.Model
+    model : tf.keras.Model
         Model to re-initialize weights for.
-    keep : list
-        List of str containing names for layers to not reinitialize.
+    keep : list, optional
+        List of :code:`str` containing names for layers to not reinitialize.
     """
     if keep is None:
         keep = []

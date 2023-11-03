@@ -1,6 +1,6 @@
 """Files included within osl-dynamics.
 
-This includes parcellation/mask files and scanner layouts.
+-----
 
 Available parcellations:
 
@@ -15,10 +15,16 @@ Available parcellations:
 - Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz
 - giles_39_binary.nii.gz
 
+-----
+
 Available masks:
 
+- MNI152_T1_1mm_brain.nii.gz
+- MNI152_T1_2mm_brain.nii.gz
 - MNI152_T1_8mm_brain.nii.gz
 - ft_8mm_brain_mask.nii.gz
+
+-----
 """
 
 from osl_dynamics.files import mask, parcellation, scanner, scene
