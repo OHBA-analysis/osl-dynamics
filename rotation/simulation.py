@@ -22,4 +22,5 @@ def HMM_single_subject_simulation(save_dir:str, n_scans:int, n_states:int, n_sam
         )
         time_series.append(sim.time_series)
     time_series = np.concatenate(time_series,axis=0)
+    print(time_series.shape)
     np.savetxt(f'{save_dir}10001.txt',time_series)

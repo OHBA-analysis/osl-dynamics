@@ -642,7 +642,7 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
 
     # Plot correlation matrix
     # Calculate the number of rows and columns for the subplot grid
-    num_cols = 5
+    num_cols = 1
     num_rows = n_states // num_cols
 
     # Create a figure and a grid of subplots
@@ -654,6 +654,8 @@ def plot_state_statistics(save_dir:str, plot_dir:str,model_name:str,n_channels:i
         col = i % num_cols
         if num_rows == 1:
             ax = axes[col]
+        elif num_cols == 1:
+            ax = axes[row]
         else:
             ax = axes[row, col]
         corr_matrix = corrs[i, :, :]
