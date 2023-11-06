@@ -151,9 +151,9 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
-        save_dir = f'./results_simulation_202311/{model}_ICA_{n_channels}'
+        save_dir = f'./results_simulation_202311_no_mean/{model}_ICA_{n_channels}'
     else:
-        save_dir = f'./results_simulation_202311/{model}_ICA_{n_channels}_state_{n_states}'
+        save_dir = f'./results_simulation_202311_no_mean/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
@@ -161,7 +161,7 @@ if __name__ == '__main__':
     
    # data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
     #data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-    data_dir = pathlib.Path(f'./data/node_timeseries/simulation/')
+    data_dir = pathlib.Path(f'./data/node_timeseries/simulation_no_mean/')
 
     if mode == 'training':
         prepare_data = PrepareData(data_dir)

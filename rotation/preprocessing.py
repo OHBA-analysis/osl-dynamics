@@ -7,9 +7,9 @@ import scipy.stats as stats
 from osl_dynamics.data import Data
 
 class PrepareData():
-    def __init__(self,data_dir:pathlib.Path,n_session:int=4):
+    def __init__(self,data_dir:pathlib.Path,n_timepoint:int=1200):
         self.data_dir = data_dir
-        self.n_session = n_session
+        self.n_timepoint = n_timepoint
         
     def load(self,split_session:bool = True,split_strategy:str ='0'):
         '''
@@ -36,12 +36,13 @@ class PrepareData():
         for file in sorted(self.data_dir.glob('*.txt')):
             subjs.append(file.stem)
             loaded_data = np.loadtxt(file)
+            n_session = len(loaded_data) / self.n_timepoint
             if split_session:
-                splitted_data = np.split(loaded_data,self.n_session)
+                splitted_data = np.split(loaded_data,n_session)
                 for i in range(len(splitted_data)):
                     data_list.append(z_score(splitted_data[i]))
             else:
-                data_list.append(z_score(loaded_data,self.n_session))
+                data_list.append(z_score(loaded_data,n_session))
         
         print('Read from directory: ',self.data_dir)
         print('Number of subjects: ',len(subjs))

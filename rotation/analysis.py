@@ -124,8 +124,8 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         plt.close()
 
     # Plot the convergence of loss function
-    if not os.path.isfile(f'{plot_dir}loss_history.pdf'):
-        plot_loss_history(save_dir,plot_dir)
+    #if not os.path.isfile(f'{plot_dir}loss_history.pdf'):
+    #    plot_loss_history(save_dir,plot_dir)
 
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm

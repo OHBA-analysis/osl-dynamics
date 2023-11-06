@@ -5,18 +5,20 @@ import numpy as np
 from osl_dynamics.analysis import connectivity
 from rotation.utils import group_high_pass_filter
 
-def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False):
+def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
+                 sequence_length=600,learn_means=False,learn_covariances=True,
+                 batch_size=64,learning_rate=1e-3,n_epochs=30):
     from osl_dynamics.models.hmm import Config, Model
     # Create a config object
     config = Config(
         n_states=n_states,
         n_channels=n_channels,
-        sequence_length=600,
-        learn_means=True,
-        learn_covariances=True,
-        batch_size=64,
-        learning_rate=1e-3,
-        n_epochs=30,
+        sequence_length=sequence_length,
+        learn_means=learn_means,
+        learn_covariances=learn_covariances,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        n_epochs=n_epochs,
     )
     
     # Initiate a Model class and print a summary

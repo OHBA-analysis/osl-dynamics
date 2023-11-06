@@ -16,17 +16,24 @@ def parse_index(index:int,models:list,list_channels:list,list_states:list,traini
     return the model, n_channels, n_states accordingly
     
     Parameters:
-    index: (int) the input index in the array job
-    models: (list) the model list
-    list_channels: (list) the n_channel list
-    list_states: (list) the n_state list
-    training: (bool) Whether we are in the training mode.
+    index: int
+        the input index in the array job
+    models: list
+        the model list
+    list_channels: list
+        the n_channel list
+    list_states: list
+        the n_state list
+    training: bool
+        Whether we are in the training mode.
     
     Returns:
-        tuple: A tuple containing the following
-            - model (string): The model to use
-            - n_channels (int): The number of channels to use
-            - n_states (int): The number of states to use
+    model: string
+        The model to use
+    n_channels: int
+        The number of channels to use
+    n_states: int
+        The number of states to use
     '''
 
     N_n_channels = len(list_channels)
@@ -51,9 +58,12 @@ def plot_FO(fo_matrix:np.ndarray,plot_dir:str,file_name:str=None):
     and save the plot to plot_dir
     Parameters
     ----------
-    fo_matrix: (np.ndarray)the fractional occupancy matrix
-    plot_dir: (str)the save direction
-    file_name: (str) the file name
+    fo_matrix: np.ndarray
+        the fractional occupancy matrix
+    plot_dir: str
+        the save direction
+    file_name: str
+        the file name
     Returns
     -------
     """
@@ -97,14 +107,14 @@ def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
     Parameters
     ----------
     stds: np.ndarray
-    standard deviation vectors with shape (M, N) or (M,N,N) (diagonal)
+        standard deviation vectors with shape (M, N) or (M,N,N) (diagonal)
     cors: np.ndarray
-    correlation matrices with shape (M, N, N)
+        correlation matrices with shape (M, N, N)
 
     Returns
     -------
     covariances: np.ndarray
-    covariance matrices with shape (M, N, N)
+        covariance matrices with shape (M, N, N)
     """
 
     if stds.ndim == 2:
@@ -120,12 +130,15 @@ def cov2stdcor(covs:np.ndarray):
     stds (M*N) and correlation matrices (M * N * N)
     Parameters
     ----------
-    covs: numpy.ndarray (M*N*N)
+    covs: np.ndarray
+        shape M*N*N
 
     Returns
     -------
-    stds: numpy.ndarray (M*N)
-    corrs: numpy.ndarray (M*N*N)
+    stds: np.ndarray
+        shape M*N
+    corrs: np.ndarray
+        shape M*N*N
     """
     # Validation
     if covs.ndim < 2:
@@ -463,16 +476,25 @@ def hungarian_pair(matrix:np.ndarray,distance:bool=False):
 def heatmap_reorder_matrix(matrix:np.ndarray,plot_dir:str,plot_statistics:str,indices:dict,model_name:str,n_channels:int,n_states:int,split_strategy:str=''):
     """
     Plot the reordered matrix while putting the row and column indices onto the x and y ticks
+
     Parameters
     ----------
-    matrix: (np.ndarray) matrix to plot
-    plot_dir: (str) the directory to save the plot
-    plot_statistics: (str) 'means_correlation' or 'FCs_distance'
-    indices: (dict) indices with keys: 'row' and 'col'
-    model_name: (str) model name
-    n_channels: (int) number of channels
-    n_states: (int) number of states
-    split_strategy: (str) Specific to split half plot, split_strategy = '1','2','3','4'
+    matrix: np.ndarray
+        matrix to plot
+    plot_dir: str
+        the directory to save the plot
+    plot_statistics: str
+        'means_correlation' or 'FCs_distance'
+    indices: dict
+        indices with keys: 'row' and 'col'
+    model_name: str
+        model name
+    n_channels: int
+        number of channels
+    n_states: int
+        number of states
+    split_strategy: str
+        Specific to split half plot, split_strategy = '1','2','3','4'
 
     Returns
     -------
