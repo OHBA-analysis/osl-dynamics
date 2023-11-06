@@ -736,18 +736,19 @@ def plot_state_psds(data, output_dir):
     )
 
 
-def calc_subject_ae_hmm_networks(data, output_dir):
-    """Calculate subject-specific AE-HMM networks.
+def dual_estimation(data, output_dir, n_jobs=1):
+    """Dual estimation for subject-specific observation model parameters.
 
     This function expects a model has already been trained and the following
-    directory to exist:
+    directories to exist:
 
+    - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
     This function will create the following directory:
 
-    - :code:`<output_dir>/networks`, which contains the subject-specific
-      networks.
+    - :code:`<output_dir>/dual_estimates`, which contains the subject-specific
+      means and covariances.
 
     Parameters
     ----------
@@ -755,30 +756,32 @@ def calc_subject_ae_hmm_networks(data, output_dir):
         Data object.
     output_dir : str
         Path to output directory.
+    n_jobs : int, optional
+        Number of jobs to run in parallel.
     """
     if data is None:
         raise ValueError("data must be passed.")
 
     # Directories
-    inf_params_dir = output_dir + "/inf_params"
-    networks_dir = output_dir + "/networks"
-    os.makedirs(networks_dir, exist_ok=True)
+    model_dir = f"{output_dir}/model"
+    inf_params_dir = f"{output_dir}/inf_params"
+    dual_estimates_dir = f"{output_dir}/dual_estimates"
+    os.makedirs(dual_estimates_dir, exist_ok=True)
+
+    #  Load model
+    from osl_dynamics.models import load
+
+    model = load(model_dir)
 
     # Load the inferred state probabilities
     alpha = load(f"{inf_params_dir}/alp.pkl")
 
-    # Get the prepared data
-    # This should be the data after calculating the amplitude envelope
-    data = data.time_series()
-
-    # Calculate subject-specific means and AECs
-    from osl_dynamics.analysis import modes
-
-    means, aecs = modes.ae_hmm_networks(data, alpha)
+    # Dual estimation
+    means, covs = model.dual_estimation(data, n_jobs=n_jobs)
 
     # Save
-    save(f"{networks_dir}/subj_means.npy", means)
-    save(f"{networks_dir}/subj_aecs.npy", aecs)
+    save(f"{dual_estimates_dir}/means.npy", means)
+    save(f"{dual_estimates_dir}/covs.npy", covs)
 
 
 def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
