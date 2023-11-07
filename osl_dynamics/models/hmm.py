@@ -1404,7 +1404,7 @@ class Model(ModelBase):
 
         # Helper function for dual estimation for a single subject
         def _single_dual_estimation(a, x):
-            a /= np.sum(a, axis=1, keepdims=True)
+            a /= np.sum(a, axis=0, keepdims=True)
             if self.config.learn_means:
                 subject_means = np.empty((n_states, n_channels))
                 for state in range(n_states):
