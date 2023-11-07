@@ -535,7 +535,7 @@ class Model(VariationalInferenceModelBase):
         n_epochs=None,
         learning_rate=None,
         store_dir="tmp",
-        alpha=None,
+        **kwargs,
     ):
         """Dual estimation to get the subject-specific observation model
         parameters.
@@ -556,8 +556,6 @@ class Model(VariationalInferenceModelBase):
             to create the model.
         store_dir : str, optional
             Directory to temporarily store the model in.
-        alpha : np.ndarray, optional
-            For consistency with API, ignored.
 
         Returns
         -------

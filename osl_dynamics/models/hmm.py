@@ -1404,11 +1404,13 @@ class Model(ModelBase):
 
         # Helper function for dual estimation for a single subject
         def _single_dual_estimation(a, x):
-            a /= np.sum(a, axis=0, keepdims=True)
+            sum_a = np.sum(a, axis=0)
             if self.config.learn_means:
                 subject_means = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    subject_means[state] = np.sum(x * a[:, state, None], axis=0)
+                    subject_means[state] = (
+                        np.sum(x * a[:, state, None], axis=0) / sum_a[state]
+                    )
             else:
                 subject_means = self.get_means()
 
@@ -1416,9 +1418,14 @@ class Model(ModelBase):
                 subject_covariances = np.empty((n_states, n_channels, n_channels))
                 for state in range(n_states):
                     diff = x - subject_means[state]
-                    subject_covariances[state] = np.sum(
-                        diff[:, :, None] * diff[:, None, :] * a[:, state, None, None],
-                        axis=0,
+                    subject_covariances[state] = (
+                        np.sum(
+                            diff[:, :, None]
+                            * diff[:, None, :]
+                            * a[:, state, None, None],
+                            axis=0,
+                        )
+                        / sum_a[state]
                     )
                     subject_covariances[
                         state
