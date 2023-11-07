@@ -481,6 +481,7 @@ def train_sehmm(
 
     # Initialise subject embeddings
     _, init_dual_covs = init_model.dual_estimation(data, n_jobs=n_jobs)
+    init_dual_covs = np.reshape(init_dual_covs, (data.n_arrays, -1))
     pca = PCA(n_components=config_kwargs["subject_embeddings_dim"])
     model.set_subject_embeddings_initializer(pca.fit_transform(init_dual_covs))
 
