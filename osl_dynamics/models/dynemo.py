@@ -530,7 +530,12 @@ class Model(VariationalInferenceModelBase):
         return alpha, np.array(means), np.array(covariances)
 
     def dual_estimation(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+        self,
+        training_data,
+        n_epochs=None,
+        learning_rate=None,
+        store_dir="tmp",
+        alpha=None,
     ):
         """Dual estimation to get the subject-specific observation model
         parameters.
@@ -551,6 +556,8 @@ class Model(VariationalInferenceModelBase):
             to create the model.
         store_dir : str, optional
             Directory to temporarily store the model in.
+        alpha : np.ndarray, optional
+            For consistency with API, ignored.
 
         Returns
         -------

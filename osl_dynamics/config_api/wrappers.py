@@ -769,15 +769,15 @@ def dual_estimation(data, output_dir, n_jobs=1):
     os.makedirs(dual_estimates_dir, exist_ok=True)
 
     #  Load model
-    from osl_dynamics.models import load
+    from osl_dynamics import models
 
-    model = load(model_dir)
+    model = models.load(model_dir)
 
     # Load the inferred state probabilities
     alpha = load(f"{inf_params_dir}/alp.pkl")
 
     # Dual estimation
-    means, covs = model.dual_estimation(data, n_jobs=n_jobs)
+    means, covs = model.dual_estimation(data, alpha=alpha, n_jobs=n_jobs)
 
     # Save
     save(f"{dual_estimates_dir}/means.npy", means)

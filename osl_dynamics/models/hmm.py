@@ -35,7 +35,6 @@ from pqdm.threads import pqdm
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
 from osl_dynamics.inference.layers import (
-    add_epsilon,
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
@@ -1400,28 +1399,32 @@ class Model(ModelBase):
         if len(alpha) != len(data):
             raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
 
+        n_states = self.config.n_states
+        n_channels = self.config.n_channels
+
         # Helper function for dual estimation for a single subject
         def _single_dual_estimation(a, x):
-            sum_gamma = np.sum(a, axis=0)
+            a /= np.sum(a, axis=1, keepdims=True)
             if self.config.learn_means:
-                subject_means = (
-                    np.sum(x[:, None, :] * a[:, :, None], axis=0) / sum_gamma[:, None]
-                )
+                subject_means = np.empty((n_states, n_channels))
+                for state in range(n_states):
+                    subject_means[state] = np.sum(x * a[:, state, None], axis=0)
             else:
                 subject_means = self.get_means()
 
             if self.config.learn_covariances:
-                diff = x[:, None, :] - subject_means[None, :, :]
-                subject_covariances = (
-                    np.sum(
-                        diff[:, :, :, None] @ diff[:, :, None, :] * a[:, :, None, None],
+                subject_covariances = np.empty((n_states, n_channels, n_channels))
+                for state in range(n_states):
+                    diff = x - subject_means[state]
+                    subject_covariances[state] = np.sum(
+                        diff[:, :, None] * diff[:, None, :] * a[:, state, None, None],
                         axis=0,
                     )
-                    / sum_gamma[:, None, None]
-                )
-                subject_covariances += self.config.covariances_epsilon * np.eye(
-                    self.config.n_channels
-                )
+                    subject_covariances[
+                        state
+                    ] += self.config.covariances_epsilon * np.eye(
+                        self.config.n_channels
+                    )
             else:
                 subject_covariances = self.get_covariances()
 
