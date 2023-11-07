@@ -530,7 +530,12 @@ class Model(VariationalInferenceModelBase):
         return alpha, np.array(means), np.array(covariances)
 
     def dual_estimation(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+        self,
+        training_data,
+        n_epochs=None,
+        learning_rate=None,
+        store_dir="tmp",
+        **kwargs,
     ):
         """Dual estimation to get the subject-specific observation model
         parameters.

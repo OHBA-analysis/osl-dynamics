@@ -548,6 +548,20 @@ class Model(MarkovStateInferenceModelBase):
         )
         self.reset()
 
+    def set_subject_embeddings_initializer(self, subject_embeddings):
+        """Set the subject embeddings initializer.
+
+        Parameters
+        ----------
+        subject_embeddings : np.ndarray
+            Subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
+        """
+        obs_mod.set_subject_embeddings_initializer(
+            self.model,
+            subject_embeddings,
+        )
+        self.reset()
+
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 

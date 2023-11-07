@@ -320,6 +320,7 @@ def train_sehmm(
     init_kwargs=None,
     fit_kwargs=None,
     save_inf_params=True,
+    n_jobs=1,
 ):
     """ Train a `Subject embedding Hidden Markov Model <https://osl-dynamics.\
     readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html>`_.
@@ -331,10 +332,11 @@ def train_sehmm(
         :code:`Model.random_state_time_course_initialization`.
     3. Build an :code:`sehmm.Model` object.
     4. Initialize the parameters of the SE-HMM model using pretrained HMM.
-    2. Initialize the parameters of the SE-HMM model using
+    5. Initialize the subject embeddings with PCA'ed dual estimated covariances.
+    6. Initialize the parameters of the SE-HMM model using
         :code:`Model.random_state_time_course_initialization`.
-    3. Perform full training.
-    4. Save the inferred parameters (state probabilities, means,
+    7. Perform full training.
+    8. Save the inferred parameters (state probabilities, means,
         covariances and subject embeddings) if :code:`save_inf_params=True`.
     
     This function will create two directories:
@@ -393,11 +395,14 @@ def train_sehmm(
         Keyword arguments to pass to the :code:`Model.fit`. No defaults.
     save_inf_params : bool, optional
         Should we save the inferred parameters?
+    n_jobs : int, optional
+        Number of jobs to run in parallel.
     """
     if data is None:
         raise ValueError("data must be passed.")
 
     from osl_dynamics.models import hmm, sehmm
+    from sklearn.decomposition import PCA
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs
@@ -474,11 +479,18 @@ def train_sehmm(
     # Set deviation initializer
     model.set_dev_parameters_initializer(data)
 
+    # Initialise subject embeddings
+    _, init_dual_covs = init_model.dual_estimation(data, n_jobs=n_jobs)
+    pca = PCA(n_components=config_kwargs["subject_embeddings_dim"])
+    model.set_subject_embeddings_initializer(pca.fit_transform(init_dual_covs))
+
+    # Initialise SE-HMM with subject embeddings fixed
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_state_time_course_initialization(
-        data,
-        **init_kwargs,
-    )
+    with model.set_trainable("subject_embeddings", False):
+        init_history = model.random_state_time_course_initialization(
+            data,
+            **init_kwargs,
+        )
 
     # Training
     history = model.fit(data, **fit_kwargs)
@@ -769,15 +781,15 @@ def dual_estimation(data, output_dir, n_jobs=1):
     os.makedirs(dual_estimates_dir, exist_ok=True)
 
     #  Load model
-    from osl_dynamics.models import load
+    from osl_dynamics import models
 
-    model = load(model_dir)
+    model = models.load(model_dir)
 
     # Load the inferred state probabilities
     alpha = load(f"{inf_params_dir}/alp.pkl")
 
     # Dual estimation
-    means, covs = model.dual_estimation(data, n_jobs=n_jobs)
+    means, covs = model.dual_estimation(data, alpha=alpha, n_jobs=n_jobs)
 
     # Save
     save(f"{dual_estimates_dir}/means.npy", means)
