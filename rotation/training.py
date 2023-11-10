@@ -43,7 +43,7 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
         
 
 
-def Dynemo_training(dataset, n_modes, n_channels, save_dir,compute_state=False):
+def Dynemo_training(dataset, n_modes, n_channels, save_dir,learn_means=False,compute_state=False):
     from osl_dynamics.models.dynemo import Config, Model
     # Create a config object
     config = Config(
@@ -56,7 +56,7 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir,compute_state=False):
         model_normalization="layer",
         learn_alpha_temperature=True,
         initial_alpha_temperature=1.0,
-        learn_means=True,
+        learn_means=learn_means,
         learn_covariances=True,
         do_kl_annealing=True,
         kl_annealing_curve="tanh",
@@ -87,7 +87,7 @@ def Dynemo_training(dataset, n_modes, n_channels, save_dir,compute_state=False):
         pickle.dump(alpha, open(f'{save_dir}/alpha.pkl', "wb"))
 
 
-def MAGE_training(dataset, n_modes, n_channels, save_dir, compute_state=False):
+def MAGE_training(dataset, n_modes, n_channels, save_dir, learn_means=False,compute_state=False):
     from osl_dynamics.models.mdynemo import Config, Model
     # Create a config object
     config = Config(
@@ -100,7 +100,7 @@ def MAGE_training(dataset, n_modes, n_channels, save_dir, compute_state=False):
         model_normalization="layer",
         learn_alpha_temperature=True,
         initial_alpha_temperature=1.0,
-        learn_means=True,
+        learn_means=learn_means,
         learn_stds=True,
         learn_fcs=True,
         do_kl_annealing=True,

@@ -18,7 +18,6 @@ def HMM_single_subject_simulation(save_dir:str, n_scans:int, n_states:int, n_sam
             trans_prob=trans_prob,
             means=means,
             covariances=covariances,
-            random_seed=42,
         )
         time_series.append(sim.time_series)
     time_series = np.concatenate(time_series,axis=0)

@@ -46,7 +46,7 @@ def construct_graph(tpm:np.ndarray):
 
     return G
 def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
+                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int,learn_mean:bool=False):
     """
     Post-training analysis of HMM model
     Parameters
@@ -175,7 +175,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                                              model='HMM',
                                              n_channels=n_channels,
                                              n_states=n_states)
-
+    '''
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
     if not os.path.exists(FO_dir):
@@ -207,7 +207,8 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         plt.savefig(f'{FO_dir}dendrogram_FO.jpg')
         plt.savefig(f'{FO_dir}dendrogram_FO.pdf')
         plt.close()
-
+    '''
+    '''
     # Compute the mean activation map
     if not os.path.isfile(f'{save_dir}mean_activation_surface_map.dscalar.nii'):
         mean_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
@@ -215,23 +216,23 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     # Compute rank-one decomposition of FC map
     if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
         FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
-
-    if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
-        mean_FC_relation(save_dir,plot_dir,'HMM',n_channels,n_states)
+    '''
+    #if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
+    #    mean_FC_relation(save_dir,plot_dir,'HMM',n_channels,n_states)
 
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',n_channels,n_states,split_strategy='1')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='2')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states, split_strategy='3')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states, split_strategy='4')
+        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',n_channels,n_states, learn_mean=learn_mean,split_strategy='1')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states,learn_mean=learn_mean,split_strategy='2')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states,learn_mean=learn_mean,split_strategy='3')
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4')
 
 
 
 def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                    spatial_map_dir:str,spatial_surface_map_dir:str, n_channels:int,n_states:int):
+                    spatial_map_dir:str,spatial_surface_map_dir:str, n_channels:int,n_states:int,learn_mean:bool=False):
     """
     Post-training analysis of Dynemo model
     Parameters
@@ -326,7 +327,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'Dynemo', n_channels, n_states, split_strategy='4')
 
 def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                  spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int):
+                  spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int,learn_mean:bool=False):
     """
     Post-training analysis of MAGE
     Parameters
@@ -1123,16 +1124,23 @@ def FO_MAGE(save_dir:str,FO_dir:str,n_channels:int,n_states:int):
 
 
 
-def comparison_analysis(models:list,list_channels:list,list_states:list,result_dir:str, save_dir:str):
+def comparison_analysis(models:list,list_channels:list,list_states:list,result_dir:str, save_dir:str,learn_mean:bool=False):
     """
     Compare results obtained from different models, channel numbers, state numbers.
     Parameters
     ----------
-    models: (list) model list.
-    list_channels: (list) N_channels list
-    list_states: (list) N_states list
-    result_dir: (str) where to find the results of different models
-    save_dir: (str) where to save comparison results
+    models: list
+        model list.
+    list_channels: list
+        N_channels list
+    list_states: list
+        N_states list
+    result_dir: str
+        where to find the results of different models
+    save_dir: str
+        where to save comparison results
+    learn_mean: bool
+        where mean activation is learned
 
     Returns
     -------
@@ -1155,8 +1163,9 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
                 FC_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
 
                 if model!= 'SWC':
-                    data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_1.npy')
-                    mean_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
+                    if learn_mean:
+                        data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_1.npy')
+                        mean_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
                     data = np.load(
                         f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_1.npy')
                     FC_distance[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
@@ -1164,8 +1173,9 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
         if model != 'SWC':
             group_comparison_plot(FC_distance, model, list_channels, list_states, 'Riemannian_distance',
                                   save_dir)
-            group_comparison_plot(mean_correlation, model, list_channels, list_states, 'mean_correlation',
-                                  save_dir)
+            if learn_mean:
+                group_comparison_plot(mean_correlation, model, list_channels, list_states, 'mean_correlation',
+                                      save_dir)
 
     # Compare the free energy and model evidence across all methods
     for model in models:
@@ -1279,40 +1289,51 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     plt.savefig(f'{plot_dir}mean_FC_relation.pdf')
     plt.close()
 
-def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n_channels:int,n_states:int,split_strategy:str='1'):
+def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n_channels:int,n_states:int,learn_mean:bool=False,split_strategy:str='1'):
     """
     Analysis the reproducibility of each model
     Parameters
     ----------
-    save_dir: (str) the root directory of the model results
-    reproduce_analysis_dir: (str) directory to save reproducibility analysis results
-    model_name: (str) the model name
-    n_channels: (int) number of channels
-    n_states: (int) number of states
+    save_dir: str
+        the root directory of the model results
+    reproduce_analysis_dir: str
+        directory to save reproducibility analysis results
+    model_name: str
+        the model name
+    n_channels: int
+        number of channels
+    n_states: int
+        number of states
+    learn_mean: bool
+        whether to learn the mean activation in the model.
     split_strategy: (str) split strategy '1','2','3','4'
     Returns
     -------
     """
     extract_state_statistics(f'{save_dir}split_{split_strategy}_first_half/',model_name)
     extract_state_statistics(f'{save_dir}split_{split_strategy}_second_half/', model_name)
+    if learn_mean:
+        means_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_means.npy')
+        means_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_means.npy')
+        means_correlation = twopair_vector_correlation(means_1, means_2)
+        row_column_indices, means_correlation_reorder = hungarian_pair(means_correlation, distance=False)
+        np.save(f'{reproduce_analysis_dir}means_correlation_split_{split_strategy}.npy', means_correlation)
+        with open(f'{reproduce_analysis_dir}means_row_column_indices_split_{split_strategy}.json', 'w') as json_file:
+            json.dump(row_column_indices, json_file)
+        np.save(f'{reproduce_analysis_dir}means_correlation_reorder_split_{split_strategy}.npy',
+                means_correlation_reorder)
 
-    means_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_means.npy')
+        heatmap_reorder_matrix(means_correlation_reorder, reproduce_analysis_dir,
+                               'means_correlation', row_column_indices,
+                               model_name, n_channels, n_states, split_strategy)
+
+    print("We are working on the FCs in reproducibility analysis!")
+    print(f'split strategy is {split_strategy}')
+    print('#################')
+    # Work on FCs
     correlations_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_correlations.npy')
-
-    means_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_means.npy')
     correlations_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_correlations.npy')
 
-    means_correlation = twopair_vector_correlation(means_1,means_2)
-    row_column_indices, means_correlation_reorder = hungarian_pair(means_correlation,distance=False)
-    np.save(f'{reproduce_analysis_dir}means_correlation_split_{split_strategy}.npy',means_correlation)
-    with open(f'{reproduce_analysis_dir}means_row_column_indices_split_{split_strategy}.json', 'w') as json_file:
-        json.dump(row_column_indices, json_file)
-    np.save(f'{reproduce_analysis_dir}means_correlation_reorder_split_{split_strategy}.npy',means_correlation_reorder)
-
-    heatmap_reorder_matrix(means_correlation_reorder,reproduce_analysis_dir,
-                           'means_correlation',row_column_indices,
-                           model_name,n_channels,n_states,split_strategy)
-    # Work on FCs
     FCs_distance = twopair_riemannian_distance(correlations_1,correlations_2)
     FCs_fisher_z_transformed_correlation = twopair_fisher_z_transformed_correlation(correlations_1,correlations_2)
     row_column_indices_FCs,FCs_distance_reorder = hungarian_pair(FCs_distance,distance=True)

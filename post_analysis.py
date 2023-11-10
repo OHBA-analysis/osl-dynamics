@@ -46,8 +46,9 @@ if __name__ == '__main__':
     HMM_post(dataset)
     '''
     models = ['HMM','Dynemo','MAGE','SWC']
-    list_channels = [15, 25, 50, 100, 200, 300]
+    list_channels = [2]#[15, 25, 50, 100, 200, 300]
     list_states = [7,8,9,10,11]
+    learn_mean = False
     #list_states = [25,30,35,40,45]
     index = int(sys.argv[1]) - 1
 
@@ -76,17 +77,17 @@ if __name__ == '__main__':
 
         # Work on BMRC
         #data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-        data_dir = pathlib.Path(f'./data/node_timeseries/simulation_no_mean/')
+        data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy/')
         prepare_data = PrepareData(data_dir)
         subj, dataset = prepare_data.load()
         print(f'Number of subjects: {len(subj)}')
 
         if model == 'HMM':
-            HMM_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels,n_states)
+            HMM_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels,n_states,learn_mean=learn_mean)
         elif model == 'Dynemo':
-            Dynemo_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states)
+            Dynemo_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states,learn_mean=learn_mean)
         elif model == 'MAGE':
-            MAGE_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states)
+            MAGE_analysis(dataset, save_dir, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states,learn_mean=learn_mean)
         else:
             raise ValueError('The model name is incorrect!')
 
