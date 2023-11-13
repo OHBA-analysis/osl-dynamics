@@ -1199,6 +1199,10 @@ class Data:
         # Helper function for parsing training examples
         def _parse_example(example):
             feature_names = ["data", "array_id"]
+            tensor_shapes = {
+                "data": [self.sequence_length, self.n_channels],
+                "array_id": [self.sequence_length],
+            }
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
             }
@@ -1207,7 +1211,9 @@ class Data:
                 feature_description,
             )
             return {
-                name: tf.io.parse_tensor(tensor, tf.float32)
+                name: tf.ensure_shape(
+                    tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
+                )
                 for name, tensor in parsed_example.items()
             }
 
