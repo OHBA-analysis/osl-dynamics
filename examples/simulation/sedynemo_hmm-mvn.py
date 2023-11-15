@@ -1,18 +1,18 @@
-"""Example script for running inference on simulated multi-subject HMM-MVN data.
+"""Example script for training SE-DyNeMo on simulated multi-subject HMM-MVN data.
 
--Should achieve a dice score of 0.99.
+- Should achieve a dice score of ~0.99.
 """
 
-print("Setting up")
-import os
+print("Importing packages")
 
+import os
 import numpy as np
-from matplotlib import pyplot as plt
+from sklearn.decomposition import PCA
+
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.sedynemo import Config, Model
 from osl_dynamics.utils import plotting
-from sklearn.decomposition import PCA
 
 # Create directory to hold plots
 os.makedirs("figures", exist_ok=True)
@@ -54,7 +54,6 @@ config = Config(
 
 # Simulate data
 print("Simulating data")
-
 sim = simulation.MSubj_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
@@ -73,7 +72,7 @@ sim = simulation.MSubj_HMM_MVN(
     random_seed=1234,
 )
 sim.standardize()
-training_data = data.Data([mtc for mtc in sim.time_series])
+training_data = data.Data(sim.time_series)
 
 # Build model
 model = Model(config)
@@ -82,11 +81,13 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-# Set dev parameters initializer
+# Set initializer for subject-specific deviation parameters
 model.set_dev_parameters_initializer(training_data)
 
+# Model initialization
 model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=0.4)
 
+# Full training
 print("Training model")
 history = model.fit(training_data)
 
@@ -113,7 +114,7 @@ inf_subject_embeddings -= np.mean(inf_subject_embeddings, axis=0)
 inf_subject_embeddings /= np.std(inf_subject_embeddings, axis=0)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
-fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+fig, axes = plotting.create_figure(1, 2, figsize=(10, 5))
 plotting.plot_scatter(
     [sim_subject_embeddings[group_mask, 0] for group_mask in group_masks],
     [sim_subject_embeddings[group_mask, 1] for group_mask in group_masks],
@@ -140,7 +141,7 @@ plotting.plot_scatter(
 )
 axes[0].set_title("Simulation")
 axes[1].set_title("Inferred")
-fig.savefig("figures/subject_embeddings.png")
-plt.close()
+plotting.save(fig, filename="figures/subject_embeddings.png")
 
+# Delete temporary directory
 training_data.delete_dir()
