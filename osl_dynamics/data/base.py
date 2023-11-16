@@ -965,6 +965,7 @@ class Data:
         validation_split=None,
         concatenate=True,
         step_size=None,
+        drop_last_batch=False,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
 
@@ -984,6 +985,8 @@ class Data:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
 
         Returns
         -------
@@ -1030,14 +1033,18 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
                 # Shuffle mini-batches
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
             if validation_split is None:
                 # Return the full dataset
@@ -1070,7 +1077,7 @@ class Data:
                     ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
-                ds = ds.batch(self.batch_size)
+                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
 
                 if shuffle:
                     # Shuffle batches
@@ -1116,6 +1123,7 @@ class Data:
         validation_split=None,
         concatenate=True,
         step_size=None,
+        drop_last_batch=False,
     ):
         """Create a TFRecord Dataset for training or evaluation.
 
@@ -1134,6 +1142,8 @@ class Data:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
 
         Returns
         -------
@@ -1237,7 +1247,9 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
                 # Shuffle batches
                 full_dataset = full_dataset.shuffle(self.buffer_size)
@@ -1252,7 +1264,9 @@ class Data:
                 full_dataset = full_dataset.map(_parse_example)
 
                 # Group into batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
             if validation_split is None:
                 # Return the dataset
@@ -1289,7 +1303,7 @@ class Data:
                     ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
-                ds = ds.batch(self.batch_size)
+                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
 
                 if shuffle:
                     # Shuffle batches

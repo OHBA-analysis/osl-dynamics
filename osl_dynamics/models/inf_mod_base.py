@@ -16,7 +16,7 @@ import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
-from osl_dynamics.models.mod_base import ModelBase
+from osl_dynamics.models.mod_base import ModelBase, single_gpu_model
 from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
@@ -211,6 +211,7 @@ class VariationalInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -223,12 +224,6 @@ class VariationalInferenceModelBase(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-
-            training_dataset = self.make_dataset(
-                training_data,
-                shuffle=True,
-                concatenate=True,
-            )
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             try:
@@ -309,7 +304,9 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Make a list of tensorflow Datasets if the data
-        training_data = self.make_dataset(training_data, shuffle=True)
+        training_data = self.make_dataset(
+            training_data, shuffle=True, drop_last_batch=True
+        )
 
         if not isinstance(training_data, list):
             raise ValueError(
@@ -448,6 +445,7 @@ class VariationalInferenceModelBase(ModelBase):
             Mode mixing logits for FC.
             Only returned if :code:`self.config.multiple_dynamics=True`.
         """
+        self = single_gpu_model(self)
         if self.config.multiple_dynamics:
             return self.get_mode_logits(
                 dataset,
@@ -516,6 +514,7 @@ class VariationalInferenceModelBase(ModelBase):
             Mode mixing logits for FC with shape (n_subjects, n_samples,
             n_modes) or (n_samples, n_modes).
         """
+        self = single_gpu_model(self)
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_theta for a single time scale model.")
 
@@ -586,6 +585,7 @@ class VariationalInferenceModelBase(ModelBase):
             Mode mixing coefficients with shape (n_subjects, n_samples,
             n_modes) or (n_samples, n_modes).
         """
+        self = single_gpu_model(self)
         if self.config.multiple_dynamics:
             return self.get_mode_time_courses(
                 dataset,
@@ -656,6 +656,7 @@ class VariationalInferenceModelBase(ModelBase):
             Gamma time course with shape (n_subjects, n_samples, n_modes) or
             (n_samples, n_modes).
         """
+        self = single_gpu_model(self)
         if not self.config.multiple_dynamics:
             raise ValueError("Please use get_alpha for a single time scale model.")
 
@@ -720,6 +721,7 @@ class VariationalInferenceModelBase(ModelBase):
         kl_loss : float
             KL divergence loss.
         """
+        self = single_gpu_model(self)
         dataset = self.make_dataset(dataset, concatenate=True)
         _logger.info("Getting losses")
         predictions = self.predict(dataset, **kwargs)
@@ -929,6 +931,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
+        self = single_gpu_model(self)
         if remove_edge_effects:
             step_size = self.config.sequence_length // 2  # 50% overlap
         else:
@@ -1049,7 +1052,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
+            training_data, shuffle=True, concatenate=True, drop_last_batch=True
         )
 
         # Calculate the number of batches to use
@@ -1062,10 +1065,6 @@ class MarkovStateInferenceModelBase(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-
-            training_dataset = self.make_dataset(
-                training_data, shuffle=True, concatenate=True
-            )
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             try:
@@ -1134,7 +1133,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
+            training_data, shuffle=True, concatenate=True, drop_last_batch=True
         )
 
         # Calculate the number of batches to use
@@ -1147,10 +1146,6 @@ class MarkovStateInferenceModelBase(ModelBase):
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-
-            training_dataset = self.make_dataset(
-                training_data, shuffle=True, concatenate=True
-            )
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
             self.set_random_state_time_course_initialization(training_data_subset)
@@ -1188,7 +1183,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         _logger.info("Setting random means and covariances")
 
         # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
+        training_dataset = self.make_dataset(
+            training_data, concatenate=True, drop_last_batch=True
+        )
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -1310,6 +1307,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
             return first_term + remaining_terms
 
+        self = single_gpu_model(self)
         dataset = self.make_dataset(dataset, concatenate=False)
         _logger.info("Getting free energy")
         free_energy = []

@@ -190,7 +190,7 @@ class ModelBase:
         # If a osl_dynamics.data.Data object has been passed for the x
         # arguments, replace it with a tensorflow dataset
         x = get_argument(self.model.fit, "x", args, kwargs)
-        x = self.make_dataset(x, shuffle=True, concatenate=True)
+        x = self.make_dataset(x, shuffle=True, concatenate=True, drop_last_batch=True)
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
 
         # Use the number of epochs in the config if it has not been passed
@@ -276,6 +276,7 @@ class ModelBase:
         shuffle=False,
         concatenate=False,
         step_size=None,
+        drop_last_batch=False,
     ):
         """Converts a Data object into a TensorFlow Dataset.
 
@@ -291,6 +292,8 @@ class ModelBase:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
 
         Returns
         -------
@@ -312,6 +315,7 @@ class ModelBase:
                     shuffle=shuffle,
                     concatenate=concatenate,
                     step_size=step_size,
+                    drop_last_batch=drop_last_batch,
                 )
             else:
                 outputs = inputs.dataset(
@@ -320,6 +324,7 @@ class ModelBase:
                     shuffle=shuffle,
                     concatenate=concatenate,
                     step_size=step_size,
+                    drop_last_batch=drop_last_batch,
                 )
         elif isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False
@@ -609,3 +614,32 @@ class ModelBase:
         model.load_weights(f"{dirname}/weights").expect_partial()
 
         return model
+
+
+def single_gpu_model(model, tmp_dir="tmp"):
+    """Compiles a model on single GPU.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model
+        Model to compile.
+    tmp_dir : str, optional
+        Directory to save the model weights to.
+
+    Returns
+    -------
+    model : osl_dynamics.models.*.Model
+        Compiled model.
+    """
+    # if model is already on single GPU, return it
+    if not isinstance(model.config.strategy, MirroredStrategy):
+        return model
+
+    # if model is on multiple GPUs, save its weights and load
+    # them into a new model on a single GPU
+    _logger.info("Compiling model on single GPU.")
+    model.config.multi_gpu = False
+    model.save(tmp_dir)
+    model = model.load(tmp_dir)
+
+    return model
