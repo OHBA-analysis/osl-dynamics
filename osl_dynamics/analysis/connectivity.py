@@ -656,7 +656,7 @@ def threshold(
     m, n = np.triu_indices(n_channels, k=1)
 
     # Which edges are greater than the threshold?
-    edges = np.empty(
+    edges = np.zeros(
         [n_components, n_modes, n_channels, n_channels],
         dtype=bool,
     )
@@ -850,19 +850,19 @@ def save(
                 fn=Path(filename), i=i, w=len(str(n_modes))
             )
 
-            # If all connections are zero don't add a colourbar
-            kwargs["colorbar"] = np.any(
-                conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
-            )
+        # If all connections are zero don't add a colourbar
+        kwargs["colorbar"] = np.any(
+            conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
+        )
 
-            # Plot maps
-            plotting.plot_connectome(
-                conn_map[i],
-                parcellation.roi_centers(),
-                edge_threshold=f"{threshold[i] * 100}%",
-                output_file=output_file,
-                **kwargs,
-            )
+        # Plot maps
+        plotting.plot_connectome(
+            conn_map[i],
+            parcellation.roi_centers(),
+            edge_threshold=f"{threshold[i] * 100}%",
+            output_file=output_file,
+            **kwargs,
+        )
 
 
 def save_interactive(
