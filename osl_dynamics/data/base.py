@@ -807,7 +807,9 @@ class Data:
         """Prepare data.
 
         Wrapper for calling a series of data preparation methods. Any method in
-        Data can be called.
+        Data can be called. Note that if the same method is called multiple
+        times, the method name should be appended with an underscore and a
+        description, e.g. :code:`standardize_1` and :code:`standardize_2`.
 
         Parameters
         ----------
@@ -841,6 +843,7 @@ class Data:
             data.prepare(methods)
         """
         for method_name, kwargs in methods.items():
+            method_name = method_name.split("_")[0]
             method = getattr(self, method_name)
             method(**kwargs)
 
