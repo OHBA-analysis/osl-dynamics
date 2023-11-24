@@ -190,7 +190,7 @@ class ModelBase:
         # If a osl_dynamics.data.Data object has been passed for the x
         # arguments, replace it with a tensorflow dataset
         x = get_argument(self.model.fit, "x", args, kwargs)
-        x = self.make_dataset(x, shuffle=True, concatenate=True)
+        x = self.make_dataset(x, shuffle=True, concatenate=True, drop_last_batch=True)
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
 
         # Use the number of epochs in the config if it has not been passed
@@ -276,6 +276,7 @@ class ModelBase:
         shuffle=False,
         concatenate=False,
         step_size=None,
+        drop_last_batch=False,
     ):
         """Converts a Data object into a TensorFlow Dataset.
 
@@ -291,6 +292,8 @@ class ModelBase:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
 
         Returns
         -------
@@ -298,6 +301,16 @@ class ModelBase:
             TensorFlow Dataset (or list of Datasets) that can be used for
             training/evaluating.
         """
+        # Validation
+        if (
+            isinstance(self.config.strategy, MirroredStrategy)
+            and not inputs.use_tfrecord
+        ):
+            _logger.warning(
+                "Using a multiple GPUs with a non-TFRecord dataset. "
+                + "This will result in poor performance. "
+                + "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
+            )
         if isinstance(inputs, str) or isinstance(inputs, np.ndarray):
             # str or numpy array -> Data object
             inputs = data.Data(inputs)
@@ -312,6 +325,7 @@ class ModelBase:
                     shuffle=shuffle,
                     concatenate=concatenate,
                     step_size=step_size,
+                    drop_last_batch=drop_last_batch,
                 )
             else:
                 outputs = inputs.dataset(
@@ -320,6 +334,7 @@ class ModelBase:
                     shuffle=shuffle,
                     concatenate=concatenate,
                     step_size=step_size,
+                    drop_last_batch=drop_last_batch,
                 )
         elif isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False
@@ -573,13 +588,15 @@ class ModelBase:
         return config_dict, version
 
     @classmethod
-    def load(cls, dirname):
+    def load(cls, dirname, single_gpu=True):
         """Load model from :code:`dirname`.
 
         Parameters
         ----------
         dirname : str
             Directory where :code:`config.yml` and weights are stored.
+        single_gpu : bool, optional
+            Should we compile the model on a single GPU?
 
         Returns
         -------
@@ -590,6 +607,9 @@ class ModelBase:
 
         # Load config dict and version from yml file
         config_dict, version = cls.load_config(dirname)
+
+        if single_gpu:
+            config_dict["multi_gpu"] = False
 
         if version in ["<1.1.6", "1.1.6", "1.1.7"]:
             raise ValueError(
@@ -609,3 +629,8 @@ class ModelBase:
         model.load_weights(f"{dirname}/weights").expect_partial()
 
         return model
+
+    @property
+    def is_multi_gpu(self):
+        """Returns True if the model's strategy is MirroredStrategy."""
+        return isinstance(self.config.strategy, MirroredStrategy)

@@ -27,13 +27,15 @@ models = {
 }
 
 
-def load(dirname):
+def load(dirname, single_gpu=True):
     """Load model from dirname.
 
     Parameters
     ----------
     dirname : str
         Path to directory where the config.yml and weights are stored.
+    single_gpu : bool, optional
+        Should we compile the model on a single GPU?
 
     Returns
     -------
@@ -57,4 +59,4 @@ def load(dirname):
             + f"Options are {', '.join(models.keys())}"
         )
 
-    return model_type.load(dirname)
+    return model_type.load(dirname, single_gpu=single_gpu)
