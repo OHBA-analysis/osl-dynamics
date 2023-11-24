@@ -301,6 +301,16 @@ class ModelBase:
             TensorFlow Dataset (or list of Datasets) that can be used for
             training/evaluating.
         """
+        # Validation
+        if (
+            isinstance(self.config.strategy, MirroredStrategy)
+            and not inputs.use_tfrecord
+        ):
+            _logger.warning(
+                "Using a multiple GPUs with a non-TFRecord dataset. "
+                + "This will result in poor performance. "
+                + "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
+            )
         if isinstance(inputs, str) or isinstance(inputs, np.ndarray):
             # str or numpy array -> Data object
             inputs = data.Data(inputs)
@@ -578,13 +588,15 @@ class ModelBase:
         return config_dict, version
 
     @classmethod
-    def load(cls, dirname):
+    def load(cls, dirname, single_gpu=True):
         """Load model from :code:`dirname`.
 
         Parameters
         ----------
         dirname : str
             Directory where :code:`config.yml` and weights are stored.
+        single_gpu : bool, optional
+            Should we compile the model on a single GPU?
 
         Returns
         -------
@@ -595,6 +607,9 @@ class ModelBase:
 
         # Load config dict and version from yml file
         config_dict, version = cls.load_config(dirname)
+
+        if single_gpu:
+            config_dict["multi_gpu"] = False
 
         if version in ["<1.1.6", "1.1.6", "1.1.7"]:
             raise ValueError(
@@ -615,31 +630,7 @@ class ModelBase:
 
         return model
 
-
-def single_gpu_model(model, tmp_dir="tmp"):
-    """Compiles a model on single GPU.
-
-    Parameters
-    ----------
-    model : osl_dynamics.models.*.Model
-        Model to compile.
-    tmp_dir : str, optional
-        Directory to save the model weights to.
-
-    Returns
-    -------
-    model : osl_dynamics.models.*.Model
-        Compiled model.
-    """
-    # if model is already on single GPU, return it
-    if not isinstance(model.config.strategy, MirroredStrategy):
-        return model
-
-    # if model is on multiple GPUs, save its weights and load
-    # them into a new model on a single GPU
-    _logger.info("Compiling model on single GPU.")
-    model.config.multi_gpu = False
-    model.save(tmp_dir)
-    model = model.load(tmp_dir)
-
-    return model
+    @property
+    def is_multi_gpu(self):
+        """Returns True if the model's strategy is MirroredStrategy."""
+        return isinstance(self.config.strategy, MirroredStrategy)
