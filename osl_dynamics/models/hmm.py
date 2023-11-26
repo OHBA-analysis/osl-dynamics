@@ -1386,18 +1386,18 @@ class Model(ModelBase):
             # Get the posterior
             alpha = self.get_alpha(training_data, concatenate=False)
 
-        # Get the subject-specific data
-        data = training_data.trim_time_series(
-            sequence_length=self.config.sequence_length,
-            concatenate=False,
-        )
-
         # Validation
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
+        # Get the subject-specific data
+        data = training_data.time_series(prepared=True, concatenate=False)
+
         if len(alpha) != len(data):
             raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
+
+        # Make sure the data and alpha have the same number of samples
+        data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
         n_states = self.config.n_states
         n_channels = self.config.n_channels
@@ -1440,11 +1440,6 @@ class Model(ModelBase):
         # Setup keyword arguments to pass to the helper function
         kwargs = []
         for a, x in zip(alpha, data):
-            if a.shape[0] != x.shape[0]:
-                raise ValueError(
-                    "alpha and training_data must have the same number of samples. "
-                    "Check if training_data has been prepared properly."
-                )
             kwargs.append({"a": a, "x": x})
 
         if len(data) == 1:
