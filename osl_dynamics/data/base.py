@@ -2,6 +2,7 @@
 
 """
 
+import re
 import logging
 import pathlib
 import pickle
@@ -806,10 +807,10 @@ class Data:
     def prepare(self, methods):
         """Prepare data.
 
-        Wrapper for calling a series of data preparation methods. Any method in
-        Data can be called. Note that if the same method is called multiple
+        Wrapper for calling a series of data preparation methods. Any method
+        in Data can be called. Note that if the same method is called multiple
         times, the method name should be appended with an underscore and a
-        description, e.g. :code:`standardize_1` and :code:`standardize_2`.
+        number, e.g. :code:`standardize_1` and :code:`standardize_2`.
 
         Parameters
         ----------
@@ -842,8 +843,14 @@ class Data:
             }
             data.prepare(methods)
         """
+        # Pattern for identifying the method name from "method-name_num"
+        pattern = re.compile(r"^(\w+?)(_\d+)?$")
+
         for method_name, kwargs in methods.items():
-            method_name = method_name.split("_")[0]
+            # Remove the "_num" part from the dict key
+            method_name = pattern.search(method_name).groups()[0]
+
+            # Apply method
             method = getattr(self, method_name)
             method(**kwargs)
 
