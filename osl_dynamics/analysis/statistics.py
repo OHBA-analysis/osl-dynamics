@@ -188,8 +188,8 @@ def group_diff_max_stat_perm(
     Parameters
     ----------
     data : np.ndarray
-        Baseline corrected evoked responses. This will be the target data for
-        the GLM. Must be shape (n_subjects, features1, features2, ...).
+        Subject-specific quantities to compare. This will be the target data
+        for the GLM. Must be shape (n_subjects, features1, features2, ...).
     assignments : np.ndarray
         1D numpy array containing group assignments. A value of 1 indicates
         Group1 and a value of 2 indicates Group2. Note, we test the contrast
