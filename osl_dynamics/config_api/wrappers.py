@@ -381,7 +381,7 @@ def train_sehmm(
 
             {
                 'sequence_length': 200,
-                'batch_size': 128,
+                'batch_size': 512,
                 'learning_rate': 0.01,
                 'n_epochs': 5,
                 'lr_decay': 0.1,
@@ -417,7 +417,7 @@ def train_sehmm(
     default_hmm_config_kwargs = {
         "n_channels": data.n_channels,
         "sequence_length": 200,
-        "batch_size": 128,
+        "batch_size": 512,
         "learning_rate": 0.01,
         "n_epochs": 5,
         "lr_decay": 0.1,
@@ -498,6 +498,9 @@ def train_sehmm(
 
     _logger.info(f"Saving model to: {model_dir}")
     model.save(model_dir)
+
+    del init_model, model
+    model = sehmm.Model.load(model_dir)
 
     # Get the variational free energy
     history["free_energy"] = model.free_energy(data)

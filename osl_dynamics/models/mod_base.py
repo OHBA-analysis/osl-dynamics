@@ -301,21 +301,22 @@ class ModelBase:
             TensorFlow Dataset (or list of Datasets) that can be used for
             training/evaluating.
         """
-        # Validation
-        if (
-            isinstance(self.config.strategy, MirroredStrategy)
-            and not inputs.use_tfrecord
-        ):
-            _logger.warning(
-                "Using a multiple GPUs with a non-TFRecord dataset. "
-                + "This will result in poor performance. "
-                + "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
-            )
         if isinstance(inputs, str) or isinstance(inputs, np.ndarray):
             # str or numpy array -> Data object
             inputs = data.Data(inputs)
 
         if isinstance(inputs, data.Data):
+            # Validation
+            if (
+                isinstance(self.config.strategy, MirroredStrategy)
+                and not inputs.use_tfrecord
+            ):
+                _logger.warning(
+                    "Using a multiple GPUs with a non-TFRecord dataset. "
+                    + "This will result in poor performance. "
+                    + "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
+                )
+
             # Data object -> list of Dataset if concatenate=False or
             # Data object -> Dataset if concatenate=True
             if inputs.use_tfrecord:
