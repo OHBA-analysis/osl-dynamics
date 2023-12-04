@@ -287,6 +287,7 @@ def pairwise_fisher_z_correlations(matrices:np.ndarray)->np.ndarray:
     -------
     correlations: numpy.ndarray with shape M * M
     """
+
     N = len(matrices)
     correlation_metrics = np.eye(N)
     for i in trange(N,desc='Compute Fisher-z transformated correlation'):

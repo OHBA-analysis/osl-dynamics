@@ -11,19 +11,22 @@ class PrepareData():
         self.data_dir = data_dir
         self.n_timepoint = n_timepoint
         
-    def load(self,split_session:bool = True,split_strategy:str ='0'):
+    def load(self,split_session:bool = True,split_strategy:str ='0', z_score_data=True):
         '''
         Load data from specified directories
         Parameters
         ----------
-        split_session: (bool) whether to split the session
-        split_strategy: (str) how to split the whole dataset
-        '0': no splitting
-        '1': randomly split into half
-        '2': For each subject, session 12 - 34
-        '3': For each subject, session 13 - 24
-        '4': For each subject, session 14 - 23
-
+        split_session: bool
+            whether to split the session
+        split_strategy: str
+             how to split the whole dataset
+            '0': no splitting
+            '1': randomly split into half
+            '2': For each subject, session 12 - 34
+            '3': For each subject, session 13 - 24
+            '4': For each subject, session 14 - 23
+        z_score_data: bool
+            whether to z_score the data in pre-processing
         Returns
         -------
         tuple: A tuple containing the following
@@ -40,9 +43,15 @@ class PrepareData():
             if split_session:
                 splitted_data = np.split(loaded_data,n_session)
                 for i in range(len(splitted_data)):
-                    data_list.append(z_score(splitted_data[i]))
+                    if z_score_data:
+                        data_list.append(z_score(splitted_data[i]))
+                    else:
+                        data_list.append(splitted_data[i])
             else:
-                data_list.append(z_score(loaded_data,n_session))
+                if z_score_data:
+                    data_list.append(z_score(loaded_data,n_session))
+                else:
+                    data_list.append(loaded_data)
         
         print('Read from directory: ',self.data_dir)
         print('Number of subjects: ',len(subjs))

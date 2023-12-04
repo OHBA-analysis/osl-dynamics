@@ -46,7 +46,7 @@ def construct_graph(tpm:np.ndarray):
 
     return G
 def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int,learn_mean:bool=False):
+                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int,learn_mean:bool=False,model_dir=None):
     """
     Post-training analysis of HMM model
     Parameters
@@ -57,6 +57,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     spatial_surface_map_dir: (str) directory of groupICA spatial surface maps
     n_channels: (int) number of channels
     n_states: (int) number of states
+    model_dir: (str) where the model is saved. If none, by default should be the same as save_dir
 
     Returns
     -------
@@ -65,7 +66,10 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     from osl_dynamics.utils import plotting
     from osl_dynamics.inference import modes
 
-    model = load(save_dir)
+    if model_dir is None:
+        model_dir = save_dir
+
+    model = load(model_dir)
 
     if not os.path.isfile(f'{save_dir}alpha.pkl'):
         alpha = model.get_alpha(dataset)
@@ -130,7 +134,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     # Analyze the transition probability matrix
     # using Louvain community detection algorithm
     if not os.path.isfile(f'{save_dir}tpm_partition.pkl'):
-        tpm = np.load(f'{save_dir}trans_prob.npy')
+        tpm = np.load(f'{model_dir}trans_prob.npy')
         # Added by swimming 2023-08-09: try to reproduce Diego's results
         # Only work on HMM_ICA_50_state_12
         for i in range(len(tpm)):
@@ -145,7 +149,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     # Obtain the statistics (mean,std,cov,cor) of states
     if not os.path.isfile(f'{save_dir}state_covariances.npy'):
-        extract_state_statistics(save_dir,model_name='HMM')
+        extract_state_statistics(save_dir,model_name='HMM',model_dir=model_dir)
 
     # Plot the statistics (mean,std,cor) of states
     if not os.path.isfile(f'{plot_dir}plot_state_correlations.pdf'):
@@ -154,14 +158,14 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                               n_channels=n_channels,
                               n_states=n_states
                               )
-
+    '''
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
         os.makedirs(dist_dir)
     if not os.path.isfile(f'{dist_dir}riemannian_distance_cor.npy'):
         compute_distance(save_dir,dist_dir)
-
+    
     # Plot the distance between different states/modes
     if not os.path.isfile(f'{plot_dir}/correct_distance_plot_cor.pdf'):
         plot_distance(dist_dir,plot_dir,
@@ -175,7 +179,8 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                                              model='HMM',
                                              n_channels=n_channels,
                                              n_states=n_states)
-    '''
+    
+
     # Fractional occupancy analysis
     FO_dir = f'{save_dir}FO_analysis/'
     if not os.path.exists(FO_dir):
@@ -216,10 +221,10 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     # Compute rank-one decomposition of FC map
     if not os.path.isfile(f'{save_dir}FC_sum_of_degree_surface_map.dscalar.nii'):
         FC_mapping(save_dir,spatial_map_dir,spatial_surface_map_dir)
-    '''
+    
     #if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
     #    mean_FC_relation(save_dir,plot_dir,'HMM',n_channels,n_states)
-
+    '''
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
@@ -228,6 +233,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states,learn_mean=learn_mean,split_strategy='2')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states,learn_mean=learn_mean,split_strategy='3')
         reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4')
+
 
 
 
@@ -271,7 +277,7 @@ def Dynemo_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     # Obtain the statistics (mean,std, cov,cor) of states
     if not os.path.isfile(f'{save_dir}state_covariances.npy'):
-        extract_state_statistics(save_dir, model_name='Dynemo')
+        extract_state_statistics(save_dir, model_name='Dynemo',model_dir=model_dir)
 
     # Plot the statistics (mean,std,cor) of states
     if not os.path.isfile(f'{plot_dir}plot_state_correlations.pdf'):
@@ -366,7 +372,7 @@ def MAGE_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     # Obtain the statistics (mean,std, cov,cor) of states
     if not os.path.isfile(f'{save_dir}state_covariances.npy'):
-        extract_state_statistics(save_dir, model_name='MAGE')
+        extract_state_statistics(save_dir, model_name='MAGE',model_dir=model_dir)
 
     # Plot the statistics (mean,std,cor) of states
     if not os.path.isfile(f'{plot_dir}plot_state_correlations.pdf'):
@@ -540,9 +546,11 @@ def K_means_clustering(old_dir:str,save_dir:str,file_name:dict,n_states:int,n_ch
     if measure == 'cov':
         stds, _ = cov2stdcor(kmean_networks)
         np.save(f'{save_dir}state_stds.npy', stds)
-def extract_state_statistics(save_dir:str,model_name:str):
+def extract_state_statistics(save_dir:str,model_name:str,model_dir:str=None):
+    if model_dir is None:
+        model_dir = save_dir
     from osl_dynamics.models import load
-    model = load(save_dir)
+    model = load(model_dir)
     if model_name == 'MAGE':
         means, stds, correlations = model.get_means_stds_fcs()
         # Compact stds (M*N*N) to (M*N)

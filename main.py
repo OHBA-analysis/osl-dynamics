@@ -6,9 +6,11 @@ import pathlib
 
 import numpy as np
 import scipy.stats as stats
+from sklearn.model_selection import KFold
 from rotation.preprocessing import PrepareData
 from rotation.training import HMM_training, Dynemo_training, MAGE_training,SWC_computation
 from rotation.utils import *
+from rotation.analysis import HMM_analysis
 from osl_dynamics.data import Data
 from osl_dynamics.analysis import connectivity
 
@@ -28,76 +30,17 @@ def swc_analysis(dataset):
     )
     '''
 
-def HMM_analysis(dataset):
-    from osl_dynamics.models.hmm import Config, Model
-    # Create a config object
-    config = Config(
-        n_states=8,
-        n_channels=15,
-        sequence_length=1000,
-        learn_means=False,
-        learn_covariances=True,
-        batch_size=16,
-        learning_rate=1e-3,
-        n_epochs=10,  # for the purposes of this tutorial we'll just train for a short period
-    )
-
-    model = Model(config)
-    model.summary()
-
-    # Initialisation
-    init_history = model.random_state_time_course_initialization(dataset, n_epochs=1, n_init=3)
-
-    # Model training
-    history = model.fit(dataset)
-
-    # Save the model
-    model.save("results/model")
-
-def Dynemo_analysis(dataset):
-    from osl_dynamics.models.dynemo import Config, Model
-
-    config = Config(
-        n_modes=6,
-        n_channels=15,
-        sequence_length=100,
-        inference_n_units=64,
-        inference_normalization="layer",
-        model_n_units=64,
-        model_normalization="layer",
-        learn_alpha_temperature=True,
-        initial_alpha_temperature=1.0,
-        learn_means=False,
-        learn_covariances=True,
-        do_kl_annealing=True,
-        kl_annealing_curve="tanh",
-        kl_annealing_sharpness=5,
-        n_kl_annealing_epochs=10,
-        batch_size=32,
-        learning_rate=0.01,
-        n_epochs=10,  # for the purposes of this tutorial we'll just train for a short period
-    )
-
-    # Initiate a Model class and print a summary
-    model = Model(config)
-    model.summary()
-
-    # Initialisation
-    init_history = model.random_subset_initialization(dataset, n_epochs=1, n_init=3, take=0.2)
-
-    # Full train
-    history = model.fit(dataset)
-
-    # Save the model
-    model.save("results/model_Dynemo")
-
-def model_train(model,dataset,n_channels, n_states,save_dir):
+def model_train(model,dataset,n_channels, n_states,save_dir,learn_means=True,learn_covariances=True,learn_trans_prob=True,learning_rate=1e-3):
     if model == 'HMM':
-        HMM_training(dataset,n_states,n_channels,save_dir)
+        HMM_training(dataset,n_states,n_channels,save_dir,
+                     learn_means=learn_means,
+                     learn_covariances=learn_covariances,
+                     learn_trans_prob=learn_trans_prob,
+                     learning_rate=learning_rate)
     elif model == 'Dynemo':
-        Dynemo_training(dataset, n_states, n_channels,save_dir)
+        Dynemo_training(dataset, n_states, n_channels,save_dir,learn_means=learn_means)
     elif model == 'MAGE':
-        MAGE_training(dataset,n_states,n_channels,save_dir)
+        MAGE_training(dataset,n_states,n_channels,save_dir,learn_means=learn_means)
     elif model == 'SWC':
         SWC_computation(dataset,window_length=143,step_size=118,save_dir=save_dir)
     else:
@@ -118,13 +61,19 @@ if __name__ == '__main__':
     # sys.argv[2] == 'split': split the data in half to test reproducibility
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
+    #list_channels = [2]
     #list_states = [4,8,12,16,20]
     # Update swimming 20231015: try train HMM model with more states
     #list_states = [25,30,35,40,45]
     list_states = [7,8,9,10,11]
 
-    index = int(sys.argv[1]) - 1
-    #index = 91
+    learn_means = False
+    learn_covariances = True
+    learn_trans_prob = False
+    learning_rate = 1e-3
+
+    #index = int(sys.argv[1]) - 1
+    index = 6
 
     # Default mode is training:
     mode = 'training'
@@ -151,9 +100,9 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
-        save_dir = f'./results_simulation_202311_no_mean/{model}_ICA_{n_channels}'
+        save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}/'
     else:
-        save_dir = f'./results_simulation_202311_no_mean/{model}_ICA_{n_channels}_state_{n_states}'
+        save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}_slow'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
@@ -161,13 +110,17 @@ if __name__ == '__main__':
     
    # data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
     #data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-    data_dir = pathlib.Path(f'./data/node_timeseries/simulation_no_mean/')
+    data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_7/')
 
     if mode == 'training':
         prepare_data = PrepareData(data_dir)
-        subj, dataset = prepare_data.load()
+        subj, dataset = prepare_data.load(z_score_data=False)
         print(f'Number of subjects: {len(subj)}')
-        model_train(model,dataset,n_channels,n_states,save_dir)
+        model_train(model,dataset,n_channels,n_states,save_dir,
+                    learn_means=learn_means,
+                    learn_covariances=learn_covariances,
+                    learn_trans_prob=learn_trans_prob,
+                    learning_rate=learning_rate)
     elif mode == 'repeat':
         prepare_data = PrepareData(data_dir)
         subj, dataset = prepare_data.load()
@@ -177,7 +130,7 @@ if __name__ == '__main__':
         print(f'save dir sub is: {save_dir_sub}')
         if not os.path.exists(save_dir_sub):
             #os.rmdir(save_dir_sub)
-            model_train(model,dataset,n_channels,n_states,save_dir_sub)
+            model_train(model,dataset,n_channels,n_states,save_dir_sub,learn_means=learn_means)
 
     elif mode == 'split':
         prepare_data = PrepareData(data_dir)
@@ -189,7 +142,29 @@ if __name__ == '__main__':
         else:
             save_dir_sub = f'{save_dir}/split_{strategy}_second_half'
             dataset = dataset_2
-        model_train(model, dataset_1, n_channels, n_states, save_dir_sub)
+        model_train(model, dataset_1, n_channels, n_states, save_dir_sub,learn_means=learn_means)
+    elif mode == "cross_validation":
+        prepare_data = PrepareData(data_dir)
+        subj, dataset = prepare_data.load()
+        kf = KFold(shuffle=True,random_state=42)
+        for j, (train_index, test_index) in enumerate(kf.split(range(len(dataset.arrays)))):
+            save_dir_sub = f'{save_dir}/cross_validation_{j}/'
+            if not os.path.exists(save_dir_sub):
+                os.makedirs(save_dir_sub)
+
+            with dataset.set_keep(list(train_index)):
+                print(f'Cross validation number{j}')
+                print(f'Please check the length of training dataset: {len(dataset.arrays)}')
+                model_train(model,dataset,n_channels,n_states,save_dir_sub,learn_means=learn_means)
+                HMM_analysis(dataset, save_dir_sub, None, None, n_channels, n_states)
+
+            with dataset.set_keep(list(test_index)):
+                save_dir_sub_validation = f'{save_dir_sub}/validation/'
+                print(f'Please check the length of validation dataset: {len(dataset.arrays)}')
+                if not os.path.exists(save_dir_sub_validation):
+                    os.makedirs(save_dir_sub_validation)
+                HMM_analysis(dataset, save_dir_sub_validation, None, None, n_channels, n_states,model_dir=save_dir_sub)
+
     else:
         raise ValueError('Mode is not available now!')
 

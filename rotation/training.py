@@ -1,14 +1,22 @@
 import pickle
 import os
 import numpy as np
+import time
+import json
 
 from osl_dynamics.analysis import connectivity
 from rotation.utils import group_high_pass_filter
 
 def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
-                 sequence_length=600,learn_means=False,learn_covariances=True,
+                 sequence_length=600,learn_means=False,learn_covariances=True,learn_trans_prob=True,
                  batch_size=64,learning_rate=1e-3,n_epochs=30):
     from osl_dynamics.models.hmm import Config, Model
+
+    initial_covariances = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/state_covariances.npy')
+    diagonal_value = 0.99
+    off_diagonal_value = (1 - diagonal_value) / (n_states - 1)
+    initial_tpm = diagonal_value * np.eye(n_states) + off_diagonal_value * (1 - np.eye(n_states))
+    #initial_tpm = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/trans_prob.npy')
     # Create a config object
     config = Config(
         n_states=n_states,
@@ -16,11 +24,17 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
         sequence_length=sequence_length,
         learn_means=learn_means,
         learn_covariances=learn_covariances,
+        learn_trans_prob=learn_trans_prob,
         batch_size=batch_size,
         learning_rate=learning_rate,
         n_epochs=n_epochs,
+        initial_covariances=initial_covariances,
+        initial_trans_prob=initial_tpm
     )
-    
+
+    # Record the start time before training
+    start_time = time.time()
+
     # Initiate a Model class and print a summary
     model = Model(config)
     model.summary()
@@ -34,6 +48,19 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
 
     loss_history = history["loss"]
     np.save(f'{save_dir}/loss_history.npy',np.array(loss_history))
+
+    end_time = time.time()
+
+    # Calculate the training duration
+    training_duration = end_time - start_time
+
+    # Print or save the training duration
+    print(f"Training time: {training_duration} seconds")
+    # Save the training duration to a JSON file
+    data = {"duration": training_duration}
+
+    with open(f'{save_dir}/time.json', "w") as json_file:
+        json.dump(data, json_file)
 
     
     # Compute state
