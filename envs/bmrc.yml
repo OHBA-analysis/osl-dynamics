@@ -4,82 +4,93 @@ channels:
 dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=5.1=1_gnu
+  - blas=1.0=mkl
   - bzip2=1.0.8=h7b6447c_0
   - ca-certificates=2023.08.22=h06a4308_0
+  - intel-openmp=2023.1.0=hdb19cb5_46306
   - ld_impl_linux-64=2.38=h1181459_1
   - libffi=3.4.4=h6a678d5_0
   - libgcc-ng=11.2.0=h1234567_1
   - libgomp=11.2.0=h1234567_1
+  - libllvm14=14.0.6=hdb19cb5_3
   - libstdcxx-ng=11.2.0=h1234567_1
   - libuuid=1.41.5=h5eee18b_0
+  - llvmlite=0.41.0=py311he621ea3_0
+  - mkl=2023.1.0=h213fc3f_46344
+  - mkl-service=2.4.0=py311h5eee18b_1
+  - mkl_fft=1.3.8=py311h5eee18b_0
+  - mkl_random=1.2.4=py311hdb19cb5_0
   - ncurses=6.4=h6a678d5_0
-  - openssl=3.0.11=h7f8727e_2
-  - pip=23.2.1=py310h06a4308_0
-  - python=3.10.13=h955ad1f_0
+  - numba=0.58.1=py311ha02d727_0
+  - numpy=1.26.2=py311h08b1b3b_0
+  - numpy-base=1.26.2=py311hf175353_0
+  - openssl=3.0.12=h7f8727e_0
+  - pip=23.3.1=py311h06a4308_0
+  - python=3.11.5=h955ad1f_0
   - readline=8.2=h5eee18b_0
-  - setuptools=68.0.0=py310h06a4308_0
+  - setuptools=68.0.0=py311h06a4308_0
   - sqlite=3.41.2=h5eee18b_0
+  - tbb=2021.8.0=hdb19cb5_0
   - tk=8.6.12=h1ccaba5_0
-  - wheel=0.41.2=py310h06a4308_0
-  - xz=5.4.2=h5eee18b_0
+  - wheel=0.41.2=py311h06a4308_0
+  - xz=5.4.5=h5eee18b_0
   - zlib=1.2.13=h5eee18b_0
   - pip:
     - absl-py==2.0.0
     - alabaster==0.7.13
     - anamnesis==1.0.4
     - astunparse==1.6.3
-    - babel==2.12.1
+    - babel==2.13.1
     - bounded-pool-executor==0.0.3
-    - cachetools==5.3.1
-    - certifi==2023.7.22
-    - charset-normalizer==3.3.0
-    - cloudpickle==2.2.1
-    - contourpy==1.1.1
-    - cycler==0.12.0
+    - cachetools==5.3.2
+    - certifi==2023.11.17
+    - charset-normalizer==3.3.2
+    - cloudpickle==3.0.0
+    - contourpy==1.2.0
+    - cycler==0.12.1
     - decorator==5.1.1
+    - defusedxml==0.7.1
     - dm-tree==0.1.8
-    - docutils==0.18.1
-    - flatbuffers==1.12
-    - fonttools==4.43.0
-    - gast==0.4.0
+    - docutils==0.20.1
+    - flatbuffers==23.5.26
+    - fonttools==4.46.0
+    - gast==0.5.4
     - glmtools==0.2.1
-    - google-auth==2.23.2
-    - google-auth-oauthlib==0.4.6
+    - google-auth==2.25.1
+    - google-auth-oauthlib==1.1.0
     - google-pasta==0.2.0
-    - grpcio==1.59.0
-    - h5py==3.9.0
-    - idna==3.4
+    - grpcio==1.59.3
+    - h5py==3.10.0
+    - idna==3.6
     - imagesize==1.4.1
     - jinja2==3.1.2
     - joblib==1.3.2
-    - keras==2.9.0
-    - keras-preprocessing==1.1.2
+    - keras==2.15.0
     - kiwisolver==1.4.5
+    - lazy-loader==0.3
     - libclang==16.0.6
-    - llvmlite==0.41.0
     - lxml==4.9.3
-    - markdown==3.4.4
+    - markdown==3.5.1
     - markupsafe==2.1.3
     - mat73==0.62
-    - matplotlib==3.8.0
-    - mne==1.5.1
+    - matplotlib==3.8.2
+    - ml-dtypes==0.2.0
+    - mne==1.6.0
     - nibabel==5.1.0
     - nilearn==0.10.2
-    - numba==0.58.0
-    - numpy==1.25.2
     - numpydoc==1.6.0
     - oauthlib==3.2.2
     - opt-einsum==3.3.0
     - packaging==23.2
-    - pandas==2.1.1
-    - pillow==10.0.1
-    - platformdirs==3.10.0
-    - pooch==1.7.0
+    - pandas==2.1.3
+    - pillow==10.1.0
+    - platformdirs==4.1.0
+    - pooch==1.8.0
     - pqdm==0.2.0
-    - protobuf==3.19.6
-    - pyasn1==0.5.0
+    - protobuf==4.23.4
+    - pyasn1==0.5.1
     - pyasn1-modules==0.3.0
-    - pygments==2.16.1
+    - pygments==2.17.2
     - pyparsing==3.1.1
     - python-dateutil==2.8.2
     - pytz==2023.3.post1
@@ -87,13 +98,13 @@ dependencies:
     - requests==2.31.0
     - requests-oauthlib==1.3.1
     - rsa==4.9
-    - scikit-learn==1.3.1
-    - scipy==1.11.3
+    - scikit-learn==1.3.2
+    - scipy==1.11.4
     - seaborn==0.13.0
     - six==1.16.0
     - snowballstemmer==2.2.0
     - sphinx==7.2.6
-    - sphinx-rtd-theme==1.3.0
+    - sphinx-rtd-theme==2.0.0
     - sphinxcontrib-applehelp==1.0.7
     - sphinxcontrib-devhelp==1.0.5
     - sphinxcontrib-htmlhelp==2.0.4
@@ -102,19 +113,17 @@ dependencies:
     - sphinxcontrib-qthelp==1.0.6
     - sphinxcontrib-serializinghtml==1.1.9
     - tabulate==0.9.0
-    - tensorboard==2.9.1
-    - tensorboard-data-server==0.6.1
-    - tensorboard-plugin-wit==1.8.1
-    - tensorflow==2.9.1
-    - tensorflow-estimator==2.9.0
+    - tensorboard==2.15.1
+    - tensorboard-data-server==0.7.2
+    - tensorflow==2.15.0.post1
+    - tensorflow-estimator==2.15.0
     - tensorflow-io-gcs-filesystem==0.34.0
-    - tensorflow-probability==0.17.0
-    - termcolor==2.3.0
+    - tensorflow-probability==0.23.0
+    - termcolor==2.4.0
     - threadpoolctl==3.2.0
-    - tomli==2.0.1
     - tqdm==4.66.1
     - typing-extensions==4.8.0
     - tzdata==2023.3
-    - urllib3==2.0.5
-    - werkzeug==3.0.0
-    - wrapt==1.15.0
+    - urllib3==2.1.0
+    - werkzeug==3.0.1
+    - wrapt==1.14.1
