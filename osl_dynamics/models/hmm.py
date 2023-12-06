@@ -1184,7 +1184,7 @@ class Model(ModelBase):
 
         return evidence / n_batches
 
-    def get_alpha(self, dataset, concatenate=False):
+    def get_alpha(self, dataset, concatenate=False, remove_edge_effects=False):
         """Get state probabilities.
 
         Parameters
@@ -1194,6 +1194,12 @@ class Model(ModelBase):
             each subject.
         concatenate : bool, optional
             Should we concatenate alpha for each subject?
+        remove_edge_effects : bool, optional
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping :code:`alpha` and
+            disregarding the :code:`alpha` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
 
         Returns
         -------
@@ -1201,7 +1207,13 @@ class Model(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset)
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+            trim = step_size // 2  # throw away 25%
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
@@ -1213,9 +1225,27 @@ class Model(ModelBase):
         alpha = []
         for i in iterator:
             gamma = []
-            for data in dataset[i]:
+            for j, data in enumerate(dataset[i]):
+                n_batches = dtf.get_n_batches(dataset[i])
                 x = data["data"]
                 g, _ = self.get_posterior(x)
+                if remove_edge_effects:
+                    batch_size, sequence_length, _ = x.shape
+                    n_states = g.shape[-1]
+                    g = g.reshape(batch_size, sequence_length, n_states)
+                    if j == 0:
+                        g = [
+                            g[0, :-trim],
+                            g[1:, trim:-trim].reshape(-1, n_states),
+                        ]
+                    elif j == n_batches - 1:
+                        g = [
+                            g[:-1, trim:-trim].reshape(-1, n_states),
+                            g[-1, trim:],
+                        ]
+                    else:
+                        g = [g[:, trim:-trim].reshape(-1, n_states)]
+                    g = np.concatenate(g).reshape(-1, n_states)
                 gamma.append(g)
             alpha.append(np.concatenate(gamma).astype(np.float32))
 
