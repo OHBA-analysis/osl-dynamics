@@ -47,7 +47,7 @@ if __name__ == '__main__':
     '''
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
-    list_states = [7,8,9,10,11]
+    list_states = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
     learn_mean = False
 
     #list_states = [25,30,35,40,45]
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 
-    save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}_slow/'
+    save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
     

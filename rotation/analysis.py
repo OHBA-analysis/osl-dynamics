@@ -158,7 +158,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
                               n_channels=n_channels,
                               n_states=n_states
                               )
-    '''
+
     # Analyze the distance between different states/modes
     dist_dir = f'{save_dir}distance/'
     if not os.path.exists(dist_dir):
@@ -224,7 +224,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     
     #if not os.path.isfile(f'{plot_dir}mean_FC_relation.pdf'):
     #    mean_FC_relation(save_dir,plot_dir,'HMM',n_channels,n_states)
-    '''
+    
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
