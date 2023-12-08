@@ -11,12 +11,6 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
                  sequence_length=600,learn_means=False,learn_covariances=True,learn_trans_prob=True,
                  batch_size=64,learning_rate=1e-3,n_epochs=30):
     from osl_dynamics.models.hmm import Config, Model
-
-    initial_covariances = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/state_covariances.npy')
-    diagonal_value = 0.99
-    off_diagonal_value = (1 - diagonal_value) / (n_states - 1)
-    initial_tpm = diagonal_value * np.eye(n_states) + off_diagonal_value * (1 - np.eye(n_states))
-    #initial_tpm = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/trans_prob.npy')
     # Create a config object
     config = Config(
         n_states=n_states,
@@ -28,8 +22,6 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
         batch_size=batch_size,
         learning_rate=learning_rate,
         n_epochs=n_epochs,
-        initial_covariances=initial_covariances,
-        initial_trans_prob=initial_tpm
     )
 
     # Record the start time before training
@@ -41,7 +33,7 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
     
     # Initialization
     init_history = model.random_state_time_course_initialization(dataset, n_epochs=2, n_init=10)
-    
+
     # Full training
     history = model.fit(dataset)
     model.save(save_dir)

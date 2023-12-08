@@ -61,19 +61,18 @@ if __name__ == '__main__':
     # sys.argv[2] == 'split': split the data in half to test reproducibility
     models = ['HMM','Dynemo','MAGE','SWC']
     list_channels = [15, 25, 50, 100, 200, 300]
-    #list_channels = [2]
     #list_states = [4,8,12,16,20]
     # Update swimming 20231015: try train HMM model with more states
     #list_states = [25,30,35,40,45]
-    list_states = [7,8,9,10,11]
+    list_states = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
 
     learn_means = False
     learn_covariances = True
     learn_trans_prob = False
-    learning_rate = 1e-3
+    learning_rate = 1e-2
 
-    #index = int(sys.argv[1]) - 1
-    index = 6
+    index = int(sys.argv[1]) - 1
+    #index = 6
 
     # Default mode is training:
     mode = 'training'
@@ -102,7 +101,7 @@ if __name__ == '__main__':
     if n_states is None:
         save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}/'
     else:
-        save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}_slow'
+        save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
@@ -110,7 +109,7 @@ if __name__ == '__main__':
     
    # data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
     #data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-    data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_7/')
+    data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_6/')
 
     if mode == 'training':
         prepare_data = PrepareData(data_dir)
@@ -123,18 +122,23 @@ if __name__ == '__main__':
                     learning_rate=learning_rate)
     elif mode == 'repeat':
         prepare_data = PrepareData(data_dir)
-        subj, dataset = prepare_data.load()
+        subj, dataset = prepare_data.load(z_score_data=False)
         print(f'Number of subjects: {len(subj)}')
 
         save_dir_sub = f'{save_dir}/repeat_{sub_index}'
         print(f'save dir sub is: {save_dir_sub}')
         if not os.path.exists(save_dir_sub):
             #os.rmdir(save_dir_sub)
-            model_train(model,dataset,n_channels,n_states,save_dir_sub,learn_means=learn_means)
+            model_train(model,dataset,n_channels,n_states,save_dir_sub,
+                        learn_means=learn_means,
+                        learn_covariances=learn_covariances,
+                        learn_trans_prob=learn_trans_prob,
+                        learning_rate=learning_rate
+                        )
 
     elif mode == 'split':
         prepare_data = PrepareData(data_dir)
-        subj, dataset_1,dataset_2 = prepare_data.load(split_strategy = strategy)
+        subj, dataset_1,dataset_2 = prepare_data.load(z_score_data=False, split_strategy = strategy)
         print(f'Number of subjects: {len(subj)}')
         if sub_index == 1:
             save_dir_sub = f'{save_dir}/split_{strategy}_first_half'
@@ -142,10 +146,15 @@ if __name__ == '__main__':
         else:
             save_dir_sub = f'{save_dir}/split_{strategy}_second_half'
             dataset = dataset_2
-        model_train(model, dataset_1, n_channels, n_states, save_dir_sub,learn_means=learn_means)
+        model_train(model, dataset_1, n_channels, n_states, save_dir_sub,
+                    learn_means=learn_means,
+                    learn_covariances=learn_covariances,
+                    learn_trans_prob=learn_trans_prob,
+                    learning_rate=learning_rate
+                    )
     elif mode == "cross_validation":
         prepare_data = PrepareData(data_dir)
-        subj, dataset = prepare_data.load()
+        subj, dataset = prepare_data.load(z_score_data=False)
         kf = KFold(shuffle=True,random_state=42)
         for j, (train_index, test_index) in enumerate(kf.split(range(len(dataset.arrays)))):
             save_dir_sub = f'{save_dir}/cross_validation_{j}/'
@@ -155,7 +164,12 @@ if __name__ == '__main__':
             with dataset.set_keep(list(train_index)):
                 print(f'Cross validation number{j}')
                 print(f'Please check the length of training dataset: {len(dataset.arrays)}')
-                model_train(model,dataset,n_channels,n_states,save_dir_sub,learn_means=learn_means)
+                model_train(model,dataset,n_channels,n_states,save_dir_sub,
+                            learn_means=learn_means,
+                            learn_covariances=learn_covariances,
+                            learn_trans_prob=learn_trans_prob,
+                            learning_rate=learning_rate
+                            )
                 HMM_analysis(dataset, save_dir_sub, None, None, n_channels, n_states)
 
             with dataset.set_keep(list(test_index)):

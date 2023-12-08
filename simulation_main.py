@@ -49,4 +49,29 @@ if __name__ == '__main__':
                                   trans_prob=tpm,
                                   means=means,
                                   covariances=covariances)
+    '''
+    ### Update 6th Dec 2023
+    ### This is a simulation from Chet, it's only for comparison purposes.
+    ### Please comment out all previous codes when doing the following simulation
+    save_dir = './data/node_timeseries/simulation_toy_8/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    from osl_dynamics import data, simulation
+    sim = simulation.HMM_MVN(
+        n_samples=25600,
+        n_states=5,
+        n_channels=11,
+        trans_prob="sequence",
+        stay_prob=0.9,
+        means="zero",
+        covariances="random",
+        random_seed=123,
+    )
 
+    from osl_dynamics.data import Data
+    # Create Data object for training
+    data = Data(sim.time_series)
+    np.savetxt(f'{save_dir}10001.txt', sim.time_series)
+    np.save(f'{save_dir}10001_state_time_course.npy', sim.state_time_course)
+    np.save(f'{save_dir}10001_state_covariances.npy',sim.obs_mod.covariances)
+    '''
