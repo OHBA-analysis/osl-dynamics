@@ -191,7 +191,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         np.save(f'{save_dir}fo_corr.npy',fo_corr)
 
         # Plot the FO distribution of each state
-        plot_FO(fo_matrix,FO_dir)
+        #plot_FO(fo_matrix,FO_dir)
 
         from scipy.spatial.distance import squareform
         # Convert correlation matrix to 1D condensed distance

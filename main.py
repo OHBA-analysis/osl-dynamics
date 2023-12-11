@@ -69,7 +69,7 @@ if __name__ == '__main__':
     learn_means = False
     learn_covariances = True
     learn_trans_prob = False
-    learning_rate = 1e-2
+    learning_rate = 0.01
 
     index = int(sys.argv[1]) - 1
     #index = 6
@@ -99,9 +99,9 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
-        save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}/'
+        save_dir = f'./results_simulation_202311_toy_6_lr_0.01/{model}_ICA_{n_channels}/'
     else:
-        save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}'
+        save_dir = f'./results_simulation_202311_toy_6_lr_0.01/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')

@@ -38,8 +38,8 @@ def HMM_training(dataset,n_states,n_channels,save_dir,compute_state=False,
     history = model.fit(dataset)
     model.save(save_dir)
 
-    loss_history = history["loss"]
-    np.save(f'{save_dir}/loss_history.npy',np.array(loss_history))
+    #loss_history = history["loss"]
+    np.save(f'{save_dir}/loss_history.npy',np.array(init_history['loss'] + history['loss']))
 
     end_time = time.time()
 
