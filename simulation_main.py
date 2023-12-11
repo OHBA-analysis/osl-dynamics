@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from rotation.simulation import HMM_single_subject_simulation
+from rotation.simulation import HMM_single_subject_simulation, perturb_covariances
 
 if __name__ == '__main__':
     save_dir = './data/node_timeseries/simulation_toy_6/'
@@ -24,9 +24,14 @@ if __name__ == '__main__':
     #tpm = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/trans_prob.npy')
 
     # tpm for simulation_toy_6
-    diagonal_value = 0.99
-    off_diagonal_value = (1 - diagonal_value) / (n_states - 1)
-    tpm = diagonal_value * np.eye(n_states) + off_diagonal_value * (1 - np.eye(n_states))
+    #diagonal_value = 0.99
+    #off_diagonal_value = (1 - diagonal_value) / (n_states - 1)
+    #tpm = diagonal_value * np.eye(n_states) + off_diagonal_value * (1 - np.eye(n_states))
+
+    # tpm for simulation_toy_9 (two subjects)
+    tpm = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/trans_prob.npy')
+
+
     #means = np.load('./results_202310/HMM_ICA_50_state_4/state_means.npy')
     means = np.zeros((n_states,n_channels))
     #covariances = np.load('./results_HCP_202311_no_mean/HMM_ICA_50_state_4/state_covariances.npy')
@@ -48,7 +53,17 @@ if __name__ == '__main__':
                                   n_channels=n_channels,
                                   trans_prob=tpm,
                                   means=means,
-                                  covariances=covariances)
+                                  covariances=perturb_covariances(covariances),
+                                  subj_name = '10001')
+    HMM_single_subject_simulation(save_dir=save_dir,
+                                  n_scans=n_scans,
+                                  n_states=n_states,
+                                  n_samples=n_samples,
+                                  n_channels=n_channels,
+                                  trans_prob=tpm,
+                                  means=means,
+                                  covariances=perturb_covariances(covariances),
+                                  subj_name='10002')
     '''
     ### Update 6th Dec 2023
     ### This is a simulation from Chet, it's only for comparison purposes.
