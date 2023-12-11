@@ -6,7 +6,7 @@ from osl_dynamics.utils import plotting
 from sklearn.model_selection import KFold
 from matplotlib import pyplot as plt
 
-def perturb_covariances(covariances:np.ndarray,perturbation_factor: float=0.01,random_seed:int=None):
+def perturb_covariances(covariances:np.ndarray,perturbation_factor: float=0.002,random_seed:int=None):
     """
     Perturb the state covariances
     Parameters
