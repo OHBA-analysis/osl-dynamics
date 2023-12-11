@@ -1199,8 +1199,24 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
                     #evidence[f'ICA_{N_channel}_state_{N_state}'] = metrics['evidence']
 
         group_comparison_plot(free_energy, model, list_channels, list_states, 'free_energy', save_dir)
-        group_comparison_plot(free_energy,model,list_channels,list_states,'free_energy',save_dir)
         #group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
+
+    # Compare the cross-validation free energy across all methods
+    for model in models:
+        free_energy_cv = {}
+        for N_channel in list_channels:
+            for N_state in list_states:
+                for i in range(5):
+                    temp = []
+                    with open(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/cross_validation_{i}/validation/metrics.json',
+                              "r") as json_file:
+                        # Use json.load to load the data from the file
+                        temp.append(json.load(json_file)['free_energy'])
+                    free_energy_cv[f'ICA_{N_channel}_state_{N_state}'] = temp
+
+            group_comparison_plot(free_energy_cv, model, list_channels, list_states, 'free_energy_cv', save_dir)
+            # group_comparison_plot(evidence,model,list_channels,list_states,'model_evidence',save_dir)
+
 
 def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_states:list,metric_name:str,save_dir:str):
     """
@@ -1243,7 +1259,7 @@ def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_sta
     plt.xticks(np.arange(len(channel_keys)) + bar_width * (len(list_states) - 1) / 2,
                [str(N_channels) for N_channels in list_channels], fontsize=15)
     plt.yticks(fontsize=15)
-    plt.legend(prop={'size': 15})
+    #plt.legend(prop={'size': 15})
     plt.tight_layout()
     plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.jpg')
     plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.pdf')

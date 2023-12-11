@@ -52,16 +52,17 @@ if __name__ == '__main__':
 
     #list_states = [25,30,35,40,45]
     index = int(sys.argv[1]) - 1
+    #index = 15
 
     # index = 120 represent comparison analysis.
     if index == 120:
-        save_dir = './results_simulation_202311_toy_5/comparison/'
-        result_dir = './results_simulation_202311_toy_5/'
+        save_dir = './results_simulation_202311_toy_6/comparison/'
+        result_dir = './results_simulation_202311_toy_6/'
         comparison_analysis(models,list_channels,list_states,result_dir,save_dir)
 
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 
-    save_dir = f'./results_simulation_202311_toy_6_lr_0.01/{model}_ICA_{n_channels}_state_{n_states}/'
+    save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
     
