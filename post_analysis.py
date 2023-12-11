@@ -56,13 +56,13 @@ if __name__ == '__main__':
 
     # index = 120 represent comparison analysis.
     if index == 120:
-        save_dir = './results_simulation_202311_toy_6/comparison/'
-        result_dir = './results_simulation_202311_toy_6/'
+        save_dir = './results_simulation_202311_toy_9/comparison/'
+        result_dir = './results_simulation_202311_toy_9/'
         comparison_analysis(models,list_channels,list_states,result_dir,save_dir)
 
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 
-    save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}/'
+    save_dir = f'./results_simulation_202311_toy_9/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
     
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     print(f'The model: {model}')
 
     if model == 'SWC':
-        old_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}/'
+        old_dir = f'./results_simulation_202311_toy_9/{model}_ICA_{n_channels}/'
         SWC_analysis(save_dir,old_dir,n_channels,n_states)
     else:
         # Work on Jalapeno
@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
         # Work on BMRC
         #data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-        data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_6/')
+        data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_9/')
         prepare_data = PrepareData(data_dir)
         subj, dataset = prepare_data.load()
         print(f'Number of subjects: {len(subj)}')
