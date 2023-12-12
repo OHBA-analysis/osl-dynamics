@@ -57,7 +57,7 @@ To request an interactive job on a node with a GPU:
 .. code-block:: shell
 
     screen
-    srun -p gpu_short --gres gpu:1 --pty bash
+    srun -p gpu_interactive --gres gpu:1 --pty bash
 
 To submit a non-interactive GPU job, first create a ``job.sh`` file:
 

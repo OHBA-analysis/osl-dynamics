@@ -39,8 +39,8 @@ class FisherKernel:
 
         self.model = model
 
-    def get_kernel_matrix(self, dataset, batch_size=None):
-        """Get the Fisher kernel matrix.
+    def get_features(self, dataset, batch_size=None):
+        """Get the Fisher features.
 
         Parameters
         ----------
@@ -51,10 +51,10 @@ class FisherKernel:
 
         Returns
         -------
-        kernel_matrix : np.ndarray
-            Fisher kernel matrix. Shape is (n_arrays, n_arrays).
+        features : np.ndarray
+            Fisher kernel matrix. Shape is (n_arrays, n_features).
         """
-        _logger.info("Getting Fisher kernel matrix")
+        _logger.info("Getting Fisher features")
 
         n_arrays = dataset.n_arrays
         if batch_size is not None:
@@ -124,6 +124,26 @@ class FisherKernel:
         # Normalise the features to l2-norm of 1
         features_l2_norm = np.sqrt(np.sum(np.square(features), axis=-1, keepdims=True))
         features /= features_l2_norm
+        return features
+
+    def get_kernel_matrix(self, dataset, batch_size=None):
+        """Get the Fisher kernel matrix.
+
+        Parameters
+        ----------
+        dataset : osl_dynamics.data.Data
+            Data.
+        batch_size : int, optional
+            Batch size. If :code:`None`, we use :code:`model.config.batch_size`.
+
+        Returns
+        -------
+        kernel_matrix : np.ndarray
+            Fisher kernel matrix. Shape is (n_arrays, n_arrays).
+        """
+        _logger.info("Getting Fisher kernel matrix")
+
+        features = self.get_features(dataset, batch_size=batch_size)
 
         # Compute the kernel matrix with inner product
         kernel_matrix = features @ features.T
