@@ -320,6 +320,7 @@ def train_sehmm(
     init_kwargs=None,
     fit_kwargs=None,
     save_inf_params=True,
+    n_jobs=1,
 ):
     """ Train a `Subject embedding Hidden Markov Model <https://osl-dynamics.\
     readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html>`_.
@@ -331,10 +332,11 @@ def train_sehmm(
         :code:`Model.random_state_time_course_initialization`.
     3. Build an :code:`sehmm.Model` object.
     4. Initialize the parameters of the SE-HMM model using pretrained HMM.
-    2. Initialize the parameters of the SE-HMM model using
+    5. Initialize the subject embeddings with PCA'ed dual estimated covariances.
+    6. Initialize the parameters of the SE-HMM model using
         :code:`Model.random_state_time_course_initialization`.
-    3. Perform full training.
-    4. Save the inferred parameters (state probabilities, means,
+    7. Perform full training.
+    8. Save the inferred parameters (state probabilities, means,
         covariances and subject embeddings) if :code:`save_inf_params=True`.
     
     This function will create two directories:
@@ -379,7 +381,7 @@ def train_sehmm(
 
             {
                 'sequence_length': 200,
-                'batch_size': 128,
+                'batch_size': 512,
                 'learning_rate': 0.01,
                 'n_epochs': 5,
                 'lr_decay': 0.1,
@@ -393,11 +395,14 @@ def train_sehmm(
         Keyword arguments to pass to the :code:`Model.fit`. No defaults.
     save_inf_params : bool, optional
         Should we save the inferred parameters?
+    n_jobs : int, optional
+        Number of jobs to run in parallel.
     """
     if data is None:
         raise ValueError("data must be passed.")
 
     from osl_dynamics.models import hmm, sehmm
+    from sklearn.decomposition import PCA
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs
@@ -412,7 +417,7 @@ def train_sehmm(
     default_hmm_config_kwargs = {
         "n_channels": data.n_channels,
         "sequence_length": 200,
-        "batch_size": 128,
+        "batch_size": 512,
         "learning_rate": 0.01,
         "n_epochs": 5,
         "lr_decay": 0.1,
@@ -474,17 +479,28 @@ def train_sehmm(
     # Set deviation initializer
     model.set_dev_parameters_initializer(data)
 
+    # Initialise subject embeddings
+    _, init_dual_covs = init_model.dual_estimation(data, n_jobs=n_jobs)
+    init_dual_covs = np.reshape(init_dual_covs, (data.n_arrays, -1))
+    pca = PCA(n_components=config_kwargs["subject_embeddings_dim"])
+    model.set_subject_embeddings_initializer(pca.fit_transform(init_dual_covs))
+
+    # Initialise SE-HMM with subject embeddings fixed
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_state_time_course_initialization(
-        data,
-        **init_kwargs,
-    )
+    with model.set_trainable("subject_embeddings", False):
+        init_history = model.random_state_time_course_initialization(
+            data,
+            **init_kwargs,
+        )
 
     # Training
     history = model.fit(data, **fit_kwargs)
 
     _logger.info(f"Saving model to: {model_dir}")
     model.save(model_dir)
+
+    del init_model, model
+    model = sehmm.Model.load(model_dir)
 
     # Get the variational free energy
     history["free_energy"] = model.free_energy(data)
@@ -736,18 +752,19 @@ def plot_state_psds(data, output_dir):
     )
 
 
-def calc_subject_ae_hmm_networks(data, output_dir):
-    """Calculate subject-specific AE-HMM networks.
+def dual_estimation(data, output_dir, n_jobs=1):
+    """Dual estimation for subject-specific observation model parameters.
 
     This function expects a model has already been trained and the following
-    directory to exist:
+    directories to exist:
 
+    - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
 
     This function will create the following directory:
 
-    - :code:`<output_dir>/networks`, which contains the subject-specific
-      networks.
+    - :code:`<output_dir>/dual_estimates`, which contains the subject-specific
+      means and covariances.
 
     Parameters
     ----------
@@ -755,30 +772,32 @@ def calc_subject_ae_hmm_networks(data, output_dir):
         Data object.
     output_dir : str
         Path to output directory.
+    n_jobs : int, optional
+        Number of jobs to run in parallel.
     """
     if data is None:
         raise ValueError("data must be passed.")
 
     # Directories
-    inf_params_dir = output_dir + "/inf_params"
-    networks_dir = output_dir + "/networks"
-    os.makedirs(networks_dir, exist_ok=True)
+    model_dir = f"{output_dir}/model"
+    inf_params_dir = f"{output_dir}/inf_params"
+    dual_estimates_dir = f"{output_dir}/dual_estimates"
+    os.makedirs(dual_estimates_dir, exist_ok=True)
+
+    #  Load model
+    from osl_dynamics import models
+
+    model = models.load(model_dir)
 
     # Load the inferred state probabilities
     alpha = load(f"{inf_params_dir}/alp.pkl")
 
-    # Get the prepared data
-    # This should be the data after calculating the amplitude envelope
-    data = data.time_series()
-
-    # Calculate subject-specific means and AECs
-    from osl_dynamics.analysis import modes
-
-    means, aecs = modes.ae_hmm_networks(data, alpha)
+    # Dual estimation
+    means, covs = model.dual_estimation(data, alpha=alpha, n_jobs=n_jobs)
 
     # Save
-    save(f"{networks_dir}/subj_means.npy", means)
-    save(f"{networks_dir}/subj_aecs.npy", aecs)
+    save(f"{dual_estimates_dir}/means.npy", means)
+    save(f"{dual_estimates_dir}/covs.npy", covs)
 
 
 def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):

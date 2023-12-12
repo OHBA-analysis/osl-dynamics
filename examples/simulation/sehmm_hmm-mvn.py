@@ -1,11 +1,13 @@
-"""Example script for running HMM inference on simulated HMM-MVN data.
+"""Example script for training SE-HMM on simulated multi-subject HMM-MVN data.
 
+- Should achieve a dice score close to 1.
 """
 
-import os
+print("Importing packages")
 
+import os
 import numpy as np
-from matplotlib import pyplot as plt
+
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.sehmm import Config, Model
@@ -66,7 +68,7 @@ sim.standardize()
 sim_stc = np.concatenate(sim.mode_time_course)
 
 # Create training dataset
-training_data = data.Data([mtc for mtc in sim.time_series])
+training_data = data.Data(sim.time_series)
 
 # Build model
 model = Model(config)
@@ -75,13 +77,14 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-# Set dev parameters initializer
+# Set initializer for subject-specific deviation parameters
 model.set_dev_parameters_initializer(training_data)
 
-model.random_state_time_course_initialization(
-    training_data, n_epochs=3, n_init=5, take=1
-)
-# Train model
+# Model initialization
+model.random_state_time_course_initialization(training_data, n_epochs=3, n_init=5, take=1)
+
+# Full model training
+print("Training model")
 history = model.fit(training_data)
 
 # Loss
@@ -111,7 +114,7 @@ plotting.plot_alpha(
     filename="figures/stc.png",
 )
 
-plotting.plot_matrices(inf_tp[np.newaxis, ...], filename="figures/trans_prob.png")
+plotting.plot_matrices([inf_tp], filename="figures/trans_prob.png")
 
 # Compare the inferred mode time course to the ground truth
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
@@ -119,14 +122,13 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc))
 
-
 sim_subject_embeddings = sim.subject_embeddings
 inf_subject_embeddings = model.get_subject_embeddings()
 inf_subject_embeddings -= np.mean(inf_subject_embeddings, axis=0)
 inf_subject_embeddings /= np.std(inf_subject_embeddings, axis=0)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
-fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+fig, axes = plotting.create_figure(1, 2, figsize=(10, 5))
 plotting.plot_scatter(
     [sim_subject_embeddings[group_mask, 0] for group_mask in group_masks],
     [sim_subject_embeddings[group_mask, 1] for group_mask in group_masks],
@@ -152,7 +154,7 @@ plotting.plot_scatter(
 )
 axes[0].set_title("Simulation")
 axes[1].set_title("Inferred")
-fig.savefig("figures/subject_embeddings.png")
-plt.close()
+plotting.save(fig, filename="figures/subject_embeddings.png")
 
+# Delete temporary directory
 training_data.delete_dir()

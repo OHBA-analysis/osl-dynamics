@@ -153,6 +153,22 @@ def set_dev_parameters_initializer(
         covs_beta_layer.tensor_initializer = RandomWeightInitializer(covs_beta, 0.1)
 
 
+def set_subject_embeddings_initializer(model, subject_embeddings):
+    """Set the subject embeddings initializer.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model.model
+        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+    subject_embeddings : np.ndarray
+        The subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
+    """
+    subject_embeddings_layer = model.get_layer("subject_embeddings")
+    subject_embeddings_layer.embeddings_initializer = WeightInitializer(
+        subject_embeddings
+    )
+
+
 def set_means_regularizer(model, training_dataset, layer_name="means"):
     """Set the means regularizer based on training data.
 

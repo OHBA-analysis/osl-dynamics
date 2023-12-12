@@ -35,7 +35,6 @@ from pqdm.threads import pqdm
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
 from osl_dynamics.inference.layers import (
-    add_epsilon,
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
@@ -1185,7 +1184,7 @@ class Model(ModelBase):
 
         return evidence / n_batches
 
-    def get_alpha(self, dataset, concatenate=False):
+    def get_alpha(self, dataset, concatenate=False, remove_edge_effects=False):
         """Get state probabilities.
 
         Parameters
@@ -1195,6 +1194,12 @@ class Model(ModelBase):
             each subject.
         concatenate : bool, optional
             Should we concatenate alpha for each subject?
+        remove_edge_effects : bool, optional
+            Edge effects can arise due to separating the data into sequences.
+            We can remove these by predicting overlapping :code:`alpha` and
+            disregarding the :code:`alpha` near the ends. Passing :code:`True`
+            does this by using sequences with 50% overlap and throwing away the
+            first and last 25% of predictions.
 
         Returns
         -------
@@ -1202,7 +1207,13 @@ class Model(ModelBase):
             State probabilities with shape (n_subjects, n_samples, n_states)
             or (n_samples, n_states).
         """
-        dataset = self.make_dataset(dataset)
+        if remove_edge_effects:
+            step_size = self.config.sequence_length // 2  # 50% overlap
+            trim = step_size // 2  # throw away 25%
+        else:
+            step_size = None
+
+        dataset = self.make_dataset(dataset, step_size=step_size)
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
@@ -1214,9 +1225,27 @@ class Model(ModelBase):
         alpha = []
         for i in iterator:
             gamma = []
-            for data in dataset[i]:
+            for j, data in enumerate(dataset[i]):
+                n_batches = dtf.get_n_batches(dataset[i])
                 x = data["data"]
                 g, _ = self.get_posterior(x)
+                if remove_edge_effects:
+                    batch_size, sequence_length, _ = x.shape
+                    n_states = g.shape[-1]
+                    g = g.reshape(batch_size, sequence_length, n_states)
+                    if j == 0:
+                        g = [
+                            g[0, :-trim],
+                            g[1:, trim:-trim].reshape(-1, n_states),
+                        ]
+                    elif j == n_batches - 1:
+                        g = [
+                            g[:-1, trim:-trim].reshape(-1, n_states),
+                            g[-1, trim:],
+                        ]
+                    else:
+                        g = [g[:, trim:-trim].reshape(-1, n_states)]
+                    g = np.concatenate(g).reshape(-1, n_states)
                 gamma.append(g)
             alpha.append(np.concatenate(gamma).astype(np.float32))
 
@@ -1387,41 +1416,52 @@ class Model(ModelBase):
             # Get the posterior
             alpha = self.get_alpha(training_data, concatenate=False)
 
-        # Get the subject-specific data
-        data = training_data.trim_time_series(
-            sequence_length=self.config.sequence_length,
-            concatenate=False,
-        )
-
         # Validation
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
+        # Get the subject-specific data
+        data = training_data.time_series(prepared=True, concatenate=False)
+
         if len(alpha) != len(data):
             raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
 
+        # Make sure the data and alpha have the same number of samples
+        data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
+
+        n_states = self.config.n_states
+        n_channels = self.config.n_channels
+
         # Helper function for dual estimation for a single subject
         def _single_dual_estimation(a, x):
-            sum_gamma = np.sum(a, axis=0)
+            sum_a = np.sum(a, axis=0)
             if self.config.learn_means:
-                subject_means = (
-                    np.sum(x[:, None, :] * a[:, :, None], axis=0) / sum_gamma[:, None]
-                )
+                subject_means = np.empty((n_states, n_channels))
+                for state in range(n_states):
+                    subject_means[state] = (
+                        np.sum(x * a[:, state, None], axis=0) / sum_a[state]
+                    )
             else:
                 subject_means = self.get_means()
 
             if self.config.learn_covariances:
-                diff = x[:, None, :] - subject_means[None, :, :]
-                subject_covariances = (
-                    np.sum(
-                        diff[:, :, :, None] @ diff[:, :, None, :] * a[:, :, None, None],
-                        axis=0,
+                subject_covariances = np.empty((n_states, n_channels, n_channels))
+                for state in range(n_states):
+                    diff = x - subject_means[state]
+                    subject_covariances[state] = (
+                        np.sum(
+                            diff[:, :, None]
+                            * diff[:, None, :]
+                            * a[:, state, None, None],
+                            axis=0,
+                        )
+                        / sum_a[state]
                     )
-                    / sum_gamma[:, None, None]
-                )
-                subject_covariances += self.config.covariances_epsilon * np.eye(
-                    self.config.n_channels
-                )
+                    subject_covariances[
+                        state
+                    ] += self.config.covariances_epsilon * np.eye(
+                        self.config.n_channels
+                    )
             else:
                 subject_covariances = self.get_covariances()
 
@@ -1430,11 +1470,6 @@ class Model(ModelBase):
         # Setup keyword arguments to pass to the helper function
         kwargs = []
         for a, x in zip(alpha, data):
-            if a.shape[0] != x.shape[0]:
-                raise ValueError(
-                    "alpha and training_data must have the same number of samples. "
-                    "Check if training_data has been prepared properly."
-                )
             kwargs.append({"a": a, "x": x})
 
         if len(data) == 1:

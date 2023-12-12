@@ -2,6 +2,7 @@
 
 """
 
+import re
 import logging
 import pathlib
 import pickle
@@ -806,8 +807,10 @@ class Data:
     def prepare(self, methods):
         """Prepare data.
 
-        Wrapper for calling a series of data preparation methods. Any method in
-        Data can be called.
+        Wrapper for calling a series of data preparation methods. Any method
+        in Data can be called. Note that if the same method is called multiple
+        times, the method name should be appended with an underscore and a
+        number, e.g. :code:`standardize_1` and :code:`standardize_2`.
 
         Parameters
         ----------
@@ -840,7 +843,14 @@ class Data:
             }
             data.prepare(methods)
         """
+        # Pattern for identifying the method name from "method-name_num"
+        pattern = re.compile(r"^(\w+?)(_\d+)?$")
+
         for method_name, kwargs in methods.items():
+            # Remove the "_num" part from the dict key
+            method_name = pattern.search(method_name).groups()[0]
+
+            # Apply method
             method = getattr(self, method_name)
             method(**kwargs)
 
@@ -965,6 +975,7 @@ class Data:
         validation_split=None,
         concatenate=True,
         step_size=None,
+        drop_last_batch=False,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
 
@@ -984,6 +995,8 @@ class Data:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
 
         Returns
         -------
@@ -1010,7 +1023,8 @@ class Data:
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             # Dataset with the time series data and ID
-            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32)
+            array_tracker = array_tracker + i
             data = {"data": array, "array_id": array_tracker}
 
             # Create dataset
@@ -1030,14 +1044,18 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
                 # Shuffle mini-batches
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
                 # Group into mini-batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
             if validation_split is None:
                 # Return the full dataset
@@ -1070,7 +1088,7 @@ class Data:
                     ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
-                ds = ds.batch(self.batch_size)
+                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
 
                 if shuffle:
                     # Shuffle batches
@@ -1116,6 +1134,7 @@ class Data:
         validation_split=None,
         concatenate=True,
         step_size=None,
+        drop_last_batch=False,
     ):
         """Create a TFRecord Dataset for training or evaluation.
 
@@ -1134,6 +1153,8 @@ class Data:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
 
         Returns
         -------
@@ -1174,7 +1195,8 @@ class Data:
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             # Create a dataset with the time series data and ID
-            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32)
+            array_tracker = array_tracker + i
             data = {"data": array, "array_id": array_tracker}
 
             # Save the dataset
@@ -1199,6 +1221,10 @@ class Data:
         # Helper function for parsing training examples
         def _parse_example(example):
             feature_names = ["data", "array_id"]
+            tensor_shapes = {
+                "data": [self.sequence_length, self.n_channels],
+                "array_id": [self.sequence_length],
+            }
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
             }
@@ -1207,7 +1233,9 @@ class Data:
                 feature_description,
             )
             return {
-                name: tf.io.parse_tensor(tensor, tf.float32)
+                name: tf.ensure_shape(
+                    tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
+                )
                 for name, tensor in parsed_example.items()
             }
 
@@ -1231,7 +1259,9 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
                 # Group into batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
                 # Shuffle batches
                 full_dataset = full_dataset.shuffle(self.buffer_size)
@@ -1246,7 +1276,9 @@ class Data:
                 full_dataset = full_dataset.map(_parse_example)
 
                 # Group into batches
-                full_dataset = full_dataset.batch(self.batch_size)
+                full_dataset = full_dataset.batch(
+                    self.batch_size, drop_remainder=drop_last_batch
+                )
 
             if validation_split is None:
                 # Return the dataset
@@ -1283,7 +1315,7 @@ class Data:
                     ds = ds.shuffle(self.buffer_size)
 
                 # Group into batches
-                ds = ds.batch(self.batch_size)
+                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
 
                 if shuffle:
                     # Shuffle batches

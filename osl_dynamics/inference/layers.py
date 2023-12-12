@@ -1796,6 +1796,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 # This is accounted for when updating the variable
                 # in inference.optimizers.ExponentialMovingAverageOptimizer
                 phi_interim = self._trans_prob_update(log_gamma, log_xi)
+
+                phi_interim = tf.cast(phi_interim, tf.float32)
                 return None, [phi_interim]
 
             return (tf.exp(log_gamma), tf.exp(log_xi)), grad

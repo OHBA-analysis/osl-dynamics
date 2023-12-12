@@ -137,7 +137,6 @@ config = """
             n_states: 8
             learn_means: True
             learn_covariances: True
-    calc_subject_ae_hmm_networks: {}
     plot_group_ae_networks:
         power_save_kwargs:
             plot_kwargs: {views: [lateral]}
