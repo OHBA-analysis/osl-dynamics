@@ -230,10 +230,10 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         os.makedirs(reproduce_analysis_dir)
     
     if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM',n_channels,n_states, learn_mean=learn_mean,split_strategy='1')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states,learn_mean=learn_mean,split_strategy='2')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM',n_channels,n_states,learn_mean=learn_mean,split_strategy='3')
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4')
+        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
+        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
 
 
 
@@ -1314,7 +1314,7 @@ def mean_FC_relation(save_dir:str,plot_dir:str,model_name:str,n_channels:int,n_s
     plt.savefig(f'{plot_dir}mean_FC_relation.pdf')
     plt.close()
 
-def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n_channels:int,n_states:int,learn_mean:bool=False,split_strategy:str='1'):
+def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n_channels:int,n_states:int,learn_mean:bool=False,split_strategy:str='1',dataset:osl_dynamics.data.Data=None):
     """
     Analysis the reproducibility of each model
     Parameters
@@ -1331,7 +1331,10 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
         number of states
     learn_mean: bool
         whether to learn the mean activation in the model.
-    split_strategy: (str) split strategy '1','2','3','4'
+    split_strategy: str
+        split strategy '1','2','3','4'
+    dataset: osl_dynamics.data.Data
+        the dataset to use. We need to calculate the temporal dynamics if dataset is used.
     Returns
     -------
     """
@@ -1381,6 +1384,8 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
     heatmap_reorder_matrix(FCs_correlation_reorder_fisher, reproduce_analysis_dir,
                            'FCs_fisher_z_correlation', row_column_indices_FCs_Fisher,
                            model_name, n_channels, n_states, split_strategy)
+
+
 
 def plot_loss_history(save_dir:str,plot_dir:str):
     """
