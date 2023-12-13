@@ -229,11 +229,11 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
     
-    if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
-        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
-        reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
+    #if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
+    #    reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
+        #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
+        #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
+        #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
 
 
 

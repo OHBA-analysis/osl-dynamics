@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=False)
 
-    save_dir = f'./results_simulation_202311_toy_6{model}_ICA_{n_channels}_state_{n_states}/'
+    save_dir = f'./results_simulation_202311_toy_6/{model}_ICA_{n_channels}_state_{n_states}/'
     spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
     spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
     
