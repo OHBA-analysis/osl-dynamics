@@ -8,7 +8,7 @@ from osl_dynamics.data import Data
 from rotation.utils import *
 from rotation.preprocessing import PrepareData
 from rotation.analysis import HMM_analysis, Dynemo_analysis, \
-    MAGE_analysis, SWC_analysis, comparison_analysis
+    MAGE_analysis, SWC_analysis, comparison_analysis, HMM_cv_reproduce
 
 def HMM_post(dataset):
     from osl_dynamics.models import load
@@ -98,8 +98,10 @@ if __name__ == '__main__':
         subj, dataset_1, dataset_2 = prepare_data.load(z_score_data=False,split_strategy='1')
         if model == 'HMM':
             HMM_analysis(dataset_1,f'{save_dir}/split_1_first_half/', spatial_map_dir, spatial_surface_map_dir, n_channels,
-                         n_states,learn_mean=learn_mean)
+                         n_states,learn_mean=learn_mean,reproducible=False)
             HMM_analysis(dataset_2, f'{save_dir}/split_1_second_half/', spatial_map_dir, spatial_surface_map_dir,
-                         n_channels, n_states, learn_mean=learn_mean)
+                         n_channels, n_states, learn_mean=learn_mean,reproducible=False)
+            HMM_cv_reproduce(dataset_1,dataset_2, f'{save_dir}/split_1_first_half/', f'{save_dir}/split_1_second_half/',
+                             n_channels, n_states,learn_mean=learn_mean)
 
 

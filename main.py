@@ -69,7 +69,7 @@ if __name__ == '__main__':
     learn_means = False
     learn_covariances = True
     learn_trans_prob = False
-    learning_rate = 0.01
+    learning_rate = 0.001
 
     index = int(sys.argv[1]) - 1
     #index = 6
@@ -99,21 +99,24 @@ if __name__ == '__main__':
     model,n_channels, n_states = parse_index(index,models,list_channels,list_states,training=True)
     
     if n_states is None:
-        save_dir = f'./results_simulation_202311_toy_9/{model}_ICA_{n_channels}/'
+        save_dir = f'./results_HCP_202312_no_mean/{model}_ICA_{n_channels}/'
     else:
-        save_dir = f'./results_simulation_202311_toy_9/{model}_ICA_{n_channels}_state_{n_states}'
+        save_dir = f'./results_HCP_202312_no_mean/{model}_ICA_{n_channels}_state_{n_states}'
     
     print(f'Number of channels: {n_channels}')
     print(f'Number of states: {n_states}')
     print(f'The model: {model}')
     
    # data_dir = pathlib.Path(f'/vols/Data/HCP/Phase2/group1200/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-    #data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
-    data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_9/')
+    data_dir = pathlib.Path(f'./data/node_timeseries/3T_HCP1200_MSMAll_d{n_channels}_ts2/')
+    #data_dir = pathlib.Path(f'./data/node_timeseries/simulation_toy_6/')
+
+    spatial_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC_sum.nii.gz'
+    spatial_surface_map_dir = f'./data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d{n_channels}.ica/melodic_IC.dscalar.nii'
 
     if mode == 'training':
         prepare_data = PrepareData(data_dir)
-        subj, dataset = prepare_data.load(z_score_data=False)
+        subj, dataset = prepare_data.load(z_score_data=True)
         print(f'Number of subjects: {len(subj)}')
         model_train(model,dataset,n_channels,n_states,save_dir,
                     learn_means=learn_means,
@@ -122,7 +125,7 @@ if __name__ == '__main__':
                     learning_rate=learning_rate)
     elif mode == 'repeat':
         prepare_data = PrepareData(data_dir)
-        subj, dataset = prepare_data.load(z_score_data=False)
+        subj, dataset = prepare_data.load(z_score_data=True)
         print(f'Number of subjects: {len(subj)}')
 
         save_dir_sub = f'{save_dir}/repeat_{sub_index}'
@@ -138,7 +141,7 @@ if __name__ == '__main__':
 
     elif mode == 'split':
         prepare_data = PrepareData(data_dir)
-        subj, dataset_1,dataset_2 = prepare_data.load(z_score_data=False, split_strategy = strategy)
+        subj, dataset_1,dataset_2 = prepare_data.load(z_score_data=True, split_strategy = strategy)
         print(f'Number of subjects: {len(subj)}')
         if sub_index == 1:
             save_dir_sub = f'{save_dir}/split_{strategy}_first_half'
@@ -154,7 +157,7 @@ if __name__ == '__main__':
                     )
     elif mode == "cross_validation":
         prepare_data = PrepareData(data_dir)
-        subj, dataset = prepare_data.load(z_score_data=False)
+        subj, dataset = prepare_data.load(z_score_data=True)
         kf = KFold(shuffle=True,random_state=42)
         for j, (train_index, test_index) in enumerate(kf.split(range(len(dataset.arrays)))):
             save_dir_sub = f'{save_dir}/cross_validation_{j}/'
@@ -170,14 +173,14 @@ if __name__ == '__main__':
                             learn_trans_prob=learn_trans_prob,
                             learning_rate=learning_rate
                             )
-                HMM_analysis(dataset, save_dir_sub, None, None, n_channels, n_states)
+                HMM_analysis(dataset, save_dir_sub, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states)
 
             with dataset.set_keep(list(test_index)):
                 save_dir_sub_validation = f'{save_dir_sub}/validation/'
                 print(f'Please check the length of validation dataset: {len(dataset.arrays)}')
                 if not os.path.exists(save_dir_sub_validation):
                     os.makedirs(save_dir_sub_validation)
-                HMM_analysis(dataset, save_dir_sub_validation, None, None, n_channels, n_states,model_dir=save_dir_sub)
+                HMM_analysis(dataset, save_dir_sub_validation, spatial_map_dir, spatial_surface_map_dir, n_channels, n_states,model_dir=save_dir_sub)
 
     else:
         raise ValueError('Mode is not available now!')

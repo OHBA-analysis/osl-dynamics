@@ -3,7 +3,7 @@ import numpy as np
 from rotation.simulation import HMM_single_subject_simulation, perturb_covariances
 
 if __name__ == '__main__':
-    save_dir = './data/node_timeseries/simulation_toy_9/'
+    save_dir = './data/node_timeseries/simulation_toy_12/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -53,7 +53,7 @@ if __name__ == '__main__':
                                   n_channels=n_channels,
                                   trans_prob=tpm,
                                   means=means,
-                                  covariances=perturb_covariances(covariances),
+                                  covariances=perturb_covariances(covariances,perturbation_factor=0.2),
                                   subj_name = '10001')
     HMM_single_subject_simulation(save_dir=save_dir,
                                   n_scans=n_scans,
@@ -62,7 +62,7 @@ if __name__ == '__main__':
                                   n_channels=n_channels,
                                   trans_prob=tpm,
                                   means=means,
-                                  covariances=perturb_covariances(covariances),
+                                  covariances=perturb_covariances(covariances,perturbation_factor=0.2),
                                   subj_name='10002')
     '''
     ### Update 6th Dec 2023

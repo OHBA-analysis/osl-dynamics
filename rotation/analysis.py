@@ -46,19 +46,28 @@ def construct_graph(tpm:np.ndarray):
 
     return G
 def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
-                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int,learn_mean:bool=False,model_dir=None):
+                 spatial_map_dir:str, spatial_surface_map_dir:str, n_channels:int, n_states:int,
+                 learn_mean:bool=False,model_dir=None,reproducible=False):
     """
     Post-training analysis of HMM model
     Parameters
     ----------
-    dataset: (osl_dynamics.data.Data) dataset to work on
-    save_dir: (str) directory to save results
-    spatial_map_dir: (str) directory of groupICA spatial maps
-    spatial_surface_map_dir: (str) directory of groupICA spatial surface maps
-    n_channels: (int) number of channels
-    n_states: (int) number of states
-    model_dir: (str) where the model is saved. If none, by default should be the same as save_dir
-
+    dataset: osl_dynamics.data.Data
+        dataset to work on
+    save_dir: str
+        directory to save results
+    spatial_map_dir: str
+        directory of groupICA spatial maps
+    spatial_surface_map_dir: str
+        directory of groupICA spatial surface maps
+    n_channels: int
+        number of channels
+    n_states: int
+        number of states
+    model_dir: str
+        where the model is saved. If none, by default should be the same as save_dir
+    reproducible: bool
+        whether to conduct reproducible analysis
     Returns
     -------
     """
@@ -228,13 +237,78 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
-    
-    #if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
-    #    reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
-        #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
-        #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
-        #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
 
+    if reproducible:
+        if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
+            reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
+            #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
+            #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
+            #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
+
+def HMM_cv_reproduce(dataset_1,dataset_2, save_dir_1:str, save_dir_2:str,n_channels:int, n_states:int,learn_mean=False):
+    """
+    Conducting cross validation
+    Parameters
+    ----------
+    dataset_1: osl_dynamics.data.Data
+        Dataset where the first half of the model was trained on
+    dataset_2: osl_dynamics.data.Data
+        Dataset where the second half of the model was trained on
+    save_dir_1: str
+        directory where the first model saved
+    save_dir_2: str
+        directory were the second model saved
+    n_channels: int
+        number of channels
+    n_states: int
+        number of states
+    learn_mean: bool
+        whether the mean activation is learned.
+    Returns
+    -------
+    """
+    from osl_dynamics.models import load
+
+    model_1 = load(save_dir_1)
+    model_2 = load(save_dir_2)
+
+    # Get mean and covariances of model 1
+    try:
+        if learn_mean:
+            means_1 = np.load(f'{save_dir_1}state_means.npy')
+        else:
+            means_1 = np.zeros((n_states, n_channels))
+        covariances_1 = np.load(f'{save_dir_1}state_covariances.npy')
+    except Exception as e:
+        if learn_mean:
+            means_1 = model_1.get_means()
+        else:
+            means_1 = np.zeros((n_states, n_channels))
+        covariances_1 = model_1.get_covariances()
+    # Get mean and covariances of model 2
+    try:
+        if learn_mean:
+            means_2 = np.load(f'{save_dir_2}state_means.npy')
+        else:
+            means_2 = np.zeros((n_states,n_channels))
+        covariances_2 = np.load(f'{save_dir_2}state_covariances.npy')
+    except Exception as e:
+        if learn_mean:
+            means_2 = model_2.get_means()
+        else:
+            means_2 = np.zeros((n_states, n_channels))
+        covariances_2 = model_2.get_covariances()
+
+    # Calculate the original free energy (model_1 on dataset_1, model_2 on dataset_2)
+    free_energy_cv = {}
+    free_energy_cv['first_first'] = model_1.free_energy(dataset_1)
+    free_energy_cv['second_second'] = model_1.free_energy(dataset_2)
+
+    # Pair these states
+    riem_distance = twopair_riemannian_distance(covariances_1, covariances_2)
+    index_1, riem_distance_reordered = hungarian_pair(riem_distance, distance=True)
+    covariance_2_reordered = covariances_2[index_1['col']]
+    free_energy_cv['first_second'] = model_1.free_energy(dataset_1,covariances=covariances_2_reordered)
 
 
 
