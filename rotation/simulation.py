@@ -29,45 +29,20 @@ def perturb_covariances(covariances:np.ndarray,perturbation_factor: float=0.002,
     if random_seed is not None:
         np.random.seed(random_seed)
 
-    def make_valid_correlation_matrix(matrix):
-        """
-        Ensure that the input matrix is a valid correlation matrix.
+    perturbed_covariances = np.zeros_like(covariances)
 
-        Args:
-            matrix (numpy.ndarray): Square matrix to be validated.
-
-        Returns:
-            numpy.ndarray: Valid correlation matrix.
-        """
-        # Ensure diagonals are 1
-        np.fill_diagonal(matrix, 1.0)
-
-        # Ensure the matrix is symmetric
-        matrix = 0.5 * (matrix + matrix.T)
-
-        # Ensure all eigenvalues are non-negative
-        eigenvalues, eigenvectors = np.linalg.eigh(matrix)
-        matrix = np.dot(eigenvectors, np.dot(np.diag(np.maximum(eigenvalues, 0)), eigenvectors.T))
-
-        return matrix
-
-    stds,cors = cov2stdcor(covariances)
-    perturbed_cors = np.zeros_like(cors)
-
-    for i in range(cors.shape[0]):
+    for i in range(len(covariances)):
         # Generate a random perturbation matrix
-        perturbation_matrix = np.random.normal(0, perturbation_factor, cors.shape[1:])
+        cholesky_matrix = np.linalg.cholesky(covariances[i,:,:])
+        perturbation_matrix = np.tril(np.random.normal(0, perturbation_factor, cholesky_matrix.shape))
 
         # Add the perturbation to the original correlation matrix
-        perturbed_matrix = cors[i] + perturbation_matrix
-
-        # Ensure the resulting matrix is still a valid correlation matrix
-        perturbed_matrix = make_valid_correlation_matrix(perturbed_matrix)
+        perturbed_cholesky_matrix = cholesky_matrix + perturbation_matrix
 
         # Store the perturbed matrix in the result array
-        perturbed_cors[i] = perturbed_matrix
+        perturbed_covariances[i,:,:] = np.dot(perturbed_cholesky_matrix, perturbed_cholesky_matrix.T)
 
-    return stdcor2cov(stds, perturbed_cors)
+    return perturbed_covariances
 
 
 def HMM_single_subject_simulation(save_dir:str, n_scans:int, n_states:int, n_samples:int,n_channels:int,
