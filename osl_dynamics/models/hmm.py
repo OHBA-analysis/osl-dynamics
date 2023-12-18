@@ -1081,8 +1081,10 @@ class Model(ModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def free_energy(self, dataset):
+    def free_energy(self, dataset,means:np.ndarray=None,covariances:np.ndarray=None):
         """Get the variational free energy.
+        This method is modified by swimming 13th Dec 2023
+        I added two arguments,means and covariances to substitute the means, and covariances in the model
 
         This calculates:
 
@@ -1095,7 +1097,10 @@ class Model(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the free energy for.
-
+        means: np.ndarray
+            N_states * N_channels to substitute the mean activation. Do not change if none.
+        covariances: np.ndarray
+            N_states * N_channels * N_channels to substitute the covariance matries. Do not change if none
         Returns
         -------
         free_energy : float
@@ -1122,8 +1127,17 @@ class Model(ModelBase):
             #   = - int q(s) log p(x | s) ds    [log_likelihood]
             #     + int q(s) log q(s) ds        [entropy]
             #     - int q(s) log p(s) ds        [prior]
-
+            if means is not None:
+                means_temp = self.get_means()
+                self.set_means(means)
+            if covariances is not None:
+                covariances_temp = self.get_covariances()
+                self.set_covariances(covariances)
             log_likelihood = self.get_posterior_expected_log_likelihood(x, gamma)
+            if means is not None:
+                self.set_means(means_temp)
+            if covariances is not None:
+                self.set_covariances(covariances_temp)
             entropy = self.get_posterior_entropy(gamma, xi)
             prior = self.get_posterior_expected_prior(gamma, xi)
 
