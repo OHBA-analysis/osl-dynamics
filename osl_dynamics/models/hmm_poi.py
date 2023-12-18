@@ -887,6 +887,19 @@ class Model(ModelBase):
             update_initializer=update_initializer,
         )
 
+    def set_rates(self, log_rates, epsilon = 1e-6, update_initializer=True):
+        """Set the state rates.
+
+        Parameters
+        ----------
+        rates : np.ndarray
+            State rates. Shape is (n_states, n_channels).
+        update_initializer : bool, optional
+            Do we want to use the passed log_rates when we re-initialize the model?
+        """
+        log_rates = np.log(log_rates+epsilon)
+        self.set_log_rates(log_rates, update_initializer=update_initializer)
+
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
@@ -941,7 +954,7 @@ class Model(ModelBase):
         training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Log_rate for each state
-        log_rates = np.zeros(
+        rates = np.zeros(
             [self.config.n_states, self.config.n_channels], dtype=np.float32
         )
         for batch in training_dataset:
@@ -954,20 +967,19 @@ class Model(ModelBase):
 
             # Calculate the mean for each state for this batch as log_rate
             m = []
-            C = []
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
                 mu_j = np.mean(x, axis=0)
                 m.append(mu_j)
-            log_rates += m
+            rates += m
 
         # Calculate the average from the running total
         n_batches = dtf.get_n_batches(training_dataset)
-        log_rates /= n_batches
+        rates /= n_batches
 
         if self.config.learn_log_rates:
             # Set initial log_rates
-            self.set_log_rates(log_rates, update_initializer=True)
+            self.set_rates(rates, update_initializer=True)
 
     # def set_regularizers(self, training_dataset):
     #     """Set the log_rates regularizer based on the training data.

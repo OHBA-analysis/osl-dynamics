@@ -1,7 +1,7 @@
 """Example script for running HMM_Poisson inference on simulated HMM-POI data.
 
 This script should take less than a couple minutes to run and
-currently the  dice coefficient is ~0.80.
+currently the  dice coefficient is ~0.99.
 """
 
 import os
@@ -52,7 +52,7 @@ model.summary()
 #%% Train model
 
 # Initialization
-init_history = model.random_subset_initialization(data, n_init=3, n_epochs=1, take = 0.25)
+init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=1, take = 1)
 
 # Full training
 history = model.fit(data)
@@ -100,6 +100,8 @@ summary_stats_dir = f"{results_dir}/summary_stats"
 os.makedirs(summary_stats_dir, exist_ok=True)
 
 np.save(f"{summary_stats_dir}/fo.npy", fo)
+print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim.state_time_course))
+print("Fractional occupancies (Inferred):", modes.fractional_occupancies(stc))
 np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
