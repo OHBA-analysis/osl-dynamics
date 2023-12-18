@@ -1356,7 +1356,7 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, n_states, epsilon, **kwargs):
+    def __init__(self, n_states, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
 
@@ -1378,6 +1378,7 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
                 allow_nan_stats=False,
             )
             a = poi.log_prob(x)
+            a = tf.reduce_sum(a, axis=-1)
             ll_loss += probs[:, :, i] * a
 
         # Sum over time dimension and average over the batch dimension

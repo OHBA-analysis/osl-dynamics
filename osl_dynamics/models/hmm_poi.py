@@ -543,13 +543,13 @@ class Model(ModelBase):
         # observed data
         log_likelihood = np.empty([n_states, batch_size, sequence_length])
         for state in range(n_states):
-            mvn = tf.stop_gradient(
+            poi = tf.stop_gradient(
                 tfp.distributions.Poisson(
                     log_rate=tf.gather(log_rates, state, axis=-2),
                     allow_nan_stats=False,
                 )
             )
-            log_likelihood[state] = mvn.log_prob(x)
+            log_likelihood[state] = tf.reduce_sum(poi.log_prob(x), axis=-1)
         log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
 
         # We add a constant to the log-likelihood for time points where all
@@ -759,13 +759,13 @@ class Model(ModelBase):
             Log-likelihood. Shape is (batch_size, ..., n_states)
         """
         log_rates = self.get_log_rates()
-        mvn = tf.stop_gradient(
+        poi = tf.stop_gradient(
             tfp.distributions.Poisson(
                 log_rate=log_rates,
                 allow_nan_stats=False,
             )
         )
-        log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
+        log_likelihood = tf.reduce_sum(poi.log_prob(tf.expand_dims(data, axis=-2)), axis = -1)
         return log_likelihood.numpy()
 
     def _evidence_update_step(self, data, log_prediction_distribution):
@@ -855,9 +855,16 @@ class Model(ModelBase):
             State log_rates. Shape is (n_states, n_channels).
         """
         return obs_mod.get_observation_model_parameter(self.model, "log_rates")
+    
+    def get_rates(self):
+        """Get the state rates.
 
-
-
+        Returns
+        -------
+        rates : np.ndarray
+            State rates. Shape is (n_states, n_channels).
+        """
+        return np.exp(self.get_log_rates())
 
     def get_observation_model_parameters(self):
         """Wrapper for :code:`get_log_rates`."""
