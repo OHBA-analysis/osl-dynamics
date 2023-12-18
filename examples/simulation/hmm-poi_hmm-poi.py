@@ -100,8 +100,6 @@ summary_stats_dir = f"{results_dir}/summary_stats"
 os.makedirs(summary_stats_dir, exist_ok=True)
 
 np.save(f"{summary_stats_dir}/fo.npy", fo)
-print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim.state_time_course))
-print("Fractional occupancies (Inferred):", modes.fractional_occupancies(stc))
 np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
