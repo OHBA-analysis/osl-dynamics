@@ -85,7 +85,7 @@ model.set_regularizers(training_data)
 model.set_dev_parameters_initializer(training_data)
 
 # Model initialization
-model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=0.4)
+model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=1)
 
 # Full training
 print("Training model")
