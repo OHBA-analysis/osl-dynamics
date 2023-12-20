@@ -39,6 +39,7 @@ from osl_dynamics.inference.layers import (
     MultiLayerPerceptronLayer,
     LearnableTensorLayer,
     StaticLossScalingFactorLayer,
+    BatchSizeLayer,
 )
 
 
@@ -551,9 +552,15 @@ def _model_structure(config):
     # Layers for inputs
     data = layers.Input(
         shape=(config.sequence_length, config.n_channels),
+        dtype=tf.float32,
         name="data",
     )
-    array_id = layers.Input(shape=(config.sequence_length,), name="array_id")
+    array_id = layers.Input(
+        shape=(config.sequence_length,), dtype=tf.int32, name="array_id"
+    )
+
+    batch_size_layer = BatchSizeLayer(name="batch_size")
+    batch_size = batch_size_layer(data)
 
     # Static loss scaling factor
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -737,15 +744,18 @@ def _model_structure(config):
             means_dev_mag_inf_beta_input
         )
         means_dev_mag = means_dev_mag_layer(
-            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta]
+            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta, array_id]
         )
+        norm_means_dev_map = tf.gather(norm_means_dev_map, array_id[:, 0], axis=0)
         means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
     else:
         means_dev_layer = ZeroLayer(
-            shape=(config.n_subjects, config.n_modes, config.n_channels),
+            shape=(config.n_modes, config.n_channels),
             name="means_dev",
         )
-        means_dev = means_dev_layer(data)
+        means_dev = tf.broadcast_to(
+            means_dev_layer(data), (batch_size, config.n_modes, config.n_channels)
+        )
 
     # ----------------------
     # Covariances deviations
@@ -834,19 +844,26 @@ def _model_structure(config):
             covs_dev_mag_inf_beta_input,
         )
         covs_dev_mag = covs_dev_mag_layer(
-            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta]
+            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta, array_id]
         )
+        norm_covs_dev_map = tf.gather(norm_covs_dev_map, array_id[:, 0], axis=0)
         covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
     else:
         covs_dev_layer = ZeroLayer(
             shape=(
-                config.n_subjects,
                 config.n_modes,
                 config.n_channels * (config.n_channels + 1) // 2,
             ),
             name="covs_dev",
         )
-        covs_dev = covs_dev_layer(data)
+        covs_dev = tf.broadcast_to(
+            covs_dev_layer(data),
+            (
+                batch_size,
+                config.n_modes,
+                config.n_channels * (config.n_channels + 1) // 2,
+            ),
+        )
 
     # ----------------------------------------
     # Add deviations to group level parameters
@@ -877,7 +894,7 @@ def _model_structure(config):
     )
 
     # Data flow
-    m, C = mix_subject_means_covs_layer([alpha, mu, D, array_id])
+    m, C = mix_subject_means_covs_layer([alpha, mu, D])
     ll_loss = ll_loss_layer([data, m, C])
 
     # ---------

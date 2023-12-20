@@ -316,27 +316,20 @@ def train_sehmm(
     data,
     output_dir,
     config_kwargs,
-    hmm_config_kwargs=None,
     init_kwargs=None,
     fit_kwargs=None,
     save_inf_params=True,
-    n_jobs=1,
 ):
     """ Train a `Subject embedding Hidden Markov Model <https://osl-dynamics.\
     readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html>`_.
     
     This function will:
 
-    1. Build an :code:`hmm.Model` object.
-    2. Initialize the parameters of the HMM model using
+    1. Build an :code:`sehmm.Model` object.
+    2. Initialize the parameters of the SE-HMM model using
         :code:`Model.random_state_time_course_initialization`.
-    3. Build an :code:`sehmm.Model` object.
-    4. Initialize the parameters of the SE-HMM model using pretrained HMM.
-    5. Initialize the subject embeddings with PCA'ed dual estimated covariances.
-    6. Initialize the parameters of the SE-HMM model using
-        :code:`Model.random_state_time_course_initialization`.
-    7. Perform full training.
-    8. Save the inferred parameters (state probabilities, means,
+    3. Perform full training.
+    4. Save the inferred parameters (state probabilities, means,
         covariances and subject embeddings) if :code:`save_inf_params=True`.
     
     This function will create two directories:
@@ -374,18 +367,6 @@ def train_sehmm(
                 'kl_annealing_sharpness': 10,
                 'n_kl_annealing_epochs': 15,
             }.
-    hmm_config_kwargs : dict, optional
-        Keyword arguments to pass to `hmm.Config <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
-        #osl_dynamics.models.hmm.Config>`_. Defaults to::
-
-            {
-                'sequence_length': 200,
-                'batch_size': 512,
-                'learning_rate': 0.01,
-                'n_epochs': 5,
-                'lr_decay': 0.1,
-            }.
     init_kwargs : dict, optional
         Keyword arguments to pass to
         :code:`Model.random_state_time_course_initialization`. Defaults to::
@@ -395,14 +376,11 @@ def train_sehmm(
         Keyword arguments to pass to the :code:`Model.fit`. No defaults.
     save_inf_params : bool, optional
         Should we save the inferred parameters?
-    n_jobs : int, optional
-        Number of jobs to run in parallel.
     """
     if data is None:
         raise ValueError("data must be passed.")
 
-    from osl_dynamics.models import hmm, sehmm
-    from sklearn.decomposition import PCA
+    from osl_dynamics.models import sehmm
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs
@@ -411,20 +389,7 @@ def train_sehmm(
     model_dir = output_dir + "/model"
 
     _logger.info("Building model")
-    # Initialise configs
 
-    # HMM config
-    default_hmm_config_kwargs = {
-        "n_channels": data.n_channels,
-        "sequence_length": 200,
-        "batch_size": 512,
-        "learning_rate": 0.01,
-        "n_epochs": 5,
-        "lr_decay": 0.1,
-    }
-    hmm_config_kwargs = override_dict_defaults(
-        default_hmm_config_kwargs, hmm_config_kwargs
-    )
     # SE-HMM config
     default_config_kwargs = {
         "n_channels": data.n_channels,
@@ -450,26 +415,11 @@ def train_sehmm(
 
     default_init_kwargs = {"n_init": 10, "n_epochs": 2}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
-
-    # Initialise with HMM
-    hmm_config_kwargs["n_states"] = config_kwargs["n_states"]
-    hmm_config_kwargs["learn_means"] = config_kwargs["learn_means"]
-    hmm_config_kwargs["learn_covariances"] = config_kwargs["learn_covariances"]
-
-    _logger.info(f"Using hmm_config_kwargs: {hmm_config_kwargs}")
-    hmm_config = hmm.Config(**hmm_config_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-
-    init_model = hmm.Model(hmm_config)
-    init_model.set_regularizers(data)
-    init_model.random_state_time_course_initialization(data, **init_kwargs)
 
     # Initialise and train SE-HMM
     _logger.info(f"Using config_kwargs: {config_kwargs}")
     config = sehmm.Config(**config_kwargs)
-    config.initial_covariances = init_model.get_covariances()
-    config.initial_trans_prob = init_model.get_trans_prob()
-
     model = sehmm.Model(config)
     model.summary()
 
@@ -479,19 +429,12 @@ def train_sehmm(
     # Set deviation initializer
     model.set_dev_parameters_initializer(data)
 
-    # Initialise subject embeddings
-    _, init_dual_covs = init_model.dual_estimation(data, n_jobs=n_jobs)
-    init_dual_covs = np.reshape(init_dual_covs, (data.n_arrays, -1))
-    pca = PCA(n_components=config_kwargs["subject_embeddings_dim"])
-    model.set_subject_embeddings_initializer(pca.fit_transform(init_dual_covs))
-
     # Initialise SE-HMM with subject embeddings fixed
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    with model.set_trainable("subject_embeddings", False):
-        init_history = model.random_state_time_course_initialization(
-            data,
-            **init_kwargs,
-        )
+    init_history = model.random_state_time_course_initialization(
+        data,
+        **init_kwargs,
+    )
 
     # Training
     history = model.fit(data, **fit_kwargs)
@@ -499,7 +442,7 @@ def train_sehmm(
     _logger.info(f"Saving model to: {model_dir}")
     model.save(model_dir)
 
-    del init_model, model
+    del model
     model = sehmm.Model.load(model_dir)
 
     # Get the variational free energy
