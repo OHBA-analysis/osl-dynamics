@@ -765,7 +765,9 @@ class Model(ModelBase):
                 allow_nan_stats=False,
             )
         )
-        log_likelihood = tf.reduce_sum(poi.log_prob(tf.expand_dims(data, axis=-2)), axis = -1)
+        log_likelihood = tf.reduce_sum(
+            poi.log_prob(tf.expand_dims(data, axis=-2)), axis=-1
+        )
         return log_likelihood.numpy()
 
     def _evidence_update_step(self, data, log_prediction_distribution):
@@ -855,7 +857,7 @@ class Model(ModelBase):
             State log_rates. Shape is (n_states, n_channels).
         """
         return obs_mod.get_observation_model_parameter(self.model, "log_rates")
-    
+
     def get_rates(self):
         """Get the state rates.
 
@@ -887,7 +889,7 @@ class Model(ModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_rates(self, log_rates, epsilon = 1e-6, update_initializer=True):
+    def set_rates(self, log_rates, epsilon=1e-6, update_initializer=True):
         """Set the state rates.
 
         Parameters
@@ -897,7 +899,7 @@ class Model(ModelBase):
         update_initializer : bool, optional
             Do we want to use the passed log_rates when we re-initialize the model?
         """
-        log_rates = np.log(log_rates+epsilon)
+        log_rates = np.log(log_rates + epsilon)
         self.set_log_rates(log_rates, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
@@ -1001,7 +1003,6 @@ class Model(ModelBase):
 
     #     if self.config.learn_log_rates:
     #         obs_mod.set_means_regularizer(self.model, training_dataset)
-
 
     def free_energy(self, dataset):
         """Get the variational free energy.
@@ -1307,7 +1308,7 @@ class Model(ModelBase):
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
         """Dual estimation to get subject-specific observation model parameters.
 
-        Here, we estimate the state log_rates for individual subjects with 
+        Here, we estimate the state log_rates for individual subjects with
         the posterior distribution of the states held fixed.
 
         Parameters
@@ -1387,7 +1388,6 @@ class Model(ModelBase):
         for result in results:
             m = result
             log_rates.append(m)
-
 
         return np.squeeze(log_rates)
 

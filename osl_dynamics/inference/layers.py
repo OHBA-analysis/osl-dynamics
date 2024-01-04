@@ -1373,6 +1373,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
 
         return tf.expand_dims(nll_loss, axis=-1)
 
+
 class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
     """Layer to calculate the log-likelihood loss assuming a categorical model with Poisson observation model.
 
@@ -1419,6 +1420,7 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
         self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
+
 
 class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.

@@ -28,8 +28,8 @@ class Poisson:
     def __init__(
         self,
         rates,
-        n_states = None,
-        n_channels = None,
+        n_states=None,
+        n_channels=None,
         random_seed=None,
     ):
         self._rng = np.random.default_rng(random_seed)
@@ -49,16 +49,16 @@ class Poisson:
             self.n_channels = n_channels
             self.rates = self.create_rates(rates)
 
-    def create_rates(self, option,eps = 1e-2):
+    def create_rates(self, option, eps=1e-2):
         if option == "random":
             # Randomly sample the rates from a gamma distribution
-           rates = self._rng.gamma(
+            rates = self._rng.gamma(
                 shape=1.0, scale=1.1, size=(self.n_states, self.n_channels)
             )
 
-           #  Add a large rate to a small number of the channels at random
-           n_active_channels = max(1, self.n_channels // self.n_states)
-           for i in range(self.n_states):
+            #  Add a large rate to a small number of the channels at random
+            n_active_channels = max(1, self.n_channels // self.n_states)
+            for i in range(self.n_states):
                 active_channels = np.unique(
                     self._rng.integers(0, self.n_channels, size=n_active_channels)
                 )
@@ -67,7 +67,7 @@ class Poisson:
         else:
             raise NotImplementedError("Please use rates='random'.")
 
-        return rates+eps
+        return rates + eps
 
     def simulate_data(self, state_time_course):
         n_samples = state_time_course.shape[0]

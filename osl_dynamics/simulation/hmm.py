@@ -533,6 +533,7 @@ class HMM_Poi(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
+
 class MSubj_HMM_MVN(Simulation):
     """Simulate an HMM with multivariate normal observation model for each
     subject.
