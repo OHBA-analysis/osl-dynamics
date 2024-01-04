@@ -23,6 +23,7 @@ models = {
     "SE-DyNeMo": sedynemo.Model,
     "State-DyNeMo": state_dynemo.Model,
     "HMM": hmm.Model,
+    "HMM-Poisson": hmm_poi.Model,
     "SE-HMM": sehmm.Model,
 }
 

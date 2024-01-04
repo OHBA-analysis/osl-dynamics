@@ -1,17 +1,5 @@
-"""Hidden Markov Model (HMM).
+"""Hidden Markov Model (HMM) with a Possion observation model.
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
-/hmm.html>`_ for a description of this model.
-
-See Also
---------
-- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
-  electrophysiological data". `Neuroimage 126, 81-95 (2016)
-  <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
-- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in
-  rest and task". `Neuroimage 180, 646-656 (2018)
-  <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
-- `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
 import logging
@@ -109,7 +97,7 @@ class Config(BaseModelConfig):
         Strategy for distributed learning.
     """
 
-    model_name: str = "HMM"
+    model_name: str = "HMM-Poisson"
 
     # Observation model parameters
     learn_log_rates: bool = None
@@ -942,8 +930,7 @@ class Model(ModelBase):
         self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial log_rates based on a random state time
-        course.
+        """Sets the initial log_rates based on a random state time course.
 
         Parameters
         ----------
@@ -982,27 +969,6 @@ class Model(ModelBase):
         if self.config.learn_log_rates:
             # Set initial log_rates
             self.set_rates(rates, update_initializer=True)
-
-    # def set_regularizers(self, training_dataset):
-    #     """Set the log_rates regularizer based on the training data.
-
-    #     A multivariate normal prior is applied to the mean vectors with
-    #     :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
-    #     :code:`config.diagonal_covariances=True`, a log normal prior is applied
-    #     to the diagonal of the covariances matrices with :code:`mu=0`,
-    #     :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior is
-    #     applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
-    #     and :code:`psi=diag(1/range)`.
-
-    #     Parameters
-    #     ----------
-    #     training_dataset : tf.data.Dataset or osl_dynamics.data.Data
-    #         Training dataset.
-    #     """
-    #     training_dataset = self.make_dataset(training_dataset, concatenate=True)
-
-    #     if self.config.learn_log_rates:
-    #         obs_mod.set_means_regularizer(self.model, training_dataset)
 
     def free_energy(self, dataset):
         """Get the variational free energy.
@@ -1482,4 +1448,4 @@ def _model_structure(config):
     )  # data not used
     ll_loss = ll_loss_layer([data, mu, gamma, None])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")
+    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM-Poisson")

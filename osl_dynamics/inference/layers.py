@@ -1375,7 +1375,8 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
 
 
 class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the log-likelihood loss assuming a categorical model with Poisson observation model.
+    """Layer to calculate the log-likelihood loss assuming a categorical model
+    with Poisson observation model.
 
     Parameters
     ----------
@@ -1391,8 +1392,6 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         x, log_rate, probs, subj_id = inputs
-
-        # Add a small error for numerical stability
 
         if subj_id is not None:
             # Get the mean and covariance for the requested subject
