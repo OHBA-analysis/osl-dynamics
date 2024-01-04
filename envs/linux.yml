@@ -19,5 +19,5 @@ dependencies:
     - seaborn
     - tabulate
     - tqdm
-    - tensorflow==2.9.1
-    - tensorflow-probability==0.17
+    - tensorflow==2.11.1
+    - tensorflow-probability==0.19

@@ -23,7 +23,7 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        pip install tensorflow==2.9.1
+        pip install tensorflow==2.11.1
 
     If you have GPU resources you may need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions.
 
@@ -31,19 +31,19 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        pip install tensorflow-macos==2.9.1
+        pip install tensorflow-macos==2.11.1
 
     If pip can not find the package, then you can try installing TensorFlow with conda:
 
     ::
 
-        conda install tensorflow=2.9.1
+        conda install tensorflow=2.11.1
 
     After you have installed TensorFlow, install the tensorflow-probability addon with:
 
     ::
 
-        pip install tensorflow-probability==0.17
+        pip install tensorflow-probability==0.19
 
 #. Finally, install osl-dynamics:
 

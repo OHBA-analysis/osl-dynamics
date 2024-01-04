@@ -46,8 +46,8 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
 
     conda activate osl
     cd osl-dynamics
-    pip install tensorflow==2.9.1
-    pip install tensorflow-probability==0.17
+    pip install tensorflow==2.11.1
+    pip install tensorflow-probability==0.19
     pip install -e .
 
 Documentation
