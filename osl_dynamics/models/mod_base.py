@@ -15,8 +15,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
-from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
@@ -75,9 +73,9 @@ class BaseModelConfig:
 
         # Strategy for distributed learning
         if self.multi_gpu:
-            self.strategy = MirroredStrategy()
+            self.strategy = tf.distribute.MirroredStrategy()
         elif self.strategy is None:
-            self.strategy = get_strategy()
+            self.strategy = tf.distribute.get_strategy()
 
     def validate_dimension_parameters(self):
         if self.n_modes is None and self.n_states is None:
@@ -308,7 +306,7 @@ class ModelBase:
         if isinstance(inputs, data.Data):
             # Validation
             if (
-                isinstance(self.config.strategy, MirroredStrategy)
+                isinstance(self.config.strategy, tf.distribute.MirroredStrategy)
                 and not inputs.use_tfrecord
             ):
                 _logger.warning(
@@ -634,4 +632,4 @@ class ModelBase:
     @property
     def is_multi_gpu(self):
         """Returns True if the model's strategy is MirroredStrategy."""
-        return isinstance(self.config.strategy, MirroredStrategy)
+        return isinstance(self.config.strategy, tf.distribute.MirroredStrategy)

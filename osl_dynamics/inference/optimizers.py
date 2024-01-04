@@ -3,10 +3,10 @@
 """
 
 import tensorflow as tf
-from keras.optimizers.optimizer_v2 import optimizer_v2
+from keras.optimizers import Optimizer
 
 
-class ExponentialMovingAverage(optimizer_v2.OptimizerV2):
+class ExponentialMovingAverage(Optimizer):
     """Optimizer for applying a exponential moving average update.
 
     Parameters
@@ -27,7 +27,7 @@ class ExponentialMovingAverage(optimizer_v2.OptimizerV2):
         return var.assign((1.0 - self.decay) * var + self.decay * grad)
 
 
-class MarkovStateModelOptimizer(optimizer_v2.OptimizerV2):
+class MarkovStateModelOptimizer(Optimizer):
     """Optimizer for a model containing a hidden state Markov chain.
 
     Parameters
