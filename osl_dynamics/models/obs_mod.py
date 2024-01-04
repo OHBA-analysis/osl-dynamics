@@ -510,7 +510,8 @@ def get_dev_mag(model, map):
         dev_mag_layer = model.get_layer("covs_dev_mag")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    dev_mag = dev_mag_layer([alpha, beta])
+    n_subjects = alpha.shape[0]
+    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_subjects)[:, None]])
     return dev_mag.numpy()
 
 
