@@ -1023,7 +1023,8 @@ class Data:
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             # Dataset with the time series data and ID
-            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32)
+            array_tracker = array_tracker + i
             data = {"data": array, "array_id": array_tracker}
 
             # Create dataset
@@ -1194,7 +1195,8 @@ class Data:
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
             # Create a dataset with the time series data and ID
-            array_tracker = np.zeros(array.shape[0], dtype=np.float32) + i
+            array_tracker = np.zeros(array.shape[0], dtype=np.float32)
+            array_tracker = array_tracker + i
             data = {"data": array, "array_id": array_tracker}
 
             # Save the dataset

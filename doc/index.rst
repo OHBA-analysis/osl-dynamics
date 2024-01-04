@@ -21,7 +21,7 @@ This package was developed by the Oxford Centre for Human Brain Activity (OHBA) 
 
 If you find this toolbox useful, please cite:
 
-    **Gohil C., et al., 2023. osl-dynamics: A toolbox for modelling fast dynamic brain activity. bioRxiv doi: https://doi.org/10.1101/2023.08.07.549346.**
+    **Gohil C., Huang R., Roberts E., van Es M.W.J., Quinn A.J., Vidaurre D., Woolrich M.W. (2023) osl-dynamics: A toolbox for modelling fast dynamic brain activity. eLife 12:RP91949 https://doi.org/10.7554/eLife.91949.2**
 
 .. |logo1| image:: https://avatars.githubusercontent.com/u/15248840?s=200&v=4
     :width: 125px
