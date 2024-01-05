@@ -1374,6 +1374,53 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
+class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
+    """Layer to calculate the log-likelihood loss assuming a categorical model
+    with Poisson observation model.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(self, n_states, **kwargs):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+
+    def call(self, inputs, **kwargs):
+        x, log_rate, probs, subj_id = inputs
+
+        if subj_id is not None:
+            # Get the mean and covariance for the requested subject
+            subj_id = tf.cast(subj_id, tf.int32)
+            log_rate = tf.gather(log_rate, subj_id)
+
+        # Log-likelihood for each state
+        ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
+        for i in range(self.n_states):
+            poi = tfp.distributions.Poisson(
+                log_rate=tf.gather(log_rate, i, axis=-2),
+                allow_nan_stats=False,
+            )
+            a = poi.log_prob(x)
+            a = tf.reduce_sum(a, axis=-1)
+            ll_loss += probs[:, :, i] * a
+
+        # Sum over time dimension and average over the batch dimension
+        ll_loss = tf.reduce_sum(ll_loss, axis=1)
+        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+
+        # Add the negative log-likelihood to the loss
+        nll_loss = -ll_loss
+        self.add_loss(nll_loss)
+        self.add_metric(nll_loss, name=self.name)
+
+        return tf.expand_dims(nll_loss, axis=-1)
+
+
 class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.
 

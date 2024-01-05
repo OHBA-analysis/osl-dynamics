@@ -31,7 +31,15 @@ def get_observation_model_parameter(model, layer_name):
     obs_parameter : np.ndarray
         The observation model parameter.
     """
-    available_layers = ["means", "covs", "stds", "fcs", "group_means", "group_covs"]
+    available_layers = [
+        "means",
+        "covs",
+        "stds",
+        "fcs",
+        "group_means",
+        "group_covs",
+        "log_rates",
+    ]
     if layer_name not in available_layers:
         raise ValueError(
             f"Layer name {layer_name} not in available layers {available_layers}."
@@ -64,7 +72,15 @@ def set_observation_model_parameter(
         Whether the covariances are diagonal.
         Ignored if :code:`layer_name` is not :code:`"covs"`.
     """
-    available_layers = ["means", "covs", "stds", "fcs", "group_means", "group_covs"]
+    available_layers = [
+        "means",
+        "covs",
+        "stds",
+        "fcs",
+        "group_means",
+        "group_covs",
+        "log_rates",
+    ]
     if layer_name not in available_layers:
         raise ValueError(
             f"Layer name {layer_name} not in available layers {available_layers}."
@@ -80,7 +96,7 @@ def set_observation_model_parameter(
     obs_layer = model.get_layer(layer_name)
     learnable_tensor_layer = obs_layer.layers[0]
 
-    if layer_name not in ["means", "group_means"]:
+    if layer_name not in ["means", "group_means", "log_rates"]:
         obs_parameter = obs_layer.bijector.inverse(obs_parameter)
 
     learnable_tensor_layer.tensor.assign(obs_parameter)
@@ -212,7 +228,7 @@ def set_covariances_regularizer(
     the diagonal of the covariance matrices with :code:`mu=0`,
     :code:`sigma=sqrt(log(2*range))`. Otherwise, an inverse Wishart prior is
     applied to the covariance matrices with :code:`nu=n_channels-1+0.1`,
-    :code:`psi=diag(1/range)`.
+    :code:`psi=diag(1/range)`.x
 
     Parameters
     ----------
