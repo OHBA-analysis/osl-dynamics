@@ -55,9 +55,9 @@ class Config(BaseModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     learn_log_rates : bool
-        Should we make log_rate for each state trainable?
+        Should we make :code:`log_rate` for each state trainable?
     initial_log_rates : np.ndarray
-        Initialisation for state log_rates.
+        Initialisation for state :code:`log_rates`.
 
     initial_trans_prob : np.ndarray
         Initialisation for the transition probability matrix.
@@ -821,12 +821,12 @@ class Model(ModelBase):
         return self.trans_prob
 
     def get_log_rates(self):
-        """Get the state log_rates.
+        """Get the state :code:`log_rates`.
 
         Returns
         -------
         log_rates : np.ndarray
-            State log_rates. Shape is (n_states, n_channels).
+            State :code:`log_rates`. Shape is (n_states, n_channels).
         """
         return obs_mod.get_observation_model_parameter(self.model, "log_rates")
 
@@ -845,14 +845,15 @@ class Model(ModelBase):
         return self.get_log_rates()
 
     def set_log_rates(self, log_rates, update_initializer=True):
-        """Set the state log_rates.
+        """Set the state :code:`log_rates`.
 
         Parameters
         ----------
         log_rates : np.ndarray
-            State log_rates. Shape is (n_states, n_channels).
+            State :code:`log_rates`. Shape is (n_states, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed log_rates when we re-initialize the model?
+            Do we want to use the passed :code:`log_rates` when we
+            re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model,
@@ -869,7 +870,8 @@ class Model(ModelBase):
         rates : np.ndarray
             State rates. Shape is (n_states, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed log_rates when we re-initialize the model?
+            Do we want to use the passed :code:`log_rates` when we
+            re-initialize the model?
         """
         log_rates = np.log(log_rates + epsilon)
         self.set_log_rates(log_rates, update_initializer=update_initializer)
@@ -914,7 +916,7 @@ class Model(ModelBase):
         self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial log_rates based on a random state time course.
+        """Sets the initial :code:`log_rates` based on a random state time course.
 
         Parameters
         ----------
@@ -1130,7 +1132,7 @@ class Model(ModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the transition probabiltity matrix, state log_rates.
+        This includes the transition probabiltity matrix, state :code:`log_rates`.
 
         Returns
         -------
@@ -1212,7 +1214,8 @@ class Model(ModelBase):
             Subject specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
         log_rates : np.ndarray
-            Subject specific log_rates. Shape is (n_subjects, n_modes, n_channels).
+            Subject-specific :code:`log_rates`.
+            Shape is (n_subjects, n_modes, n_channels).
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
@@ -1258,8 +1261,8 @@ class Model(ModelBase):
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
         """Dual estimation to get subject-specific observation model parameters.
 
-        Here, we estimate the state log_rates for individual subjects with
-        the posterior distribution of the states held fixed.
+        Here, we estimate the state :code:`log_rates` for individual subjects
+        with the posterior distribution of the states held fixed.
 
         Parameters
         ----------
@@ -1274,7 +1277,8 @@ class Model(ModelBase):
         Returns
         -------
         log_rates : np.ndarray
-            Subject specific log_rates. Shape is (n_subjects, n_states, n_channels).
+            Subject-specific :code:`log_rates`.
+            Shape is (n_subjects, n_states, n_channels).
         """
         if alpha is None:
             # Get the posterior

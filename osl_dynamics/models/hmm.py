@@ -1,4 +1,4 @@
-"""Hidden Markov Model (HMM).
+"""Hidden Markov Model (HMM) with a Multivariate Normal observation model.
 
 See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
 /hmm.html>`_ for a description of this model.
