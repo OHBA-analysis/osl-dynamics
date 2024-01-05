@@ -11,6 +11,7 @@ from osl_dynamics.models import (
     sedynemo,
     state_dynemo,
     hmm,
+    hmm_poi,
     sehmm,
 )
 from osl_dynamics.utils.misc import NumpyLoader

@@ -55,7 +55,7 @@ class Config(BaseModelConfig):
         Length of sequence passed to the inference network and generative model.
 
     learn_log_rates : bool
-        Should we make the mean vectors for each state trainable?
+        Should we make log_rate for each state trainable?
     initial_log_rates : np.ndarray
         Initialisation for state log_rates.
 
@@ -102,7 +102,6 @@ class Config(BaseModelConfig):
     # Observation model parameters
     learn_log_rates: bool = None
     initial_log_rates: np.ndarray = None
-    log_rates_regularizer: tf.keras.regularizers.Regularizer = None
 
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
@@ -188,9 +187,6 @@ class Model(ModelBase):
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
-        # Set static loss scaling factor
-        self.set_static_loss_scaling_factor(dataset)
-
         # Training curves
         history = {"loss": [], "rho": [], "lr": []}
 
@@ -259,18 +255,6 @@ class Model(ModelBase):
             _range.close()
 
         return history
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -1423,19 +1407,12 @@ def _model_structure(config):
     )
     data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        name="static_loss_scaling_factor"
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
     # Definition of layers
     log_rates_layer = VectorsLayer(
         config.n_states,
         config.n_channels,
         config.learn_log_rates,
         config.initial_log_rates,
-        config.log_rates_regularizer,
         name="log_rates",
     )
     ll_loss_layer = CategoricalPoissonLogLikelihoodLossLayer(
@@ -1443,9 +1420,7 @@ def _model_structure(config):
     )
 
     # Data flow
-    mu = log_rates_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
+    mu = log_rates_layer(data)  # data not used
     ll_loss = ll_loss_layer([data, mu, gamma, None])
 
     return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM-Poisson")
