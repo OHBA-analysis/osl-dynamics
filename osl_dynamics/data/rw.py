@@ -111,7 +111,7 @@ def load_data(
     picks=None,
     reject_by_annotation=None,
     mmap_location=None,
-    mmap_mode="r+",
+    mmap_mode="c",
 ):
     """Loads time series data.
 
@@ -139,7 +139,7 @@ def load_data(
     mmap_location : str, optional
         Filename to save the data as a numpy memory map.
     mmap_mode : str, optional
-        Mode to load memory maps in. Default is :code:`'r+'`.
+        Mode to load memory maps in. Default is :code:`'c'`.
 
     Returns
     -------
