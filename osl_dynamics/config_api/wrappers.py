@@ -949,7 +949,7 @@ def regression_spectra(data, output_dir, kwargs):
         save(f"{spectra_dir}/f.npy", f)
         save(f"{spectra_dir}/psd.npy", psd)
         save(f"{spectra_dir}/coh.npy", coh)
-        save(f"{spectra_dir}/w.npy")
+        save(f"{spectra_dir}/w.npy", w)
     else:
         f, psd, coh = spectra
         save(f"{spectra_dir}/f.npy", f)
