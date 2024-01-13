@@ -264,19 +264,19 @@ class SampleGammaDistributionLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
-        alpha, beta, subj_id = inputs
-        # alpha.shape = (n_subjects, n_states, 1)
-        # beta.shape = (n_subjects, n_states, 1)
-        # subj_id.shape = (None, sequence_length)
+        alpha, beta, array_id = inputs
+        # alpha.shape = (n_arrays, n_states, 1)
+        # beta.shape = (n_arrays, n_states, 1)
+        # array_id.shape = (None, sequence_length)
 
         # output.shape = (None, n_states, 1)
 
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
-        subj_id = subj_id[:, 0]  # shape = (None,)
+        array_id = array_id[:, 0]  # shape = (None,)
 
-        alpha = tf.gather(alpha, subj_id, axis=0)  # shape = (None, n_states, 1)
-        beta = tf.gather(beta, subj_id, axis=0)  # shape = (None, n_states, 1)
+        alpha = tf.gather(alpha, array_id, axis=0)  # shape = (None, n_states, 1)
+        beta = tf.gather(beta, array_id, axis=0)  # shape = (None, n_states, 1)
         if training:
             output = alpha / beta
             if self.annealing_factor > 0:
@@ -1340,16 +1340,16 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
-        x, mu, sigma, probs, subj_id = inputs
+        x, mu, sigma, probs, array_id = inputs
 
         # Add a small error for numerical stability
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
-        if subj_id is not None:
-            # Get the mean and covariance for the requested subject
-            subj_id = tf.cast(subj_id, tf.int32)
-            mu = tf.gather(mu, subj_id)
-            sigma = tf.gather(sigma, subj_id)
+        if array_id is not None:
+            # Get the mean and covariance for the requested array
+            array_id = tf.cast(array_id, tf.int32)
+            mu = tf.gather(mu, array_id)
+            sigma = tf.gather(sigma, array_id)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1391,12 +1391,12 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
         self.n_states = n_states
 
     def call(self, inputs, **kwargs):
-        x, log_rate, probs, subj_id = inputs
+        x, log_rate, probs, array_id = inputs
 
-        if subj_id is not None:
-            # Get the mean and covariance for the requested subject
-            subj_id = tf.cast(subj_id, tf.int32)
-            log_rate = tf.gather(log_rate, subj_id)
+        if array_id is not None:
+            # Get the mean and covariance for the requested array
+            array_id = tf.cast(array_id, tf.int32)
+            log_rate = tf.gather(log_rate, array_id)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1424,38 +1424,38 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
 class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.
 
-    The concatenated embeddings are obtained by concatenating subject embeddings
-    and mode spatial map embeddings.
+    The concatenated embeddings are obtained by concatenating embeddings
+    and spatial embeddings.
     """
 
     def call(self, inputs):
-        subject_embeddings, mode_embeddings = inputs
-        n_subjects, subject_embedding_dim = subject_embeddings.shape
-        n_modes, mode_embedding_dim = mode_embeddings.shape
+        embeddings, spatial_embeddings = inputs
+        n_arrays, embeddings_dim = embeddings.shape
+        n_states, spatial_embeddings_dim = spatial_embeddings.shape
 
         # Match dimensions for concatenation
-        subject_embeddings = tf.broadcast_to(
-            tf.expand_dims(subject_embeddings, axis=1),
-            [n_subjects, n_modes, subject_embedding_dim],
+        embeddings = tf.broadcast_to(
+            tf.expand_dims(embeddings, axis=1),
+            [n_arrays, n_states, embeddings_dim],
         )
-        mode_embeddings = tf.broadcast_to(
-            tf.expand_dims(mode_embeddings, axis=0),
-            [n_subjects, n_modes, mode_embedding_dim],
+        spatial_embeddings = tf.broadcast_to(
+            tf.expand_dims(spatial_embeddings, axis=0),
+            [n_arrays, n_states, spatial_embeddings_dim],
         )
 
         # Concatenate the embeddings
         concat_embeddings = tf.concat(
-            [subject_embeddings, mode_embeddings],
+            [embeddings, spatial_embeddings],
             axis=-1,
         )
 
         return concat_embeddings
 
 
-class SubjectMapLayer(layers.Layer):
-    """Layer for getting the subject specific maps.
+class ArrayMapLayer(layers.Layer):
+    """Layer for getting the array specific maps.
 
-    This layer adds subject specific deviations to the group spatial maps.
+    This layer adds deviations to the group spatial maps.
 
     Parameters
     ----------
@@ -1487,24 +1487,24 @@ class SubjectMapLayer(layers.Layer):
 
         # Match dimensions for addition
         group_map = tf.expand_dims(group_map, axis=0)
-        subject_map = tf.add(group_map, dev)
-        subject_map = self.bijector(subject_map)
+        array_map = tf.add(group_map, dev)
+        array_map = self.bijector(array_map)
 
         if self.which_map == "covariances":
-            subject_map = add_epsilon(subject_map, self.epsilon, diag=True)
+            array_map = add_epsilon(array_map, self.epsilon, diag=True)
 
-        return subject_map
+        return array_map
 
 
-class MixSubjectSpecificParametersLayer(layers.Layer):
-    r"""Class for mixing means and covariances for the subject embedding model.
+class MixArraySpecificParametersLayer(layers.Layer):
+    r"""Class for mixing means and covariances.
 
     The mixture is calculated as
 
     - :math:`m_t = \displaystyle\sum_j \alpha_{jt} \mu_j^{s_t}`
     - :math:`C_t = \displaystyle\sum_j \alpha_{jt} D_j^{s_t}`
 
-    where :math:`s_t` is the subject at time :math:`t`.
+    where :math:`s_t` is the array at time :math:`t`.
     """
 
     def call(self, inputs):

@@ -1,4 +1,4 @@
-"""Subject Embedding HMM.
+"""HIVE (HMM with Integrated Variability Estimation).
 
 """
 
@@ -8,14 +8,14 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import layers, initializers
+from tensorflow.keras import layers
 
 from osl_dynamics.inference.layers import (
     LearnableTensorLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
     ConcatEmbeddingsLayer,
-    SubjectMapLayer,
+    ArrayMapLayer,
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
@@ -44,7 +44,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 @dataclass
 class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
-    """Settings for Subject Embedding HMM.
+    """Settings for HIVE.
 
     Parameters
     ----------
@@ -65,18 +65,18 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     initial_covariances : np.ndarray
         Initialisation for group level state covariances.
     covariances_epsilon : float
-        Error added to mode covariances for numerical stability.
+        Error added to state covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for group mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for group covariance matrices.
 
-    n_subjects : int
-        Number of subjects.
-    subject_embeddings_dim : int
-        Number of dimensions for subject embeddings.
-    mode_embeddings_dim : int
-        Number of dimensions for mode embeddings.
+    n_arrays : int
+        Number of arrays whose observation model parameters can vary.
+    embeddings_dim : int
+        Number of dimensions for embeddings dimension.
+    spatial_embeddings_dim : int
+        Number of dimensions for spatial embeddings.
 
     dev_n_layers : int
         Number of layers for the MLP for deviations.
@@ -142,12 +142,12 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Number of epochs to perform KL annealing.
     """
 
-    model_name: str = "SE-HMM"
+    model_name: str = "HIVE"
 
-    # Parameters specific to subject embedding model
-    n_subjects: int = None
-    subject_embeddings_dim: int = None
-    mode_embeddings_dim: int = None
+    # Parameters specific to embedding model
+    n_arrays: int = None
+    embeddings_dim: int = None
+    spatial_embeddings_dim: int = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -178,7 +178,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         self.validate_trans_prob_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
-        self.validate_subject_embedding_parameters()
+        self.validate_embedding_parameters()
         self.validate_kl_annealing_parameters()
 
     def validate_observation_model_parameters(self):
@@ -194,14 +194,14 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         if self.initial_dev is None:
             self.initial_dev = dict()
 
-    def validate_subject_embedding_parameters(self):
+    def validate_embedding_parameters(self):
         if (
-            self.n_subjects is None
-            or self.subject_embeddings_dim is None
-            or self.mode_embeddings_dim is None
+            self.n_arrays is None
+            or self.embeddings_dim is None
+            or self.spatial_embeddings_dim is None
         ):
             raise ValueError(
-                "n_subjects, subject_embeddings_dim and mode_embeddings_dim must be passed."
+                "n_arrays, embeddings_dim and spatial_embeddings_dim must be passed."
             )
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
@@ -241,11 +241,11 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
 
 
 class Model(MarkovStateInferenceModelBase):
-    """Subject Embedding HMM class.
+    """HIVE model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.sehmm.Config
+    config : osl_dynamics.models.hive.Config
     """
 
     config_type = Config
@@ -313,12 +313,12 @@ class Model(MarkovStateInferenceModelBase):
             kl_loss_layer.annealing_factor.assign(0.0)
 
     def get_group_means(self):
-        """Get the group level mode means.
+        """Get the group level state means.
 
         Returns
         -------
         means : np.ndarray
-            Group means. Shape is (n_modes, n_channels).
+            Group means. Shape is (n_states, n_channels).
         """
         return obs_mod.get_observation_model_parameter(
             self.model,
@@ -330,12 +330,12 @@ class Model(MarkovStateInferenceModelBase):
         return self.get_group_means()
 
     def get_group_covariances(self):
-        """Get the group level mode covariances.
+        """Get the group level state covariances.
 
         Returns
         -------
         covariances : np.ndarray
-            Group covariances. Shape is (n_modes, n_channels, n_channels).
+            Group covariances. Shape is (n_states, n_channels, n_channels).
         """
         return obs_mod.get_observation_model_parameter(self.model, "group_covs")
 
@@ -344,7 +344,7 @@ class Model(MarkovStateInferenceModelBase):
         return self.get_group_covariances()
 
     def get_group_means_covariances(self):
-        """Get the group level mode means and covariances.
+        """Get the group level state means and covariances.
 
         This is a wrapper for :code:`get_group_means` and
         :code:`get_group_covariances`.
@@ -352,9 +352,9 @@ class Model(MarkovStateInferenceModelBase):
         Returns
         -------
         means : np.ndarray
-            Group means. Shape is (n_modes, n_channels).
+            Group means. Shape is (n_states, n_channels).
         covariances : np.ndarray
-            Group covariances. Shape is (n_modes, n_channels, n_channels).
+            Group covariances. Shape is (n_states, n_channels, n_channels).
         """
         return self.get_group_means(), self.get_group_covariances()
 
@@ -370,56 +370,56 @@ class Model(MarkovStateInferenceModelBase):
         """Wrapper for :code:`get_group_observation_model_parameters`."""
         return self.get_group_observation_model_parameters()
 
-    def get_subject_means_covariances(
+    def get_array_means_covariances(
         self,
-        subject_embeddings=None,
+        embeddings=None,
         n_neighbours=2,
     ):
-        """Get the subject means and covariances.
+        """Get the array means and covariances.
 
         Parameters
         ----------
-        subject_embeddings : np.ndarray, optional
-            Input embedding vectors for subjects.
-            Shape is (n_subjects, subject_embeddings_dim).
+        embeddings : np.ndarray, optional
+            Input embedding vectors.
+            Shape is (n_arrays, embeddings_dim).
         n_neighbours : int, optional
             Number of nearest neighbours. Ignored if
-            :code:`subject_embedding=None`.
+            :code:`embeddings=None`.
 
         Returns
         -------
         means : np.ndarray
-            Subject means. Shape is (n_subjects, n_states, n_channels).
+            Array means. Shape is (n_arrays, n_states, n_channels).
         covs : np.ndarray
-            Subject covariances.
-            Shape is (n_subjects, n_states, n_channels, n_channels).
+            Array covariances.
+            Shape is (n_arrays, n_states, n_channels, n_channels).
         """
-        return obs_mod.get_subject_means_covariances(
+        return obs_mod.get_array_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
-            subject_embeddings,
+            embeddings,
             n_neighbours,
         )
 
-    def get_subject_embeddings(self):
-        """Get the subject embedding vectors.
+    def get_embeddings(self):
+        """Get the embedding vectors.
 
         Returns
         -------
-        subject_embeddings : np.ndarray
-            Embedding vectors for subjects.
-            Shape is (n_subjects, subject_embedding_dim).
+        embeddings : np.ndarray
+            Embedding vectors.
+            Shape is (n_arrays, embeddings_dim).
         """
-        return obs_mod.get_subject_embeddings(self.model)
+        return obs_mod.get_embeddings(self.model)
 
     def set_group_means(self, group_means, update_initializer=True):
-        """Set the group means of each mode.
+        """Set the group means of each state.
 
         Parameters
         ----------
         group_means : np.ndarray
-            Group level mode means. Shape is (n_modes, n_channels).
+            Group level state means. Shape is (n_states, n_channels).
         update_initializer : bool, optional
             Do we want to use the passed group means when we re-initialize
             the model?
@@ -432,13 +432,13 @@ class Model(MarkovStateInferenceModelBase):
         )
 
     def set_group_covariances(self, group_covariances, update_initializer=True):
-        """Set the group covariances of each mode.
+        """Set the group covariances of each state.
 
         Parameters
         ----------
         group_covariances : np.ndarray
-            Group level mode covariances.
-            Shape is (n_modes, n_channels, n_channels).
+            Group level state covariances.
+            Shape is (n_states, n_channels, n_channels).
         update_initializer : bool, optional
             Do we want to use the passed group covariances when we re-initialize
             the model?
@@ -549,48 +549,19 @@ class Model(MarkovStateInferenceModelBase):
         )
         self.reset()
 
-    def set_subject_embeddings_initializer(self, subject_embeddings):
-        """Set the subject embeddings initializer.
+    def set_embeddings_initializer(self, embeddings):
+        """Set the embeddings initializer.
 
         Parameters
         ----------
-        subject_embeddings : np.ndarray
-            Subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
+        embeddings : np.ndarray
+            The embeddings. Shape is (n_arrays, embeddings_dim).
         """
-        obs_mod.set_subject_embeddings_initializer(
+        obs_mod.set_embeddings_initializer(
             self.model,
-            subject_embeddings,
+            embeddings,
         )
         self.reset()
-
-    def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model.
-
-        This includes the transition probability matrix, state means and
-        covariances (group and subject deviation) and subject embeddings.
-
-        Returns
-        -------
-        n_params : int
-            Number of parameters in the generative model.
-        """
-        n_params = 0
-        if self.config.learn_trans_prob:
-            n_params += self.config.n_states * (self.config.n_states - 1)
-
-        for var in self.trainable_variables:
-            var_name = var.name
-            if (
-                "mod_" in var_name
-                or "alpha" in var_name
-                or "group_means" in var_name
-                or "group_covs" in var_name
-                or "_embeddings" in var_name
-                or "dev_map" in var_name
-            ):
-                n_params += np.prod(var.shape)
-
-        return int(n_params)
 
 
 def _model_structure(config):
@@ -615,12 +586,12 @@ def _model_structure(config):
     )
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
-    # Subject embedding layers
-    subjects_layer = TFRangeLayer(config.n_subjects, name="subjects")
-    subject_embeddings_layer = layers.Embedding(
-        config.n_subjects,
-        config.subject_embeddings_dim,
-        name="subject_embeddings",
+    # Embedding layers
+    arrays_layer = TFRangeLayer(config.n_arrays, name="arrays")
+    embeddings_layer = layers.Embedding(
+        config.n_arrays,
+        config.embeddings_dim,
+        name="embeddings",
     )
 
     # Group level observation model parameters
@@ -642,8 +613,8 @@ def _model_structure(config):
         name="group_covs",
     )
 
-    subjects = subjects_layer(data)
-    subject_embeddings = subject_embeddings_layer(subjects)
+    arrays = arrays_layer(data)
+    embeddings = embeddings_layer(arrays)
 
     group_mu = group_means_layer(
         data, static_loss_scaling_factor=static_loss_scaling_factor
@@ -657,9 +628,9 @@ def _model_structure(config):
 
     # Layer definitions
     if config.learn_means:
-        means_mode_embeddings_layer = layers.Dense(
-            config.mode_embeddings_dim,
-            name="means_mode_embeddings",
+        means_spatial_embeddings_layer = layers.Dense(
+            config.spatial_embeddings_dim,
+            name="means_spatial_embeddings",
         )
         means_concat_embeddings_layer = ConcatEmbeddingsLayer(
             name="means_concat_embeddings",
@@ -683,7 +654,7 @@ def _model_structure(config):
         )
 
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
-            shape=(config.n_subjects, config.n_states, 1),
+            shape=(config.n_arrays, config.n_states, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("means_alpha", 0.0)),
@@ -695,7 +666,7 @@ def _model_structure(config):
             "softplus", name="means_dev_mag_inf_alpha"
         )
         means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
-            shape=(config.n_subjects, config.n_states, 1),
+            shape=(config.n_arrays, config.n_states, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 5.0)),
@@ -712,12 +683,12 @@ def _model_structure(config):
 
         means_dev_layer = layers.Multiply(name="means_dev")
 
-        # Data flow to get the subject specific deviations of means
+        # Data flow to get mean deviations
 
         # Get the concatenated embeddings
-        means_mode_embeddings = means_mode_embeddings_layer(group_mu)
+        means_spatial_embeddings = means_spatial_embeddings_layer(group_mu)
         means_concat_embeddings = means_concat_embeddings_layer(
-            [subject_embeddings, means_mode_embeddings]
+            [embeddings, means_spatial_embeddings]
         )
 
         # Get the mean deviation maps (no global magnitude information)
@@ -760,9 +731,9 @@ def _model_structure(config):
 
     # Layer definitions
     if config.learn_covariances:
-        covs_mode_embeddings_layer = layers.Dense(
-            config.mode_embeddings_dim,
-            name="covs_mode_embeddings",
+        covs_spatial_embeddings_layer = layers.Dense(
+            config.spatial_embeddings_dim,
+            name="covs_spatial_embeddings",
         )
         covs_concat_embeddings_layer = ConcatEmbeddingsLayer(
             name="covs_concat_embeddings",
@@ -787,7 +758,7 @@ def _model_structure(config):
         )
 
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
-            shape=(config.n_subjects, config.n_states, 1),
+            shape=(config.n_arrays, config.n_states, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("covs_alpha", 0.0)),
@@ -799,7 +770,7 @@ def _model_structure(config):
             "softplus", name="covs_dev_mag_inf_alpha"
         )
         covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
-            shape=(config.n_subjects, config.n_states, 1),
+            shape=(config.n_arrays, config.n_states, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 5.0)),
@@ -815,14 +786,14 @@ def _model_structure(config):
         )
         covs_dev_layer = layers.Multiply(name="covs_dev")
 
-        # Data flow to get subject specific deviations of covariances
+        # Data flow to get covariances deviations
 
         # Get the concatenated embeddings
-        covs_mode_embeddings = covs_mode_embeddings_layer(
+        covs_spatial_embeddings = covs_spatial_embeddings_layer(
             InverseCholeskyLayer(config.covariances_epsilon)(group_D)
         )
         covs_concat_embeddings = covs_concat_embeddings_layer(
-            [subject_embeddings, covs_mode_embeddings]
+            [embeddings, covs_spatial_embeddings]
         )
 
         # Get the covariance deviation maps (no global magnitude information)
@@ -871,24 +842,23 @@ def _model_structure(config):
     # Add deviations to group level parameters
 
     # Layer definitions
-    subject_means_layer = SubjectMapLayer(
-        "means", config.covariances_epsilon, name="subject_means"
+    array_means_layer = ArrayMapLayer(
+        "means", config.covariances_epsilon, name="array_means"
     )
-    subject_covs_layer = SubjectMapLayer(
-        "covariances", config.covariances_epsilon, name="subject_covs"
+    array_covs_layer = ArrayMapLayer(
+        "covariances", config.covariances_epsilon, name="array_covs"
     )
 
     # Data flow
-    mu = subject_means_layer(
+    mu = array_means_layer(
         [group_mu, means_dev]
     )  # shape = (None, n_states, n_channels)
-    D = subject_covs_layer(
+    D = array_covs_layer(
         [group_D, covs_dev]
     )  # shape = (None, n_states, n_channels, n_channels)
 
     # -----------------------------------
-    # Mix the subject specific paraemters
-    # and get the conditional likelihood
+    # Get the log likelihood
 
     # Layer definitions
     ll_layer = SeparateLogLikelihoodLayer(
@@ -985,5 +955,5 @@ def _model_structure(config):
     return tf.keras.Model(
         inputs=[data, array_id],
         outputs=[ll_loss, kl_loss, gamma, xi],
-        name="SE-HMM",
+        name="HIVE",
     )

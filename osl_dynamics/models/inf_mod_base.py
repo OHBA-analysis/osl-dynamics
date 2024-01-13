@@ -426,9 +426,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            subject.
+            array.
         concatenate : bool, optional
-            Should we concatenate theta for each subject?
+            Should we concatenate theta for each array?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`theta` and
@@ -439,7 +439,7 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         theta : list or np.ndarray
-            Mode mixing logits with shape (n_subjects, n_samples, n_modes)
+            Mode mixing logits with shape (n_arrays, n_samples, n_modes)
             or (n_samples, n_modes).
         fc_theta : list or np.ndarray
             Mode mixing logits for FC.
@@ -501,9 +501,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            subject.
+            array.
         concatenate : bool, optional
-            Should we concatenate theta for each subject?
+            Should we concatenate theta for each array?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`theta` and
@@ -514,10 +514,10 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         mean_theta : list or np.ndarray
-            Mode mixing logits for mean with shape (n_subjects, n_samples,
+            Mode mixing logits for mean with shape (n_arrays, n_samples,
             n_modes) or (n_samples, n_modes).
         fc_theta : list or np.ndarray
-            Mode mixing logits for FC with shape (n_subjects, n_samples,
+            Mode mixing logits for FC with shape (n_arrays, n_samples,
             n_modes) or (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -581,9 +581,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            subject.
+            array.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each array?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -594,7 +594,7 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Mode mixing coefficients with shape (n_subjects, n_samples,
+            Mode mixing coefficients with shape (n_arrays, n_samples,
             n_modes) or (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -655,9 +655,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data. This can be a list of datasets, one for each
-            subject.
+            array.
         concatenate : bool, optional
-            Should we concatenate alpha/gamma for each subject?
+            Should we concatenate alpha/gamma for each array?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha`/
@@ -668,10 +668,10 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            Alpha time course with shape (n_arrays, n_samples, n_modes) or
             (n_samples, n_modes).
         gamma : list or np.ndarray
-            Gamma time course with shape (n_subjects, n_samples, n_modes) or
+            Gamma time course with shape (n_arrays, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -930,7 +930,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             Dictionary with labels for each prediction.
         """
         predictions = self.model.predict(*args, **kwargs)
-        if self.config.model_name == "SE-HMM":
+        if self.config.model_name == "HIVE":
             names = ["ll_loss", "kl_loss", "gamma", "xi"]
         else:
             names = ["ll_loss", "gamma", "xi"]
@@ -945,9 +945,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each subject.
+            each array.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each array?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -958,7 +958,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
+            State probabilities with shape (n_arrays, n_samples, n_states)
             or (n_samples, n_states).
         """
         if self.is_multi_gpu:

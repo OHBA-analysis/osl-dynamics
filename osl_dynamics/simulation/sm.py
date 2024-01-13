@@ -5,7 +5,7 @@
 import numpy as np
 from scipy.special import softmax
 
-from osl_dynamics.simulation.mvn import MVN, MSubj_MVN
+from osl_dynamics.simulation.mvn import MVN, MArr_MVN
 from osl_dynamics.simulation.base import Simulation
 
 
@@ -179,14 +179,14 @@ class MixedSine_MVN(Simulation):
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
-class MSubj_MixedSine_MVN(Simulation):
+class MArr_MixedSine_MVN(Simulation):
     """Simulates sinusoidal alphas with a multivariable normal observation model
-    for each subject.
+    for each array.
 
     Parameters
     ----------
     n_samples : int
-        Number of samples per subject to draw from the model.
+        Number of samples per array to draw from the model.
     relative_activation : np.ndarray or list
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
@@ -198,13 +198,13 @@ class MSubj_MixedSine_MVN(Simulation):
         Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
-    subject_means : np.ndarray or str
-        Subject mean vector for each mode, shape should be (n_subjects, n_modes,
+    array_means : np.ndarray or str
+        Array mean vector for each mode, shape should be (n_arrays, n_modes,
         n_channels). Either a numpy array or :code:`'zero'` or
         :code:`'random'`.
-    subject_covariances : np.ndarray or str
-        Subject covariance matrix for each mode, shape should be
-        (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
+    array_covariances : np.ndarray or str
+        Array covariance matrix for each mode, shape should be
+        (n_arrays, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
@@ -212,16 +212,16 @@ class MSubj_MixedSine_MVN(Simulation):
         Number of modes.
     n_channels : int, optional
         Number of channels.
-    n_subjects : int, optional
-        Number of subjects.
-    n_subject_embedding_dim : int, optional
-        Number of dimensions for subject embedding.
-    n_mode_embedding_dim : int, optional
-        Number of dimensions for mode embedding.
-    subject_embedding_scale : float, optional
-        Scale of variability between subject observation parameters.
+    n_arrays : int, optional
+        Number of arrays.
+    embeddings_dim : int, optional
+        Number of dimensions for embedding vectors.
+    spatial_embeddings_dim : int, optional
+        Number of dimensions for spatial embedding vectors.
+    embeddings_scale : float, optional
+        Scale of variability between array observation parameters.
     n_groups : int, optional
-        Number of groups of subjects when subject means or covariances are
+        Number of groups of arrays when array means or covariances are
         :code:`'random'`.
     between_group_scale : float, optional
         Scale of variability between groups.
@@ -238,31 +238,31 @@ class MSubj_MixedSine_MVN(Simulation):
         amplitudes,
         frequencies,
         sampling_frequency,
-        subject_means,
-        subject_covariances,
+        array_means,
+        array_covariances,
         n_covariances_act=1,
         n_modes=None,
         n_channels=None,
-        n_subjects=None,
-        n_subject_embedding_dim=None,
-        n_mode_embedding_dim=None,
-        subject_embedding_scale=None,
+        n_arrays=None,
+        embeddings_dim=None,
+        spatial_embeddings_dim=None,
+        embeddings_scale=None,
         n_groups=None,
         between_group_scale=None,
         observation_error=0.0,
         random_seed=None,
     ):
         # Observation model
-        self.obs_mod = MSubj_MVN(
-            subject_means=subject_means,
-            subject_covariances=subject_covariances,
+        self.obs_mod = MArr_MVN(
+            array_means=array_means,
+            array_covariances=array_covariances,
             n_covariances_act=n_covariances_act,
             n_modes=n_modes,
             n_channels=n_channels,
-            n_subjects=n_subjects,
-            n_subject_embedding_dim=n_subject_embedding_dim,
-            n_mode_embedding_dim=n_mode_embedding_dim,
-            subject_embedding_scale=subject_embedding_scale,
+            n_arrays=n_arrays,
+            embeddings_dim=embeddings_dim,
+            spatial_embeddings_dim=spatial_embeddings_dim,
+            embeddings_scale=embeddings_scale,
             n_groups=n_groups,
             between_group_scale=between_group_scale,
             observation_error=observation_error,
@@ -271,15 +271,15 @@ class MSubj_MixedSine_MVN(Simulation):
 
         self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
-        self.n_subjecs = self.obs_mod.n_subjects
+        self.n_arrays = self.obs_mod.n_arrays
 
         super().__init__(n_samples=n_samples)
 
-        # Simulate mode time courses for all subjects
+        # Simulate mode time courses for all arrays
         self.mode_time_course = []
         self.sm = []
 
-        for _ in range(self.n_subjects):
+        for _ in range(self.n_arrays):
             sm = MixedSine(
                 n_modes=self.n_modes,
                 relative_activation=relative_activation,
@@ -293,9 +293,7 @@ class MSubj_MixedSine_MVN(Simulation):
         self.mode_time_course = np.array(self.mode_time_course)
 
         # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_subject_data(
-            self.mode_time_course
-        )
+        self.time_series = self.obs_mod.simulate_multi_array_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):
@@ -307,10 +305,10 @@ class MSubj_MixedSine_MVN(Simulation):
         means = np.mean(self.time_series, axis=1).astype(np.float64)
         standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
-        self.obs_mod.subject_means = (
-            self.obs_mod.subject_means - means[:, None, :]
+        self.obs_mod.array_means = (
+            self.obs_mod.array_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
-        self.obs_mod.subject_covariances /= np.expand_dims(
+        self.obs_mod.array_covariances /= np.expand_dims(
             standard_deviations[:, :, None] @ standard_deviations[:, None, :],
             axis=1,
         )

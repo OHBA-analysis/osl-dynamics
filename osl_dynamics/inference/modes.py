@@ -26,7 +26,7 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     ----------
     alpha : list or np.ndarray
         Mode mixing factors or state probabilities. Shape must be
-        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
+        (n_arrays, n_samples, n_modes) or (n_samples, n_modes).
     concatenate : bool, optional
         If :code:`alpha` is a :code:`list`, should we concatenate the
         time courses?
@@ -37,7 +37,7 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     Returns
     -------
     argmax_tcs : list or np.ndarray
-        Argmax time courses. Shape is (n_subjects, n_samples, n_modes)
+        Argmax time courses. Shape is (n_arrays, n_samples, n_modes)
         or (n_samples, n_modes).
     """
     if isinstance(alpha, list):
@@ -82,7 +82,7 @@ def gmm_time_courses(
     Parameters
     ----------
     alpha : list of np.ndarray or np.ndarray
-        Mode time courses. Shape must be (n_subjects, n_samples, n_modes) or
+        Mode time courses. Shape must be (n_arrays, n_samples, n_modes) or
         (n_samples, n_modes).
     logit_transform : bool, optional
         Should we logit transform the mode time course?
@@ -109,7 +109,7 @@ def gmm_time_courses(
     -------
     gmm_tcs : list of np.ndarray or np.ndarray
         GMM time courses with binary entries. Shape is
-        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
+        (n_arrays, n_samples, n_modes) or (n_samples, n_modes).
     """
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -117,12 +117,12 @@ def gmm_time_courses(
     if not isinstance(alpha, list):
         alpha = [alpha]
 
-    n_subjects = len(alpha)
+    n_arrays = len(alpha)
     n_modes = alpha[0].shape[1]
 
     gmm_tcs = []
     gmm_metrics = []
-    for sub in trange(n_subjects, desc="Fitting GMMs"):
+    for sub in trange(n_arrays, desc="Fitting GMMs"):
         # Initialise an array to hold the gmm thresholded time course
         gmm_tc = np.empty(alpha[sub].shape, dtype=int)
         gmm_metric = []
@@ -148,14 +148,14 @@ def gmm_time_courses(
             gmm_tc[:, mode] = a > threshold
             gmm_metric.append(metrics)
 
-        # Add to list containing subject-specific time courses and
+        # Add to list containing array-specific time courses and
         # component metrics
         gmm_tcs.append(gmm_tc)
         gmm_metrics.append(gmm_metric)
 
-    # Visualise subject-specific time courses in one plot per mode
+    # Visualise array-specific time courses in one plot per mode
     avg_threshold = [
-        np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_subjects)])
+        np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_arrays)])
         for m in range(n_modes)
     ]
     if filename:
@@ -170,9 +170,9 @@ def gmm_time_courses(
             else:
                 plot_filename = None
 
-            # Subject-specific GMM plots per mode
+            # array-specific GMM plots per mode
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 4))
-            for sub in range(n_subjects):
+            for sub in range(n_arrays):
                 metric = gmm_metrics[sub][mode]
                 plotting.plot_gmm(
                     metric["data"],
@@ -538,7 +538,7 @@ def reweight_alphas(alpha, covs):
     Parameters
     ----------
     alpha : list of np.ndarray or np.ndarray
-        Raw mixing coefficients. Shape must be (n_subjects, n_samples, n_modes)
+        Raw mixing coefficients. Shape must be (n_arrays, n_samples, n_modes)
         or (n_samples, n_modes).
     covs : np.ndarray
         Mode covariances. Shape must be (n_modes, n_channels, n_channels).
@@ -570,7 +570,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     Parameters
     ----------
     alpha : list of list of np.ndarray or list of np.ndarray
-        State probabilities. Shape must be (n_runs, n_subjects, n_samples,
+        State probabilities. Shape must be (n_runs, n_arrays, n_samples,
         n_states) or (n_runs, n_samples, n_states).
     n_clusters : int, optional
         Number of clusters to fit. Defaults to the largest number of states
@@ -581,7 +581,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     Returns
     -------
     average_alpha : list of np.ndarray or np.ndarray
-        State probabilities averaged over runs. Shape is (n_subjects, n_states).
+        State probabilities averaged over runs. Shape is (n_arrays, n_states).
     cluster_info : dict
         Clustering info. Only returned if :code:`return_cluster_info=True`.
         This is a dictionary with keys :code:`'correlation'`,
@@ -600,15 +600,15 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     if isinstance(alpha[0], np.ndarray):
         alpha = [[a] for a in alpha]
 
-    # Number of runs and length of each subject's data
+    # Number of runs and length of each array's data
     n_runs = len(alpha)
-    n_subject_samples = [a.shape[0] for a in alpha[0]]
+    n_array_samples = [a.shape[0] for a in alpha[0]]
 
     # Use the largest number of states as the number of clusters to find
     if n_clusters is None:
         n_clusters = max([a.shape[-1] for a in alpha[0]])
 
-    # Concatenate over subjects, gives (n_runs, n_samples, n_states) array
+    # Concatenate over arrays, gives (n_runs, n_samples, n_states) array
     alpha = [np.concatenate(a, axis=0) for a in alpha]
 
     # Turn into a (n_runs * n_states, n_samples) array
@@ -635,8 +635,8 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
         average_alpha.append(a)
     average_alpha = np.array(average_alpha, dtype=np.float32).T
 
-    # Split average alphas back into subject-specific time courses
-    average_alpha = np.split(average_alpha, np.cumsum(n_subject_samples[:-1]))
+    # Split average alphas back into array-specific time courses
+    average_alpha = np.split(average_alpha, np.cumsum(n_array_samples[:-1]))
 
     if return_cluster_info:
         # Create a dictionary containing the clustering info

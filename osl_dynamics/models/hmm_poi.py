@@ -439,7 +439,7 @@ class Model(ModelBase):
         Parameters
         ----------
         B : np.ndarray
-            Probability of individual data points, under observation model for
+            Probability of array data points, under observation model for
             each state. Shape is (n_states, n_samples).
         Pi_0 : np.ndarray
             Initial state probabilities. Shape is (n_states,).
@@ -1066,9 +1066,9 @@ class Model(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each subject.
+            each array.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each array?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -1079,7 +1079,7 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
+            State probabilities with shape (n_arrays, n_samples, n_states)
             or (n_samples, n_states).
         """
         if remove_edge_effects:
@@ -1186,13 +1186,13 @@ class Model(ModelBase):
         )
         return bic
 
-    def subject_fine_tuning(
+    def array_fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Fine tuning the model for each subject.
+        """Fine tuning the model for each array.
 
         Here, we estimate the posterior distribution (state probabilities)
-        and observation model using the data from a single subject with the
+        and observation model using the data from a single array with the
         group-level transition probability matrix held fixed.
 
         Parameters
@@ -1211,11 +1211,11 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Subject specific mixing coefficients.
-            Each element has shape (n_samples, n_modes).
+            Array specific mixing coefficients.
+            Each element has shape (n_samples, n_states).
         log_rates : np.ndarray
-            Subject-specific :code:`log_rates`.
-            Shape is (n_subjects, n_modes, n_channels).
+            Array specific :code:`log_rates`.
+            Shape is (n_arrays, n_states, n_channels).
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
@@ -1232,13 +1232,13 @@ class Model(ModelBase):
         # Reset the optimiser
         self.compile()
 
-        # Fine tune the model for each subject
+        # Fine tune the model for each array
         alpha = []
         log_rates = []
         with set_logging_level(_logger, logging.WARNING):
-            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
-                # Train on this subject
-                with training_data.set_keep(subject):
+            for i in trange(training_data.n_arrays, desc="Array fine tuning"):
+                # Train on this array
+                with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
                     a = self.get_alpha(training_data, concatenate=True)
 
@@ -1259,9 +1259,9 @@ class Model(ModelBase):
         return alpha, np.array(log_rates)
 
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
-        """Dual estimation to get subject-specific observation model parameters.
+        """Dual estimation to get array-specific observation model parameters.
 
-        Here, we estimate the state :code:`log_rates` for individual subjects
+        Here, we estimate the state :code:`log_rates` for arrays
         with the posterior distribution of the states held fixed.
 
         Parameters
@@ -1270,15 +1270,15 @@ class Model(ModelBase):
             Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
-            (n_subjects, n_samples, n_states).
+            (n_arrays, n_samples, n_states).
         n_jobs : int, optional
             Number of jobs to run in parallel.
 
         Returns
         -------
         log_rates : np.ndarray
-            Subject-specific :code:`log_rates`.
-            Shape is (n_subjects, n_states, n_channels).
+            Array-specific :code:`log_rates`.
+            Shape is (n_arrays, n_states, n_channels).
         """
         if alpha is None:
             # Get the posterior
@@ -1288,7 +1288,7 @@ class Model(ModelBase):
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
-        # Get the subject-specific data
+        # Get the array-specific data
         data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
@@ -1300,19 +1300,19 @@ class Model(ModelBase):
         n_states = self.config.n_states
         n_channels = self.config.n_channels
 
-        # Helper function for dual estimation for a single subject
+        # Helper function for dual estimation for a single array
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
             if self.config.learn_log_rates:
-                subject_log_rates = np.empty((n_states, n_channels))
+                array_log_rates = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    subject_log_rates[state] = (
+                    array_log_rates[state] = (
                         np.sum(x * a[:, state, None], axis=0) / sum_a[state]
                     )
             else:
-                subject_log_rates = self.get_log_rates()
+                array_log_rates = self.get_log_rates()
 
-            return subject_log_rates
+            return array_log_rates
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []

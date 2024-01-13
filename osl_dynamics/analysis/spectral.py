@@ -127,13 +127,13 @@ def welch_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Time series data. Must have shape (n_subjects, n_samples,
+        Time series data. Must have shape (n_arrays, n_samples,
         n_channels) or (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
     alpha : np.ndarray or list, optional
         Inferred state probability time course. Must have shape
-        (n_subjects, n_samples, n_states) or (n_samples, n_states).
+        (n_arrays, n_samples, n_states) or (n_samples, n_states).
     window_length : int, optional
         Length of the data segment to use to calculate spectra.
         If None, we use :code:`2 * sampling_frequency`.
@@ -147,10 +147,10 @@ def welch_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for subject-specific spectra?
+        Should we return the weights for array-specific spectra?
         This is useful for calculating a group average.
     keepdims : bool, optional
-        Should we enforce a (n_subject, n_states, ...) array is returned
+        Should we enforce a (n_arrays, n_states, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
         dimension of length 1.
     n_jobs : int, optional
@@ -161,16 +161,16 @@ def welch_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
+        Power spectra for each array and state. Shape is (n_arrays,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        Coherences for each state. Shape is (n_arrays, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     w : np.ndarray
-        Weighting for subject-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_subjects,).
+        Weighting for array-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_arrays,).
     """
 
     # Validation
@@ -184,11 +184,11 @@ def welch_spectra(
             )
 
         if isinstance(data, list):
-            # Check data and state time course for the same number of subjects
+            # Check data and state time course for the same number of arrays
             # has been passed
             if len(data) != len(alpha):
                 raise ValueError(
-                    "A different number of subjects has been passed for "
+                    "A different number of arrays has been passed for "
                     f"data and alpha: len(data)={len(data)}, "
                     f"len(alpha)={len(alpha)}."
                 )
@@ -242,13 +242,13 @@ def welch_spectra(
 
     # Main calculation of spectra
     if len(data) == 1:
-        # We only have one subject so we don't need to parallelise
+        # We only have one array so we don't need to parallelise
         # the calculation
         _logger.info("Calculating spectra")
         results = [_welch(**kwargs[0])]
 
     elif n_jobs == 1:
-        # We have multiple subjects but we're running in serial
+        # We have multiple arrays but we're running in serial
         results = []
         for i in trange(len(data), desc="Calculating spectra"):
             results.append(_welch(**kwargs[i]))
@@ -314,13 +314,13 @@ def multitaper_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Time series data. Must have shape (n_subjects, n_samples,
+        Time series data. Must have shape (n_arrays, n_samples,
         n_channels) or (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
     alpha : np.ndarray or list, optional
         Inferred state probability time course. Must have shape
-        (n_subjects, n_samples, n_states) or (n_samples, n_states).
+        (n_arrays, n_samples, n_states) or (n_samples, n_states).
     window_length : int, optional
         Length of the data segment to use to calculate spectra.
     step_size : int, optional
@@ -337,10 +337,10 @@ def multitaper_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for subject-specific spectra?
+        Should we return the weights for array-specific spectra?
         This is useful for calculating a group average.
     keepdims : bool, optional
-        Should we enforce a (n_subject, n_states, ...) array is returned
+        Should we enforce a (n_arrays, n_states, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
         dimension of length 1.
     n_jobs : int, optional
@@ -351,16 +351,16 @@ def multitaper_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
+        Power spectra for each array and state. Shape is (n_arrays,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
+        Coherences for each state. Shape is (n_arrays, n_states, n_channels,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     w : np.ndarray
-        Weighting for subject-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_subjects,).
+        Weighting for array-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_arrays,).
     """
 
     # Validation
@@ -374,11 +374,11 @@ def multitaper_spectra(
             )
 
         if isinstance(data, list):
-            # Check data and state time course for the same number of subjects
+            # Check data and state time course for the same number of arrays
             # has been passed
             if len(data) != len(alpha):
                 raise ValueError(
-                    "A different number of subjects has been passed for "
+                    "A different number of arrays has been passed for "
                     f"data and alpha: len(data)={len(data)}, "
                     f"len(alpha)={len(alpha)}."
                 )
@@ -434,13 +434,13 @@ def multitaper_spectra(
 
     # Main calculation of spectra
     if len(data) == 1:
-        # We only have one subject so we don't need to parallelise
+        # We only have one array so we don't need to parallelise
         # the calculation
         _logger.info("Calculating spectra")
         results = [_multitaper(**kwargs[0])]
 
     elif n_jobs == 1:
-        # We have multiple subjects but we're running in serial
+        # We have multiple arrays but we're running in serial
         results = []
         for i in trange(len(data), desc="Calculating spectra"):
             results.append(_multitaper(**kwargs[i]))
@@ -516,10 +516,10 @@ def regression_spectra(
     ----------
     data : np.ndarray or list
         Data to calculate a spectrogram for. Shape must be
-        (n_subjects, n_samples, n_channels) or (n_samples, n_channels).
+        (n_arrays, n_samples, n_channels) or (n_samples, n_channels).
     alpha : np.ndarray or list
         Inferred mode mixing factors. Shape must be
-        (n_subjects, n_samples, n_modes) or (n_samples, n_modes).
+        (n_arrays, n_samples, n_modes) or (n_samples, n_modes).
     sampling_frequency : float
         Sampling_frequency in Hz.
     window_length : int
@@ -537,13 +537,13 @@ def regression_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for subject-specific spectra?
+        Should we return the weights for array-specific spectra?
         Useful for calculating the group average spectra.
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
         separately for the mode PSDs?
     keepdims : bool, optional
-        Should we enforce a (n_subject, n_states, ...) array is returned for
+        Should we enforce a (n_arrays, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
         of length 1.
     n_jobs : int, optional
@@ -554,16 +554,16 @@ def regression_spectra(
     f : np.ndarray
         Frequency axis. Shape is (n_freq).
     psd : np.ndarray
-        Mode PSDs. A numpy array with shape (n_subjects, 2, n_modes, n_channels,
+        Mode PSDs. A numpy array with shape (n_arrays, 2, n_modes, n_channels,
         n_freq) where :code:`axis=1` is the coefficients/intercept if
-        :code:`return_coef_int=True`, otherwise shape is (n_subjects, n_modes,
+        :code:`return_coef_int=True`, otherwise shape is (n_arrays, n_modes,
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Mode coherences. Shape is (n_subjects, n_modes, n_channels, n_channels,
+        Mode coherences. Shape is (n_arrays, n_modes, n_channels, n_channels,
         n_freq). Any axis of length 1 is removed if :code:`keepdims=False`.
     w : np.ndarray
-        Weight for each subject-specific PSD. Shape is (n_subjects,).
+        Weight for each array-specific PSD. Shape is (n_arrays,).
         Only returned if :code:`return_weights=True`.
     """
 
@@ -577,11 +577,11 @@ def regression_spectra(
         )
 
     if isinstance(data, list):
-        # Check data and state time course for the same number of subjects
+        # Check data and state time course for the same number of arrays
         # has been passed
         if len(data) != len(alpha):
             raise ValueError(
-                "A different number of subjects has been passed for "
+                "A different number of arrays has been passed for "
                 f"data and alpha: len(data)={len(data)}, "
                 f"len(alpha)={len(alpha)}."
             )
@@ -632,13 +632,13 @@ def regression_spectra(
 
     # Main calculation of spectra
     if len(data) == 1:
-        # We only have one subject so we don't need to parallelise the
+        # We only have one array so we don't need to parallelise the
         # calculation
         _logger.info("Calculating spectra")
         results = [_regress_welch_spectrogram(**kwargs[0])]
 
     elif n_jobs == 1:
-        # We have multiple subjects but we're running in serial
+        # We have multiple arrays but we're running in serial
         results = []
         for i, kws in enumerate(kwargs):
             _logger.info(f"Calculating spectra {i}")
@@ -682,29 +682,29 @@ def regression_spectra(
     # Indices of the upper triangle of an n_channels by n_channels array
     m, n = np.triu_indices(n_channels)
 
-    # Number of subjects
-    n_subjects = len(data)
+    # Number of arrays
+    n_arrays = len(data)
 
     # Create a n_channels by n_channels array
     P = np.empty(
-        [n_subjects, 2, n_modes, n_channels, n_channels, n_freq],
+        [n_arrays, 2, n_modes, n_channels, n_channels, n_freq],
         dtype=np.complex64,
     )
-    for i in range(n_subjects):
+    for i in range(n_arrays):
         for j in range(2):  # j=0 is the coefficients and j=1 is the intercepts
             P[i, j][:, m, n] = Pj[i, j]
             P[i, j][:, n, m] = np.conj(Pj[i, j])
 
     # PSDs and coherences for each mode
     psd = np.empty(
-        [n_subjects, 2, n_modes, n_channels, n_freq],
+        [n_arrays, 2, n_modes, n_channels, n_freq],
         dtype=np.float32,
     )
     coh = np.empty(
-        [n_subjects, n_modes, n_channels, n_channels, n_freq],
+        [n_arrays, n_modes, n_channels, n_channels, n_freq],
         dtype=np.float32,
     )
-    for i in range(n_subjects):
+    for i in range(n_arrays):
         # PSDs
         p = P[i, :, :, range(n_channels), range(n_channels)].real
         psd[i] = np.rollaxis(p, axis=0, start=3)
@@ -740,9 +740,9 @@ def rescale_regression_coefs(
     Parameters
     ----------
     psd : np.ndarray
-        Mode PSDs. Shape must be (n_subjects, 2, n_modes, n_channels, n_freq).
+        Mode PSDs. Shape must be (n_arrays, 2, n_modes, n_channels, n_freq).
     alpha : np.ndarray or list
-        Inferred mode mixing coefficients. Shape must be (n_subjects, n_samples,
+        Inferred mode mixing coefficients. Shape must be (n_arrays, n_samples,
         n_modes) or (n_samples, n_modes).
     window_length : int
         Number samples used as the window to calcualte a PSD.
@@ -765,7 +765,7 @@ def rescale_regression_coefs(
 
     if psd.ndim != 5:
         raise ValueError(
-            "psd must have shape (n_subjects, 2, n_modes, n_channels, n_freqs)."
+            "psd must have shape (n_arrays, 2, n_modes, n_channels, n_freqs)."
         )
 
     if isinstance(alpha, np.ndarray):
@@ -773,7 +773,7 @@ def rescale_regression_coefs(
 
     if len(psd) != len(alpha):
         raise ValueError(
-            "A different number of subjects has been passed for "
+            "A different number of arrays has been passed for "
             f"psd and alpha: len(psd)={len(psd)}, "
             f"len(alpha)={len(alpha)}."
         )
@@ -785,8 +785,8 @@ def rescale_regression_coefs(
     # Prevent in-place operation
     psd = psd.copy()
 
-    # Number of subjects
-    n_subjects = len(alpha)
+    # Number of arrays
+    n_arrays = len(alpha)
 
     # Window alphas to match the windowing of STFT
     for i, a in enumerate(alpha):
@@ -805,7 +805,7 @@ def rescale_regression_coefs(
     max_alpha = [np.max(a, axis=0) for a in alpha]
 
     # Rescale the regression coefficients
-    for n in range(n_subjects):
+    for n in range(n_arrays):
         psd[n, 0] *= np.expand_dims(max_alpha[n], axis=(1, 2))
 
     return psd
@@ -899,7 +899,7 @@ def decompose_spectra(
         "coherences must be a numpy array with shape "
         "(n_channels, n_channels, n_freq), "
         "(n_modes, n_channels, n_channels, n_freq) or "
-        "(n_subjects, n_modes, n_channels, n_channels, n_freq)."
+        "(n_arrays, n_modes, n_channels, n_channels, n_freq)."
     )
     coherences = array_ops.validate(
         coherences,
@@ -908,14 +908,14 @@ def decompose_spectra(
         error_message=error_message,
     )
 
-    # Number of subjects, modes, channels and frequency bins
-    n_subjects, n_modes, n_channels, n_channels, n_freq = coherences.shape
+    # Number of arrays, modes, channels and frequency bins
+    n_arrays, n_modes, n_channels, n_channels, n_freq = coherences.shape
 
     # Indices of the upper triangle of the
     # [n_channels, n_channels, n_freq] sub-array
     i, j = np.triu_indices(n_channels, 1)
 
-    # Concatenate coherences for each subject and mode
+    # Concatenate coherences for each array and mode
     # and only keep the upper triangle
     coherences = coherences[:, :, i, j].reshape(-1, n_freq)
 
@@ -1749,7 +1749,7 @@ def _regress_welch_spectrogram(
     frequency_range,
     calc_cpsd,
 ):
-    """Calculate regression spectra for a single subject.
+    """Calculate regression spectra for a single array.
 
     Parameters
     ----------

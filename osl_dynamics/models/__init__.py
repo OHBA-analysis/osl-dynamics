@@ -8,11 +8,11 @@ from osl_dynamics.models import (
     mage,
     sage,
     mdynemo,
-    sedynemo,
     state_dynemo,
     hmm,
     hmm_poi,
-    sehmm,
+    hive,
+    dive,
 )
 from osl_dynamics.utils.misc import NumpyLoader
 
@@ -21,11 +21,11 @@ models = {
     "MAGE": mage.Model,
     "SAGE": sage.Model,
     "M-DyNeMo": mdynemo.Model,
-    "SE-DyNeMo": sedynemo.Model,
     "State-DyNeMo": state_dynemo.Model,
     "HMM": hmm.Model,
     "HMM-Poisson": hmm_poi.Model,
-    "SE-HMM": sehmm.Model,
+    "HIVE": hive.Model,
+    "DIVE": dive.Model,
 }
 
 

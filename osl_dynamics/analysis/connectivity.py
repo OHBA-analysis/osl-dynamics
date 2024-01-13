@@ -40,7 +40,7 @@ def sliding_window_connectivity(
     Parameters
     ----------
     data : list or np.ndarray
-        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        Time series data. Shape must be (n_arrays, n_samples, n_channels)
         or (n_samples, n_channels).
     window_length : int
         Window length in samples.
@@ -53,12 +53,12 @@ def sliding_window_connectivity(
         for covariance.
     concatenate : bool, optional
         Should we concatenate the sliding window connectivities from each
-        subject into one big time series?
+        array into one big time series?
 
     Returns
     -------
     sliding_window_conn : list or np.ndarray
-        Time series of connectivity matrices. Shape is (n_subjects, n_windows,
+        Time series of connectivity matrices. Shape is (n_arrays, n_windows,
         n_channels, n_channels) or (n_windows, n_channels, n_channels).
     """
     # Validation
@@ -77,7 +77,7 @@ def sliding_window_connectivity(
         if data.ndim != 3:
             data = [data]
 
-    # Calculate sliding window connectivity for each subject
+    # Calculate sliding window connectivity for each array
     sliding_window_conn = []
     for i in trange(len(data), desc="Calculating connectivity"):
         ts = data[i]
@@ -135,7 +135,7 @@ def covariance_from_spectra(
     error_message = (
         "A (n_channels, n_channels, n_freq), "
         + "(n_modes, n_channels, n_channels, n_freq) or "
-        + "(n_subjects, n_modes, n_channels, n_channels, n_freq) "
+        + "(n_arrays, n_modes, n_channels, n_channels, n_freq) "
         + "array must be passed."
     )
     cpsd = array_ops.validate(
@@ -156,15 +156,15 @@ def covariance_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_freq = cpsd.shape
+    n_arrays, n_modes, n_channels, n_channels, n_freq = cpsd.shape
     if components is None:
         n_components = 1
     else:
         n_components = components.shape[0]
 
-    # Calculate connectivity maps for each subject
+    # Calculate connectivity maps for each array
     covar = []
-    for i in range(n_subjects):
+    for i in range(n_arrays):
         # Cross spectral densities
         csd = cpsd[i].reshape(-1, n_freq)
         csd = abs(csd)
@@ -242,15 +242,15 @@ def mean_coherence_from_spectra(
         )
 
     # Dimensions
-    n_subjects, n_modes, n_channels, n_channels, n_freq = coh.shape
+    n_arrays, n_modes, n_channels, n_channels, n_freq = coh.shape
     if components is None:
         n_components = 1
     else:
         n_components = components.shape[0]
 
-    # Calculate mean coherence for each subject
+    # Calculate mean coherence for each array
     mean_coh = []
-    for i in range(n_subjects):
+    for i in range(n_arrays):
         # Concatenate over modes
         c = coh[i].reshape(-1, n_freq)
 

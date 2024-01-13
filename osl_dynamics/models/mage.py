@@ -445,15 +445,15 @@ class Model(ModelBase):
         inputs : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each array?
 
         Returns
         -------
         alpha : list or np.ndarray
-            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            Alpha time course with shape (n_arrays, n_samples, n_modes) or
             (n_samples, n_modes).
         gamma : list or np.ndarray
-            Gamma time course with shape (n_subjects, n_samples, n_modes) or
+            Gamma time course with shape (n_arrays, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if not self.config.multiple_dynamics:

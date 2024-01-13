@@ -33,7 +33,7 @@ def sliding_window_power(
     Parameters
     ----------
     data : list or np.ndarray
-        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        Time series data. Shape must be (n_arrays, n_samples, n_channels)
         or (n_samples, n_channels).
     window_length : int
         Window length in samples.
@@ -43,13 +43,13 @@ def sliding_window_power(
     power_type : str, optional
         Type of power to calculate. Can be :code:`"mean"` or :code:`"var"`.
     concatenate : bool, optional
-        Should we concatenate the sliding window power from each subject
+        Should we concatenate the sliding window power from each array
         into one big time series?
 
     Returns
     -------
     sliding_window_power : list or np.ndarray
-        Time series of power vectors. Shape is (n_subjects, n_windows,
+        Time series of power vectors. Shape is (n_arrays, n_windows,
         n_channels) or (n_windows, n_channels).
     """
     # Validation
@@ -68,7 +68,7 @@ def sliding_window_power(
         if data.ndim != 3:
             data = [data]
 
-    # Calculate sliding window power for each subject
+    # Calculate sliding window power for each array
     sliding_window_power = []
     for i in trange(len(data), desc="Calculating sliding window power"):
         ts = data[i]
@@ -127,13 +127,13 @@ def variance_from_spectra(
     if power_spectra.ndim == 2:
         # PSDs were passed
         power_spectra = power_spectra[np.newaxis, np.newaxis, ...]
-        n_subjects, n_modes, n_channels, n_freq = power_spectra.shape
+        n_arrays, n_modes, n_channels, n_freq = power_spectra.shape
 
     elif power_spectra.shape[-2] != power_spectra.shape[-3]:
         # PSDs were passed, check dimensionality
         error_message = (
             "A (n_channels, n_freq), (n_modes, n_channels, n_freq) or "
-            + "(n_subjects, n_modes, n_channels, n_freq) array must be passed."
+            + "(n_arrays, n_modes, n_channels, n_freq) array must be passed."
         )
         power_spectra = array_ops.validate(
             power_spectra,
@@ -141,14 +141,14 @@ def variance_from_spectra(
             allow_dimensions=[2, 3],
             error_message=error_message,
         )
-        n_subjects, n_modes, n_channels, n_freq = power_spectra.shape
+        n_arrays, n_modes, n_channels, n_freq = power_spectra.shape
 
     else:
         # Cross spectra were passed, check dimensionality
         error_message = (
             "A (n_channels, n_channels, n_freq), "
             + "(n_modes, n_channels, n_channels, n_freq) or "
-            + "(n_subjects, n_modes, n_channels, n_channels, n_freq) "
+            + "(n_arrays, n_modes, n_channels, n_channels, n_freq) "
             + "array must be passed."
         )
         power_spectra = array_ops.validate(
@@ -157,7 +157,7 @@ def variance_from_spectra(
             allow_dimensions=[3, 4],
             error_message=error_message,
         )
-        n_subjects, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
+        n_arrays, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
     if components is not None and frequency_range is not None:
         raise ValueError(
@@ -178,9 +178,9 @@ def variance_from_spectra(
     else:
         n_components = components.shape[0]
 
-    # Calculate power maps for each subject
+    # Calculate power maps for each array
     var = []
-    for i in range(n_subjects):
+    for i in range(n_arrays):
         # Get PSDs
         if power_spectra.shape[-2] == power_spectra.shape[-3]:
             # Cross-spectra densities were passed
@@ -456,22 +456,22 @@ def save(
 
 def multi_save(
     group_power_map,
-    subject_power_map,
+    array_power_map,
     mask_file,
     parcellation_file,
     filename=None,
-    subjects=None,
+    arrays=None,
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
 ):
-    """Saves group level and subject level power maps.
+    """Saves group level and array level power maps.
 
-    When training subject-specific models we want to plot the group-level map
-    and subject-specific deviations. This function is a wrapper for `power.save
+    When training array-specific models we want to plot the group-level map
+    and array-specific deviations. This function is a wrapper for `power.save
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
     /analysis/power/index.html#osl_dynamics.analysis.power.save>`_, which helps
-    us plot power maps for subject-specific models.
+    us plot power maps for array-specific models.
 
     Parameters
     ----------
@@ -480,9 +480,9 @@ def multi_save(
         Can be of shape: (n_modes, n_channels) or (n_channels,). A (...,
         n_channels, n_channels) can also be passed. Warning: this function
         cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
-    subject_power_map : np.ndarray
-        Subject level power maps to save.
-        Can be of shape: (n_subjects, n_modes, n_channels), (n_modes,
+    Array_power_map : np.ndarray
+        Array level power maps to save.
+        Can be of shape: (n_arrays, n_modes, n_channels), (n_modes,
         n_channels) or (n_channels,). A (..., n_channels, n_channels) array can
         also be passed. Warning: this function cannot be used if
         :code:`n_modes=n_channels`.
@@ -495,8 +495,8 @@ def multi_save(
         as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
         as images. If :code:`None` is passed then the image is shown on screen
         and the Matplotlib objects are returned.
-    subjects : list, optional
-        List of subject indices to be plot power maps for.
+    arrays : list, optional
+        List of array indices to be plot power maps for.
     subtract_mean : bool, optional
         Should we subtract the mean power across modes?
     mean_weights: np.ndarray, optional
@@ -509,7 +509,7 @@ def multi_save(
     """
     # Create a copy of the power maps so we don't modify them
     group_power_map = np.copy(group_power_map)
-    subject_power_map = np.copy(subject_power_map)
+    array_power_map = np.copy(array_power_map)
 
     # Validation
     if group_power_map.ndim > 1:
@@ -519,14 +519,12 @@ def multi_save(
     else:
         group_power_map = group_power_map[np.newaxis, ...]
 
-    if subject_power_map.ndim > 1:
-        if subject_power_map.shape[-1] == subject_power_map.shape[-2]:
+    if array_power_map.ndim > 1:
+        if array_power_map.shape[-1] == array_power_map.shape[-2]:
             # np.copy is needed because np.diagonal returns a read only array
-            subject_power_map = np.copy(
-                np.diagonal(subject_power_map, axis1=-2, axis2=-1)
-            )
+            array_power_map = np.copy(np.diagonal(array_power_map, axis1=-2, axis2=-1))
     else:
-        subject_power_map = subject_power_map[np.newaxis, ...]
+        array_power_map = array_power_map[np.newaxis, ...]
 
     group_power_map = array_ops.validate(
         group_power_map,
@@ -534,17 +532,15 @@ def multi_save(
         allow_dimensions=[1],
         error_message="group_power_map.shape is incorrect.",
     )
-    subject_power_map = array_ops.validate(
-        subject_power_map,
+    array_power_map = array_ops.validate(
+        array_power_map,
         correct_dimensionality=3,
         allow_dimensions=[1, 2],
-        error_message="subject_power_map.shape is incorrect",
+        error_message="array_power_map.shape is incorrect",
     )
 
-    if group_power_map.shape[0] != subject_power_map.shape[1]:
-        raise ValueError(
-            "group and subject level power maps must have the same n_modes."
-        )
+    if group_power_map.shape[0] != array_power_map.shape[1]:
+        raise ValueError("group and array level power maps must have the same n_modes.")
 
     # Subtract mean
     n_modes = group_power_map.shape[0]
@@ -557,7 +553,7 @@ def multi_save(
             weights=mean_weights,
         )
         group_power_map -= mean_group_power[np.newaxis, ...]
-        subject_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
+        array_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
 
     # Save the group power map
     filename = Path(filename)
@@ -574,22 +570,22 @@ def multi_save(
         plot_kwargs=plot_kwargs,
     )
 
-    # Save the subject level power maps
-    n_subjects = subject_power_map.shape[0]
-    if subjects is None:
-        subjects = np.arange(n_subjects)
+    # Save the array level power maps
+    n_arrays = array_power_map.shape[0]
+    if arrays is None:
+        arrays = np.arange(n_arrays)
 
-    for sub in subjects:
-        subject_dir = "{fn.parent}/sub_{sub:0{v}d}".format(
-            fn=filename, sub=sub, v=len(str(n_subjects))
+    for arr in arrays:
+        array_dir = "{fn.parent}/arr_{arr:0{v}d}".format(
+            fn=filename, arr=arr, v=len(str(n_arrays))
         )
-        os.makedirs(subject_dir, exist_ok=True)
-        subject_filename = f"{subject_dir}/{filename.stem}{filename.suffix}"
+        os.makedirs(array_dir, exist_ok=True)
+        array_filename = f"{array_dir}/{filename.stem}{filename.suffix}"
 
-        _logger.info(f"Saving subject {sub} power map:")
+        _logger.info(f"Saving array {arr} power map:")
         save(
-            subject_power_map[sub],
-            filename=subject_filename,
+            array_power_map[arr],
+            filename=array_filename,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
             plot_kwargs=plot_kwargs,
