@@ -312,7 +312,7 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
-def train_sehmm(
+def train_hive(
     data,
     output_dir,
     config_kwargs,
@@ -326,7 +326,7 @@ def train_sehmm(
     This function will:
 
     1. Build an :code:`hive.Model` object.
-    2. Initialize the parameters of the SE-HMM model using
+    2. Initialize the parameters of the HIVE model using
         :code:`Model.random_state_time_course_initialization`.
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means,
