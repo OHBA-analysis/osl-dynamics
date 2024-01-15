@@ -420,6 +420,23 @@ def mean_amplitudes(state_time_course, data):
     return analysis.modes.mean_amplitudes(state_time_course, data)
 
 
+def lifetime_statistics(state_time_course, sampling_frequency=None):
+    """Wrapper for `analysis.modes.lifetime_statistics \
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    .lifetime_statistics>`_."""
+    return analysis.modes.lifetime_statistics(state_time_course, sampling_frequency)
+
+
+def fano_factor(state_time_course, window_length, sampling_frequency=1.0):
+    """Wrapper for `analysis.modes.fano_factor \
+    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
+    /analysis/modes/index.html#osl_dynamics.analysis.modes.fano_factor>`_."""
+    return analysis.modes.fano_factor(
+        state_time_course, window_length, sampling_frequency
+    )
+
+
 def convert_to_mne_raw(
     alpha,
     raw,
