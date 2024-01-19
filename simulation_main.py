@@ -3,10 +3,11 @@ import numpy as np
 from rotation.simulation import HMM_single_subject_simulation, perturb_covariances
 
 if __name__ == '__main__':
-    save_dir = './data/node_timeseries/simulation_toy_12/'
+    save_dir = './data/node_timeseries/simulation_202401/sigma_0.025/run_0'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
+    perturbation_factor = 0.025
     # Define the parameters
     n_scans = 100
     n_states = 8
@@ -45,25 +46,17 @@ if __name__ == '__main__':
     #])
     covariances = np.load('./results_HCP_202311_no_mean/HMM_ICA_25_state_8/state_covariances.npy')
 
-
-    HMM_single_subject_simulation(save_dir=save_dir,
-                                  n_scans=n_scans,
-                                  n_states=n_states,
-                                  n_samples=n_samples,
-                                  n_channels=n_channels,
-                                  trans_prob=tpm,
-                                  means=means,
-                                  covariances=perturb_covariances(covariances,perturbation_factor=0.2),
-                                  subj_name = '10001')
-    HMM_single_subject_simulation(save_dir=save_dir,
-                                  n_scans=n_scans,
-                                  n_states=n_states,
-                                  n_samples=n_samples,
-                                  n_channels=n_channels,
-                                  trans_prob=tpm,
-                                  means=means,
-                                  covariances=perturb_covariances(covariances,perturbation_factor=0.2),
-                                  subj_name='10002')
+    # Update 20240119: generate ten subjects for simulation
+    for i in range(10001,10011):
+        HMM_single_subject_simulation(save_dir=save_dir,
+                                      n_scans=n_scans,
+                                      n_states=n_states,
+                                      n_samples=n_samples,
+                                      n_channels=n_channels,
+                                      trans_prob=tpm,
+                                      means=means,
+                                      covariances=perturb_covariances(covariances,perturbation_factor=perturbation_factor),
+                                      subj_name = str(i))
     '''
     ### Update 6th Dec 2023
     ### This is a simulation from Chet, it's only for comparison purposes.
