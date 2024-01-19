@@ -3,6 +3,7 @@
 """
 
 import logging
+import warnings
 
 import numpy as np
 from scipy import signal
@@ -1404,8 +1405,15 @@ def _welch(
     # Rescale PSDs to account for the number of time points
     # each state was active
     fo = np.sum(stc, axis=0) / stc.shape[0]
-    for psd_, fo_ in zip(psd, fo):
+    for i, (psd_, fo_) in enumerate(zip(psd, fo)):
         psd_ /= fo_
+        if np.isnan(psd_).any():
+            psd[i] = np.nan_to_num(psd_)  # zero out nan values
+            warnings.warn(
+                "psd_ contains NaN values. This may indicate a potentially poor HMM fit. "
+                + "You should consider running the model again or selecting the model run "
+                + "with the lowest free energy after training multiple times."
+            )
 
     if not keepdims:
         # Squeeze any axes of length 1
@@ -1724,8 +1732,15 @@ def _multitaper(
     # Rescale PSDs to account for the number of time points
     # each state was active
     fo = np.sum(stc, axis=0) / stc.shape[0]
-    for psd_, fo_ in zip(psd, fo):
+    for i, (psd_, fo_) in enumerate(zip(psd, fo)):
         psd_ /= fo_
+        if np.isnan(psd_).any():
+            psd[i] = np.nan_to_num(psd_)  # zero out nan values
+            warnings.warn(
+                "psd_ contains NaN values. This may indicate a potentially poor HMM fit. "
+                + "You should consider running the model again or selecting the model run "
+                + "with the lowest free energy after training multiple times."
+            )
 
     if not keepdims:
         # Squeeze any axes of length 1
