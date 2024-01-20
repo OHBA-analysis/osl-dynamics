@@ -3,7 +3,7 @@ import numpy as np
 from rotation.simulation import HMM_single_subject_simulation, perturb_covariances
 
 if __name__ == '__main__':
-    save_dir = './data/node_timeseries/simulation_202401/sigma_0.025/run_0'
+    save_dir ='./data/node_timeseries/simulation_202401/sigma_0.025/run_0/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
