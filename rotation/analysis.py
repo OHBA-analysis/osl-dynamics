@@ -240,8 +240,8 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
 
     if reproducible:
         if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
-            reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
-            #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
+    #        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
+            reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
             #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
             #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
 
@@ -1242,15 +1242,15 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
             FC_distance = {}
         for N_channel in list_channels:
             for N_state in list_states:
-                data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_fisher_correlation_reorder_split_1.npy')
+                data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_fisher_correlation_reorder_split_2.npy')
                 FC_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
 
                 if model!= 'SWC':
                     if learn_mean:
-                        data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_1.npy')
+                        data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_2.npy')
                         mean_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
                     data = np.load(
-                        f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_1.npy')
+                        f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_2.npy')
                     FC_distance[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
         group_comparison_plot(FC_correlation, model, list_channels, list_states, 'Fisher_z_transformed_correlation', save_dir)
         if model != 'SWC':
