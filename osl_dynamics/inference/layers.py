@@ -221,6 +221,24 @@ class InverseCholeskyLayer(layers.Layer):
         return self.bijector.inverse(inputs)
 
 
+class BatchSizeLayer(layers.Layer):
+    """Layer for getting the batch size.
+
+    Parameters
+    ----------
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def call(self, inputs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
+        return tf.shape(inputs)[0]
+
+
 class SampleGammaDistributionLayer(layers.Layer):
     """Layer for sampling from a Gamma distribution.
 
@@ -246,9 +264,19 @@ class SampleGammaDistributionLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
-        alpha, beta = inputs
+        alpha, beta, subj_id = inputs
+        # alpha.shape = (n_subjects, n_states, 1)
+        # beta.shape = (n_subjects, n_states, 1)
+        # subj_id.shape = (None, sequence_length)
+
+        # output.shape = (None, n_states, 1)
+
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
+        subj_id = subj_id[:, 0]  # shape = (None,)
+
+        alpha = tf.gather(alpha, subj_id, axis=0)  # shape = (None, n_states, 1)
+        beta = tf.gather(beta, subj_id, axis=0)  # shape = (None, n_states, 1)
         if training:
             output = alpha / beta
             if self.annealing_factor > 0:
@@ -1346,6 +1374,53 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
+class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
+    """Layer to calculate the log-likelihood loss assuming a categorical model
+    with Poisson observation model.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(self, n_states, **kwargs):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+
+    def call(self, inputs, **kwargs):
+        x, log_rate, probs, subj_id = inputs
+
+        if subj_id is not None:
+            # Get the mean and covariance for the requested subject
+            subj_id = tf.cast(subj_id, tf.int32)
+            log_rate = tf.gather(log_rate, subj_id)
+
+        # Log-likelihood for each state
+        ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
+        for i in range(self.n_states):
+            poi = tfp.distributions.Poisson(
+                log_rate=tf.gather(log_rate, i, axis=-2),
+                allow_nan_stats=False,
+            )
+            a = poi.log_prob(x)
+            a = tf.reduce_sum(a, axis=-1)
+            ll_loss += probs[:, :, i] * a
+
+        # Sum over time dimension and average over the batch dimension
+        ll_loss = tf.reduce_sum(ll_loss, axis=1)
+        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+
+        # Add the negative log-likelihood to the loss
+        nll_loss = -ll_loss
+        self.add_loss(nll_loss)
+        self.add_metric(nll_loss, name=self.name)
+
+        return tf.expand_dims(nll_loss, axis=-1)
+
+
 class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.
 
@@ -1435,22 +1510,20 @@ class MixSubjectSpecificParametersLayer(layers.Layer):
     def call(self, inputs):
         # Unpack inputs:
         # - alpha.shape   = (None, sequence_length, n_modes)
-        # - mu.shape      = (n_subjects, n_modes, n_channels)
-        # - D.shape       = (n_subjects, n_modes, n_channels, n_channels)
-        # - subj_id.shape = (None, sequence_length)
-        alpha, mu, D, subj_id = inputs
-        subj_id = tf.cast(subj_id, tf.int32)
+        # - mu.shape      = (None, n_modes, n_channels)
+        # - D.shape       = (None, n_modes, n_channels, n_channels)
+        alpha, mu, D = inputs
 
-        # The parameters for each time point
-        dynamic_mu = tf.gather(mu, subj_id)
-        dynamic_D = tf.gather(D, subj_id)
+        # Add the sequence dimension
+        mu = tf.expand_dims(mu, axis=1)
+        D = tf.expand_dims(D, axis=1)
 
         # Next mix with the time course
         alpha = tf.expand_dims(alpha, axis=-1)
-        m = tf.reduce_sum(tf.multiply(alpha, dynamic_mu), axis=2)
+        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
 
         alpha = tf.expand_dims(alpha, axis=-1)
-        C = tf.reduce_sum(tf.multiply(alpha, dynamic_D), axis=2)
+        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
 
         return m, C
 
@@ -1824,16 +1897,17 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
-        x, mu, sigma, subj_id = inputs
+        x, mu, sigma = inputs
+        # x.shape = (None, sequence_length, n_channels)
+        # mu.shape = (None, n_states, n_channels)
+        # sigma.shape = (None, n_states, n_channels, n_channels)
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
-        if subj_id is None:
-            n_states = tf.shape(mu)[0]
-        else:
-            n_states = tf.shape(mu)[1]
-            subj_id = tf.cast(subj_id, tf.int32)
-            mu = tf.gather(mu, subj_id)
-            sigma = tf.gather(sigma, subj_id)
+        n_states = tf.shape(mu)[1]
+
+        # add the sequence dimension
+        mu = tf.expand_dims(mu, axis=1)
+        sigma = tf.expand_dims(sigma, axis=1)
 
         # Calculate log-likelihood for each state
         log_likelihood = tf.TensorArray(tf.float32, size=n_states)

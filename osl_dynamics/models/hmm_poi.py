@@ -1,17 +1,5 @@
-"""Hidden Markov Model (HMM) with a Multivariate Normal observation model.
+"""Hidden Markov Model (HMM) with a Possion observation model.
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
-/hmm.html>`_ for a description of this model.
-
-See Also
---------
-- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
-  electrophysiological data". `Neuroimage 126, 81-95 (2016)
-  <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
-- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in
-  rest and task". `Neuroimage 180, 646-656 (2018)
-  <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
-- `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
 import logging
@@ -35,9 +23,7 @@ from pqdm.threads import pqdm
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import initializers
 from osl_dynamics.inference.layers import (
-    CategoricalLogLikelihoodLossLayer,
-    CovarianceMatricesLayer,
-    DiagonalMatricesLayer,
+    CategoricalPoissonLogLikelihoodLossLayer,
     VectorsLayer,
     StaticLossScalingFactorLayer,
 )
@@ -68,20 +54,10 @@ class Config(BaseModelConfig):
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
 
-    learn_means : bool
-        Should we make the mean vectors for each state trainable?
-    learn_covariances : bool
-        Should we make the covariance matrix for each staet trainable?
-    initial_means : np.ndarray
-        Initialisation for state means.
-    initial_covariances : np.ndarray
-        Initialisation for state covariances. If
-        :code:`diagonal_covariances=True` and full matrices are passed,
-        the diagonal is extracted.
-    diagonal_covariances : bool
-        Should we learn diagonal covariances?
-    covariances_epsilon : float
-        Error added to state covariances for numerical stability.
+    learn_log_rates : bool
+        Should we make :code:`log_rate` for each state trainable?
+    initial_log_rates : np.ndarray
+        Initialisation for state :code:`log_rates`.
 
     initial_trans_prob : np.ndarray
         Initialisation for the transition probability matrix.
@@ -121,17 +97,11 @@ class Config(BaseModelConfig):
         Strategy for distributed learning.
     """
 
-    model_name: str = "HMM"
+    model_name: str = "HMM-Poisson"
 
     # Observation model parameters
-    learn_means: bool = None
-    learn_covariances: bool = None
-    initial_means: np.ndarray = None
-    initial_covariances: np.ndarray = None
-    diagonal_covariances: bool = False
-    covariances_epsilon: float = None
-    means_regularizer: tf.keras.regularizers.Regularizer = None
-    covariances_regularizer: tf.keras.regularizers.Regularizer = None
+    learn_log_rates: bool = None
+    initial_log_rates: np.ndarray = None
 
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
@@ -149,14 +119,8 @@ class Config(BaseModelConfig):
         self.validate_training_parameters()
 
     def validate_observation_model_parameters(self):
-        if self.learn_means is None or self.learn_covariances is None:
-            raise ValueError("learn_means and learn_covariances must be passed.")
-
-        if self.covariances_epsilon is None:
-            if self.learn_covariances:
-                self.covariances_epsilon = 1e-6
-            else:
-                self.covariances_epsilon = 0.0
+        if self.learn_log_rates is None:
+            raise ValueError("learn_log_rates must be passed.")
 
     def validate_trans_prob_parameters(self):
         if self.initial_trans_prob is not None:
@@ -222,9 +186,6 @@ class Model(ModelBase):
 
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
-
-        # Set static loss scaling factor
-        self.set_static_loss_scaling_factor(dataset)
 
         # Training curves
         history = {"loss": [], "rho": [], "lr": []}
@@ -294,18 +255,6 @@ class Model(ModelBase):
             _range.close()
 
         return history
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -556,8 +505,8 @@ class Model(ModelBase):
             Likelihood. Shape is (n_states, batch_size*sequence_length).
         """
         # Get the current observation model parameters
-        means, covs = self.get_means_covariances()
-        n_states = means.shape[0]
+        log_rates = self.get_log_rates()
+        n_states = log_rates.shape[0]
 
         batch_size = x.shape[0]
         sequence_length = x.shape[1]
@@ -566,14 +515,13 @@ class Model(ModelBase):
         # observed data
         log_likelihood = np.empty([n_states, batch_size, sequence_length])
         for state in range(n_states):
-            mvn = tf.stop_gradient(
-                tfp.distributions.MultivariateNormalTriL(
-                    loc=tf.gather(means, state, axis=-2),
-                    scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
+            poi = tf.stop_gradient(
+                tfp.distributions.Poisson(
+                    log_rate=tf.gather(log_rates, state, axis=-2),
                     allow_nan_stats=False,
                 )
             )
-            log_likelihood[state] = mvn.log_prob(x)
+            log_likelihood[state] = tf.reduce_sum(poi.log_prob(x), axis=-1)
         log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
 
         # We add a constant to the log-likelihood for time points where all
@@ -782,15 +730,16 @@ class Model(ModelBase):
         log_likelihood : np.ndarray
             Log-likelihood. Shape is (batch_size, ..., n_states)
         """
-        means, covs = self.get_means_covariances()
-        mvn = tf.stop_gradient(
-            tfp.distributions.MultivariateNormalTriL(
-                loc=means,
-                scale_tril=tf.linalg.cholesky(covs),
+        log_rates = self.get_log_rates()
+        poi = tf.stop_gradient(
+            tfp.distributions.Poisson(
+                log_rate=log_rates,
                 allow_nan_stats=False,
             )
         )
-        log_likelihood = mvn.log_prob(tf.expand_dims(data, axis=-2))
+        log_likelihood = tf.reduce_sum(
+            poi.log_prob(tf.expand_dims(data, axis=-2)), axis=-1
+        )
         return log_likelihood.numpy()
 
     def _evidence_update_step(self, data, log_prediction_distribution):
@@ -871,98 +820,68 @@ class Model(ModelBase):
         """
         return self.trans_prob
 
-    def get_means(self):
-        """Get the state means.
+    def get_log_rates(self):
+        """Get the state :code:`log_rates`.
 
         Returns
         -------
-        means : np.ndarray
-            State means. Shape is (n_states, n_channels).
+        log_rates : np.ndarray
+            State :code:`log_rates`. Shape is (n_states, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.model, "means")
+        return obs_mod.get_observation_model_parameter(self.model, "log_rates")
 
-    def get_covariances(self):
-        """Get the state covariances.
+    def get_rates(self):
+        """Get the state rates.
 
         Returns
         -------
-        covariances : np.ndarray
-            State covariances. Shape is (n_states, n_channels, n_channels).
+        rates : np.ndarray
+            State rates. Shape is (n_states, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.model, "covs")
-
-    def get_means_covariances(self):
-        """Get the state means and covariances.
-
-        This is a wrapper for :code:`get_means` and :code:`get_covariances`.
-
-        Returns
-        -------
-        means : np.ndarary
-            State means.
-        covariances : np.ndarray
-            State covariances.
-        """
-        return self.get_means(), self.get_covariances()
+        return np.exp(self.get_log_rates())
 
     def get_observation_model_parameters(self):
-        """Wrapper for :code:`get_means_covariances`."""
-        return self.get_means_covariances()
+        """Wrapper for :code:`get_log_rates`."""
+        return self.get_log_rates()
 
-    def set_means(self, means, update_initializer=True):
-        """Set the state means.
-
-        Parameters
-        ----------
-        means : np.ndarray
-            State means. Shape is (n_states, n_channels).
-        update_initializer : bool, optional
-            Do we want to use the passed means when we re-initialize the model?
-        """
-        obs_mod.set_observation_model_parameter(
-            self.model,
-            means,
-            layer_name="means",
-            update_initializer=update_initializer,
-        )
-
-    def set_covariances(self, covariances, update_initializer=True):
-        """Set the state covariances.
+    def set_log_rates(self, log_rates, update_initializer=True):
+        """Set the state :code:`log_rates`.
 
         Parameters
         ----------
-        covariances : np.ndarray
-            State covariances. Shape is (n_states, n_channels, n_channels).
+        log_rates : np.ndarray
+            State :code:`log_rates`. Shape is (n_states, n_channels).
         update_initializer : bool, optional
-            Do we want to use the passed covariances when we re-initialize
-            the model?
+            Do we want to use the passed :code:`log_rates` when we
+            re-initialize the model?
         """
         obs_mod.set_observation_model_parameter(
             self.model,
-            covariances,
-            layer_name="covs",
+            log_rates,
+            layer_name="log_rates",
             update_initializer=update_initializer,
-            diagonal_covariances=self.config.diagonal_covariances,
         )
 
-    def set_means_covariances(
-        self,
-        means,
-        covariances,
-        update_initializer=True,
-    ):
-        """This is a wrapper for :code:`set_means` and
-        :code:`set_covariances`."""
-        self.set_means(means, update_initializer=update_initializer)
-        self.set_covariances(covariances, update_initializer=update_initializer)
+    def set_rates(self, log_rates, epsilon=1e-6, update_initializer=True):
+        """Set the state rates.
+
+        Parameters
+        ----------
+        rates : np.ndarray
+            State rates. Shape is (n_states, n_channels).
+        update_initializer : bool, optional
+            Do we want to use the passed :code:`log_rates` when we
+            re-initialize the model?
+        """
+        log_rates = np.log(log_rates + epsilon)
+        self.set_log_rates(log_rates, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for :code:`set_means_covariances`."""
-        self.set_means_covariances(
-            observation_model_parameters[0],
-            observation_model_parameters[1],
+        """Wrapper for :code:`set_log_rates`."""
+        self.set_log_rates(
+            observation_model_parameters,
             update_initializer=update_initializer,
         )
 
@@ -997,28 +916,22 @@ class Model(ModelBase):
         self.state_probs_t0 = state_probs_t0
 
     def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time
-        course.
+        """Sets the initial :code:`log_rates` based on a random state time course.
 
         Parameters
         ----------
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Training data.
         """
-        _logger.info("Setting random means and covariances")
+        _logger.info("Setting random log_rates")
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(training_data, concatenate=True)
 
-        # Mean and covariance for each state
-        means = np.zeros(
+        # Log_rate for each state
+        rates = np.zeros(
             [self.config.n_states, self.config.n_channels], dtype=np.float32
         )
-        covariances = np.zeros(
-            [self.config.n_states, self.config.n_channels, self.config.n_channels],
-            dtype=np.float32,
-        )
-
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
@@ -1027,64 +940,24 @@ class Model(ModelBase):
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
 
-            # Calculate the mean/covariance for each state for this batch
+            # Calculate the mean for each state for this batch as log_rate
             m = []
-            C = []
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
                 mu_j = np.mean(x, axis=0)
-                sigma_j = np.cov(x, rowvar=False)
                 m.append(mu_j)
-                C.append(sigma_j)
-            means += m
-            covariances += C
+            rates += m
 
         # Calculate the average from the running total
         n_batches = dtf.get_n_batches(training_dataset)
-        means /= n_batches
-        covariances /= n_batches
+        rates /= n_batches
 
-        if self.config.learn_means:
-            # Set initial means
-            self.set_means(means, update_initializer=True)
+        if self.config.learn_log_rates:
+            # Set initial log_rates
+            self.set_rates(rates, update_initializer=True)
 
-        if self.config.learn_covariances:
-            # Set initial covariances
-            self.set_covariances(covariances, update_initializer=True)
-
-    def set_regularizers(self, training_dataset):
-        """Set the means and covariances regularizer based on the training data.
-
-        A multivariate normal prior is applied to the mean vectors with
-        :code:`mu=0`, :code:`sigma=diag((range/2)**2)`. If
-        :code:`config.diagonal_covariances=True`, a log normal prior is applied
-        to the diagonal of the covariances matrices with :code:`mu=0`,
-        :code:`sigma=sqrt(log(2*range))`, otherwise an inverse Wishart prior is
-        applied to the covariances matrices with :code:`nu=n_channels-1+0.1`
-        and :code:`psi=diag(1/range)`.
-
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-
-        if self.config.learn_means:
-            obs_mod.set_means_regularizer(self.model, training_dataset)
-
-        if self.config.learn_covariances:
-            obs_mod.set_covariances_regularizer(
-                self.model,
-                training_dataset,
-                self.config.covariances_epsilon,
-                self.config.diagonal_covariances,
-            )
-
-    def free_energy(self, dataset,means:np.ndarray=None,covariances:np.ndarray=None):
+    def free_energy(self, dataset):
         """Get the variational free energy.
-        This method is modified by swimming 13th Dec 2023
-        I added two arguments,means and covariances to substitute the means, and covariances in the model
 
         This calculates:
 
@@ -1097,10 +970,7 @@ class Model(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the free energy for.
-        means: np.ndarray
-            N_states * N_channels to substitute the mean activation. Do not change if none.
-        covariances: np.ndarray
-            N_states * N_channels * N_channels to substitute the covariance matries. Do not change if none
+
         Returns
         -------
         free_energy : float
@@ -1127,17 +997,8 @@ class Model(ModelBase):
             #   = - int q(s) log p(x | s) ds    [log_likelihood]
             #     + int q(s) log q(s) ds        [entropy]
             #     - int q(s) log p(s) ds        [prior]
-            if means is not None:
-                means_temp = self.get_means()
-                self.set_means(means)
-            if covariances is not None:
-                covariances_temp = self.get_covariances()
-                self.set_covariances(covariances)
+
             log_likelihood = self.get_posterior_expected_log_likelihood(x, gamma)
-            if means is not None:
-                self.set_means(means_temp)
-            if covariances is not None:
-                self.set_covariances(covariances_temp)
             entropy = self.get_posterior_entropy(gamma, xi)
             prior = self.get_posterior_expected_prior(gamma, xi)
 
@@ -1271,8 +1132,7 @@ class Model(ModelBase):
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
-        This includes the transition probabiltity matrix, state means and
-        covariances.
+        This includes the transition probabiltity matrix, state :code:`log_rates`.
 
         Returns
         -------
@@ -1285,7 +1145,7 @@ class Model(ModelBase):
 
         for var in self.trainable_weights:
             var_name = var.name
-            if "means" in var_name or "covs" in var_name:
+            if "log_rates" in var_name:
                 n_params += np.prod(var.shape)
 
         return int(n_params)
@@ -1353,11 +1213,9 @@ class Model(ModelBase):
         alpha : list of np.ndarray
             Subject specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
-        means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
-        covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_modes, n_channels, n_channels).
+        log_rates : np.ndarray
+            Subject-specific :code:`log_rates`.
+            Shape is (n_subjects, n_modes, n_channels).
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
@@ -1376,8 +1234,7 @@ class Model(ModelBase):
 
         # Fine tune the model for each subject
         alpha = []
-        means = []
-        covariances = []
+        log_rates = []
         with set_logging_level(_logger, logging.WARNING):
             for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
                 # Train on this subject
@@ -1386,10 +1243,9 @@ class Model(ModelBase):
                     a = self.get_alpha(training_data, concatenate=True)
 
                 # Get the inferred parameters
-                m, c = self.get_means_covariances()
+                m = self.get_log_rates()
                 alpha.append(a)
-                means.append(m)
-                covariances.append(c)
+                log_rates.append(m)
 
                 # Reset back to group-level model parameters
                 self.load_weights(f"{store_dir}/weights.h5")
@@ -1400,13 +1256,13 @@ class Model(ModelBase):
         self.config.learning_rate = original_learning_rate
         self.config.learn_trans_prob = original_learn_trans_prob
 
-        return alpha, np.array(means), np.array(covariances)
+        return alpha, np.array(log_rates)
 
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
         """Dual estimation to get subject-specific observation model parameters.
 
-        Here, we estimate the state means and covariances for individual
-        subjects with the posterior distribution of the states held fixed.
+        Here, we estimate the state :code:`log_rates` for individual subjects
+        with the posterior distribution of the states held fixed.
 
         Parameters
         ----------
@@ -1420,11 +1276,9 @@ class Model(ModelBase):
 
         Returns
         -------
-        means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_states, n_channels).
-        covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_states, n_channels, n_channels).
+        log_rates : np.ndarray
+            Subject-specific :code:`log_rates`.
+            Shape is (n_subjects, n_states, n_channels).
         """
         if alpha is None:
             # Get the posterior
@@ -1449,37 +1303,16 @@ class Model(ModelBase):
         # Helper function for dual estimation for a single subject
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
-            if self.config.learn_means:
-                subject_means = np.empty((n_states, n_channels))
+            if self.config.learn_log_rates:
+                subject_log_rates = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    subject_means[state] = (
+                    subject_log_rates[state] = (
                         np.sum(x * a[:, state, None], axis=0) / sum_a[state]
                     )
             else:
-                subject_means = self.get_means()
+                subject_log_rates = self.get_log_rates()
 
-            if self.config.learn_covariances:
-                subject_covariances = np.empty((n_states, n_channels, n_channels))
-                for state in range(n_states):
-                    diff = x - subject_means[state]
-                    subject_covariances[state] = (
-                        np.sum(
-                            diff[:, :, None]
-                            * diff[:, None, :]
-                            * a[:, state, None, None],
-                            axis=0,
-                        )
-                        / sum_a[state]
-                    )
-                    subject_covariances[
-                        state
-                    ] += self.config.covariances_epsilon * np.eye(
-                        self.config.n_channels
-                    )
-            else:
-                subject_covariances = self.get_covariances()
-
-            return subject_means, subject_covariances
+            return subject_log_rates
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []
@@ -1505,14 +1338,12 @@ class Model(ModelBase):
             )
 
         # Unpack the results
-        means = []
-        covariances = []
+        log_rates = []
         for result in results:
-            m, c = result
-            means.append(m)
-            covariances.append(c)
+            m = result
+            log_rates.append(m)
 
-        return np.squeeze(means), np.squeeze(covariances)
+        return np.squeeze(log_rates)
 
     def save_weights(self, filepath):
         """Save all model weights.
@@ -1580,52 +1411,20 @@ def _model_structure(config):
     )
     data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        name="static_loss_scaling_factor"
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
     # Definition of layers
-    means_layer = VectorsLayer(
+    log_rates_layer = VectorsLayer(
         config.n_states,
         config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="means",
+        config.learn_log_rates,
+        config.initial_log_rates,
+        name="log_rates",
     )
-    if config.diagonal_covariances:
-        covs_layer = DiagonalMatricesLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
-        )
-    else:
-        covs_layer = CovarianceMatricesLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
-        )
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-        config.n_states, config.covariances_epsilon, name="ll_loss"
+    ll_loss_layer = CategoricalPoissonLogLikelihoodLossLayer(
+        config.n_states, name="ll_loss"
     )
 
     # Data flow
-    mu = means_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    D = covs_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    ll_loss = ll_loss_layer([data, mu, D, gamma, None])
+    mu = log_rates_layer(data)  # data not used
+    ll_loss = ll_loss_layer([data, mu, gamma, None])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")
+    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM-Poisson")
