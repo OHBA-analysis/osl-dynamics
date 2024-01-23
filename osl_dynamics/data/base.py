@@ -1007,7 +1007,7 @@ class Data:
         Returns
         -------
         n : np.ndarray
-            Number of sequences for each array's data.
+            Number of sequences for each session's data.
         """
         return np.array(
             [
@@ -1160,7 +1160,7 @@ class Data:
                         (1.0 - validation_split) * dataset_size
                     )
 
-                    # Split this array's dataset
+                    # Split this session's dataset
                     training_datasets.append(
                         full_datasets[i].take(training_dataset_size)
                     )

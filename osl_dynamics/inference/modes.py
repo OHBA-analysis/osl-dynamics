@@ -617,7 +617,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     if isinstance(alpha[0], np.ndarray):
         alpha = [[a] for a in alpha]
 
-    # Number of runs and length of each array's data
+    # Number of runs and length of each session's data
     n_runs = len(alpha)
     n_array_samples = [a.shape[0] for a in alpha[0]]
 

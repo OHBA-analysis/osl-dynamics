@@ -656,7 +656,7 @@ class MSess_HMM_MVN(Simulation):
         self.state_time_course = []
         self.hmm = []
         for i in range(self.n_sessions):
-            # Build HMM object with the array's stay probalibity with
+            # Build HMM object with the session's stay probalibity with
             # different seeds
             hmm = HMM(
                 trans_prob=trans_prob[i],
