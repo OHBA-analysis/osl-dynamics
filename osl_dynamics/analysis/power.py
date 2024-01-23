@@ -576,16 +576,16 @@ def multi_save(
         arrays = np.arange(n_sessions)
 
     for arr in arrays:
-        array_dir = "{fn.parent}/arr_{arr:0{v}d}".format(
+        session_dir = "{fn.parent}/arr_{arr:0{v}d}".format(
             fn=filename, arr=arr, v=len(str(n_sessions))
         )
-        os.makedirs(array_dir, exist_ok=True)
-        array_filename = f"{array_dir}/{filename.stem}{filename.suffix}"
+        os.makedirs(session_dir, exist_ok=True)
+        session_filename = f"{session_dir}/{filename.stem}{filename.suffix}"
 
         _logger.info(f"Saving array {arr} power map:")
         save(
             session_power_map[arr],
-            filename=array_filename,
+            filename=session_filename,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
             plot_kwargs=plot_kwargs,
