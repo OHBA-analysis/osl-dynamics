@@ -571,7 +571,7 @@ def get_dev_map(model, map, embeddings=None):
     return norm_dev_map.numpy()
 
 
-def get_array_dev(
+def get_session_dev(
     model,
     learn_means,
     learn_covariances,
@@ -670,7 +670,7 @@ def get_session_means_covariances(
     """
     group_means = get_observation_model_parameter(model, "group_means")
     group_covs = get_observation_model_parameter(model, "group_covs")
-    means_dev, covs_dev = get_array_dev(
+    means_dev, covs_dev = get_session_dev(
         model, learn_means, learn_covariances, embeddings, n_neighbours
     )
 

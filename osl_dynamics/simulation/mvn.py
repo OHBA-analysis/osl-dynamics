@@ -740,7 +740,7 @@ class MSess_MVN(MVN):
 
         return data.astype(np.float32)
 
-    def get_array_instantaneous_covariances(self, array, mode_time_course):
+    def get_session_instantaneous_covariances(self, array, mode_time_course):
         """Get ground truth covariances at each time point for a particular array.
 
         Parameters
@@ -786,7 +786,7 @@ class MSess_MVN(MVN):
         inst_covs = []
         for array in range(self.n_sessions):
             inst_covs.append(
-                self.get_array_instantaneous_covariances(
+                self.get_session_instantaneous_covariances(
                     array, mode_time_courses[array]
                 )
             )
