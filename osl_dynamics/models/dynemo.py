@@ -448,7 +448,7 @@ class Model(VariationalInferenceModelBase):
 
         return int(n_params)
 
-    def array_fine_tuning(
+    def fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
         """Fine tuning the model for each array.
