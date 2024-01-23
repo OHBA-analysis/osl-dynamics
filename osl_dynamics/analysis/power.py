@@ -460,7 +460,7 @@ def multi_save(
     mask_file,
     parcellation_file,
     filename=None,
-    arrays=None,
+    sessions=None,
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
@@ -495,8 +495,8 @@ def multi_save(
         as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
         as images. If :code:`None` is passed then the image is shown on screen
         and the Matplotlib objects are returned.
-    arrays : list, optional
-        List of array indices to be plot power maps for.
+    sessions : list, optional
+        List of session indices to be plot power maps for.
     subtract_mean : bool, optional
         Should we subtract the mean power across modes?
     mean_weights: np.ndarray, optional
@@ -522,7 +522,9 @@ def multi_save(
     if session_power_map.ndim > 1:
         if session_power_map.shape[-1] == session_power_map.shape[-2]:
             # np.copy is needed because np.diagonal returns a read only array
-            session_power_map = np.copy(np.diagonal(session_power_map, axis1=-2, axis2=-1))
+            session_power_map = np.copy(
+                np.diagonal(session_power_map, axis1=-2, axis2=-1)
+            )
     else:
         session_power_map = session_power_map[np.newaxis, ...]
 
@@ -570,21 +572,21 @@ def multi_save(
         plot_kwargs=plot_kwargs,
     )
 
-    # Save the array level power maps
+    # Save the session-level power maps
     n_sessions = session_power_map.shape[0]
-    if arrays is None:
-        arrays = np.arange(n_sessions)
+    if sessions is None:
+        sessions = np.arange(n_sessions)
 
-    for arr in arrays:
-        session_dir = "{fn.parent}/arr_{arr:0{v}d}".format(
-            fn=filename, arr=arr, v=len(str(n_sessions))
+    for sess in sessions:
+        session_dir = "{fn.parent}/sess_{sess:0{v}d}".format(
+            fn=filename, sess=sess, v=len(str(n_sessions))
         )
         os.makedirs(session_dir, exist_ok=True)
         session_filename = f"{session_dir}/{filename.stem}{filename.suffix}"
 
-        _logger.info(f"Saving array {arr} power map:")
+        _logger.info(f"Saving session {sess} power map:")
         save(
-            session_power_map[arr],
+            session_power_map[sess],
             filename=session_filename,
             mask_file=mask_file,
             parcellation_file=parcellation_file,

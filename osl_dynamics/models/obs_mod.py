@@ -578,7 +578,7 @@ def get_session_dev(
     embeddings=None,
     n_neighbours=2,
 ):
-    """Get the array deviation.
+    """Get the session deviation.
 
     Parameters
     ----------
@@ -643,7 +643,7 @@ def get_session_means_covariances(
     embeddings=None,
     n_neighbours=2,
 ):
-    """Get the array means and covariances.
+    """Get the session means and covariances.
 
     Parameters
     ----------
@@ -663,9 +663,9 @@ def get_session_means_covariances(
     Returns
     -------
     mu : np.ndarray
-        The array means. Shape is (n_sessions, n_states, n_channels).
+        The session means. Shape is (n_sessions, n_states, n_channels).
     D : np.ndarray
-        The array covariances.
+        The session covariances.
         Shape is (n_sessions, n_states, n_channels, n_channels).
     """
     group_means = get_observation_model_parameter(model, "group_means")

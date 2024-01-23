@@ -181,12 +181,12 @@ class MixedSine_MVN(Simulation):
 
 class MSess_MixedSine_MVN(Simulation):
     """Simulates sinusoidal alphas with a multivariable normal observation model
-    for each array.
+    for each session.
 
     Parameters
     ----------
     n_samples : int
-        Number of samples per array to draw from the model.
+        Number of samples per session to draw from the model.
     relative_activation : np.ndarray or list
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
@@ -213,15 +213,15 @@ class MSess_MixedSine_MVN(Simulation):
     n_channels : int, optional
         Number of channels.
     n_sessions : int, optional
-        Number of arrays.
+        Number of sessions.
     embeddings_dim : int, optional
         Number of dimensions for embedding vectors.
     spatial_embeddings_dim : int, optional
         Number of dimensions for spatial embedding vectors.
     embeddings_scale : float, optional
-        Scale of variability between array observation parameters.
+        Scale of variability between session observation parameters.
     n_groups : int, optional
-        Number of groups of arrays when array means or covariances are
+        Number of groups when session means or covariances are
         :code:`'random'`.
     between_group_scale : float, optional
         Scale of variability between groups.
@@ -275,7 +275,7 @@ class MSess_MixedSine_MVN(Simulation):
 
         super().__init__(n_samples=n_samples)
 
-        # Simulate mode time courses for all arrays
+        # Simulate mode time courses for all sessions
         self.mode_time_course = []
         self.sm = []
 
@@ -293,7 +293,9 @@ class MSess_MixedSine_MVN(Simulation):
         self.mode_time_course = np.array(self.mode_time_course)
 
         # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_session_data(self.mode_time_course)
+        self.time_series = self.obs_mod.simulate_multi_session_data(
+            self.mode_time_course
+        )
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):

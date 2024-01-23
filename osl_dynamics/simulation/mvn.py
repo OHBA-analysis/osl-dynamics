@@ -365,18 +365,18 @@ class MDyn_MVN(MVN):
 
 class MSess_MVN(MVN):
     """Class that generates data from a multivariate normal distribution for
-    multiple arrays.
+    multiple sessions.
 
     Parameters
     ----------
     session_means : np.ndarray or str
-        Session mean vector for each mode for each array, shape should be
+        Mean vector for each mode for each session, shape should be
         (n_sessions, n_modes, n_channels). Either a numpy array or
         :code:`'zero'` or :code:`'random'`.
     session_covariances : np.ndarray or str
-        Session covariance matrix for each mode for each array, shape should
-        be (n_sessions, n_modes, n_channels, n_channels). Either a numpy array
-        or :code:`'random'`.
+        Covariance matrix for each mode for each session, shape should
+        be (n_sessions, n_modes, n_channels, n_channels). Either a numpy
+        array or :code:`'random'`.
     n_modes : int, optional
         Number of modes.
     n_channels : int, optional
@@ -384,7 +384,7 @@ class MSess_MVN(MVN):
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
     n_sessions : int, optional
-        Number of arrays.
+        Number of sessions.
     embeddings_dim : int, optional
         Dimension of embeddings.
     spatial_embeddings_dim : int, optional
@@ -393,7 +393,7 @@ class MSess_MVN(MVN):
         Standard deviation when generating embeddings with a normal
         distribution.
     n_groups : int, optional
-        Number of groups of arrays when generating embeddings.
+        Number of groups when generating embeddings.
     between_group_scale : float, optional
         Standard deviation when generating centroids of groups of
         embeddings.
@@ -428,7 +428,7 @@ class MSess_MVN(MVN):
         self.n_groups = n_groups
         self.between_group_scale = between_group_scale
 
-        # Both the array means and covariances were passed as numpy arrays
+        # Both the session means and covariances were passed as numpy arrays
         if isinstance(session_means, np.ndarray) and isinstance(
             session_covariances, np.ndarray
         ):
@@ -472,7 +472,7 @@ class MSess_MVN(MVN):
             self.group_covariances = None
             self.session_covariances = session_covariances
 
-        # Only the array means were passed as a numpy array
+        # Only the session means were passed as a numpy array
         elif isinstance(session_means, np.ndarray) and not isinstance(
             session_covariances, np.ndarray
         ):
@@ -489,7 +489,7 @@ class MSess_MVN(MVN):
             self.group_covariances = super().create_covariances(session_covariances)
             self.session_covariances = self.create_session_covariances()
 
-        # Only the array covariances were passed as a numpy array
+        # Only the session covariances were passed as a numpy array
         elif not isinstance(session_means, np.ndarray) and isinstance(
             session_covariances, np.ndarray
         ):
@@ -506,7 +506,7 @@ class MSess_MVN(MVN):
             self.group_covariances = None
             self.session_covariances = session_covariances
 
-        # Neither array means or nor covariances were passed as numpy arrays
+        # Neither session means or nor covariances were passed as numpy arrays
         elif not isinstance(session_means, np.ndarray) and not isinstance(
             session_covariances, np.ndarray
         ):
@@ -556,7 +556,7 @@ class MSess_MVN(MVN):
             )
 
     def create_embeddings(self):
-        # Assign groups to arrays
+        # Assign groups to sessions
         assigned_groups = self._rng.choice(self.n_groups, self.n_sessions)
         self.group_centroids = self._rng.normal(
             scale=self.between_group_scale,
@@ -676,22 +676,22 @@ class MSess_MVN(MVN):
         group_cholesky_covariances = np.linalg.cholesky(self.group_covariances)
         m, n = np.tril_indices(self.n_channels)
         flattened_group_cholesky_covariances = group_cholesky_covariances[:, m, n]
-        flattened_array_cholesky_covariances = (
+        flattened_session_cholesky_covariances = (
             flattened_group_cholesky_covariances[None, ...]
             + self.flattened_covariances_cholesky_deviations
         )
 
-        array_cholesky_covariances = np.zeros(
+        session_cholesky_covariances = np.zeros(
             [self.n_sessions, self.n_modes, self.n_channels, self.n_channels]
         )
         for i in range(self.n_sessions):
             for j in range(self.n_modes):
-                array_cholesky_covariances[
+                session_cholesky_covariances[
                     i, j, m, n
-                ] = flattened_array_cholesky_covariances[i, j]
+                ] = flattened_session_cholesky_covariances[i, j]
 
-        session_covariances = array_cholesky_covariances @ np.transpose(
-            array_cholesky_covariances, (0, 1, 3, 2)
+        session_covariances = session_cholesky_covariances @ np.transpose(
+            session_cholesky_covariances, (0, 1, 3, 2)
         )
 
         # A small value to add to the diagonal to ensure the covariances
@@ -700,12 +700,12 @@ class MSess_MVN(MVN):
 
         return session_covariances
 
-    def simulate_session_data(self, array, mode_time_course):
-        """Simulate single array data.
+    def simulate_session_data(self, session, mode_time_course):
+        """Simulate single session data.
 
         Parameters
         ----------
-        array : int
+        session : int
             Session number.
         mode_time_course : np.ndarray
             Mode time course. Shape is (n_samples, n_modes).
@@ -722,8 +722,10 @@ class MSess_MVN(MVN):
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
             # Mean and covariance for this combination of modes
-            mu = np.sum(self.session_means[array] * alpha[:, None], axis=0)
-            sigma = np.sum(self.session_covariances[array] * alpha[:, None, None], axis=0)
+            mu = np.sum(self.session_means[session] * alpha[:, None], axis=0)
+            sigma = np.sum(
+                self.session_covariances[session] * alpha[:, None, None], axis=0
+            )
 
             # Generate data for the time points that this combination of
             # modes is active
@@ -740,12 +742,12 @@ class MSess_MVN(MVN):
 
         return data.astype(np.float32)
 
-    def get_session_instantaneous_covariances(self, array, mode_time_course):
-        """Get ground truth covariances at each time point for a particular array.
+    def get_session_instantaneous_covariances(self, session, mode_time_course):
+        """Get ground truth covariances at each time point for a particular session.
 
         Parameters
         ----------
-        array : int
+        session : int
             Session number.
         mode_time_course : np.ndarray
             Mode time course. Shape is (n_samples, n_modes).
@@ -753,7 +755,7 @@ class MSess_MVN(MVN):
         Returns
         -------
         inst_covs : np.ndarray
-            Instantaneous covariances for an array.
+            Instantaneous covariances for an session.
             Shape is (n_samples, n_channels, n_channels).
         """
         # Initialise array to hold data
@@ -763,13 +765,15 @@ class MSess_MVN(MVN):
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
             # Covariance for this combination of modes
-            sigma = np.sum(self.session_covariances[array] * alpha[:, None, None], axis=0)
+            sigma = np.sum(
+                self.session_covariances[session] * alpha[:, None, None], axis=0
+            )
             inst_covs[np.all(mode_time_course == alpha, axis=1)] = sigma
 
         return inst_covs.astype(np.float32)
 
     def get_instantaneous_covariances(self, mode_time_courses):
-        """Get ground truth covariance at each time point for each array.
+        """Get ground truth covariance at each time point for each session.
 
         Parameters
         ----------
@@ -784,10 +788,10 @@ class MSess_MVN(MVN):
             Shape is (n_sessions, n_samples, n_channels, n_channels).
         """
         inst_covs = []
-        for array in range(self.n_sessions):
+        for session in range(self.n_sessions):
             inst_covs.append(
                 self.get_session_instantaneous_covariances(
-                    array, mode_time_courses[array]
+                    session, mode_time_courses[session]
                 )
             )
         return np.array(inst_covs)
@@ -804,10 +808,10 @@ class MSess_MVN(MVN):
         Returns
         -------
         data : np.ndarray
-            Simulated data for arrays.
+            Simulated data for sessions.
             Shape is (n_sessions, n_samples, n_channels).
         """
         data = []
-        for array in range(self.n_sessions):
-            data.append(self.simulate_session_data(array, mode_time_courses[array]))
+        for session in range(self.n_sessions):
+            data.append(self.simulate_session_data(session, mode_time_courses[session]))
         return np.array(data)

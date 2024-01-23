@@ -451,7 +451,7 @@ class Model(VariationalInferenceModelBase):
     def fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Fine tuning the model for each array.
+        """Fine tuning the model for each session.
 
         Here, we train the inference RNN and observation model with the model
         RNN fixed held fixed at the group-level.
@@ -495,7 +495,7 @@ class Model(VariationalInferenceModelBase):
         # Layers to fix (i.e. make non-trainable)
         fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
 
-        # Fine tune on arrays
+        # Fine tune on sessions
         alpha = []
         means = []
         covariances = []
@@ -503,7 +503,7 @@ class Model(VariationalInferenceModelBase):
             _logger, logging.WARNING
         ):
             for i in trange(training_data.n_sessions, desc="Fine tuning"):
-                # Train on this array
+                # Train on this session
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
                     a = self.get_alpha(
@@ -586,12 +586,12 @@ class Model(VariationalInferenceModelBase):
             "alpha",
         ]
 
-        # Dual estimation on arrays
+        # Dual estimation on sessions
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False):
             for i in trange(training_data.n_sessions, desc="Dual estimation"):
-                # Train on this array
+                # Train on this session
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
 

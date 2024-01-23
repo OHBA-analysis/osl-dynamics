@@ -66,7 +66,7 @@ class FisherKernel:
             shuffle=False,
         )
 
-        # Initialise list to hold features for each array
+        # Initialise list to hold features for each session
         features = []
         for i in trange(n_sessions, desc="Getting features"):
             session_data = dataset[i]
@@ -94,7 +94,7 @@ class FisherKernel:
                 ):
                     d_model[name] = []
 
-            # Loop over data for each array
+            # Loop over data for each session
             for inputs in session_data:
                 if self.model.config.model_name == "HMM":
                     x = inputs["data"]
@@ -162,6 +162,7 @@ class FisherKernel:
         xi : np.ndarray
             Joint posterior distribution of hidden states given the data.
             Shape is (batch_size*sequence_length-1, n_states*n_states).
+
         Returns
         -------
         d_initial_distribution : np.ndarray

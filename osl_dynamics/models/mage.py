@@ -445,7 +445,7 @@ class Model(ModelBase):
         inputs : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data.
         concatenate : bool, optional
-            Should we concatenate alpha for each array?
+            Should we concatenate alpha for each session?
 
         Returns
         -------

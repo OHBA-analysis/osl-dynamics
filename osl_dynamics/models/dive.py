@@ -146,7 +146,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Strategy for distributed learning.
 
     n_sessions : int
-        Number of arrays whose observation model parameters can vary.
+        Number of sessions whose observation model parameters can vary.
     embeddings_dim : int
         Number of dimensions for the embedding vectors.
     spatial_embeddings_dim : int
@@ -329,7 +329,7 @@ class Model(VariationalInferenceModelBase):
         embeddings=None,
         n_neighbours=2,
     ):
-        """Get the means and covariances for each array.
+        """Get the means and covariances for each session.
 
         Parameters
         ----------
@@ -343,10 +343,10 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         session_means : np.ndarray
-            Mode means for each array.
+            Mode means for each session.
             Shape is (n_sessions, n_modes, n_channels).
         session_covs : np.ndarray
-            Mode covariances for each array.
+            Mode covariances for each session.
             Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         return obs_mod.get_session_means_covariances(
@@ -588,7 +588,7 @@ def _model_structure(config):
     # Observation model
 
     # Embedding layers
-    sessions_layer = TFRangeLayer(config.n_sessions, name="arrays")
+    sessions_layer = TFRangeLayer(config.n_sessions, name="sessions")
     embeddings_layer = layers.Embedding(
         config.n_sessions,
         config.embeddings_dim,
@@ -614,8 +614,8 @@ def _model_structure(config):
         name="group_covs",
     )
 
-    arrays = sessions_layer(data)
-    embeddings = embeddings_layer(arrays)
+    sessions = sessions_layer(data)
+    embeddings = embeddings_layer(sessions)
 
     group_mu = group_means_layer(
         data, static_loss_scaling_factor=static_loss_scaling_factor
@@ -852,7 +852,7 @@ def _model_structure(config):
     D = session_covs_layer([group_D, covs_dev])
 
     # -----------------------------------
-    # Mix the array specific paraemters
+    # Mix the session specific paraemters
     # and get the conditional likelihood
 
     # Layer definitions

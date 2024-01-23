@@ -1191,9 +1191,9 @@ class Model(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each array.
+            each session.
         concatenate : bool, optional
-            Should we concatenate alpha for each array?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -1315,10 +1315,10 @@ class Model(ModelBase):
     def fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Fine tuning the model for each array.
+        """Fine tuning the model for each session.
 
         Here, we estimate the posterior distribution (state probabilities)
-        and observation model using the data from a single array with the
+        and observation model using the data from a single session with the
         group-level transition probability matrix held fixed.
 
         Parameters
@@ -1360,13 +1360,13 @@ class Model(ModelBase):
         # Reset the optimiser
         self.compile()
 
-        # Fine tune the model for each array
+        # Fine tune the model for each session
         alpha = []
         means = []
         covariances = []
         with set_logging_level(_logger, logging.WARNING):
             for i in trange(training_data.n_sessions, desc="Fine tuning"):
-                # Train on this array
+                # Train on this session
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
                     a = self.get_alpha(training_data, concatenate=True)
@@ -1391,7 +1391,7 @@ class Model(ModelBase):
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
         """Dual estimation to get session-specific observation model parameters.
 
-        Here, we estimate the state means and covariances for arrays
+        Here, we estimate the state means and covariances for sessions
         with the posterior distribution of the states held fixed.
 
         Parameters
@@ -1424,7 +1424,9 @@ class Model(ModelBase):
         data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
-            raise ValueError("len(alpha) and training_data.n_sessions must be the same.")
+            raise ValueError(
+                "len(alpha) and training_data.n_sessions must be the same."
+            )
 
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
@@ -1432,7 +1434,7 @@ class Model(ModelBase):
         n_states = self.config.n_states
         n_channels = self.config.n_channels
 
-        # Helper function for dual estimation for a single array
+        # Helper function for dual estimation for a single session
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
             if self.config.learn_means:

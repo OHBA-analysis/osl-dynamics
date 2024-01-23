@@ -536,12 +536,12 @@ class HMM_Poi(Simulation):
 
 class MSess_HMM_MVN(Simulation):
     """Simulate an HMM with multivariate normal observation model for each
-    array.
+    session.
 
     Parameters
     ----------
     n_samples : int
-        Number of samples per array to draw from the model.
+        Number of samples per session to draw from the model.
     trans_prob : np.ndarray or str
         Transition probability matrix as a numpy array or a :code:`str`
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
@@ -564,7 +564,7 @@ class MSess_HMM_MVN(Simulation):
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
     n_sessions : int, optional
-        Number of arrays.
+        Number of sessions.
     embeddings_dim : int
         Dimension of the embedding vectors.
     spatial_embeddings_dim : int
@@ -572,15 +572,15 @@ class MSess_HMM_MVN(Simulation):
     embeddings_scale : float
         Scale of the embedding vectors.
     n_groups : int, optional
-        Number of groups of arrays when array means or covariances are
+        Number of groups when session means or covariances are
         :code:`'random'`.
     between_group_scale : float, optional
-        Scale of variability between array observation parameters.
+        Scale of variability between session observation parameters.
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob`
         is a :code:`str`. Must be between 0 and 1.
     tc_std : float, optional
-        Standard deviation when generating array specific stay probability.
+        Standard deviation when generating session-specific stay probability.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
     random_seed : int, optional
@@ -611,7 +611,7 @@ class MSess_HMM_MVN(Simulation):
         if n_states is None:
             n_states = n_modes
 
-        # Construct trans_prob for each array
+        # Construct trans_prob for each session
         if isinstance(trans_prob, str) or trans_prob is None:
             trans_prob = [trans_prob] * n_sessions
 
@@ -636,7 +636,7 @@ class MSess_HMM_MVN(Simulation):
         self.n_channels = self.obs_mod.n_channels
         self.n_sessions = self.obs_mod.n_sessions
 
-        # vary the stay probability for each array
+        # Vary the stay probability for each session
         if stay_prob is not None:
             session_stay_prob = self.obs_mod._rng.normal(
                 loc=stay_prob,
@@ -652,7 +652,7 @@ class MSess_HMM_MVN(Simulation):
         # Initialise base class
         super().__init__(n_samples=n_samples)
 
-        # Simulate state time courses all arrays
+        # Simulate state time courses for all sessions
         self.state_time_course = []
         self.hmm = []
         for i in range(self.n_sessions):

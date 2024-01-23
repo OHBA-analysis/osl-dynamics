@@ -95,7 +95,7 @@ def welch_spectra(
         Should we return the weights for session-specific spectra?
         This is useful for calculating a group average.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, n_states, ...) array is returned
+        Should we enforce a (n_sessions, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
         dimension of length 1.
     n_jobs : int, optional
@@ -106,13 +106,12 @@ def welch_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each array and state. Shape is (n_sessions,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        Power spectra. Shape is (n_sessions, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_sessions, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+        Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Only returned is :code:`calc_coh=True`.
     w : np.ndarray
         Weighting for session-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_sessions,).
@@ -185,13 +184,12 @@ def multitaper_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each array and state. Shape is (n_sessions,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        Power spectra. Shape is (n_sessions, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_sessions, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+        Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Only returned is :code:`calc_coh=True`.
     w : np.ndarray
         Weighting for session-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_sessions,).

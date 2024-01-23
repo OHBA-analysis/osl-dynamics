@@ -426,9 +426,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            array.
+            session.
         concatenate : bool, optional
-            Should we concatenate theta for each array?
+            Should we concatenate theta for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`theta` and
@@ -501,9 +501,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            array.
+            session.
         concatenate : bool, optional
-            Should we concatenate theta for each array?
+            Should we concatenate theta for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`theta` and
@@ -581,9 +581,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            array.
+            session.
         concatenate : bool, optional
-            Should we concatenate alpha for each array?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -655,9 +655,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data. This can be a list of datasets, one for each
-            array.
+            session.
         concatenate : bool, optional
-            Should we concatenate alpha/gamma for each array?
+            Should we concatenate alpha/gamma for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha`/
@@ -945,9 +945,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each array.
+            each session.
         concatenate : bool, optional
-            Should we concatenate alpha for each array?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and

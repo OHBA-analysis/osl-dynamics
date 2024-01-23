@@ -161,12 +161,12 @@ def welch_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each array and state. Shape is (n_sessions,
+        Power spectra for each session and state. Shape is (n_sessions,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_sessions, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
+        Coherences for each session and state. Shape is (n_sessions, n_states,
+        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     w : np.ndarray
         Weighting for session-specific spectra. Only returned if
@@ -351,12 +351,12 @@ def multitaper_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each array and state. Shape is (n_sessions,
+        Power spectra for each session and state. Shape is (n_sessions,
         n_states, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_sessions, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
+        Coherences for each session and state. Shape is (n_sessions, n_states,
+        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     w : np.ndarray
         Weighting for session-specific spectra. Only returned if

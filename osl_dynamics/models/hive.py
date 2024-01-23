@@ -72,7 +72,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Regularizer for group covariance matrices.
 
     n_sessions : int
-        Number of arrays whose observation model parameters can vary.
+        Number of sessions whose observation model parameters can vary.
     embeddings_dim : int
         Number of dimensions for embeddings dimension.
     spatial_embeddings_dim : int
@@ -587,7 +587,7 @@ def _model_structure(config):
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Embedding layers
-    sessions_layer = TFRangeLayer(config.n_sessions, name="arrays")
+    sessions_layer = TFRangeLayer(config.n_sessions, name="sessions")
     embeddings_layer = layers.Embedding(
         config.n_sessions,
         config.embeddings_dim,
@@ -613,8 +613,8 @@ def _model_structure(config):
         name="group_covs",
     )
 
-    arrays = sessions_layer(data)
-    embeddings = embeddings_layer(arrays)
+    sessions = sessions_layer(data)
+    embeddings = embeddings_layer(sessions)
 
     group_mu = group_means_layer(
         data, static_loss_scaling_factor=static_loss_scaling_factor

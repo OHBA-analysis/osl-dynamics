@@ -360,7 +360,7 @@ class ModelBase:
         prepared : bool, optional
             Should we return the prepared data? If not, we return the raw data.
         concatenate : bool, optional
-            Should we concatenate the data for each array?
+            Should we concatenate the data for each session?
 
         Returns
         -------
