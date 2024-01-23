@@ -1436,18 +1436,18 @@ class Model(ModelBase):
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
             if self.config.learn_means:
-                array_means = np.empty((n_states, n_channels))
+                session_means = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    array_means[state] = (
+                    session_means[state] = (
                         np.sum(x * a[:, state, None], axis=0) / sum_a[state]
                     )
             else:
-                array_means = self.get_means()
+                session_means = self.get_means()
 
             if self.config.learn_covariances:
                 array_covariances = np.empty((n_states, n_channels, n_channels))
                 for state in range(n_states):
-                    diff = x - array_means[state]
+                    diff = x - session_means[state]
                     array_covariances[state] = (
                         np.sum(
                             diff[:, :, None]
@@ -1465,7 +1465,7 @@ class Model(ModelBase):
             else:
                 array_covariances = self.get_covariances()
 
-            return array_means, array_covariances
+            return session_means, array_covariances
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []

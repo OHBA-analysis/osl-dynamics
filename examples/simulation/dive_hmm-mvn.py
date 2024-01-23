@@ -57,7 +57,7 @@ print("Simulating data")
 sim = simulation.MArr_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
-    array_means="zero",
+    session_means="zero",
     array_covariances="random",
     n_states=config.n_modes,
     n_channels=config.n_channels,

@@ -370,7 +370,7 @@ class Model(MarkovStateInferenceModelBase):
         """Wrapper for :code:`get_group_observation_model_parameters`."""
         return self.get_group_observation_model_parameters()
 
-    def get_array_means_covariances(
+    def get_session_means_covariances(
         self,
         embeddings=None,
         n_neighbours=2,
@@ -394,7 +394,7 @@ class Model(MarkovStateInferenceModelBase):
             Array covariances.
             Shape is (n_sessions, n_states, n_channels, n_channels).
         """
-        return obs_mod.get_array_means_covariances(
+        return obs_mod.get_session_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
@@ -842,15 +842,15 @@ def _model_structure(config):
     # Add deviations to group level parameters
 
     # Layer definitions
-    array_means_layer = ArrayMapLayer(
-        "means", config.covariances_epsilon, name="array_means"
+    session_means_layer = ArrayMapLayer(
+        "means", config.covariances_epsilon, name="session_means"
     )
     array_covs_layer = ArrayMapLayer(
         "covariances", config.covariances_epsilon, name="array_covs"
     )
 
     # Data flow
-    mu = array_means_layer(
+    mu = session_means_layer(
         [group_mu, means_dev]
     )  # shape = (None, n_states, n_channels)
     D = array_covs_layer(

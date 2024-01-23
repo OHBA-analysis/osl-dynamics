@@ -369,7 +369,7 @@ class MArr_MVN(MVN):
 
     Parameters
     ----------
-    array_means : np.ndarray or str
+    session_means : np.ndarray or str
         Array mean vector for each mode for each array, shape should be
         (n_sessions, n_modes, n_channels). Either a numpy array or
         :code:`'zero'` or :code:`'random'`.
@@ -405,7 +405,7 @@ class MArr_MVN(MVN):
 
     def __init__(
         self,
-        array_means,
+        session_means,
         array_covariances,
         n_modes=None,
         n_channels=None,
@@ -429,36 +429,36 @@ class MArr_MVN(MVN):
         self.between_group_scale = between_group_scale
 
         # Both the array means and covariances were passed as numpy arrays
-        if isinstance(array_means, np.ndarray) and isinstance(
+        if isinstance(session_means, np.ndarray) and isinstance(
             array_covariances, np.ndarray
         ):
-            if array_means.ndim != 3:
+            if session_means.ndim != 3:
                 raise ValueError(
-                    "array_means must have shape (n_sessions, n_modes, n_channels)."
+                    "session_means must have shape (n_sessions, n_modes, n_channels)."
                 )
             if array_covariances.ndim != 4:
                 raise ValueError(
                     "array_covariances must have shape "
                     "(n_sessions, n_modes, n_channels, n_channels)."
                 )
-            if array_means.shape[0] != array_covariances.shape[0]:
+            if session_means.shape[0] != array_covariances.shape[0]:
                 raise ValueError(
-                    "array_means and array_covariances have a different  "
+                    "session_means and array_covariances have a different  "
                     "number of arrays."
                 )
-            if array_means.shape[1] != array_covariances.shape[1]:
+            if session_means.shape[1] != array_covariances.shape[1]:
                 raise ValueError(
-                    "array_means and array_covariances have a different "
+                    "session_means and array_covariances have a different "
                     "number of modes."
                 )
-            if array_means.shape[2] != array_covariances.shape[2]:
+            if session_means.shape[2] != array_covariances.shape[2]:
                 raise ValueError(
-                    "array_means and array_covariances have a different "
+                    "session_means and array_covariances have a different "
                     "number of channels."
                 )
-            self.n_sessions = array_means.shape[0]
-            self.n_modes = array_means.shape[1]
-            self.n_channels = array_means.shape[2]
+            self.n_sessions = session_means.shape[0]
+            self.n_modes = session_means.shape[1]
+            self.n_channels = session_means.shape[2]
             self.n_groups = None
             self.group_centroids = None
             self.between_group_scale = None
@@ -467,30 +467,30 @@ class MArr_MVN(MVN):
             self.embeddings_scale = None
 
             self.group_means = None
-            self.array_means = array_means
+            self.session_means = session_means
 
             self.group_covariances = None
             self.array_covariances = array_covariances
 
         # Only the array means were passed as a numpy array
-        elif isinstance(array_means, np.ndarray) and not isinstance(
+        elif isinstance(session_means, np.ndarray) and not isinstance(
             array_covariances, np.ndarray
         ):
-            self.n_sessions = array_means.shape[0]
-            self.n_modes = array_means.shape[1]
-            self.n_channels = array_means.shape[2]
+            self.n_sessions = session_means.shape[0]
+            self.n_modes = session_means.shape[1]
+            self.n_channels = session_means.shape[2]
 
             self.validate_embedding_parameters()
             self.create_embeddings()
 
             self.group_means = None
-            self.array_means = array_means
+            self.session_means = session_means
 
             self.group_covariances = super().create_covariances(array_covariances)
             self.array_covariances = self.create_array_covariances()
 
         # Only the array covariances were passed as a numpy array
-        elif not isinstance(array_means, np.ndarray) and isinstance(
+        elif not isinstance(session_means, np.ndarray) and isinstance(
             array_covariances, np.ndarray
         ):
             self.n_sessions = array_covariances.shape[0]
@@ -500,14 +500,14 @@ class MArr_MVN(MVN):
             self.validate_embedding_parameters()
             self.create_embeddings()
 
-            self.group_means = super().create_means(array_means)
-            self.array_means = self.create_array_means(array_means)
+            self.group_means = super().create_means(session_means)
+            self.session_means = self.create_session_means(session_means)
 
             self.group_covariances = None
             self.array_covariances = array_covariances
 
         # Neither array means or nor covariances were passed as numpy arrays
-        elif not isinstance(array_means, np.ndarray) and not isinstance(
+        elif not isinstance(session_means, np.ndarray) and not isinstance(
             array_covariances, np.ndarray
         ):
             if n_sessions is None or n_modes is None or n_channels is None:
@@ -523,8 +523,8 @@ class MArr_MVN(MVN):
             self.validate_embedding_parameters()
             self.create_embeddings()
 
-            self.group_means = super().create_means(array_means)
-            self.array_means = self.create_array_means(array_means)
+            self.group_means = super().create_means(session_means)
+            self.session_means = self.create_session_means(session_means)
 
             self.group_covariances = super().create_covariances(array_covariances)
             self.array_covariances = self.create_array_covariances()
@@ -584,7 +584,7 @@ class MArr_MVN(MVN):
             np.sum(np.square(linear_transform), axis=-1, keepdims=True)
         )
 
-    def create_array_means_deviations(self):
+    def create_session_means_deviations(self):
         means_spatial_embeddings_lienar_transform = self.create_linear_transform(
             self.n_channels, self.spatial_embeddings_dim
         )
@@ -663,13 +663,13 @@ class MArr_MVN(MVN):
             @ self.covariances_concat_embeddings[..., None]
         )
 
-    def create_array_means(self, option):
+    def create_session_means(self, option):
         if option == "zero":
-            array_means = np.zeros([self.n_sessions, self.n_modes, self.n_channels])
+            session_means = np.zeros([self.n_sessions, self.n_modes, self.n_channels])
         else:
-            self.create_array_means_deviations()
-            array_means = self.group_means[None, ...] + self.means_deviations
-        return array_means
+            self.create_session_means_deviations()
+            session_means = self.group_means[None, ...] + self.means_deviations
+        return session_means
 
     def create_array_covariances(self, eps=1e-6):
         self.create_array_covariances_deviations()
@@ -722,7 +722,7 @@ class MArr_MVN(MVN):
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
             # Mean and covariance for this combination of modes
-            mu = np.sum(self.array_means[array] * alpha[:, None], axis=0)
+            mu = np.sum(self.session_means[array] * alpha[:, None], axis=0)
             sigma = np.sum(self.array_covariances[array] * alpha[:, None, None], axis=0)
 
             # Generate data for the time points that this combination of

@@ -546,7 +546,7 @@ class MArr_HMM_MVN(Simulation):
         Transition probability matrix as a numpy array or a :code:`str`
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
         probability matrix.
-    array_means : np.ndarray or str
+    session_means : np.ndarray or str
         Array mean vector for each state, shape should be
         (n_sessions, n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
@@ -591,7 +591,7 @@ class MArr_HMM_MVN(Simulation):
         self,
         n_samples,
         trans_prob,
-        array_means,
+        session_means,
         array_covariances,
         n_states=None,
         n_modes=None,
@@ -617,7 +617,7 @@ class MArr_HMM_MVN(Simulation):
 
         # Observation model
         self.obs_mod = MArr_MVN(
-            array_means=array_means,
+            session_means=session_means,
             array_covariances=array_covariances,
             n_modes=n_states,
             n_channels=n_channels,
@@ -702,8 +702,8 @@ class MArr_HMM_MVN(Simulation):
         mu = np.mean(self.time_series, axis=1).astype(np.float64)
         sigma = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
-        self.obs_mod.array_means = (
-            self.obs_mod.array_means - mu[:, np.newaxis, :]
+        self.obs_mod.session_means = (
+            self.obs_mod.session_means - mu[:, np.newaxis, :]
         ) / sigma[:, np.newaxis, :]
         self.obs_mod.array_covariances /= np.expand_dims(
             sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1

@@ -324,7 +324,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_embeddings(self.model)
 
-    def get_array_means_covariances(
+    def get_session_means_covariances(
         self,
         embeddings=None,
         n_neighbours=2,
@@ -342,14 +342,14 @@ class Model(VariationalInferenceModelBase):
 
         Returns
         -------
-        array_means : np.ndarray
+        session_means : np.ndarray
             Mode means for each array.
             Shape is (n_sessions, n_modes, n_channels).
         array_covs : np.ndarray
             Mode covariances for each array.
             Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_array_means_covariances(
+        return obs_mod.get_session_means_covariances(
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
@@ -840,15 +840,15 @@ def _model_structure(config):
     # Add deviations to group level parameters
 
     # Layer definitions
-    array_means_layer = ArrayMapLayer(
-        "means", config.covariances_epsilon, name="array_means"
+    session_means_layer = ArrayMapLayer(
+        "means", config.covariances_epsilon, name="session_means"
     )
     array_covs_layer = ArrayMapLayer(
         "covariances", config.covariances_epsilon, name="array_covs"
     )
 
     # Data flow
-    mu = array_means_layer([group_mu, means_dev])
+    mu = session_means_layer([group_mu, means_dev])
     D = array_covs_layer([group_D, covs_dev])
 
     # -----------------------------------
@@ -856,8 +856,8 @@ def _model_structure(config):
     # and get the conditional likelihood
 
     # Layer definitions
-    mix_array_means_covs_layer = MixArraySpecificParametersLayer(
-        name="mix_array_means_covs"
+    mix_session_means_covs_layer = MixArraySpecificParametersLayer(
+        name="mix_session_means_covs"
     )
     ll_loss_layer = LogLikelihoodLossLayer(
         config.covariances_epsilon,
@@ -865,7 +865,7 @@ def _model_structure(config):
     )
 
     # Data flow
-    m, C = mix_array_means_covs_layer([alpha, mu, D])
+    m, C = mix_session_means_covs_layer([alpha, mu, D])
     ll_loss = ll_loss_layer([data, m, C])
 
     # ---------

@@ -459,7 +459,7 @@ def train_hive(
 
         # Get the inferred parameters
         alpha = model.get_alpha(data)
-        means, covs = model.get_array_means_covariances()
+        means, covs = model.get_session_means_covariances()
         embeddings = model.get_embeddings()
 
         # Save inferred parameters

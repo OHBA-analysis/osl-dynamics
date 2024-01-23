@@ -198,7 +198,7 @@ class MArr_MixedSine_MVN(Simulation):
         Frequency of each sinusoid. Shape must be (n_modes,).
     sampling_frequency : float
         Sampling frequency.
-    array_means : np.ndarray or str
+    session_means : np.ndarray or str
         Array mean vector for each mode, shape should be (n_sessions, n_modes,
         n_channels). Either a numpy array or :code:`'zero'` or
         :code:`'random'`.
@@ -238,7 +238,7 @@ class MArr_MixedSine_MVN(Simulation):
         amplitudes,
         frequencies,
         sampling_frequency,
-        array_means,
+        session_means,
         array_covariances,
         n_covariances_act=1,
         n_modes=None,
@@ -254,7 +254,7 @@ class MArr_MixedSine_MVN(Simulation):
     ):
         # Observation model
         self.obs_mod = MArr_MVN(
-            array_means=array_means,
+            session_means=session_means,
             array_covariances=array_covariances,
             n_covariances_act=n_covariances_act,
             n_modes=n_modes,
@@ -305,8 +305,8 @@ class MArr_MixedSine_MVN(Simulation):
         means = np.mean(self.time_series, axis=1).astype(np.float64)
         standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
-        self.obs_mod.array_means = (
-            self.obs_mod.array_means - means[:, None, :]
+        self.obs_mod.session_means = (
+            self.obs_mod.session_means - means[:, None, :]
         ) / standard_deviations[:, None, :]
         self.obs_mod.array_covariances /= np.expand_dims(
             standard_deviations[:, :, None] @ standard_deviations[:, None, :],
