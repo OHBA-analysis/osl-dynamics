@@ -1074,7 +1074,7 @@ class Data:
             # Dataset with the time series data and ID
             array_tracker = np.zeros(array.shape[0], dtype=np.float32)
             array_tracker = array_tracker + i
-            data = {"data": array, "array_id": array_tracker}
+            data = {"data": array, "session_id": array_tracker}
 
             # Create dataset
             dataset = dtf.create_dataset(
@@ -1246,7 +1246,7 @@ class Data:
             # Create a dataset with the time series data and ID
             array_tracker = np.zeros(array.shape[0], dtype=np.float32)
             array_tracker = array_tracker + i
-            data = {"data": array, "array_id": array_tracker}
+            data = {"data": array, "session_id": array_tracker}
 
             # Save the dataset
             dtf.save_tfrecord(
@@ -1269,10 +1269,10 @@ class Data:
 
         # Helper function for parsing training examples
         def _parse_example(example):
-            feature_names = ["data", "array_id"]
+            feature_names = ["data", "session_id"]
             tensor_shapes = {
                 "data": [self.sequence_length, self.n_channels],
-                "array_id": [self.sequence_length],
+                "session_id": [self.sequence_length],
             }
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names

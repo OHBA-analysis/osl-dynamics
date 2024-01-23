@@ -571,10 +571,10 @@ def _model_structure(config):
         dtype=tf.float32,
         name="data",
     )
-    array_id = layers.Input(
+    session_id = layers.Input(
         shape=(config.sequence_length,),
         dtype=tf.int32,
-        name="array_id",
+        name="session_id",
     )
 
     batch_size_layer = BatchSizeLayer(name="batch_size")
@@ -712,9 +712,9 @@ def _model_structure(config):
             means_dev_mag_inf_beta_input
         )
         means_dev_mag = means_dev_mag_layer(
-            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta, array_id]
+            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta, session_id]
         )
-        norm_means_dev_map = tf.gather(norm_means_dev_map, array_id[:, 0], axis=0)
+        norm_means_dev_map = tf.gather(norm_means_dev_map, session_id[:, 0], axis=0)
         means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
     else:
         means_dev_layer = ZeroLayer(
@@ -814,10 +814,10 @@ def _model_structure(config):
             covs_dev_mag_inf_beta_input,
         )
         covs_dev_mag = covs_dev_mag_layer(
-            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta, array_id]
+            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta, session_id]
         )
         # covs_dev_mag.shape = (None, n_states, 1)
-        norm_covs_dev_map = tf.gather(norm_covs_dev_map, array_id[:, 0], axis=0)
+        norm_covs_dev_map = tf.gather(norm_covs_dev_map, session_id[:, 0], axis=0)
         # norm_covs_dev_map.shape = (None, n_states, n_channels * (n_channels + 1) // 2)
         covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
         # covs_dev.shape = (None, n_states, n_channels * (n_channels + 1) // 2)
@@ -953,7 +953,7 @@ def _model_structure(config):
     kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
     return tf.keras.Model(
-        inputs=[data, array_id],
+        inputs=[data, session_id],
         outputs=[ll_loss, kl_loss, gamma, xi],
         name="HIVE",
     )

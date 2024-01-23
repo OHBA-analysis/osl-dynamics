@@ -264,19 +264,19 @@ class SampleGammaDistributionLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
-        alpha, beta, array_id = inputs
+        alpha, beta, session_id = inputs
         # alpha.shape = (n_sessions, n_states, 1)
         # beta.shape = (n_sessions, n_states, 1)
-        # array_id.shape = (None, sequence_length)
+        # session_id.shape = (None, sequence_length)
 
         # output.shape = (None, n_states, 1)
 
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
-        array_id = array_id[:, 0]  # shape = (None,)
+        session_id = session_id[:, 0]  # shape = (None,)
 
-        alpha = tf.gather(alpha, array_id, axis=0)  # shape = (None, n_states, 1)
-        beta = tf.gather(beta, array_id, axis=0)  # shape = (None, n_states, 1)
+        alpha = tf.gather(alpha, session_id, axis=0)  # shape = (None, n_states, 1)
+        beta = tf.gather(beta, session_id, axis=0)  # shape = (None, n_states, 1)
         if training:
             output = alpha / beta
             if self.annealing_factor > 0:
@@ -1340,16 +1340,16 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
-        x, mu, sigma, probs, array_id = inputs
+        x, mu, sigma, probs, session_id = inputs
 
         # Add a small error for numerical stability
         sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
-        if array_id is not None:
+        if session_id is not None:
             # Get the mean and covariance for the requested array
-            array_id = tf.cast(array_id, tf.int32)
-            mu = tf.gather(mu, array_id)
-            sigma = tf.gather(sigma, array_id)
+            session_id = tf.cast(session_id, tf.int32)
+            mu = tf.gather(mu, session_id)
+            sigma = tf.gather(sigma, session_id)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1391,12 +1391,12 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
         self.n_states = n_states
 
     def call(self, inputs, **kwargs):
-        x, log_rate, probs, array_id = inputs
+        x, log_rate, probs, session_id = inputs
 
-        if array_id is not None:
+        if session_id is not None:
             # Get the mean and covariance for the requested array
-            array_id = tf.cast(array_id, tf.int32)
-            log_rate = tf.gather(log_rate, array_id)
+            session_id = tf.cast(session_id, tf.int32)
+            log_rate = tf.gather(log_rate, session_id)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])

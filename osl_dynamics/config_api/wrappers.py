@@ -1682,7 +1682,7 @@ def plot_alpha(
         Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
-             'filename': '<output_dir>/alphas/alpha_<array>.png'}
+             'filename': '<output_dir>/alphas/alpha_*.png'}
     """
     if sampling_frequency is None and data is not None:
         sampling_frequency = data.sampling_frequency
