@@ -147,7 +147,7 @@ def welch_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for array-specific spectra?
+        Should we return the weights for session-specific spectra?
         This is useful for calculating a group average.
     keepdims : bool, optional
         Should we enforce a (n_sessions, n_states, ...) array is returned
@@ -169,7 +169,7 @@ def welch_spectra(
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     w : np.ndarray
-        Weighting for array-specific spectra. Only returned if
+        Weighting for session-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_sessions,).
     """
 
@@ -337,7 +337,7 @@ def multitaper_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for array-specific spectra?
+        Should we return the weights for session-specific spectra?
         This is useful for calculating a group average.
     keepdims : bool, optional
         Should we enforce a (n_sessions, n_states, ...) array is returned
@@ -359,7 +359,7 @@ def multitaper_spectra(
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
     w : np.ndarray
-        Weighting for array-specific spectra. Only returned if
+        Weighting for session-specific spectra. Only returned if
         :code:`return_weights=True`. Shape is (n_sessions,).
     """
 
@@ -537,7 +537,7 @@ def regression_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for array-specific spectra?
+        Should we return the weights for session-specific spectra?
         Useful for calculating the group average spectra.
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
@@ -563,7 +563,7 @@ def regression_spectra(
         Mode coherences. Shape is (n_sessions, n_modes, n_channels, n_channels,
         n_freq). Any axis of length 1 is removed if :code:`keepdims=False`.
     w : np.ndarray
-        Weight for each array-specific PSD. Shape is (n_sessions,).
+        Weight for each session-specific PSD. Shape is (n_sessions,).
         Only returned if :code:`return_weights=True`.
     """
 

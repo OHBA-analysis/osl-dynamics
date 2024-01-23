@@ -77,7 +77,7 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-# Set initializer for array-specific deviation parameters
+# Set initializer for session-specific deviation parameters
 model.set_dev_parameters_initializer(training_data)
 
 # Model initialization

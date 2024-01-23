@@ -536,7 +536,7 @@ class Model(VariationalInferenceModelBase):
         learning_rate=None,
         store_dir="tmp",
     ):
-        """Dual estimation to get the array-specific observation model
+        """Dual estimation to get the session-specific observation model
         parameters.
 
         Here, we train the observation model parameters (mode means and

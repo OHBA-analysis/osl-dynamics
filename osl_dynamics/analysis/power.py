@@ -467,11 +467,11 @@ def multi_save(
 ):
     """Saves group level and array level power maps.
 
-    When training array-specific models we want to plot the group-level map
-    and array-specific deviations. This function is a wrapper for `power.save
+    When training session-specific models we want to plot the group-level map
+    and session-specific deviations. This function is a wrapper for `power.save
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
     /analysis/power/index.html#osl_dynamics.analysis.power.save>`_, which helps
-    us plot power maps for array-specific models.
+    us plot power maps for session-specific models.
 
     Parameters
     ----------

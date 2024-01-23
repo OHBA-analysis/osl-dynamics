@@ -629,7 +629,7 @@ def fano_factor(state_time_course, window_lengths, sampling_frequency=1.0):
 
 
 def calc_trans_prob_matrix(state_time_course, n_states=None):
-    """Calculate array-specific transition probability matrices.
+    """Calculate session-specific transition probability matrices.
 
     Parameters
     ----------

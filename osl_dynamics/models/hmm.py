@@ -1389,7 +1389,7 @@ class Model(ModelBase):
         return alpha, np.array(means), np.array(covariances)
 
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
-        """Dual estimation to get array-specific observation model parameters.
+        """Dual estimation to get session-specific observation model parameters.
 
         Here, we estimate the state means and covariances for arrays
         with the posterior distribution of the states held fixed.
@@ -1420,7 +1420,7 @@ class Model(ModelBase):
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
-        # Get the array-specific data
+        # Get the session-specific data
         data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):

@@ -696,7 +696,7 @@ def plot_state_psds(data, output_dir):
 
 
 def dual_estimation(data, output_dir, n_jobs=1):
-    """Dual estimation for array-specific observation model parameters.
+    """Dual estimation for session-specific observation model parameters.
 
     This function expects a model has already been trained and the following
     directories to exist:
@@ -706,7 +706,7 @@ def dual_estimation(data, output_dir, n_jobs=1):
 
     This function will create the following directory:
 
-    - :code:`<output_dir>/dual_estimates`, which contains the array-specific
+    - :code:`<output_dir>/dual_estimates`, which contains the session-specific
       means and covariances.
 
     Parameters
@@ -772,7 +772,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
              'keepdims': True}
     nnmf_components : int, optional
         Number of non-negative matrix factorization (NNMF) components to fit to
-        the stacked array-specific coherence spectra.
+        the stacked session-specific coherence spectra.
     """
     if data is None:
         raise ValueError("data must be passed.")

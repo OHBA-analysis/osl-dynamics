@@ -148,12 +148,12 @@ def gmm_time_courses(
             gmm_tc[:, mode] = a > threshold
             gmm_metric.append(metrics)
 
-        # Add to list containing array-specific time courses and
+        # Add to list containing session-specific time courses and
         # component metrics
         gmm_tcs.append(gmm_tc)
         gmm_metrics.append(gmm_metric)
 
-    # Visualise array-specific time courses in one plot per mode
+    # Visualise session-specific time courses in one plot per mode
     avg_threshold = [
         np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_sessions)])
         for m in range(n_modes)
@@ -170,7 +170,7 @@ def gmm_time_courses(
             else:
                 plot_filename = None
 
-            # array-specific GMM plots per mode
+            # session-specific GMM plots per mode
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 4))
             for sub in range(n_sessions):
                 metric = gmm_metrics[sub][mode]
@@ -652,7 +652,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
         average_alpha.append(a)
     average_alpha = np.array(average_alpha, dtype=np.float32).T
 
-    # Split average alphas back into array-specific time courses
+    # Split average alphas back into session-specific time courses
     average_alpha = np.split(average_alpha, np.cumsum(n_array_samples[:-1]))
 
     if return_cluster_info:
