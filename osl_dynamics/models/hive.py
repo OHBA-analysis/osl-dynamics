@@ -845,15 +845,15 @@ def _model_structure(config):
     session_means_layer = SessionMapLayer(
         "means", config.covariances_epsilon, name="session_means"
     )
-    array_covs_layer = SessionMapLayer(
-        "covariances", config.covariances_epsilon, name="array_covs"
+    session_covs_layer = SessionMapLayer(
+        "covariances", config.covariances_epsilon, name="session_covs"
     )
 
     # Data flow
     mu = session_means_layer(
         [group_mu, means_dev]
     )  # shape = (None, n_states, n_channels)
-    D = array_covs_layer(
+    D = session_covs_layer(
         [group_D, covs_dev]
     )  # shape = (None, n_states, n_channels, n_channels)
 

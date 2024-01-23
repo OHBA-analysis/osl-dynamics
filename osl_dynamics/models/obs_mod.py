@@ -675,10 +675,10 @@ def get_session_means_covariances(
     )
 
     session_means_layer = model.get_layer("session_means")
-    array_covs_layer = model.get_layer("array_covs")
+    session_covs_layer = model.get_layer("session_covs")
 
     mu = session_means_layer([group_means, means_dev])
-    D = array_covs_layer([group_covs, covs_dev])
+    D = session_covs_layer([group_covs, covs_dev])
     return mu.numpy(), D.numpy()
 
 

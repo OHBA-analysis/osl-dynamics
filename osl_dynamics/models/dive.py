@@ -345,7 +345,7 @@ class Model(VariationalInferenceModelBase):
         session_means : np.ndarray
             Mode means for each array.
             Shape is (n_sessions, n_modes, n_channels).
-        array_covs : np.ndarray
+        session_covs : np.ndarray
             Mode covariances for each array.
             Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
@@ -843,13 +843,13 @@ def _model_structure(config):
     session_means_layer = SessionMapLayer(
         "means", config.covariances_epsilon, name="session_means"
     )
-    array_covs_layer = SessionMapLayer(
-        "covariances", config.covariances_epsilon, name="array_covs"
+    session_covs_layer = SessionMapLayer(
+        "covariances", config.covariances_epsilon, name="session_covs"
     )
 
     # Data flow
     mu = session_means_layer([group_mu, means_dev])
-    D = array_covs_layer([group_D, covs_dev])
+    D = session_covs_layer([group_D, covs_dev])
 
     # -----------------------------------
     # Mix the array specific paraemters
