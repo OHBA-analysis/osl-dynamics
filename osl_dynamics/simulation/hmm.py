@@ -550,7 +550,7 @@ class MArr_HMM_MVN(Simulation):
         Array mean vector for each state, shape should be
         (n_sessions, n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
-    array_covariances : np.ndarray or str
+    session_covariances : np.ndarray or str
         Array covariance matrix for each state, shape should be
         (n_sessions, n_states, n_channels, n_channels).
         Either a numpy array or :code:`'random'`.
@@ -592,7 +592,7 @@ class MArr_HMM_MVN(Simulation):
         n_samples,
         trans_prob,
         session_means,
-        array_covariances,
+        session_covariances,
         n_states=None,
         n_modes=None,
         n_channels=None,
@@ -618,7 +618,7 @@ class MArr_HMM_MVN(Simulation):
         # Observation model
         self.obs_mod = MArr_MVN(
             session_means=session_means,
-            array_covariances=array_covariances,
+            session_covariances=session_covariances,
             n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
@@ -705,7 +705,7 @@ class MArr_HMM_MVN(Simulation):
         self.obs_mod.session_means = (
             self.obs_mod.session_means - mu[:, np.newaxis, :]
         ) / sigma[:, np.newaxis, :]
-        self.obs_mod.array_covariances /= np.expand_dims(
+        self.obs_mod.session_covariances /= np.expand_dims(
             sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
         )
 

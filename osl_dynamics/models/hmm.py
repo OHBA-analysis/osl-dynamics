@@ -1445,10 +1445,10 @@ class Model(ModelBase):
                 session_means = self.get_means()
 
             if self.config.learn_covariances:
-                array_covariances = np.empty((n_states, n_channels, n_channels))
+                session_covariances = np.empty((n_states, n_channels, n_channels))
                 for state in range(n_states):
                     diff = x - session_means[state]
-                    array_covariances[state] = (
+                    session_covariances[state] = (
                         np.sum(
                             diff[:, :, None]
                             * diff[:, None, :]
@@ -1457,15 +1457,15 @@ class Model(ModelBase):
                         )
                         / sum_a[state]
                     )
-                    array_covariances[
+                    session_covariances[
                         state
                     ] += self.config.covariances_epsilon * np.eye(
                         self.config.n_channels
                     )
             else:
-                array_covariances = self.get_covariances()
+                session_covariances = self.get_covariances()
 
-            return session_means, array_covariances
+            return session_means, session_covariances
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []
