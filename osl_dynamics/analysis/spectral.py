@@ -3,7 +3,6 @@
 """
 
 import logging
-import warnings
 
 import numpy as np
 from scipy import signal
@@ -1409,10 +1408,11 @@ def _welch(
         psd_ /= fo_
         if np.isnan(psd_).any():
             psd[i] = np.nan_to_num(psd_)  # zero out nan values
-            warnings.warn(
-                "psd_ contains NaN values. This may indicate a potentially poor HMM fit. "
-                + "You should consider running the model again or selecting the model run "
-                + "with the lowest free energy after training multiple times."
+            _logger.warn(
+                "PSD contains NaN values. This may indicate a potentially"
+                "poor HMM fit. You should consider running the model again "
+                "or selecting the model run with the lowest free energy after "
+                "training multiple times."
             )
 
     if not keepdims:
@@ -1736,10 +1736,11 @@ def _multitaper(
         psd_ /= fo_
         if np.isnan(psd_).any():
             psd[i] = np.nan_to_num(psd_)  # zero out nan values
-            warnings.warn(
-                "psd_ contains NaN values. This may indicate a potentially poor HMM fit. "
-                + "You should consider running the model again or selecting the model run "
-                + "with the lowest free energy after training multiple times."
+            _logger.warn(
+                "PSD contains NaN values. This may indicate a potentially"
+                "poor HMM fit. You should consider running the model again "
+                "or selecting the model run with the lowest free energy after "
+                "training multiple times."
             )
 
     if not keepdims:
