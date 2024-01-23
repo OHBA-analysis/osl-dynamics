@@ -8,7 +8,7 @@ import logging
 import numpy as np
 from scipy import signal
 
-from osl_dynamics import array_ops, inference
+from osl_dynamics import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 
