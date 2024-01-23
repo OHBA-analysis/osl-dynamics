@@ -371,11 +371,11 @@ class MArr_MVN(MVN):
     ----------
     array_means : np.ndarray or str
         Array mean vector for each mode for each array, shape should be
-        (n_arrays, n_modes, n_channels). Either a numpy array or
+        (n_sessions, n_modes, n_channels). Either a numpy array or
         :code:`'zero'` or :code:`'random'`.
     array_covariances : np.ndarray or str
         Array covariance matrix for each mode for each array, shape should
-        be (n_arrays, n_modes, n_channels, n_channels). Either a numpy array
+        be (n_sessions, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
     n_modes : int, optional
         Number of modes.
@@ -383,7 +383,7 @@ class MArr_MVN(MVN):
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_arrays : int, optional
+    n_sessions : int, optional
         Number of arrays.
     embeddings_dim : int, optional
         Dimension of embeddings.
@@ -410,7 +410,7 @@ class MArr_MVN(MVN):
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
-        n_arrays=None,
+        n_sessions=None,
         embeddings_dim=None,
         spatial_embeddings_dim=None,
         embeddings_scale=None,
@@ -434,12 +434,12 @@ class MArr_MVN(MVN):
         ):
             if array_means.ndim != 3:
                 raise ValueError(
-                    "array_means must have shape (n_arrays, n_modes, n_channels)."
+                    "array_means must have shape (n_sessions, n_modes, n_channels)."
                 )
             if array_covariances.ndim != 4:
                 raise ValueError(
                     "array_covariances must have shape "
-                    "(n_arrays, n_modes, n_channels, n_channels)."
+                    "(n_sessions, n_modes, n_channels, n_channels)."
                 )
             if array_means.shape[0] != array_covariances.shape[0]:
                 raise ValueError(
@@ -456,7 +456,7 @@ class MArr_MVN(MVN):
                     "array_means and array_covariances have a different "
                     "number of channels."
                 )
-            self.n_arrays = array_means.shape[0]
+            self.n_sessions = array_means.shape[0]
             self.n_modes = array_means.shape[1]
             self.n_channels = array_means.shape[2]
             self.n_groups = None
@@ -476,7 +476,7 @@ class MArr_MVN(MVN):
         elif isinstance(array_means, np.ndarray) and not isinstance(
             array_covariances, np.ndarray
         ):
-            self.n_arrays = array_means.shape[0]
+            self.n_sessions = array_means.shape[0]
             self.n_modes = array_means.shape[1]
             self.n_channels = array_means.shape[2]
 
@@ -493,7 +493,7 @@ class MArr_MVN(MVN):
         elif not isinstance(array_means, np.ndarray) and isinstance(
             array_covariances, np.ndarray
         ):
-            self.n_arrays = array_covariances.shape[0]
+            self.n_sessions = array_covariances.shape[0]
             self.n_modes = array_covariances.shape[1]
             self.n_channels = array_covariances.shape[2]
 
@@ -510,13 +510,13 @@ class MArr_MVN(MVN):
         elif not isinstance(array_means, np.ndarray) and not isinstance(
             array_covariances, np.ndarray
         ):
-            if n_arrays is None or n_modes is None or n_channels is None:
+            if n_sessions is None or n_modes is None or n_channels is None:
                 raise ValueError(
                     "If we are generating array means and covariances, "
-                    "n_arrays, n_modes, n_channels must be passed."
+                    "n_sessions, n_modes, n_channels must be passed."
                 )
 
-            self.n_arrays = n_arrays
+            self.n_sessions = n_sessions
             self.n_modes = n_modes
             self.n_channels = n_channels
 
@@ -557,13 +557,13 @@ class MArr_MVN(MVN):
 
     def create_embeddings(self):
         # Assign groups to arrays
-        assigned_groups = self._rng.choice(self.n_groups, self.n_arrays)
+        assigned_groups = self._rng.choice(self.n_groups, self.n_sessions)
         self.group_centroids = self._rng.normal(
             scale=self.between_group_scale,
             size=[self.n_groups, self.embeddings_dim],
         )
 
-        embeddings = np.zeros([self.n_arrays, self.embeddings_dim])
+        embeddings = np.zeros([self.n_sessions, self.embeddings_dim])
         for i in range(self.n_groups):
             group_mask = assigned_groups == i
             embeddings[group_mask] = self._rng.multivariate_normal(
@@ -596,7 +596,7 @@ class MArr_MVN(MVN):
         concat_array_embeddings = np.broadcast_to(
             self.embeddings[:, None, :],
             (
-                self.n_arrays,
+                self.n_sessions,
                 self.n_modes,
                 self.embeddings_dim,
             ),
@@ -604,7 +604,7 @@ class MArr_MVN(MVN):
         concat_means_spatial_embeddings = np.broadcast_to(
             self.means_spatial_embeddings[None, :, :],
             (
-                self.n_arrays,
+                self.n_sessions,
                 self.n_modes,
                 self.spatial_embeddings_dim,
             ),
@@ -637,7 +637,7 @@ class MArr_MVN(MVN):
         concat_array_embeddings = np.broadcast_to(
             self.embeddings[:, None, :],
             (
-                self.n_arrays,
+                self.n_sessions,
                 self.n_modes,
                 self.embeddings_dim,
             ),
@@ -645,7 +645,7 @@ class MArr_MVN(MVN):
         concat_covarainces_spatial_embeddings = np.broadcast_to(
             self.covariances_spatial_embeddings[None, :, :],
             (
-                self.n_arrays,
+                self.n_sessions,
                 self.n_modes,
                 self.spatial_embeddings_dim,
             ),
@@ -665,7 +665,7 @@ class MArr_MVN(MVN):
 
     def create_array_means(self, option):
         if option == "zero":
-            array_means = np.zeros([self.n_arrays, self.n_modes, self.n_channels])
+            array_means = np.zeros([self.n_sessions, self.n_modes, self.n_channels])
         else:
             self.create_array_means_deviations()
             array_means = self.group_means[None, ...] + self.means_deviations
@@ -682,9 +682,9 @@ class MArr_MVN(MVN):
         )
 
         array_cholesky_covariances = np.zeros(
-            [self.n_arrays, self.n_modes, self.n_channels, self.n_channels]
+            [self.n_sessions, self.n_modes, self.n_channels, self.n_channels]
         )
-        for i in range(self.n_arrays):
+        for i in range(self.n_sessions):
             for j in range(self.n_modes):
                 array_cholesky_covariances[
                     i, j, m, n
@@ -775,16 +775,16 @@ class MArr_MVN(MVN):
         ----------
         mode_time_courses : np.ndarray
             Mode time courses.
-            Shape is (n_arrays, n_samples, n_modes).
+            Shape is (n_sessions, n_samples, n_modes).
 
         Returns
         -------
         inst_covs : np.ndarray
             Instantaneous covariances.
-            Shape is (n_arrays, n_samples, n_channels, n_channels).
+            Shape is (n_sessions, n_samples, n_channels, n_channels).
         """
         inst_covs = []
-        for array in range(self.n_arrays):
+        for array in range(self.n_sessions):
             inst_covs.append(
                 self.get_array_instantaneous_covariances(
                     array, mode_time_courses[array]
@@ -798,16 +798,16 @@ class MArr_MVN(MVN):
         Parameters
         ----------
         mode_time_courses : np.ndarray
-            It contains n_arrays time courses.
-            Shape is (n_arrays, n_samples, n_modes).
+            It contains n_sessions time courses.
+            Shape is (n_sessions, n_samples, n_modes).
 
         Returns
         -------
         data : np.ndarray
             Simulated data for arrays.
-            Shape is (n_arrays, n_samples, n_channels).
+            Shape is (n_sessions, n_samples, n_channels).
         """
         data = []
-        for array in range(self.n_arrays):
+        for array in range(self.n_sessions):
             data.append(self.simulate_array_data(array, mode_time_courses[array]))
         return np.array(data)

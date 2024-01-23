@@ -24,7 +24,7 @@ tf_ops.gpu_growth()
 config = Config(
     n_modes=5,
     n_channels=20,
-    n_arrays=100,
+    n_sessions=100,
     embeddings_dim=2,
     spatial_embeddings_dim=2,
     sequence_length=200,
@@ -62,7 +62,7 @@ sim = simulation.MArr_HMM_MVN(
     n_states=config.n_modes,
     n_channels=config.n_channels,
     n_covariances_act=2,
-    n_arrays=config.n_arrays,
+    n_sessions=config.n_sessions,
     embeddings_dim=config.embeddings_dim,
     spatial_embeddings_dim=config.spatial_embeddings_dim,
     embeddings_scale=0.001,
@@ -121,7 +121,7 @@ plotting.plot_scatter(
     x_label="dim_1",
     y_label="dim_2",
     annotate=[
-        np.array([str(i) for i in range(config.n_arrays)])[group_mask]
+        np.array([str(i) for i in range(config.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
     ax=axes[0],
@@ -134,7 +134,7 @@ plotting.plot_scatter(
     x_label="dim1",
     y_label="dim2",
     annotate=[
-        np.array([str(i) for i in range(config.n_arrays)])[group_mask]
+        np.array([str(i) for i in range(config.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
     ax=axes[1],

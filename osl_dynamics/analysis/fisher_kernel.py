@@ -52,11 +52,11 @@ class FisherKernel:
         Returns
         -------
         features : np.ndarray
-            Fisher kernel matrix. Shape is (n_arrays, n_features).
+            Fisher kernel matrix. Shape is (n_sessions, n_features).
         """
         _logger.info("Getting Fisher features")
 
-        n_arrays = dataset.n_arrays
+        n_sessions = dataset.n_sessions
         if batch_size is not None:
             self.model.config.batch_size = batch_size
 
@@ -68,7 +68,7 @@ class FisherKernel:
 
         # Initialise list to hold features for each array
         features = []
-        for i in trange(n_arrays, desc="Getting features"):
+        for i in trange(n_sessions, desc="Getting features"):
             array_data = dataset[i]
 
             # Initialise dictionary for holding gradients
@@ -119,7 +119,7 @@ class FisherKernel:
             )
             features.append(array_features)
 
-        features = np.array(features)  # shape=(n_arrays, n_features)
+        features = np.array(features)  # shape=(n_sessions, n_features)
 
         # Normalise the features to l2-norm of 1
         features_l2_norm = np.sqrt(np.sum(np.square(features), axis=-1, keepdims=True))
@@ -139,7 +139,7 @@ class FisherKernel:
         Returns
         -------
         kernel_matrix : np.ndarray
-            Fisher kernel matrix. Shape is (n_arrays, n_arrays).
+            Fisher kernel matrix. Shape is (n_sessions, n_sessions).
         """
         _logger.info("Getting Fisher kernel matrix")
 

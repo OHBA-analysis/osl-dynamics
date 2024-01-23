@@ -265,8 +265,8 @@ class SampleGammaDistributionLayer(layers.Layer):
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
         alpha, beta, array_id = inputs
-        # alpha.shape = (n_arrays, n_states, 1)
-        # beta.shape = (n_arrays, n_states, 1)
+        # alpha.shape = (n_sessions, n_states, 1)
+        # beta.shape = (n_sessions, n_states, 1)
         # array_id.shape = (None, sequence_length)
 
         # output.shape = (None, n_states, 1)
@@ -1430,17 +1430,17 @@ class ConcatEmbeddingsLayer(layers.Layer):
 
     def call(self, inputs):
         embeddings, spatial_embeddings = inputs
-        n_arrays, embeddings_dim = embeddings.shape
+        n_sessions, embeddings_dim = embeddings.shape
         n_states, spatial_embeddings_dim = spatial_embeddings.shape
 
         # Match dimensions for concatenation
         embeddings = tf.broadcast_to(
             tf.expand_dims(embeddings, axis=1),
-            [n_arrays, n_states, embeddings_dim],
+            [n_sessions, n_states, embeddings_dim],
         )
         spatial_embeddings = tf.broadcast_to(
             tf.expand_dims(spatial_embeddings, axis=0),
-            [n_arrays, n_states, spatial_embeddings_dim],
+            [n_sessions, n_states, spatial_embeddings_dim],
         )
 
         # Concatenate the embeddings

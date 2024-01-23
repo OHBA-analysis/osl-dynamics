@@ -199,12 +199,12 @@ class MArr_MixedSine_MVN(Simulation):
     sampling_frequency : float
         Sampling frequency.
     array_means : np.ndarray or str
-        Array mean vector for each mode, shape should be (n_arrays, n_modes,
+        Array mean vector for each mode, shape should be (n_sessions, n_modes,
         n_channels). Either a numpy array or :code:`'zero'` or
         :code:`'random'`.
     array_covariances : np.ndarray or str
         Array covariance matrix for each mode, shape should be
-        (n_arrays, n_modes, n_channels, n_channels). Either a numpy array
+        (n_sessions, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
@@ -212,7 +212,7 @@ class MArr_MixedSine_MVN(Simulation):
         Number of modes.
     n_channels : int, optional
         Number of channels.
-    n_arrays : int, optional
+    n_sessions : int, optional
         Number of arrays.
     embeddings_dim : int, optional
         Number of dimensions for embedding vectors.
@@ -243,7 +243,7 @@ class MArr_MixedSine_MVN(Simulation):
         n_covariances_act=1,
         n_modes=None,
         n_channels=None,
-        n_arrays=None,
+        n_sessions=None,
         embeddings_dim=None,
         spatial_embeddings_dim=None,
         embeddings_scale=None,
@@ -259,7 +259,7 @@ class MArr_MixedSine_MVN(Simulation):
             n_covariances_act=n_covariances_act,
             n_modes=n_modes,
             n_channels=n_channels,
-            n_arrays=n_arrays,
+            n_sessions=n_sessions,
             embeddings_dim=embeddings_dim,
             spatial_embeddings_dim=spatial_embeddings_dim,
             embeddings_scale=embeddings_scale,
@@ -271,7 +271,7 @@ class MArr_MixedSine_MVN(Simulation):
 
         self.n_modes = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
-        self.n_arrays = self.obs_mod.n_arrays
+        self.n_sessions = self.obs_mod.n_sessions
 
         super().__init__(n_samples=n_samples)
 
@@ -279,7 +279,7 @@ class MArr_MixedSine_MVN(Simulation):
         self.mode_time_course = []
         self.sm = []
 
-        for _ in range(self.n_arrays):
+        for _ in range(self.n_sessions):
             sm = MixedSine(
                 n_modes=self.n_modes,
                 relative_activation=relative_activation,

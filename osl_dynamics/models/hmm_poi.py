@@ -1079,7 +1079,7 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_arrays, n_samples, n_states)
+            State probabilities with shape (n_sessions, n_samples, n_states)
             or (n_samples, n_states).
         """
         if remove_edge_effects:
@@ -1215,7 +1215,7 @@ class Model(ModelBase):
             Each element has shape (n_samples, n_states).
         log_rates : np.ndarray
             Array specific :code:`log_rates`.
-            Shape is (n_arrays, n_states, n_channels).
+            Shape is (n_sessions, n_states, n_channels).
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
@@ -1236,7 +1236,7 @@ class Model(ModelBase):
         alpha = []
         log_rates = []
         with set_logging_level(_logger, logging.WARNING):
-            for i in trange(training_data.n_arrays, desc="Array fine tuning"):
+            for i in trange(training_data.n_sessions, desc="Array fine tuning"):
                 # Train on this array
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
@@ -1270,7 +1270,7 @@ class Model(ModelBase):
             Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
-            (n_arrays, n_samples, n_states).
+            (n_sessions, n_samples, n_states).
         n_jobs : int, optional
             Number of jobs to run in parallel.
 
@@ -1278,7 +1278,7 @@ class Model(ModelBase):
         -------
         log_rates : np.ndarray
             Array-specific :code:`log_rates`.
-            Shape is (n_arrays, n_states, n_channels).
+            Shape is (n_sessions, n_states, n_channels).
         """
         if alpha is None:
             # Get the posterior
@@ -1292,7 +1292,7 @@ class Model(ModelBase):
         data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
-            raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
+            raise ValueError("len(alpha) and training_data.n_sessions must be the same.")
 
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]

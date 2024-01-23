@@ -393,7 +393,7 @@ def train_hive(
     # SE-HMM config
     default_config_kwargs = {
         "n_channels": data.n_channels,
-        "n_arrays": data.n_arrays,
+        "n_sessions": data.n_sessions,
         "sequence_length": 200,
         "spatial_embeddings_dim": 2,
         "dev_n_layers": 5,
@@ -2080,8 +2080,8 @@ def compare_groups_hmm_summary_stats(
         save(f"{group_diff_dir}/{names[i]}.npy", sum_stats[:, i])
 
     # Create a vector for group assignments
-    n_arrays = fo.shape[0]
-    assignments = np.ones(n_arrays)
+    n_sessions = fo.shape[0]
+    assignments = np.ones(n_sessions)
     assignments[group2_indices] += 1
 
     # Load covariates

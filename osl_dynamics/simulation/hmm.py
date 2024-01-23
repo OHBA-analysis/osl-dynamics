@@ -548,11 +548,11 @@ class MArr_HMM_MVN(Simulation):
         probability matrix.
     array_means : np.ndarray or str
         Array mean vector for each state, shape should be
-        (n_arrays, n_states, n_channels).
+        (n_sessions, n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     array_covariances : np.ndarray or str
         Array covariance matrix for each state, shape should be
-        (n_arrays, n_states, n_channels, n_channels).
+        (n_sessions, n_states, n_channels, n_channels).
         Either a numpy array or :code:`'random'`.
     n_states : int, optional
         Number of states. Can pass this argument with keyword :code:`n_modes`
@@ -563,7 +563,7 @@ class MArr_HMM_MVN(Simulation):
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_arrays : int, optional
+    n_sessions : int, optional
         Number of arrays.
     embeddings_dim : int
         Dimension of the embedding vectors.
@@ -597,7 +597,7 @@ class MArr_HMM_MVN(Simulation):
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
-        n_arrays=None,
+        n_sessions=None,
         embeddings_dim=None,
         spatial_embeddings_dim=None,
         embeddings_scale=None,
@@ -613,7 +613,7 @@ class MArr_HMM_MVN(Simulation):
 
         # Construct trans_prob for each array
         if isinstance(trans_prob, str) or trans_prob is None:
-            trans_prob = [trans_prob] * n_arrays
+            trans_prob = [trans_prob] * n_sessions
 
         # Observation model
         self.obs_mod = MArr_MVN(
@@ -622,7 +622,7 @@ class MArr_HMM_MVN(Simulation):
             n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
-            n_arrays=n_arrays,
+            n_sessions=n_sessions,
             embeddings_dim=embeddings_dim,
             spatial_embeddings_dim=spatial_embeddings_dim,
             embeddings_scale=embeddings_scale,
@@ -634,20 +634,20 @@ class MArr_HMM_MVN(Simulation):
 
         self.n_states = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
-        self.n_arrays = self.obs_mod.n_arrays
+        self.n_sessions = self.obs_mod.n_sessions
 
         # vary the stay probability for each array
         if stay_prob is not None:
             array_stay_prob = self.obs_mod._rng.normal(
                 loc=stay_prob,
                 scale=tc_std,
-                size=self.n_arrays,
+                size=self.n_sessions,
             )
             # truncate stay_prob at 0 and 1
             array_stay_prob = np.minimum(array_stay_prob, 1)
             array_stay_prob = np.maximum(array_stay_prob, 0)
         else:
-            array_stay_prob = [stay_prob] * n_arrays
+            array_stay_prob = [stay_prob] * n_sessions
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
@@ -655,7 +655,7 @@ class MArr_HMM_MVN(Simulation):
         # Simulate state time courses all arrays
         self.state_time_course = []
         self.hmm = []
-        for i in range(self.n_arrays):
+        for i in range(self.n_sessions):
             # Build HMM object with the array's stay probalibity with
             # different seeds
             hmm = HMM(

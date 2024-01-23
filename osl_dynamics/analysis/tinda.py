@@ -562,7 +562,7 @@ def optimise_sequence(fo_density, metric_to_use=0):
     ----------
     fo_density : array_like
         Time-in-state densities array of shape (n_interval_states,
-        n_density_states, 2, n_arrays).
+        n_density_states, 2, n_sessions).
     metric : int, optional
         Metric to use for optimisation:
 
@@ -660,7 +660,7 @@ def plot_cycle(
         rotation).
     fo_density : array_like
         Time-in-state densities array of shape (n_interval_states,
-        n_density_states, 2, (n_interval_ranges,) n_arrays).
+        n_density_states, 2, (n_interval_ranges,) n_sessions).
     edges : array_like
         Array of zeros and ones indicating whether the connection should be
         plotted.

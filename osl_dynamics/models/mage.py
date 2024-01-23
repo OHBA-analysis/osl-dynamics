@@ -450,10 +450,10 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Alpha time course with shape (n_arrays, n_samples, n_modes) or
+            Alpha time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         gamma : list or np.ndarray
-            Gamma time course with shape (n_arrays, n_samples, n_modes) or
+            Gamma time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if not self.config.multiple_dynamics:

@@ -33,7 +33,7 @@ def sliding_window_power(
     Parameters
     ----------
     data : list or np.ndarray
-        Time series data. Shape must be (n_arrays, n_samples, n_channels)
+        Time series data. Shape must be (n_sessions, n_samples, n_channels)
         or (n_samples, n_channels).
     window_length : int
         Window length in samples.
@@ -49,7 +49,7 @@ def sliding_window_power(
     Returns
     -------
     sliding_window_power : list or np.ndarray
-        Time series of power vectors. Shape is (n_arrays, n_windows,
+        Time series of power vectors. Shape is (n_sessions, n_windows,
         n_channels) or (n_windows, n_channels).
     """
     # Validation
@@ -127,13 +127,13 @@ def variance_from_spectra(
     if power_spectra.ndim == 2:
         # PSDs were passed
         power_spectra = power_spectra[np.newaxis, np.newaxis, ...]
-        n_arrays, n_modes, n_channels, n_freq = power_spectra.shape
+        n_sessions, n_modes, n_channels, n_freq = power_spectra.shape
 
     elif power_spectra.shape[-2] != power_spectra.shape[-3]:
         # PSDs were passed, check dimensionality
         error_message = (
             "A (n_channels, n_freq), (n_modes, n_channels, n_freq) or "
-            + "(n_arrays, n_modes, n_channels, n_freq) array must be passed."
+            + "(n_sessions, n_modes, n_channels, n_freq) array must be passed."
         )
         power_spectra = array_ops.validate(
             power_spectra,
@@ -141,14 +141,14 @@ def variance_from_spectra(
             allow_dimensions=[2, 3],
             error_message=error_message,
         )
-        n_arrays, n_modes, n_channels, n_freq = power_spectra.shape
+        n_sessions, n_modes, n_channels, n_freq = power_spectra.shape
 
     else:
         # Cross spectra were passed, check dimensionality
         error_message = (
             "A (n_channels, n_channels, n_freq), "
             + "(n_modes, n_channels, n_channels, n_freq) or "
-            + "(n_arrays, n_modes, n_channels, n_channels, n_freq) "
+            + "(n_sessions, n_modes, n_channels, n_channels, n_freq) "
             + "array must be passed."
         )
         power_spectra = array_ops.validate(
@@ -157,7 +157,7 @@ def variance_from_spectra(
             allow_dimensions=[3, 4],
             error_message=error_message,
         )
-        n_arrays, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
+        n_sessions, n_modes, n_channels, n_channels, n_freq = power_spectra.shape
 
     if components is not None and frequency_range is not None:
         raise ValueError(
@@ -180,7 +180,7 @@ def variance_from_spectra(
 
     # Calculate power maps for each array
     var = []
-    for i in range(n_arrays):
+    for i in range(n_sessions):
         # Get PSDs
         if power_spectra.shape[-2] == power_spectra.shape[-3]:
             # Cross-spectra densities were passed
@@ -482,7 +482,7 @@ def multi_save(
         cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
     Array_power_map : np.ndarray
         Array level power maps to save.
-        Can be of shape: (n_arrays, n_modes, n_channels), (n_modes,
+        Can be of shape: (n_sessions, n_modes, n_channels), (n_modes,
         n_channels) or (n_channels,). A (..., n_channels, n_channels) array can
         also be passed. Warning: this function cannot be used if
         :code:`n_modes=n_channels`.
@@ -571,13 +571,13 @@ def multi_save(
     )
 
     # Save the array level power maps
-    n_arrays = array_power_map.shape[0]
+    n_sessions = array_power_map.shape[0]
     if arrays is None:
-        arrays = np.arange(n_arrays)
+        arrays = np.arange(n_sessions)
 
     for arr in arrays:
         array_dir = "{fn.parent}/arr_{arr:0{v}d}".format(
-            fn=filename, arr=arr, v=len(str(n_arrays))
+            fn=filename, arr=arr, v=len(str(n_sessions))
         )
         os.makedirs(array_dir, exist_ok=True)
         array_filename = f"{array_dir}/{filename.stem}{filename.suffix}"

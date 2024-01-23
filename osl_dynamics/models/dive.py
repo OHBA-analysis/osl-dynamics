@@ -145,7 +145,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     strategy : str
         Strategy for distributed learning.
 
-    n_arrays : int
+    n_sessions : int
         Number of arrays whose observation model parameters can vary.
     embeddings_dim : int
         Number of dimensions for the embedding vectors.
@@ -201,7 +201,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     # Parameters specific to embedding model
-    n_arrays: int = None
+    n_sessions: int = None
     embeddings_dim: int = None
     spatial_embeddings_dim: int = None
 
@@ -245,12 +245,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
     def validate_embedding_parameters(self):
         if (
-            self.n_arrays is None
+            self.n_sessions is None
             or self.embeddings_dim is None
             or self.spatial_embeddings_dim is None
         ):
             raise ValueError(
-                "n_arrays, embedding_dim and spatial_embedding_dim must " "be passed."
+                "n_sessions, embedding_dim and spatial_embedding_dim must " "be passed."
             )
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
@@ -320,7 +320,7 @@ class Model(VariationalInferenceModelBase):
         -------
         embeddings : np.ndarray
             Embedding vectors.
-            Shape is (n_arrays, embedding_dim).
+            Shape is (n_sessions, embedding_dim).
         """
         return obs_mod.get_embeddings(self.model)
 
@@ -335,7 +335,7 @@ class Model(VariationalInferenceModelBase):
         ----------
         embeddings : np.ndarray, optional
             Input embedding vectors.
-            Shape is (n_arrays, embeddings_dim).
+            Shape is (n_sessions, embeddings_dim).
         n_neighbours : int, optional
             Number of nearest neighbours.
             Ignored if :code:`embeddings=None`.
@@ -344,10 +344,10 @@ class Model(VariationalInferenceModelBase):
         -------
         array_means : np.ndarray
             Mode means for each array.
-            Shape is (n_arrays, n_modes, n_channels).
+            Shape is (n_sessions, n_modes, n_channels).
         array_covs : np.ndarray
             Mode covariances for each array.
-            Shape is (n_arrays, n_modes, n_channels, n_channels).
+            Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         return obs_mod.get_array_means_covariances(
             self.model,
@@ -410,7 +410,7 @@ class Model(VariationalInferenceModelBase):
         Parameters
         ----------
         embeddings : np.ndarray
-            The embeddings. Shape is (n_arrays, embeddings_dim).
+            The embeddings. Shape is (n_sessions, embeddings_dim).
         """
         obs_mod.set_embeddings_initializer(
             self.model,
@@ -588,9 +588,9 @@ def _model_structure(config):
     # Observation model
 
     # Embedding layers
-    arrays_layer = TFRangeLayer(config.n_arrays, name="arrays")
+    arrays_layer = TFRangeLayer(config.n_sessions, name="arrays")
     embeddings_layer = layers.Embedding(
-        config.n_arrays,
+        config.n_sessions,
         config.embeddings_dim,
         name="embeddings",
     )
@@ -657,7 +657,7 @@ def _model_structure(config):
         )
 
         means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
-            shape=(config.n_arrays, config.n_modes, 1),
+            shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("means_alpha", 0.0)),
@@ -669,7 +669,7 @@ def _model_structure(config):
             "softplus", name="means_dev_mag_inf_alpha"
         )
         means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
-            shape=(config.n_arrays, config.n_modes, 1),
+            shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 5.0)),
@@ -759,7 +759,7 @@ def _model_structure(config):
         )
 
         covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
-            shape=(config.n_arrays, config.n_modes, 1),
+            shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("covs_alpha", 0.0)),
@@ -771,7 +771,7 @@ def _model_structure(config):
             "softplus", name="covs_dev_mag_inf_alpha"
         )
         covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
-            shape=(config.n_arrays, config.n_modes, 1),
+            shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
                 tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 5.0)),

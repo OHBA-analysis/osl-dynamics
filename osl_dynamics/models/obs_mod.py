@@ -177,7 +177,7 @@ def set_embeddings_initializer(model, embeddings):
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
     embeddings : np.ndarray
-        The embeddings. Shape is (n_arrays, embeddings_dim).
+        The embeddings. Shape is (n_sessions, embeddings_dim).
     """
     embeddings_layer = model.get_layer("embeddings")
     embeddings_layer.embeddings_initializer = WeightInitializer(embeddings)
@@ -334,11 +334,11 @@ def get_embeddings(model):
     Returns
     -------
     embeddings : np.ndarray
-        The embeddings. Shape is (n_arrays, embeddings_dim).
+        The embeddings. Shape is (n_sessions, embeddings_dim).
     """
     embeddings_layer = model.get_layer("embeddings")
-    n_arrays = embeddings_layer.input_dim
-    return embeddings_layer(np.arange(n_arrays)).numpy()
+    n_sessions = embeddings_layer.input_dim
+    return embeddings_layer(np.arange(n_sessions)).numpy()
 
 
 def get_means_spatial_embeddings(model):
@@ -404,12 +404,12 @@ def get_concatenated_embeddings(model, map, embeddings=None):
         The map to use. Either :code:`"means"` or :code:`"covs"`.
     embeddings : np.ndarray, optional
         Input embeddings. If :code:`None`, they are retrieved from
-        the model. Shape is (n_arrays, embeddings_dim).
+        the model. Shape is (n_sessions, embeddings_dim).
 
     Returns
     -------
     concat_embeddings : np.ndarray
-        The concatenated embeddings. Shape is (n_arrays, n_states,
+        The concatenated embeddings. Shape is (n_sessions, n_states,
         embeddings_dim + spatial_embeddings_dim).
     """
     if embeddings is None:
@@ -438,10 +438,10 @@ def get_means_dev_mag_parameters(model):
     -------
     means_dev_mag_inf_alpha : np.ndarray
         The means deviation magnitude alpha parameters.
-        Shape is (n_arrays, n_states, 1).
+        Shape is (n_sessions, n_states, 1).
     means_dev_mag_inf_beta : np.ndarray
         The means deviation magnitude beta parameters.
-        Shape is (n_arrays, n_states, 1).
+        Shape is (n_sessions, n_states, 1).
     """
     means_dev_mag_inf_alpha_input_layer = model.get_layer(
         "means_dev_mag_inf_alpha_input"
@@ -472,10 +472,10 @@ def get_covs_dev_mag_parameters(model):
     -------
     covs_dev_mag_inf_alpha : np.ndarray
         The covariances deviation magnitude alpha parameters.
-        Shape is (n_arrays, n_states, 1).
+        Shape is (n_sessions, n_states, 1).
     covs_dev_mag_inf_beta : np.ndarray
         The covariances deviation magnitude beta parameters.
-        Shape is (n_arrays, n_states, 1).
+        Shape is (n_sessions, n_states, 1).
     """
     covs_dev_mag_inf_alpha_input_layer = model.get_layer("covs_dev_mag_inf_alpha_input")
     covs_dev_mag_inf_alpha_layer = model.get_layer("covs_dev_mag_inf_alpha")
@@ -514,7 +514,7 @@ def get_dev_mag(model, map):
     Returns
     -------
     dev_mag : np.ndarray
-        The deviance magnitude. Shape is (n_arrays, n_states, 1).
+        The deviance magnitude. Shape is (n_sessions, n_states, 1).
     """
     if map == "means":
         alpha, beta = get_means_dev_mag_parameters(model)
@@ -524,8 +524,8 @@ def get_dev_mag(model, map):
         dev_mag_layer = model.get_layer("covs_dev_mag")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    n_arrays = alpha.shape[0]
-    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_arrays)[:, None]])
+    n_sessions = alpha.shape[0]
+    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_sessions)[:, None]])
     return dev_mag.numpy()
 
 
@@ -540,14 +540,14 @@ def get_dev_map(model, map, embeddings=None):
         The map to use. Either :code:`"means"` or :code:`"covs"`.
     embeddings : np.ndarray, optional
         Input embeddings. If :code:`None`, they are retrieved from
-        the model. Shape is (n_arrays, embeddings_dim).
+        the model. Shape is (n_sessions, embeddings_dim).
 
     Returns
     -------
     dev_map : np.ndarray
         The deviance map.
-        If :code:`map="means"`, shape is (n_arrays, n_states, n_channels).
-        If :code:`map="covs"`, shape is (n_arrays, n_states,
+        If :code:`map="means"`, shape is (n_sessions, n_states, n_channels).
+        If :code:`map="covs"`, shape is (n_sessions, n_states,
         n_channels * (n_channels + 1) // 2).
     """
     concat_embeddings = get_concatenated_embeddings(
@@ -589,7 +589,7 @@ def get_array_dev(
     learn_covariances : bool
         Whether the covariances are learnt.
     embeddings : np.ndarray, optional
-        Input embeddings. Shape is (n_arrays, embeddings_dim).
+        Input embeddings. Shape is (n_sessions, embeddings_dim).
         If :code:`None`, then the embeddings are retrieved from the model.
     n_neighbours : int, optional
         The number of nearest neighbours if :code:`embedding` is not
@@ -598,10 +598,10 @@ def get_array_dev(
     Returns
     -------
     means_dev : np.ndarray
-        The means deviation. Shape is (n_arrays, n_states, n_channels).
+        The means deviation. Shape is (n_sessions, n_states, n_channels).
     covs_dev : np.ndarray
         The covariances deviation.
-        Shape is (n_arrays, n_states, n_channels * (n_channels + 1) // 2).
+        Shape is (n_sessions, n_states, n_channels * (n_channels + 1) // 2).
     """
     means_dev_layer = model.get_layer("means_dev")
     covs_dev_layer = model.get_layer("covs_dev")
@@ -654,7 +654,7 @@ def get_array_means_covariances(
     learn_covariances : bool
         Whether the covariances are learnt.
     embeddings : np.ndarray, optional
-        Input embeddings. Shape is (n_arrays, embeddings_dim).
+        Input embeddings. Shape is (n_sessions, embeddings_dim).
         If None, then the embeddings are retrieved from the model.
     n_neighbours : int, optional
         The number of nearest neighbours if :code:`+embedding` is not
@@ -663,10 +663,10 @@ def get_array_means_covariances(
     Returns
     -------
     mu : np.ndarray
-        The array means. Shape is (n_arrays, n_states, n_channels).
+        The array means. Shape is (n_sessions, n_states, n_channels).
     D : np.ndarray
         The array covariances.
-        Shape is (n_arrays, n_states, n_channels, n_channels).
+        Shape is (n_sessions, n_states, n_channels, n_channels).
     """
     group_means = get_observation_model_parameter(model, "group_means")
     group_covs = get_observation_model_parameter(model, "group_covs")
@@ -690,7 +690,7 @@ def get_nearest_neighbours(model, embeddings, n_neighbours):
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
     embeddings : np.ndarray
-        Input embeddings. Shape is (n_arrays, embeddings_dim).
+        Input embeddings. Shape is (n_sessions, embeddings_dim).
     n_neighbours : int
         The number of nearest neighbours.
 
@@ -698,7 +698,7 @@ def get_nearest_neighbours(model, embeddings, n_neighbours):
     -------
     nearest_neighbours : np.ndarray
         The indices of the nearest neighbours.
-        Shape is (n_arrays, n_neighbours).
+        Shape is (n_sessions, n_neighbours).
     """
     model_embeddings = get_embeddings(model)
     distances = np.linalg.norm(

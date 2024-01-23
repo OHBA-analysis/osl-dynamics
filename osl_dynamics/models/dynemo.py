@@ -475,10 +475,10 @@ class Model(VariationalInferenceModelBase):
             Array specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
         means : np.ndarray
-            Array specific means. Shape is (n_arrays, n_modes, n_channels).
+            Array specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
             Array specific covariances.
-            Shape is (n_arrays, n_modes, n_channels, n_channels).
+            Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
@@ -502,7 +502,7 @@ class Model(VariationalInferenceModelBase):
         with self.set_trainable(fixed_layers, False), set_logging_level(
             _logger, logging.WARNING
         ):
-            for i in trange(training_data.n_arrays, desc="Array fine tuning"):
+            for i in trange(training_data.n_sessions, desc="Array fine tuning"):
                 # Train on this array
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
@@ -559,10 +559,10 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         means : np.ndarray
-            Array specific means. Shape is (n_arrays, n_modes, n_channels).
+            Array specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
             Array specific covariances.
-            Shape is (n_arrays, n_modes, n_channels, n_channels).
+            Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
@@ -590,7 +590,7 @@ class Model(VariationalInferenceModelBase):
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False):
-            for i in trange(training_data.n_arrays, desc="Dual estimation"):
+            for i in trange(training_data.n_sessions, desc="Dual estimation"):
                 # Train on this array
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)

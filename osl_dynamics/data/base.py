@@ -146,15 +146,15 @@ class Data:
 
         # Create filenames for prepared data memmaps
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(self.n_arrays)), identifier=self._identifier
+            width=len(str(self.n_sessions)), identifier=self._identifier
         )
         self.prepared_data_filenames = [
             str(self.store_dir / prepared_data_pattern.format(i=i))
-            for i in range(self.n_arrays)
+            for i in range(self.n_sessions)
         ]
 
         # Arrays to keep when making TensorFlow Datasets
-        self.keep = list(range(self.n_arrays))
+        self.keep = list(range(self.n_sessions))
 
     def __iter__(self):
         return iter(self.arrays)
@@ -166,7 +166,7 @@ class Data:
         info = [
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
-            f"n_arrays: {self.n_arrays}",
+            f"n_sessions: {self.n_sessions}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
         ]
@@ -188,7 +188,7 @@ class Data:
         return sum([array.shape[-2] for array in self.arrays])
 
     @property
-    def n_arrays(self):
+    def n_sessions(self):
         """Number of arrays."""
         return len(self.arrays)
 
@@ -260,7 +260,7 @@ class Data:
             arrays = self.raw_data_arrays
 
         # Should we return one long time series?
-        if concatenate or self.n_arrays == 1:
+        if concatenate or self.n_sessions == 1:
             return np.concatenate(arrays)
         else:
             return arrays
@@ -359,7 +359,7 @@ class Data:
 
         # Select channels
         new_arrays = []
-        for i in tqdm(range(self.n_arrays), desc="Selecting channels"):
+        for i in tqdm(range(self.n_sessions), desc="Selecting channels"):
             array = arrays[i][:, channels]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)
@@ -422,7 +422,7 @@ class Data:
             desc="Filtering",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -479,7 +479,7 @@ class Data:
             desc="Downsampling",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -574,7 +574,7 @@ class Data:
             desc="PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -621,7 +621,7 @@ class Data:
             desc="TDE",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -720,7 +720,7 @@ class Data:
             desc="TDE-PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -760,7 +760,7 @@ class Data:
             desc="Amplitude envelope",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -806,7 +806,7 @@ class Data:
             desc="Sliding window",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -842,7 +842,7 @@ class Data:
             desc="Standardize",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -1062,7 +1062,7 @@ class Data:
         n_sequences = self.count_sequences(self.sequence_length)
 
         datasets = []
-        for i in range(self.n_arrays):
+        for i in range(self.n_sessions):
             if i not in self.keep:
                 # We don't want to include this file in the dataset
                 continue
@@ -1230,8 +1230,8 @@ class Data:
         for i in self.keep:
             filepath = tfrecord_paths.format(
                 array=i,
-                n_array=self.n_arrays - 1,
-                v=len(str(self.n_arrays - 1)),
+                n_array=self.n_sessions - 1,
+                v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
             if not path.exists(filepath):
@@ -1469,7 +1469,7 @@ class Data:
 
         # Function to save a single array
         def _save(i, arr):
-            padded_number = misc.leading_zeros(i, self.n_arrays)
+            padded_number = misc.leading_zeros(i, self.n_sessions)
             np.save(f"{output_dir}/array{padded_number}.npy", arr)
 
         # Save arrays in parallel
@@ -1479,7 +1479,7 @@ class Data:
             desc="Saving data",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
 
         # Save preparation settings

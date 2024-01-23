@@ -439,7 +439,7 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         theta : list or np.ndarray
-            Mode mixing logits with shape (n_arrays, n_samples, n_modes)
+            Mode mixing logits with shape (n_sessions, n_samples, n_modes)
             or (n_samples, n_modes).
         fc_theta : list or np.ndarray
             Mode mixing logits for FC.
@@ -514,10 +514,10 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         mean_theta : list or np.ndarray
-            Mode mixing logits for mean with shape (n_arrays, n_samples,
+            Mode mixing logits for mean with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         fc_theta : list or np.ndarray
-            Mode mixing logits for FC with shape (n_arrays, n_samples,
+            Mode mixing logits for FC with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -594,7 +594,7 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Mode mixing coefficients with shape (n_arrays, n_samples,
+            Mode mixing coefficients with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -668,10 +668,10 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Alpha time course with shape (n_arrays, n_samples, n_modes) or
+            Alpha time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         gamma : list or np.ndarray
-            Gamma time course with shape (n_arrays, n_samples, n_modes) or
+            Gamma time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -958,7 +958,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_arrays, n_samples, n_states)
+            State probabilities with shape (n_sessions, n_samples, n_states)
             or (n_samples, n_states).
         """
         if self.is_multi_gpu:

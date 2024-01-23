@@ -2030,11 +2030,11 @@ def plot_summary_stats_group_diff(
     name : str
         Name of the summary statistic.
     summary_stats : np.ndarray
-        Summary statistics. Shape is (n_arrays, n_states).
+        Summary statistics. Shape is (n_sessions, n_states).
     pvalues : np.ndarray
         p-values for each summary statistic difference. Shape is (n_states,).
     assignments : np.ndarray
-        Array of 1s and 2s indicating group assignment. Shape is (n_arrays,).
+        Array of 1s and 2s indicating group assignment. Shape is (n_sessions,).
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     ax : plt.axes, optional
@@ -2063,8 +2063,8 @@ def plot_summary_stats_group_diff(
 
     # Create a pandas DataFrame to hold the summary stats
     ss_dict = {name: [], "State": [], "Group": []}
-    n_arrays, n_states = summary_stats.shape
-    for array in range(n_arrays):
+    n_sessions, n_states = summary_stats.shape
+    for array in range(n_sessions):
         for state in range(n_states):
             ss_dict[name].append(summary_stats[array, state])
             ss_dict["State"].append(state + 1)

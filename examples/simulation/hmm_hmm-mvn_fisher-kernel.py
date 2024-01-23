@@ -33,7 +33,7 @@ sim = simulation.MArr_HMM_MVN(
     n_states=config.n_states,
     n_channels=config.n_channels,
     n_covariances_act=2,
-    n_arrays=100,
+    n_sessions=100,
     embeddings_dim=2,
     spatial_embeddings_dim=2,
     embeddings_scale=0.001,
@@ -54,7 +54,7 @@ plotting.plot_scatter(
     x_label="dim_1",
     y_label="dim_2",
     annotate=[
-        np.array([str(i) for i in range(sim.n_arrays)])[group_mask]
+        np.array([str(i) for i in range(sim.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
     filename="figures/sim_embeddings.png",
@@ -74,7 +74,7 @@ kernel = fk.get_kernel_matrix(training_data)
 # 5-fold cross validation
 scores = []
 kf = KFold(5, shuffle=True, random_state=234)
-for train_index, validation_index in kf.split(range(sim.n_arrays)):
+for train_index, validation_index in kf.split(range(sim.n_sessions)):
     kernel_train = kernel[train_index][:, train_index]
     labels_train = assigned_groups[train_index]
     kernel_validation = kernel[validation_index][:, train_index]

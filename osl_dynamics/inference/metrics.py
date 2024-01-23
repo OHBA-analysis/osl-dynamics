@@ -345,14 +345,14 @@ def pairwise_l2_distance(arrays, batch_dims=0):
     Parameters
     ----------
     arrays : np.ndarray
-        Set of arrays. Shape is (..., n_arrays, ...).
+        Set of arrays. Shape is (..., n_sessions, ...).
     batch_dims : int, optional
         Number of batch dimensions.
 
     Returns
     -------
     pairwise_distance : np.ndarray
-        Matrix of pairwise L2 distance. Shape is (..., n_arrays, n_arrays).
+        Matrix of pairwise L2 distance. Shape is (..., n_sessions, n_sessions).
     """
     if batch_dims > arrays.ndim - 1:
         raise ValueError("batch_dims must be less than arrays.ndim - 1")

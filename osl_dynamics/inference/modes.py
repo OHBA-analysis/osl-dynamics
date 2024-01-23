@@ -26,7 +26,7 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     ----------
     alpha : list or np.ndarray
         Mode mixing factors or state probabilities. Shape must be
-        (n_arrays, n_samples, n_modes) or (n_samples, n_modes).
+        (n_sessions, n_samples, n_modes) or (n_samples, n_modes).
     concatenate : bool, optional
         If :code:`alpha` is a :code:`list`, should we concatenate the
         time courses?
@@ -37,7 +37,7 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
     Returns
     -------
     argmax_tcs : list or np.ndarray
-        Argmax time courses. Shape is (n_arrays, n_samples, n_modes)
+        Argmax time courses. Shape is (n_sessions, n_samples, n_modes)
         or (n_samples, n_modes).
     """
     if isinstance(alpha, list):
@@ -82,7 +82,7 @@ def gmm_time_courses(
     Parameters
     ----------
     alpha : list of np.ndarray or np.ndarray
-        Mode time courses. Shape must be (n_arrays, n_samples, n_modes) or
+        Mode time courses. Shape must be (n_sessions, n_samples, n_modes) or
         (n_samples, n_modes).
     logit_transform : bool, optional
         Should we logit transform the mode time course?
@@ -109,7 +109,7 @@ def gmm_time_courses(
     -------
     gmm_tcs : list of np.ndarray or np.ndarray
         GMM time courses with binary entries. Shape is
-        (n_arrays, n_samples, n_modes) or (n_samples, n_modes).
+        (n_sessions, n_samples, n_modes) or (n_samples, n_modes).
     """
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -117,12 +117,12 @@ def gmm_time_courses(
     if not isinstance(alpha, list):
         alpha = [alpha]
 
-    n_arrays = len(alpha)
+    n_sessions = len(alpha)
     n_modes = alpha[0].shape[1]
 
     gmm_tcs = []
     gmm_metrics = []
-    for sub in trange(n_arrays, desc="Fitting GMMs"):
+    for sub in trange(n_sessions, desc="Fitting GMMs"):
         # Initialise an array to hold the gmm thresholded time course
         gmm_tc = np.empty(alpha[sub].shape, dtype=int)
         gmm_metric = []
@@ -155,7 +155,7 @@ def gmm_time_courses(
 
     # Visualise array-specific time courses in one plot per mode
     avg_threshold = [
-        np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_arrays)])
+        np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_sessions)])
         for m in range(n_modes)
     ]
     if filename:
@@ -172,7 +172,7 @@ def gmm_time_courses(
 
             # array-specific GMM plots per mode
             fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 4))
-            for sub in range(n_arrays):
+            for sub in range(n_sessions):
                 metric = gmm_metrics[sub][mode]
                 plotting.plot_gmm(
                     metric["data"],
@@ -555,7 +555,7 @@ def reweight_alphas(alpha, covs):
     Parameters
     ----------
     alpha : list of np.ndarray or np.ndarray
-        Raw mixing coefficients. Shape must be (n_arrays, n_samples, n_modes)
+        Raw mixing coefficients. Shape must be (n_sessions, n_samples, n_modes)
         or (n_samples, n_modes).
     covs : np.ndarray
         Mode covariances. Shape must be (n_modes, n_channels, n_channels).
@@ -587,7 +587,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     Parameters
     ----------
     alpha : list of list of np.ndarray or list of np.ndarray
-        State probabilities. Shape must be (n_runs, n_arrays, n_samples,
+        State probabilities. Shape must be (n_runs, n_sessions, n_samples,
         n_states) or (n_runs, n_samples, n_states).
     n_clusters : int, optional
         Number of clusters to fit. Defaults to the largest number of states
@@ -598,7 +598,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     Returns
     -------
     average_alpha : list of np.ndarray or np.ndarray
-        State probabilities averaged over runs. Shape is (n_arrays, n_states).
+        State probabilities averaged over runs. Shape is (n_sessions, n_states).
     cluster_info : dict
         Clustering info. Only returned if :code:`return_cluster_info=True`.
         This is a dictionary with keys :code:`'correlation'`,
