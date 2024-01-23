@@ -1487,13 +1487,13 @@ class SessionMapLayer(layers.Layer):
 
         # Match dimensions for addition
         group_map = tf.expand_dims(group_map, axis=0)
-        array_map = tf.add(group_map, dev)
-        array_map = self.bijector(array_map)
+        session_map = tf.add(group_map, dev)
+        session_map = self.bijector(session_map)
 
         if self.which_map == "covariances":
-            array_map = add_epsilon(array_map, self.epsilon, diag=True)
+            session_map = add_epsilon(session_map, self.epsilon, diag=True)
 
-        return array_map
+        return session_map
 
 
 class MixArraySpecificParametersLayer(layers.Layer):
