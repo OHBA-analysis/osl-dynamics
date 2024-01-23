@@ -642,7 +642,7 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
     Returns
     -------
     trans_prob : np.ndarray
-        Array-specific transition probability matrices. Shape is (n_sessions,
+        Session-specific transition probability matrices. Shape is (n_sessions,
         n_states, n_states).
     """
     if isinstance(state_time_course, np.ndarray):

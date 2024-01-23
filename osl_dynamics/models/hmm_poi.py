@@ -1277,7 +1277,7 @@ class Model(ModelBase):
         Returns
         -------
         log_rates : np.ndarray
-            Array-specific :code:`log_rates`.
+            Session-specific :code:`log_rates`.
             Shape is (n_sessions, n_states, n_channels).
         """
         if alpha is None:
