@@ -700,7 +700,7 @@ class MSess_MVN(MVN):
 
         return session_covariances
 
-    def simulate_array_data(self, array, mode_time_course):
+    def simulate_session_data(self, array, mode_time_course):
         """Simulate single array data.
 
         Parameters
@@ -792,7 +792,7 @@ class MSess_MVN(MVN):
             )
         return np.array(inst_covs)
 
-    def simulate_multi_array_data(self, mode_time_courses):
+    def simulate_multi_session_data(self, mode_time_courses):
         """Simulates data.
 
         Parameters
@@ -809,5 +809,5 @@ class MSess_MVN(MVN):
         """
         data = []
         for array in range(self.n_sessions):
-            data.append(self.simulate_array_data(array, mode_time_courses[array]))
+            data.append(self.simulate_session_data(array, mode_time_courses[array]))
         return np.array(data)

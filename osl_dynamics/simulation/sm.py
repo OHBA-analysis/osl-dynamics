@@ -293,7 +293,7 @@ class MSess_MixedSine_MVN(Simulation):
         self.mode_time_course = np.array(self.mode_time_course)
 
         # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_array_data(self.mode_time_course)
+        self.time_series = self.obs_mod.simulate_multi_session_data(self.mode_time_course)
 
     def __getattr__(self, attr):
         if attr in dir(self.obs_mod):

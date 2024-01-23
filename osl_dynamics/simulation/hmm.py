@@ -669,7 +669,7 @@ class MSess_HMM_MVN(Simulation):
         self.state_time_course = np.array(self.state_time_course)
 
         # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_array_data(
+        self.time_series = self.obs_mod.simulate_multi_session_data(
             self.state_time_course
         )
 

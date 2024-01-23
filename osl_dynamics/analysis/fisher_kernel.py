@@ -69,7 +69,7 @@ class FisherKernel:
         # Initialise list to hold features for each array
         features = []
         for i in trange(n_sessions, desc="Getting features"):
-            array_data = dataset[i]
+            session_data = dataset[i]
 
             # Initialise dictionary for holding gradients
             d_model = dict()
@@ -95,7 +95,7 @@ class FisherKernel:
                     d_model[name] = []
 
             # Loop over data for each array
-            for inputs in array_data:
+            for inputs in session_data:
                 if self.model.config.model_name == "HMM":
                     x = inputs["data"]
                     gamma, xi = self.model.get_posterior(x)
