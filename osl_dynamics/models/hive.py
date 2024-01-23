@@ -15,7 +15,7 @@ from osl_dynamics.inference.layers import (
     VectorsLayer,
     CovarianceMatricesLayer,
     ConcatEmbeddingsLayer,
-    ArrayMapLayer,
+    SessionMapLayer,
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
@@ -842,10 +842,10 @@ def _model_structure(config):
     # Add deviations to group level parameters
 
     # Layer definitions
-    session_means_layer = ArrayMapLayer(
+    session_means_layer = SessionMapLayer(
         "means", config.covariances_epsilon, name="session_means"
     )
-    array_covs_layer = ArrayMapLayer(
+    array_covs_layer = SessionMapLayer(
         "covariances", config.covariances_epsilon, name="array_covs"
     )
 

@@ -1452,7 +1452,7 @@ class ConcatEmbeddingsLayer(layers.Layer):
         return concat_embeddings
 
 
-class ArrayMapLayer(layers.Layer):
+class SessionMapLayer(layers.Layer):
     """Layer for getting the array specific maps.
 
     This layer adds deviations to the group spatial maps.
