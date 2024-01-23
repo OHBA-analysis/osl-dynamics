@@ -1304,15 +1304,15 @@ class Model(ModelBase):
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
             if self.config.learn_log_rates:
-                array_log_rates = np.empty((n_states, n_channels))
+                session_log_rates = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    array_log_rates[state] = (
+                    session_log_rates[state] = (
                         np.sum(x * a[:, state, None], axis=0) / sum_a[state]
                     )
             else:
-                array_log_rates = self.get_log_rates()
+                session_log_rates = self.get_log_rates()
 
-            return array_log_rates
+            return session_log_rates
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []
