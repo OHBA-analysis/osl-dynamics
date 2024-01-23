@@ -587,7 +587,7 @@ def _model_structure(config):
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Embedding layers
-    arrays_layer = TFRangeLayer(config.n_sessions, name="arrays")
+    sessions_layer = TFRangeLayer(config.n_sessions, name="arrays")
     embeddings_layer = layers.Embedding(
         config.n_sessions,
         config.embeddings_dim,
@@ -613,7 +613,7 @@ def _model_structure(config):
         name="group_covs",
     )
 
-    arrays = arrays_layer(data)
+    arrays = sessions_layer(data)
     embeddings = embeddings_layer(arrays)
 
     group_mu = group_means_layer(

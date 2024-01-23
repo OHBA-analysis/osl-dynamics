@@ -250,7 +250,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             or self.spatial_embeddings_dim is None
         ):
             raise ValueError(
-                "n_sessions, embedding_dim and spatial_embedding_dim must " "be passed."
+                "n_sessions, embedding_dim and spatial_embedding_dim must be passed."
             )
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
@@ -588,7 +588,7 @@ def _model_structure(config):
     # Observation model
 
     # Embedding layers
-    arrays_layer = TFRangeLayer(config.n_sessions, name="arrays")
+    sessions_layer = TFRangeLayer(config.n_sessions, name="arrays")
     embeddings_layer = layers.Embedding(
         config.n_sessions,
         config.embeddings_dim,
@@ -614,7 +614,7 @@ def _model_structure(config):
         name="group_covs",
     )
 
-    arrays = arrays_layer(data)
+    arrays = sessions_layer(data)
     embeddings = embeddings_layer(arrays)
 
     group_mu = group_means_layer(
