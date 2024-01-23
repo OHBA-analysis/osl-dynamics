@@ -291,9 +291,9 @@ def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
         [
             np.array([array_ops.slice_length(slice_) for slice_ in state_slices])
             / sampling_frequency
-            for state_slices in array_slices
+            for state_slices in session_slices
         ]
-        for array_slices in slices
+        for session_slices in slices
     ]
 
     if not squeeze:
