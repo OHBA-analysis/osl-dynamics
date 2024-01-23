@@ -114,10 +114,10 @@ class FisherKernel:
                     d_model[name].append(gradients[name])
 
             # Concatenate the flattened gradients
-            array_features = np.concatenate(
+            session_features = np.concatenate(
                 [np.sum(grad, axis=0).flatten() for grad in d_model.values()]
             )
-            features.append(array_features)
+            features.append(session_features)
 
         features = np.array(features)  # shape=(n_sessions, n_features)
 
