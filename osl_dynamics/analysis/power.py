@@ -456,7 +456,7 @@ def save(
 
 def multi_save(
     group_power_map,
-    array_power_map,
+    session_power_map,
     mask_file,
     parcellation_file,
     filename=None,
@@ -480,7 +480,7 @@ def multi_save(
         Can be of shape: (n_modes, n_channels) or (n_channels,). A (...,
         n_channels, n_channels) can also be passed. Warning: this function
         cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
-    Array_power_map : np.ndarray
+    session_power_map : np.ndarray
         Array level power maps to save.
         Can be of shape: (n_sessions, n_modes, n_channels), (n_modes,
         n_channels) or (n_channels,). A (..., n_channels, n_channels) array can
@@ -509,7 +509,7 @@ def multi_save(
     """
     # Create a copy of the power maps so we don't modify them
     group_power_map = np.copy(group_power_map)
-    array_power_map = np.copy(array_power_map)
+    session_power_map = np.copy(session_power_map)
 
     # Validation
     if group_power_map.ndim > 1:
@@ -519,12 +519,12 @@ def multi_save(
     else:
         group_power_map = group_power_map[np.newaxis, ...]
 
-    if array_power_map.ndim > 1:
-        if array_power_map.shape[-1] == array_power_map.shape[-2]:
+    if session_power_map.ndim > 1:
+        if session_power_map.shape[-1] == session_power_map.shape[-2]:
             # np.copy is needed because np.diagonal returns a read only array
-            array_power_map = np.copy(np.diagonal(array_power_map, axis1=-2, axis2=-1))
+            session_power_map = np.copy(np.diagonal(session_power_map, axis1=-2, axis2=-1))
     else:
-        array_power_map = array_power_map[np.newaxis, ...]
+        session_power_map = session_power_map[np.newaxis, ...]
 
     group_power_map = array_ops.validate(
         group_power_map,
@@ -532,14 +532,14 @@ def multi_save(
         allow_dimensions=[1],
         error_message="group_power_map.shape is incorrect.",
     )
-    array_power_map = array_ops.validate(
-        array_power_map,
+    session_power_map = array_ops.validate(
+        session_power_map,
         correct_dimensionality=3,
         allow_dimensions=[1, 2],
-        error_message="array_power_map.shape is incorrect",
+        error_message="session_power_map.shape is incorrect",
     )
 
-    if group_power_map.shape[0] != array_power_map.shape[1]:
+    if group_power_map.shape[0] != session_power_map.shape[1]:
         raise ValueError("group and array level power maps must have the same n_modes.")
 
     # Subtract mean
@@ -553,7 +553,7 @@ def multi_save(
             weights=mean_weights,
         )
         group_power_map -= mean_group_power[np.newaxis, ...]
-        array_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
+        session_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
 
     # Save the group power map
     filename = Path(filename)
@@ -571,7 +571,7 @@ def multi_save(
     )
 
     # Save the array level power maps
-    n_sessions = array_power_map.shape[0]
+    n_sessions = session_power_map.shape[0]
     if arrays is None:
         arrays = np.arange(n_sessions)
 
@@ -584,7 +584,7 @@ def multi_save(
 
         _logger.info(f"Saving array {arr} power map:")
         save(
-            array_power_map[arr],
+            session_power_map[arr],
             filename=array_filename,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
