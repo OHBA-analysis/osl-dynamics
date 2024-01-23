@@ -8,7 +8,7 @@ import logging
 import numpy as np
 from scipy import signal
 
-from osl_dynamics import array_ops, inference
+from osl_dynamics import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -225,7 +225,7 @@ def state_activations(state_time_course):
     if isinstance(state_time_course, np.ndarray):
         if state_time_course.ndim == 3 or state_time_course.dtype == object:
             state_time_course = list(state_time_course)
-        if state_time_course.ndim == 2:
+        elif state_time_course.ndim == 2:
             state_time_course = [state_time_course]
         elif state_time_course.ndim == 1:
             state_time_course = [state_time_course[:, np.newaxis]]
