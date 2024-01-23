@@ -363,7 +363,7 @@ class MDyn_MVN(MVN):
         return inst_covs.astype(np.float32)
 
 
-class MArr_MVN(MVN):
+class MSess_MVN(MVN):
     """Class that generates data from a multivariate normal distribution for
     multiple arrays.
 

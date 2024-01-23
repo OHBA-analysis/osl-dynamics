@@ -25,7 +25,7 @@ config = Config(
     learn_trans_prob=True,
 )
 
-sim = simulation.MArr_HMM_MVN(
+sim = simulation.MSess_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
     session_means="zero",

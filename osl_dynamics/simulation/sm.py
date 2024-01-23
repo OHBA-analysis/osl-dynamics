@@ -5,7 +5,7 @@
 import numpy as np
 from scipy.special import softmax
 
-from osl_dynamics.simulation.mvn import MVN, MArr_MVN
+from osl_dynamics.simulation.mvn import MVN, MSess_MVN
 from osl_dynamics.simulation.base import Simulation
 
 
@@ -179,7 +179,7 @@ class MixedSine_MVN(Simulation):
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
 
 
-class MArr_MixedSine_MVN(Simulation):
+class MSess_MixedSine_MVN(Simulation):
     """Simulates sinusoidal alphas with a multivariable normal observation model
     for each array.
 
@@ -253,7 +253,7 @@ class MArr_MixedSine_MVN(Simulation):
         random_seed=None,
     ):
         # Observation model
-        self.obs_mod = MArr_MVN(
+        self.obs_mod = MSess_MVN(
             session_means=session_means,
             session_covariances=session_covariances,
             n_covariances_act=n_covariances_act,

@@ -7,7 +7,7 @@ import numpy as np
 
 from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
-from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MArr_MVN
+from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSess_MVN
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.simulation.poi import Poisson
@@ -534,7 +534,7 @@ class HMM_Poi(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
 
-class MArr_HMM_MVN(Simulation):
+class MSess_HMM_MVN(Simulation):
     """Simulate an HMM with multivariate normal observation model for each
     array.
 
@@ -616,7 +616,7 @@ class MArr_HMM_MVN(Simulation):
             trans_prob = [trans_prob] * n_sessions
 
         # Observation model
-        self.obs_mod = MArr_MVN(
+        self.obs_mod = MSess_MVN(
             session_means=session_means,
             session_covariances=session_covariances,
             n_modes=n_states,
