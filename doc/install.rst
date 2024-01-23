@@ -1,8 +1,8 @@
 Installation
 ============
 
-Instructions
-------------
+Linux Instructions
+------------------
 
 OSL Dynamics can be installed in three steps. Open a Terminal and execute the following commands:
 
@@ -58,6 +58,10 @@ To remove osl-dynamics simply delete the conda environment:
     conda env remove -n osld
     conda clean --all
 
+Windows Instructions
+--------------------
+
+If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
 
 Training Speed
 --------------
