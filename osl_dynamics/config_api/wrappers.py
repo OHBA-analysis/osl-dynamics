@@ -417,7 +417,7 @@ def train_hive(
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
 
-    # Initialise and train Hive
+    # Initialise and train HIVE
     _logger.info(f"Using config_kwargs: {config_kwargs}")
     config = hive.Config(**config_kwargs)
     model = hive.Model(config)

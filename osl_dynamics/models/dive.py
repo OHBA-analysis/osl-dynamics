@@ -258,7 +258,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
 
 class Model(VariationalInferenceModelBase):
-    """Dive.
+    """DIVE.
 
     Parameters
     ----------
