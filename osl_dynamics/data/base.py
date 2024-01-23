@@ -1168,7 +1168,7 @@ class Data:
                         full_datasets[i].skip(training_dataset_size)
                     )
                     _logger.info(
-                        f"Array {i}: "
+                        f"Session {i}: "
                         + f"{len(training_datasets[i])} batches in training dataset, "
                         + f"{len(validation_datasets[i])} batches in the validation "
                         + "dataset."
@@ -1391,7 +1391,7 @@ class Data:
                     training_datasets.append(ds.take(training_dataset_size))
                     validation_datasets.append(ds.skip(training_dataset_size))
                     _logger.info(
-                        f"Array {i}: "
+                        f"Session {i}: "
                         + f"{training_dataset_size} batches in training dataset, "
                         + f"{dataset_size - training_dataset_size} batches in the validation "
                         + "dataset."

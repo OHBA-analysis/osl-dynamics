@@ -1496,7 +1496,7 @@ class SessionMapLayer(layers.Layer):
         return session_map
 
 
-class MixArraySpecificParametersLayer(layers.Layer):
+class MixSessionSpecificParametersLayer(layers.Layer):
     r"""Class for mixing means and covariances.
 
     The mixture is calculated as

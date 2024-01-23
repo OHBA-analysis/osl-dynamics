@@ -199,11 +199,11 @@ class MSess_MixedSine_MVN(Simulation):
     sampling_frequency : float
         Sampling frequency.
     session_means : np.ndarray or str
-        Array mean vector for each mode, shape should be (n_sessions, n_modes,
+        Session mean vector for each mode, shape should be (n_sessions, n_modes,
         n_channels). Either a numpy array or :code:`'zero'` or
         :code:`'random'`.
     session_covariances : np.ndarray or str
-        Array covariance matrix for each mode, shape should be
+        Session covariance matrix for each mode, shape should be
         (n_sessions, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
     n_covariances_act : int, optional

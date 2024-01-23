@@ -1211,10 +1211,10 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Array specific mixing coefficients.
+            Session-specific mixing coefficients.
             Each element has shape (n_samples, n_states).
         log_rates : np.ndarray
-            Array specific :code:`log_rates`.
+            Session-specific :code:`log_rates`.
             Shape is (n_sessions, n_states, n_channels).
         """
         # Save group-level model parameters
@@ -1236,7 +1236,7 @@ class Model(ModelBase):
         alpha = []
         log_rates = []
         with set_logging_level(_logger, logging.WARNING):
-            for i in trange(training_data.n_sessions, desc="Array fine tuning"):
+            for i in trange(training_data.n_sessions, desc="Fine tuning"):
                 # Train on this array
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)

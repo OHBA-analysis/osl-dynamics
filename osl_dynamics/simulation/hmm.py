@@ -547,11 +547,11 @@ class MSess_HMM_MVN(Simulation):
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
         probability matrix.
     session_means : np.ndarray or str
-        Array mean vector for each state, shape should be
+        Session mean vector for each state, shape should be
         (n_sessions, n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
     session_covariances : np.ndarray or str
-        Array covariance matrix for each state, shape should be
+        Session covariance matrix for each state, shape should be
         (n_sessions, n_states, n_channels, n_channels).
         Either a numpy array or :code:`'random'`.
     n_states : int, optional

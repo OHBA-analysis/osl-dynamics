@@ -370,11 +370,11 @@ class MSess_MVN(MVN):
     Parameters
     ----------
     session_means : np.ndarray or str
-        Array mean vector for each mode for each array, shape should be
+        Session mean vector for each mode for each array, shape should be
         (n_sessions, n_modes, n_channels). Either a numpy array or
         :code:`'zero'` or :code:`'random'`.
     session_covariances : np.ndarray or str
-        Array covariance matrix for each mode for each array, shape should
+        Session covariance matrix for each mode for each array, shape should
         be (n_sessions, n_modes, n_channels, n_channels). Either a numpy array
         or :code:`'random'`.
     n_modes : int, optional
@@ -532,26 +532,26 @@ class MSess_MVN(MVN):
     def validate_embedding_parameters(self):
         if self.embeddings_dim is None:
             raise ValueError(
-                "Array means or covariances not passed, please pass "
+                "Session means or covariances not passed, please pass "
                 "'embeddings_dim'."
             )
         if self.spatial_embeddings_dim is None:
             raise ValueError(
-                "Array means or covariances not passed, please pass "
+                "Session means or covariances not passed, please pass "
                 "'spatial_embeddings_dim'."
             )
         if self.embeddings_scale is None:
             raise ValueError(
-                "Array means or covariances not passed, please pass "
+                "Session means or covariances not passed, please pass "
                 "'embeddings_scale'."
             )
         if self.n_groups is None:
             raise ValueError(
-                "Array means or covariances not passed, please pass 'n_groups'."
+                "Session means or covariances not passed, please pass 'n_groups'."
             )
         if self.between_group_scale is None:
             raise ValueError(
-                "Array means or covariances not passed, please pass "
+                "Session means or covariances not passed, please pass "
                 "'between_group_scale'."
             )
 
@@ -706,7 +706,7 @@ class MSess_MVN(MVN):
         Parameters
         ----------
         array : int
-            Array number.
+            Session number.
         mode_time_course : np.ndarray
             Mode time course. Shape is (n_samples, n_modes).
 
@@ -746,7 +746,7 @@ class MSess_MVN(MVN):
         Parameters
         ----------
         array : int
-            Array number.
+            Session number.
         mode_time_course : np.ndarray
             Mode time course. Shape is (n_samples, n_modes).
 

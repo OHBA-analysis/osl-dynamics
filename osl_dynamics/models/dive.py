@@ -31,7 +31,7 @@ from osl_dynamics.inference.layers import (
     SoftmaxLayer,
     ConcatEmbeddingsLayer,
     SessionMapLayer,
-    MixArraySpecificParametersLayer,
+    MixSessionSpecificParametersLayer,
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
@@ -856,7 +856,7 @@ def _model_structure(config):
     # and get the conditional likelihood
 
     # Layer definitions
-    mix_session_means_covs_layer = MixArraySpecificParametersLayer(
+    mix_session_means_covs_layer = MixSessionSpecificParametersLayer(
         name="mix_session_means_covs"
     )
     ll_loss_layer = LogLikelihoodLossLayer(

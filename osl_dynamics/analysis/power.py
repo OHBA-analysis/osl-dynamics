@@ -481,7 +481,7 @@ def multi_save(
         n_channels, n_channels) can also be passed. Warning: this function
         cannot be used if :code:`n_modes` is equal to :code:`n_channels`.
     session_power_map : np.ndarray
-        Array level power maps to save.
+        Session-level power maps to save.
         Can be of shape: (n_sessions, n_modes, n_channels), (n_modes,
         n_channels) or (n_channels,). A (..., n_channels, n_channels) array can
         also be passed. Warning: this function cannot be used if

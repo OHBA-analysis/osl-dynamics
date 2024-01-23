@@ -472,12 +472,12 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Array specific mixing coefficients.
+            Session-specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
         means : np.ndarray
-            Array specific means. Shape is (n_sessions, n_modes, n_channels).
+            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
-            Array specific covariances.
+            Session-specific covariances.
             Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save the group level model
@@ -502,7 +502,7 @@ class Model(VariationalInferenceModelBase):
         with self.set_trainable(fixed_layers, False), set_logging_level(
             _logger, logging.WARNING
         ):
-            for i in trange(training_data.n_sessions, desc="Array fine tuning"):
+            for i in trange(training_data.n_sessions, desc="Fine tuning"):
                 # Train on this array
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
@@ -559,9 +559,9 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         means : np.ndarray
-            Array specific means. Shape is (n_sessions, n_modes, n_channels).
+            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
-            Array specific covariances.
+            Session-specific covariances.
             Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save the group level model

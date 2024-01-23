@@ -389,9 +389,9 @@ class Model(MarkovStateInferenceModelBase):
         Returns
         -------
         means : np.ndarray
-            Array means. Shape is (n_sessions, n_states, n_channels).
+            Session means. Shape is (n_sessions, n_states, n_channels).
         covs : np.ndarray
-            Array covariances.
+            Session covariances.
             Shape is (n_sessions, n_states, n_channels, n_channels).
         """
         return obs_mod.get_session_means_covariances(
