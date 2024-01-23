@@ -638,16 +638,16 @@ class MSess_HMM_MVN(Simulation):
 
         # vary the stay probability for each array
         if stay_prob is not None:
-            array_stay_prob = self.obs_mod._rng.normal(
+            session_stay_prob = self.obs_mod._rng.normal(
                 loc=stay_prob,
                 scale=tc_std,
                 size=self.n_sessions,
             )
             # truncate stay_prob at 0 and 1
-            array_stay_prob = np.minimum(array_stay_prob, 1)
-            array_stay_prob = np.maximum(array_stay_prob, 0)
+            session_stay_prob = np.minimum(session_stay_prob, 1)
+            session_stay_prob = np.maximum(session_stay_prob, 0)
         else:
-            array_stay_prob = [stay_prob] * n_sessions
+            session_stay_prob = [stay_prob] * n_sessions
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
@@ -660,7 +660,7 @@ class MSess_HMM_MVN(Simulation):
             # different seeds
             hmm = HMM(
                 trans_prob=trans_prob[i],
-                stay_prob=array_stay_prob[i],
+                stay_prob=session_stay_prob[i],
                 n_states=self.n_states,
                 random_seed=random_seed if random_seed is None else random_seed + 1 + i,
             )
